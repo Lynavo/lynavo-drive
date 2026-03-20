@@ -1,0 +1,181 @@
+import { useMemo } from 'react';
+import { ArrowUpDown, ArrowUp, ArrowDown, ExternalLink } from 'lucide-react';
+import {
+  Table,
+  TableHeader,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+} from '@renderer/components/ui/table';
+import { FileIcon } from '@renderer/components/shared/FileIcon';
+import { formatBytes, formatDuration } from '@renderer/lib/format';
+import {
+  useDeviceDetailStore,
+  type SortField,
+} from '@renderer/stores/device-detail-store';
+
+function SortIcon({ field }: { field: SortField }) {
+  const sortField = useDeviceDetailStore((s) => s.sortField);
+  const sortDirection = useDeviceDetailStore((s) => s.sortDirection);
+
+  if (sortField !== field) {
+    return <ArrowUpDown className="h-3 w-3 opacity-30" />;
+  }
+  return sortDirection === 'asc' ? (
+    <ArrowUp className="h-3 w-3 text-blue-500" />
+  ) : (
+    <ArrowDown className="h-3 w-3 text-blue-500" />
+  );
+}
+
+function formatTime(iso?: string): string {
+  if (!iso) return '\u2014';
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+export function FileLedgerTable() {
+  const files = useDeviceDetailStore((s) => s.files);
+  const sortField = useDeviceDetailStore((s) => s.sortField);
+  const sortDirection = useDeviceDetailStore((s) => s.sortDirection);
+  const toggleSort = useDeviceDetailStore((s) => s.toggleSort);
+
+  const sortedFiles = useMemo(() => {
+    const result = [...files];
+    result.sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'name':
+          cmp = a.originalFilename.localeCompare(b.originalFilename);
+          break;
+        case 'size':
+          cmp = a.fileSize - b.fileSize;
+          break;
+        case 'completedAt':
+          cmp = (a.completedAt ?? '').localeCompare(b.completedAt ?? '');
+          break;
+        case 'createdAt':
+          cmp = (a.createdAtRemote ?? '').localeCompare(
+            b.createdAtRemote ?? '',
+          );
+          break;
+        case 'duration':
+          cmp = a.activeTransmissionMs - b.activeTransmissionMs;
+          break;
+      }
+      return sortDirection === 'asc' ? cmp : -cmp;
+    });
+    return result;
+  }, [files, sortField, sortDirection]);
+
+  const handleOpen = (path?: string) => {
+    if (path) {
+      window.electronAPI?.files.openFile(path);
+    }
+  };
+
+  const columns: { label: string; field: SortField }[] = [
+    { label: '文件名称', field: 'name' },
+    { label: '文件大小', field: 'size' },
+    { label: '完成时间', field: 'completedAt' },
+    { label: '创建时间', field: 'createdAt' },
+    { label: '传输耗时', field: 'duration' },
+  ];
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow style={{ borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
+          {columns.map((col) => (
+            <TableHead key={col.field} className="pr-4">
+              <button
+                onClick={() => toggleSort(col.field)}
+                className="flex items-center gap-1 text-xs font-medium transition-colors hover:text-blue-500"
+                style={{ color: '#8a9ab0' }}
+              >
+                {col.label}
+                <SortIcon field={col.field} />
+              </button>
+            </TableHead>
+          ))}
+          <TableHead className="text-right">
+            <span className="text-xs font-medium" style={{ color: '#8a9ab0' }}>
+              操作
+            </span>
+          </TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {sortedFiles.length === 0 ? (
+          <TableRow>
+            <TableCell
+              colSpan={6}
+              className="py-16 text-center text-sm"
+              style={{ color: '#8a9ab0' }}
+            >
+              该日期暂无传输记录
+            </TableCell>
+          </TableRow>
+        ) : (
+          sortedFiles.map((file) => (
+            <TableRow
+              key={file.fileKey}
+              className="transition-colors hover:bg-blue-50/40"
+            >
+              <TableCell className="pr-4">
+                <div className="flex items-center gap-3">
+                  <FileIcon name={file.originalFilename} />
+                  <span
+                    className="font-medium"
+                    style={{ color: '#1a2a3a' }}
+                  >
+                    {file.originalFilename}
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell
+                className="pr-4 text-sm"
+                style={{ color: '#6b7a8d' }}
+              >
+                {formatBytes(file.fileSize)}
+              </TableCell>
+              <TableCell
+                className="pr-4 text-sm"
+                style={{ color: '#6b7a8d' }}
+              >
+                {formatTime(file.completedAt)}
+              </TableCell>
+              <TableCell
+                className="pr-4 text-sm"
+                style={{ color: '#6b7a8d' }}
+              >
+                {formatTime(file.createdAtRemote)}
+              </TableCell>
+              <TableCell
+                className="pr-4 text-sm"
+                style={{ color: '#6b7a8d' }}
+              >
+                {formatDuration(file.activeTransmissionMs)}
+              </TableCell>
+              <TableCell className="text-right">
+                <button
+                  onClick={() => handleOpen(file.finalPath)}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-blue-50"
+                  style={{
+                    color: '#3b82f6',
+                    border: '1px solid rgba(59,130,246,0.18)',
+                  }}
+                  title="打开文件"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  打开
+                </button>
+              </TableCell>
+            </TableRow>
+          ))
+        )}
+      </TableBody>
+    </Table>
+  );
+}
