@@ -1,0 +1,25 @@
+{
+  "name": "syncflow",
+  "private": true,
+  "engines": { "node": ">=20", "pnpm": ">=10" },
+  "packageManager": "pnpm@10.32.1",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.26.0",
+    "@typescript-eslint/parser": "^8.26.0",
+    "eslint": "^9.22.0",
+    "eslint-config-prettier": "^10.1.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "prettier": "^3.5.0",
+    "turbo": "^2.8.0",
+    "typescript": "^5.8.0"
+  }
+}
