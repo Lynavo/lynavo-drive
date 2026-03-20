@@ -1,0 +1,10 @@
+appId: com.syncflow.desktop
+productName: SyncFlow
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.utilities
+directories:
+  output: out
+  buildResources: resources
