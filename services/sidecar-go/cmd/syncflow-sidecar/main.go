@@ -15,6 +15,7 @@ import (
 	"github.com/nicksyncflow/sidecar/internal/config"
 	"github.com/nicksyncflow/sidecar/internal/events"
 	"github.com/nicksyncflow/sidecar/internal/logging"
+	"github.com/nicksyncflow/sidecar/internal/mdns"
 	"github.com/nicksyncflow/sidecar/internal/server"
 	"github.com/nicksyncflow/sidecar/internal/store"
 )
@@ -66,6 +67,27 @@ func main() {
 	if err := tcpSrv.Start(fmt.Sprintf(":%d", cfg.TCPPort)); err != nil {
 		slog.Error("tcp server failed", "err", err)
 		os.Exit(1)
+	}
+
+	// Start Bonjour/mDNS broadcast
+	deviceID, _ := st.GetDeviceID()
+	deviceName, _ := st.GetSetting("device_name")
+	if deviceName == "" {
+		deviceName = cfg.DeviceName
+	}
+	broadcaster, err := mdns.NewBroadcaster(mdns.BroadcastConfig{
+		DeviceID:     deviceID,
+		DeviceName:   deviceName,
+		DeviceType:   "mac",
+		TCPPort:      cfg.TCPPort,
+		Proto:        2,
+		ShareEnabled: false,
+		ShareName:    "SyncFlow",
+	})
+	if err != nil {
+		slog.Warn("bonjour broadcast failed, continuing without discovery", "err", err)
+	} else {
+		defer broadcaster.Shutdown()
 	}
 
 	// Graceful shutdown
