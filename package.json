@@ -6,11 +6,15 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "dev:desktop": "pnpm --filter @syncflow/desktop dev",
+    "build:desktop": "pnpm --filter @syncflow/desktop build",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "check": "turbo run build test typecheck",
+    "clean": "turbo run clean && rm -rf node_modules/.cache .turbo"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",

@@ -28,22 +28,27 @@ Electron 窗口将自动打开，renderer 支持 HMR 热更新。
 ### 常用命令
 
 ```bash
-# 全量构建
+# Desktop 开发（快捷方式）
+pnpm dev:desktop
+
+# 全量构建 / 测试 / 类型检查
 pnpm build
-
-# 全量测试（60 tests）
 pnpm test
-
-# 类型检查
 pnpm typecheck
+
+# 一次性跑完 build + test + typecheck
+pnpm check
 
 # 代码格式化
 pnpm format
 
-# 仅操作某个包
+# 清理构建产物
+pnpm clean
+
+# 按包操作
 pnpm --filter @syncflow/desktop dev
+pnpm --filter @syncflow/desktop test:watch    # vitest watch 模式
 pnpm --filter @syncflow/contracts build
-pnpm --filter @syncflow/design-tokens test
 ```
 
 ## 项目结构
