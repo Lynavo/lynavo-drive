@@ -8,7 +8,7 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 
 export type RootStackParamList = {
   DeviceDiscovery: undefined;
-  CodeVerify: { deviceId: string; host: string; port: number };
+  CodeVerify: { deviceId: string; host: string; port: number; deviceName: string };
   SyncStatus: undefined;
   History: undefined;
   Settings: undefined;
