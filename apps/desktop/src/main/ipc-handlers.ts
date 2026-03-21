@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron';
+import { sidecarClient } from './sidecar-client';
 import { openFolder, openFile, selectFolder, copyToClipboard } from './file-operations';
 
 // Channel constants — shared between main and preload
@@ -21,71 +22,30 @@ export const IPC = {
 } as const;
 
 export function registerIpcHandlers(): void {
-  // Sidecar stubs — return mock data; replaced with real HTTP calls in Phase 3
-  ipcMain.handle(IPC.SIDECAR_HEALTH, async () => ({
-    ok: true,
-    service: 'syncflow-sidecar',
-  }));
-  ipcMain.handle(IPC.SIDECAR_DASHBOARD_SUMMARY, async () => ({
-    todayUploadCount: 0,
-    todayOccupiedBytes: 0,
-    remainingBytes: 0,
-    isDiskLow: false,
-  }));
-  ipcMain.handle(IPC.SIDECAR_DASHBOARD_DEVICES, async () => []);
-  ipcMain.handle(
-    IPC.SIDECAR_DEVICE_DETAIL,
-    async (_e, _deviceId: string) => ({}),
+  // Sidecar — real HTTP calls
+  ipcMain.handle(IPC.SIDECAR_HEALTH, () => sidecarClient.getHealth());
+  ipcMain.handle(IPC.SIDECAR_DASHBOARD_SUMMARY, () => sidecarClient.getDashboardSummary());
+  ipcMain.handle(IPC.SIDECAR_DASHBOARD_DEVICES, () => sidecarClient.getDashboardDevices());
+  ipcMain.handle(IPC.SIDECAR_DEVICE_DETAIL, (_e, deviceId: string) =>
+    sidecarClient.getDeviceDetail(deviceId),
   );
-  ipcMain.handle(
-    IPC.SIDECAR_DEVICE_FILES,
-    async (_e, _deviceId: string, _date: string) => [],
+  ipcMain.handle(IPC.SIDECAR_DEVICE_FILES, (_e, deviceId: string, date: string) =>
+    sidecarClient.getDeviceFiles(deviceId, date),
   );
-  ipcMain.handle(
-    IPC.SIDECAR_DEVICE_DATES,
-    async (_e, _deviceId: string) => ({ dates: [] }),
+  ipcMain.handle(IPC.SIDECAR_DEVICE_DATES, (_e, deviceId: string) =>
+    sidecarClient.getDeviceDates(deviceId),
   );
-  ipcMain.handle(IPC.SIDECAR_SETTINGS, async () => ({
-    connectionCode: '000000',
-    receivePath: '',
-    shareAddress: '',
-    shareStatus: 'unknown',
-    shareName: '',
-  }));
-  ipcMain.handle(
-    IPC.SIDECAR_UPDATE_SETTINGS,
-    async (_e, _partial: Record<string, unknown>) => ({
-      connectionCode: '000000',
-      receivePath: '',
-      shareAddress: '',
-      shareStatus: 'unknown',
-      shareName: '',
-    }),
+  ipcMain.handle(IPC.SIDECAR_SETTINGS, () => sidecarClient.getSettings());
+  ipcMain.handle(IPC.SIDECAR_UPDATE_SETTINGS, (_e, partial) =>
+    sidecarClient.updateSettings(partial),
   );
-  ipcMain.handle(IPC.SIDECAR_REGENERATE_CODE, async () => {
-    const code = String(Math.floor(100000 + Math.random() * 900000));
-    return { code };
-  });
-  ipcMain.handle(IPC.SIDECAR_SHARE_STATUS, async () => ({
-    enabled: false,
-    smbUrl: null,
-    status: 'unknown',
-  }));
-  ipcMain.handle(IPC.SIDECAR_VALIDATE_SHARE, async () => ({
-    enabled: false,
-    smbUrl: null,
-    status: 'unknown',
-  }));
+  ipcMain.handle(IPC.SIDECAR_REGENERATE_CODE, () => sidecarClient.regenerateConnectionCode());
+  ipcMain.handle(IPC.SIDECAR_SHARE_STATUS, () => sidecarClient.getShareStatus());
+  ipcMain.handle(IPC.SIDECAR_VALIDATE_SHARE, () => sidecarClient.validateShare());
 
-  // File operations
-  ipcMain.handle(IPC.FILES_OPEN_FOLDER, async (_e, path: string) =>
-    openFolder(path),
-  );
-  ipcMain.handle(IPC.FILES_OPEN_FILE, async (_e, path: string) =>
-    openFile(path),
-  );
-  ipcMain.handle(IPC.FILES_SELECT_FOLDER, async () => selectFolder());
-  ipcMain.handle(IPC.FILES_COPY_CLIPBOARD, async (_e, text: string) => {
-    copyToClipboard(text);
-  });
+  // File operations — real Electron APIs
+  ipcMain.handle(IPC.FILES_OPEN_FOLDER, (_e, path: string) => openFolder(path));
+  ipcMain.handle(IPC.FILES_OPEN_FILE, (_e, path: string) => openFile(path));
+  ipcMain.handle(IPC.FILES_SELECT_FOLDER, () => selectFolder());
+  ipcMain.handle(IPC.FILES_COPY_CLIPBOARD, (_e, text: string) => copyToClipboard(text));
 }
