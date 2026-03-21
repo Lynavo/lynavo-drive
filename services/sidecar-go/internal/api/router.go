@@ -1,54 +1,49 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
+
+	"github.com/nicksyncflow/sidecar/internal/config"
+	"github.com/nicksyncflow/sidecar/internal/events"
+	"github.com/nicksyncflow/sidecar/internal/store"
 )
 
-type Router struct{}
+// Server holds the dependencies for the HTTP API handlers.
+type Server struct {
+	store  *store.Store
+	config *config.Config
+	hub    *events.Hub
+}
 
-func NewRouter() http.Handler {
-	r := &Router{}
+// NewServer creates a new HTTP handler with all API routes registered.
+func NewServer(s *store.Store, cfg *config.Config, hub *events.Hub) http.Handler {
+	srv := &Server{store: s, config: cfg, hub: hub}
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/health", r.handleHealth)
-	mux.HandleFunc("/dashboard/summary", r.handleDashboardSummary)
-	mux.HandleFunc("/settings/share", r.handleShareStatus)
-	mux.HandleFunc("/events/stream", r.handleEventStream)
+	// Health
+	mux.HandleFunc("GET /health", withJSON(srv.handleHealth))
+	// Dashboard
+	mux.HandleFunc("GET /dashboard/summary", withJSON(srv.handleDashboardSummary))
+	mux.HandleFunc("GET /dashboard/devices", withJSON(srv.handleDashboardDevices))
+	// Devices
+	mux.HandleFunc("GET /devices/{deviceId}", withJSON(srv.handleDeviceDetail))
+	mux.HandleFunc("GET /devices/{deviceId}/files", withJSON(srv.handleDeviceFiles))
+	mux.HandleFunc("GET /devices/{deviceId}/dates", withJSON(srv.handleDeviceDates))
+	// Settings
+	mux.HandleFunc("GET /settings", withJSON(srv.handleGetSettings))
+	mux.HandleFunc("PUT /settings", withJSON(srv.handleUpdateSettings))
+	// Connection code
+	mux.HandleFunc("POST /connection-code/regenerate", withJSON(srv.handleRegenerateCode))
+	// Share
+	mux.HandleFunc("GET /share/status", withJSON(srv.handleShareStatus))
+	mux.HandleFunc("POST /share/validate", withJSON(srv.handleShareValidate))
+	// WebSocket
+	mux.HandleFunc("GET /events/stream", srv.handleEventStream)
 
-	return mux
+	return withLogging(mux)
 }
 
-func (r *Router) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
-		"ok": true,
-		"service": "syncflow-sidecar",
-	})
-}
-
-func (r *Router) handleDashboardSummary(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
-		"todayUploadCount":   0,
-		"todayOccupiedBytes": 0,
-		"remainingBytes":     0,
-		"isDiskLow":          false,
-	})
-}
-
-func (r *Router) handleShareStatus(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
-		"enabled": false,
-		"smbUrl":  nil,
-	})
-}
-
-func (r *Router) handleEventStream(w http.ResponseWriter, _ *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-	_, _ = w.Write([]byte("TODO: implement SSE or WebSocket stream"))
-}
-
-func writeJSON(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
+// handleEventStream upgrades the connection to a WebSocket for real-time events.
+func (s *Server) handleEventStream(w http.ResponseWriter, r *http.Request) {
+	s.hub.HandleUpgrade(w, r)
 }
