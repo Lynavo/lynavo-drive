@@ -56,6 +56,15 @@ class TcpTransport {
             host: NWEndpoint.Host(host),
             port: NWEndpoint.Port(rawValue: port)!
         )
+        connectToEndpoint(endpoint)
+    }
+
+    /// Connect using a Bonjour NWEndpoint directly (avoids IP resolution)
+    func connect(endpoint: NWEndpoint) {
+        connectToEndpoint(endpoint)
+    }
+
+    private func connectToEndpoint(_ endpoint: NWEndpoint) {
         connection = NWConnection(to: endpoint, using: .tcp)
         connection?.stateUpdateHandler = { [weak self] state in
             switch state {

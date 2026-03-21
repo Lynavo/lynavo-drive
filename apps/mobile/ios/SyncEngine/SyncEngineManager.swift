@@ -18,6 +18,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
     private var uploadStore: UploadStore?
     private var historyStore: HistoryLedgerStore?
     private var protocolSession: ProtocolSession?
+    private var discoveredDevices: [String: DiscoveredDevice] = [:]  // keyed by deviceId
 
     private override init() {
         super.init()
@@ -327,6 +328,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
 
     func discoveryDidUpdate(devices: [DiscoveredDevice]) {
         NSLog("[SyncEngine] discoveryDidUpdate called with \(devices.count) devices")
+        // Cache devices for endpoint lookup during pairing
+        for device in devices {
+            discoveredDevices[device.deviceId] = device
+        }
         let mapped: [[String: Any]] = devices.map { device in
             [
                 "deviceId": device.deviceId,
@@ -383,13 +388,21 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
     // MARK: - Pairing (LMUP/2 handshake — spec Section 7.2)
 
     func pairDevice(deviceId: String, host: String, port: Int, connectionCode: String) async throws {
-        NSLog("[SyncEngine] pairDevice: connecting to \(host):\(port)")
+        NSLog("[SyncEngine] pairDevice: deviceId=\(deviceId) host=\(host) port=\(port)")
 
         let session = ProtocolSession(transport: transport)
         protocolSession = session
 
-        // 1. Connect TCP and await .ready
-        try await session.connect(host: host, port: UInt16(port))
+        // 1. Connect TCP — prefer Bonjour endpoint (avoids IP resolution issues)
+        if let cachedDevice = discoveredDevices[deviceId], let endpoint = cachedDevice.endpoint {
+            NSLog("[SyncEngine] connecting via Bonjour endpoint")
+            try await session.connect(endpoint: endpoint)
+        } else if !host.isEmpty {
+            NSLog("[SyncEngine] connecting via host:port")
+            try await session.connect(host: host, port: UInt16(port))
+        } else {
+            throw SyncEngineError.networkError("No endpoint or host available for device \(deviceId)")
+        }
 
         let clientId = bindingService.getOrCreateClientId()
 

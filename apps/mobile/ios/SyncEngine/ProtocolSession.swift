@@ -1,4 +1,5 @@
 import Foundation
+import Network
 
 /// Wraps TcpTransport delegate callbacks into async/await using CheckedContinuation.
 ///
@@ -27,6 +28,15 @@ class ProtocolSession: NSObject, TcpTransportDelegate {
             connectContinuation = cont
             lock.unlock()
             transport.connect(host: host, port: port)
+        }
+    }
+
+    func connect(endpoint: NWEndpoint) async throws {
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            lock.lock()
+            connectContinuation = cont
+            lock.unlock()
+            transport.connect(endpoint: endpoint)
         }
     }
 
