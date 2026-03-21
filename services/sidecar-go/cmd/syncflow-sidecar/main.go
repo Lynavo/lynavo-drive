@@ -15,6 +15,7 @@ import (
 	"github.com/nicksyncflow/sidecar/internal/config"
 	"github.com/nicksyncflow/sidecar/internal/events"
 	"github.com/nicksyncflow/sidecar/internal/logging"
+	"github.com/nicksyncflow/sidecar/internal/server"
 	"github.com/nicksyncflow/sidecar/internal/store"
 )
 
@@ -31,7 +32,7 @@ func main() {
 	}
 
 	logging.Setup(cfg.LogLevel)
-	slog.Info("starting syncflow-sidecar", "http_port", cfg.HTTPPort)
+	slog.Info("starting syncflow-sidecar", "http_port", cfg.HTTPPort, "tcp_port", cfg.TCPPort)
 
 	// Ensure data directories exist
 	for _, dir := range []string{cfg.DataDir, cfg.ReceiveDir, cfg.StagingDir(), cfg.LogDir()} {
@@ -60,6 +61,13 @@ func main() {
 		Handler: handler,
 	}
 
+	// Start TCP server for LMUP/2 protocol
+	tcpSrv := server.NewTCPServer(st, cfg, hub)
+	if err := tcpSrv.Start(fmt.Sprintf(":%d", cfg.TCPPort)); err != nil {
+		slog.Error("tcp server failed", "err", err)
+		os.Exit(1)
+	}
+
 	// Graceful shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -75,6 +83,7 @@ func main() {
 	<-ctx.Done()
 	slog.Info("shutting down")
 
+	tcpSrv.Stop()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	srv.Shutdown(shutdownCtx)
