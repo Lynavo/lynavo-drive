@@ -14,14 +14,14 @@ interface DateFilterProps {
 }
 
 function getDateLabel(iso: string): string {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toLocaleDateString('sv-SE');
   const formatted = formatDate(iso);
   return iso === today ? `今天 (${formatted})` : formatted;
 }
 
 export function DateFilter({ dates, selected, onSelect }: DateFilterProps) {
   // Ensure today is always in the list and at the top
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toLocaleDateString('sv-SE');
   const allDates = dates.includes(today) ? dates : [today, ...dates];
 
   return (
