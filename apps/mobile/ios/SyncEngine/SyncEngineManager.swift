@@ -550,7 +550,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
             throw SyncEngineError.pairingError("Expected HELLO_RES, got \(helloType)")
         }
 
-        let authRequired = helloRes["authRequired"] as? Bool ?? true
+        let authRequired: Bool
+        if let b = helloRes["authRequired"] as? Bool { authRequired = b }
+        else if let n = helloRes["authRequired"] as? NSNumber { authRequired = n.boolValue }
+        else { authRequired = true }
 
         guard authRequired else {
             // Already bound — no PAIR_REQ needed
@@ -570,7 +573,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
             throw SyncEngineError.pairingError("Expected PAIR_RES, got \(pairType)")
         }
 
-        guard pairRes["ok"] as? Bool == true else {
+        let pairOk: Bool
+        if let b = pairRes["ok"] as? Bool { pairOk = b }
+        else if let n = pairRes["ok"] as? NSNumber { pairOk = n.boolValue }
+        else { pairOk = (pairType == .pairRes) }
+
+        guard pairOk else {
             let errMsg = pairRes["error"] as? String ?? "unknown"
             throw SyncEngineError.pairingError("Pairing rejected: \(errMsg)")
         }
