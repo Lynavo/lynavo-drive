@@ -1,4 +1,5 @@
 import { ConnectionCodeSection } from './ConnectionCodeSection';
+import { DeviceNameSection } from './DeviceNameSection';
 import { FilePathSection } from './FilePathSection';
 import { ShareAddressSection } from './ShareAddressSection';
 import { SystemGuideSection } from './SystemGuideSection';
@@ -8,6 +9,17 @@ export function SettingsPage() {
     <div className="flex-1 overflow-auto">
       <div className="mx-auto max-w-2xl px-6 py-8">
         <h1 className="mb-8 text-xl font-semibold text-foreground">设置</h1>
+
+        {/* Device Name */}
+        <section className="mb-8">
+          <h2 className="mb-1 text-sm font-semibold text-foreground">
+            设备名称
+          </h2>
+          <p className="mb-4 text-xs text-muted-foreground">
+            此名称将在局域网中广播，方便手机识别本台电脑
+          </p>
+          <DeviceNameSection />
+        </section>
 
         {/* Connection Code */}
         <section className="mb-8">

@@ -11,6 +11,7 @@ export interface SettingsState {
 
 export const useSettingsStore = create<SettingsState>((set) => ({
   settings: {
+    deviceName: '',
     connectionCode: '',
     receivePath: '',
     shareAddress: '',

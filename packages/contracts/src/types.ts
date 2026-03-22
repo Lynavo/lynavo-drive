@@ -63,6 +63,7 @@ export interface DeviceFileLedgerDTO {
 // ── Desktop Settings ──
 
 export interface SettingsDTO {
+  deviceName: string;
   connectionCode: string;
   receivePath: string;
   shareAddress: string;

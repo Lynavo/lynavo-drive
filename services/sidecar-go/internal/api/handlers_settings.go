@@ -6,6 +6,7 @@ import (
 )
 
 type settingsDTO struct {
+	DeviceName     string `json:"deviceName"`
 	ConnectionCode string `json:"connectionCode"`
 	ReceivePath    string `json:"receivePath"`
 	ShareAddress   string `json:"shareAddress"`
@@ -14,6 +15,7 @@ type settingsDTO struct {
 }
 
 type updateSettingsRequest struct {
+	DeviceName  *string `json:"deviceName,omitempty"`
 	ReceivePath *string `json:"receivePath,omitempty"`
 }
 
@@ -32,6 +34,14 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	if err := readJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
+	}
+
+	if req.DeviceName != nil {
+		if err := s.store.SetDeviceName(*req.DeviceName); err != nil {
+			slog.Error("update device_name", "err", err)
+			writeError(w, http.StatusInternalServerError, "failed to update settings")
+			return
+		}
 	}
 
 	if req.ReceivePath != nil {
@@ -59,6 +69,11 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) assembleSettingsDTO() (*settingsDTO, error) {
+	deviceName, err := s.store.GetDeviceName()
+	if err != nil {
+		return nil, err
+	}
+
 	code, err := s.store.GetConnectionCode()
 	if err != nil {
 		return nil, err
@@ -70,6 +85,7 @@ func (s *Server) assembleSettingsDTO() (*settingsDTO, error) {
 	}
 
 	return &settingsDTO{
+		DeviceName:     deviceName,
 		ConnectionCode: code,
 		ReceivePath:    shareConfig.ReceiveRoot,
 		ShareAddress:   shareConfig.ShareURL,

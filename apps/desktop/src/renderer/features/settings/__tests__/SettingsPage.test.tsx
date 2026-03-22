@@ -15,6 +15,7 @@ describe('SettingsPage', () => {
   it('renders section headings', () => {
     render(<SettingsPage />);
 
+    expect(screen.getByRole('heading', { name: '设备名称' })).toBeInTheDocument();
     expect(screen.getByText('连接码管理')).toBeInTheDocument();
     expect(screen.getByText('文件地址配置')).toBeInTheDocument();
     expect(screen.getByText('系统权限指引')).toBeInTheDocument();

@@ -269,6 +269,9 @@ func TestGetSettings(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
+	if _, ok := body["deviceName"]; !ok {
+		t.Error("missing deviceName")
+	}
 	if _, ok := body["connectionCode"]; !ok {
 		t.Error("missing connectionCode")
 	}
@@ -440,6 +443,7 @@ func TestConnectionCodeAutoRegeneration(t *testing.T) {
 
 // settingsResp mirrors the settings JSON response for test decoding.
 type settingsResp struct {
+	DeviceName     string `json:"deviceName"`
 	ConnectionCode string `json:"connectionCode"`
 	ReceivePath    string `json:"receivePath"`
 	ShareAddress   string `json:"shareAddress"`

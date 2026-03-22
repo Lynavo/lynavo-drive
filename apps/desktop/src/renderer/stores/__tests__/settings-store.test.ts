@@ -20,6 +20,7 @@ describe('settings-store', () => {
 
   it('updateSettings replaces full settings object', () => {
     const updated: SettingsDTO = {
+      deviceName: 'New Mac',
       connectionCode: '111222',
       receivePath: '/tmp/new-path',
       shareAddress: 'smb://10.0.0.1/Share',
