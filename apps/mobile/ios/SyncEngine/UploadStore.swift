@@ -255,7 +255,7 @@ class UploadStore {
 
     func getPendingUploadItems() -> [UploadItemRecord] {
         return queue.sync {
-            let sql = "SELECT * FROM upload_items WHERE status IN ('discovered', 'preparing', 'ready', 'uploading') ORDER BY id ASC"
+            let sql = "SELECT * FROM upload_items WHERE status IN ('queued', 'discovered', 'preparing', 'ready', 'uploading') ORDER BY id ASC"
             let rows = queryInternal(sql, bind: [])
             return rows.compactMap { uploadItemFromRow($0) }
         }
