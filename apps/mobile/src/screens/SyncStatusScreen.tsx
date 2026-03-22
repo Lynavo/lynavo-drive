@@ -367,7 +367,7 @@ export function SyncStatusScreen() {
   const keyExtractor = useCallback((item: QueueItem) => item.id, []);
 
   const isDone = overview.uploadState === 'completed' ||
-    (overview.uploadState === 'idle' && queue.length === 0 && overview.progressPercent >= 100);
+    (overview.uploadState === 'idle' && queue.length === 0 && (overview.progressPercent >= 100 || todayStats.fileCount > 0));
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
