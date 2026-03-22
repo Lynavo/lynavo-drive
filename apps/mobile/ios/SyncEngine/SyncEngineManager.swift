@@ -116,6 +116,26 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
 
         NSLog("[SyncEngine] found \(newAssets.count) new assets to sync")
 
+        // Write scanned assets to DB + emit queue to JS
+        for asset in newAssets {
+            let item = UploadItemRecord(
+                id: nil,
+                assetLocalId: asset.asset.localIdentifier,
+                modifiedAt: asset.asset.modificationDate?.iso8601String ?? "",
+                mediaType: asset.mediaType,
+                originalFilename: nil,  // known after export
+                fileKey: asset.fileKey,
+                fileSize: nil,
+                status: "queued",
+                tempFilePath: nil,
+                ackedOffset: 0,
+                lastErrorCode: nil,
+                updatedAt: ISO8601DateFormatter().string(from: Date())
+            )
+            try? uploadStore?.upsertUploadItem(item)
+        }
+        emitQueueToJS()
+
         guard !newAssets.isEmpty else {
             sessionService.transitionTo(.idle)
             NativeSyncEngineModule.shared?.emitSyncStateChanged([
@@ -248,6 +268,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
         defer { exportService.cleanup(tempURL: exported.tempURL) }
 
         try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "uploading")
+        // Update filename + size now that we know them from export
+        if var item = uploadStore?.getUploadItemByFileKey(asset.fileKey) {
+            item.originalFilename = exported.originalFilename
+            item.fileSize = exported.fileSize
+            try? uploadStore?.upsertUploadItem(item)
+        }
+        emitQueueToJS()
 
         // FILE_INIT_REQ → FILE_INIT_RES
         let (initType, initRes) = try await session.sendAndReceive(type: .fileInitReq, payload: [
@@ -307,6 +334,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
         if endType == .fileEndRes, endRes["ok"] as? Bool == true {
             NSLog("[SyncEngine] completed: \(exported.originalFilename)")
             try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "completed")
+            emitQueueToJS()  // Update JS queue display
 
             // Update daily ledger
             let storedBytes = endRes["storedBytes"] as? Int64 ?? exported.fileSize
@@ -394,6 +422,23 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
         }
         let digest = hasher.finalize()
         return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    // MARK: - Queue Event Emission
+
+    private func emitQueueToJS() {
+        guard let store = uploadStore else { return }
+        let pending = store.getPendingUploadItems()
+        let mapped: [[String: Any]] = pending.map { item in
+            [
+                "id": item.id ?? 0,
+                "originalFilename": item.originalFilename ?? item.assetLocalId,
+                "mediaType": item.mediaType,
+                "fileSize": item.fileSize ?? 0,
+                "status": item.status,
+            ] as [String: Any]
+        }
+        NativeSyncEngineModule.shared?.emitQueueUpdated(mapped)
     }
 
     // MARK: - DiscoveryServiceDelegate
