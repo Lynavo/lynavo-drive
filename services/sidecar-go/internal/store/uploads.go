@@ -65,7 +65,7 @@ func (s *Store) ListUploadsByDeviceAndDate(clientID, date string) ([]Upload, err
 		       file_size, created_at_remote, modified_at_remote, status, part_path, final_path,
 		       committed_bytes, sha256, active_transmission_ms, completed_at, updated_at
 		FROM uploads
-		WHERE client_id = ? AND DATE(updated_at, 'localtime') = ?
+		WHERE client_id = ? AND DATE(updated_at, 'localtime') = ? AND status = 'completed'
 		ORDER BY updated_at DESC`, clientID, date,
 	)
 	if err != nil {
@@ -93,7 +93,7 @@ func (s *Store) GetAvailableDates(clientID string) ([]string, error) {
 	rows, err := s.db.Query(`
 		SELECT DISTINCT DATE(updated_at, 'localtime') AS d
 		FROM uploads
-		WHERE client_id = ?
+		WHERE client_id = ? AND status = 'completed'
 		ORDER BY d DESC`, clientID,
 	)
 	if err != nil {
