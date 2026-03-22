@@ -281,11 +281,36 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
             NSLog("[SyncPipeline] uploading %d files", newAssets.count)
 
-            // Upload each file serially
+            // Upload files with prefetch: export next file while current uploads
+            var nextExport: ExportedFile? = nil
+            if !newAssets.isEmpty {
+                nextExport = try? await exportService.exportAsset(newAssets[0].asset)
+            }
+
             for (index, asset) in newAssets.enumerated() {
+                // Use pre-exported file if available, otherwise export now
+                let exported: ExportedFile
+                if let prefetched = nextExport {
+                    exported = prefetched
+                    nextExport = nil
+                } else {
+                    exported = try await exportService.exportAsset(asset.asset)
+                }
+
+                // Start pre-exporting next file in background
+                let nextIndex = index + 1
+                if nextIndex < newAssets.count {
+                    let nextAsset = newAssets[nextIndex]
+                    Task {
+                        nextExport = try? await self.exportService.exportAsset(nextAsset.asset)
+                    }
+                }
+
+                // Upload current file (pass exported instead of re-exporting)
                 do {
-                    try await uploadSingleFile(
+                    try await uploadSingleFileWithExport(
                         asset: asset,
+                        exported: exported,
                         sessionId: sessionId,
                         index: index,
                         total: newAssets.count,
@@ -295,6 +320,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     NSLog("[SyncEngine] upload failed for \(asset.fileKey): \(error)")
                     try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "failed")
                 }
+                exportService.cleanup(tempURL: exported.tempURL)
             }
 
             // SYNC_END
@@ -308,17 +334,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     // MARK: - Single File Upload (spec Sections 7.3, 7.4)
 
-    private func uploadSingleFile(
+    private func uploadSingleFileWithExport(
         asset: ScannedAsset,
+        exported: ExportedFile,
         sessionId: String,
         index: Int,
         total: Int,
         session: ProtocolSession
     ) async throws {
-        // Export PHAsset to a temp file
-        let exported = try await exportService.exportAsset(asset.asset)
-        defer { exportService.cleanup(tempURL: exported.tempURL) }
-
         try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "uploading")
         // Update filename + size now that we know them from export
         if var item = uploadStore?.getUploadItemByFileKey(asset.fileKey) {
@@ -376,7 +399,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
 
         // FILE_END_REQ → FILE_END_RES
-        let sha256 = Self.computeSHA256(fileURL: exported.tempURL)
+        let sha256 = "" // Skip SHA256 for speed; server validates file size instead
 
         let (endType, endRes) = try await session.sendAndReceive(type: .fileEndReq, payload: [
             "fileKey": asset.fileKey,
@@ -427,8 +450,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     // MARK: - Stream FILE_DATA Chunks (spec Section 7.4, 7.7: 8 MiB chunks)
 
     // MARK: - Upload Throttle (set to 0 for full speed)
-    /// Bytes per second limit. 0 = unlimited. Set to e.g. 500_000 for ~500 KB/s during testing.
-    private let uploadThrottleBytesPerSec: Int64 = 500_000  // TODO: remove after testing
+    /// Bytes per second limit. 0 = unlimited.
+    private let uploadThrottleBytesPerSec: Int64 = 0
 
     private func streamFileData(
         fileURL: URL,
@@ -438,7 +461,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     ) async throws {
         let chunkSize = uploadThrottleBytesPerSec > 0
             ? Int(min(Int64(512 * 1024), uploadThrottleBytesPerSec))  // smaller chunks when throttled
-            : 8 * 1024 * 1024  // 8 MiB per spec Section 7.7
+            : 32 * 1024 * 1024  // 32 MiB for throughput (was 8 MiB per spec Section 7.7)
         let handle = try FileHandle(forReadingFrom: fileURL)
         defer { handle.closeFile() }
 

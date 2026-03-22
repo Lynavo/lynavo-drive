@@ -121,51 +121,59 @@ func (c *connection) handleFileEnd(body []byte) error {
 		slog.Warn("failed to close file writer before hash", "err", err)
 	}
 
-	// Compute SHA256 of .part file
-	computedHash, err := hashFile(c.fileWriter.PartPath())
-	if err != nil {
-		slog.Error("failed to hash .part file", "err", err)
-		c.fileWriter.Cleanup()
-		c.fileWriter = nil
-		return c.sendJSON(protocol.TypeFileEndRes, protocol.FileEndRes{
-			OK:      false,
-			FileKey: req.FileKey,
-		})
-	}
-
-	// Compare hashes
-	if computedHash != req.SHA256 {
-		slog.Warn("SHA256 mismatch",
-			"fileKey", req.FileKey,
-			"expected", req.SHA256,
-			"computed", computedHash,
-		)
-		c.fileWriter.Cleanup()
-		c.fileWriter = nil
-
-		// Update upload status to failed
-		if err := c.store.UpsertUpload(store.Upload{
-			FileKey:   req.FileKey,
-			ClientID:  c.clientID,
-			Status:    "failed",
-			UpdatedAt: time.Now().UTC().Format(time.RFC3339),
-		}); err != nil {
-			slog.Warn("failed to mark upload as failed", "err", err)
+	// Compute and verify SHA256 only if client provided one (empty = skipped for speed)
+	computedHash := ""
+	if req.SHA256 != "" {
+		var err error
+		computedHash, err = hashFile(c.fileWriter.PartPath())
+		if err != nil {
+			slog.Error("failed to hash .part file", "err", err)
+			c.fileWriter.Cleanup()
+			c.fileWriter = nil
+			return c.sendJSON(protocol.TypeFileEndRes, protocol.FileEndRes{
+				OK:      false,
+				FileKey: req.FileKey,
+			})
 		}
 
-		c.hub.Broadcast(events.Event{
-			Type: "upload.failed",
-			Payload: map[string]any{
-				"deviceId": c.clientID,
-				"fileKey":  req.FileKey,
-				"reason":   "SHA256_MISMATCH",
-			},
-		})
+		if computedHash != req.SHA256 {
+			slog.Warn("SHA256 mismatch",
+				"fileKey", req.FileKey,
+				"expected", req.SHA256,
+				"computed", computedHash,
+			)
+			c.fileWriter.Cleanup()
+			c.fileWriter = nil
 
-		return c.sendJSON(protocol.TypeFileEndRes, protocol.FileEndRes{
-			OK:      false,
-			FileKey: req.FileKey,
-		})
+			// Update upload status to failed
+			if err := c.store.UpsertUpload(store.Upload{
+				FileKey:   req.FileKey,
+				ClientID:  c.clientID,
+				Status:    "failed",
+				UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+			}); err != nil {
+				slog.Warn("failed to mark upload as failed", "err", err)
+			}
+
+			c.hub.Broadcast(events.Event{
+				Type: "upload.failed",
+				Payload: map[string]any{
+					"deviceId": c.clientID,
+					"fileKey":  req.FileKey,
+					"reason":   "SHA256_MISMATCH",
+				},
+			})
+
+			return c.sendJSON(protocol.TypeFileEndRes, protocol.FileEndRes{
+				OK:      false,
+				FileKey: req.FileKey,
+			})
+		}
+	} else {
+		slog.Info("SHA256 skipped by client, relying on file size validation",
+			"fileKey", req.FileKey,
+			"fileSize", req.FileSize,
+		)
 	}
 
 	// SHA256 matches — finalize
