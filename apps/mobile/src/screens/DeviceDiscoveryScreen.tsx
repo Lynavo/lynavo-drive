@@ -124,22 +124,17 @@ export function DeviceDiscoveryScreen() {
         
         
         NativeSyncEngine.startDiscovery()
-          .then((diag: any) => console.log('[Discovery] startDiscovery resolved, diag:', JSON.stringify(diag)))
           .catch((e: Error) => console.warn('[Discovery] startDiscovery failed:', e));
-        // Poll browser state after a delay
-        setTimeout(() => {
-          NativeSyncEngine.startDiscovery()
-            .then((diag: any) => console.log('[Discovery] browser state after 3s:', JSON.stringify(diag)));
-        }, 3000);
         const emitter = new NativeEventEmitter(NativeSyncEngine);
         subscription = emitter.addListener('onDiscoveredDevicesChanged', (discoveredDevices: DiscoveredDevice[]) => {
-          console.log('[Discovery] received devices event:', JSON.stringify(discoveredDevices));
           setDevices(discoveredDevices);
-          setScanning(false);
+          if (discoveredDevices.length > 0) {
+            setScanning(false);
+            if (mockTimer) { clearTimeout(mockTimer); mockTimer = undefined; }
+          }
         });
         // Timeout fallback: if no devices found after 8s, stop scanning animation
         mockTimer = setTimeout(() => {
-          console.log('[Discovery] timeout — no devices found, stopping scan animation');
           setScanning(false);
         }, 8000);
       } else {

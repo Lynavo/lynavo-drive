@@ -65,13 +65,7 @@ class NativeSyncEngineModule: RCTEventEmitter {
     @objc
     func startDiscovery(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         SyncEngineManager.shared.startDiscovery()
-        // Return diagnostic info so JS can see what happened
-        let diag: [String: Any] = [
-            "bridgeShared": NativeSyncEngineModule.shared != nil,
-            "delegateSet": SyncEngineManager.shared.discoveryService.delegate != nil,
-            "browserState": String(describing: SyncEngineManager.shared.discoveryService.browserState),
-        ]
-        resolve(diag)
+        resolve(nil)
     }
 
     @objc

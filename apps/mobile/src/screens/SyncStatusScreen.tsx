@@ -181,8 +181,14 @@ function QueueItemRow({ item, isLast }: { item: QueueItem; isLast: boolean }) {
 
 export function SyncStatusScreen() {
   const navigation = useNavigation<SyncStatusNav>();
-  const [overview, setOverview] = useState<SyncOverview>(MOCK_OVERVIEW);
-  const [queue, setQueue] = useState<QueueItem[]>(mockQueue);
+  const [overview, setOverview] = useState<SyncOverview>({
+    progressPercent: 0,
+    speed: '0 MB/s',
+    completed: '0 B',
+    total: '0 B',
+    uploadState: 'idle',
+  });
+  const [queue, setQueue] = useState<QueueItem[]>([]);
 
   // ---------------------------------------------------------------------------
   // Load real data from native module with mock fallback
@@ -220,7 +226,7 @@ export function SyncStatusScreen() {
 
         // Load initial queue
         const queueData = await NativeSyncEngine.getReadOnlyQueue();
-        if (queueData && queueData.length > 0) {
+        if (queueData) {
           setQueue(queueData.map((item: Record<string, unknown>, index: number) => ({
             id: String(item.id ?? index),
             name: (item.originalFilename as string) || 'Unknown',
@@ -243,7 +249,7 @@ export function SyncStatusScreen() {
         });
 
         queueSub = emitter.addListener('onQueueUpdated', (updatedQueue: Array<Record<string, unknown>>) => {
-          if (updatedQueue && updatedQueue.length > 0) {
+          if (updatedQueue) {
             setQueue(updatedQueue.map((item, index) => ({
               id: String(item.id ?? index),
               name: (item.originalFilename as string) || 'Unknown',
