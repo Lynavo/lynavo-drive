@@ -70,8 +70,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
 
     // MARK: - Sync Pipeline (spec Section 7.3)
 
+    private var isSyncing = false
+
     /// Start a full photo scan and serial upload session over the open TCP connection.
     func startSync() {
+        guard !isSyncing else {
+            NSLog("[SyncEngine] startSync skipped — already syncing")
+            return
+        }
+        isSyncing = true
         NSLog("[SyncEngine] startSync")
         sessionService.transitionTo(.scanning)
 
@@ -80,6 +87,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
                 try await runSyncPipeline()
             } catch {
                 NSLog("[SyncEngine] sync pipeline failed: \(error)")
+                isSyncing = false
                 sessionService.transitionTo(.idle)
                 NativeSyncEngineModule.shared?.emitError([
                     "code": "SYNC_PIPELINE_ERROR",
@@ -243,6 +251,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
         // 6. SYNC_END_REQ → SYNC_END_RES
         let (_, _) = try await session.sendAndReceive(type: .syncEndReq, payload: [:])
 
+        isSyncing = false
         sessionService.transitionTo(.idle)
         NativeSyncEngineModule.shared?.emitSyncStateChanged([
             "uploadState": "completed",
