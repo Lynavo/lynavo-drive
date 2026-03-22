@@ -351,8 +351,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
             let data = handle.readData(ofLength: chunkSize)
             if data.isEmpty { break }
 
-            // Send binary FILE_DATA frame
-            transport.sendFileData(fileKey: fileKey, offset: offset, chunk: data)
+            // Send binary FILE_DATA frame via the session's transport (not self.transport)
+            session.sendFileData(fileKey: fileKey, offset: offset, chunk: data)
 
             // Wait for FILE_ACK from server
             let (ackType, ackRes) = try await session.waitForNextMessage()

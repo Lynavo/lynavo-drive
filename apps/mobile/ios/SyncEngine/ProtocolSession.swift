@@ -40,6 +40,13 @@ class ProtocolSession: NSObject, TcpTransportDelegate {
         }
     }
 
+    // MARK: - Binary Send (FILE_DATA)
+
+    /// Send binary FILE_DATA frame through the correct transport
+    func sendFileData(fileKey: String, offset: Int64, chunk: Data) {
+        transport.sendFileData(fileKey: fileKey, offset: offset, chunk: chunk)
+    }
+
     // MARK: - Send & Receive
 
     /// Send a JSON control message and wait for the next server response.
