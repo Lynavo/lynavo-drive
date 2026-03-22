@@ -111,7 +111,7 @@ export function FileLedgerTable() {
               </button>
             </TableHead>
           ))}
-          <TableHead className="text-right w-16">
+          <TableHead className="text-right w-20 pr-2">
             <span className="text-xs font-medium" style={{ color: colors.headerText }}>
               操作
             </span>
@@ -171,7 +171,7 @@ export function FileLedgerTable() {
               >
                 {formatDuration(file.activeTransmissionMs)}
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="text-right pr-2">
                 <button
                   onClick={() => handleOpen(file.finalPath)}
                   className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-80"

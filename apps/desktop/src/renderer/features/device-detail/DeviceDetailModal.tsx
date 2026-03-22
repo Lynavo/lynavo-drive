@@ -93,7 +93,7 @@ export function DeviceDetailModal() {
             activeTransmissionMs={totalTransmissionMs}
           />
 
-          <ScrollArea className="flex-1 px-6 pb-6">
+          <ScrollArea className="flex-1 px-4 pb-6">
             {loading ? (
               <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
                 加载中...
