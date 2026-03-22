@@ -81,7 +81,7 @@ func (s *Server) handleDashboardDevices(w http.ResponseWriter, _ *http.Request) 
 				}
 			}
 		}
-		if status == "offline" && s.presence.IsAlive(d.ClientID, 90*time.Second) {
+		if status == "offline" && s.presence.IsAlive(d.ClientID, 45*time.Second) {
 			status = "connected_idle"
 		}
 
