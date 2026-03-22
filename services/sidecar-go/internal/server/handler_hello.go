@@ -58,6 +58,13 @@ func (c *connection) handleHello(body []byte) error {
 
 	paired := device != nil && device.RevokedAt == nil
 
+	// If device is "returning" but client didn't send a pairingToken,
+	// the client lost its credentials (e.g. app reinstall). Force re-pair.
+	if paired && req.PairingToken == "" {
+		slog.Info("returning device has no pairingToken — forcing re-pair", "clientID", req.ClientID)
+		paired = false
+	}
+
 	if paired {
 		// Generate nonce for HMAC auth
 		nonceBytes := make([]byte, 32)
@@ -96,6 +103,7 @@ func (c *connection) handleHello(body []byte) error {
 			slog.Warn("failed to update last_seen", "err", err)
 		}
 
+		slog.Info("sending HELLO_RES (returning device, authRequired=false)", "clientID", req.ClientID)
 		res := protocol.HelloRes{
 			ServerID:           serverID,
 			ServerName:         serverName,
@@ -110,11 +118,13 @@ func (c *connection) handleHello(body []byte) error {
 		if err := c.sendJSON(protocol.TypeHelloRes, res); err != nil {
 			return err
 		}
+		slog.Info("HELLO_RES sent, waiting for AUTH_REQ", "clientID", req.ClientID)
 		c.state = stateWaitAuth
 		return nil
 	}
 
 	// Not paired — ask client to pair
+	slog.Info("sending HELLO_RES (new device, authRequired=true)", "clientID", req.ClientID)
 	res := protocol.HelloRes{
 		ServerID:           serverID,
 		ServerName:         serverName,
@@ -127,6 +137,7 @@ func (c *connection) handleHello(body []byte) error {
 	if err := c.sendJSON(protocol.TypeHelloRes, res); err != nil {
 		return err
 	}
+	slog.Info("HELLO_RES sent, waiting for PAIR_REQ", "clientID", req.ClientID)
 	c.state = stateWaitPair
 	return nil
 }
@@ -170,6 +181,11 @@ func (c *connection) handleAuth(body []byte) error {
 
 	slog.Info("client authenticated via HMAC", "clientID", c.clientID)
 	c.state = stateAuthenticated
+
+	// Send AUTH_RES so the client isn't stuck waiting
+	if err := c.sendJSON(protocol.TypeAuthRes, map[string]interface{}{"ok": true}); err != nil {
+		return fmt.Errorf("send AUTH_RES: %w", err)
+	}
 	return nil
 }
 

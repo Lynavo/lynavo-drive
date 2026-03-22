@@ -24,7 +24,7 @@ class BindingService {
     }
 
     func getPairingToken() -> String? {
-        readKeychain(key: Self.pairingTokenKey)
+        return readKeychain(key: Self.pairingTokenKey)
     }
 
     func clearPairingToken() {
@@ -48,7 +48,7 @@ class BindingService {
         addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
         let status = SecItemAdd(addQuery as CFDictionary, nil)
         if status != errSecSuccess {
-            print("[BindingService] Keychain write failed for \(key): \(status)")
+            NSLog("[BindingService] Keychain write failed for %@: OSStatus=%d", key, status)
         }
     }
 
@@ -62,7 +62,14 @@ class BindingService {
         ]
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess, let data = result as? Data else { return nil }
+        if status != errSecSuccess {
+            NSLog("[BindingService] Keychain read failed for %@: OSStatus=%d", key, status)
+            return nil
+        }
+        guard let data = result as? Data else {
+            NSLog("[BindingService] Keychain read for %@: status OK but data cast failed", key)
+            return nil
+        }
         return String(data: data, encoding: .utf8)
     }
 

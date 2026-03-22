@@ -72,7 +72,7 @@ func (c *connection) handle() {
 	for {
 		hdr, body, err := protocol.ReadFrame(c.conn)
 		if err != nil {
-			slog.Debug("connection read error", "remote", c.conn.RemoteAddr(), "err", err)
+			slog.Info("connection closed", "remote", c.conn.RemoteAddr(), "err", err)
 			return
 		}
 		c.resetDeadline()

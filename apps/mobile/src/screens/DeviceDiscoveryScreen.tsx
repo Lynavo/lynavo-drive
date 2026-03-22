@@ -30,16 +30,6 @@ interface DiscoveredDevice {
 }
 
 // ---------------------------------------------------------------------------
-// Static mock data (fallback when native module not available)
-// ---------------------------------------------------------------------------
-
-const mockDevices: DiscoveredDevice[] = [
-  { deviceId: 'mac-1', name: '剪辑工作站-A', ip: '192.168.1.101', type: 'mac' as const, port: 39393 },
-  { deviceId: 'mac-2', name: 'MacBook Pro', ip: '192.168.1.108', type: 'mac' as const, port: 39393 },
-  { deviceId: 'mac-3', name: '备用机-B', ip: '192.168.1.115', type: 'mac' as const, port: 39393 },
-];
-
-// ---------------------------------------------------------------------------
 // Pulse ring animation component
 // ---------------------------------------------------------------------------
 
@@ -109,20 +99,16 @@ export function DeviceDiscoveryScreen() {
   const [devices, setDevices] = useState<DiscoveredDevice[]>([]);
 
   // ---------------------------------------------------------------------------
-  // Native module discovery with mock fallback
+  // Native module discovery
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
     let subscription: { remove: () => void } | undefined;
-    let mockTimer: ReturnType<typeof setTimeout> | undefined;
+    let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
 
     try {
       const { NativeSyncEngine } = NativeModules;
       if (NativeSyncEngine) {
-        
-        
-        
-        
         NativeSyncEngine.startDiscovery()
           .catch((e: Error) => console.warn('[Discovery] startDiscovery failed:', e));
         const emitter = new NativeEventEmitter(NativeSyncEngine);
@@ -130,31 +116,24 @@ export function DeviceDiscoveryScreen() {
           setDevices(discoveredDevices);
           if (discoveredDevices.length > 0) {
             setScanning(false);
-            if (mockTimer) { clearTimeout(mockTimer); mockTimer = undefined; }
+            if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = undefined; }
           }
         });
         // Timeout fallback: if no devices found after 8s, stop scanning animation
-        mockTimer = setTimeout(() => {
+        timeoutTimer = setTimeout(() => {
           setScanning(false);
         }, 8000);
       } else {
-        console.log('[Discovery] native module not found, using mock data');
-        mockTimer = setTimeout(() => {
-          setDevices(mockDevices);
-          setScanning(false);
-        }, 1800);
+        setScanning(false);
       }
     } catch (e) {
       console.warn('[Discovery] error:', e);
-      mockTimer = setTimeout(() => {
-        setDevices(mockDevices);
-        setScanning(false);
-      }, 1800);
+      setScanning(false);
     }
 
     return () => {
       subscription?.remove();
-      if (mockTimer) clearTimeout(mockTimer);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
       try {
         NativeModules.NativeSyncEngine?.stopDiscovery();
       } catch {
@@ -181,11 +160,7 @@ export function DeviceDiscoveryScreen() {
     } catch {
       // fallback
     }
-    // Mock fallback
-    setTimeout(() => {
-      setDevices(mockDevices);
-      setScanning(false);
-    }, 1800);
+    setScanning(false);
   }, []);
 
   const handleDevicePress = useCallback(

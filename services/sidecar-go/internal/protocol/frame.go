@@ -32,7 +32,8 @@ const (
 	TypePing         uint16 = 0x000F
 	TypePong         uint16 = 0x0010
 	TypeError        uint16 = 0x0011
-	TypeAuthReq      uint16 = 0x0012 // nonce-HMAC auth response from client
+	TypeAuthReq      uint16 = 0x0012 // nonce-HMAC auth request from client
+	TypeAuthRes      uint16 = 0x0013 // auth result from server
 )
 
 // FrameHeader represents the parsed header of an LMUP/2 frame.

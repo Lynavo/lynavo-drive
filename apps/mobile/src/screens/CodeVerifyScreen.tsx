@@ -43,7 +43,7 @@ export function CodeVerifyScreen() {
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
   // -----------------------------------------------------------------------
-  // Submit code — try native module, fallback to mock
+  // Submit code via native module
   // -----------------------------------------------------------------------
 
   const submitCode = useCallback(
@@ -65,8 +65,8 @@ export function CodeVerifyScreen() {
           return;
         }
       } catch (e) {
-        console.warn('Native pairing failed or unavailable, falling back to mock');
-        // If native module threw an actual pairing error, show error state
+        console.error('Native pairing failed:', e);
+        // Native module threw a pairing error — show error state
         setVerifying(false);
         setError(true);
         setCode(Array(CODE_LENGTH).fill(''));

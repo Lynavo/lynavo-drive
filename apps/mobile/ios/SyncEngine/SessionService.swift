@@ -25,7 +25,7 @@ class SessionService {
     }
 
     func transitionTo(_ newState: SyncEngineState) {
-        print("[SessionService] \(state.rawValue) -> \(newState.rawValue)")
+        NSLog("[SessionService] %@ -> %@", state.rawValue, newState.rawValue)
         state = newState
     }
 

@@ -16,7 +16,7 @@ class BackgroundExecutionService {
             self.handleMaintenanceTask(task as! BGProcessingTask)
         }
 
-        print("[BackgroundExec] registered background tasks")
+        NSLog("[BackgroundExec] registered background tasks")
     }
 
     /// Submit continued processing task — call when foreground sync starts
@@ -26,9 +26,9 @@ class BackgroundExecutionService {
         request.requiresExternalPower = false
         do {
             try BGTaskScheduler.shared.submit(request)
-            print("[BackgroundExec] submitted continued task")
+            NSLog("[BackgroundExec] submitted continued task")
         } catch {
-            print("[BackgroundExec] failed to submit continued task: \(error)")
+            NSLog("[BackgroundExec] failed to submit continued task: %@", "\(error)")
         }
     }
 
@@ -39,16 +39,16 @@ class BackgroundExecutionService {
         request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60) // 15 min from now
         do {
             try BGTaskScheduler.shared.submit(request)
-            print("[BackgroundExec] submitted maintenance task")
+            NSLog("[BackgroundExec] submitted maintenance task")
         } catch {
-            print("[BackgroundExec] failed to submit maintenance task: \(error)")
+            NSLog("[BackgroundExec] failed to submit maintenance task: %@", "\(error)")
         }
     }
 
     /// Begin transition task — call when app moves to background
     func beginTransitionTask() -> UIBackgroundTaskIdentifier {
         return UIApplication.shared.beginBackgroundTask {
-            print("[BackgroundExec] transition task expired")
+            NSLog("[BackgroundExec] transition task expired")
         }
     }
 

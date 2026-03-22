@@ -7,22 +7,13 @@ import {
   TextInput,
   ScrollView,
   NativeModules,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/colors';
-
-// ---------------------------------------------------------------------------
-// Mock data (fallback when native module not available)
-// ---------------------------------------------------------------------------
-
-const mockDevice = {
-  name: '剪辑工作站-A',
-  ip: '192.168.1.101',
-  connected: true,
-};
 
 // ---------------------------------------------------------------------------
 // SettingsScreen
@@ -33,9 +24,9 @@ type NavigationProp = StackNavigationProp<RootStackParamList, 'Settings'>;
 export function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const [editing, setEditing] = useState(false);
-  const [deviceName, setDeviceName] = useState(mockDevice.name);
-  const [deviceIp, setDeviceIp] = useState(mockDevice.ip);
-  const [connected, setConnected] = useState(mockDevice.connected);
+  const [deviceName, setDeviceName] = useState('');
+  const [deviceIp, setDeviceIp] = useState('');
+  const [connected, setConnected] = useState(false);
 
   // My iPhone display name
   const [myName, setMyName] = useState('iPhone');
@@ -56,15 +47,15 @@ export function SettingsScreen() {
           NativeSyncEngine.getClientDisplayName(),
         ]);
         if (state) {
-          setDeviceName(state.deviceAlias || state.deviceName || mockDevice.name);
-          setDeviceIp(state.host || mockDevice.ip);
+          setDeviceName(state.deviceAlias || state.deviceName || '');
+          setDeviceIp(state.host || '');
           setConnected(true);
         }
         if (clientName) {
           setMyName(clientName);
         }
       } catch (e) {
-        console.warn('Native module not available for Settings, using mock data');
+        console.warn('Native module not available for Settings');
       }
     };
 
@@ -109,19 +100,32 @@ export function SettingsScreen() {
   // Disconnect and unbind
   // ---------------------------------------------------------------------------
 
-  const handleDisconnect = useCallback(async () => {
-    try {
-      const { NativeSyncEngine } = NativeModules;
-      if (NativeSyncEngine) {
-        await NativeSyncEngine.disconnectAndUnbind();
-      }
-    } catch (e) {
-      console.warn('Failed to disconnect');
-    }
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'DeviceDiscovery' }],
-    });
+  const handleDisconnect = useCallback(() => {
+    Alert.alert(
+      '断开连接',
+      '确定要断开与电脑的连接吗？断开后需要重新输入连接码配对',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '确定',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { NativeSyncEngine } = NativeModules;
+              if (NativeSyncEngine) {
+                await NativeSyncEngine.disconnectAndUnbind();
+              }
+            } catch (e) {
+              console.warn('Failed to disconnect');
+            }
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'DeviceDiscovery' }],
+            });
+          },
+        },
+      ],
+    );
   }, [navigation]);
 
   return (

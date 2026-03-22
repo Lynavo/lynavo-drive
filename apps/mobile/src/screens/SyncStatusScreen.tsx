@@ -37,26 +37,6 @@ interface SyncOverview {
 }
 
 // ---------------------------------------------------------------------------
-// Mock data (fallback when native module not available)
-// ---------------------------------------------------------------------------
-
-const MOCK_OVERVIEW: SyncOverview = {
-  progressPercent: 68,
-  speed: '45 MB/s',
-  completed: '8 GB',
-  total: '12.4 GB',
-  uploadState: 'syncing_foreground',
-};
-
-const mockQueue: QueueItem[] = [
-  { id: '1', name: 'DJI_0022_PRO.mp4', size: '1.2 GB', type: 'video', status: 'uploading' },
-  { id: '2', name: 'DJI_0023_PRO.mp4', size: '2.4 GB', type: 'video', status: 'queued' },
-  { id: '3', name: 'IMG_8492.HEIC', size: '12 MB', type: 'image', status: 'queued' },
-  { id: '4', name: 'A001_C012_1024.braw', size: '4.2 GB', type: 'video', status: 'queued' },
-  { id: '5', name: 'IMG_8493.HEIC', size: '14 MB', type: 'image', status: 'queued' },
-];
-
-// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
@@ -228,6 +208,7 @@ export function SyncStatusScreen() {
   });
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [todayStats, setTodayStats] = useState({ fileCount: 0, totalBytes: 0 });
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const loadTodayStats = useCallback(async (engine?: any) => {
     try {
@@ -250,12 +231,13 @@ export function SyncStatusScreen() {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Load real data from native module with mock fallback
+  // Load real data from native module
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
     let syncSub: { remove: () => void } | undefined;
     let queueSub: { remove: () => void } | undefined;
+    let bindingSub: { remove: () => void } | undefined;
 
     const loadReal = async () => {
       try {
@@ -264,27 +246,29 @@ export function SyncStatusScreen() {
 
         // Listen for errors from native engine
         const debugEmitter = new NativeEventEmitter(NativeSyncEngine);
-        const errorSub = debugEmitter.addListener('onError', (error: Record<string, unknown>) => {
+        debugEmitter.addListener('onError', (error: Record<string, unknown>) => {
           console.error('[SyncStatus] Native error:', JSON.stringify(error));
         });
-        const syncEventSub = debugEmitter.addListener('onSyncStateChanged', (state: Record<string, unknown>) => {
-          console.log('[SyncStatus] Sync state changed:', JSON.stringify(state));
+
+        // Listen for binding cleared (e.g. token lost → need re-pair)
+        const bindingEmitter = new NativeEventEmitter(NativeSyncEngine);
+        bindingSub = bindingEmitter.addListener('onBindingStateChanged', (state: Record<string, unknown>) => {
+          if (!state || !state.deviceId) {
+            // Binding cleared — navigate back to discovery for re-pairing
+            navigation.reset({ index: 0, routes: [{ name: 'DeviceDiscovery' }] });
+          }
         });
 
-        // Auto-start sync if we have a binding (coming from app launch or after pairing)
+        // Check binding before loading data
         const binding = await NativeSyncEngine.getBindingState();
-        if (binding && binding.deviceId) {
-          // Start discovery first (so sync pipeline can find the target device)
-          await NativeSyncEngine.startDiscovery();
-          // Trigger sync — runs in background: scans photos → connects → uploads
-          NativeSyncEngine.triggerSync?.()
-            .catch((e: Error) => console.warn('[SyncStatus] triggerSync failed:', e));
+        if (!binding || !binding.deviceId) {
+          navigation.reset({ index: 0, routes: [{ name: 'DeviceDiscovery' }] });
+          return;
         }
 
-        // Load today's stats from history
-        loadTodayStats(NativeSyncEngine);
+        // Load initial state FIRST (before triggering sync, to avoid flash)
+        await loadTodayStats(NativeSyncEngine);
 
-        // Load initial overview
         const syncData = await NativeSyncEngine.getSyncOverview();
         if (syncData) {
           setOverview({
@@ -307,6 +291,13 @@ export function SyncStatusScreen() {
             status: ((item.status as string) ?? 'queued') as QueueItem['status'],
           })));
         }
+
+        setInitialLoading(false);
+
+        // NOW trigger sync (after initial UI render, so no flash)
+        await NativeSyncEngine.startDiscovery();
+        NativeSyncEngine.triggerSync?.()
+          .catch((e: Error) => console.warn('[SyncStatus] triggerSync failed:', e));
 
         // Subscribe to live updates
         const emitter = new NativeEventEmitter(NativeSyncEngine);
@@ -337,7 +328,8 @@ export function SyncStatusScreen() {
           }
         });
       } catch (e) {
-        console.warn('Native module not available for SyncStatus, using mock data');
+        console.warn('Native module not available for SyncStatus');
+        setInitialLoading(false);
       }
     };
 
@@ -346,6 +338,7 @@ export function SyncStatusScreen() {
     return () => {
       syncSub?.remove();
       queueSub?.remove();
+      bindingSub?.remove();
     };
   }, []);
 
@@ -392,7 +385,7 @@ export function SyncStatusScreen() {
         </View>
       </View>
 
-      {isDone ? (
+      {initialLoading ? null : isDone ? (
         /* ---- Completion card ---- */
         <View style={styles.progressCard}>
           <CompletionCard fileCount={todayStats.fileCount} totalSize={formatBytes(todayStats.totalBytes)} />

@@ -64,63 +64,6 @@ function formatDateLabel(dateStr: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Mock data
-// ---------------------------------------------------------------------------
-
-const mockSections: HistorySection[] = [
-  {
-    title: '今天',
-    isToday: true,
-    data: [
-      {
-        id: 's1',
-        deviceName: '剪辑工作站-A',
-        deviceIp: '192.168.1.101',
-        fileCount: 15,
-        totalSize: '16.3 GB',
-        duration: '22:51',
-      },
-      {
-        id: 's2',
-        deviceName: 'MacBook Pro',
-        deviceIp: '192.168.1.108',
-        fileCount: 3,
-        totalSize: '2.1 GB',
-        duration: '10:02',
-      },
-    ],
-  },
-  {
-    title: '3月18日',
-    isToday: false,
-    data: [
-      {
-        id: 's3',
-        deviceName: '剪辑工作站-A',
-        deviceIp: '192.168.1.101',
-        fileCount: 45,
-        totalSize: '86.5 GB',
-        duration: '22:17',
-      },
-    ],
-  },
-  {
-    title: '3月17日',
-    isToday: false,
-    data: [
-      {
-        id: 's4',
-        deviceName: '剪辑工作站-A',
-        deviceIp: '192.168.1.101',
-        fileCount: 29,
-        totalSize: '51.0 GB',
-        duration: '21:05',
-      },
-    ],
-  },
-];
-
-// ---------------------------------------------------------------------------
 // Pulsing blue dot component
 // ---------------------------------------------------------------------------
 
@@ -235,7 +178,7 @@ export function HistoryScreen() {
   const [sections, setSections] = useState<HistorySection[]>([]);
 
   // ---------------------------------------------------------------------------
-  // Load real history from native module with mock fallback
+  // Load real history from native module
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
@@ -247,7 +190,6 @@ export function HistoryScreen() {
         if (!NativeSyncEngine) return;
 
         const result = await NativeSyncEngine.getHistoryDays(null);
-        console.log('[History] RAW getHistoryDays:', JSON.stringify(result, null, 2));
         if (result && result.items) {
           const grouped = groupByDate(result.items);
           setSections(grouped);
@@ -266,7 +208,7 @@ export function HistoryScreen() {
           }
         });
       } catch (e) {
-        console.warn('Native module not available for History, using mock data');
+        console.warn('Native module not available for History');
       }
     };
 

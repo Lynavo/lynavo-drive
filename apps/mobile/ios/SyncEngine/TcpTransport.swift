@@ -23,6 +23,7 @@ enum LMUPMessageType: UInt16 {
     case pong         = 0x0010
     case error        = 0x0011
     case authReq      = 0x0012
+    case authRes      = 0x0013
 }
 
 // MARK: - Delegate
@@ -99,7 +100,7 @@ class TcpTransport {
         }
         let frame = header + body
         connection?.send(content: frame, completion: .contentProcessed({ error in
-            if let error { print("[TcpTransport] send error: \(error)") }
+            if let error { NSLog("[TcpTransport] send error: %@", "\(error)") }
         }))
     }
 
@@ -183,7 +184,7 @@ class TcpTransport {
 
             // Validate magic bytes
             guard String(data: data[0..<4], encoding: .utf8) == "LMUP" else {
-                print("[TcpTransport] invalid magic")
+                NSLog("[TcpTransport] invalid magic")
                 self.disconnect()
                 return
             }
@@ -192,7 +193,7 @@ class TcpTransport {
             let length = data.withUnsafeBytes { $0.load(fromByteOffset: 8, as: UInt32.self).bigEndian }
 
             guard let msgType = LMUPMessageType(rawValue: type) else {
-                print("[TcpTransport] unknown type: \(type)")
+                NSLog("[TcpTransport] unknown type: %d", type)
                 self.receiveHeader() // skip unknown and continue
                 return
             }

@@ -13,7 +13,6 @@
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		DB862C6CA16A33F1996C19AF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		FC3ECC2E2F6F05B5000460F8 /* RNBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC252F6F05B5000460F8 /* RNBridge.m */; };
-		FC3ECC2F2F6F05B5000460F8 /* UploadQueueManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC2B2F6F05B5000460F8 /* UploadQueueManager.swift */; };
 		FC3ECC302F6F05B5000460F8 /* RNBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC262F6F05B5000460F8 /* RNBridge.swift */; };
 		FC3ECC312F6F05B5000460F8 /* BindingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC212F6F05B5000460F8 /* BindingService.swift */; };
 		FC3ECC322F6F05B5000460F8 /* TcpTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC2A2F6F05B5000460F8 /* TcpTransport.swift */; };
@@ -52,7 +51,6 @@
 		FC3ECC282F6F05B5000460F8 /* SyncEngineError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngineError.swift; sourceTree = "<group>"; };
 		FC3ECC292F6F05B5000460F8 /* SyncEngineManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngineManager.swift; sourceTree = "<group>"; };
 		FC3ECC2A2F6F05B5000460F8 /* TcpTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TcpTransport.swift; sourceTree = "<group>"; };
-		FC3ECC2B2F6F05B5000460F8 /* UploadQueueManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadQueueManager.swift; sourceTree = "<group>"; };
 		FC3ECC2C2F6F05B5000460F8 /* UploadStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadStore.swift; sourceTree = "<group>"; };
 		FC3ECC3D2F6F05B5000460F8 /* ProtocolSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolSession.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -145,7 +143,6 @@
 				FC3ECC282F6F05B5000460F8 /* SyncEngineError.swift */,
 				FC3ECC292F6F05B5000460F8 /* SyncEngineManager.swift */,
 				FC3ECC2A2F6F05B5000460F8 /* TcpTransport.swift */,
-				FC3ECC2B2F6F05B5000460F8 /* UploadQueueManager.swift */,
 				FC3ECC2C2F6F05B5000460F8 /* UploadStore.swift */,
 			);
 			path = SyncEngine;
@@ -301,7 +298,6 @@
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
 				FC3ECC2E2F6F05B5000460F8 /* RNBridge.m in Sources */,
-				FC3ECC2F2F6F05B5000460F8 /* UploadQueueManager.swift in Sources */,
 				FC3ECC302F6F05B5000460F8 /* RNBridge.swift in Sources */,
 				FC3ECC312F6F05B5000460F8 /* BindingService.swift in Sources */,
 				FC3ECC322F6F05B5000460F8 /* TcpTransport.swift in Sources */,
