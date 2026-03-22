@@ -12,7 +12,8 @@ export function formatDuration(ms: number): string {
   const sec = s % 60;
   if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
   if (m > 0) return `${m}m ${String(sec).padStart(2, '0')}s`;
-  return `${sec}s`;
+  if (s > 0) return `${sec}s`;
+  return `${ms}ms`;
 }
 
 export function formatDate(iso: string): string {
