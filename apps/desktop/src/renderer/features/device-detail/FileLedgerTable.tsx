@@ -92,14 +92,18 @@ export function FileLedgerTable() {
   ];
 
   return (
-    <Table>
+    <Table className="table-fixed w-full">
       <TableHeader>
         <TableRow style={{ borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
           {columns.map((col) => (
-            <TableHead key={col.field} className="pr-4">
+            <TableHead
+              key={col.field}
+              className="pr-2"
+              style={{ width: col.field === 'name' ? '35%' : undefined }}
+            >
               <button
                 onClick={() => toggleSort(col.field)}
-                className="flex items-center gap-1 text-xs font-medium transition-colors hover:text-blue-500"
+                className="flex items-center gap-1 text-xs font-medium transition-colors hover:text-blue-500 whitespace-nowrap"
                 style={{ color: colors.headerText }}
               >
                 {col.label}
@@ -107,7 +111,7 @@ export function FileLedgerTable() {
               </button>
             </TableHead>
           ))}
-          <TableHead className="text-right">
+          <TableHead className="text-right w-16">
             <span className="text-xs font-medium" style={{ color: colors.headerText }}>
               操作
             </span>
@@ -131,37 +135,38 @@ export function FileLedgerTable() {
               key={file.fileKey}
               className="transition-colors hover:bg-blue-50/40"
             >
-              <TableCell className="pr-4">
-                <div className="flex items-center gap-3">
+              <TableCell className="pr-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <FileIcon name={file.originalFilename} />
                   <span
-                    className="font-medium"
+                    className="font-medium truncate"
                     style={{ color: colors.fileName }}
+                    title={file.originalFilename}
                   >
                     {file.originalFilename}
                   </span>
                 </div>
               </TableCell>
               <TableCell
-                className="pr-4 text-sm"
+                className="pr-2 text-sm whitespace-nowrap"
                 style={{ color: colors.cellText }}
               >
                 {formatBytes(file.fileSize)}
               </TableCell>
               <TableCell
-                className="pr-4 text-sm"
+                className="pr-2 text-sm whitespace-nowrap"
                 style={{ color: colors.cellText }}
               >
                 {formatTime(file.completedAt)}
               </TableCell>
               <TableCell
-                className="pr-4 text-sm"
+                className="pr-2 text-sm whitespace-nowrap"
                 style={{ color: colors.cellText }}
               >
                 {formatTime(file.createdAtRemote)}
               </TableCell>
               <TableCell
-                className="pr-4 text-sm"
+                className="pr-2 text-sm whitespace-nowrap"
                 style={{ color: colors.cellText }}
               >
                 {formatDuration(file.activeTransmissionMs)}
