@@ -211,7 +211,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             roundNumber += 1
             let completedKeys = Set(uploadStore?.getCompletedFileKeys() ?? [])
             let newAssets = photoScanner.scanForNewAssets(clientId: clientId, completedFileKeys: completedKeys)
-            NSLog("[SyncPipeline] round %d: %d new assets", roundNumber, newAssets.count)
+            NSLog("[SyncPipeline] round %d: %d new assets (completed: %d, photoChanged: %@)",
+                  roundNumber, newAssets.count, completedKeys.count,
+                  photoLibraryChanged ? "yes" : "no")
 
             if newAssets.isEmpty {
                 // Nothing to upload — emit completed and wait for photo library changes
@@ -327,7 +329,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             let (_, _) = try await session.sendAndReceive(type: .syncEndReq, payload: [:])
             NSLog("[SyncPipeline] round %d complete", roundNumber)
 
-            // Loop back to check for more new assets
+            // Reset change flag — exports during upload may have triggered false positives
+            photoLibraryChanged = false
         }
         // Note: loop exits only via throw (error) or task cancellation
     }
