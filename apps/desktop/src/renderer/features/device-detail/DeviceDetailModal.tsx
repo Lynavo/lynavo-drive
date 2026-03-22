@@ -99,7 +99,7 @@ export function DeviceDetailModal() {
                 加载中...
               </div>
             ) : (
-              <FileLedgerTable />
+              <FileLedgerTable storagePath={selectedDevice.storagePath} />
             )}
           </ScrollArea>
         </DialogContent>

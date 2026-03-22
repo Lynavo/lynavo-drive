@@ -43,7 +43,17 @@ function formatTime(iso?: string): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-export function FileLedgerTable() {
+function formatDateTime(iso?: string): string {
+  if (!iso) return '\u2014';
+  const d = new Date(iso);
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hour = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${month}-${day} ${hour}:${min}`;
+}
+
+export function FileLedgerTable({ storagePath }: { storagePath: string }) {
   const files = useDeviceDetailStore((s) => s.files);
   const sortField = useDeviceDetailStore((s) => s.sortField);
   const sortDirection = useDeviceDetailStore((s) => s.sortDirection);
@@ -77,9 +87,10 @@ export function FileLedgerTable() {
     return result;
   }, [files, sortField, sortDirection]);
 
-  const handleOpen = (path?: string) => {
-    if (path) {
-      window.electronAPI?.files.openFile(path);
+  const handleOpen = (relativePath?: string) => {
+    if (relativePath && storagePath) {
+      const fullPath = `${storagePath}/${relativePath}`;
+      window.electronAPI?.files.openFile(fullPath);
     }
   };
 
@@ -163,7 +174,7 @@ export function FileLedgerTable() {
                 className="pr-2 text-sm whitespace-nowrap"
                 style={{ color: colors.cellText }}
               >
-                {formatTime(file.createdAtRemote)}
+                {formatDateTime(file.createdAtRemote)}
               </TableCell>
               <TableCell
                 className="pr-2 text-sm whitespace-nowrap"
