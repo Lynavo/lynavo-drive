@@ -169,10 +169,10 @@ export function FileLedgerTable() {
               <TableCell className="text-right">
                 <button
                   onClick={() => handleOpen(file.finalPath)}
-                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-blue-50"
+                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-80"
                   style={{
-                    color: colors.actionButton,
-                    border: '1px solid rgba(59,130,246,0.18)',
+                    color: '#fff',
+                    background: colors.actionButton,
                   }}
                   title="打开文件"
                 >
