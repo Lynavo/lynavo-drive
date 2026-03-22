@@ -261,6 +261,14 @@ class UploadStore {
         }
     }
 
+    func getCompletedFileKeys() -> [String] {
+        return queue.sync {
+            let sql = "SELECT file_key FROM upload_items WHERE status = 'completed' AND file_key IS NOT NULL"
+            let rows = queryInternal(sql, bind: [])
+            return rows.compactMap { $0["file_key"] as? String }
+        }
+    }
+
     func updateUploadStatus(fileKey: String, status: String) throws {
         try queue.sync {
             let now = ISO8601DateFormatter().string(from: Date())

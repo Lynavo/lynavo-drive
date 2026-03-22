@@ -108,10 +108,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
 
         // 2. Scan for assets not yet uploaded (offline — no TCP needed)
         let clientId = bindingService.getOrCreateClientId()
-        let allItems = uploadStore?.getPendingUploadItems() ?? []
-        let completedKeys = Set(
-            allItems.filter { $0.status == "completed" }.compactMap { $0.fileKey }
-        )
+        let completedKeys = Set(uploadStore?.getCompletedFileKeys() ?? [])
         let newAssets = photoScanner.scanForNewAssets(clientId: clientId, completedFileKeys: completedKeys)
 
         NSLog("[SyncEngine] found \(newAssets.count) new assets to sync")

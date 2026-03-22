@@ -247,6 +247,7 @@ export function HistoryScreen() {
         if (!NativeSyncEngine) return;
 
         const result = await NativeSyncEngine.getHistoryDays(null);
+        console.log('[History] getHistoryDays result:', JSON.stringify(result));
         if (result && result.items) {
           const grouped = groupByDate(result.items);
           setSections(grouped);
