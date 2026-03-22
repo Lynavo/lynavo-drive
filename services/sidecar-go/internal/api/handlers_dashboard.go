@@ -69,7 +69,7 @@ func (s *Server) handleDashboardDevices(w http.ResponseWriter, _ *http.Request) 
 		if d.LastIP != nil {
 			ip = *d.LastIP
 		}
-		// Derive status from live TCP connection, not stale session DB
+		// Derive status: live TCP connection > recent activity > offline
 		status := "offline"
 		if s.clientStates != nil {
 			liveStates := s.clientStates.ConnectedClientStates()
@@ -77,6 +77,14 @@ func (s *Server) handleDashboardDevices(w http.ResponseWriter, _ *http.Request) 
 				if st == "syncing" {
 					status = "transferring"
 				} else {
+					status = "connected_idle"
+				}
+			}
+		}
+		// Fallback: if no live TCP but seen recently (within 5 min), show connected_idle
+		if status == "offline" && d.LastSeenAt != "" {
+			if seen, err := time.Parse(time.RFC3339, d.LastSeenAt); err == nil {
+				if time.Since(seen) < 5*time.Minute {
 					status = "connected_idle"
 				}
 			}
