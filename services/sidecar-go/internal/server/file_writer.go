@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -153,6 +154,30 @@ func (fw *FileWriter) Finalize(receivePath, deviceAlias, date, filename, fileKey
 		return filepath.Base(finalPath), nil
 	}
 	return rel, nil
+}
+
+// MigrateDeviceDir renames a device's receive directory when its display name changes.
+// oldDirName is the previously stored sanitized name, newAlias is the current display name.
+func MigrateDeviceDir(receivePath, oldDirName, newAlias string) {
+	newDir := sanitizeDirName(newAlias)
+	if newDir == "" || oldDirName == "" || oldDirName == newDir {
+		return
+	}
+	oldPath := filepath.Join(receivePath, oldDirName)
+	newPath := filepath.Join(receivePath, newDir)
+	if info, err := os.Stat(oldPath); err == nil && info.IsDir() {
+		if err := os.Rename(oldPath, newPath); err != nil {
+			slog.Warn("failed to migrate device dir", "old", oldPath, "new", newPath, "err", err)
+		} else {
+			slog.Info("migrated device dir", "old", oldDirName, "new", newDir)
+		}
+	}
+}
+
+// SanitizeDirName replaces characters unsafe for directory names.
+// Exported so handlers can compute the dir name to store in the DB.
+func SanitizeDirName(name string) string {
+	return sanitizeDirName(name)
 }
 
 // sanitizeDirName replaces characters unsafe for directory names.

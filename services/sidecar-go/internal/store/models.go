@@ -12,6 +12,7 @@ type PairedDevice struct {
 	CreatedAt        string  `json:"createdAt"`
 	LastSeenAt       string  `json:"lastSeenAt"`
 	RevokedAt        *string `json:"revokedAt,omitempty"`
+	ReceiveDirName   *string `json:"-"` // sanitized dir name on disk
 }
 
 // Upload represents a single file upload record.

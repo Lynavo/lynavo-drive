@@ -170,13 +170,25 @@ func (c *connection) handleFileEnd(body []byte) error {
 
 	// SHA256 matches — finalize
 	deviceAlias := c.clientID // fallback
+	var oldDirName string
 	if dev, err := c.store.GetPairedDevice(c.clientID); err == nil {
 		if dev.DeviceAlias != nil && *dev.DeviceAlias != "" {
 			deviceAlias = *dev.DeviceAlias
 		} else {
 			deviceAlias = dev.ClientName
 		}
+		if dev.ReceiveDirName != nil {
+			oldDirName = *dev.ReceiveDirName
+		}
 	}
+
+	// Migrate device directory if name changed
+	newDirName := SanitizeDirName(deviceAlias)
+	if oldDirName != "" && oldDirName != newDirName {
+		MigrateDeviceDir(c.config.ReceiveDir, oldDirName, deviceAlias)
+	}
+	// Always update stored dir name
+	_ = c.store.UpdateReceiveDirName(c.clientID, newDirName)
 
 	date := time.Now().Format("2006-01-02")
 

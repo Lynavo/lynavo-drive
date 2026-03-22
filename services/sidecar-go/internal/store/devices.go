@@ -33,16 +33,26 @@ func (s *Store) GetPairedDevice(clientID string) (*PairedDevice, error) {
 	d := &PairedDevice{}
 	err := s.db.QueryRow(`
 		SELECT client_id, client_name, device_alias, last_ip, platform, pairing_id,
-		       pairing_token_hash, created_at, last_seen_at, revoked_at
+		       pairing_token_hash, created_at, last_seen_at, revoked_at, receive_dir_name
 		FROM paired_devices WHERE client_id = ?`, clientID,
 	).Scan(
 		&d.ClientID, &d.ClientName, &d.DeviceAlias, &d.LastIP, &d.Platform,
 		&d.PairingID, &d.PairingTokenHash, &d.CreatedAt, &d.LastSeenAt, &d.RevokedAt,
+		&d.ReceiveDirName,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get paired device %q: %w", clientID, err)
 	}
 	return d, nil
+}
+
+// UpdateReceiveDirName stores the sanitized directory name used on disk for a device.
+func (s *Store) UpdateReceiveDirName(clientID, dirName string) error {
+	_, err := s.db.Exec(
+		"UPDATE paired_devices SET receive_dir_name = ? WHERE client_id = ?",
+		dirName, clientID,
+	)
+	return err
 }
 
 // ListPairedDevices returns all paired devices ordered by last_seen_at descending.
