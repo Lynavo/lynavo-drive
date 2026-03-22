@@ -43,14 +43,28 @@ function formatTime(iso?: string): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function formatDateTime(iso?: string): string {
+function formatSmartDate(iso?: string): string {
   if (!iso) return '\u2014';
   const d = new Date(iso);
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const hour = String(d.getHours()).padStart(2, '0');
-  const min = String(d.getMinutes()).padStart(2, '0');
-  return `${month}-${day} ${hour}:${min}`;
+  const now = new Date();
+  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const targetStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.floor((todayStart.getTime() - targetStart.getTime()) / 86400000);
+
+  if (diffDays === 0) return time;
+  if (diffDays === 1) return `昨天 ${time}`;
+  if (diffDays > 1 && diffDays < 7) {
+    const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+    return `${weekdays[d.getDay()]} ${time}`;
+  }
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  if (d.getFullYear() !== now.getFullYear()) {
+    return `${d.getFullYear()}/${month}/${day} ${time}`;
+  }
+  return `${month}月${day}日 ${time}`;
 }
 
 export function FileLedgerTable({ storagePath }: { storagePath: string }) {
@@ -174,7 +188,7 @@ export function FileLedgerTable({ storagePath }: { storagePath: string }) {
                 className="pr-2 text-sm whitespace-nowrap"
                 style={{ color: colors.cellText }}
               >
-                {formatDateTime(file.createdAtRemote)}
+                {formatSmartDate(file.createdAtRemote)}
               </TableCell>
               <TableCell
                 className="pr-2 text-sm whitespace-nowrap"
