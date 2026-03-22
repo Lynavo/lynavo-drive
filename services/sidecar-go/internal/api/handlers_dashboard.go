@@ -81,14 +81,6 @@ func (s *Server) handleDashboardDevices(w http.ResponseWriter, _ *http.Request) 
 				}
 			}
 		}
-		// Fallback: if no live TCP but seen recently (within 5 min), show connected_idle
-		if status == "offline" && d.LastSeenAt != "" {
-			if seen, err := time.Parse(time.RFC3339, d.LastSeenAt); err == nil {
-				if time.Since(seen) < 5*time.Minute {
-					status = "connected_idle"
-				}
-			}
-		}
 
 		dto := deviceDTO{
 			DeviceID:       d.ClientID,

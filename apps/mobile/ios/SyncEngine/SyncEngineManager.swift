@@ -5,7 +5,7 @@ import CryptoKit
 import Network
 
 @objc
-class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
+class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegate {
     static let shared = SyncEngineManager()
 
     let discoveryService = DiscoveryService()
@@ -19,6 +19,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
     private var historyStore: HistoryLedgerStore?
     private var protocolSession: ProtocolSession?
     private var discoveredDevices: [String: DiscoveredDevice] = [:]  // keyed by deviceId
+    private var photoLibraryChanged = false  // set by observer, consumed by watch loop
+    private var watchLoopContinuation: CheckedContinuation<Void, Never>?
 
     private override init() {
         super.init()
@@ -29,6 +31,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
             NSLog("[SyncEngine] Failed to init stores: \(error)")
         }
         discoveryService.delegate = self
+        photoScanner.delegate = self
 
         NotificationCenter.default.addObserver(
             self,
@@ -98,12 +101,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
     private func runSyncPipeline() async throws {
         NSLog("[SyncPipeline] START")
 
-        // 0. Check prerequisites — do this BEFORE connecting TCP
+        // 0. Check prerequisites
         guard let binding = uploadStore?.getBinding() else {
             throw SyncEngineError.pairingError("No binding found — pair first")
         }
         guard let token = bindingService.getPairingToken() else {
-            // Token lost (app reinstall, Keychain issue) — clear stale binding so UI navigates to pairing
             NSLog("[SyncPipeline] pairing token missing — clearing stale binding, need re-pair")
             try? uploadStore?.clearBinding()
             isSyncing = false
@@ -112,71 +114,30 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
             return
         }
 
-        // 1. Request photo permission FIRST (user may take time to select photos)
-        let status = await photoScanner.requestPermission()
-        guard status == .authorized || status == .limited else {
+        // 1. Request photo permission
+        let permStatus = await photoScanner.requestPermission()
+        guard permStatus == .authorized || permStatus == .limited else {
             NSLog("[SyncEngine] photo permission denied")
             sessionService.transitionTo(.pausedNoPermission)
             return
         }
 
-        // 2. Scan for assets not yet uploaded (offline — no TCP needed)
+        // 2. Start observing photo library for new assets
+        photoScanner.startObserving()
+
         let clientId = bindingService.getOrCreateClientId()
-        let completedKeys = Set(uploadStore?.getCompletedFileKeys() ?? [])
-        let newAssets = photoScanner.scanForNewAssets(clientId: clientId, completedFileKeys: completedKeys)
-        NSLog("[SyncPipeline] scan done: %d new assets", newAssets.count)
 
-        // Write scanned assets to DB with filename + estimated size from PHAssetResource
-        for asset in newAssets {
-            let item = UploadItemRecord(
-                id: nil,
-                assetLocalId: asset.asset.localIdentifier,
-                modifiedAt: asset.asset.modificationDate?.iso8601String ?? "",
-                mediaType: asset.mediaType,
-                originalFilename: asset.originalFilename,
-                fileKey: asset.fileKey,
-                fileSize: asset.estimatedSize,
-                status: "queued",
-                tempFilePath: nil,
-                ackedOffset: 0,
-                lastErrorCode: nil,
-                updatedAt: ISO8601DateFormatter().string(from: Date())
-            )
-            try? uploadStore?.upsertUploadItem(item)
-        }
-        emitQueueToJS()
-
-        guard !newAssets.isEmpty else {
-            NSLog("[SyncPipeline] no new assets — completed")
-            sessionService.transitionTo(.idle)
-            NativeSyncEngineModule.shared?.emitSyncStateChanged([
-                "uploadState": "completed",
-                "progressPercent": 100,
-            ])
-            return
-        }
-
-        // 3. Find the target device — use any discovered _syncflow._tcp device
-        //    (v2 supports single target only, so first match is correct)
-        var targetEndpoint: NWEndpoint?
-
-        // Try to find the target device by binding.deviceId first, then fallback to any device
+        // 3. Find target device
         func findDevice() -> DiscoveredDevice? {
-            // Exact match by sidecar device ID
             if let exact = discoveredDevices[binding.deviceId], exact.endpoint != nil {
                 return exact
             }
-            // Fallback: any _syncflow._tcp device (v2 single-target)
             return discoveredDevices.values.first(where: { $0.endpoint != nil })
         }
 
-        if let cached = findDevice() {
-            targetEndpoint = cached.endpoint
-        }
-
+        var targetEndpoint = findDevice()?.endpoint
         if targetEndpoint == nil {
             discoveryService.startBrowsing()
-
             for _ in 0..<20 {
                 try await Task.sleep(nanoseconds: 500_000_000)
                 if let found = findDevice() {
@@ -185,20 +146,18 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
                 }
             }
         }
-
         guard let endpoint = targetEndpoint else {
             NSLog("[SyncPipeline] target device not found after discovery")
             throw SyncEngineError.networkError("Target device not found on network")
         }
 
-        // 4. Connect TCP
+        // 4. Connect TCP + auth (one connection for the entire session)
         let newTransport = TcpTransport()
         let session = ProtocolSession(transport: newTransport)
         protocolSession = session
         try await session.connect(endpoint: endpoint)
         NSLog("[SyncPipeline] TCP connected")
 
-        // 4. Auto-auth with pairingToken
         let (helloType, helloRes) = try await session.sendAndReceive(type: .helloReq, payload: [
             "clientId": clientId,
             "clientName": getClientDisplayName(),
@@ -222,54 +181,105 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
             NSLog("[SyncPipeline] auth successful")
         }
 
-        // 5. Start sync session
-        let sessionId = sessionService.startNewSession()
+        // 5. Continuous sync loop — scan, upload, wait for new photos, repeat
+        var roundNumber = 0
+        while true {
+            roundNumber += 1
+            let completedKeys = Set(uploadStore?.getCompletedFileKeys() ?? [])
+            let newAssets = photoScanner.scanForNewAssets(clientId: clientId, completedFileKeys: completedKeys)
+            NSLog("[SyncPipeline] round %d: %d new assets", roundNumber, newAssets.count)
 
-        // 4. SYNC_BEGIN_REQ → SYNC_BEGIN_RES
-        let (beginType, beginRes) = try await session.sendAndReceive(type: .syncBeginReq, payload: [
-            "sessionId": sessionId,
-            "queueTotalCount": newAssets.count,
-            "queueTotalBytes": 0,  // actual sizes known only after export
-        ])
+            if newAssets.isEmpty {
+                // Nothing to upload — emit completed and wait for photo library changes
+                NativeSyncEngineModule.shared?.emitSyncStateChanged([
+                    "uploadState": "completed",
+                    "progressPercent": 100,
+                ])
 
-        let syncOk: Bool
-        if let b = beginRes["ok"] as? Bool { syncOk = b }
-        else if let n = beginRes["ok"] as? NSNumber { syncOk = n.boolValue }
-        else { syncOk = (beginType == .syncBeginRes) }
+                NSLog("[SyncPipeline] waiting for new photos...")
+                photoLibraryChanged = false
 
-        guard syncOk else {
-            throw SyncEngineError.networkError("SYNC_BEGIN rejected")
-        }
+                // Wait for photo library change or timeout (60s check interval)
+                await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                    if photoLibraryChanged {
+                        // Already changed while we were setting up
+                        cont.resume()
+                        return
+                    }
+                    watchLoopContinuation = cont
+                    // Timeout: wake up periodically to check even without notification
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 60) { [weak self] in
+                        self?.watchLoopContinuation?.resume()
+                        self?.watchLoopContinuation = nil
+                    }
+                }
 
-        NSLog("[SyncPipeline] uploading %d files", newAssets.count)
-
-        // 5. Upload each file serially (spec: single file at a time)
-        for (index, asset) in newAssets.enumerated() {
-            do {
-                try await uploadSingleFile(
-                    asset: asset,
-                    sessionId: sessionId,
-                    index: index,
-                    total: newAssets.count,
-                    session: session
-                )
-            } catch {
-                NSLog("[SyncEngine] upload failed for \(asset.fileKey): \(error)")
-                try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "failed")
-                // Continue to next file — don't abort the whole session
+                // Small debounce — photos may still be saving
+                try await Task.sleep(nanoseconds: 2_000_000_000)
+                continue
             }
+
+            // Write scanned assets to DB
+            for asset in newAssets {
+                let item = UploadItemRecord(
+                    id: nil,
+                    assetLocalId: asset.asset.localIdentifier,
+                    modifiedAt: asset.asset.modificationDate?.iso8601String ?? "",
+                    mediaType: asset.mediaType,
+                    originalFilename: asset.originalFilename,
+                    fileKey: asset.fileKey,
+                    fileSize: asset.estimatedSize,
+                    status: "queued",
+                    tempFilePath: nil,
+                    ackedOffset: 0,
+                    lastErrorCode: nil,
+                    updatedAt: ISO8601DateFormatter().string(from: Date())
+                )
+                try? uploadStore?.upsertUploadItem(item)
+            }
+            emitQueueToJS()
+
+            // SYNC_BEGIN
+            let sessionId = sessionService.startNewSession()
+            let (beginType, beginRes) = try await session.sendAndReceive(type: .syncBeginReq, payload: [
+                "sessionId": sessionId,
+                "queueTotalCount": newAssets.count,
+                "queueTotalBytes": 0,
+            ])
+            let syncOk: Bool
+            if let b = beginRes["ok"] as? Bool { syncOk = b }
+            else if let n = beginRes["ok"] as? NSNumber { syncOk = n.boolValue }
+            else { syncOk = (beginType == .syncBeginRes) }
+
+            guard syncOk else {
+                throw SyncEngineError.networkError("SYNC_BEGIN rejected")
+            }
+
+            NSLog("[SyncPipeline] uploading %d files", newAssets.count)
+
+            // Upload each file serially
+            for (index, asset) in newAssets.enumerated() {
+                do {
+                    try await uploadSingleFile(
+                        asset: asset,
+                        sessionId: sessionId,
+                        index: index,
+                        total: newAssets.count,
+                        session: session
+                    )
+                } catch {
+                    NSLog("[SyncEngine] upload failed for \(asset.fileKey): \(error)")
+                    try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "failed")
+                }
+            }
+
+            // SYNC_END
+            let (_, _) = try await session.sendAndReceive(type: .syncEndReq, payload: [:])
+            NSLog("[SyncPipeline] round %d complete", roundNumber)
+
+            // Loop back to check for more new assets
         }
-
-        // 6. SYNC_END_REQ → SYNC_END_RES
-        let (_, _) = try await session.sendAndReceive(type: .syncEndReq, payload: [:])
-
-        isSyncing = false
-        sessionService.transitionTo(.idle)
-        NativeSyncEngineModule.shared?.emitSyncStateChanged([
-            "uploadState": "completed",
-            "progressPercent": 100,
-        ])
-        NSLog("[SyncEngine] sync session \(sessionId) complete")
+        // Note: loop exits only via throw (error) or task cancellation
     }
 
     // MARK: - Single File Upload (spec Sections 7.3, 7.4)
@@ -473,6 +483,16 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate {
             ] as [String: Any]
         }
         NativeSyncEngineModule.shared?.emitQueueUpdated(mapped)
+    }
+
+    // MARK: - PhotoScannerDelegate
+
+    func photoLibraryDidChange() {
+        NSLog("[SyncEngine] photo library changed — flagging rescan")
+        photoLibraryChanged = true
+        // Wake up the watch loop if it's sleeping
+        watchLoopContinuation?.resume()
+        watchLoopContinuation = nil
     }
 
     // MARK: - DiscoveryServiceDelegate

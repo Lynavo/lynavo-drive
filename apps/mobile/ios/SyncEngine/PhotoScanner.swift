@@ -2,11 +2,43 @@ import Foundation
 import Photos
 import CryptoKit
 
-class PhotoScanner {
+protocol PhotoScannerDelegate: AnyObject {
+    func photoLibraryDidChange()
+}
+
+class PhotoScanner: NSObject, PHPhotoLibraryChangeObserver {
+
+    weak var delegate: PhotoScannerDelegate?
+    private var observing = false
 
     /// Request photo library permission
     func requestPermission() async -> PHAuthorizationStatus {
         await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+    }
+
+    /// Start observing photo library for new assets
+    func startObserving() {
+        guard !observing else { return }
+        observing = true
+        PHPhotoLibrary.shared().register(self)
+        NSLog("[PhotoScanner] started observing photo library changes")
+    }
+
+    /// Stop observing
+    func stopObserving() {
+        guard observing else { return }
+        observing = false
+        PHPhotoLibrary.shared().unregisterChangeObserver(self)
+        NSLog("[PhotoScanner] stopped observing")
+    }
+
+    // MARK: - PHPhotoLibraryChangeObserver
+
+    func photoLibraryDidChange(_ changeInstance: PHChange) {
+        NSLog("[PhotoScanner] photo library changed — notifying delegate")
+        DispatchQueue.main.async { [weak self] in
+            self?.delegate?.photoLibraryDidChange()
+        }
     }
 
     /// Scan all photos and videos, return items not yet uploaded
