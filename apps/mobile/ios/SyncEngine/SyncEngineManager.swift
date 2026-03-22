@@ -21,6 +21,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private var discoveredDevices: [String: DiscoveredDevice] = [:]  // keyed by deviceId
     private var photoLibraryChanged = false  // set by observer, consumed by watch loop
     private var watchLoopContinuation: CheckedContinuation<Void, Never>?
+    private var sidecarHost: String?  // resolved IP of Mac, for HTTP heartbeat
 
     private override init() {
         super.init()
@@ -146,7 +147,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
                 // Wait loop: send HTTP presence heartbeat every 30s while idle
                 while !photoLibraryChanged {
-                    sendPresenceHeartbeat(clientId: clientId, host: binding.host)
+                    sendPresenceHeartbeat(clientId: clientId)
                     await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
                         if photoLibraryChanged {
                             cont.resume()
@@ -239,7 +240,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let session = ProtocolSession(transport: newTransport)
         protocolSession = session
         try await session.connect(endpoint: endpoint)
-        NSLog("[SyncPipeline] TCP connected")
+        sidecarHost = newTransport.remoteHost
+        NSLog("[SyncPipeline] TCP connected to %@", sidecarHost ?? "unknown")
 
         let (helloType, helloRes) = try await session.sendAndReceive(type: .helloReq, payload: [
             "clientId": clientId,
@@ -845,15 +847,21 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     // MARK: - HTTP Presence Heartbeat
 
-    private func sendPresenceHeartbeat(clientId: String, host: String) {
-        // Send lightweight HTTP POST to sidecar to indicate we're alive
+    private func sendPresenceHeartbeat(clientId: String) {
+        guard let host = sidecarHost, !host.isEmpty else { return }
         let port = 39394
-        let urlStr = "http://127.0.0.1:\(port)/presence/\(clientId)"
+        // IPv6 link-local needs brackets and zone ID in URL
+        let hostPart = host.contains(":") ? "[\(host)]" : host
+        let urlStr = "http://\(hostPart):\(port)/presence/\(clientId)"
         guard let url = URL(string: urlStr) else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = 5
-        URLSession.shared.dataTask(with: request) { _, _, _ in }.resume()
+        URLSession.shared.dataTask(with: request) { _, _, error in
+            if let error {
+                NSLog("[Presence] heartbeat failed: %@", "\(error)")
+            }
+        }.resume()
     }
 
     func getClientDisplayName() -> String {

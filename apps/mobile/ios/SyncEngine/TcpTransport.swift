@@ -47,6 +47,18 @@ protocol TcpTransportDelegate: AnyObject {
 /// ```
 class TcpTransport {
     private var connection: NWConnection?
+
+    /// Returns the remote endpoint's resolved IP (e.g., from NWConnection path)
+    var remoteHost: String? {
+        guard let path = connection?.currentPath,
+              let endpoint = path.remoteEndpoint else { return nil }
+        switch endpoint {
+        case .hostPort(let host, _):
+            return "\(host)"
+        default:
+            return nil
+        }
+    }
     private let queue = DispatchQueue(label: "com.syncflow.tcp")
     weak var delegate: TcpTransportDelegate?
 
