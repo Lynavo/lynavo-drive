@@ -8,7 +8,7 @@ class HistoryLedgerStore {
     }
 
     /// Upsert a daily ledger row.
-    /// On conflict (same date + device), replaces snapshot fields and counters with the new values.
+    /// On conflict (same date + device), updates snapshot fields and accumulates counters.
     func upsertDailyLedger(
         date: String,
         deviceId: String,
@@ -25,9 +25,9 @@ class HistoryLedgerStore {
         ON CONFLICT(ledger_date, device_id) DO UPDATE SET
           device_name_snapshot = excluded.device_name_snapshot,
           device_ip_snapshot = excluded.device_ip_snapshot,
-          file_count = excluded.file_count,
-          total_bytes = excluded.total_bytes,
-          active_transmission_ms = excluded.active_transmission_ms,
+          file_count = file_count + excluded.file_count,
+          total_bytes = total_bytes + excluded.total_bytes,
+          active_transmission_ms = active_transmission_ms + excluded.active_transmission_ms,
           updated_at = excluded.updated_at
         """
         try store.executeParameterized(sql, bind: [

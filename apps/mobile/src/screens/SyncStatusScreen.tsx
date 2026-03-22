@@ -25,6 +25,7 @@ interface QueueItem {
   name: string;
   size: string;
   type: 'video' | 'image';
+  status: 'queued' | 'uploading' | 'completed';
 }
 
 interface SyncOverview {
@@ -48,11 +49,11 @@ const MOCK_OVERVIEW: SyncOverview = {
 };
 
 const mockQueue: QueueItem[] = [
-  { id: '1', name: 'DJI_0022_PRO.mp4', size: '1.2 GB', type: 'video' },
-  { id: '2', name: 'DJI_0023_PRO.mp4', size: '2.4 GB', type: 'video' },
-  { id: '3', name: 'IMG_8492.HEIC', size: '12 MB', type: 'image' },
-  { id: '4', name: 'A001_C012_1024.braw', size: '4.2 GB', type: 'video' },
-  { id: '5', name: 'IMG_8493.HEIC', size: '14 MB', type: 'image' },
+  { id: '1', name: 'DJI_0022_PRO.mp4', size: '1.2 GB', type: 'video', status: 'uploading' },
+  { id: '2', name: 'DJI_0023_PRO.mp4', size: '2.4 GB', type: 'video', status: 'queued' },
+  { id: '3', name: 'IMG_8492.HEIC', size: '12 MB', type: 'image', status: 'queued' },
+  { id: '4', name: 'A001_C012_1024.braw', size: '4.2 GB', type: 'video', status: 'queued' },
+  { id: '5', name: 'IMG_8493.HEIC', size: '14 MB', type: 'image', status: 'queued' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -72,6 +73,8 @@ const ICON_BG = '#eef6fc';
 const SEPARATOR = '#f2f6fa';
 const QUEUE_SEPARATOR = '#eef3f8';
 const SCREEN_BG = '#d6ecf8';
+const UPLOADING_BG = 'rgba(59,159,216,0.08)';
+const UPLOADING_BORDER = BLUE;
 
 const RING_SIZE = 200;
 const RING_THICKNESS = 9;
@@ -159,9 +162,36 @@ function CircularProgress({ progress, speed }: { progress: number; speed: string
   );
 }
 
-function QueueItemRow({ item, isLast }: { item: QueueItem; isLast: boolean }) {
+function CompletionCard({ completed, total }: { completed: string; total: string }) {
   return (
-    <View style={[styles.queueRow, !isLast && styles.queueRowBorder]}>
+    <View style={styles.completionContainer}>
+      {/* Glow backdrop */}
+      <View style={styles.completionGlow} />
+      {/* Checkmark circle */}
+      <View style={styles.completionCircle}>
+        <Text style={styles.completionCheck}>{'\u2713'}</Text>
+      </View>
+      <Text style={styles.completionTitle}>{'\u6240\u6709\u6587\u4EF6\u5DF2\u540C\u6B65'}</Text>
+      <View style={styles.completionMeta}>
+        <Text style={styles.completionStats}>
+          {completed}{' / '}{total}
+        </Text>
+        <Text style={styles.completionSubtext}>{'\u672C\u6B21\u540C\u6B65\u5DF2\u5168\u90E8\u5B8C\u6210'}</Text>
+      </View>
+    </View>
+  );
+}
+
+function QueueItemRow({ item, isLast }: { item: QueueItem; isLast: boolean }) {
+  const isUploading = item.status === 'uploading';
+  return (
+    <View
+      style={[
+        styles.queueRow,
+        !isLast && styles.queueRowBorder,
+        isUploading && styles.queueRowUploading,
+      ]}
+    >
       <View style={styles.queueIcon}>
         <Text style={styles.queueIconText}>{fileIcon(item.type)}</Text>
       </View>
@@ -169,7 +199,15 @@ function QueueItemRow({ item, isLast }: { item: QueueItem; isLast: boolean }) {
         <Text style={styles.queueFileName} numberOfLines={1}>
           {item.name}
         </Text>
-        <Text style={styles.queueFileSize}>{item.size}</Text>
+        <View style={styles.queueFileMeta}>
+          <Text style={styles.queueFileSize}>{item.size}</Text>
+          {isUploading && (
+            <View style={styles.uploadingBadge}>
+              <View style={styles.uploadingDot} />
+              <Text style={styles.uploadingLabel}>{'\u4F20\u8F93\u4E2D'}</Text>
+            </View>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -242,6 +280,7 @@ export function SyncStatusScreen() {
             name: (item.originalFilename as string) || 'Unknown',
             size: formatBytes((item.fileSize as number) ?? 0),
             type: (item.mediaType as string) === 'video' ? 'video' : 'image',
+            status: ((item.status as string) ?? 'queued') as QueueItem['status'],
           })));
         }
 
@@ -265,6 +304,7 @@ export function SyncStatusScreen() {
               name: (item.originalFilename as string) || 'Unknown',
               size: formatBytes((item.fileSize as number) ?? 0),
               type: (item.mediaType as string) === 'video' ? 'video' : 'image',
+              status: ((item.status as string) ?? 'queued') as QueueItem['status'],
             })));
           }
         });
@@ -298,6 +338,9 @@ export function SyncStatusScreen() {
 
   const keyExtractor = useCallback((item: QueueItem) => item.id, []);
 
+  const isDone = overview.uploadState === 'completed' ||
+    (overview.uploadState === 'idle' && queue.length === 0 && overview.progressPercent >= 100);
+
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       {/* ---- Header ---- */}
@@ -321,30 +364,39 @@ export function SyncStatusScreen() {
         </View>
       </View>
 
-      {/* ---- Progress card ---- */}
-      <View style={styles.progressCard}>
-        <CircularProgress progress={overview.progressPercent} speed={overview.speed} />
-        <Text style={styles.completedText}>
-          {'\u5DF2\u5B8C\u6210 '}{overview.completed}{' / '}{overview.total}
-        </Text>
-      </View>
-
-      {/* ---- Queue card ---- */}
-      <View style={styles.queueCard}>
-        <View style={styles.queueHeader}>
-          <Text style={styles.queueTitle}>{'\u6392\u961F\u4E2D'}</Text>
-          <View style={styles.queueBadge}>
-            <Text style={styles.queueBadgeText}>{queue.length}</Text>
-          </View>
+      {isDone ? (
+        /* ---- Completion card ---- */
+        <View style={styles.progressCard}>
+          <CompletionCard completed={overview.completed} total={overview.total} />
         </View>
-        <FlatList<QueueItem>
-          data={queue}
-          renderItem={renderQueueItem}
-          keyExtractor={keyExtractor}
-          scrollEnabled={true}
-          showsVerticalScrollIndicator={false}
-        />
-      </View>
+      ) : (
+        <>
+          {/* ---- Progress card ---- */}
+          <View style={styles.progressCard}>
+            <CircularProgress progress={overview.progressPercent} speed={overview.speed} />
+            <Text style={styles.completedText}>
+              {'\u5DF2\u5B8C\u6210 '}{overview.completed}{' / '}{overview.total}
+            </Text>
+          </View>
+
+          {/* ---- Queue card ---- */}
+          <View style={styles.queueCard}>
+            <View style={styles.queueHeader}>
+              <Text style={styles.queueTitle}>{'\u6392\u961F\u4E2D'}</Text>
+              <View style={styles.queueBadge}>
+                <Text style={styles.queueBadgeText}>{queue.length}</Text>
+              </View>
+            </View>
+            <FlatList<QueueItem>
+              data={queue}
+              renderItem={renderQueueItem}
+              keyExtractor={keyExtractor}
+              scrollEnabled={true}
+              showsVerticalScrollIndicator={false}
+            />
+          </View>
+        </>
+      )}
     </SafeAreaView>
   );
 }
@@ -533,5 +585,88 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: MUTED_FILE,
     marginTop: 2,
+  },
+  queueFileMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+
+  // Uploading row highlight
+  queueRowUploading: {
+    backgroundColor: UPLOADING_BG,
+    borderLeftWidth: 3,
+    borderLeftColor: UPLOADING_BORDER,
+  },
+  uploadingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(59,159,216,0.12)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  uploadingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: BLUE,
+  },
+  uploadingLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: BLUE,
+  },
+
+  // Completion card
+  completionContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+  },
+  completionGlow: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(59,159,216,0.12)',
+  },
+  completionCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 4,
+    borderColor: '#c5e5f5',
+    backgroundColor: 'rgba(59,159,216,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  completionCheck: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: BLUE,
+  },
+  completionTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: BLUE,
+    letterSpacing: -0.3,
+  },
+  completionMeta: {
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 16,
+  },
+  completionStats: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: BLUE,
+  },
+  completionSubtext: {
+    fontSize: 12,
+    color: '#9bb8c8',
   },
 });
