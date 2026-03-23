@@ -78,10 +78,7 @@ class TcpTransport {
     }
 
     private func connectToEndpoint(_ endpoint: NWEndpoint) {
-        let tcpOptions = NWProtocolTCP.Options()
-        tcpOptions.noDelay = true  // disable Nagle's algorithm for lower latency
-        let params = NWParameters(tls: nil, tcp: tcpOptions)
-        connection = NWConnection(to: endpoint, using: params)
+        connection = NWConnection(to: endpoint, using: .tcp)
         connection?.stateUpdateHandler = { [weak self] state in
             switch state {
             case .ready:
