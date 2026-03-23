@@ -8,6 +8,8 @@
     "dev": "turbo run dev",
     "dev:desktop": "pnpm --filter @syncflow/desktop dev",
     "build:desktop": "pnpm --filter @syncflow/desktop build",
+    "dev:mobile": "pnpm --filter @syncflow/mobile start",
+    "build:mobile": "cd apps/mobile/ios && xcodebuild -workspace SyncFlowMobile.xcworkspace -scheme SyncFlowMobile -destination 'generic/platform=iOS' -configuration Debug build",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",

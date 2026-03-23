@@ -6,7 +6,9 @@
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
-    "test": "jest"
+    "test": "jest",
+    "build": "cd ios && xcodebuild -workspace SyncFlowMobile.xcworkspace -scheme SyncFlowMobile -destination 'generic/platform=iOS' -configuration Debug build",
+    "bundle": "react-native bundle --platform ios --dev true --entry-file index.js --bundle-output ios/main.jsbundle --assets-dest ios"
   },
   "dependencies": {
     "@react-navigation/native": "^7.1.34",
