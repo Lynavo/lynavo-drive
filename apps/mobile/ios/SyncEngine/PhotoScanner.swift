@@ -50,7 +50,9 @@ class PhotoScanner: NSObject, PHPhotoLibraryChangeObserver {
                                               PHAssetMediaType.video.rawValue)
 
         let assets = PHAsset.fetchAssets(with: fetchOptions)
+        NSLog("[PhotoScanner] library has %d authorized assets, %d completed keys", assets.count, completedFileKeys.count)
         var results: [ScannedAsset] = []
+        var skippedCount = 0
 
         assets.enumerateObjects { asset, _, _ in
             let fileKey = Self.computeFileKey(
@@ -61,6 +63,9 @@ class PhotoScanner: NSObject, PHPhotoLibraryChangeObserver {
                 mediaType: asset.mediaType == .video ? "video" : "image"
             )
 
+            if completedFileKeys.contains(fileKey) {
+                skippedCount += 1
+            }
             if !completedFileKeys.contains(fileKey) {
                 // Get filename and estimated size from PHAssetResource
                 let resources = PHAssetResource.assetResources(for: asset)
@@ -82,6 +87,7 @@ class PhotoScanner: NSObject, PHPhotoLibraryChangeObserver {
             }
         }
 
+        NSLog("[PhotoScanner] scan result: %d new, %d skipped (already completed)", results.count, skippedCount)
         return results
     }
 

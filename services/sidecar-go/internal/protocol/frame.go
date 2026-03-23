@@ -10,7 +10,7 @@ const (
 	MagicBytes = "LMUP"
 	Version    = 2
 	HeaderSize = 12
-	MaxBodyLen = 16 * 1024 * 1024 // 16 MiB max frame body
+	MaxBodyLen = 64 * 1024 * 1024 // 64 MiB max frame body (supports 32 MiB chunks + metadata)
 )
 
 // Message type constants matching @syncflow/contracts
