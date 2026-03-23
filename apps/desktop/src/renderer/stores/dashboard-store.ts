@@ -26,7 +26,7 @@ export interface DashboardState {
   updateDeviceStatus(deviceId: string, status: DeviceDashboardStatus): void;
 }
 
-export const useDashboardStore = create<DashboardState>((set) => ({
+export const useDashboardStore = create<DashboardState>((set, get) => ({
   summary: {
     todayUploadCount: 0,
     todayOccupiedBytes: 0,
@@ -45,7 +45,18 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         api.sidecar.getDashboardDevices(),
       ]);
       if (summary) set({ summary });
-      if (devices) set({ devices: sortDevices(devices) });
+      if (devices) {
+        // Preserve real-time progress from WebSocket events during poll refresh
+        const current = get().devices;
+        const merged = devices.map((d) => {
+          const existing = current.find((c) => c.deviceId === d.deviceId);
+          if (existing?.currentFile && existing.currentFile.progress > 0 && !d.currentFile) {
+            return { ...d, currentFile: existing.currentFile, status: existing.status };
+          }
+          return d;
+        });
+        set({ devices: sortDevices(merged) });
+      }
     } catch (err) {
       console.error('Failed to fetch dashboard:', err);
     }
