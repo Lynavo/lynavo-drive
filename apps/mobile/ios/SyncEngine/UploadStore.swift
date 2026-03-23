@@ -121,7 +121,7 @@ class UploadStore {
           acked_offset    INTEGER NOT NULL DEFAULT 0,
           last_error_code TEXT,
           updated_at      TEXT NOT NULL,
-          UNIQUE(asset_local_id, modified_at)
+          UNIQUE(asset_local_id)
         );
 
         CREATE TABLE IF NOT EXISTS sync_sessions (
@@ -152,6 +152,35 @@ class UploadStore {
         );
         """
         try executeInternal(sql)
+
+        // Migration: change UNIQUE(asset_local_id, modified_at) to UNIQUE(asset_local_id)
+        // SQLite doesn't support ALTER UNIQUE, so recreate the table if old constraint exists
+        let tableInfo = try queryInternal("SELECT sql FROM sqlite_master WHERE type='table' AND name='upload_items'", bind: [])
+        if let createSQL = tableInfo.first?["sql"] as? String,
+           createSQL.contains("UNIQUE(asset_local_id, modified_at)") {
+            NSLog("[UploadStore] migrating upload_items: removing modified_at from UNIQUE constraint")
+            try executeInternal("""
+                CREATE TABLE upload_items_new (
+                  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                  asset_local_id  TEXT NOT NULL,
+                  modified_at     TEXT NOT NULL DEFAULT '',
+                  media_type      TEXT NOT NULL,
+                  original_filename TEXT,
+                  file_key        TEXT,
+                  file_size       INTEGER,
+                  status          TEXT NOT NULL,
+                  temp_file_path  TEXT,
+                  acked_offset    INTEGER NOT NULL DEFAULT 0,
+                  last_error_code TEXT,
+                  updated_at      TEXT NOT NULL,
+                  UNIQUE(asset_local_id)
+                );
+                INSERT OR REPLACE INTO upload_items_new SELECT * FROM upload_items;
+                DROP TABLE upload_items;
+                ALTER TABLE upload_items_new RENAME TO upload_items;
+            """)
+            NSLog("[UploadStore] migration complete")
+        }
     }
 
     // MARK: - Binding CRUD
@@ -210,7 +239,7 @@ class UploadStore {
             let sql = """
             INSERT INTO upload_items (asset_local_id, modified_at, media_type, original_filename, file_key, file_size, status, temp_file_path, acked_offset, last_error_code, updated_at)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
-            ON CONFLICT(asset_local_id, modified_at) DO UPDATE SET
+            ON CONFLICT(asset_local_id) DO UPDATE SET
               media_type = excluded.media_type,
               original_filename = excluded.original_filename,
               file_key = excluded.file_key,

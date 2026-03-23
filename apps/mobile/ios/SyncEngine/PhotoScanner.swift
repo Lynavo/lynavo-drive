@@ -91,9 +91,10 @@ class PhotoScanner: NSObject, PHPhotoLibraryChangeObserver {
         return results
     }
 
-    /// Compute fileKey per spec Section 8.10
+    /// Compute fileKey — stable identifier for a file from this client.
+    /// Uses clientId + assetLocalId + mediaType (NOT modifiedAt, which iOS can change).
     static func computeFileKey(clientId: String, assetLocalId: String, resourceSize: Int64, modifiedAt: String, mediaType: String) -> String {
-        let input = "\(clientId)|\(assetLocalId)||||\(modifiedAt)|\(mediaType)"
+        let input = "\(clientId)|\(assetLocalId)|\(mediaType)"
         let hash = SHA256.hash(data: Data(input.utf8))
         return hash.map { String(format: "%02x", $0) }.joined()
     }
