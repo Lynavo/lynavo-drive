@@ -42,6 +42,9 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "failed to update settings")
 			return
 		}
+		if s.OnDeviceRenamed != nil {
+			s.OnDeviceRenamed(*req.DeviceName)
+		}
 	}
 
 	if req.ReceivePath != nil {

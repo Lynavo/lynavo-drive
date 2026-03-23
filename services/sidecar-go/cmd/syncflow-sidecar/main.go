@@ -62,7 +62,7 @@ func main() {
 	}
 
 	// Create API server (uses tcpSrv for live client state)
-	handler := api.NewServer(st, cfg, hub, tcpSrv)
+	apiSrv, handler := api.NewServer(st, cfg, hub, tcpSrv)
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
 		Handler: handler,
@@ -74,20 +74,39 @@ func main() {
 	if deviceName == "" {
 		deviceName = cfg.DeviceName
 	}
-	broadcaster, err := mdns.NewBroadcaster(mdns.BroadcastConfig{
-		DeviceID:     deviceID,
-		DeviceName:   deviceName,
-		DeviceType:   "mac",
-		TCPPort:      cfg.TCPPort,
-		Proto:        2,
-		ShareEnabled: false,
-		ShareName:    "SyncFlow",
-	})
-	if err != nil {
-		slog.Warn("bonjour broadcast failed, continuing without discovery", "err", err)
-	} else {
-		defer broadcaster.Shutdown()
+
+	var broadcaster *mdns.Broadcaster
+	startBroadcaster := func(name string) {
+		if broadcaster != nil {
+			broadcaster.Shutdown()
+		}
+		var err error
+		broadcaster, err = mdns.NewBroadcaster(mdns.BroadcastConfig{
+			DeviceID:     deviceID,
+			DeviceName:   name,
+			DeviceType:   "mac",
+			TCPPort:      cfg.TCPPort,
+			Proto:        2,
+			ShareEnabled: false,
+			ShareName:    "SyncFlow",
+		})
+		if err != nil {
+			slog.Warn("bonjour broadcast failed", "err", err)
+		}
 	}
+	startBroadcaster(deviceName)
+
+	// Restart Bonjour when device name changes
+	apiSrv.OnDeviceRenamed = func(newName string) {
+		slog.Info("device renamed, restarting bonjour", "name", newName)
+		startBroadcaster(newName)
+	}
+
+	defer func() {
+		if broadcaster != nil {
+			broadcaster.Shutdown()
+		}
+	}()
 
 	// Graceful shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

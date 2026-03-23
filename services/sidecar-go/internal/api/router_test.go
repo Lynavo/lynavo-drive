@@ -47,7 +47,7 @@ func testEnv(t *testing.T) (*store.Store, *config.Config, *events.Hub) {
 
 func TestHealthEndpoint(t *testing.T) {
 	st, cfg, hub := testEnv(t)
-	handler := api.NewServer(st, cfg, hub, nil)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -78,7 +78,7 @@ func TestHealthEndpoint(t *testing.T) {
 
 func TestDashboardSummary(t *testing.T) {
 	st, cfg, hub := testEnv(t)
-	handler := api.NewServer(st, cfg, hub, nil)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -112,7 +112,7 @@ func TestDashboardSummary(t *testing.T) {
 
 func TestDashboardDevices(t *testing.T) {
 	st, cfg, hub := testEnv(t)
-	handler := api.NewServer(st, cfg, hub, nil)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -138,7 +138,7 @@ func TestDashboardDevices(t *testing.T) {
 
 func TestDeviceDetail_NotFound(t *testing.T) {
 	st, cfg, hub := testEnv(t)
-	handler := api.NewServer(st, cfg, hub, nil)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -155,7 +155,7 @@ func TestDeviceDetail_NotFound(t *testing.T) {
 
 func TestDeviceDetail_Found(t *testing.T) {
 	st, cfg, hub := testEnv(t)
-	handler := api.NewServer(st, cfg, hub, nil)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -195,7 +195,7 @@ func TestDeviceDetail_Found(t *testing.T) {
 
 func TestDeviceFiles(t *testing.T) {
 	st, cfg, hub := testEnv(t)
-	handler := api.NewServer(st, cfg, hub, nil)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -221,7 +221,7 @@ func TestDeviceFiles(t *testing.T) {
 
 func TestDeviceDates(t *testing.T) {
 	st, cfg, hub := testEnv(t)
-	handler := api.NewServer(st, cfg, hub, nil)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -251,7 +251,7 @@ func TestDeviceDates(t *testing.T) {
 
 func TestGetSettings(t *testing.T) {
 	st, cfg, hub := testEnv(t)
-	handler := api.NewServer(st, cfg, hub, nil)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -285,7 +285,7 @@ func TestGetSettings(t *testing.T) {
 
 func TestUpdateSettings(t *testing.T) {
 	st, cfg, hub := testEnv(t)
-	handler := api.NewServer(st, cfg, hub, nil)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -314,7 +314,7 @@ func TestUpdateSettings(t *testing.T) {
 
 func TestRegenerateCode(t *testing.T) {
 	st, cfg, hub := testEnv(t)
-	handler := api.NewServer(st, cfg, hub, nil)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -368,7 +368,7 @@ func TestConnectionCodeAutoRegeneration(t *testing.T) {
 		}
 	}
 
-	handler := api.NewServer(st, cfg, hub, nil)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -453,7 +453,7 @@ type settingsResp struct {
 
 func TestShareStatus(t *testing.T) {
 	st, cfg, hub := testEnv(t)
-	handler := api.NewServer(st, cfg, hub, nil)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -478,7 +478,7 @@ func TestShareStatus(t *testing.T) {
 
 func TestShareValidate(t *testing.T) {
 	st, cfg, hub := testEnv(t)
-	handler := api.NewServer(st, cfg, hub, nil)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 

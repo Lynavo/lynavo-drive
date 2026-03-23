@@ -15,15 +15,16 @@ type ClientStateProvider interface {
 
 // Server holds the dependencies for the HTTP API handlers.
 type Server struct {
-	store        *store.Store
-	config       *config.Config
-	hub          *events.Hub
-	clientStates ClientStateProvider
-	presence     *PresenceTracker
+	store           *store.Store
+	config          *config.Config
+	hub             *events.Hub
+	clientStates    ClientStateProvider
+	presence        *PresenceTracker
+	OnDeviceRenamed func(newName string) // called when device name changes, to restart Bonjour
 }
 
 // NewServer creates a new HTTP handler with all API routes registered.
-func NewServer(s *store.Store, cfg *config.Config, hub *events.Hub, csp ClientStateProvider) http.Handler {
+func NewServer(s *store.Store, cfg *config.Config, hub *events.Hub, csp ClientStateProvider) (*Server, http.Handler) {
 	srv := &Server{store: s, config: cfg, hub: hub, clientStates: csp, presence: NewPresenceTracker()}
 	mux := http.NewServeMux()
 
@@ -49,7 +50,7 @@ func NewServer(s *store.Store, cfg *config.Config, hub *events.Hub, csp ClientSt
 	// WebSocket
 	mux.HandleFunc("GET /events/stream", srv.handleEventStream)
 
-	return withLogging(mux)
+	return srv, withLogging(mux)
 }
 
 // handleEventStream upgrades the connection to a WebSocket for real-time events.
