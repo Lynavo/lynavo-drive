@@ -211,6 +211,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
     }
 
+    private func currentAppVersionLabel() -> String {
+        let bundle = Bundle.main
+        return bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0"
+    }
+
     private func beginBackgroundTransitionIfNeeded(reason: String) {
         guard transitionBackgroundTaskId == .invalid else { return }
         transitionBackgroundTaskId = backgroundService.beginTransitionTask()
@@ -588,7 +593,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             "clientId": clientId,
             "clientName": getClientDisplayName(),
             "clientPlatform": "ios",
-            "appVersion": "1.0.0",
+            "appVersion": currentAppVersionLabel(),
             "pairingToken": token,
             "appState": currentAppStateLabel(),
         ])
@@ -1307,7 +1312,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             "clientId": clientId,
             "clientName": getClientDisplayName(),
             "clientPlatform": "ios",
-            "appVersion": "1.0.0",
+            "appVersion": currentAppVersionLabel(),
             "appState": currentAppStateLabel(),
         ])
 
@@ -1541,7 +1546,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         // Auth so sidecar registers us as connected
         let (helloType, helloRes) = try await session.sendAndReceive(type: .helloReq, payload: [
             "clientId": clientId, "clientName": getClientDisplayName(),
-            "clientPlatform": "ios", "appVersion": "1.0.0",
+            "clientPlatform": "ios", "appVersion": currentAppVersionLabel(),
             "pairingToken": token, "appState": currentAppStateLabel(),
         ])
         if helloType == .helloRes, let nonce = helloRes["nonce"] as? String {
