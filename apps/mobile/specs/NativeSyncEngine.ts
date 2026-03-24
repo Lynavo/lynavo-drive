@@ -22,6 +22,7 @@ export interface Spec extends TurboModule {
   getSyncOverview(): Promise<SyncSummaryDTO>;
   getReadOnlyQueue(): Promise<ReadOnlyQueueItemDTO[]>;
   getHistoryDays(cursor?: string): Promise<{ items: HistoryLedgerCardDTO[]; nextCursor: string | null }>;
+  getAppInfo(): Promise<{ appName: string; version: string; build: string }>;
   // 设置
   renameBoundDeviceAlias(alias: string): Promise<void>;
   // 事件 (Codegen EventEmitter)

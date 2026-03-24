@@ -4,6 +4,7 @@ import { ConnectionCodeSection } from './ConnectionCodeSection';
 import { DeviceNameSection } from './DeviceNameSection';
 import { FilePathSection } from './FilePathSection';
 import { ShareAddressSection } from './ShareAddressSection';
+import { SupportSection } from './SupportSection';
 import { SystemGuideSection } from './SystemGuideSection';
 
 export function SettingsPage() {
@@ -63,6 +64,10 @@ export function SettingsPage() {
             局域网共享需要开启系统文件共享权限
           </p>
           <SystemGuideSection />
+        </section>
+
+        <section className="mt-8">
+          <SupportSection />
         </section>
       </div>
     </div>

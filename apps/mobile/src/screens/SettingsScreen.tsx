@@ -9,6 +9,7 @@ import {
   NativeModules,
   NativeEventEmitter,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -23,11 +24,43 @@ import { Icon } from '../components/Icon';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'Settings'>;
 
+function formatAppVersionLabel(appInfo?: Record<string, unknown>): string {
+  const version = typeof appInfo?.version === 'string' ? appInfo.version : '';
+  if (!version) return '未知版本';
+
+  const appName = typeof appInfo?.appName === 'string' && appInfo.appName
+    ? appInfo.appName
+    : 'SyncFlow';
+  const build = typeof appInfo?.build === 'string' && appInfo.build
+    ? appInfo.build
+    : '0';
+  return `${appName} v${version} (${build})`;
+}
+
+function formatDateTimeLabel(iso?: string): string {
+  if (!iso) return '暂无记录';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '暂无记录';
+
+  const now = new Date();
+  const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  if (date.toDateString() === now.toDateString()) {
+    return `今天 ${time}`;
+  }
+  if (date.getFullYear() === now.getFullYear()) {
+    return `${date.getMonth() + 1}月${date.getDate()}日 ${time}`;
+  }
+  return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()} ${time}`;
+}
+
 export function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const [deviceName, setDeviceName] = useState('');
   const [deviceIp, setDeviceIp] = useState('');
   const [connectionState, setConnectionState] = useState<'bound' | 'connecting' | 'connected' | 'offline' | 'discovering'>('offline');
+  const [latestSyncLabel, setLatestSyncLabel] = useState('暂无记录');
+  const [appVersionLabel, setAppVersionLabel] = useState('读取中…');
+  const [isPhotoPermissionBlocked, setIsPhotoPermissionBlocked] = useState(false);
 
   // My iPhone display name
   const [myName, setMyName] = useState('iPhone');
@@ -61,15 +94,57 @@ export function SettingsScreen() {
         const emitter = new NativeEventEmitter(NativeSyncEngine);
         bindingSub = emitter.addListener('onBindingStateChanged', applyBindingState);
 
-        const [state, clientName] = await Promise.all([
+        const [stateResult, clientNameResult, appInfoResult, historyResult, syncOverviewResult] = await Promise.allSettled([
           NativeSyncEngine.getBindingState(),
           NativeSyncEngine.getClientDisplayName(),
+          NativeSyncEngine.getAppInfo?.(),
+          NativeSyncEngine.getHistoryDays?.(null),
+          NativeSyncEngine.getSyncOverview?.(),
         ]);
-        applyBindingState(state);
-        if (clientName) {
-          setMyName(clientName);
+
+        if (stateResult.status === 'fulfilled') {
+          applyBindingState(stateResult.value as Record<string, unknown> | null | undefined);
         }
+
+        if (clientNameResult.status === 'fulfilled' && clientNameResult.value) {
+          setMyName(clientNameResult.value as string);
+        }
+
+        if (appInfoResult.status === 'fulfilled') {
+          setAppVersionLabel(formatAppVersionLabel(appInfoResult.value as Record<string, unknown> | undefined));
+        } else {
+          setAppVersionLabel('未知版本');
+        }
+
+        const history = historyResult.status === 'fulfilled'
+          ? (historyResult.value as { items?: Array<Record<string, unknown>> } | undefined)
+          : undefined;
+        const items = history?.items as Array<Record<string, unknown>> | undefined;
+        if (items?.length) {
+          let latestItem: Record<string, unknown> | null = null;
+          for (const item of items) {
+            if (!latestItem) {
+              latestItem = item;
+              continue;
+            }
+            const currentTs = new Date(String(item.updatedAt ?? 0)).getTime();
+            const latestTs = new Date(String(latestItem.updatedAt ?? 0)).getTime();
+            if (currentTs > latestTs) {
+              latestItem = item;
+            }
+          }
+          if (latestItem?.updatedAt) {
+            setLatestSyncLabel(
+              `${formatDateTimeLabel(String(latestItem.updatedAt))} · ${String(latestItem.deviceName || 'Mac')}`,
+            );
+          }
+        }
+        const syncOverview = syncOverviewResult.status === 'fulfilled'
+          ? (syncOverviewResult.value as { uploadState?: string } | undefined)
+          : undefined;
+        setIsPhotoPermissionBlocked(syncOverview?.uploadState === 'paused_no_permission');
       } catch (e) {
+        setAppVersionLabel('未知版本');
         console.warn('Native module not available for Settings');
       }
     };
@@ -210,6 +285,35 @@ export function SettingsScreen() {
           </View>
 
           {/* Connected device card */}
+          <View style={styles.deviceCard}>
+            <Text style={styles.sectionLabel}>{'同步状态'}</Text>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>{'最近一次成功同步'}</Text>
+              <Text style={styles.metaValue}>{latestSyncLabel}</Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>{'应用版本'}</Text>
+              <Text style={styles.metaValue}>{appVersionLabel}</Text>
+            </View>
+            {isPhotoPermissionBlocked ? (
+              <View style={styles.warningBox}>
+                <Text style={styles.warningTitle}>{'照片权限未开启'}</Text>
+                <Text style={styles.warningText}>
+                  {'需要允许访问照片后才能继续自动同步。'}
+                </Text>
+                <TouchableOpacity
+                  style={styles.warningAction}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    void Linking.openSettings();
+                  }}
+                >
+                  <Text style={styles.warningActionText}>{'打开系统设置'}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+          </View>
+
           <View style={styles.deviceCard}>
             {/* Device info row */}
             <View style={styles.deviceRow}>
@@ -452,6 +556,56 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#90b0c8',
     marginBottom: 12,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 10,
+  },
+  metaLabel: {
+    fontSize: 13,
+    color: '#90b0c8',
+  },
+  metaValue: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.screenTitle,
+  },
+  warningBox: {
+    marginTop: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(220,38,38,0.12)',
+    backgroundColor: 'rgba(254,242,242,0.9)',
+    padding: 12,
+    gap: 6,
+  },
+  warningTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#991b1b',
+  },
+  warningText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#b91c1c',
+  },
+  warningAction: {
+    alignSelf: 'flex-start',
+    marginTop: 2,
+    borderRadius: 999,
+    backgroundColor: 'rgba(185,28,28,0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  warningActionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#991b1b',
   },
 
   // Phone icon

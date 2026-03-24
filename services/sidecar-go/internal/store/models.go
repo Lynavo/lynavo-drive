@@ -71,8 +71,10 @@ type Session struct {
 
 // DashboardSummaryResult holds the aggregated dashboard summary for a given day.
 type DashboardSummaryResult struct {
-	TotalFiles int   `json:"totalFiles"`
-	TotalBytes int64 `json:"totalBytes"`
+	TotalFiles               int     `json:"totalFiles"`
+	TotalBytes               int64   `json:"totalBytes"`
+	LastSuccessfulSyncAt     *string `json:"lastSuccessfulSyncAt,omitempty"`
+	LastSuccessfulDeviceName *string `json:"lastSuccessfulDeviceName,omitempty"`
 }
 
 // DashboardDeviceResult holds per-device dashboard data including current transfer info.

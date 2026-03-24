@@ -32,6 +32,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     todayOccupiedBytes: 0,
     remainingBytes: 0,
     isDiskLow: false,
+    lastSuccessfulSyncAt: undefined,
+    lastSuccessfulDeviceName: undefined,
   },
   devices: [],
   diskWarningDismissed: false,

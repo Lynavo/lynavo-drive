@@ -182,6 +182,18 @@ func (s *Store) GetDashboardSummary(today string) (DashboardSummaryResult, error
 	if err != nil && err != sql.ErrNoRows {
 		return result, fmt.Errorf("get dashboard summary: %w", err)
 	}
+	if err := s.db.QueryRow(`
+		SELECT
+			u.completed_at,
+			COALESCE(NULLIF(pd.device_alias, ''), pd.client_name)
+		FROM uploads u
+		LEFT JOIN paired_devices pd ON pd.client_id = u.client_id
+		WHERE u.status = 'completed' AND u.completed_at IS NOT NULL
+		ORDER BY u.completed_at DESC
+		LIMIT 1`,
+	).Scan(&result.LastSuccessfulSyncAt, &result.LastSuccessfulDeviceName); err != nil && err != sql.ErrNoRows {
+		return result, fmt.Errorf("get latest completed upload: %w", err)
+	}
 	return result, nil
 }
 

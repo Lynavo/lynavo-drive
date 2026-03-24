@@ -1,7 +1,7 @@
 import { FileVideo, HardDrive, Database } from 'lucide-react';
 import { useDashboardStore } from '@renderer/stores/dashboard-store';
 import { useAppStore } from '@renderer/stores/app-store';
-import { formatBytes } from '@renderer/lib/format';
+import { formatBytes, formatDateTime } from '@renderer/lib/format';
 import { DiskWarningBanner } from './DiskWarningBanner';
 import { StatCard } from './StatCard';
 import { DeviceCard } from './DeviceCard';
@@ -16,6 +16,11 @@ export function Dashboard() {
 
       <div className="px-6 pt-5 pb-1">
         <h1 className="text-xl font-bold">所有设备</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {summary.lastSuccessfulSyncAt
+            ? `最近一次成功同步：${formatDateTime(summary.lastSuccessfulSyncAt)} · ${summary.lastSuccessfulDeviceName ?? '未知设备'}`
+            : '最近一次成功同步：暂无记录'}
+        </p>
       </div>
 
       {/* Stat cards */}

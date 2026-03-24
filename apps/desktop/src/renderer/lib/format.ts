@@ -24,3 +24,20 @@ export function formatDuration(ms: number): string {
 export function formatDate(iso: string): string {
   return iso.slice(5).replace('-', '\u6708') + '\u65e5';
 }
+
+export function formatDateTime(iso?: string): string {
+  if (!iso) return '暂无记录';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '暂无记录';
+
+  const now = new Date();
+  const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+
+  if (date.toDateString() === now.toDateString()) {
+    return `今天 ${time}`;
+  }
+  if (date.getFullYear() === now.getFullYear()) {
+    return `${date.getMonth() + 1}月${date.getDate()}日 ${time}`;
+  }
+  return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()} ${time}`;
+}

@@ -36,4 +36,8 @@ export interface ElectronAPI {
   platform: {
     isMac(): boolean;
   };
+  support: {
+    exportDiagnostics(): Promise<string | null>;
+    getAppInfo(): Promise<{ name: string; version: string }>;
+  };
 }

@@ -28,6 +28,8 @@ export interface DashboardSummaryDTO {
   todayOccupiedBytes: number;
   remainingBytes: number;
   isDiskLow: boolean;
+  lastSuccessfulSyncAt?: string;
+  lastSuccessfulDeviceName?: string;
 }
 
 export interface DashboardDeviceDTO {

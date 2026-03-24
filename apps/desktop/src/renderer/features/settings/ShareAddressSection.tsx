@@ -1,7 +1,10 @@
-import { AlertTriangle, CheckCircle2, Link2, Loader2, RefreshCw, Settings2 } from 'lucide-react';
+import { AlertTriangle, ArrowUpRight, CheckCircle2, Link2, Loader2, RefreshCw, Settings2 } from 'lucide-react';
 import { Button } from '@renderer/components/ui/button';
 import { CopyButton } from '@renderer/components/shared/CopyButton';
 import { useSettingsStore } from '@renderer/stores/settings-store';
+
+const MAC_SHARING_GUIDE_URL =
+  'https://support.apple.com/guide/mac-help/set-up-file-sharing-on-mac-mh17131/mac';
 
 export function ShareAddressSection() {
   const { shareAddress, shareName, shareStatus } = useSettingsStore((s) => s.settings);
@@ -32,6 +35,7 @@ export function ShareAddressSection() {
       tone: 'text-amber-700 bg-amber-50 border-amber-200',
       icon: Settings2,
       iconClassName: '',
+      showGuide: true,
     },
     share_registered: {
       label: '已检测到共享',
@@ -39,6 +43,7 @@ export function ShareAddressSection() {
       tone: 'text-sky-700 bg-sky-50 border-sky-200',
       icon: Link2,
       iconClassName: '',
+      showGuide: true,
     },
     error: {
       label: '检测失败',
@@ -89,6 +94,17 @@ export function ShareAddressSection() {
       <p className="mb-3 text-sm text-muted-foreground">
         {meta.detail}
       </p>
+
+      {'showGuide' in meta && meta.showGuide ? (
+        <button
+          type="button"
+          onClick={() => window.open(MAC_SHARING_GUIDE_URL, '_blank')}
+          className="mb-3 inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+        >
+          查看系统共享设置指南
+          <ArrowUpRight className="h-3.5 w-3.5" />
+        </button>
+      ) : null}
 
       <div className="flex items-center gap-2">
         <div className="flex flex-1 items-center gap-2 rounded-lg bg-secondary px-3 py-2 text-sm text-muted-foreground">

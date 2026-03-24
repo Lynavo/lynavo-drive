@@ -198,6 +198,40 @@ func TestGetDashboardSummary_EmptyDate(t *testing.T) {
 	}
 }
 
+func TestGetDashboardSummary_IncludesLatestCompletedSync(t *testing.T) {
+	s := newTestStore(t)
+	now := time.Now().UTC()
+	alias := "WorkPhone"
+	device := PairedDevice{
+		ClientID: "c1", ClientName: "iPhone 15", DeviceAlias: &alias,
+		Platform: "ios", PairingID: "p1", PairingTokenHash: "h1",
+		CreatedAt: now.Format(time.RFC3339), LastSeenAt: now.Format(time.RFC3339),
+	}
+	if err := s.UpsertPairedDevice(device); err != nil {
+		t.Fatalf("UpsertPairedDevice: %v", err)
+	}
+
+	u := sampleUpload("latest-file", "c1")
+	completedAt := now.Add(-5 * time.Minute).Format(time.RFC3339)
+	u.Status = "completed"
+	u.CompletedAt = &completedAt
+	u.UpdatedAt = completedAt
+	if err := s.UpsertUpload(u); err != nil {
+		t.Fatalf("UpsertUpload: %v", err)
+	}
+
+	summary, err := s.GetDashboardSummary(now.Format("2006-01-02"))
+	if err != nil {
+		t.Fatalf("GetDashboardSummary: %v", err)
+	}
+	if summary.LastSuccessfulSyncAt == nil || *summary.LastSuccessfulSyncAt != completedAt {
+		t.Fatalf("expected lastSuccessfulSyncAt %q, got %v", completedAt, summary.LastSuccessfulSyncAt)
+	}
+	if summary.LastSuccessfulDeviceName == nil || *summary.LastSuccessfulDeviceName != alias {
+		t.Fatalf("expected lastSuccessfulDeviceName %q, got %v", alias, summary.LastSuccessfulDeviceName)
+	}
+}
+
 func TestGetDashboardDevices(t *testing.T) {
 	s := newTestStore(t)
 	today := "2026-03-21"

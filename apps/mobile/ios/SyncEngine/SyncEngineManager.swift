@@ -1477,11 +1477,28 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 "fileCount": ledger.fileCount,
                 "totalBytes": ledger.totalBytes,
                 "transmissionMs": ledger.activeTransmissionMs,
+                "updatedAt": ledger.updatedAt,
             ]
         }
         return [
             "items": items,
             "nextCursor": result.nextCursor ?? NSNull(),
+        ]
+    }
+
+    func getAppInfo() async -> [String: Any] {
+        let bundle = Bundle.main
+        let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
+        let build = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+        let appName =
+            (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String) ??
+            (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String) ??
+            "SyncFlow"
+
+        return [
+            "appName": appName,
+            "version": version,
+            "build": build,
         ]
     }
 

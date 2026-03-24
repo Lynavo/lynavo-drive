@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, type CSSProperties } from 'react';
 import { Skeleton } from '@renderer/components/ui/skeleton';
 import { useAppStore } from '@renderer/stores/app-store';
 import { useDashboardStore } from '@renderer/stores/dashboard-store';
@@ -120,7 +120,11 @@ export function AppShell() {
       <Sidebar />
 
       {/* Content area */}
-      <div className="flex flex-1 flex-col overflow-hidden pt-3">
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <div
+          className="shrink-0 px-6 pt-2 pb-2"
+          style={{ WebkitAppRegion: 'drag' } as CSSProperties}
+        />
         <SidecarStatusBanner />
         <Suspense fallback={<PageFallback />}>
           {currentView === 'dashboard' && <Dashboard />}

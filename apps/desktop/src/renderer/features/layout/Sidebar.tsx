@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { LayoutDashboard, Settings } from 'lucide-react';
 import { glass, elevation } from '@syncflow/design-tokens';
 import { useAppStore, type AppState } from '@renderer/stores/app-store';
@@ -6,6 +7,14 @@ const navItems: { key: AppState['currentView']; label: string; icon: typeof Layo
   { key: 'dashboard', label: '首页看板', icon: LayoutDashboard },
   { key: 'settings', label: '全局设置', icon: Settings },
 ];
+
+const dragRegionStyle = { WebkitAppRegion: 'drag' } as CSSProperties;
+const noDragRegionStyle = { WebkitAppRegion: 'no-drag' } as CSSProperties;
+const activeNavStyle = {
+  background: 'rgba(255,255,255,0.85)',
+  boxShadow: '0 2px 12px rgba(59,130,246,0.10)',
+  WebkitAppRegion: 'no-drag',
+} as CSSProperties;
 
 export function Sidebar() {
   const currentView = useAppStore((s) => s.currentView);
@@ -22,7 +31,10 @@ export function Sidebar() {
       }}
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-5 py-5">
+      <div
+        className="flex items-center gap-3 px-5 py-5"
+        style={dragRegionStyle}
+      >
         <div
           className="flex h-9 w-9 items-center justify-center rounded-xl"
           style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #60c4f0 100%)' }}
@@ -54,14 +66,7 @@ export function Sidebar() {
                   ? 'text-primary'
                   : 'text-[#6b7a8d] hover:bg-white/70 hover:text-[#1a2a3a]'
               }`}
-              style={
-                active
-                  ? {
-                      background: 'rgba(255,255,255,0.85)',
-                      boxShadow: '0 2px 12px rgba(59,130,246,0.10)',
-                    }
-                  : {}
-              }
+              style={active ? activeNavStyle : noDragRegionStyle}
             >
               <Icon className="h-4 w-4" />
               {label}

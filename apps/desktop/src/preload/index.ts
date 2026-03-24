@@ -18,6 +18,8 @@ const IPC = {
   SIDECAR_RETRY_START: 'sidecar:retry-start',
   SIDECAR_SHARE_STATUS: 'sidecar:share-status',
   SIDECAR_VALIDATE_SHARE: 'sidecar:validate-share',
+  SUPPORT_EXPORT_DIAGNOSTICS: 'support:export-diagnostics',
+  SUPPORT_APP_INFO: 'support:app-info',
   FILES_OPEN_FOLDER: 'files:open-folder',
   FILES_OPEN_FILE: 'files:open-file',
   FILES_SELECT_FOLDER: 'files:select-folder',
@@ -67,6 +69,10 @@ const electronAPI: ElectronAPI = {
   },
   platform: {
     isMac: () => process.platform === 'darwin',
+  },
+  support: {
+    exportDiagnostics: () => ipcRenderer.invoke(IPC.SUPPORT_EXPORT_DIAGNOSTICS),
+    getAppInfo: () => ipcRenderer.invoke(IPC.SUPPORT_APP_INFO),
   },
 };
 

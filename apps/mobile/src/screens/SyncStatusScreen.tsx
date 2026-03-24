@@ -7,6 +7,7 @@ import {
   Pressable,
   NativeModules,
   NativeEventEmitter,
+  Linking,
   type ListRenderItemInfo,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -53,6 +54,11 @@ interface RetryBannerState {
   startedAtMs: number;
 }
 
+interface LatestSyncInfo {
+  updatedAt: string;
+  deviceName: string;
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -93,6 +99,22 @@ function formatBytes(bytes: number): string {
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+}
+
+function formatDateTimeLabel(iso?: string): string {
+  if (!iso) return '暂无记录';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '暂无记录';
+
+  const now = new Date();
+  const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  if (date.toDateString() === now.toDateString()) {
+    return `今天 ${time}`;
+  }
+  if (date.getFullYear() === now.getFullYear()) {
+    return `${date.getMonth() + 1}月${date.getDate()}日 ${time}`;
+  }
+  return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()} ${time}`;
 }
 
 /**
@@ -163,7 +185,15 @@ function CircularProgress({ progress, speed }: { progress: number; speed: string
   );
 }
 
-function CompletionCard({ fileCount, totalSize }: { fileCount: number; totalSize: string }) {
+function CompletionCard({
+  fileCount,
+  totalSize,
+  latestSyncLabel,
+}: {
+  fileCount: number;
+  totalSize: string;
+  latestSyncLabel?: string;
+}) {
   return (
     <View style={styles.completionContainer}>
       {/* Glow backdrop */}
@@ -178,6 +208,9 @@ function CompletionCard({ fileCount, totalSize }: { fileCount: number; totalSize
           {fileCount} {'个文件'} {'·'} {totalSize}
         </Text>
         <Text style={styles.completionSubtext}>{'本次同步已全部完成'}</Text>
+        {latestSyncLabel ? (
+          <Text style={styles.lastSyncText}>{`最近一次成功同步：${latestSyncLabel}`}</Text>
+        ) : null}
       </View>
     </View>
   );
@@ -236,6 +269,7 @@ export function SyncStatusScreen() {
   const [bindingState, setBindingState] = useState<BindingState | null>(null);
   const [retryBanner, setRetryBanner] = useState<RetryBannerState | null>(null);
   const [retryCountdownSec, setRetryCountdownSec] = useState(0);
+  const [latestSync, setLatestSync] = useState<LatestSyncInfo | null>(null);
 
   const loadTodayStats = useCallback(async (engine?: any) => {
     try {
@@ -254,6 +288,32 @@ export function SyncStatusScreen() {
         }
         setTodayStats({ fileCount: totalFiles, totalBytes: totalBytesSum });
       }
+    } catch { /* ignore */ }
+  }, []);
+
+  const loadLatestSync = useCallback(async (engine?: any) => {
+    try {
+      const mod = engine || NativeModules.NativeSyncEngine;
+      if (!mod) return;
+      const history = await mod.getHistoryDays(null);
+      const items = history?.items as Array<Record<string, unknown>> | undefined;
+      if (!items?.length) {
+        setLatestSync(null);
+        return;
+      }
+
+      let latest: LatestSyncInfo | null = null;
+      for (const item of items) {
+        const updatedAt = item.updatedAt as string | undefined;
+        if (!updatedAt) continue;
+        if (!latest || new Date(updatedAt).getTime() > new Date(latest.updatedAt).getTime()) {
+          latest = {
+            updatedAt,
+            deviceName: (item.deviceName as string) || 'Mac',
+          };
+        }
+      }
+      setLatestSync(latest);
     } catch { /* ignore */ }
   }, []);
 
@@ -325,6 +385,7 @@ export function SyncStatusScreen() {
 
         // Load initial state FIRST (before triggering sync, to avoid flash)
         await loadTodayStats(NativeSyncEngine);
+        await loadLatestSync(NativeSyncEngine);
 
         const syncData = await NativeSyncEngine.getSyncOverview();
         if (syncData) {
@@ -394,6 +455,7 @@ export function SyncStatusScreen() {
           // Reload today stats when sync completes
           if (state.uploadState === 'completed') {
             loadTodayStats(NativeModules.NativeSyncEngine);
+            loadLatestSync(NativeModules.NativeSyncEngine);
           }
         });
 
@@ -446,13 +508,16 @@ export function SyncStatusScreen() {
   const boundDeviceName = bindingState?.deviceAlias || bindingState?.deviceName || 'Mac';
   const isConnectionError = bindingState?.connectionState === 'offline' || bindingState?.connectionState === 'bound';
   const isTransferInterrupted = retryBanner !== null || overview.uploadState === 'reconnecting';
+  const isPermissionBlocked = overview.uploadState === 'paused_no_permission';
   const reconnectElapsedMs = retryBanner ? Date.now() - retryBanner.startedAtMs : 0;
   const isWaitingForNetworkRecovery = isTransferInterrupted && (
     reconnectElapsedMs >= RECONNECT_PAUSED_THRESHOLD_MS ||
     (retryBanner?.attempt ?? overview.retryAttempt ?? 0) >= RECONNECT_PAUSED_THRESHOLD_ATTEMPT
   );
   const connectionNotice = (
-    isTransferInterrupted
+    isPermissionBlocked
+      ? '需要授予照片访问权限。'
+      : isTransferInterrupted
       ? (
         isWaitingForNetworkRecovery
           ? '传输已暂停，等待网络恢复。'
@@ -467,7 +532,9 @@ export function SyncStatusScreen() {
         : null
   );
   const connectionDetail = (
-    isTransferInterrupted
+    isPermissionBlocked
+      ? '打开系统设置后允许访问照片，恢复后会自动继续同步。'
+      : isTransferInterrupted
       ? (
         isWaitingForNetworkRecovery
           ? (
@@ -518,20 +585,21 @@ export function SyncStatusScreen() {
             styles.connectionBannerFloating,
             { top: insets.top + 56 },
             isTransferInterrupted || isConnectionError
+            || isPermissionBlocked
               ? styles.connectionBannerError
               : styles.connectionBannerWarning,
           ]}
         >
           <Icon
-            name={isTransferInterrupted || isConnectionError ? 'alert-circle-outline' : 'sync-outline'}
+            name={isTransferInterrupted || isConnectionError || isPermissionBlocked ? 'alert-circle-outline' : 'sync-outline'}
             size={18}
-            color={isTransferInterrupted || isConnectionError ? '#b91c1c' : '#9a3412'}
+            color={isTransferInterrupted || isConnectionError || isPermissionBlocked ? '#b91c1c' : '#9a3412'}
           />
           <View style={styles.connectionBannerCopy}>
             <Text
               style={[
                 styles.connectionBannerText,
-                isTransferInterrupted || isConnectionError
+                isTransferInterrupted || isConnectionError || isPermissionBlocked
                   ? styles.connectionBannerTextError
                   : styles.connectionBannerTextWarning,
               ]}
@@ -542,13 +610,23 @@ export function SyncStatusScreen() {
               <Text
                 style={[
                   styles.connectionBannerDetail,
-                  isTransferInterrupted || isConnectionError
+                  isTransferInterrupted || isConnectionError || isPermissionBlocked
                     ? styles.connectionBannerDetailError
                     : styles.connectionBannerDetailWarning,
                 ]}
               >
                 {connectionDetail}
               </Text>
+            ) : null}
+            {isPermissionBlocked ? (
+              <Pressable
+                onPress={() => {
+                  void Linking.openSettings();
+                }}
+                style={styles.connectionBannerAction}
+              >
+                <Text style={styles.connectionBannerActionText}>{'打开系统设置'}</Text>
+              </Pressable>
             ) : null}
           </View>
         </View>
@@ -557,7 +635,11 @@ export function SyncStatusScreen() {
       {initialLoading ? null : isDone ? (
         /* ---- Completion card ---- */
         <View style={styles.progressCard}>
-          <CompletionCard fileCount={todayStats.fileCount} totalSize={formatBytes(todayStats.totalBytes)} />
+          <CompletionCard
+            fileCount={todayStats.fileCount}
+            totalSize={formatBytes(todayStats.totalBytes)}
+            latestSyncLabel={latestSync ? `${formatDateTimeLabel(latestSync.updatedAt)} · ${latestSync.deviceName}` : undefined}
+          />
         </View>
       ) : (
         <>
@@ -654,6 +736,19 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
   },
+  connectionBannerAction: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(185,28,28,0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  connectionBannerActionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#991b1b',
+  },
   connectionBannerError: {
     backgroundColor: 'rgba(254,226,226,0.94)',
     borderColor: 'rgba(220,38,38,0.18)',
@@ -703,6 +798,11 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontSize: 14,
     color: BLUE_MUTED,
+  },
+  lastSyncText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#8aa7ba',
   },
 
   // Circular progress ring

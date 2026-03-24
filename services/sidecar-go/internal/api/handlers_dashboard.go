@@ -29,10 +29,12 @@ func (s *Server) handleDashboardSummary(w http.ResponseWriter, _ *http.Request) 
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"todayUploadCount":   summary.TotalFiles,
-		"todayOccupiedBytes": summary.TotalBytes,
-		"remainingBytes":     remainingBytes,
-		"isDiskLow":          isDiskLow,
+		"todayUploadCount":         summary.TotalFiles,
+		"todayOccupiedBytes":       summary.TotalBytes,
+		"remainingBytes":           remainingBytes,
+		"isDiskLow":                isDiskLow,
+		"lastSuccessfulSyncAt":     summary.LastSuccessfulSyncAt,
+		"lastSuccessfulDeviceName": summary.LastSuccessfulDeviceName,
 	})
 }
 

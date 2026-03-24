@@ -138,6 +138,14 @@ class NativeSyncEngineModule: RCTEventEmitter {
     }
 
     @objc
+    func getAppInfo(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        Task {
+            let result = await SyncEngineManager.shared.getAppInfo()
+            resolve(result)
+        }
+    }
+
+    @objc
     func getClientDisplayName(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         resolve(SyncEngineManager.shared.getClientDisplayName())
     }
