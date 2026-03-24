@@ -9,6 +9,7 @@ func testConfig() BroadcastConfig {
 		DeviceID:     "mac-7fae12c9",
 		DeviceName:   "WorkStation-A",
 		DeviceType:   "mac",
+		DeviceIP:     "192.168.1.10",
 		TCPPort:      39393,
 		Proto:        2,
 		ShareEnabled: true,
@@ -37,6 +38,7 @@ func TestBuildTXTRecords(t *testing.T) {
 		"auth=code",
 		"share=1",
 		"shareName=SyncFlow",
+		"ip=192.168.1.10",
 	}
 
 	if len(txt) != len(expected) {

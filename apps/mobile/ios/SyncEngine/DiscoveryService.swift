@@ -5,6 +5,23 @@ protocol DiscoveryServiceDelegate: AnyObject {
     func discoveryDidUpdate(devices: [DiscoveredDevice])
 }
 
+private func isIPv4Address(_ host: String) -> Bool {
+    !host.isEmpty && host.range(of: #"^\d{1,3}(?:\.\d{1,3}){3}$"#, options: .regularExpression) != nil
+}
+
+private func preferredDiscoveryHost(advertisedIP: String, probedHost: String) -> String {
+    if isIPv4Address(probedHost) {
+        return probedHost
+    }
+    if isIPv4Address(advertisedIP) {
+        return advertisedIP
+    }
+    if !probedHost.isEmpty {
+        return probedHost
+    }
+    return advertisedIP
+}
+
 struct DiscoveredDevice {
     let deviceId: String
     let name: String
@@ -32,7 +49,9 @@ class DiscoveryService {
         NSLog("[DiscoveryService] startBrowsing called")
         let descriptor = NWBrowser.Descriptor.bonjourWithTXTRecord(type: "_syncflow._tcp", domain: nil)
         let params = NWParameters()
-        params.includePeerToPeer = true
+        // Prefer infrastructure Wi-Fi / USB network paths for discovery so the
+        // surfaced address matches the path used for actual transfer.
+        params.includePeerToPeer = false
         browser = NWBrowser(for: descriptor, using: params)
 
         browser?.browseResultsChangedHandler = { [weak self] results, _ in
@@ -79,7 +98,7 @@ class DiscoveryService {
 
                     // Approach 2: getEntry(for:) API if dictionary was empty
                     if txtDict.isEmpty {
-                        let keys = ["id", "name", "type", "proto", "auth", "share", "shareName"]
+                        let keys = ["id", "name", "type", "proto", "auth", "share", "shareName", "ip"]
                         for key in keys {
                             if let entry = txtRecord.getEntry(for: key) {
                                 switch entry {
@@ -94,13 +113,12 @@ class DiscoveryService {
                             }
                         }
                     }
-
                     if let id = txtDict["id"], !id.isEmpty {
                         device = DiscoveredDevice(
                             deviceId: id,
                             name: txtDict["name"] ?? name,
                             type: txtDict["type"] ?? "mac",
-                            ip: "",
+                            ip: txtDict["ip"] ?? "",
                             port: 39393,
                             protoVersion: Int(txtDict["proto"] ?? "2") ?? 2,
                             authMode: txtDict["auth"] ?? "code",
@@ -141,13 +159,16 @@ class DiscoveryService {
         for deviceID in staleReachableIDs {
             reachableDevices.removeValue(forKey: deviceID)
         }
+        let removedReachableDevices = !staleReachableIDs.isEmpty
 
         if updated.isEmpty {
             delegate?.discoveryDidUpdate(devices: [])
             return
         }
 
-        emitReachableDevices()
+        if removedReachableDevices {
+            emitReachableDevices()
+        }
         for device in updated.values {
             probeReachability(for: device, generation: generation)
         }
@@ -177,7 +198,9 @@ class DiscoveryService {
         tcpOptions.noDelay = true
 
         let params = NWParameters(tls: nil, tcp: tcpOptions)
-        params.includePeerToPeer = true
+        // Keep probe routing aligned with upload routing to avoid exposing
+        // AWDL/link-local IPv6 addresses in the UI and fallback host path.
+        params.includePeerToPeer = false
 
         let connection = NWConnection(to: endpoint, using: params)
         probeConnections[device.deviceId] = connection
@@ -208,12 +231,14 @@ class DiscoveryService {
                 timeoutWork.cancel()
                 self.probeConnections.removeValue(forKey: device.deviceId)
 
-                var resolvedIP = device.ip
+                var probedHost = ""
                 if let remoteEndpoint = connection.currentPath?.remoteEndpoint,
                    case .hostPort(let host, _) = remoteEndpoint
                 {
-                    resolvedIP = "\(host)"
+                    probedHost = "\(host)"
                 }
+                let resolvedIP = preferredDiscoveryHost(advertisedIP: device.ip, probedHost: probedHost)
+                NSLog("[DiscoveryService] reachable %@ via %@", device.name, resolvedIP)
 
                 self.reachableDevices[device.deviceId] = DiscoveredDevice(
                     deviceId: device.deviceId,
@@ -230,15 +255,19 @@ class DiscoveryService {
                 connection.cancel()
                 self.emitReachableDevices()
 
-            case .failed, .waiting, .cancelled:
+            case .waiting:
+                NSLog("[DiscoveryService] reachability waiting for %@: %@", device.name, "\(state)")
+
+            case .failed, .cancelled:
                 timeoutWork.cancel()
-                if let current = self.probeConnections[device.deviceId], current === connection {
+                let isCurrentProbe = self.probeConnections[device.deviceId].map { $0 === connection } ?? false
+                if isCurrentProbe {
                     self.probeConnections.removeValue(forKey: device.deviceId)
+                    if self.reachableDevices.removeValue(forKey: device.deviceId) != nil {
+                        self.emitReachableDevices()
+                    }
                 }
                 connection.cancel()
-                if self.reachableDevices.removeValue(forKey: device.deviceId) != nil {
-                    self.emitReachableDevices()
-                }
 
             default:
                 break

@@ -3,6 +3,7 @@ package mdns
 import (
 	"fmt"
 	"log/slog"
+	"net"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -13,6 +14,7 @@ type BroadcastConfig struct {
 	DeviceID     string
 	DeviceName   string
 	DeviceType   string // "mac"
+	DeviceIP     string
 	TCPPort      int    // 39393
 	Proto        int    // 2
 	ShareEnabled bool
@@ -26,7 +28,7 @@ type Broadcaster struct {
 
 // BuildTXTRecords constructs the TXT record key-value pairs from config.
 func BuildTXTRecords(cfg BroadcastConfig) []string {
-	return []string{
+	txt := []string{
 		fmt.Sprintf("id=%s", cfg.DeviceID),
 		fmt.Sprintf("name=%s", cfg.DeviceName),
 		fmt.Sprintf("type=%s", cfg.DeviceType),
@@ -35,11 +37,18 @@ func BuildTXTRecords(cfg BroadcastConfig) []string {
 		fmt.Sprintf("share=%d", boolToInt(cfg.ShareEnabled)),
 		fmt.Sprintf("shareName=%s", cfg.ShareName),
 	}
+	if cfg.DeviceIP != "" {
+		txt = append(txt, fmt.Sprintf("ip=%s", cfg.DeviceIP))
+	}
+	return txt
 }
 
 // NewBroadcaster registers a _syncflow._tcp Bonjour service using macOS native dns-sd command.
 // This is guaranteed compatible with Apple's NWBrowser on iOS.
 func NewBroadcaster(cfg BroadcastConfig) (*Broadcaster, error) {
+	if cfg.DeviceIP == "" {
+		cfg.DeviceIP = getLocalIPv4()
+	}
 	txt := BuildTXTRecords(cfg)
 
 	if err := cleanupStaleBroadcastProcesses(); err != nil {
@@ -66,6 +75,23 @@ func NewBroadcaster(cfg BroadcastConfig) (*Broadcaster, error) {
 		"pid", cmd.Process.Pid,
 	)
 	return &Broadcaster{cmd: cmd}, nil
+}
+
+func getLocalIPv4() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, addr := range addrs {
+		ipnet, ok := addr.(*net.IPNet)
+		if !ok || ipnet.IP.IsLoopback() {
+			continue
+		}
+		if ip4 := ipnet.IP.To4(); ip4 != nil {
+			return ip4.String()
+		}
+	}
+	return ""
 }
 
 // Shutdown stops the dns-sd process.

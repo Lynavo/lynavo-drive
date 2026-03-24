@@ -114,6 +114,16 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private var transitionBackgroundTaskId: UIBackgroundTaskIdentifier = .invalid
     private var bindingConnectionState: BindingConnectionState = .offline
 
+    private func preferredSidecarHost(probedHost: String?, device: DiscoveredDevice?) -> String? {
+        if let probedHost, !probedHost.isEmpty, !probedHost.contains(":") {
+            return probedHost
+        }
+        if let device, !device.ip.isEmpty {
+            return device.ip
+        }
+        return probedHost
+    }
+
     private override init() {
         super.init()
         do {
@@ -569,12 +579,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 return discoveredDevices.values.first(where: { $0.endpoint != nil })
             }
 
-            var targetEndpoint = findDevice()?.endpoint
+            var targetDevice = findDevice()
+            var targetEndpoint = targetDevice?.endpoint
             if targetEndpoint == nil {
                 discoveryService.startBrowsing()
                 for _ in 0..<20 {
                     try await Task.sleep(nanoseconds: 500_000_000)
                     if let found = findDevice() {
+                        targetDevice = found
                         targetEndpoint = found.endpoint
                         break
                     }
@@ -585,7 +597,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             }
 
             try await session.connect(endpoint: endpoint)
-            sidecarHost = newTransport.remoteHost
+            sidecarHost = preferredSidecarHost(probedHost: newTransport.remoteHost, device: targetDevice)
             NSLog("[SyncPipeline] TCP connected to %@", sidecarHost ?? "unknown")
         }
 
@@ -1525,12 +1537,17 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             return discoveredDevices.values.first(where: { $0.endpoint != nil })
         }
 
-        var endpoint = findDevice()?.endpoint
+        var targetDevice = findDevice()
+        var endpoint = targetDevice?.endpoint
         if endpoint == nil {
             discoveryService.startBrowsing()
             for _ in 0..<20 {
                 try await Task.sleep(nanoseconds: 500_000_000)
-                if let found = findDevice() { endpoint = found.endpoint; break }
+                if let found = findDevice() {
+                    targetDevice = found
+                    endpoint = found.endpoint
+                    break
+                }
             }
         }
         guard let ep = endpoint else { return }
@@ -1538,7 +1555,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let transport = TcpTransport()
         let session = ProtocolSession(transport: transport)
         try await session.connect(endpoint: ep)
-        sidecarHost = transport.remoteHost
+        sidecarHost = preferredSidecarHost(probedHost: transport.remoteHost, device: targetDevice)
         NSLog("[SyncPipeline] resolved sidecar host: %@", sidecarHost ?? "nil")
 
         // Auth so sidecar registers us as connected

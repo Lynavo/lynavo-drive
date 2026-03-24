@@ -110,8 +110,6 @@ export function DeviceDiscoveryScreen() {
     try {
       const { NativeSyncEngine } = NativeModules;
       if (NativeSyncEngine) {
-        NativeSyncEngine.startDiscovery()
-          .catch((e: Error) => console.warn('[Discovery] startDiscovery failed:', e));
         const emitter = new NativeEventEmitter(NativeSyncEngine);
         subscription = emitter.addListener('onDiscoveredDevicesChanged', (discoveredDevices: DiscoveredDevice[]) => {
           setDevices(discoveredDevices);
@@ -120,6 +118,8 @@ export function DeviceDiscoveryScreen() {
             if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = undefined; }
           }
         });
+        NativeSyncEngine.startDiscovery()
+          .catch((e: Error) => console.warn('[Discovery] startDiscovery failed:', e));
         // Timeout fallback: if no devices found after 8s, stop scanning animation
         timeoutTimer = setTimeout(() => {
           setScanning(false);
