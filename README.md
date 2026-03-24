@@ -2,79 +2,83 @@
 
 iPhone → Mac 局域网素材无感增量同步工具，面向短视频团队。
 
+## 当前状态
+
+- 桌面端、Go sidecar、移动端和 iOS 原生 `SyncEngine` 都已落地
+- 当前工作重点是 beta 收口、异常恢复、后台上传和发布验证
+- 仓库中目前没有单独维护的产品 spec 文件；开发基线以当前代码、`@syncflow/contracts` 和测试矩阵为准
+
+## 前置依赖
+
+- **macOS**（当前桌面端仅支持 macOS）
+- **Node.js** >= 22.11.0
+- **pnpm** >= 10
+- **Go** >= 1.25.6（sidecar 开发和测试）
+- **Xcode + CocoaPods**（iOS 构建和真机调试）
+
 ## 快速开始
-
-### 前置依赖
-
-- **Node.js** >= 20
-- **pnpm** >= 10（`corepack enable && corepack prepare pnpm@latest --activate`）
-- **Go** >= 1.26（仅 sidecar 开发需要）
-
-### 安装 & 启动
 
 ```bash
 # 1. 安装依赖
 pnpm install
 
-# 2. 构建共享包（首次必须）
-pnpm build
+# 2. 构建共享包
+pnpm --filter @syncflow/contracts build
+pnpm --filter @syncflow/design-tokens build
 
 # 3. 启动 Desktop 开发模式
-pnpm --filter @syncflow/desktop dev
+pnpm dev:desktop
 ```
 
-Electron 窗口将自动打开，renderer 支持 HMR 热更新。
+Electron 窗口会自动打开；桌面端会负责拉起 sidecar。
 
-### 常用命令
+## 常用命令
 
 ```bash
-# Desktop 开发（快捷方式）
+# Desktop
 pnpm dev:desktop
+pnpm build:desktop
 
-# 全量构建 / 测试 / 类型检查
+# Mobile
+pnpm dev:mobile
+pnpm build:mobile
+
+# Sidecar
+pnpm dev:sidecar
+pnpm build:sidecar
+pnpm test:sidecar
+
+# 全仓验证
 pnpm build
 pnpm test
 pnpm typecheck
-
-# 一次性跑完 build + test + typecheck
+pnpm format:check
 pnpm check
-
-# 代码格式化
-pnpm format
-
-# 清理构建产物
-pnpm clean
-
-# 按包操作
-pnpm --filter @syncflow/desktop dev
-pnpm --filter @syncflow/desktop test:watch    # vitest watch 模式
-pnpm --filter @syncflow/contracts build
 ```
 
 ## 项目结构
 
-```
+```text
 syncflow/
 ├── apps/
-│   └── desktop/              # Electron 桌面应用
-│       ├── src/main/         #   主进程（窗口管理、IPC、sidecar 生命周期）
-│       ├── src/preload/      #   预加载脚本（contextBridge API）
-│       └── src/renderer/     #   渲染进程（React 18 + shadcn/ui + Tailwind v4）
-│           ├── features/     #     页面组件（dashboard / settings / device-detail）
-│           ├── stores/       #     zustand 状态管理
-│           ├── components/   #     UI 组件（shadcn + 共享组件）
-│           └── mocks/        #     Phase 1 mock 数据
+│   ├── desktop/              # Electron 桌面应用
+│   │   └── src/
+│   │       ├── main/         # 主进程（窗口、IPC、sidecar 生命周期）
+│   │       ├── preload/      # 预加载桥接
+│   │       └── renderer/     # React 18 UI
+│   └── mobile/               # React Native iOS 应用 + 原生 SyncEngine
+│       ├── ios/              # Xcode 工程、Swift 原生模块
+│       ├── src/              # RN 页面和 hooks
+│       └── __tests__/        # RN 测试
 ├── packages/
-│   ├── contracts/            # @syncflow/contracts — 共享 DTO / 枚举 / 事件 / 错误码
-│   └── design-tokens/        # @syncflow/design-tokens — 颜色 / 圆角 / 阴影 / 排版 token
+│   ├── contracts/            # 共享 DTO / 常量 / 事件 / 错误码
+│   └── design-tokens/        # 共享设计 token
 ├── services/
-│   └── sidecar-go/           # Go sidecar（独立 go.mod，不受 turbo 管理）
+│   └── sidecar-go/           # Go sidecar（TCP/HTTP/SQLite/mDNS）
 ├── docs/
-│   └── superpowers/
-│       ├── specs/            # 项目规格文档
-│       └── plans/            # 实施计划文档
+│   └── testing/              # 测试矩阵和 beta 验证说明
 └── tmp/
-    └── ui-demo/              # UI 视觉参考（只读，不用于开发）
+    └── ui-demo/              # 视觉参考，仅供比对，不直接复用代码
 ```
 
 ## 技术栈
@@ -83,45 +87,42 @@ syncflow/
 |----|------|
 | Monorepo | pnpm 10 + turborepo 2.8 |
 | Desktop | Electron 41 + electron-vite 5 + electron-builder 26 |
-| Desktop UI | React 18.3 + shadcn/ui (new-york) + Tailwind CSS v4 + zustand 5 |
-| Sidecar | Go 1.26 + SQLite |
-| Mobile | React Native 0.84 + Swift TurboModule（计划中） |
-| 共享 | @syncflow/contracts + @syncflow/design-tokens |
-| 测试 | vitest 4.1 (TS) + go test (Go) |
-| TypeScript | 5.8 |
+| Desktop UI | React 18.3 + zustand 5 + Tailwind CSS v4 |
+| Mobile | React Native 0.84.1 + React 19 |
+| iOS Native | Swift `SyncEngine` + BGTask + PhotoKit + Network.framework |
+| Sidecar | Go 1.25.6 + SQLite + WebSocket |
+| Shared | `@syncflow/contracts` + `@syncflow/design-tokens` |
+| Test | vitest 4.1 + jest + `go test` |
 
 ## 架构概览
 
+```text
+iPhone (RN UI + Swift SyncEngine)
+  ├── Bonjour/mDNS discover
+  ├── LMUP/TCP :39393
+  └── Presence/HTTP :39394
+                │
+                ▼
+Mac (Electron + Go sidecar)
+  ├── Electron: UI 壳、窗口、桥接、sidecar 生命周期管理
+  ├── Sidecar HTTP API / WebSocket
+  ├── LMUP 文件接收
+  ├── SQLite
+  └── 文件系统 / 共享目录检测
 ```
-iPhone (RN + Swift)  ──── Bonjour/mDNS ────►  Mac (Electron + Go sidecar)
-                     ──── LMUP/TCP:39393 ──►
-                                               Electron ◄── HTTP:39394 ──► Go sidecar
-                                                                            ├── SQLite
-                                                                            ├── 文件系统
-                                                                            └── SMB 共享
-```
 
-- **Electron**：UI 壳 + sidecar 生命周期管理
-- **Go sidecar**：Bonjour 广播、TCP 协议、文件接收、SQLite、共享检测
-- **React Native**：iOS 展示层
-- **Swift SyncEngine**：Bonjour 发现、PhotoKit 扫描、TCP 传输、后台任务
+## 开发基线
 
-## 开发阶段
-
-| Phase | 状态 | 内容 |
-|-------|------|------|
-| 0: Monorepo Bootstrap | ✅ 完成 | pnpm workspace + turbo + contracts + design-tokens |
-| 1: Desktop Shell | ✅ 完成 | Electron 应用 + 全部页面（mock 数据） |
-| 2: Go Sidecar | 📋 计划就绪 | HTTP API + SQLite + Bonjour + WebSocket |
-| 3: Desktop ↔ Sidecar 集成 | 📋 待规划 | 真实数据接入 |
-| 4: LMUP/2 协议 | 📋 待规划 | TCP 文件传输 |
-| 5: Mobile | 📋 待规划 | RN + Swift 同步引擎 |
+- 共享类型、常量、事件名、端口定义统一来自 `@syncflow/contracts`
+- renderer 不直接访问 sidecar、文件系统、SQLite；全部通过 preload bridge / main 进程转发
+- 队列保持只读，不允许在 UI 里删除、调序或跳过
+- 同一台手机同一时间只允许串行上传一个文件
+- `tmp/ui-demo/` 只做视觉参考，不作为实现来源
 
 ## 文档
 
-- **项目规格**：[`docs/superpowers/specs/2026-03-21-syncflow-v2-spec.md`](docs/superpowers/specs/2026-03-21-syncflow-v2-spec.md)
-- **Phase 0+1 计划**：[`docs/superpowers/plans/2026-03-21-phase-0-1-monorepo-desktop.md`](docs/superpowers/plans/2026-03-21-phase-0-1-monorepo-desktop.md)
-- **Phase 2 计划**：[`docs/superpowers/plans/2026-03-21-phase-2-go-sidecar.md`](docs/superpowers/plans/2026-03-21-phase-2-go-sidecar.md)
+- 开发约束和执行准则：[`AGENTS.md`](./AGENTS.md)
+- beta 测试矩阵：[`docs/testing/beta-test-matrix.md`](./docs/testing/beta-test-matrix.md)
 
 ## License
 

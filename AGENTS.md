@@ -2,11 +2,17 @@
 
 ## 项目概述
 
-SyncFlow V2：iPhone → Mac 局域网素材无感增量同步工具。Monorepo 包含 Electron 桌面应用、Go sidecar、和未来的 React Native 移动端。
+SyncFlow V2：iPhone → Mac 局域网素材无感增量同步工具。Monorepo 当前包含 Electron 桌面应用、Go sidecar、React Native 移动端，以及 iOS 原生 `SyncEngine`。
 
-## 唯一的 Source of Truth
+## 当前开发依据
 
-**`docs/superpowers/specs/2026-03-21-syncflow-v2-spec.md`** 是本项目唯一的规格文档。docs/ 下其他文件（01-05 编号的文档、AGENTS_SYNCFLOW_GREENFIELD.md、syncflow_v2_technical_design.md）仅作为历史参考，不再作为开发依据。
+仓库中目前**没有单独维护的产品 spec 文件**。开发和修改请按以下优先级判断：
+
+1. **当前已提交代码**：实际行为以仓库中的现有实现为准
+2. **`@syncflow/contracts`**：共享 DTO、常量、事件名、端口定义的唯一来源
+3. **`docs/testing/beta-test-matrix.md`**：当前内测验证范围、回归场景和发布门槛
+
+历史文档如果后续恢复，只能作为背景参考；在新的 source of truth 明确之前，不要再假定某个已删除 spec 文件仍然有效。
 
 ## 关键架构约束
 
@@ -15,7 +21,7 @@ SyncFlow V2：iPhone → Mac 局域网素材无感增量同步工具。Monorepo 
 - **全自动增量同步**：不允许手动勾选文件
 - **单文件串行上传**：同一台手机同一时间只传 1 个文件
 - **所有 DTO 类型从 `@syncflow/contracts` 导入**，不允许在 desktop/mobile 中重新定义
-- **`tmp/ui-demo/` 只做视觉参考**，不允许直接复制代码。spec 是唯一依据。
+- **`tmp/ui-demo/` 只做视觉参考**，不允许直接复制代码。实现以当前代码、`@syncflow/contracts` 和测试矩阵为准。
 - **Renderer 不直接访问** sidecar、文件系统、SQLite —— 全部走 preload bridge
 
 ## 开发流程
@@ -62,7 +68,7 @@ pnpm format:check      # 格式检查
 - main/preload/renderer 严格隔离
 - IPC channel 名定义在 `src/main/ipc-handlers.ts` 的 `IPC` 常量对象
 - preload 通过 `contextBridge.exposeInMainWorld('electronAPI', ...)` 暴露 API
-- sidecar 相关调用在 Phase 1 返回 mock 数据，Phase 3 替换为真实 HTTP 调用
+- renderer 不直接访问 sidecar、文件系统、SQLite，全部通过 preload bridge / main 进程转发
 
 ### Go Sidecar
 - 独立 `go.mod`，不受 turbo 管理
@@ -80,9 +86,9 @@ pnpm format:check      # 格式检查
 
 ## 当前状态
 
-- **Phase 0 (Monorepo) + Phase 1 (Desktop Shell)**：已完成，60 个测试全通过
-- **Phase 2 (Go Sidecar)**：计划就绪，待执行
-- **Phase 3-5**：待规划
+- **Monorepo / Desktop / Sidecar / Mobile SyncEngine**：都已落地，不再是 greenfield 阶段
+- **当前重点**：异常恢复、后台上传、连接状态提示、beta 收口和发布验证
+- **回归基线**：以 `go test ./...`、`pnpm --filter @syncflow/mobile exec tsc --noEmit`、iOS 构建和 `docs/testing/beta-test-matrix.md` 为准
 
 ## Sidecar HTTP API 端口
 
