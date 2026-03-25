@@ -146,6 +146,18 @@ class NativeSyncEngineModule: RCTEventEmitter {
     }
 
     @objc
+    func exportDiagnostics(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        Task {
+            do {
+                let archivePath = try await SyncEngineManager.shared.exportDiagnostics()
+                resolve(archivePath)
+            } catch {
+                reject("EXPORT_DIAGNOSTICS_ERROR", error.localizedDescription, error)
+            }
+        }
+    }
+
+    @objc
     func getClientDisplayName(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         resolve(SyncEngineManager.shared.getClientDisplayName())
     }

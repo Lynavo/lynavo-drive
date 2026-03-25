@@ -4,7 +4,10 @@ import Photos
 class AssetExportService {
 
     /// Export a PHAsset to a temporary file
-    func exportAsset(_ asset: PHAsset) async throws -> ExportedFile {
+    func exportAsset(
+        _ asset: PHAsset,
+        onDownloadProgress: ((Double) -> Void)? = nil
+    ) async throws -> ExportedFile {
         let perfLoggingEnabled = syncFlowBoolSetting(
             envKey: "SYNCFLOW_UPLOAD_PERF_LOG",
             userDefaultsKey: "SyncFlowUploadPerfLog"
@@ -24,6 +27,9 @@ class AssetExportService {
         // Export with iCloud download support
         let options = PHAssetResourceRequestOptions()
         options.isNetworkAccessAllowed = true  // Allow iCloud download
+        options.progressHandler = { progress in
+            onDownloadProgress?(progress)
+        }
 
         return try await withCheckedThrowingContinuation { continuation in
             PHAssetResourceManager.default().writeData(for: resource, toFile: tempURL, options: options) { error in

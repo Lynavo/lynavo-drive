@@ -30,7 +30,8 @@ interface QueueItem {
   name: string;
   size: string;
   type: 'video' | 'image';
-  status: 'queued' | 'uploading' | 'completed';
+  status: 'queued' | 'preparing' | 'cloud_downloading' | 'uploading' | 'completed';
+  isCloudAsset: boolean;
 }
 
 interface SyncOverview {
@@ -247,6 +248,12 @@ function QueueItemRow({ item, isLast }: { item: QueueItem; isLast: boolean }) {
               <Text style={styles.uploadingLabel}>{'传输中'}</Text>
             </View>
           )}
+          {item.isCloudAsset && (
+            <View style={styles.cloudAssetBadge}>
+              <Icon name="cloud-outline" size={11} color={BLUE} />
+              <Text style={styles.cloudAssetLabel}>{'iCloud'}</Text>
+            </View>
+          )}
         </View>
       </View>
     </View>
@@ -279,6 +286,15 @@ export function SyncStatusScreen() {
   const [suppressInitialOfflineBanner, setSuppressInitialOfflineBanner] = useState(false);
   const [showConnectionBanner, setShowConnectionBanner] = useState(false);
   const [holdCompletionCardUntilMs, setHoldCompletionCardUntilMs] = useState<number | null>(null);
+
+  const mapQueueItem = useCallback((item: Record<string, unknown>, index: number): QueueItem => ({
+    id: String(item.id ?? index),
+    name: (item.originalFilename as string) || 'Unknown',
+    size: formatBytes((item.fileSize as number) ?? 0),
+    type: (item.mediaType as string) === 'video' ? 'video' : 'image',
+    status: ((item.status as string) ?? 'queued') as QueueItem['status'],
+    isCloudAsset: Boolean(item.isCloudAsset),
+  }), []);
 
   const loadTodayStats = useCallback(async (engine?: any) => {
     try {
@@ -435,13 +451,7 @@ export function SyncStatusScreen() {
         // Load initial queue
         const queueData = await NativeSyncEngine.getReadOnlyQueue();
         const initialQueue = queueData
-          ? queueData.map((item: Record<string, unknown>, index: number) => ({
-            id: String(item.id ?? index),
-            name: (item.originalFilename as string) || 'Unknown',
-            size: formatBytes((item.fileSize as number) ?? 0),
-            type: (item.mediaType as string) === 'video' ? 'video' : 'image',
-            status: ((item.status as string) ?? 'queued') as QueueItem['status'],
-          }))
+          ? queueData.map(mapQueueItem)
           : [];
         if (queueData) {
           setQueue(initialQueue);
@@ -492,9 +502,15 @@ export function SyncStatusScreen() {
             progressPercent: (state.progressPercent as number) ?? prev.progressPercent,
             speed: uploadState === 'reconnecting'
               ? '0 MB/s'
-              : state.currentSpeedMbps ? `${state.currentSpeedMbps} MB/s` : prev.speed,
-            completed: state.transferredBytes ? formatBytes(state.transferredBytes as number) : prev.completed,
-            total: state.totalBytes ? formatBytes(state.totalBytes as number) : prev.total,
+              : state.currentSpeedMbps !== undefined && state.currentSpeedMbps !== null
+                ? `${state.currentSpeedMbps} MB/s`
+                : prev.speed,
+            completed: state.transferredBytes !== undefined && state.transferredBytes !== null
+              ? formatBytes(state.transferredBytes as number)
+              : prev.completed,
+            total: state.totalBytes !== undefined && state.totalBytes !== null
+              ? formatBytes(state.totalBytes as number)
+              : prev.total,
             uploadState: uploadState ?? prev.uploadState,
             retryAttempt: uploadState === 'reconnecting'
               ? ((state.retryAttempt as number) ?? prev.retryAttempt ?? 0)
@@ -512,13 +528,7 @@ export function SyncStatusScreen() {
 
         queueSub = emitter.addListener('onQueueUpdated', (updatedQueue: Array<Record<string, unknown>>) => {
           if (updatedQueue) {
-            setQueue(updatedQueue.map((item, index) => ({
-              id: String(item.id ?? index),
-              name: (item.originalFilename as string) || 'Unknown',
-              size: formatBytes((item.fileSize as number) ?? 0),
-              type: (item.mediaType as string) === 'video' ? 'video' : 'image',
-              status: ((item.status as string) ?? 'queued') as QueueItem['status'],
-            })));
+            setQueue(updatedQueue.map(mapQueueItem));
           }
         });
       } catch (e) {
@@ -538,7 +548,7 @@ export function SyncStatusScreen() {
       queueSub?.remove();
       bindingSub?.remove();
     };
-  }, []);
+  }, [loadLatestSync, loadTodayStats, mapQueueItem, navigation]);
 
   useEffect(() => {
     let appState = AppState.currentState;
@@ -602,6 +612,11 @@ export function SyncStatusScreen() {
     reconnectElapsedMs >= RECONNECT_PAUSED_THRESHOLD_MS ||
     (retryBanner?.attempt ?? overview.retryAttempt ?? 0) >= RECONNECT_PAUSED_THRESHOLD_ATTEMPT
   );
+  const isTransientReconnect = isTransferInterrupted && !isWaitingForNetworkRecovery;
+  const isBannerError =
+    isPermissionBlocked ||
+    isConnectionError ||
+    (isTransferInterrupted && isWaitingForNetworkRecovery);
   const enableConnectionBanner = true;
   const connectionNotice = (
     isPermissionBlocked
@@ -612,7 +627,7 @@ export function SyncStatusScreen() {
       ? (
         isWaitingForNetworkRecovery
           ? '传输已暂停，等待网络恢复。'
-          : `传输已中断，正在重连“${boundDeviceName}”。`
+          : `网络波动，正在重连“${boundDeviceName}”。`
       )
       : isConnectionError
       ? (
@@ -695,22 +710,21 @@ export function SyncStatusScreen() {
             styles.connectionBanner,
             styles.connectionBannerFloating,
             { top: insets.top + 56 },
-            isTransferInterrupted || isConnectionError
-            || isPermissionBlocked
+            isBannerError
               ? styles.connectionBannerError
               : styles.connectionBannerWarning,
           ]}
         >
           <Icon
-            name={isTransferInterrupted || isConnectionError || isPermissionBlocked ? 'alert-circle-outline' : 'sync-outline'}
+            name={isBannerError ? 'alert-circle-outline' : 'sync-outline'}
             size={18}
-            color={isTransferInterrupted || isConnectionError || isPermissionBlocked ? '#b91c1c' : '#9a3412'}
+            color={isBannerError ? '#b91c1c' : '#9a3412'}
           />
           <View style={styles.connectionBannerCopy}>
             <Text
               style={[
                 styles.connectionBannerText,
-                isTransferInterrupted || isConnectionError || isPermissionBlocked
+                isBannerError
                   ? styles.connectionBannerTextError
                   : styles.connectionBannerTextWarning,
               ]}
@@ -721,7 +735,7 @@ export function SyncStatusScreen() {
               <Text
                 style={[
                   styles.connectionBannerDetail,
-                  isTransferInterrupted || isConnectionError || isPermissionBlocked
+                  isBannerError
                     ? styles.connectionBannerDetailError
                     : styles.connectionBannerDetailWarning,
                 ]}
@@ -1052,6 +1066,20 @@ const styles = StyleSheet.create({
     backgroundColor: UPLOADING_BG,
     borderLeftWidth: 3,
     borderLeftColor: UPLOADING_BORDER,
+  },
+  cloudAssetBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(59,159,216,0.12)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  cloudAssetLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: BLUE,
   },
   uploadingBadge: {
     flexDirection: 'row',

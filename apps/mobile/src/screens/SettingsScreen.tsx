@@ -10,6 +10,7 @@ import {
   NativeEventEmitter,
   Alert,
   Linking,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -61,6 +62,7 @@ export function SettingsScreen() {
   const [latestSyncLabel, setLatestSyncLabel] = useState('暂无记录');
   const [appVersionLabel, setAppVersionLabel] = useState('读取中…');
   const [isPhotoPermissionBlocked, setIsPhotoPermissionBlocked] = useState(false);
+  const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false);
 
   // My iPhone display name
   const [myName, setMyName] = useState('iPhone');
@@ -214,6 +216,28 @@ export function SettingsScreen() {
     );
   }, [navigation]);
 
+  const handleExportDiagnostics = useCallback(async () => {
+    const { NativeSyncEngine } = NativeModules;
+    if (!NativeSyncEngine?.exportDiagnostics) {
+      Alert.alert('无法导出', '当前版本暂不支持导出诊断包');
+      return;
+    }
+
+    try {
+      setIsExportingDiagnostics(true);
+      const archivePath = await NativeSyncEngine.exportDiagnostics();
+      const archiveUrl = archivePath.startsWith('file://') ? archivePath : `file://${archivePath}`;
+      await Share.share({
+        title: 'SyncFlow 诊断包',
+        url: archiveUrl,
+      });
+    } catch (error) {
+      Alert.alert('导出失败', '诊断包导出失败，请稍后重试');
+    } finally {
+      setIsExportingDiagnostics(false);
+    }
+  }, []);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
@@ -312,6 +336,29 @@ export function SettingsScreen() {
                 </TouchableOpacity>
               </View>
             ) : null}
+          </View>
+
+          <View style={styles.deviceCard}>
+            <Text style={styles.sectionLabel}>{'支持与诊断'}</Text>
+            <Text style={styles.diagnosticsHint}>
+              {'导出当前设备状态、队列快照、本地数据库和最近日志，便于排查同步问题。'}
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.diagnosticsButton,
+                isExportingDiagnostics && styles.diagnosticsButtonDisabled,
+              ]}
+              activeOpacity={0.8}
+              disabled={isExportingDiagnostics}
+              onPress={() => {
+                void handleExportDiagnostics();
+              }}
+            >
+              <Icon name="download-outline" size={16} color="#3b9fd8" />
+              <Text style={styles.diagnosticsButtonText}>
+                {isExportingDiagnostics ? '正在导出诊断包…' : '导出诊断包'}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.deviceCard}>
@@ -606,6 +653,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#991b1b',
+  },
+  diagnosticsHint: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#6e8aa3',
+    marginBottom: 12,
+  },
+  diagnosticsButton: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(59,159,216,0.18)',
+    backgroundColor: 'rgba(59,159,216,0.08)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  diagnosticsButtonDisabled: {
+    opacity: 0.6,
+  },
+  diagnosticsButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#3b9fd8',
   },
 
   // Phone icon

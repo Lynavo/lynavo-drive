@@ -24,7 +24,7 @@ struct UploadItemRecord {
     var originalFilename: String?
     var fileKey: String?
     var fileSize: Int64?
-    var status: String  // MobileUploadItemStatus values: discovered, preparing, ready, uploading, completed, failed, skipped
+    var status: String  // MobileUploadItemStatus values: discovered, preparing, ready, cloud_downloading, uploading, completed, failed, skipped
     var tempFilePath: String?
     var ackedOffset: Int64
     var lastErrorCode: String?
@@ -265,7 +265,7 @@ class UploadStore {
 
     func getPendingUploadItems() -> [UploadItemRecord] {
         return queue.sync {
-            let sql = "SELECT * FROM upload_items WHERE status IN ('queued', 'discovered', 'preparing', 'ready', 'uploading') ORDER BY id ASC"
+            let sql = "SELECT * FROM upload_items WHERE status IN ('queued', 'discovered', 'preparing', 'ready', 'cloud_downloading', 'uploading') ORDER BY id ASC"
             let rows = queryInternal(sql, bind: [])
             return rows.compactMap { uploadItemFromRow($0) }
         }
@@ -390,6 +390,12 @@ class UploadStore {
             let sql = "SELECT * FROM sync_sessions WHERE state NOT IN ('completed', 'cancelled') ORDER BY started_at DESC LIMIT 1"
             let rows = queryInternal(sql, bind: [])
             return rows.first.flatMap { sessionFromRow($0) }
+        }
+    }
+
+    func checkpointWal() throws {
+        try queue.sync {
+            try executeInternal("PRAGMA wal_checkpoint(FULL)")
         }
     }
 

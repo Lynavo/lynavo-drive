@@ -20,13 +20,13 @@
 		FC3ECC342F6F05B5000460F8 /* SessionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC272F6F05B5000460F8 /* SessionService.swift */; };
 		FC3ECC352F6F05B5000460F8 /* UploadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC2C2F6F05B5000460F8 /* UploadStore.swift */; };
 		FC3ECC362F6F05B5000460F8 /* DiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC222F6F05B5000460F8 /* DiscoveryService.swift */; };
-		FC3ECC512F6F0AAA000460F8 /* SilentAudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC502F6F0AAA000460F8 /* SilentAudioService.swift */; };
 		FC3ECC372F6F05B5000460F8 /* PhotoScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC242F6F05B5000460F8 /* PhotoScanner.swift */; };
 		FC3ECC382F6F05B5000460F8 /* BackgroundExecutionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC202F6F05B5000460F8 /* BackgroundExecutionService.swift */; };
 		FC3ECC392F6F05B5000460F8 /* HistoryLedgerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC232F6F05B5000460F8 /* HistoryLedgerStore.swift */; };
 		FC3ECC3A2F6F05B5000460F8 /* SyncEngineManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC292F6F05B5000460F8 /* SyncEngineManager.swift */; };
 		FC3ECC3B2F6F05B5000460F8 /* SyncEngineError.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC282F6F05B5000460F8 /* SyncEngineError.swift */; };
 		FC3ECC3C2F6F05B5000460F8 /* ProtocolSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC3D2F6F05B5000460F8 /* ProtocolSession.swift */; };
+		FC3ECC512F6F0AAA000460F8 /* SilentAudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC502F6F0AAA000460F8 /* SilentAudioService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -44,7 +44,6 @@
 		FC3ECC202F6F05B5000460F8 /* BackgroundExecutionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundExecutionService.swift; sourceTree = "<group>"; };
 		FC3ECC212F6F05B5000460F8 /* BindingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BindingService.swift; sourceTree = "<group>"; };
 		FC3ECC222F6F05B5000460F8 /* DiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryService.swift; sourceTree = "<group>"; };
-		FC3ECC502F6F0AAA000460F8 /* SilentAudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SilentAudioService.swift; sourceTree = "<group>"; };
 		FC3ECC232F6F05B5000460F8 /* HistoryLedgerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryLedgerStore.swift; sourceTree = "<group>"; };
 		FC3ECC242F6F05B5000460F8 /* PhotoScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoScanner.swift; sourceTree = "<group>"; };
 		FC3ECC252F6F05B5000460F8 /* RNBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RNBridge.m; sourceTree = "<group>"; };
@@ -55,6 +54,7 @@
 		FC3ECC2A2F6F05B5000460F8 /* TcpTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TcpTransport.swift; sourceTree = "<group>"; };
 		FC3ECC2C2F6F05B5000460F8 /* UploadStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadStore.swift; sourceTree = "<group>"; };
 		FC3ECC3D2F6F05B5000460F8 /* ProtocolSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolSession.swift; sourceTree = "<group>"; };
+		FC3ECC502F6F0AAA000460F8 /* SilentAudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SilentAudioService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */

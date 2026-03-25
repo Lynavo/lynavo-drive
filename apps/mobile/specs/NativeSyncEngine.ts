@@ -23,6 +23,10 @@ export interface Spec extends TurboModule {
   getReadOnlyQueue(): Promise<ReadOnlyQueueItemDTO[]>;
   getHistoryDays(cursor?: string): Promise<{ items: HistoryLedgerCardDTO[]; nextCursor: string | null }>;
   getAppInfo(): Promise<{ appName: string; version: string; build: string }>;
+  exportDiagnostics(): Promise<string>;
+  getClientDisplayName(): Promise<string>;
+  setClientDisplayName(name: string): Promise<void>;
+  triggerSync(): Promise<void>;
   // 设置
   renameBoundDeviceAlias(alias: string): Promise<void>;
   // 事件 (Codegen EventEmitter)
