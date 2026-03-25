@@ -157,3 +157,27 @@ spctl --assess --type execute -vv /Volumes/workspace/work/sync-flow/apps/desktop
 1. 签名问题已经由项目脚本固定下来
 2. notarization 仍然依赖 Apple 服务器返回
 3. 打包耗时主要由 Apple 处理速度决定
+
+## 9. beta tag
+
+如果本次桌面端产物要作为一次正式 beta 发布的一部分，在 iOS TestFlight 上传和桌面端 signed DMG 都确认可用后，再回到仓库根目录打 tag：
+
+```bash
+cd /Volumes/workspace/work/sync-flow
+pnpm tag:beta
+```
+
+默认 tag 取当前 iOS 版本和 build：
+
+- `beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION>`
+
+例如：
+
+- `beta/v0.1.0-b4`
+
+如果需要推到远端：
+
+```bash
+cd /Volumes/workspace/work/sync-flow
+pnpm tag:beta:push
+```

@@ -146,7 +146,40 @@ pnpm package:mobile:testflight:upload
 1. 先发 iOS Internal TestFlight
 2. 再发 desktop beta DMG
 3. 先让内部同事跑一次完整闭环
-4. 再决定是否扩展到更大范围 external beta
+4. 确认上传成功后，在当前提交打一个 beta tag
+5. 再决定是否扩展到更大范围 external beta
+
+## 8.1 发布 tag
+
+每次真正发布 beta 时，都在当前提交打一个 annotated tag。
+
+从仓库根目录执行：
+
+```bash
+cd /Volumes/workspace/work/sync-flow
+pnpm tag:beta
+```
+
+默认 tag 格式：
+
+- `beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION>`
+
+例如：
+
+- `beta/v0.1.0-b4`
+
+如果需要立即推到远端：
+
+```bash
+cd /Volumes/workspace/work/sync-flow
+pnpm tag:beta:push
+```
+
+约束：
+
+1. 只在 TestFlight 上传成功后打 tag
+2. 打 tag 前工作区必须是干净的
+3. 一个 build 只对应一个 tag，不复用、不覆盖
 
 ## 9. 发布后回归
 

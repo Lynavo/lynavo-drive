@@ -18,6 +18,8 @@
     "package:mobile:testflight:archive": "pnpm --filter @syncflow/mobile archive:testflight",
     "package:mobile:testflight:upload": "pnpm --filter @syncflow/mobile upload:testflight",
     "package:mobile:testflight": "pnpm --filter @syncflow/mobile release:testflight",
+    "tag:beta": "bash ./scripts/release/create-beta-tag.sh",
+    "tag:beta:push": "bash ./scripts/release/create-beta-tag.sh --push",
     "test:sidecar": "cd services/sidecar-go && make test",
     "lint": "turbo run lint",
     "test": "turbo run test",
