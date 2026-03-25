@@ -17,6 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { Icon } from '../components/Icon';
+import { formatLocalDateKey } from '../utils/localDateKey';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -285,7 +286,7 @@ export function SyncStatusScreen() {
       if (!mod) return null;
       const history = await mod.getHistoryDays(null);
       if (history?.items) {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = formatLocalDateKey(new Date());
         let totalFiles = 0;
         let totalBytesSum = 0;
         for (const item of history.items) {

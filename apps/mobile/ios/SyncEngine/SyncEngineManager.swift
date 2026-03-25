@@ -379,6 +379,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         return suffix.isEmpty ? model : "\(model) \(suffix)"
     }
 
+    private func localDateKey(for date: Date = Date()) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
     private func buildClientHelloPayload(clientId: String, pairingToken: String? = nil) -> [String: Any] {
         var payload: [String: Any] = [
             "clientId": clientId,
@@ -1108,7 +1117,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 ?? 100
             let binding = uploadStore?.getBinding()
             if let binding = binding {
-                let dateStr = String(ISO8601DateFormatter().string(from: Date()).prefix(10))
+                let dateStr = (endRes["ledgerDate"] as? String) ?? localDateKey()
                 let ip = binding.host.isEmpty ? (binding.deviceAlias ?? binding.deviceName) : binding.host
                 do {
                     try historyStore?.upsertDailyLedger(

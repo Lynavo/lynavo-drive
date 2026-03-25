@@ -129,6 +129,7 @@ type FileEndRes struct {
 	OK                   bool   `json:"ok"`
 	FileKey              string `json:"fileKey"`
 	RelativePath         string `json:"relativePath"`
+	LedgerDate           string `json:"ledgerDate,omitempty"`
 	StoredBytes          int64  `json:"storedBytes"`
 	ActiveTransmissionMs int64  `json:"activeTransmissionMs"`
 }

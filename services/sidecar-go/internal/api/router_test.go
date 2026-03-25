@@ -211,12 +211,19 @@ func TestDeviceFiles(t *testing.T) {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
 
-	var body []any
+	var body map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body == nil {
+	items, ok := body["items"].([]any)
+	if !ok {
+		t.Fatalf("expected items array, got %T", body["items"])
+	}
+	if items == nil {
 		t.Error("expected empty array, got nil")
+	}
+	if body["page"] != float64(1) {
+		t.Fatalf("expected page=1, got %v", body["page"])
 	}
 }
 
@@ -331,15 +338,23 @@ func TestDeviceFiles_FilesystemFallback(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	var body []map[string]any
+	var body map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if len(body) != 1 {
-		t.Fatalf("expected 1 fallback file, got %d", len(body))
+	items, ok := body["items"].([]any)
+	if !ok {
+		t.Fatalf("expected items array, got %T", body["items"])
 	}
-	if body[0]["originalFilename"] != "IMG_0001.JPG" {
-		t.Fatalf("expected fallback filename, got %v", body[0]["originalFilename"])
+	if len(items) != 1 {
+		t.Fatalf("expected 1 fallback file, got %d", len(items))
+	}
+	item, ok := items[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected fallback item object, got %T", items[0])
+	}
+	if item["originalFilename"] != "IMG_0001.JPG" {
+		t.Fatalf("expected fallback filename, got %v", item["originalFilename"])
 	}
 }
 

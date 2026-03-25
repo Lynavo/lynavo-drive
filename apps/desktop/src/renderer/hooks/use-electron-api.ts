@@ -20,7 +20,14 @@ const mockSidecar: ElectronAPI['sidecar'] = {
     isDiskLow: false,
   }),
   getDashboardDevices: async () => [],
-  getDeviceFiles: async () => [],
+  getDeviceFiles: async (_deviceId, _date, options) => ({
+    items: [],
+    page: options?.page ?? 1,
+    pageSize: options?.pageSize ?? 200,
+    totalItems: 0,
+    totalBytes: 0,
+    totalActiveTransmissionMs: 0,
+  }),
   getDeviceDates: async () => ({ dates: [] }),
   getSettings: async () => ({ ...defaultSettings }),
   updateSettings: async (s) =>

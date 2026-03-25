@@ -6,7 +6,7 @@ import {
   DialogContent,
   DialogTitle,
 } from '@renderer/components/ui/dialog';
-import { ScrollArea } from '@renderer/components/ui/scroll-area';
+import { Button } from '@renderer/components/ui/button';
 import { useAppStore } from '@renderer/stores/app-store';
 import { useDeviceDetailStore } from '@renderer/stores/device-detail-store';
 import { DeviceHeader } from './DeviceHeader';
@@ -19,9 +19,13 @@ export function DeviceDetailModal() {
   const selectedDevice = useAppStore((s) => s.selectedDevice);
   const closeDeviceDetail = useAppStore((s) => s.closeDeviceDetail);
 
-  const files = useDeviceDetailStore((s) => s.files);
   const selectedDate = useDeviceDetailStore((s) => s.selectedDate);
   const availableDates = useDeviceDetailStore((s) => s.availableDates);
+  const page = useDeviceDetailStore((s) => s.page);
+  const pageSize = useDeviceDetailStore((s) => s.pageSize);
+  const totalItems = useDeviceDetailStore((s) => s.totalItems);
+  const totalBytes = useDeviceDetailStore((s) => s.totalBytes);
+  const totalTransmissionMs = useDeviceDetailStore((s) => s.totalTransmissionMs);
   const loading = useDeviceDetailStore((s) => s.loading);
 
   // Fetch files when modal opens with a device
@@ -29,17 +33,18 @@ export function DeviceDetailModal() {
     if (isModalOpen && selectedDevice) {
       useDeviceDetailStore.getState().fetchDeviceFiles(selectedDevice.deviceId);
     }
+    if (!isModalOpen) {
+      useDeviceDetailStore.getState().reset();
+    }
   }, [isModalOpen, selectedDevice]);
 
-  const { fileCount, totalBytes, totalTransmissionMs } = useMemo(() => {
-    let bytes = 0;
-    let ms = 0;
-    for (const f of files) {
-      bytes += f.fileSize;
-      ms += f.activeTransmissionMs;
-    }
-    return { fileCount: files.length, totalBytes: bytes, totalTransmissionMs: ms };
-  }, [files]);
+  const { totalPages, pageStart, pageEnd } = useMemo(() => {
+    const safeTotalPages = Math.max(1, Math.ceil(totalItems / Math.max(pageSize, 1)));
+    const safePage = Math.min(Math.max(page, 1), safeTotalPages);
+    const start = totalItems === 0 ? 0 : (safePage - 1) * pageSize + 1;
+    const end = totalItems === 0 ? 0 : Math.min(safePage * pageSize, totalItems);
+    return { totalPages: safeTotalPages, pageStart: start, pageEnd: end };
+  }, [page, pageSize, totalItems]);
 
   if (!selectedDevice) return null;
 
@@ -55,7 +60,7 @@ export function DeviceDetailModal() {
         />
         <DialogContent
           showCloseButton={false}
-          className="flex flex-col overflow-hidden border-none p-0"
+          className="flex min-h-0 flex-col overflow-hidden border-none p-0"
           style={{
             background: 'rgba(248,252,255,0.88)',
             backdropFilter: 'blur(24px)',
@@ -65,6 +70,7 @@ export function DeviceDetailModal() {
               '0 24px 80px rgba(80,150,200,0.18), 0 4px 20px rgba(0,0,0,0.06)',
             width: 'min(960px, 92vw)',
             maxWidth: 'min(960px, 92vw)',
+            height: 'min(82vh, 760px)',
             maxHeight: '82vh',
           }}
         >
@@ -86,19 +92,22 @@ export function DeviceDetailModal() {
               selected={selectedDate}
               onSelect={(date) => {
                 if (selectedDevice) {
-                  useDeviceDetailStore.getState().fetchDeviceFiles(selectedDevice.deviceId, date);
+                  useDeviceDetailStore.getState().fetchDeviceFiles(selectedDevice.deviceId, {
+                    date,
+                    page: 1,
+                  });
                 }
               }}
             />
           </div>
 
           <StatsBar
-            fileCount={fileCount}
+            fileCount={totalItems}
             totalBytes={totalBytes}
             activeTransmissionMs={totalTransmissionMs}
           />
 
-          <ScrollArea className="flex-1 px-4 pb-6">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4">
             {loading ? (
               <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
                 加载中...
@@ -106,7 +115,44 @@ export function DeviceDetailModal() {
             ) : (
               <FileLedgerTable storagePath={selectedDevice.storagePath} />
             )}
-          </ScrollArea>
+          </div>
+
+          <div className="flex items-center justify-between border-t border-black/5 px-6 py-4">
+            <div className="text-xs text-slate-500">
+              {totalItems === 0
+                ? '该日期暂无传输记录'
+                : `显示第 ${pageStart}-${pageEnd} 条，共 ${totalItems} 条`}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500">
+                第 {Math.min(page, totalPages)} / {totalPages} 页
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={loading || page <= 1}
+                onClick={() =>
+                  useDeviceDetailStore.getState().fetchDeviceFiles(selectedDevice.deviceId, {
+                    page: Math.max(1, page - 1),
+                  })
+                }
+              >
+                上一页
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={loading || page >= totalPages || totalItems === 0}
+                onClick={() =>
+                  useDeviceDetailStore.getState().fetchDeviceFiles(selectedDevice.deviceId, {
+                    page: Math.min(totalPages, page + 1),
+                  })
+                }
+              >
+                下一页
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </DialogPortal>
     </Dialog>

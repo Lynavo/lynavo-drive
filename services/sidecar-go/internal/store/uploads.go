@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -60,20 +61,61 @@ func (s *Store) GetUpload(fileKey string) (*Upload, error) {
 
 // ListUploadsByDeviceAndDate returns uploads for a given client on a given date (YYYY-MM-DD).
 func (s *Store) ListUploadsByDeviceAndDate(clientID, date string) ([]Upload, error) {
-	rows, err := s.db.Query(`
+	page, err := s.ListUploadsPageByDeviceAndDate(clientID, date, "completedAt", "desc", 1, 10000)
+	if err != nil {
+		return nil, err
+	}
+	return page.Items, nil
+}
+
+func (s *Store) ListUploadsPageByDeviceAndDate(
+	clientID, date, sortField, sortDirection string,
+	page, pageSize int,
+) (UploadPage, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 200
+	}
+
+	orderBy, err := buildUploadOrderClause(sortField, sortDirection)
+	if err != nil {
+		return UploadPage{}, err
+	}
+
+	var result UploadPage
+	result.Page = page
+	result.PageSize = pageSize
+
+	if err := s.db.QueryRow(`
+		SELECT
+			COUNT(*),
+			COALESCE(SUM(file_size), 0),
+			COALESCE(SUM(active_transmission_ms), 0)
+		FROM uploads
+		WHERE client_id = ? AND DATE(updated_at, 'localtime') = ? AND status = 'completed'`,
+		clientID, date,
+	).Scan(&result.TotalItems, &result.TotalBytes, &result.TotalActiveTransmissionMs); err != nil {
+		return UploadPage{}, fmt.Errorf("list uploads summary for %q on %s: %w", clientID, date, err)
+	}
+
+	rows, err := s.db.Query(fmt.Sprintf(`
 		SELECT file_key, session_id, client_id, original_filename, media_type,
 		       file_size, created_at_remote, modified_at_remote, status, part_path, final_path,
 		       committed_bytes, sha256, active_transmission_ms, completed_at, updated_at
 		FROM uploads
 		WHERE client_id = ? AND DATE(updated_at, 'localtime') = ? AND status = 'completed'
-		ORDER BY updated_at DESC`, clientID, date,
+		ORDER BY %s
+		LIMIT ? OFFSET ?`, orderBy),
+		clientID, date, pageSize, (page-1)*pageSize,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list uploads for %q on %s: %w", clientID, date, err)
+		return UploadPage{}, fmt.Errorf("list uploads page for %q on %s: %w", clientID, date, err)
 	}
 	defer rows.Close()
 
-	var uploads []Upload
+	items := make([]Upload, 0, pageSize)
 	for rows.Next() {
 		var u Upload
 		if err := rows.Scan(
@@ -81,11 +123,41 @@ func (s *Store) ListUploadsByDeviceAndDate(clientID, date string) ([]Upload, err
 			&u.FileSize, &u.CreatedAtRemote, &u.ModifiedAtRemote, &u.Status, &u.PartPath, &u.FinalPath,
 			&u.CommittedBytes, &u.SHA256, &u.ActiveTransmissionMs, &u.CompletedAt, &u.UpdatedAt,
 		); err != nil {
-			return nil, fmt.Errorf("scan upload: %w", err)
+			return UploadPage{}, fmt.Errorf("scan upload: %w", err)
 		}
-		uploads = append(uploads, u)
+		items = append(items, u)
 	}
-	return uploads, rows.Err()
+	if err := rows.Err(); err != nil {
+		return UploadPage{}, err
+	}
+
+	result.Items = items
+	return result, nil
+}
+
+func buildUploadOrderClause(sortField, sortDirection string) (string, error) {
+	direction := strings.ToUpper(sortDirection)
+	if direction != "ASC" && direction != "DESC" {
+		direction = "DESC"
+	}
+
+	var expr string
+	switch sortField {
+	case "name":
+		expr = "original_filename COLLATE NOCASE"
+	case "size":
+		expr = "file_size"
+	case "createdAt":
+		expr = "COALESCE(created_at_remote, '')"
+	case "duration":
+		expr = "active_transmission_ms"
+	case "", "completedAt":
+		expr = "COALESCE(completed_at, updated_at)"
+	default:
+		return "", fmt.Errorf("unsupported sort field %q", sortField)
+	}
+
+	return fmt.Sprintf("%s %s, updated_at %s, file_key %s", expr, direction, direction, direction), nil
 }
 
 // GetAvailableDates returns distinct dates (YYYY-MM-DD) that have uploads for a given client, descending.

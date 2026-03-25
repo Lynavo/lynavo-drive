@@ -31,8 +31,17 @@ const electronAPI: ElectronAPI = {
     getHealth: () => ipcRenderer.invoke(IPC.SIDECAR_HEALTH),
     getDashboardSummary: () => ipcRenderer.invoke(IPC.SIDECAR_DASHBOARD_SUMMARY),
     getDashboardDevices: () => ipcRenderer.invoke(IPC.SIDECAR_DASHBOARD_DEVICES),
-    getDeviceFiles: (deviceId: string, date: string) =>
-      ipcRenderer.invoke(IPC.SIDECAR_DEVICE_FILES, deviceId, date),
+    getDeviceFiles: (
+      deviceId: string,
+      date: string,
+      options?: {
+        page?: number;
+        pageSize?: number;
+        sortField?: import('@syncflow/contracts').DeviceFileSortField;
+        sortDirection?: import('@syncflow/contracts').SortDirection;
+      },
+    ) =>
+      ipcRenderer.invoke(IPC.SIDECAR_DEVICE_FILES, deviceId, date, options),
     getDeviceDates: (deviceId: string) =>
       ipcRenderer.invoke(IPC.SIDECAR_DEVICE_DATES, deviceId),
     getSettings: () => ipcRenderer.invoke(IPC.SIDECAR_SETTINGS),

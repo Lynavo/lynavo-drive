@@ -35,6 +35,15 @@ type Upload struct {
 	UpdatedAt            string  `json:"updatedAt"`
 }
 
+type UploadPage struct {
+	Items                     []Upload `json:"items"`
+	Page                      int      `json:"page"`
+	PageSize                  int      `json:"pageSize"`
+	TotalItems                int      `json:"totalItems"`
+	TotalBytes                int64    `json:"totalBytes"`
+	TotalActiveTransmissionMs int64    `json:"totalActiveTransmissionMs"`
+}
+
 // DailyStats represents per-device daily aggregated statistics.
 type DailyStats struct {
 	StatDate             string `json:"statDate"`

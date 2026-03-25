@@ -1,9 +1,11 @@
 import type {
   DashboardSummaryDTO,
   DashboardDeviceDTO,
-  DeviceFileLedgerDTO,
+  DeviceFileLedgerPageDTO,
+  DeviceFileSortField,
   SettingsDTO,
   ShareStatusDTO,
+  SortDirection,
 } from '@syncflow/contracts';
 import type { SidecarEvent } from '@syncflow/contracts';
 import type { SidecarRuntimeState } from '../shared/sidecar-runtime';
@@ -13,7 +15,16 @@ export interface ElectronAPI {
     getHealth(): Promise<{ ok: boolean; service: string }>;
     getDashboardSummary(): Promise<DashboardSummaryDTO>;
     getDashboardDevices(): Promise<DashboardDeviceDTO[]>;
-    getDeviceFiles(deviceId: string, date: string): Promise<DeviceFileLedgerDTO[]>;
+    getDeviceFiles(
+      deviceId: string,
+      date: string,
+      options?: {
+        page?: number;
+        pageSize?: number;
+        sortField?: DeviceFileSortField;
+        sortDirection?: SortDirection;
+      },
+    ): Promise<DeviceFileLedgerPageDTO>;
     getDeviceDates(deviceId: string): Promise<{ dates: string[] }>;
     getSettings(): Promise<SettingsDTO>;
     updateSettings(settings: Partial<SettingsDTO>): Promise<SettingsDTO>;

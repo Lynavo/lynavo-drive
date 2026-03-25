@@ -65,6 +65,24 @@ export interface DeviceFileLedgerDTO {
   finalPath?: string;
 }
 
+export type DeviceFileSortField =
+  | 'name'
+  | 'size'
+  | 'completedAt'
+  | 'createdAt'
+  | 'duration';
+
+export type SortDirection = 'asc' | 'desc';
+
+export interface DeviceFileLedgerPageDTO {
+  items: DeviceFileLedgerDTO[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalBytes: number;
+  totalActiveTransmissionMs: number;
+}
+
 // ── Desktop Settings ──
 
 export interface SettingsDTO {

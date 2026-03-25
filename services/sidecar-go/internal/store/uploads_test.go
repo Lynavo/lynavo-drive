@@ -74,6 +74,40 @@ func TestListUploadsByDeviceAndDate(t *testing.T) {
 	}
 }
 
+func TestListUploadsPageByDeviceAndDate(t *testing.T) {
+	s := newTestStore(t)
+	today := time.Now().Format("2006-01-02")
+
+	for i, fk := range []string{"f1", "f2", "f3", "f4", "f5"} {
+		u := sampleUpload(fk, "client-A")
+		u.OriginalFilename = "file-" + fk
+		u.FileSize = int64(1000 + i)
+		u.ActiveTransmissionMs = int64(100 + i)
+		u.Status = "completed"
+		u.UpdatedAt = time.Now().Add(time.Duration(i) * time.Second).UTC().Format(time.RFC3339)
+		if err := s.UpsertUpload(u); err != nil {
+			t.Fatalf("UpsertUpload: %v", err)
+		}
+	}
+
+	page, err := s.ListUploadsPageByDeviceAndDate("client-A", today, "completedAt", "desc", 2, 2)
+	if err != nil {
+		t.Fatalf("ListUploadsPageByDeviceAndDate: %v", err)
+	}
+	if page.Page != 2 {
+		t.Fatalf("expected page=2, got %d", page.Page)
+	}
+	if page.PageSize != 2 {
+		t.Fatalf("expected pageSize=2, got %d", page.PageSize)
+	}
+	if page.TotalItems != 5 {
+		t.Fatalf("expected totalItems=5, got %d", page.TotalItems)
+	}
+	if len(page.Items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(page.Items))
+	}
+}
+
 func TestCompleteUpload(t *testing.T) {
 	s := newTestStore(t)
 	u := sampleUpload("complete-me", "client-1")

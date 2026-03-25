@@ -47,6 +47,11 @@ beforeEach(() => {
     ],
     selectedDate: '2026-03-19',
     availableDates: ['2026-03-19', '2026-03-18'],
+    page: 1,
+    pageSize: 200,
+    totalItems: 2,
+    totalBytes: 1_612_814_745,
+    totalTransmissionMs: 200_000,
   });
 });
 

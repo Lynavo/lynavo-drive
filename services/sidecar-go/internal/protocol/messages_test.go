@@ -271,6 +271,7 @@ func TestFileEndResRoundtrip(t *testing.T) {
 		OK:                   true,
 		FileKey:              "file-123",
 		RelativePath:         "My Phone/2026-03-21/IMG_0001.HEIC",
+		LedgerDate:           "2026-03-21",
 		StoredBytes:          10485760,
 		ActiveTransmissionMs: 2500,
 	}

@@ -9,6 +9,14 @@ describe('device-detail-store', () => {
       files: mockFiles,
       selectedDate: mockAvailableDates[0],
       availableDates: mockAvailableDates,
+      page: 1,
+      pageSize: 200,
+      totalItems: mockFiles.length,
+      totalBytes: mockFiles.reduce((sum, file) => sum + file.fileSize, 0),
+      totalTransmissionMs: mockFiles.reduce(
+        (sum, file) => sum + file.activeTransmissionMs,
+        0,
+      ),
       sortField: 'completedAt',
       sortDirection: 'desc',
       loading: false,
@@ -20,6 +28,8 @@ describe('device-detail-store', () => {
     expect(state.files.length).toBe(mockFiles.length);
     expect(state.selectedDate).toBe('2026-03-19');
     expect(state.availableDates).toEqual(mockAvailableDates);
+    expect(state.page).toBe(1);
+    expect(state.totalItems).toBe(mockFiles.length);
   });
 
   it('setDate updates selectedDate', () => {
@@ -34,24 +44,42 @@ describe('device-detail-store', () => {
   });
 
   it('toggleSort sets new field to asc', () => {
-    useDeviceDetailStore.getState().toggleSort('name');
+    useDeviceDetailStore.setState({
+      fetchDeviceFiles: async (
+        _deviceId: string,
+        _options?: { date?: string; page?: number },
+      ) => {},
+    });
+    void useDeviceDetailStore.getState().toggleSort('device-1', 'name');
     const state = useDeviceDetailStore.getState();
     expect(state.sortField).toBe('name');
     expect(state.sortDirection).toBe('asc');
   });
 
   it('toggleSort flips direction on same field', () => {
-    useDeviceDetailStore.getState().toggleSort('name');
+    useDeviceDetailStore.setState({
+      fetchDeviceFiles: async (
+        _deviceId: string,
+        _options?: { date?: string; page?: number },
+      ) => {},
+    });
+    void useDeviceDetailStore.getState().toggleSort('device-1', 'name');
     expect(useDeviceDetailStore.getState().sortDirection).toBe('asc');
 
-    useDeviceDetailStore.getState().toggleSort('name');
+    void useDeviceDetailStore.getState().toggleSort('device-1', 'name');
     expect(useDeviceDetailStore.getState().sortDirection).toBe('desc');
   });
 
   it('toggleSort resets to asc when switching to a different field', () => {
-    useDeviceDetailStore.getState().toggleSort('name');
-    useDeviceDetailStore.getState().toggleSort('name'); // desc
-    useDeviceDetailStore.getState().toggleSort('size');
+    useDeviceDetailStore.setState({
+      fetchDeviceFiles: async (
+        _deviceId: string,
+        _options?: { date?: string; page?: number },
+      ) => {},
+    });
+    void useDeviceDetailStore.getState().toggleSort('device-1', 'name');
+    void useDeviceDetailStore.getState().toggleSort('device-1', 'name'); // desc
+    void useDeviceDetailStore.getState().toggleSort('device-1', 'size');
     const state = useDeviceDetailStore.getState();
     expect(state.sortField).toBe('size');
     expect(state.sortDirection).toBe('asc');
@@ -71,5 +99,14 @@ describe('device-detail-store', () => {
     const state = useDeviceDetailStore.getState();
     expect(state.files).toEqual(newFiles);
     expect(state.files.length).toBe(1);
+  });
+
+  it('reset clears pagination state', () => {
+    useDeviceDetailStore.getState().reset();
+    const state = useDeviceDetailStore.getState();
+    expect(state.files).toEqual([]);
+    expect(state.selectedDate).toBe('');
+    expect(state.page).toBe(1);
+    expect(state.totalItems).toBe(0);
   });
 });

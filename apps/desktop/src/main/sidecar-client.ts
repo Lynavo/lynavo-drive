@@ -1,5 +1,10 @@
 import http from 'node:http';
 import { SIDECAR_HTTP_PORT } from '@syncflow/contracts';
+import type {
+  DeviceFileLedgerPageDTO,
+  DeviceFileSortField,
+  SortDirection,
+} from '@syncflow/contracts';
 
 const BASE = `http://127.0.0.1:${SIDECAR_HTTP_PORT}`;
 
@@ -38,11 +43,26 @@ export const sidecarClient = {
     request<import('@syncflow/contracts').DashboardSummaryDTO>('GET', '/dashboard/summary'),
   getDashboardDevices: () =>
     request<import('@syncflow/contracts').DashboardDeviceDTO[]>('GET', '/dashboard/devices'),
-  getDeviceFiles: (id: string, date: string) =>
-    request<import('@syncflow/contracts').DeviceFileLedgerDTO[]>(
+  getDeviceFiles: (
+    id: string,
+    date: string,
+    options?: {
+      page?: number;
+      pageSize?: number;
+      sortField?: DeviceFileSortField;
+      sortDirection?: SortDirection;
+    },
+  ) => {
+    const params = new URLSearchParams({ date });
+    if (options?.page) params.set('page', String(options.page));
+    if (options?.pageSize) params.set('pageSize', String(options.pageSize));
+    if (options?.sortField) params.set('sortField', options.sortField);
+    if (options?.sortDirection) params.set('sortDirection', options.sortDirection);
+    return request<DeviceFileLedgerPageDTO>(
       'GET',
-      `/devices/${id}/files?date=${date}`,
-    ),
+      `/devices/${id}/files?${params.toString()}`,
+    );
+  },
   getDeviceDates: (id: string) =>
     request<{ dates: string[] }>('GET', `/devices/${id}/dates`),
   getSettings: () =>

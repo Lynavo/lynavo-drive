@@ -18,6 +18,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/colors';
 import { formatBytes, formatDuration } from '../utils/format';
+import { formatLocalDateKey, formatLocalYesterdayDateKey } from '../utils/localDateKey';
 import { Icon } from '../components/Icon';
 
 // ---------------------------------------------------------------------------
@@ -44,14 +45,12 @@ interface HistorySection {
 // ---------------------------------------------------------------------------
 
 function isToday(dateStr: string): boolean {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = formatLocalDateKey(new Date());
   return dateStr === today;
 }
 
 function isYesterday(dateStr: string): boolean {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return dateStr === yesterday.toISOString().slice(0, 10);
+  return dateStr === formatLocalYesterdayDateKey(new Date());
 }
 
 function formatDateLabel(dateStr: string): string {

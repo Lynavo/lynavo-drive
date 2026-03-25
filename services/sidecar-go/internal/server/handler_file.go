@@ -353,6 +353,7 @@ func (c *connection) handleFileEnd(body []byte) error {
 		OK:                   true,
 		FileKey:              req.FileKey,
 		RelativePath:         relativePath,
+		LedgerDate:           date,
 		StoredBytes:          req.FileSize,
 		ActiveTransmissionMs: totalTransmissionMs,
 	}); err != nil {

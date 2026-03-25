@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	internalserver "github.com/nicksyncflow/sidecar/internal/server"
@@ -77,19 +78,26 @@ func mergeDateKeys(primary, fallback []string) []string {
 	return merged
 }
 
-func (s *Server) filesystemUploads(deviceID, date string) ([]store.Upload, error) {
+type uploadWithTime struct {
+	upload store.Upload
+	ts     time.Time
+}
+
+func (s *Server) filesystemUploadsPage(
+	deviceID, date, sortField, sortDirection string,
+	page, pageSize int,
+) (store.UploadPage, error) {
 	dateDir := filepath.Join(s.deviceDirPath(deviceID), date)
 	entries, err := os.ReadDir(dateDir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return []store.Upload{}, nil
+			return store.UploadPage{
+				Items:    []store.Upload{},
+				Page:     max(page, 1),
+				PageSize: clampPageSize(pageSize),
+			}, nil
 		}
-		return nil, err
-	}
-
-	type uploadWithTime struct {
-		upload store.Upload
-		ts     time.Time
+		return store.UploadPage{}, err
 	}
 
 	files := make([]uploadWithTime, 0, len(entries))
@@ -99,7 +107,7 @@ func (s *Server) filesystemUploads(deviceID, date string) ([]store.Upload, error
 		}
 		info, err := entry.Info()
 		if err != nil {
-			return nil, err
+			return store.UploadPage{}, err
 		}
 		if !info.Mode().IsRegular() {
 			continue
@@ -129,13 +137,122 @@ func (s *Server) filesystemUploads(deviceID, date string) ([]store.Upload, error
 		})
 	}
 
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].ts.After(files[j].ts)
-	})
+	sortFilesystemUploads(files, sortField, sortDirection)
 
-	uploads := make([]store.Upload, 0, len(files))
+	totalBytes := int64(0)
+	totalTransmissionMs := int64(0)
 	for _, file := range files {
+		totalBytes += file.upload.FileSize
+		totalTransmissionMs += file.upload.ActiveTransmissionMs
+	}
+
+	page = max(page, 1)
+	pageSize = clampPageSize(pageSize)
+	start := min((page-1)*pageSize, len(files))
+	end := min(start+pageSize, len(files))
+
+	uploads := make([]store.Upload, 0, end-start)
+	for _, file := range files[start:end] {
 		uploads = append(uploads, file.upload)
 	}
-	return uploads, nil
+
+	return store.UploadPage{
+		Items:                     uploads,
+		Page:                      page,
+		PageSize:                  pageSize,
+		TotalItems:                len(files),
+		TotalBytes:                totalBytes,
+		TotalActiveTransmissionMs: totalTransmissionMs,
+	}, nil
+}
+
+func (s *Server) filesystemUploads(deviceID, date string) ([]store.Upload, error) {
+	page, err := s.filesystemUploadsPage(deviceID, date, "completedAt", "desc", 1, 10000)
+	if err != nil {
+		return nil, err
+	}
+	return page.Items, nil
+}
+
+func sortFilesystemUploads(files []uploadWithTime, sortField, sortDirection string) {
+	desc := strings.ToLower(sortDirection) != "asc"
+
+	sort.Slice(files, func(i, j int) bool {
+		a := files[i].upload
+		b := files[j].upload
+
+		switch sortField {
+		case "name":
+			aName := strings.ToLower(a.OriginalFilename)
+			bName := strings.ToLower(b.OriginalFilename)
+			if aName != bName {
+				if desc {
+					return aName > bName
+				}
+				return aName < bName
+			}
+		case "size":
+			if a.FileSize != b.FileSize {
+				if desc {
+					return a.FileSize > b.FileSize
+				}
+				return a.FileSize < b.FileSize
+			}
+		case "createdAt":
+			aCreated := ""
+			bCreated := ""
+			if a.CreatedAtRemote != nil {
+				aCreated = *a.CreatedAtRemote
+			}
+			if b.CreatedAtRemote != nil {
+				bCreated = *b.CreatedAtRemote
+			}
+			if aCreated != bCreated {
+				if desc {
+					return aCreated > bCreated
+				}
+				return aCreated < bCreated
+			}
+		case "duration":
+			if a.ActiveTransmissionMs != b.ActiveTransmissionMs {
+				if desc {
+					return a.ActiveTransmissionMs > b.ActiveTransmissionMs
+				}
+				return a.ActiveTransmissionMs < b.ActiveTransmissionMs
+			}
+		default:
+			if !files[i].ts.Equal(files[j].ts) {
+				if desc {
+					return files[i].ts.After(files[j].ts)
+				}
+				return files[i].ts.Before(files[j].ts)
+			}
+		}
+
+		if desc {
+			return a.FileKey > b.FileKey
+		}
+		return a.FileKey < b.FileKey
+	})
+}
+
+func clampPageSize(pageSize int) int {
+	if pageSize < 1 {
+		return 200
+	}
+	return pageSize
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

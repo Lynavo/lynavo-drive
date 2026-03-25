@@ -14,6 +14,7 @@ import {
   useDeviceDetailStore,
   type SortField,
 } from '@renderer/stores/device-detail-store';
+import { useAppStore } from '@renderer/stores/app-store';
 
 const colors = {
   headerText: '#8a9ab0',
@@ -72,6 +73,7 @@ export function FileLedgerTable({ storagePath }: { storagePath: string }) {
   const sortField = useDeviceDetailStore((s) => s.sortField);
   const sortDirection = useDeviceDetailStore((s) => s.sortDirection);
   const toggleSort = useDeviceDetailStore((s) => s.toggleSort);
+  const selectedDevice = useAppStore((s) => s.selectedDevice);
 
   const sortedFiles = useMemo(() => {
     const result = [...files];
@@ -127,7 +129,10 @@ export function FileLedgerTable({ storagePath }: { storagePath: string }) {
               style={{ width: col.field === 'name' ? '35%' : undefined }}
             >
               <button
-                onClick={() => toggleSort(col.field)}
+                onClick={() => {
+                  if (!selectedDevice) return;
+                  void toggleSort(selectedDevice.deviceId, col.field);
+                }}
                 className="flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-1 text-xs font-medium transition-[color,background-color,transform] duration-150 ease-out hover:bg-blue-50 hover:text-blue-500 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
                 style={{ color: colors.headerText }}
               >

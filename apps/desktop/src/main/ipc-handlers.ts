@@ -31,8 +31,19 @@ export function registerIpcHandlers(sidecarManager: SidecarManager): void {
   ipcMain.handle(IPC.SIDECAR_HEALTH, () => sidecarClient.getHealth());
   ipcMain.handle(IPC.SIDECAR_DASHBOARD_SUMMARY, () => sidecarClient.getDashboardSummary());
   ipcMain.handle(IPC.SIDECAR_DASHBOARD_DEVICES, () => sidecarClient.getDashboardDevices());
-  ipcMain.handle(IPC.SIDECAR_DEVICE_FILES, (_e, deviceId: string, date: string) =>
-    sidecarClient.getDeviceFiles(deviceId, date),
+  ipcMain.handle(
+    IPC.SIDECAR_DEVICE_FILES,
+    (
+      _e,
+      deviceId: string,
+      date: string,
+      options?: {
+        page?: number;
+        pageSize?: number;
+        sortField?: import('@syncflow/contracts').DeviceFileSortField;
+        sortDirection?: import('@syncflow/contracts').SortDirection;
+      },
+    ) => sidecarClient.getDeviceFiles(deviceId, date, options),
   );
   ipcMain.handle(IPC.SIDECAR_DEVICE_DATES, (_e, deviceId: string) =>
     sidecarClient.getDeviceDates(deviceId),
