@@ -76,6 +76,10 @@ syncflow/
 ├── services/
 │   └── sidecar-go/           # Go sidecar（TCP/HTTP/SQLite/mDNS）
 ├── docs/
+│   ├── architecture/         # 架构、状态机、数据模型
+│   ├── operations/           # 排障、诊断、环境、sidecar 运行手册
+│   ├── product/              # 产品约束与非目标
+│   ├── release/              # TestFlight / 签名 / 发版手册
 │   └── testing/              # 测试矩阵和 beta 验证说明
 └── tmp/
     └── ui-demo/              # 视觉参考，仅供比对，不直接复用代码
@@ -122,6 +126,15 @@ Mac (Electron + Go sidecar)
 ## 文档
 
 - 开发约束和执行准则：[`AGENTS.md`](./AGENTS.md)
+- 系统概览：[`docs/architecture/system-overview.md`](./docs/architecture/system-overview.md)
+- 同步状态机：[`docs/architecture/sync-state-machine.md`](./docs/architecture/sync-state-machine.md)
+- 数据模型与统计口径：[`docs/architecture/data-model.md`](./docs/architecture/data-model.md)
+- 排障手册：[`docs/operations/troubleshooting.md`](./docs/operations/troubleshooting.md)
+- Mobile 诊断包说明：[`docs/operations/mobile-diagnostics.md`](./docs/operations/mobile-diagnostics.md)
+- Sidecar 运维手册：[`docs/operations/sidecar-runbook.md`](./docs/operations/sidecar-runbook.md)
+- 环境与密钥说明：[`docs/operations/environment-and-secrets.md`](./docs/operations/environment-and-secrets.md)
+- 产品约束与非目标：[`docs/product/constraints.md`](./docs/product/constraints.md)
+- Beta 发布手册：[`docs/release/release-playbook.md`](./docs/release/release-playbook.md)
 - beta 测试矩阵：[`docs/testing/beta-test-matrix.md`](./docs/testing/beta-test-matrix.md)
 
 ## License

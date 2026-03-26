@@ -10,9 +10,30 @@ SyncFlow V2：iPhone → Mac 局域网素材无感增量同步工具。Monorepo 
 
 1. **当前已提交代码**：实际行为以仓库中的现有实现为准
 2. **`@syncflow/contracts`**：共享 DTO、常量、事件名、端口定义的唯一来源
-3. **`docs/testing/beta-test-matrix.md`**：当前内测验证范围、回归场景和发布门槛
+3. **架构 / 运维 / 发布文档**：用于解释当前实现，而不是覆盖代码
+4. **`docs/testing/beta-test-matrix.md`**：当前内测验证范围、回归场景和发布门槛
 
 历史文档如果后续恢复，只能作为背景参考；在新的 source of truth 明确之前，不要再假定某个已删除 spec 文件仍然有效。
+
+## 新会话接手顺序
+
+如果是新的 AI coding 会话，先按这个顺序建立上下文：
+
+1. [README.md](./README.md)
+2. [docs/architecture/system-overview.md](./docs/architecture/system-overview.md)
+3. [docs/architecture/sync-state-machine.md](./docs/architecture/sync-state-machine.md)
+4. [docs/architecture/data-model.md](./docs/architecture/data-model.md)
+5. [docs/operations/troubleshooting.md](./docs/operations/troubleshooting.md)
+6. [docs/release/release-playbook.md](./docs/release/release-playbook.md)
+
+如果任务明确涉及某个方向，再补读：
+
+- mobile 诊断包：[docs/operations/mobile-diagnostics.md](./docs/operations/mobile-diagnostics.md)
+- sidecar 运维：[docs/operations/sidecar-runbook.md](./docs/operations/sidecar-runbook.md)
+- 环境和密钥：[docs/operations/environment-and-secrets.md](./docs/operations/environment-and-secrets.md)
+- 产品边界：[docs/product/constraints.md](./docs/product/constraints.md)
+- iOS TF：[docs/release/ios-testflight.md](./docs/release/ios-testflight.md)
+- macOS 签名：[docs/release/macos-desktop-signing.md](./docs/release/macos-desktop-signing.md)
 
 ## 关键架构约束
 
@@ -23,6 +44,13 @@ SyncFlow V2：iPhone → Mac 局域网素材无感增量同步工具。Monorepo 
 - **所有 DTO 类型从 `@syncflow/contracts` 导入**，不允许在 desktop/mobile 中重新定义
 - **`tmp/ui-demo/` 只做视觉参考**，不允许直接复制代码。实现以当前代码、`@syncflow/contracts` 和测试矩阵为准。
 - **Renderer 不直接访问** sidecar、文件系统、SQLite —— 全部走 preload bridge
+
+补充解释：
+
+- 设备身份以 **mobile `clientId`** 为准，不以设备名、IP、目录名为准
+- 历史“属于哪一天”以 **sidecar / Mac 完成日** 为准
+- 真实上传集合必须来自 **mobile 本地 pending 队列**，不能只拿本轮新扫描素材
+- iCloud 素材在扫描阶段照常入队，导出阶段才会触发云端下载
 
 ## 开发流程
 
@@ -89,6 +117,21 @@ pnpm format:check      # 格式检查
 - **Monorepo / Desktop / Sidecar / Mobile SyncEngine**：都已落地，不再是 greenfield 阶段
 - **当前重点**：异常恢复、后台上传、连接状态提示、beta 收口和发布验证
 - **回归基线**：以 `go test ./...`、`pnpm --filter @syncflow/mobile exec tsc --noEmit`、iOS 构建和 `docs/testing/beta-test-matrix.md` 为准
+- **交接基线**：新同事优先依赖 `docs/architecture/*`、`docs/operations/*`、`docs/release/release-playbook.md`
+
+## 排障与发布入口
+
+排障优先看：
+
+1. [docs/operations/troubleshooting.md](./docs/operations/troubleshooting.md)
+2. [docs/operations/mobile-diagnostics.md](./docs/operations/mobile-diagnostics.md)
+3. [docs/operations/sidecar-runbook.md](./docs/operations/sidecar-runbook.md)
+
+发布优先看：
+
+1. [docs/release/release-playbook.md](./docs/release/release-playbook.md)
+2. [docs/release/ios-testflight.md](./docs/release/ios-testflight.md)
+3. [docs/release/macos-desktop-signing.md](./docs/release/macos-desktop-signing.md)
 
 ## Sidecar HTTP API 端口
 
