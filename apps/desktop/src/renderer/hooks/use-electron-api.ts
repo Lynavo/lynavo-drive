@@ -1,5 +1,6 @@
 import type { SettingsDTO } from '@syncflow/contracts';
 import type { ElectronAPI } from '../../preload/api';
+import { BONJOUR_WINDOWS_SUPPORT_URL } from '../../shared/bonjour';
 import { INITIAL_SIDECAR_RUNTIME_STATE } from '../../shared/sidecar-runtime';
 
 const defaultSettings: SettingsDTO = {
@@ -35,6 +36,13 @@ const mockSidecar: ElectronAPI['sidecar'] = {
   regenerateConnectionCode: async () => ({ code: '000000' }),
   getRuntimeState: async () => ({ ...INITIAL_SIDECAR_RUNTIME_STATE, status: 'healthy', message: null }),
   retryStart: async () => {},
+  installBonjour: async () => ({
+    status: 'already_installed' as const,
+    message: '已检测到 Bonjour for Windows，无需重复安装。',
+    supportUrl: BONJOUR_WINDOWS_SUPPORT_URL,
+    installerPath: null,
+    bonjourPath: 'C:\\Program Files\\Bonjour\\dns-sd.exe',
+  }),
   getShareStatus: async () => ({
     enabled: false,
     smbUrl: null,

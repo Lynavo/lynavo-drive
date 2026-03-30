@@ -1,17 +1,27 @@
 import { EventEmitter } from 'node:events';
-import { spawn, ChildProcess } from 'node:child_process';
-import { join } from 'node:path';
+import { spawn, ChildProcess, execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { delimiter, join } from 'node:path';
+import { promisify } from 'node:util';
 import { app } from 'electron';
 import log from 'electron-log';
+import { SIDECAR_HTTP_PORT } from '@syncflow/contracts';
 import { sidecarClient } from './sidecar-client';
-import type { SidecarRuntimeState } from '../shared/sidecar-runtime';
+import type {
+  BonjourRuntimeSource,
+  BonjourRuntimeState,
+  SidecarRuntimeState,
+} from '../shared/sidecar-runtime';
 import { INITIAL_SIDECAR_RUNTIME_STATE } from '../shared/sidecar-runtime';
 
 const isDev = !app.isPackaged;
 const sidecarBinaryName = process.platform === 'win32' ? 'syncflow-sidecar.exe' : 'syncflow-sidecar';
 const HEALTHCHECK_INTERVAL_MS = 500;
+const SIDECAR_STOP_TIMEOUT_MS = 5000;
 const DEV_HEALTHCHECK_RETRIES = 120;
 const PROD_HEALTHCHECK_RETRIES = 10;
+const bonjourBinaryName = process.platform === 'win32' ? 'dns-sd.exe' : 'dns-sd';
+const execFileAsync = promisify(execFile);
 
 export class SidecarManager extends EventEmitter {
   private process: ChildProcess | null = null;
@@ -43,20 +53,88 @@ export class SidecarManager extends EventEmitter {
     return { command: join(process.resourcesPath, sidecarBinaryName), args: [] };
   }
 
-  async start(): Promise<void> {
+  detectBonjourRuntime(): BonjourRuntimeState {
+    if (process.platform !== 'win32') {
+      return {
+        status: 'not_applicable',
+        source: 'not_applicable',
+        message: null,
+        path: null,
+      };
+    }
+
+    const explicitPath = process.env.SYNCFLOW_DNSSD_PATH;
+    const pathEntries = (process.env.PATH ?? process.env.Path ?? '')
+      .split(delimiter)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    const candidates: Array<{ path: string; source: BonjourRuntimeSource }> = [];
+
+    if (explicitPath) {
+      candidates.push({ path: explicitPath, source: 'environment' });
+    }
+
+    const bundledCandidates = [
+      isDev ? join(app.getAppPath(), 'resources', bonjourBinaryName) : join(process.resourcesPath, bonjourBinaryName),
+      isDev ? join(app.getAppPath(), '..', 'resources', bonjourBinaryName) : undefined,
+    ].filter((candidate): candidate is string => Boolean(candidate));
+    for (const candidate of bundledCandidates) {
+      candidates.push({ path: candidate, source: 'bundled' });
+    }
+
+    for (const entry of pathEntries) {
+      candidates.push({ path: join(entry, bonjourBinaryName), source: 'system' });
+    }
+
+    for (const root of [process.env.ProgramFiles, process.env['ProgramFiles(x86)']]) {
+      if (!root) {
+        continue;
+      }
+      candidates.push({ path: join(root, 'Bonjour', bonjourBinaryName), source: 'system' });
+      candidates.push({
+        path: join(root, 'Bonjour Print Services', bonjourBinaryName),
+        source: 'system',
+      });
+    }
+
+    const runtime = candidates.find((candidate) => existsSync(candidate.path));
+    if (runtime) {
+      log.info(`[SidecarManager] using Bonjour runtime at ${runtime.path}`);
+      return {
+        status: 'native',
+        source: runtime.source,
+        message: '已检测到 Bonjour for Windows，手机扫描会优先使用 Apple Bonjour 广播。',
+        path: runtime.path,
+      };
+    }
+
+    log.warn('[SidecarManager] Bonjour runtime not found; sidecar will fall back to built-in zeroconf');
+    return {
+      status: 'fallback',
+      source: 'fallback',
+      message:
+        '未检测到 Bonjour for Windows，当前将使用兼容模式广播；iPhone 重新扫描可能不稳定。安装 Bonjour 后点击“重试后台服务”即可重新检测。',
+      path: null,
+    };
+  }
+
+  async start(options: { reuseExisting?: boolean } = {}): Promise<void> {
     if (this.process) return;
 
     this.stopping = false;
     this.clearRestartTimer();
     this.stopHealthCheck();
+    const bonjour = this.detectBonjourRuntime();
+    const reuseExisting = options.reuseExisting ?? true;
 
-    if (await this.healthCheck()) {
+    if (reuseExisting && await this.healthCheck()) {
       this.restartCount = 0;
       this.startHealthCheck();
       this.setState({
         status: 'healthy',
         message: null,
         lastExitCode: null,
+        bonjour,
       });
       log.info('[SidecarManager] reusing existing healthy sidecar');
       return;
@@ -72,13 +150,19 @@ export class SidecarManager extends EventEmitter {
         this.restartCount > 0
           ? `后台服务不可用，正在重试（${this.restartCount}/${this.maxRestarts}）`
           : '后台服务启动中…',
+      bonjour,
     });
     log.info(`[SidecarManager] starting: ${command} ${args.join(' ')}`);
 
     const child = spawn(command, args, {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, SYNCFLOW_CONFIG: '', CGO_ENABLED: '1' },
+      env: {
+        ...process.env,
+        SYNCFLOW_CONFIG: '',
+        CGO_ENABLED: '1',
+        ...(bonjour.path ? { SYNCFLOW_DNSSD_PATH: bonjour.path } : {}),
+      },
     });
     this.process = child;
 
@@ -113,6 +197,7 @@ export class SidecarManager extends EventEmitter {
         status: 'healthy',
         message: null,
         lastExitCode: null,
+        bonjour,
       });
       log.info('[SidecarManager] sidecar is healthy');
     } catch (err) {
@@ -127,11 +212,11 @@ export class SidecarManager extends EventEmitter {
   async retryStart(): Promise<void> {
     this.restartCount = 0;
     this.clearRestartTimer();
-    await this.stop();
-    await this.start();
+    await this.stop({ killExternal: true });
+    await this.start({ reuseExisting: false });
   }
 
-  async stop(): Promise<void> {
+  async stop(options: { killExternal?: boolean } = {}): Promise<void> {
     this.stopping = true;
     this.clearRestartTimer();
     this.stopHealthCheck();
@@ -151,9 +236,14 @@ export class SidecarManager extends EventEmitter {
       });
       this.process = null;
     }
+    if (options.killExternal) {
+      await this.forceShutdownExistingSidecar();
+      await this.waitForSidecarToStop(SIDECAR_STOP_TIMEOUT_MS);
+    }
     this.setState({
       status: 'stopped',
       message: null,
+      bonjour: this.detectBonjourRuntime(),
     });
   }
 
@@ -172,6 +262,32 @@ export class SidecarManager extends EventEmitter {
       await new Promise((r) => setTimeout(r, intervalMs));
     }
     throw new Error('Sidecar failed to become healthy');
+  }
+
+  private async waitForSidecarToStop(timeoutMs: number): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (!await this.healthCheck()) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    throw new Error('Sidecar failed to stop');
+  }
+
+  private async forceShutdownExistingSidecar(): Promise<void> {
+    const pids = await findListeningPIDs(SIDECAR_HTTP_PORT);
+    const ownProcessPID = this.process?.pid ?? null;
+    const externalPIDs = pids.filter((pid) => pid !== process.pid && pid !== ownProcessPID);
+
+    if (externalPIDs.length === 0) {
+      return;
+    }
+
+    log.info(`[SidecarManager] force stopping existing sidecar PID(s): ${externalPIDs.join(', ')}`);
+    for (const pid of externalPIDs) {
+      await killProcessByPID(pid);
+    }
   }
 
   private startHealthCheck(): void {
@@ -247,4 +363,45 @@ export class SidecarManager extends EventEmitter {
     };
     this.emit('state', this.getState());
   }
+}
+
+async function findListeningPIDs(port: number): Promise<number[]> {
+  if (process.platform === 'win32') {
+    try {
+      const script = [
+        `$connections = Get-NetTCPConnection -LocalPort ${port} -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess`,
+        'if ($connections) { $connections | Sort-Object -Unique }',
+      ].join('; ');
+      const { stdout } = await execFileAsync('powershell.exe', [
+        '-NoProfile',
+        '-Command',
+        script,
+      ]);
+      return stdout
+        .split(/\r?\n/)
+        .map((value) => Number(value.trim()))
+        .filter((pid) => Number.isInteger(pid) && pid > 0);
+    } catch {
+      return [];
+    }
+  }
+
+  try {
+    const { stdout } = await execFileAsync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t']);
+    return stdout
+      .split(/\r?\n/)
+      .map((value) => Number(value.trim()))
+      .filter((pid) => Number.isInteger(pid) && pid > 0);
+  } catch {
+    return [];
+  }
+}
+
+async function killProcessByPID(pid: number): Promise<void> {
+  if (process.platform === 'win32') {
+    await execFileAsync('taskkill', ['/PID', String(pid), '/T', '/F']);
+    return;
+  }
+
+  await execFileAsync('kill', ['-TERM', String(pid)]);
 }

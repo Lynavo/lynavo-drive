@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { BonjourRuntimeSection } from './BonjourRuntimeSection';
 import { useSettingsStore } from '@renderer/stores/settings-store';
 import { ConnectionCodeSection } from './ConnectionCodeSection';
 import { DeviceNameSection } from './DeviceNameSection';
@@ -9,6 +10,7 @@ import { SystemGuideSection } from './SystemGuideSection';
 
 export function SettingsPage() {
   const refreshShareStatus = useSettingsStore((s) => s.refreshShareStatus);
+  const isWindows = window.electronAPI?.platform.isWindows?.() ?? false;
 
   useEffect(() => {
     void refreshShareStatus(true);
@@ -54,6 +56,18 @@ export function SettingsPage() {
             <ShareAddressSection />
           </div>
         </section>
+
+        {isWindows && (
+          <section className="mb-8">
+            <h2 className="mb-1 text-sm font-semibold text-foreground">
+              Windows Bonjour 广播
+            </h2>
+            <p className="mb-4 text-xs text-muted-foreground">
+              iPhone 重新扫描主要依赖 Bonjour/mDNS。Windows 如果缺少 Bonjour 运行时，会退回兼容模式。
+            </p>
+            <BonjourRuntimeSection />
+          </section>
+        )}
 
         {/* System Guide */}
         <section>

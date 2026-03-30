@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -14,8 +15,16 @@ import (
 )
 
 const (
-	serviceType   = "_syncflow._tcp"
-	serviceDomain = "local."
+	serviceType     = "_syncflow._tcp"
+	serviceDomain   = "local."
+	backendDNSSD    = "dns-sd"
+	backendZeroconf = "zeroconf"
+	dnsSDPathEnv    = "SYNCFLOW_DNSSD_PATH"
+)
+
+var (
+	lookPath       = exec.LookPath
+	executablePath = os.Executable
 )
 
 // BroadcastConfig holds the parameters for Bonjour/mDNS service registration.
@@ -54,18 +63,29 @@ func BuildTXTRecords(cfg BroadcastConfig) []string {
 }
 
 // NewBroadcaster registers a _syncflow._tcp Bonjour service.
-// macOS keeps using dns-sd for parity with production; other platforms use a
-// pure-Go mDNS responder so Windows dev builds remain discoverable.
+// macOS and Windows prefer dns-sd when available for parity with the Apple
+// Bonjour stack used by iOS. Platforms without dns-sd fall back to zeroconf.
 func NewBroadcaster(cfg BroadcastConfig) (*Broadcaster, error) {
 	if cfg.DeviceIP == "" {
 		cfg.DeviceIP = getLocalIPv4()
 	}
 	txt := BuildTXTRecords(cfg)
 
-	if runtime.GOOS != "darwin" {
-		return newCrossPlatformBroadcaster(cfg, txt)
+	backend, dnsSDPath := selectBroadcasterBackend(runtime.GOOS)
+	if backend == backendDNSSD {
+		return newDNSSDBroadcaster(cfg, txt, dnsSDPath)
 	}
+	if supportsNativeDNSSD(runtime.GOOS) {
+		slog.Warn(
+			"dns-sd unavailable, falling back to zeroconf",
+			"platform", runtime.GOOS,
+			"hint", "install Bonjour for Windows or provide SYNCFLOW_DNSSD_PATH for best iOS discovery compatibility",
+		)
+	}
+	return newCrossPlatformBroadcaster(cfg, txt)
+}
 
+func newDNSSDBroadcaster(cfg BroadcastConfig, txt []string, dnsSDPath string) (*Broadcaster, error) {
 	if err := cleanupStaleBroadcastProcesses(); err != nil {
 		slog.Warn("failed to clean stale bonjour broadcasts", "err", err)
 	}
@@ -74,7 +94,7 @@ func NewBroadcaster(cfg BroadcastConfig) (*Broadcaster, error) {
 	args := []string{"-R", cfg.DeviceName, serviceType, serviceDomain, fmt.Sprintf("%d", cfg.TCPPort)}
 	args = append(args, txt...)
 
-	cmd := exec.Command("dns-sd", args...)
+	cmd := exec.Command(dnsSDPath, args...)
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 
@@ -86,14 +106,141 @@ func NewBroadcaster(cfg BroadcastConfig) (*Broadcaster, error) {
 		"service", serviceType,
 		"port", cfg.TCPPort,
 		"name", cfg.DeviceName,
+		"path", dnsSDPath,
 		"txt", strings.Join(txt, ", "),
 		"pid", cmd.Process.Pid,
 	)
 	return &Broadcaster{cmd: cmd}, nil
 }
 
+func selectBroadcasterBackend(goos string) (backend string, dnsSDPath string) {
+	if !supportsNativeDNSSD(goos) {
+		return backendZeroconf, ""
+	}
+
+	if path, ok := resolveDNSSDPath(goos); ok {
+		return backendDNSSD, path
+	}
+
+	return backendZeroconf, ""
+}
+
+func supportsNativeDNSSD(goos string) bool {
+	return goos == "darwin" || goos == "windows"
+}
+
+func resolveDNSSDPath(goos string) (string, bool) {
+	if !supportsNativeDNSSD(goos) {
+		return "", false
+	}
+
+	for _, candidate := range runtimeDNSSDCandidates(goos) {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, true
+		}
+	}
+
+	if path, err := lookPath("dns-sd"); err == nil {
+		return path, true
+	}
+
+	for _, candidate := range dnsSDCandidates(goos) {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, true
+		}
+	}
+
+	return "", false
+}
+
+func runtimeDNSSDCandidates(goos string) []string {
+	if !supportsNativeDNSSD(goos) {
+		return nil
+	}
+
+	var candidates []string
+	if configuredPath := strings.TrimSpace(os.Getenv(dnsSDPathEnv)); configuredPath != "" {
+		candidates = append(candidates, configuredPath)
+	}
+
+	if exePath, err := executablePath(); err == nil && strings.TrimSpace(exePath) != "" {
+		candidates = append(candidates, filepath.Join(filepath.Dir(exePath), dnsSDExecutableName(goos)))
+	}
+
+	return candidates
+}
+
+func dnsSDExecutableName(goos string) string {
+	if goos == "windows" {
+		return "dns-sd.exe"
+	}
+	return "dns-sd"
+}
+
+func dnsSDCandidates(goos string) []string {
+	if goos != "windows" {
+		return nil
+	}
+
+	var candidates []string
+	programRoots := []string{
+		os.Getenv("ProgramFiles"),
+		os.Getenv("ProgramFiles(x86)"),
+	}
+	for _, root := range programRoots {
+		if strings.TrimSpace(root) == "" {
+			continue
+		}
+		candidates = append(candidates,
+			filepath.Join(root, "Bonjour", "dns-sd.exe"),
+			filepath.Join(root, "Bonjour Print Services", "dns-sd.exe"),
+		)
+	}
+	return candidates
+}
+
 func newCrossPlatformBroadcaster(cfg BroadcastConfig, txt []string) (*Broadcaster, error) {
-	server, err := zeroconf.RegisterProxy(
+	server, err := registerZeroconfService(cfg, txt)
+	if err != nil {
+		return nil, fmt.Errorf("zeroconf register: %w", err)
+	}
+
+	logAttrs := []any{
+		"service", serviceType,
+		"port", cfg.TCPPort,
+		"name", cfg.DeviceName,
+		"backend", backendZeroconf,
+		"ip", cfg.DeviceIP,
+		"txt", strings.Join(txt, ", "),
+	}
+	if runtime.GOOS == "windows" {
+		logAttrs = append(logAttrs, "mode", "local")
+	} else {
+		logAttrs = append(logAttrs,
+			"mode", "proxy",
+			"host", serviceHostName(cfg),
+		)
+	}
+
+	slog.Info("bonjour broadcasting (zeroconf)",
+		logAttrs...,
+	)
+	return &Broadcaster{server: server}, nil
+}
+
+func registerZeroconfService(cfg BroadcastConfig, txt []string) (*zeroconf.Server, error) {
+	if runtime.GOOS == "windows" {
+		return zeroconf.Register(
+			cfg.DeviceName,
+			serviceType,
+			serviceDomain,
+			cfg.TCPPort,
+			txt,
+			nil,
+		)
+	}
+
+	return zeroconf.RegisterProxy(
 		cfg.DeviceName,
 		serviceType,
 		serviceDomain,
@@ -103,19 +250,6 @@ func newCrossPlatformBroadcaster(cfg BroadcastConfig, txt []string) (*Broadcaste
 		txt,
 		nil,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("zeroconf register: %w", err)
-	}
-
-	slog.Info("bonjour broadcasting (zeroconf)",
-		"service", serviceType,
-		"port", cfg.TCPPort,
-		"name", cfg.DeviceName,
-		"host", serviceHostName(cfg),
-		"ip", cfg.DeviceIP,
-		"txt", strings.Join(txt, ", "),
-	)
-	return &Broadcaster{server: server}, nil
 }
 
 func getLocalIPv4() string {

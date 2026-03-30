@@ -20,8 +20,11 @@ win:
   target:
     - zip
   extraResources:
-    - from: resources/syncflow-sidecar.exe
-      to: syncflow-sidecar.exe
+    - from: resources
+      filter:
+        - syncflow-sidecar.exe
+        - dns-sd.exe
+        - dnssd.dll
 directories:
   output: release
   buildResources: resources

@@ -6,7 +6,7 @@
       "type": "pwa-node",
       "request": "launch",
       "cwd": "${workspaceFolder}/apps/desktop",
-      "runtimeExecutable": "${workspaceFolder}/tools/node/runtime/node.exe",
+      "runtimeExecutable": "${env:LOCALAPPDATA}\\Programs\\nodejs\\node.exe",
       "runtimeArgs": [
         "./scripts/run-electron-vite.cjs",
         "dev",
@@ -14,7 +14,7 @@
         "--remoteDebuggingPort=9223"
       ],
       "env": {
-        "PATH": "${workspaceFolder}\\tools\\node\\runtime;${env:PATH}"
+        "PATH": "${env:LOCALAPPDATA}\\Programs\\nodejs;${env:PATH}"
       },
       "console": "integratedTerminal",
       "preLaunchTask": "desktop: build shared packages",
@@ -39,20 +39,20 @@
       "name": "Mobile: Metro",
       "type": "node-terminal",
       "request": "launch",
-      "command": "pnpm --filter @syncflow/mobile start"
+      "command": "$env:Path='${env:LOCALAPPDATA}\\Programs\\nodejs;' + $env:Path; & '${env:LOCALAPPDATA}\\Programs\\nodejs\\corepack.cmd' pnpm --filter @syncflow/mobile start"
     },
     {
       "name": "Mobile: iOS App",
       "type": "node-terminal",
       "request": "launch",
-      "command": "pnpm --filter @syncflow/mobile ios",
+      "command": "$env:Path='${env:LOCALAPPDATA}\\Programs\\nodejs;' + $env:Path; & '${env:LOCALAPPDATA}\\Programs\\nodejs\\corepack.cmd' pnpm --filter @syncflow/mobile ios",
       "preLaunchTask": "mobile: start metro"
     },
     {
       "name": "Mobile: iOS App (No Metro)",
       "type": "node-terminal",
       "request": "launch",
-      "command": "pnpm --filter @syncflow/mobile ios"
+      "command": "$env:Path='${env:LOCALAPPDATA}\\Programs\\nodejs;' + $env:Path; & '${env:LOCALAPPDATA}\\Programs\\nodejs\\corepack.cmd' pnpm --filter @syncflow/mobile ios"
     }
   ],
   "compounds": [

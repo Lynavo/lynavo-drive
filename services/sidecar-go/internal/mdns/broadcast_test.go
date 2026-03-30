@@ -91,6 +91,125 @@ func TestShutdown_NilCmd(t *testing.T) {
 	b.Shutdown()
 }
 
+func TestSelectBroadcasterBackend(t *testing.T) {
+	originalLookPath := lookPath
+	defer func() { lookPath = originalLookPath }()
+
+	lookPath = func(file string) (string, error) {
+		if file != "dns-sd" {
+			t.Fatalf("unexpected lookup target %q", file)
+		}
+		return `C:\Program Files\Bonjour\dns-sd.exe`, nil
+	}
+
+	backend, path := selectBroadcasterBackend("windows")
+	if backend != backendDNSSD {
+		t.Fatalf("backend = %q, want %q", backend, backendDNSSD)
+	}
+	if path != `C:\Program Files\Bonjour\dns-sd.exe` {
+		t.Fatalf("path = %q, want Bonjour dns-sd.exe", path)
+	}
+}
+
+func TestSelectBroadcasterBackendFallsBackWhenDNSSDUnavailable(t *testing.T) {
+	originalLookPath := lookPath
+	defer func() { lookPath = originalLookPath }()
+
+	lookPath = func(string) (string, error) {
+		return "", os.ErrNotExist
+	}
+
+	backend, path := selectBroadcasterBackend("linux")
+	if backend != backendZeroconf {
+		t.Fatalf("backend = %q, want %q", backend, backendZeroconf)
+	}
+	if path != "" {
+		t.Fatalf("path = %q, want empty", path)
+	}
+}
+
+func TestResolveDNSSDPathUsesEnvOverride(t *testing.T) {
+	originalLookPath := lookPath
+	originalExecutablePath := executablePath
+	originalEnv := os.Getenv(dnsSDPathEnv)
+	defer func() {
+		lookPath = originalLookPath
+		executablePath = originalExecutablePath
+		_ = os.Setenv(dnsSDPathEnv, originalEnv)
+	}()
+
+	tempDir := t.TempDir()
+	overridePath := tempDir + `\dns-sd.exe`
+	if err := os.WriteFile(overridePath, []byte("test"), 0o644); err != nil {
+		t.Fatalf("WriteFile() failed: %v", err)
+	}
+
+	lookPath = func(string) (string, error) {
+		return "", os.ErrNotExist
+	}
+	executablePath = func() (string, error) {
+		return "", os.ErrNotExist
+	}
+	if err := os.Setenv(dnsSDPathEnv, overridePath); err != nil {
+		t.Fatalf("Setenv() failed: %v", err)
+	}
+
+	path, ok := resolveDNSSDPath("windows")
+	if !ok {
+		t.Fatal("expected env override to resolve dns-sd path")
+	}
+	if path != overridePath {
+		t.Fatalf("path = %q, want %q", path, overridePath)
+	}
+}
+
+func TestResolveDNSSDPathUsesAdjacentExecutable(t *testing.T) {
+	originalLookPath := lookPath
+	originalExecutablePath := executablePath
+	originalEnv := os.Getenv(dnsSDPathEnv)
+	defer func() {
+		lookPath = originalLookPath
+		executablePath = originalExecutablePath
+		_ = os.Setenv(dnsSDPathEnv, originalEnv)
+	}()
+
+	tempDir := t.TempDir()
+	adjacentPath := tempDir + `\dns-sd.exe`
+	if err := os.WriteFile(adjacentPath, []byte("test"), 0o644); err != nil {
+		t.Fatalf("WriteFile() failed: %v", err)
+	}
+
+	lookPath = func(string) (string, error) {
+		return "", os.ErrNotExist
+	}
+	executablePath = func() (string, error) {
+		return tempDir + `\syncflow-sidecar.exe`, nil
+	}
+	if err := os.Unsetenv(dnsSDPathEnv); err != nil {
+		t.Fatalf("Unsetenv() failed: %v", err)
+	}
+
+	path, ok := resolveDNSSDPath("windows")
+	if !ok {
+		t.Fatal("expected adjacent executable directory to resolve dns-sd path")
+	}
+	if path != adjacentPath {
+		t.Fatalf("path = %q, want %q", path, adjacentPath)
+	}
+}
+
+func TestSupportsNativeDNSSD(t *testing.T) {
+	if !supportsNativeDNSSD("darwin") {
+		t.Fatal("expected darwin to support dns-sd")
+	}
+	if !supportsNativeDNSSD("windows") {
+		t.Fatal("expected windows to support dns-sd")
+	}
+	if supportsNativeDNSSD("linux") {
+		t.Fatal("expected linux to fall back to zeroconf")
+	}
+}
+
 func TestServiceHostName(t *testing.T) {
 	want := sanitizeHostName(mustHostname(t))
 	if got := serviceHostName(BroadcastConfig{

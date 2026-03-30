@@ -1,4 +1,18 @@
 export type SidecarRuntimeStatus = 'starting' | 'healthy' | 'failed' | 'stopped';
+export type BonjourRuntimeStatus = 'native' | 'fallback' | 'not_applicable';
+export type BonjourRuntimeSource =
+  | 'environment'
+  | 'bundled'
+  | 'system'
+  | 'fallback'
+  | 'not_applicable';
+
+export interface BonjourRuntimeState {
+  status: BonjourRuntimeStatus;
+  source: BonjourRuntimeSource;
+  message: string | null;
+  path: string | null;
+}
 
 export interface SidecarRuntimeState {
   status: SidecarRuntimeStatus;
@@ -6,6 +20,7 @@ export interface SidecarRuntimeState {
   restartCount: number;
   maxRestarts: number;
   lastExitCode: number | null;
+  bonjour: BonjourRuntimeState;
 }
 
 export const INITIAL_SIDECAR_RUNTIME_STATE: SidecarRuntimeState = {
@@ -14,4 +29,10 @@ export const INITIAL_SIDECAR_RUNTIME_STATE: SidecarRuntimeState = {
   restartCount: 0,
   maxRestarts: 3,
   lastExitCode: null,
+  bonjour: {
+    status: 'not_applicable',
+    source: 'not_applicable',
+    message: null,
+    path: null,
+  },
 };

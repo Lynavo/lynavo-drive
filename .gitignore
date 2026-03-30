@@ -17,6 +17,8 @@ out/
 apps/desktop/release/
 apps/desktop/resources/syncflow-sidecar
 apps/desktop/resources/syncflow-sidecar.exe
+apps/desktop/resources/dns-sd.exe
+apps/desktop/resources/dnssd.dll
 tools/node/
 
 # Go sidecar

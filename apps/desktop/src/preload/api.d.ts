@@ -8,6 +8,7 @@ import type {
   SortDirection,
 } from '@syncflow/contracts';
 import type { SidecarEvent } from '@syncflow/contracts';
+import type { BonjourInstallResult } from '../shared/bonjour';
 import type { SidecarRuntimeState } from '../shared/sidecar-runtime';
 
 export interface ElectronAPI {
@@ -31,6 +32,7 @@ export interface ElectronAPI {
     regenerateConnectionCode(): Promise<{ code: string }>;
     getRuntimeState(): Promise<SidecarRuntimeState>;
     retryStart(): Promise<void>;
+    installBonjour(): Promise<BonjourInstallResult>;
     getShareStatus(): Promise<ShareStatusDTO>;
     validateShare(): Promise<ShareStatusDTO>;
   };

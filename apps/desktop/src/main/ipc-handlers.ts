@@ -9,6 +9,7 @@ import {
 } from './file-operations';
 import type { SidecarManager } from './sidecar-manager';
 import { exportDiagnostics, getAppInfo } from './diagnostics';
+import { installBonjourForWindows } from './bonjour-installer';
 
 // Channel constants — shared between main and preload
 export const IPC = {
@@ -22,6 +23,7 @@ export const IPC = {
   SIDECAR_REGENERATE_CODE: 'sidecar:regenerate-code',
   SIDECAR_RUNTIME_STATE: 'sidecar:runtime-state',
   SIDECAR_RETRY_START: 'sidecar:retry-start',
+  SIDECAR_INSTALL_BONJOUR: 'sidecar:install-bonjour',
   SIDECAR_SHARE_STATUS: 'sidecar:share-status',
   SIDECAR_VALIDATE_SHARE: 'sidecar:validate-share',
   SUPPORT_EXPORT_DIAGNOSTICS: 'support:export-diagnostics',
@@ -62,6 +64,7 @@ export function registerIpcHandlers(sidecarManager: SidecarManager): void {
   ipcMain.handle(IPC.SIDECAR_REGENERATE_CODE, () => sidecarClient.regenerateConnectionCode());
   ipcMain.handle(IPC.SIDECAR_RUNTIME_STATE, () => sidecarManager.getState());
   ipcMain.handle(IPC.SIDECAR_RETRY_START, () => sidecarManager.retryStart());
+  ipcMain.handle(IPC.SIDECAR_INSTALL_BONJOUR, () => installBonjourForWindows(sidecarManager));
   ipcMain.handle(IPC.SIDECAR_SHARE_STATUS, () => sidecarClient.getShareStatus());
   ipcMain.handle(IPC.SIDECAR_VALIDATE_SHARE, () => sidecarClient.validateShare());
   ipcMain.handle(IPC.SUPPORT_EXPORT_DIAGNOSTICS, () => exportDiagnostics(sidecarManager));

@@ -1,4 +1,4 @@
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const path = require('node:path');
 
 const command = process.argv[2];
@@ -13,6 +13,19 @@ const projectRoot = path.resolve(__dirname, '..');
 const binName = process.platform === 'win32' ? 'electron-vite.cmd' : 'electron-vite';
 const binPath = path.join(projectRoot, 'node_modules', '.bin', binName);
 const env = { ...process.env };
+
+if (process.platform === 'win32') {
+  const syncScriptPath = path.join(__dirname, 'sync-bonjour-runtime.cjs');
+  const syncResult = spawnSync(process.execPath, [syncScriptPath], {
+    cwd: projectRoot,
+    env,
+    stdio: 'inherit',
+  });
+  if (syncResult.status && syncResult.status !== 0) {
+    process.exit(syncResult.status);
+  }
+}
+
 const spawnCommand = process.platform === 'win32' ? 'cmd.exe' : binPath;
 const spawnArgs =
   process.platform === 'win32'
