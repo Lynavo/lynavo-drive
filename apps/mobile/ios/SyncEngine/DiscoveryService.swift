@@ -185,7 +185,7 @@ class DiscoveryService {
     }
 
     private func probeReachability(for device: DiscoveredDevice, generation: UInt64) {
-        guard let endpoint = device.endpoint else {
+        guard let endpoint = preferredProbeEndpoint(for: device) else {
             if reachableDevices.removeValue(forKey: device.deviceId) != nil {
                 emitReachableDevices()
             }
@@ -276,5 +276,13 @@ class DiscoveryService {
 
         connection.start(queue: queue)
         queue.asyncAfter(deadline: .now() + .seconds(2), execute: timeoutWork)
+    }
+
+    private func preferredProbeEndpoint(for device: DiscoveredDevice) -> NWEndpoint? {
+        if isIPv4Address(device.ip), let port = NWEndpoint.Port(rawValue: device.port) {
+            NSLog("[DiscoveryService] probing %@ via advertised IPv4 %@", device.name, device.ip)
+            return .hostPort(host: NWEndpoint.Host(device.ip), port: port)
+        }
+        return device.endpoint
     }
 }

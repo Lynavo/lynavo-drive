@@ -4,20 +4,34 @@
     {
       "label": "desktop: build contracts",
       "type": "shell",
-      "command": "pnpm",
-      "args": ["--filter", "@syncflow/contracts", "build"],
+      "command": "${env:LOCALAPPDATA}\\Programs\\nodejs\\corepack.cmd",
+      "args": ["pnpm", "--filter", "@syncflow/contracts", "build"],
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PATH": "${env:LOCALAPPDATA}\\Programs\\nodejs;${env:PATH}"
+        },
+        "shell": {
+          "executable": "C:\\Windows\\System32\\cmd.exe",
+          "args": ["/d", "/c"]
+        }
       },
       "problemMatcher": []
     },
     {
       "label": "desktop: build design tokens",
       "type": "shell",
-      "command": "pnpm",
-      "args": ["--filter", "@syncflow/design-tokens", "build"],
+      "command": "${env:LOCALAPPDATA}\\Programs\\nodejs\\corepack.cmd",
+      "args": ["pnpm", "--filter", "@syncflow/design-tokens", "build"],
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PATH": "${env:LOCALAPPDATA}\\Programs\\nodejs;${env:PATH}"
+        },
+        "shell": {
+          "executable": "C:\\Windows\\System32\\cmd.exe",
+          "args": ["/d", "/c"]
+        }
       },
       "problemMatcher": []
     },
@@ -28,12 +42,71 @@
       "problemMatcher": []
     },
     {
+      "label": "desktop: dev",
+      "type": "shell",
+      "command": "${env:LOCALAPPDATA}\\Programs\\nodejs\\corepack.cmd",
+      "args": ["pnpm", "--filter", "@syncflow/desktop", "dev"],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PATH": "${env:LOCALAPPDATA}\\Programs\\nodejs;${env:PATH}"
+        },
+        "shell": {
+          "executable": "C:\\Windows\\System32\\cmd.exe",
+          "args": ["/d", "/c"]
+        }
+      },
+      "dependsOn": ["desktop: build shared packages"],
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": {
+        "owner": "custom",
+        "pattern": {
+          "regexp": "^(.*)$",
+          "message": 1
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": ".*(ready in|watching for file changes|Local:).*"
+        }
+      }
+    },
+    {
+      "label": "desktop: package win",
+      "type": "shell",
+      "command": "${env:LOCALAPPDATA}\\Programs\\nodejs\\corepack.cmd",
+      "args": ["pnpm", "--filter", "@syncflow/desktop", "package:win"],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PATH": "${env:LOCALAPPDATA}\\Programs\\nodejs;${env:PATH}"
+        },
+        "shell": {
+          "executable": "C:\\Windows\\System32\\cmd.exe",
+          "args": ["/d", "/c"]
+        }
+      },
+      "dependsOn": ["desktop: build shared packages"],
+      "problemMatcher": []
+    },
+    {
       "label": "mobile: start metro",
       "type": "shell",
-      "command": "pnpm",
-      "args": ["--filter", "@syncflow/mobile", "start"],
+      "command": "${env:LOCALAPPDATA}\\Programs\\nodejs\\corepack.cmd",
+      "args": ["pnpm", "--filter", "@syncflow/mobile", "start"],
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PATH": "${env:LOCALAPPDATA}\\Programs\\nodejs;${env:PATH}"
+        },
+        "shell": {
+          "executable": "C:\\Windows\\System32\\cmd.exe",
+          "args": ["/d", "/c"]
+        }
       },
       "isBackground": true,
       "presentation": {

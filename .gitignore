@@ -16,6 +16,8 @@ out/
 # Desktop release/resources
 apps/desktop/release/
 apps/desktop/resources/syncflow-sidecar
+apps/desktop/resources/syncflow-sidecar.exe
+tools/node/
 
 # Go sidecar
 services/sidecar-go/syncflow-sidecar

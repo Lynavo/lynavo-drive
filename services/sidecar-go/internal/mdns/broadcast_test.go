@@ -1,6 +1,8 @@
 package mdns
 
 import (
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -84,9 +86,62 @@ func TestNewBroadcaster_ValidConfig(t *testing.T) {
 }
 
 func TestShutdown_NilCmd(t *testing.T) {
-	b := &Broadcaster{cmd: nil}
+	b := &Broadcaster{cmd: nil, server: nil}
 	// Must not panic.
 	b.Shutdown()
+}
+
+func TestServiceHostName(t *testing.T) {
+	want := sanitizeHostName(mustHostname(t))
+	if got := serviceHostName(BroadcastConfig{
+		DeviceID:   "Windows Dev-01",
+		DeviceName: "Ignored Name",
+	}); got != want {
+		t.Fatalf("serviceHostName() = %q, want %q", got, want)
+	}
+}
+
+func mustHostname(t *testing.T) string {
+	t.Helper()
+	host, err := os.Hostname()
+	if err != nil {
+		t.Fatalf("os.Hostname() failed: %v", err)
+	}
+	return host
+}
+
+func sanitizeHostName(base string) string {
+	var builder strings.Builder
+	lastWasHyphen := false
+	for _, r := range strings.ToLower(strings.TrimSpace(base)) {
+		isAlphaNum := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
+		if isAlphaNum {
+			builder.WriteRune(r)
+			lastWasHyphen = false
+			continue
+		}
+		if !lastWasHyphen {
+			builder.WriteByte('-')
+			lastWasHyphen = true
+		}
+	}
+
+	host := strings.Trim(builder.String(), "-")
+	if host == "" {
+		host = "syncflow-sidecar"
+	}
+	return host
+}
+
+func TestServiceIPs(t *testing.T) {
+	if got := serviceIPs(BroadcastConfig{}); got != nil {
+		t.Fatalf("serviceIPs() = %#v, want nil", got)
+	}
+
+	got := serviceIPs(BroadcastConfig{DeviceIP: "192.168.1.10"})
+	if len(got) != 1 || got[0] != "192.168.1.10" {
+		t.Fatalf("serviceIPs() = %#v, want [192.168.1.10]", got)
+	}
 }
 
 func TestParseSyncFlowBroadcastPID(t *testing.T) {
