@@ -11,26 +11,23 @@ import {
   NativeEventEmitter,
   ListRenderItemInfo,
   Alert,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
+import type { DiscoveredDeviceDTO } from '@syncflow/contracts';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/colors';
 import { Icon } from '../components/Icon';
 import { isDiagnosticsExportUnavailable, shareDiagnosticsArchive } from '../utils/shareDiagnosticsArchive';
+import { buildManualPairDevice } from './deviceDiscoveryManualPairing';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-interface DiscoveredDevice {
-  deviceId: string;
-  name: string;
-  ip: string;
-  type: 'mac';
-  port: number;
-}
+type DiscoveredDevice = Pick<DiscoveredDeviceDTO, 'deviceId' | 'name' | 'ip' | 'type' | 'port'>;
 
 // ---------------------------------------------------------------------------
 // Pulse ring animation component
@@ -101,6 +98,8 @@ export function DeviceDiscoveryScreen() {
   const [scanning, setScanning] = useState(true);
   const [devices, setDevices] = useState<DiscoveredDevice[]>([]);
   const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false);
+  const [manualHost, setManualHost] = useState('');
+  const [manualHostError, setManualHostError] = useState<string | null>(null);
 
   // ---------------------------------------------------------------------------
   // Native module discovery
@@ -184,6 +183,11 @@ export function DeviceDiscoveryScreen() {
 
   const handleDevicePress = useCallback(
     (device: DiscoveredDevice) => {
+      try {
+        NativeModules.NativeSyncEngine?.stopDiscovery();
+      } catch {
+        // ignore cleanup errors
+      }
       navigation.navigate('CodeVerify', {
         deviceId: device.deviceId,
         host: device.ip,
@@ -193,6 +197,18 @@ export function DeviceDiscoveryScreen() {
     },
     [navigation],
   );
+
+  const handleManualPair = useCallback(() => {
+    const manualDevice = buildManualPairDevice(manualHost);
+
+    if (!manualDevice) {
+      setManualHostError('请输入有效的 IPv4 地址，例如 172.16.8.83');
+      return;
+    }
+
+    setManualHostError(null);
+    handleDevicePress(manualDevice);
+  }, [handleDevicePress, manualHost]);
 
   const renderDevice = useCallback(
     ({ item }: ListRenderItemInfo<DiscoveredDevice>) => (
@@ -209,7 +225,9 @@ export function DeviceDiscoveryScreen() {
         {/* Device info */}
         <View style={styles.deviceInfo}>
           <Text style={styles.deviceName}>{item.name}</Text>
-          <Text style={styles.deviceMeta}>macOS {'·'} {item.ip}</Text>
+          <Text style={styles.deviceMeta}>
+            {item.type === 'win' ? 'Windows' : 'macOS'} {'·'} {item.ip}
+          </Text>
         </View>
 
         {/* Chevron */}
@@ -292,6 +310,51 @@ export function DeviceDiscoveryScreen() {
             </TouchableOpacity>
           </View>
         )}
+
+        <View style={styles.manualSection}>
+          <View style={styles.manualCard}>
+            <Text style={styles.manualTitle}>{'手动输入 IP 配对'}</Text>
+            <Text style={styles.manualDescription}>
+              {'如果扫描不到电脑，尤其是 Windows 设备，可直接输入电脑端 IPv4 地址继续配对。'}
+            </Text>
+            <View style={styles.manualInputRow}>
+              <TextInput
+                style={[
+                  styles.manualInput,
+                  manualHostError && styles.manualInputError,
+                ]}
+                value={manualHost}
+                onChangeText={(value) => {
+                  setManualHost(value);
+                  if (manualHostError) {
+                    setManualHostError(null);
+                  }
+                }}
+                placeholder="172.16.8.83"
+                placeholderTextColor="#8aa9bc"
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="decimal-pad"
+                returnKeyType="done"
+                onSubmitEditing={handleManualPair}
+              />
+              <TouchableOpacity
+                style={styles.manualButton}
+                activeOpacity={0.8}
+                onPress={handleManualPair}
+              >
+                <Text style={styles.manualButtonText}>{'继续'}</Text>
+              </TouchableOpacity>
+            </View>
+            {manualHostError ? (
+              <Text style={styles.manualErrorText}>{manualHostError}</Text>
+            ) : (
+              <Text style={styles.manualHint}>
+                {'默认使用同步端口 39393，输入后仍需在下一步填写 6 位连接码。'}
+              </Text>
+            )}
+          </View>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -484,5 +547,77 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#5a9abf',
+  },
+  manualCard: {
+    padding: 16,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.9)',
+    shadowColor: 'rgba(80,160,210,0.25)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 2,
+  },
+  manualSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+  },
+  manualTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.screenTitle,
+  },
+  manualDescription: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#6a96b8',
+  },
+  manualInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 14,
+  },
+  manualInput: {
+    flex: 1,
+    minHeight: 48,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.85)',
+    backgroundColor: 'rgba(242,248,253,0.88)',
+    color: colors.screenTitle,
+    fontSize: 15,
+  },
+  manualInputError: {
+    borderColor: '#db6b6b',
+  },
+  manualButton: {
+    minHeight: 48,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3b9fd8',
+  },
+  manualButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  manualHint: {
+    marginTop: 10,
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#8aabbd',
+  },
+  manualErrorText: {
+    marginTop: 10,
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#db6b6b',
   },
 });

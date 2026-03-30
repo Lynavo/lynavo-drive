@@ -29,8 +29,8 @@ class SessionService {
         state = newState
     }
 
-    func endSession() {
-        state = .idle
+    func endSession(transitionTo newState: SyncEngineState = .idle) {
+        state = newState
         currentSessionId = nil
     }
 }

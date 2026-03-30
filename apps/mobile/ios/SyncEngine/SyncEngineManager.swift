@@ -256,6 +256,16 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         ISO8601DateFormatter().string(from: Date())
     }
 
+    private func inferredBindingDeviceType(for deviceId: String) -> String {
+        if let discovered = discoveredDevices[deviceId] {
+            return discovered.type
+        }
+        if deviceId.hasPrefix("manual-") {
+            return "win"
+        }
+        return "mac"
+    }
+
     private func recordRecentRetry(error: Error, attempt: Int, delaySeconds: Double) {
         let payload: [String: Any] = [
             "timestamp": diagnosticsTimestamp(),
@@ -763,7 +773,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         isSyncing = false
         endBackgroundTransitionIfNeeded(reason: "syncStopped")
         SilentAudioService.shared.stop()
-        sessionService.transitionTo(finalState)
+        sessionService.endSession(transitionTo: finalState)
     }
 
     private struct UploadTuning {
@@ -963,6 +973,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
         do {
             try await runSyncPipeline()
+        } catch is CancellationError {
+            protocolSession?.disconnect()
+            protocolSession = nil
+            clearResolvedSidecarHost()
+            if uploadStore?.getBinding() != nil {
+                updateBindingConnectionState(.offline, reason: "pipeline_cancelled")
+            }
+            stopSyncLifecycle(finalState: .idle)
         } catch {
             NSLog("[SyncEngine] sync pipeline failed: \(error)")
             syncDiagnosticsLog("SyncEngine", "sync pipeline failed: \(error)")
@@ -1124,6 +1142,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     uploaded = true
                     photoLibraryChanged = false // reset after round
                 } catch {
+                    if Task.isCancelled {
+                        throw CancellationError()
+                    }
                     if !isRetryableSyncError(error) {
                         NSLog("[SyncPipeline] upload failed with non-retryable error: %@", "\(error)")
                         syncDiagnosticsLog("SyncPipeline", "upload failed with non-retryable error: \(error)")
@@ -1987,7 +2008,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     deviceId: serverId,
                     deviceName: serverName,
                     deviceAlias: nil,
-                    deviceType: "mac",
+                    deviceType: inferredBindingDeviceType(for: deviceId),
                     host: host,
                     port: port,
                     pairingId: "",
@@ -2042,7 +2063,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             deviceId: serverInfo["serverId"] as? String ?? deviceId,
             deviceName: serverInfo["serverName"] as? String ?? "",
             deviceAlias: nil,
-            deviceType: "mac",
+            deviceType: inferredBindingDeviceType(for: deviceId),
             host: host,
             port: port,
             pairingId: pairRes["pairingId"] as? String ?? "",

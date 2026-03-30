@@ -22,6 +22,28 @@ private func preferredDiscoveryHost(advertisedIP: String, probedHost: String) ->
     return advertisedIP
 }
 
+private func endpointDebugDescription(_ endpoint: NWEndpoint?) -> String {
+    guard let endpoint else { return "nil" }
+    switch endpoint {
+    case .hostPort(let host, let port):
+        return "\(host):\(port)"
+    case .service(let name, let type, let domain, let interface):
+        let interfaceName: String
+        if let interface {
+            interfaceName = interface.debugDescription
+        } else {
+            interfaceName = "nil"
+        }
+        return "service(name=\(name), type=\(type), domain=\(domain), interface=\(interfaceName))"
+    case .unix(let path):
+        return "unix(\(path))"
+    case .url(let url):
+        return "url(\(url.absoluteString))"
+    @unknown default:
+        return String(describing: endpoint)
+    }
+}
+
 struct DiscoveredDevice {
     let deviceId: String
     let name: String
@@ -118,6 +140,10 @@ class DiscoveryService {
                         }
                     }
                     if let id = txtDict["id"], !id.isEmpty {
+                        syncDiagnosticsLog(
+                            "DiscoveryService",
+                            "bonjour_seen id=\(id) name=\(txtDict["name"] ?? name) advertised_ip=\(txtDict["ip"] ?? "") endpoint=\(endpointDebugDescription(result.endpoint)) txt=\(txtDict)"
+                        )
                         device = DiscoveredDevice(
                             deviceId: id,
                             name: txtDict["name"] ?? name,
@@ -135,6 +161,10 @@ class DiscoveryService {
 
                 // Fallback: use service name as device ID, include debug metadata type
                 if device == nil {
+                    syncDiagnosticsLog(
+                        "DiscoveryService",
+                        "bonjour_seen_fallback id=\(name) endpoint=\(endpointDebugDescription(result.endpoint)) metadata=\(String(describing: result.metadata))"
+                    )
                     device = DiscoveredDevice(
                         deviceId: name, name: name, type: "mac", ip: "",
                         port: 39393, protoVersion: 2, authMode: "code",
@@ -190,6 +220,10 @@ class DiscoveryService {
 
     private func probeReachability(for device: DiscoveredDevice, generation: UInt64) {
         guard let endpoint = preferredProbeEndpoint(for: device) else {
+            syncDiagnosticsLog(
+                "DiscoveryService",
+                "probe_skipped id=\(device.deviceId) name=\(device.name) reason=no_endpoint advertised_ip=\(device.ip) endpoint=\(endpointDebugDescription(device.endpoint))"
+            )
             if reachableDevices.removeValue(forKey: device.deviceId) != nil {
                 emitReachableDevices()
             }
@@ -209,6 +243,11 @@ class DiscoveryService {
         let connection = NWConnection(to: endpoint, using: params)
         probeConnections[device.deviceId] = connection
 
+        syncDiagnosticsLog(
+            "DiscoveryService",
+            "probe_started id=\(device.deviceId) name=\(device.name) target=\(endpointDebugDescription(endpoint)) advertised_ip=\(device.ip) generation=\(generation)"
+        )
+
         let timeoutWork = DispatchWorkItem { [weak self, weak connection] in
             guard let self else { return }
             guard generation == self.probeGeneration else { return }
@@ -216,6 +255,10 @@ class DiscoveryService {
                   let probedConnection = connection,
                   current === probedConnection
             else { return }
+            syncDiagnosticsLog(
+                "DiscoveryService",
+                "probe_timeout id=\(device.deviceId) name=\(device.name) target=\(endpointDebugDescription(endpoint)) generation=\(generation)"
+            )
             current.cancel()
             self.probeConnections.removeValue(forKey: device.deviceId)
             if self.reachableDevices.removeValue(forKey: device.deviceId) != nil {
@@ -243,7 +286,10 @@ class DiscoveryService {
                 }
                 let resolvedIP = preferredDiscoveryHost(advertisedIP: device.ip, probedHost: probedHost)
                 NSLog("[DiscoveryService] reachable %@ via %@", device.name, resolvedIP)
-                syncDiagnosticsLog("DiscoveryService", "reachable \(device.name) via \(resolvedIP)")
+                syncDiagnosticsLog(
+                    "DiscoveryService",
+                    "probe_ready id=\(device.deviceId) name=\(device.name) resolved_ip=\(resolvedIP) advertised_ip=\(device.ip) remote_endpoint=\(endpointDebugDescription(connection.currentPath?.remoteEndpoint))"
+                )
 
                 self.reachableDevices[device.deviceId] = DiscoveredDevice(
                     deviceId: device.deviceId,
@@ -262,10 +308,17 @@ class DiscoveryService {
 
             case .waiting:
                 NSLog("[DiscoveryService] reachability waiting for %@: %@", device.name, "\(state)")
-                syncDiagnosticsLog("DiscoveryService", "reachability waiting for \(device.name): \(state)")
+                syncDiagnosticsLog(
+                    "DiscoveryService",
+                    "probe_waiting id=\(device.deviceId) name=\(device.name) state=\(state) target=\(endpointDebugDescription(endpoint))"
+                )
 
             case .failed, .cancelled:
                 timeoutWork.cancel()
+                syncDiagnosticsLog(
+                    "DiscoveryService",
+                    "probe_ended id=\(device.deviceId) name=\(device.name) state=\(state) target=\(endpointDebugDescription(endpoint))"
+                )
                 let isCurrentProbe = self.probeConnections[device.deviceId].map { $0 === connection } ?? false
                 if isCurrentProbe {
                     self.probeConnections.removeValue(forKey: device.deviceId)

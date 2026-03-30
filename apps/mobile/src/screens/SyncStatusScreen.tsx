@@ -48,6 +48,7 @@ interface BindingState {
   deviceId: string;
   deviceName: string;
   deviceAlias?: string;
+  deviceType?: 'mac' | 'win';
   host: string;
   connectionState: 'bound' | 'connecting' | 'connected' | 'offline' | 'discovering';
 }
@@ -337,7 +338,7 @@ export function SyncStatusScreen() {
         if (!latest || new Date(updatedAt).getTime() > new Date(latest.updatedAt).getTime()) {
           latest = {
             updatedAt,
-            deviceName: (item.deviceName as string) || 'Mac',
+            deviceName: (item.deviceName as string) || '电脑',
           };
         }
       }
@@ -383,6 +384,7 @@ export function SyncStatusScreen() {
         deviceId: state.deviceId as string,
         deviceName: (state.deviceName as string) || '',
         deviceAlias: state.deviceAlias as string | undefined,
+        deviceType: state.deviceType as BindingState['deviceType'] | undefined,
         host: (state.host as string) || '',
         connectionState: ((state.connectionState as BindingState['connectionState']) || 'bound'),
       });
@@ -602,8 +604,14 @@ export function SyncStatusScreen() {
     overview.uploadState !== 'uploading' &&
     overview.uploadState !== 'reconnecting' &&
     overview.uploadState !== 'paused_no_permission';
-  const boundDeviceName = bindingState?.deviceAlias || bindingState?.deviceName || 'Mac';
-  const isConnectionError = bindingState?.connectionState === 'offline' || bindingState?.connectionState === 'bound';
+  const boundDeviceName = bindingState?.deviceAlias || bindingState?.deviceName || (
+    bindingState?.deviceType === 'win' ? 'Windows 电脑' : '电脑'
+  );
+  const isConnectingState =
+    bindingState?.connectionState === 'bound' ||
+    bindingState?.connectionState === 'connecting' ||
+    bindingState?.connectionState === 'discovering';
+  const isConnectionError = bindingState?.connectionState === 'offline';
   const isTransferInterrupted = retryBanner !== null || overview.uploadState === 'reconnecting';
   const isPermissionBlocked = overview.uploadState === 'paused_no_permission';
   const suppressConnectionNotice = suppressInitialOfflineBanner && !isPermissionBlocked;
@@ -631,9 +639,9 @@ export function SyncStatusScreen() {
       )
       : isConnectionError
       ? (
-        `未连接到“${boundDeviceName}”，请确认 Mac 端 Sidecar 正在运行。`
+        `未连接到“${boundDeviceName}”，请确认电脑端 SyncFlow 正在运行。`
       )
-      : bindingState?.connectionState === 'connecting' || bindingState?.connectionState === 'discovering'
+      : isConnectingState
         ? `正在连接到“${boundDeviceName}”。`
         : null
   );
@@ -657,8 +665,8 @@ export function SyncStatusScreen() {
           )
       )
       : isConnectionError
-        ? '恢复网络或重新打开 Mac 端 Sidecar 后会自动继续。'
-        : bindingState?.connectionState === 'connecting' || bindingState?.connectionState === 'discovering'
+        ? '恢复网络或重新打开电脑端 SyncFlow 后会自动继续。'
+        : isConnectingState
         ? '连接建立后会自动继续当前同步任务。'
         : null
   );
