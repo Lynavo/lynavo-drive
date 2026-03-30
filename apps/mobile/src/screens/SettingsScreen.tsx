@@ -10,7 +10,6 @@ import {
   NativeEventEmitter,
   Alert,
   Linking,
-  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -18,6 +17,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/colors';
 import { Icon } from '../components/Icon';
+import { isDiagnosticsExportUnavailable, shareDiagnosticsArchive } from '../utils/shareDiagnosticsArchive';
 
 // ---------------------------------------------------------------------------
 // SettingsScreen
@@ -217,22 +217,15 @@ export function SettingsScreen() {
   }, [navigation]);
 
   const handleExportDiagnostics = useCallback(async () => {
-    const { NativeSyncEngine } = NativeModules;
-    if (!NativeSyncEngine?.exportDiagnostics) {
-      Alert.alert('无法导出', '当前版本暂不支持导出诊断包');
-      return;
-    }
-
     try {
       setIsExportingDiagnostics(true);
-      const archivePath = await NativeSyncEngine.exportDiagnostics();
-      const archiveUrl = archivePath.startsWith('file://') ? archivePath : `file://${archivePath}`;
-      await Share.share({
-        title: 'SyncFlow 诊断包',
-        url: archiveUrl,
-      });
+      await shareDiagnosticsArchive();
     } catch (error) {
-      Alert.alert('导出失败', '诊断包导出失败，请稍后重试');
+      if (isDiagnosticsExportUnavailable(error)) {
+        Alert.alert('无法导出', '当前版本暂不支持导出诊断包');
+      } else {
+        Alert.alert('导出失败', '诊断包导出失败，请稍后重试');
+      }
     } finally {
       setIsExportingDiagnostics(false);
     }

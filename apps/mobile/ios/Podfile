@@ -18,6 +18,7 @@ ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
 
 target 'SyncFlowMobile' do
   config = use_native_modules!
+  hermes_cli_path = '${PODS_ROOT}/hermes-engine/destroot/bin/hermesc'
 
   use_react_native!(
     :path => config[:reactNativePath],
@@ -34,5 +35,24 @@ target 'SyncFlowMobile' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |build_configuration|
+        build_configuration.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      end
+    end
+
+    installer.aggregate_targets
+      .map(&:user_project)
+      .uniq
+      .each do |project|
+        project.native_targets.each do |target|
+          target.build_configurations.each do |build_configuration|
+            build_configuration.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+            build_configuration.build_settings['HERMES_CLI_PATH'] = hermes_cli_path
+          end
+        end
+        project.save
+      end
   end
 end

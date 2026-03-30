@@ -153,7 +153,7 @@ private func syncFlowPreferredClientIPv4() -> String? {
     return fallback
 }
 
-private final class SyncDiagnosticsLogStore {
+final class SyncDiagnosticsLogStore {
     static let shared = SyncDiagnosticsLogStore()
 
     private let lock = NSLock()
@@ -178,8 +178,21 @@ private final class SyncDiagnosticsLogStore {
     }
 }
 
-private func syncDiagnosticsLog(_ category: String, _ message: @autoclosure () -> String) {
+func syncDiagnosticsLog(_ category: String, _ message: @autoclosure () -> String) {
     SyncDiagnosticsLogStore.shared.record(category: category, message: message())
+}
+
+private func syncDiagnosticsDumpToConsole(_ lines: [String]) {
+    if lines.isEmpty {
+        NSLog("[Diagnostics] engine.log snapshot is empty at export time")
+        return
+    }
+
+    NSLog("[Diagnostics] engine.log snapshot begin (%d lines)", lines.count)
+    for line in lines {
+        NSLog("[DiagnosticsLog] %@", line)
+    }
+    NSLog("[Diagnostics] engine.log snapshot end")
 }
 
 @objc
@@ -611,13 +624,18 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         emitBindingStateChanged()
     }
 
-    private func currentAppStateLabel() -> String {
-        switch UIApplication.shared.applicationState {
+    private func currentAppStateLabel(for applicationState: UIApplication.State) -> String {
+        switch applicationState {
         case .background:
             return "background"
         default:
             return sessionService.state == .syncingBackground ? "background" : "foreground"
         }
+    }
+
+    private func currentAppStateLabel() async -> String {
+        let applicationState = await MainActor.run { UIApplication.shared.applicationState }
+        return currentAppStateLabel(for: applicationState)
     }
 
     private func currentAppVersionLabel() -> String {
@@ -650,13 +668,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         return formatter.string(from: date)
     }
 
-    private func buildClientHelloPayload(clientId: String, pairingToken: String? = nil) -> [String: Any] {
+    private func buildClientHelloPayload(clientId: String, pairingToken: String? = nil) async -> [String: Any] {
         var payload: [String: Any] = [
             "clientId": clientId,
             "clientName": getClientDisplayName(),
             "clientPlatform": "ios",
             "appVersion": currentAppVersionLabel(),
-            "appState": currentAppStateLabel(),
+            "appState": await currentAppStateLabel(),
         ]
         if let pairingToken, !pairingToken.isEmpty {
             payload["pairingToken"] = pairingToken
@@ -705,7 +723,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 let clientId = self.bindingService.getOrCreateClientId()
                 let (helloType, helloRes) = try await session.sendAndReceive(
                     type: .helloReq,
-                    payload: self.buildClientHelloPayload(clientId: clientId, pairingToken: token)
+                    payload: await self.buildClientHelloPayload(clientId: clientId, pairingToken: token)
                 )
                 guard helloType == .helloRes else {
                     return
@@ -926,29 +944,40 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         sessionService.transitionTo(.scanning)
         backgroundService.submitContinuedTask()
         SilentAudioService.shared.start()
-        if UIApplication.shared.applicationState == .background {
-            beginBackgroundTransitionIfNeeded(reason: "startSyncWhileBackgrounded")
+
+        Task { [weak self] in
+            await self?.runStartSyncFlow()
+        }
+    }
+
+    private func runStartSyncFlow() async {
+        let shouldBeginBackgroundTransition = await MainActor.run {
+            UIApplication.shared.applicationState == .background
         }
 
-        Task {
-            do {
-                try await runSyncPipeline()
-            } catch {
-                NSLog("[SyncEngine] sync pipeline failed: \(error)")
-                syncDiagnosticsLog("SyncEngine", "sync pipeline failed: \(error)")
-                self.protocolSession?.disconnect()
-                self.protocolSession = nil
-                self.clearResolvedSidecarHost()
-                if self.uploadStore?.getBinding() != nil {
-                    self.updateBindingConnectionState(.offline, reason: "pipeline_failed")
-                }
-                self.stopSyncLifecycle(finalState: .idle)
-                self.recordRecentError(code: "SYNC_PIPELINE_ERROR", message: "\(error)")
-                NativeSyncEngineModule.shared?.emitError([
-                    "code": "SYNC_PIPELINE_ERROR",
-                    "message": "\(error)",
-                ])
+        if shouldBeginBackgroundTransition {
+            await MainActor.run {
+                beginBackgroundTransitionIfNeeded(reason: "startSyncWhileBackgrounded")
             }
+        }
+
+        do {
+            try await runSyncPipeline()
+        } catch {
+            NSLog("[SyncEngine] sync pipeline failed: \(error)")
+            syncDiagnosticsLog("SyncEngine", "sync pipeline failed: \(error)")
+            protocolSession?.disconnect()
+            protocolSession = nil
+            clearResolvedSidecarHost()
+            if uploadStore?.getBinding() != nil {
+                updateBindingConnectionState(.offline, reason: "pipeline_failed")
+            }
+            stopSyncLifecycle(finalState: .idle)
+            recordRecentError(code: "SYNC_PIPELINE_ERROR", message: "\(error)")
+            NativeSyncEngineModule.shared?.emitError([
+                "code": "SYNC_PIPELINE_ERROR",
+                "message": "\(error)",
+            ])
         }
     }
 
@@ -1194,7 +1223,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
         let (helloType, helloRes) = try await session.sendAndReceive(
             type: .helloReq,
-            payload: buildClientHelloPayload(clientId: clientId, pairingToken: token)
+            payload: await buildClientHelloPayload(clientId: clientId, pairingToken: token)
         )
         guard helloType == .helloRes else {
             throw SyncEngineError.networkError("Expected HELLO_RES")
@@ -1842,6 +1871,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     func discoveryDidUpdate(devices: [DiscoveredDevice]) {
         NSLog("[SyncEngine] discoveryDidUpdate called with \(devices.count) devices")
+        syncDiagnosticsLog("SyncEngine", "discoveryDidUpdate called with \(devices.count) devices")
         discoveredDevices = Dictionary(uniqueKeysWithValues: devices.map { ($0.deviceId, $0) })
         let mapped: [[String: Any]] = devices.map { device in
             [
@@ -1858,9 +1888,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
         if let bridge = NativeSyncEngineModule.shared {
             NSLog("[SyncEngine] emitting \(mapped.count) devices to RN")
+            syncDiagnosticsLog("SyncEngine", "emitting \(mapped.count) devices to RN")
             bridge.emitDiscoveredDevices(mapped)
         } else {
             NSLog("[SyncEngine] WARNING: NativeSyncEngineModule.shared is nil, cannot emit")
+            syncDiagnosticsLog("SyncEngine", "warning: NativeSyncEngineModule.shared is nil, cannot emit")
         }
     }
 
@@ -1868,11 +1900,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     func startDiscovery() {
         NSLog("[SyncEngine] startDiscovery - delegate is \(discoveryService.delegate == nil ? "nil" : "set")")
+        syncDiagnosticsLog("SyncEngine", "startDiscovery - delegate is \(discoveryService.delegate == nil ? "nil" : "set")")
         discoveryService.startBrowsing()
     }
 
     func stopDiscovery() {
         NSLog("[SyncEngine] stopDiscovery")
+        syncDiagnosticsLog("SyncEngine", "stopDiscovery")
         discoveryService.stopBrowsing()
         discoveredDevices.removeAll()
     }
@@ -1930,7 +1964,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         // 2. HELLO_REQ → HELLO_RES  (spec Section 7.8)
         let (helloType, helloRes) = try await session.sendAndReceive(
             type: .helloReq,
-            payload: buildClientHelloPayload(clientId: clientId)
+            payload: await buildClientHelloPayload(clientId: clientId)
         )
 
         guard helloType == .helloRes else {
@@ -2211,12 +2245,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             "client": clientPayload,
             "runtime": runtimePayload,
         ]
+        let engineLogSnapshot = SyncDiagnosticsLogStore.shared.snapshot()
+
+        syncDiagnosticsDumpToConsole(engineLogSnapshot)
 
         try writeJSONFile(diagnostics, to: exportRoot.appendingPathComponent("diagnostics.json"))
         try writeJSONFile(queueSnapshot, to: exportRoot.appendingPathComponent("queue.json"))
         try writeJSONFile(historyDays, to: exportRoot.appendingPathComponent("history.json"))
         try writeTextFile(
-            SyncDiagnosticsLogStore.shared.snapshot().joined(separator: "\n"),
+            engineLogSnapshot.joined(separator: "\n"),
             to: exportRoot.appendingPathComponent("engine.log")
         )
         try exportDatabaseSnapshot(to: exportRoot)
@@ -2321,7 +2358,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         // Auth so sidecar registers us as connected
         let (helloType, helloRes) = try await session.sendAndReceive(
             type: .helloReq,
-            payload: buildClientHelloPayload(clientId: clientId, pairingToken: token)
+            payload: await buildClientHelloPayload(clientId: clientId, pairingToken: token)
         )
         if helloType == .helloRes, let nonce = helloRes["nonce"] as? String {
             let hmac = transport.computeHMAC(token: token, nonce: nonce)

@@ -47,6 +47,7 @@ class DiscoveryService {
 
     func startBrowsing() {
         NSLog("[DiscoveryService] startBrowsing called")
+        syncDiagnosticsLog("DiscoveryService", "startBrowsing called")
         let descriptor = NWBrowser.Descriptor.bonjourWithTXTRecord(type: "_syncflow._tcp", domain: nil)
         let params = NWParameters()
         // Prefer infrastructure Wi-Fi / USB network paths for discovery so the
@@ -56,11 +57,13 @@ class DiscoveryService {
 
         browser?.browseResultsChangedHandler = { [weak self] results, _ in
             NSLog("[DiscoveryService] results changed: \(results.count) results")
+            syncDiagnosticsLog("DiscoveryService", "results changed: \(results.count) results")
             self?.handleResults(results)
         }
 
         browser?.stateUpdateHandler = { [weak self] state in
             NSLog("[DiscoveryService] state: \(state)")
+            syncDiagnosticsLog("DiscoveryService", "state: \(state)")
             self?.browserState = String(describing: state)
         }
 
@@ -68,6 +71,7 @@ class DiscoveryService {
     }
 
     func stopBrowsing() {
+        syncDiagnosticsLog("DiscoveryService", "stopBrowsing")
         browser?.cancel()
         browser = nil
         for connection in probeConnections.values {
@@ -239,6 +243,7 @@ class DiscoveryService {
                 }
                 let resolvedIP = preferredDiscoveryHost(advertisedIP: device.ip, probedHost: probedHost)
                 NSLog("[DiscoveryService] reachable %@ via %@", device.name, resolvedIP)
+                syncDiagnosticsLog("DiscoveryService", "reachable \(device.name) via \(resolvedIP)")
 
                 self.reachableDevices[device.deviceId] = DiscoveredDevice(
                     deviceId: device.deviceId,
@@ -257,6 +262,7 @@ class DiscoveryService {
 
             case .waiting:
                 NSLog("[DiscoveryService] reachability waiting for %@: %@", device.name, "\(state)")
+                syncDiagnosticsLog("DiscoveryService", "reachability waiting for \(device.name): \(state)")
 
             case .failed, .cancelled:
                 timeoutWork.cancel()

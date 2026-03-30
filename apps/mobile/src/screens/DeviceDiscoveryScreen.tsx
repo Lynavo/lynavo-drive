@@ -10,6 +10,7 @@ import {
   NativeModules,
   NativeEventEmitter,
   ListRenderItemInfo,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -17,6 +18,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/colors';
 import { Icon } from '../components/Icon';
+import { isDiagnosticsExportUnavailable, shareDiagnosticsArchive } from '../utils/shareDiagnosticsArchive';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -98,6 +100,7 @@ export function DeviceDiscoveryScreen() {
   const navigation = useNavigation<NavigationProp>();
   const [scanning, setScanning] = useState(true);
   const [devices, setDevices] = useState<DiscoveredDevice[]>([]);
+  const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false);
 
   // ---------------------------------------------------------------------------
   // Native module discovery
@@ -164,6 +167,21 @@ export function DeviceDiscoveryScreen() {
     setScanning(false);
   }, []);
 
+  const handleExportDiagnostics = useCallback(async () => {
+    try {
+      setIsExportingDiagnostics(true);
+      await shareDiagnosticsArchive();
+    } catch (error) {
+      if (isDiagnosticsExportUnavailable(error)) {
+        Alert.alert('无法导出', '当前版本暂不支持导出诊断包');
+      } else {
+        Alert.alert('导出失败', '诊断包导出失败，请稍后重试');
+      }
+    } finally {
+      setIsExportingDiagnostics(false);
+    }
+  }, []);
+
   const handleDevicePress = useCallback(
     (device: DiscoveredDevice) => {
       navigation.navigate('CodeVerify', {
@@ -208,8 +226,26 @@ export function DeviceDiscoveryScreen() {
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.wifiIconBox}>
-            <Icon name="wifi" size={24} color="#3b9fd8" />
+          <View style={styles.headerTopRow}>
+            <View style={styles.wifiIconBox}>
+              <Icon name="wifi" size={24} color="#3b9fd8" />
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.diagnosticsButton,
+                isExportingDiagnostics && styles.diagnosticsButtonDisabled,
+              ]}
+              activeOpacity={0.8}
+              disabled={isExportingDiagnostics}
+              onPress={() => {
+                void handleExportDiagnostics();
+              }}
+            >
+              <Icon name="download-outline" size={16} color="#3b9fd8" />
+              <Text style={styles.diagnosticsButtonText}>
+                {isExportingDiagnostics ? '导出中…' : '导出诊断包'}
+              </Text>
+            </TouchableOpacity>
           </View>
           <Text style={styles.title}>{'搜索设备'}</Text>
           <Text style={styles.subtitle}>{'正在扫描局域网中的电脑端应用...'}</Text>
@@ -281,6 +317,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 24,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   wifiIconBox: {
     width: 56,
     height: 56,
@@ -299,6 +341,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6a96b8',
     marginTop: 4,
+  },
+  diagnosticsButton: {
+    minHeight: 40,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(255,255,255,0.62)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.82)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    shadowColor: 'rgba(80,160,210,0.25)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  diagnosticsButtonDisabled: {
+    opacity: 0.6,
+  },
+  diagnosticsButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#3b9fd8',
   },
 
   // Scanning
