@@ -426,6 +426,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         runtimeCurrentFileConfirmedBytes = 0
         runtimeCurrentFileTotalBytes = nextAsset.estimatedSize
         runtimeCurrentSpeedMbps = 0
+        // Also update DB filename so the queue list shows the definitive name.
+        if var item = uploadStore?.getUploadItemByFileKey(nextAsset.fileKey) {
+            item.originalFilename = nextAsset.originalFilename
+            if nextAsset.estimatedSize > 0 {
+                item.fileSize = nextAsset.estimatedSize
+            }
+            try? uploadStore?.upsertUploadItem(item)
+        }
         NativeSyncEngineModule.shared?.emitSyncStateChanged(
             runtimeSyncOverviewPayload(uploadState: "preparing", progressPercent: 0)
         )
@@ -528,13 +536,26 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
     }
 
-    private func markAssetPreparing(fileKey: String) {
-        try? uploadStore?.updateUploadStatus(fileKey: fileKey, status: "preparing")
+    private func markAssetPreparing(asset: ScannedAsset) {
+        // Update status and write the definitive filename/size (from ScannedAsset, which
+        // matches what AssetExportService will produce) before emitting the queue so that
+        // the JS queue list immediately shows the correct filename instead of a stale
+        // PHAsset-scan-time value.
+        if var item = uploadStore?.getUploadItemByFileKey(asset.fileKey) {
+            item.status = "preparing"
+            item.originalFilename = asset.originalFilename
+            if asset.estimatedSize > 0 {
+                item.fileSize = asset.estimatedSize
+            }
+            try? uploadStore?.upsertUploadItem(item)
+        } else {
+            try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "preparing")
+        }
         emitQueueToJS()
     }
 
     private func exportAssetForUpload(_ asset: ScannedAsset) async throws -> ExportedFile {
-        markAssetPreparing(fileKey: asset.fileKey)
+        markAssetPreparing(asset: asset)
 
         var markedCloudDownload = false
         return try await exportService.exportAsset(asset.asset) { [weak self] progress in

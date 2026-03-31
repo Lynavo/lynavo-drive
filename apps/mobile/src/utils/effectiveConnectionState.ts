@@ -17,7 +17,13 @@ type SyncConnectionEvidence = {
 export function syncActivityImpliesConnected(
   evidence: SyncConnectionEvidence,
 ): boolean {
-  if (evidence.uploadState === 'uploading' || evidence.uploadState === 'completed') {
+  if (
+    evidence.uploadState === 'uploading' ||
+    evidence.uploadState === 'completed' ||
+    evidence.uploadState === 'preparing' ||
+    evidence.uploadState === 'cloud_downloading' ||
+    evidence.uploadState === 'reconnecting'
+  ) {
     return true;
   }
 
