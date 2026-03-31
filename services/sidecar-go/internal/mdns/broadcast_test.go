@@ -2,6 +2,7 @@ package mdns
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -174,7 +175,7 @@ func TestResolveDNSSDPathUsesAdjacentExecutable(t *testing.T) {
 	}()
 
 	tempDir := t.TempDir()
-	adjacentPath := tempDir + `\dns-sd.exe`
+	adjacentPath := filepath.Join(tempDir, "dns-sd.exe")
 	if err := os.WriteFile(adjacentPath, []byte("test"), 0o644); err != nil {
 		t.Fatalf("WriteFile() failed: %v", err)
 	}
@@ -183,7 +184,7 @@ func TestResolveDNSSDPathUsesAdjacentExecutable(t *testing.T) {
 		return "", os.ErrNotExist
 	}
 	executablePath = func() (string, error) {
-		return tempDir + `\syncflow-sidecar.exe`, nil
+		return filepath.Join(tempDir, "syncflow-sidecar.exe"), nil
 	}
 	if err := os.Unsetenv(dnsSDPathEnv); err != nil {
 		t.Fatalf("Unsetenv() failed: %v", err)

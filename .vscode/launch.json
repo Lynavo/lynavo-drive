@@ -2,64 +2,22 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Desktop: Electron Main",
-      "type": "pwa-node",
-      "request": "launch",
-      "cwd": "${workspaceFolder}/apps/desktop",
-      "runtimeExecutable": "${env:LOCALAPPDATA}\\Programs\\nodejs\\node.exe",
-      "runtimeArgs": [
-        "./scripts/run-electron-vite.cjs",
-        "dev",
-        "--inspect=9229",
-        "--remoteDebuggingPort=9223"
-      ],
-      "env": {
-        "PATH": "${env:LOCALAPPDATA}\\Programs\\nodejs;${env:PATH}"
-      },
-      "console": "integratedTerminal",
-      "preLaunchTask": "desktop: build shared packages",
-      "autoAttachChildProcesses": true,
-      "sourceMaps": true,
-      "outFiles": ["${workspaceFolder}/apps/desktop/out/**/*.js"],
-      "resolveSourceMapLocations": [
-        "${workspaceFolder}/apps/desktop/**",
-        "!**/node_modules/**"
-      ],
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "name": "Desktop: Renderer",
-      "type": "pwa-chrome",
-      "request": "attach",
-      "port": 9223,
-      "webRoot": "${workspaceFolder}/apps/desktop/src/renderer",
-      "timeout": 30000
-    },
-    {
-      "name": "Mobile: Metro",
+      "name": "Mobile: iOS (macOS)",
       "type": "node-terminal",
       "request": "launch",
-      "command": "$env:Path='${env:LOCALAPPDATA}\\Programs\\nodejs;' + $env:Path; & '${env:LOCALAPPDATA}\\Programs\\nodejs\\corepack.cmd' pnpm --filter @syncflow/mobile start"
+      "command": "cd \"${workspaceFolder}\" && corepack pnpm --filter @syncflow/mobile ios"
     },
     {
-      "name": "Mobile: iOS App",
+      "name": "Mobile: Metro (macOS)",
       "type": "node-terminal",
       "request": "launch",
-      "command": "$env:Path='${env:LOCALAPPDATA}\\Programs\\nodejs;' + $env:Path; & '${env:LOCALAPPDATA}\\Programs\\nodejs\\corepack.cmd' pnpm --filter @syncflow/mobile ios",
-      "preLaunchTask": "mobile: start metro"
+      "command": "cd \"${workspaceFolder}\" && corepack pnpm --filter @syncflow/mobile start"
     },
     {
-      "name": "Mobile: iOS App (No Metro)",
+      "name": "Desktop: Dev",
       "type": "node-terminal",
       "request": "launch",
-      "command": "$env:Path='${env:LOCALAPPDATA}\\Programs\\nodejs;' + $env:Path; & '${env:LOCALAPPDATA}\\Programs\\nodejs\\corepack.cmd' pnpm --filter @syncflow/mobile ios"
-    }
-  ],
-  "compounds": [
-    {
-      "name": "SyncFlow: Desktop + iOS",
-      "configurations": ["Desktop: Electron Main", "Mobile: iOS App"],
-      "stopAll": true
+      "command": "cd \"${workspaceFolder}\" && corepack pnpm --filter @syncflow/desktop dev"
     }
   ]
 }

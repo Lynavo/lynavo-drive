@@ -1893,6 +1893,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     func discoveryDidUpdate(devices: [DiscoveredDevice]) {
         NSLog("[SyncEngine] discoveryDidUpdate called with \(devices.count) devices")
         syncDiagnosticsLog("SyncEngine", "discoveryDidUpdate called with \(devices.count) devices")
+        let deviceSummary = devices.map {
+            "\($0.name)/\($0.ip.isEmpty ? "no-ip" : $0.ip)/\($0.deviceId)/\($0.type)/port:\($0.port)"
+        }.joined(separator: ", ")
+        syncDiagnosticsLog(
+            "SyncEngine",
+            "discoveryDidUpdate devices=\(deviceSummary.isEmpty ? "none" : deviceSummary)"
+        )
         discoveredDevices = Dictionary(uniqueKeysWithValues: devices.map { ($0.deviceId, $0) })
         let mapped: [[String: Any]] = devices.map { device in
             [
@@ -1922,12 +1929,20 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     func startDiscovery() {
         NSLog("[SyncEngine] startDiscovery - delegate is \(discoveryService.delegate == nil ? "nil" : "set")")
         syncDiagnosticsLog("SyncEngine", "startDiscovery - delegate is \(discoveryService.delegate == nil ? "nil" : "set")")
+        syncDiagnosticsLog(
+            "SyncEngine",
+            "startDiscovery existingDiscoveredDevices=\(discoveredDevices.count)"
+        )
         discoveryService.startBrowsing()
     }
 
     func stopDiscovery() {
         NSLog("[SyncEngine] stopDiscovery")
         syncDiagnosticsLog("SyncEngine", "stopDiscovery")
+        syncDiagnosticsLog(
+            "SyncEngine",
+            "stopDiscovery clearingDiscoveredDevices=\(discoveredDevices.count)"
+        )
         discoveryService.stopBrowsing()
         discoveredDevices.removeAll()
     }

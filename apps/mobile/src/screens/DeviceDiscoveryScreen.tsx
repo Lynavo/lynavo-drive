@@ -12,8 +12,11 @@ import {
   ListRenderItemInfo,
   Alert,
   TextInput,
+  Keyboard,
+  LayoutChangeEvent,
+  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { DiscoveredDeviceDTO } from '@syncflow/contracts';
@@ -28,6 +31,16 @@ import { buildManualPairDevice } from './deviceDiscoveryManualPairing';
 // ---------------------------------------------------------------------------
 
 type DiscoveredDevice = Pick<DiscoveredDeviceDTO, 'deviceId' | 'name' | 'ip' | 'type' | 'port'>;
+
+function deviceDiscoveryDebugSummary(devices: DiscoveredDevice[]): string {
+  if (devices.length === 0) {
+    return 'none';
+  }
+
+  return devices
+    .map((device) => `${device.name}/${device.ip || 'no-ip'}/${device.deviceId}/${device.type}`)
+    .join(', ');
+}
 
 // ---------------------------------------------------------------------------
 // Pulse ring animation component
@@ -95,53 +108,86 @@ type NavigationProp = StackNavigationProp<RootStackParamList, 'DeviceDiscovery'>
 
 export function DeviceDiscoveryScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const insets = useSafeAreaInsets();
   const [scanning, setScanning] = useState(true);
   const [devices, setDevices] = useState<DiscoveredDevice[]>([]);
   const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false);
   const [manualHost, setManualHost] = useState('');
   const [manualHostError, setManualHostError] = useState<string | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [manualSectionHeight, setManualSectionHeight] = useState(0);
 
   // ---------------------------------------------------------------------------
   // Native module discovery
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
+    console.log('[DiscoveryScreen] mounted');
     let subscription: { remove: () => void } | undefined;
     let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
 
     try {
       const { NativeSyncEngine } = NativeModules;
       if (NativeSyncEngine) {
+        console.log('[DiscoveryScreen] NativeSyncEngine available, subscribing to discovery events');
         const emitter = new NativeEventEmitter(NativeSyncEngine);
         subscription = emitter.addListener('onDiscoveredDevicesChanged', (discoveredDevices: DiscoveredDevice[]) => {
+          console.log(
+            '[DiscoveryScreen] onDiscoveredDevicesChanged',
+            discoveredDevices.length,
+            deviceDiscoveryDebugSummary(discoveredDevices),
+          );
           setDevices(discoveredDevices);
           if (discoveredDevices.length > 0) {
             setScanning(false);
             if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = undefined; }
           }
         });
+        console.log('[DiscoveryScreen] calling startDiscovery');
         NativeSyncEngine.startDiscovery()
-          .catch((e: Error) => console.warn('[Discovery] startDiscovery failed:', e));
+          .then(() => console.log('[DiscoveryScreen] startDiscovery resolved'))
+          .catch((e: Error) => console.warn('[DiscoveryScreen] startDiscovery failed:', e));
         // Timeout fallback: if no devices found after 8s, stop scanning animation
         timeoutTimer = setTimeout(() => {
+          console.log('[DiscoveryScreen] discovery timeout reached with no devices');
           setScanning(false);
         }, 8000);
       } else {
+        console.log('[DiscoveryScreen] NativeSyncEngine unavailable');
         setScanning(false);
       }
     } catch (e) {
-      console.warn('[Discovery] error:', e);
+      console.warn('[DiscoveryScreen] setup error:', e);
       setScanning(false);
     }
 
     return () => {
+      console.log('[DiscoveryScreen] unmounting, cleaning up discovery listeners');
       subscription?.remove();
       if (timeoutTimer) clearTimeout(timeoutTimer);
       try {
+        console.log('[DiscoveryScreen] calling stopDiscovery during cleanup');
         NativeModules.NativeSyncEngine?.stopDiscovery();
       } catch {
         // ignore cleanup errors
       }
+    };
+  }, []);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
     };
   }, []);
 
@@ -150,12 +196,14 @@ export function DeviceDiscoveryScreen() {
   // ---------------------------------------------------------------------------
 
   const handleRescan = useCallback(() => {
+    console.log('[DiscoveryScreen] handleRescan invoked');
     setScanning(true);
     setDevices([]);
 
     try {
       const { NativeSyncEngine } = NativeModules;
       if (NativeSyncEngine) {
+        console.log('[DiscoveryScreen] handleRescan restarting discovery');
         NativeSyncEngine.stopDiscovery();
         NativeSyncEngine.startDiscovery();
         return;
@@ -183,6 +231,10 @@ export function DeviceDiscoveryScreen() {
 
   const handleDevicePress = useCallback(
     (device: DiscoveredDevice) => {
+      console.log(
+        '[DiscoveryScreen] handleDevicePress',
+        `${device.name}/${device.ip || 'no-ip'}/${device.deviceId}/${device.type}`,
+      );
       try {
         NativeModules.NativeSyncEngine?.stopDiscovery();
       } catch {
@@ -199,13 +251,19 @@ export function DeviceDiscoveryScreen() {
   );
 
   const handleManualPair = useCallback(() => {
+    console.log('[DiscoveryScreen] handleManualPair submitted', manualHost);
     const manualDevice = buildManualPairDevice(manualHost);
 
     if (!manualDevice) {
+      console.log('[DiscoveryScreen] handleManualPair rejected invalid host');
       setManualHostError('请输入有效的 IPv4 地址，例如 172.16.8.83');
       return;
     }
 
+    console.log(
+      '[DiscoveryScreen] handleManualPair accepted',
+      `${manualDevice.name}/${manualDevice.ip}/${manualDevice.deviceId}/${manualDevice.type}`,
+    );
     setManualHostError(null);
     handleDevicePress(manualDevice);
   }, [handleDevicePress, manualHost]);
@@ -238,6 +296,16 @@ export function DeviceDiscoveryScreen() {
   );
 
   const keyExtractor = useCallback((item: DiscoveredDevice) => item.deviceId, []);
+
+  const handleManualSectionLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+    setManualSectionHeight((currentHeight) => (
+      currentHeight === nextHeight ? currentHeight : nextHeight
+    ));
+  }, []);
+
+  const manualDockBottom = keyboardHeight > 0 ? Math.max(12, keyboardHeight - insets.bottom) : 0;
+  const listBottomInset = manualSectionHeight > 0 ? manualSectionHeight + 16 : 220;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -279,7 +347,7 @@ export function DeviceDiscoveryScreen() {
 
         {/* Device list */}
         {!scanning && (
-          <View style={styles.listSection}>
+          <View style={[styles.listSection, { paddingBottom: listBottomInset }]}>
             {devices.length > 0 && (
               <Text style={styles.deviceCount}>{'发现'} {devices.length} {'台设备'}</Text>
             )}
@@ -294,6 +362,7 @@ export function DeviceDiscoveryScreen() {
                 keyExtractor={keyExtractor}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
               />
             )}
 
@@ -311,48 +380,59 @@ export function DeviceDiscoveryScreen() {
           </View>
         )}
 
-        <View style={styles.manualSection}>
-          <View style={styles.manualCard}>
-            <Text style={styles.manualTitle}>{'手动输入 IP 配对'}</Text>
-            <Text style={styles.manualDescription}>
-              {'如果扫描不到电脑，尤其是 Windows 设备，可直接输入电脑端 IPv4 地址继续配对。'}
-            </Text>
-            <View style={styles.manualInputRow}>
-              <TextInput
-                style={[
-                  styles.manualInput,
-                  manualHostError && styles.manualInputError,
-                ]}
-                value={manualHost}
-                onChangeText={(value) => {
-                  setManualHost(value);
-                  if (manualHostError) {
-                    setManualHostError(null);
-                  }
-                }}
-                placeholder="172.16.8.83"
-                placeholderTextColor="#8aa9bc"
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="decimal-pad"
-                returnKeyType="done"
-                onSubmitEditing={handleManualPair}
-              />
-              <TouchableOpacity
-                style={styles.manualButton}
-                activeOpacity={0.8}
-                onPress={handleManualPair}
-              >
-                <Text style={styles.manualButtonText}>{'继续'}</Text>
-              </TouchableOpacity>
-            </View>
-            {manualHostError ? (
-              <Text style={styles.manualErrorText}>{manualHostError}</Text>
-            ) : (
-              <Text style={styles.manualHint}>
-                {'默认使用同步端口 39393，输入后仍需在下一步填写 6 位连接码。'}
+        <View
+          style={[
+            styles.manualDock,
+            {
+              bottom: manualDockBottom,
+              paddingBottom: Math.max(insets.bottom, 24),
+            },
+          ]}
+          onLayout={handleManualSectionLayout}
+        >
+          <View style={styles.manualSection}>
+            <View style={styles.manualCard}>
+              <Text style={styles.manualTitle}>{'手动输入 IP 配对'}</Text>
+              <Text style={styles.manualDescription}>
+                {'如果扫描不到电脑，尤其是 Windows 设备，可直接输入电脑端 IPv4 地址继续配对。'}
               </Text>
-            )}
+              <View style={styles.manualInputRow}>
+                <TextInput
+                  style={[
+                    styles.manualInput,
+                    manualHostError && styles.manualInputError,
+                  ]}
+                  value={manualHost}
+                  onChangeText={(value) => {
+                    setManualHost(value);
+                    if (manualHostError) {
+                      setManualHostError(null);
+                    }
+                  }}
+                  placeholder="172.16.8.83"
+                  placeholderTextColor="#8aa9bc"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="decimal-pad"
+                  returnKeyType="done"
+                  onSubmitEditing={handleManualPair}
+                />
+                <TouchableOpacity
+                  style={styles.manualButton}
+                  activeOpacity={0.8}
+                  onPress={handleManualPair}
+                >
+                  <Text style={styles.manualButtonText}>{'继续'}</Text>
+                </TouchableOpacity>
+              </View>
+              {manualHostError ? (
+                <Text style={styles.manualErrorText}>{manualHostError}</Text>
+              ) : (
+                <Text style={styles.manualHint}>
+                  {'默认使用同步端口 39393，输入后仍需在下一步填写 6 位连接码。'}
+                </Text>
+              )}
+            </View>
           </View>
         </View>
       </View>
@@ -562,7 +642,11 @@ const styles = StyleSheet.create({
   },
   manualSection: {
     paddingHorizontal: 20,
-    paddingBottom: 24,
+  },
+  manualDock: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
   },
   manualTitle: {
     fontSize: 15,

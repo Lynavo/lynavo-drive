@@ -3,35 +3,21 @@
   "tasks": [
     {
       "label": "desktop: build contracts",
-      "type": "shell",
-      "command": "${env:LOCALAPPDATA}\\Programs\\nodejs\\corepack.cmd",
+      "type": "process",
+      "command": "corepack",
       "args": ["pnpm", "--filter", "@syncflow/contracts", "build"],
       "options": {
-        "cwd": "${workspaceFolder}",
-        "env": {
-          "PATH": "${env:LOCALAPPDATA}\\Programs\\nodejs;${env:PATH}"
-        },
-        "shell": {
-          "executable": "C:\\Windows\\System32\\cmd.exe",
-          "args": ["/d", "/c"]
-        }
+        "cwd": "${workspaceFolder}"
       },
       "problemMatcher": []
     },
     {
       "label": "desktop: build design tokens",
-      "type": "shell",
-      "command": "${env:LOCALAPPDATA}\\Programs\\nodejs\\corepack.cmd",
+      "type": "process",
+      "command": "corepack",
       "args": ["pnpm", "--filter", "@syncflow/design-tokens", "build"],
       "options": {
-        "cwd": "${workspaceFolder}",
-        "env": {
-          "PATH": "${env:LOCALAPPDATA}\\Programs\\nodejs;${env:PATH}"
-        },
-        "shell": {
-          "executable": "C:\\Windows\\System32\\cmd.exe",
-          "args": ["/d", "/c"]
-        }
+        "cwd": "${workspaceFolder}"
       },
       "problemMatcher": []
     },
@@ -43,18 +29,11 @@
     },
     {
       "label": "desktop: dev",
-      "type": "shell",
-      "command": "${env:LOCALAPPDATA}\\Programs\\nodejs\\corepack.cmd",
+      "type": "process",
+      "command": "corepack",
       "args": ["pnpm", "--filter", "@syncflow/desktop", "dev"],
       "options": {
-        "cwd": "${workspaceFolder}",
-        "env": {
-          "PATH": "${env:LOCALAPPDATA}\\Programs\\nodejs;${env:PATH}"
-        },
-        "shell": {
-          "executable": "C:\\Windows\\System32\\cmd.exe",
-          "args": ["/d", "/c"]
-        }
+        "cwd": "${workspaceFolder}"
       },
       "dependsOn": ["desktop: build shared packages"],
       "isBackground": true,
@@ -77,36 +56,22 @@
     },
     {
       "label": "desktop: package win",
-      "type": "shell",
-      "command": "${env:LOCALAPPDATA}\\Programs\\nodejs\\corepack.cmd",
+      "type": "process",
+      "command": "corepack",
       "args": ["pnpm", "--filter", "@syncflow/desktop", "package:win"],
       "options": {
-        "cwd": "${workspaceFolder}",
-        "env": {
-          "PATH": "${env:LOCALAPPDATA}\\Programs\\nodejs;${env:PATH}"
-        },
-        "shell": {
-          "executable": "C:\\Windows\\System32\\cmd.exe",
-          "args": ["/d", "/c"]
-        }
+        "cwd": "${workspaceFolder}"
       },
       "dependsOn": ["desktop: build shared packages"],
       "problemMatcher": []
     },
     {
       "label": "mobile: start metro",
-      "type": "shell",
-      "command": "${env:LOCALAPPDATA}\\Programs\\nodejs\\corepack.cmd",
+      "type": "process",
+      "command": "corepack",
       "args": ["pnpm", "--filter", "@syncflow/mobile", "start"],
       "options": {
-        "cwd": "${workspaceFolder}",
-        "env": {
-          "PATH": "${env:LOCALAPPDATA}\\Programs\\nodejs;${env:PATH}"
-        },
-        "shell": {
-          "executable": "C:\\Windows\\System32\\cmd.exe",
-          "args": ["/d", "/c"]
-        }
+        "cwd": "${workspaceFolder}"
       },
       "isBackground": true,
       "presentation": {

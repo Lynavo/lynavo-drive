@@ -75,6 +75,10 @@ class DiscoveryService {
         // Prefer infrastructure Wi-Fi / USB network paths for discovery so the
         // surfaced address matches the path used for actual transfer.
         params.includePeerToPeer = false
+        syncDiagnosticsLog(
+            "DiscoveryService",
+            "starting browser type=_syncflow._tcp domain=default includePeerToPeer=\(params.includePeerToPeer)"
+        )
         browser = NWBrowser(for: descriptor, using: params)
 
         browser?.browseResultsChangedHandler = { [weak self] results, _ in
@@ -93,7 +97,10 @@ class DiscoveryService {
     }
 
     func stopBrowsing() {
-        syncDiagnosticsLog("DiscoveryService", "stopBrowsing")
+        syncDiagnosticsLog(
+            "DiscoveryService",
+            "stopBrowsing activeDevices=\(devices.count) reachableDevices=\(reachableDevices.count) activeProbes=\(probeConnections.count)"
+        )
         browser?.cancel()
         browser = nil
         for connection in probeConnections.values {
@@ -107,8 +114,16 @@ class DiscoveryService {
 
     private func handleResults(_ results: Set<NWBrowser.Result>) {
         var updated: [String: DiscoveredDevice] = [:]
+        syncDiagnosticsLog(
+            "DiscoveryService",
+            "handleResults total=\(results.count)"
+        )
 
         for result in results {
+            syncDiagnosticsLog(
+                "DiscoveryService",
+                "handleResult endpoint=\(endpointDebugDescription(result.endpoint)) metadata=\(String(describing: result.metadata))"
+            )
             if case .service(let name, _, _, _) = result.endpoint {
                 var device: DiscoveredDevice?
 
@@ -194,8 +209,13 @@ class DiscoveryService {
             reachableDevices.removeValue(forKey: deviceID)
         }
         let removedReachableDevices = !staleReachableIDs.isEmpty
+        syncDiagnosticsLog(
+            "DiscoveryService",
+            "candidate_devices updated=\(updated.count) reachable=\(reachableDevices.count) staleReachable=\(staleReachableIDs.count) generation=\(generation)"
+        )
 
         if updated.isEmpty {
+            syncDiagnosticsLog("DiscoveryService", "candidate_devices empty, emitting 0 devices")
             delegate?.discoveryDidUpdate(devices: [])
             return
         }
@@ -215,6 +235,11 @@ class DiscoveryService {
             }
             return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
+        let summary = sorted.map { "\($0.name)/\($0.ip)/\($0.deviceId)/\($0.type)" }.joined(separator: ", ")
+        syncDiagnosticsLog(
+            "DiscoveryService",
+            "emitReachableDevices count=\(sorted.count) devices=\(summary.isEmpty ? "none" : summary)"
+        )
         delegate?.discoveryDidUpdate(devices: sorted)
     }
 

@@ -30,6 +30,7 @@ export function ShareAddressSection() {
   const effectiveShareName = shareStatusInfo.shareName || shareName || 'SyncFlow';
   const recommendedShareAddress = `\\\\${hostName || '电脑名'}\\${effectiveShareName}`;
   const effectiveShareAddress = shareAddress || recommendedShareAddress;
+  const hideWindowsManualShareStatus = isWindows && effectiveStatus === 'needs_manual_enable';
   const statusMeta = {
     validating: {
       label: '检测中',
@@ -86,6 +87,8 @@ export function ShareAddressSection() {
   const meta = statusMeta[effectiveStatus];
   const StatusIcon = meta.icon;
   const showWindowsQuickActions = isWindows && effectiveStatus !== 'ready';
+  const showRefreshButton = !isWindows;
+  const showStatusBadge = !hideWindowsManualShareStatus;
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -94,29 +97,39 @@ export function ShareAddressSection() {
           <label className="mb-1 block text-xs font-medium text-muted-foreground">
             共享地址（局域网）
           </label>
-          <div
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${meta.tone}`}
-          >
-            <StatusIcon className={`h-3.5 w-3.5 ${meta.iconClassName}`} />
-            {meta.label}
-          </div>
+          {showStatusBadge ? (
+            <div
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${meta.tone}`}
+            >
+              <StatusIcon className={`h-3.5 w-3.5 ${meta.iconClassName}`} />
+              {meta.label}
+            </div>
+          ) : null}
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => void refreshShareStatus(false)}
-          disabled={validatingShare}
-          className="shrink-0"
-        >
-          <RefreshCw className={`h-4 w-4 ${validatingShare ? 'animate-spin' : ''}`} />
-          重新检测
-        </Button>
+        {showRefreshButton ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void refreshShareStatus(false)}
+            disabled={validatingShare}
+            className="shrink-0"
+          >
+            <RefreshCw className={`h-4 w-4 ${validatingShare ? 'animate-spin' : ''}`} />
+            重新检测
+          </Button>
+        ) : null}
       </div>
 
       <p className="mb-3 text-sm text-muted-foreground">
         {meta.detail}
       </p>
+
+      {showWindowsQuickActions ? (
+        <p className="mb-3 text-xs text-muted-foreground">
+          配置方式请查看下面的“Windows 手动配置共享方法”。
+        </p>
+      ) : null}
 
       {showWindowsQuickActions ? (
         <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50/70 p-3">
