@@ -17,14 +17,27 @@ mac:
     - from: resources/syncflow-sidecar
       to: syncflow-sidecar
 win:
+  artifactName: ${productName}-Setup.${ext}
   target:
-    - zip
+    - target: nsis
+      arch:
+        - x64
+    - target: zip
+      arch:
+        - x64
+  executableName: SyncFlow
   extraResources:
     - from: resources
       filter:
         - syncflow-sidecar.exe
         - dns-sd.exe
         - dnssd.dll
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: SyncFlow
 directories:
   output: release
   buildResources: resources

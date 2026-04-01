@@ -27,7 +27,16 @@ if (syncResult.status && syncResult.status !== 0) {
 
 const child = spawn(
   'go',
-  ['build', '-o', outputPath, './cmd/syncflow-sidecar/'],
+  [
+    'build',
+    // Stripping DWARF avoids malformed PE debug sections that Windows rejects
+    // for sqlite-backed CGO binaries built on this toolchain.
+    '-ldflags',
+    '-s -w',
+    '-o',
+    outputPath,
+    './cmd/syncflow-sidecar/',
+  ],
   {
     cwd: sidecarRoot,
     env,

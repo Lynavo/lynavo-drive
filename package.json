@@ -1,7 +1,10 @@
 {
   "name": "syncflow",
   "private": true,
-  "engines": { "node": ">=20", "pnpm": ">=10" },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
   "packageManager": "pnpm@10.32.1",
   "scripts": {
     "build": "turbo run build",
@@ -13,6 +16,7 @@
     "dev:sidecar": "cd services/sidecar-go && make run",
     "build:sidecar": "cd services/sidecar-go && make build",
     "package:desktop": "pnpm build && pnpm --filter @syncflow/desktop package",
+    "package:desktop:win": "pnpm --filter @syncflow/desktop package:win",
     "package:desktop:signed": "pnpm --filter @syncflow/desktop package:signed",
     "package:desktop:signed:dir": "pnpm --filter @syncflow/desktop package:signed:dir",
     "package:mobile:testflight:archive": "pnpm --filter @syncflow/mobile archive:testflight",
