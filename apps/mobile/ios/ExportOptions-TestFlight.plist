@@ -4,14 +4,18 @@
 <dict>
   <key>method</key>
   <string>app-store-connect</string>
+  <key>teamID</key>
+  <string>V57RT7LMFH</string>
   <key>destination</key>
   <string>upload</string>
   <key>signingStyle</key>
   <string>automatic</string>
   <key>stripSwiftSymbols</key>
-  <true/>
+  <false/>
   <key>uploadSymbols</key>
-  <true/>
+  <false/>
+  <key>compileBitcode</key>
+  <false/>
   <key>manageAppVersionAndBuildNumber</key>
   <false/>
   <key>testFlightInternalTestingOnly</key>
