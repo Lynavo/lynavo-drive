@@ -91,7 +91,7 @@ function resolveBuildNumber(): string {
 
 export async function exportDiagnostics(sidecarManager: SidecarManager): Promise<string | null> {
   const timestamp = diagnosticsTimestamp();
-  const defaultPath = join(app.getPath('desktop'), `SyncFlow-Diagnostics-${timestamp}.zip`);
+  const defaultPath = join(app.getPath('desktop'), `小豹闪传-诊断包-${timestamp}.zip`);
   const dialogResult = await dialog.showSaveDialog({
     title: '导出诊断包',
     defaultPath,
@@ -102,7 +102,7 @@ export async function exportDiagnostics(sidecarManager: SidecarManager): Promise
   }
 
   const tempRoot = join(tmpdir(), `syncflow-diagnostics-${timestamp}`);
-  const bundleDir = join(tempRoot, `SyncFlow-Diagnostics-${timestamp}`);
+  const bundleDir = join(tempRoot, `小豹闪传-诊断包-${timestamp}`);
   const filesDir = join(bundleDir, 'files');
   const sidecarDataDir = app.getPath('userData');
   const sidecarDbPath = join(sidecarDataDir, 'sidecar.db');
@@ -137,7 +137,7 @@ export async function exportDiagnostics(sidecarManager: SidecarManager): Promise
   await writeFile(
     join(bundleDir, 'README.txt'),
     [
-      'SyncFlow 诊断包',
+      '小豹闪传 诊断包',
       '',
       '包含内容：',
       '- diagnostics.json：版本、运行时状态、dashboard、设置、共享状态',

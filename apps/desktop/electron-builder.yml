@@ -1,9 +1,10 @@
 appId: com.syncflow.desktop
-productName: SyncFlow
+productName: 小豹闪传
 mac:
   target:
     - dmg
     - zip
+    - mas
   category: public.app-category.utilities
   icon: resources/icon.icns
   sign: ./scripts/mac-sign.cjs
@@ -16,6 +17,13 @@ mac:
   extraResources:
     - from: resources/syncflow-sidecar
       to: syncflow-sidecar
+mas:
+  extendInfo:
+    ITSAppUsesNonExemptEncryption: false
+  entitlements: resources/entitlements.mas.plist
+  entitlementsInherit: resources/entitlements.mas.inherit.plist
+  provisioningProfile: resources/embedded.provisionprofile
+  notarize: null
 win:
   artifactName: ${productName}-Setup.${ext}
   target:

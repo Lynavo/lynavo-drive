@@ -57,11 +57,11 @@ func (c *Config) setDefaults() {
 func defaultDataDir() string {
 	configDir, err := os.UserConfigDir()
 	if err == nil && configDir != "" {
-		return filepath.Join(configDir, "SyncFlow")
+		return filepath.Join(configDir, "小豹闪传")
 	}
 
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "SyncFlow")
+	return filepath.Join(home, ".config", "小豹闪传")
 }
 
 func (c *Config) DBPath() string {

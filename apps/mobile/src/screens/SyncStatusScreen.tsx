@@ -793,7 +793,7 @@ export function SyncStatusScreen() {
       )
       : isConnectionError
       ? (
-        `未连接到“${boundDeviceName}”，请确认电脑端 SyncFlow 正在运行。`
+        `未连接到“${boundDeviceName}”，请确认电脑端 小豹闪传 正在运行。`
       )
       : isConnectingState
         ? `正在连接到“${boundDeviceName}”。`
@@ -819,7 +819,7 @@ export function SyncStatusScreen() {
                   )
               )
       : isConnectionError
-        ? '恢复网络或重新打开电脑端 SyncFlow 后会自动继续。'
+        ? '恢复网络或重新打开电脑端 小豹闪传 后会自动继续。'
         : isConnectingState
         ? '连接建立后会自动继续当前同步任务。'
         : null

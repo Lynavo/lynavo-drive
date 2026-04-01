@@ -27,7 +27,7 @@ export function ShareAddressSection() {
   const hostName = window.electronAPI?.platform.getHostName?.() ?? '';
 
   const effectiveStatus = validatingShare ? 'validating' : shareStatusInfo.status ?? shareStatus;
-  const effectiveShareName = shareStatusInfo.shareName || shareName || 'SyncFlow';
+  const effectiveShareName = shareStatusInfo.shareName || shareName || '小豹闪传';
   const recommendedShareAddress = `\\\\${hostName || '电脑名'}\\${effectiveShareName}`;
   const effectiveShareAddress = shareAddress || recommendedShareAddress;
 

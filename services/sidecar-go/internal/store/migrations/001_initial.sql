@@ -73,4 +73,4 @@ INSERT OR IGNORE INTO settings (key, value) VALUES ('connection_code', '000000')
 INSERT OR IGNORE INTO settings (key, value) VALUES ('device_id', lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))));
 INSERT OR IGNORE INTO settings (key, value) VALUES ('device_name', '');
 INSERT OR IGNORE INTO share_config (id, receive_root, share_name, share_url, share_status)
-  VALUES (1, '', 'SyncFlow', '', 'unknown');
+  VALUES (1, '', '小豹闪传', '', 'unknown');

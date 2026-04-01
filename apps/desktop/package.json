@@ -1,6 +1,6 @@
 {
   "name": "@syncflow/desktop",
-  "productName": "SyncFlow",
+  "productName": "小豹闪传",
   "version": "0.1.0",
   "private": true,
   "main": "./out/main/index.js",
@@ -12,6 +12,8 @@
     "package": "node ./scripts/run-workspace-pnpm.cjs build && pnpm build:sidecar && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg",
     "package:signed": "bash ./scripts/package-macos-signed.sh dmg",
     "package:signed:dir": "bash ./scripts/package-macos-signed.sh dir",
+    "package:mas": "bash ./scripts/package-macos-mas.sh",
+    "upload:testflight": "bash ./scripts/upload-macos-testflight.sh",
     "package:all": "node ./scripts/run-workspace-pnpm.cjs build && pnpm build:sidecar && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
     "package:win": "node ./scripts/run-workspace-pnpm.cjs build && node ./scripts/run-workspace-pnpm.cjs --filter @syncflow/desktop build:sidecar:win && node ./scripts/run-electron-builder.cjs --win nsis zip --x64",
     "preview": "node ./scripts/run-electron-vite.cjs preview",

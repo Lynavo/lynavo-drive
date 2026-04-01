@@ -12,7 +12,7 @@ export async function shareDiagnosticsArchive(): Promise<string> {
   const archiveUrl = archivePath.startsWith('file://') ? archivePath : `file://${archivePath}`;
 
   await Share.share({
-    title: 'SyncFlow 诊断包',
+    title: '小豹闪传 诊断包',
     url: archiveUrl,
   });
 

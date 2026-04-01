@@ -122,6 +122,20 @@ async function collectExecutableFiles(dir, files = []) {
 
 async function signTarget(opts, target, extraArgs = []) {
   const signOptions = opts.optionsForFile ? opts.optionsForFile(target) : {};
+
+  // For MAS: Ensure helpers and nested executables have at least the inherit entitlements (which includes sandbox)
+  if (!signOptions.entitlements && target !== opts.app) {
+    if (target.includes('LoginItems') && target.endsWith('.app')) {
+      signOptions.entitlements = path.join(__dirname, '..', 'resources', 'entitlements.mas.login-helper.plist');
+      console.log(`[Sign] Applied specialized LoginHelper entitlements for: ${path.relative(opts.app, target)}`);
+    } else {
+      const defaultInherit = path.join(__dirname, '..', 'resources', 'entitlements.mas.inherit.plist');
+      signOptions.entitlements = opts.entitlementsInherit || defaultInherit;
+      console.log(`[Sign] Applied fallback inherit entitlements for: ${path.relative(opts.app, target)}`);
+    }
+  }
+
+  console.log(`[Sign] ${path.relative(opts.app, target) || 'Main App'} with entitlements: ${signOptions.entitlements || 'NONE'}`);
   await runCodesign(opts.identity, target, signOptions, extraArgs);
 }
 
@@ -130,10 +144,34 @@ module.exports = async function sign(opts) {
     return;
   }
 
+  // For MAS: Ensure the provisioning profile is embedded in the bundle
+  if (opts.provisioningProfile) {
+    const dest = path.join(opts.app, 'Contents', 'embedded.provisionprofile');
+    try {
+      await fs.copyFile(opts.provisioningProfile, dest);
+      console.log(`[Sign] Embedded provisioning profile: ${opts.provisioningProfile} -> ${dest}`);
+    } catch (err) {
+      console.error(`[Sign] Failed to embed provisioning profile: ${err.message}`);
+    }
+  }
+
   const frameworksDir = path.join(opts.app, 'Contents', 'Frameworks');
-  const helperApps = await listImmediateChildren(frameworksDir, '.app');
+  const loginItemsDir = path.join(opts.app, 'Contents', 'Library', 'LoginItems');
+  const helpersDir = path.join(opts.app, 'Contents', 'Helpers');
+
+  const helperApps = [
+    ...(await listImmediateChildren(frameworksDir, '.app')),
+    ...(await listImmediateChildren(loginItemsDir, '.app')),
+    ...(await listImmediateChildren(helpersDir, '.app')),
+  ];
+
   const frameworks = await listImmediateChildren(frameworksDir, '.framework');
-  const nestedExecutables = await collectExecutableFiles(frameworksDir);
+
+  const nestedExecutables = [
+    ...(await collectExecutableFiles(frameworksDir)),
+    ...(await collectExecutableFiles(loginItemsDir)),
+    ...(await collectExecutableFiles(helpersDir)),
+  ];
 
   const binaries = Array.isArray(opts.binaries) ? opts.binaries : [];
   for (const binary of binaries) {

@@ -1,0 +1,146 @@
+
+> @syncflow/desktop@0.1.0 package:mas /Volumes/T7/Dev/Web/SyncFlow/apps/desktop
+> bash ./scripts/package-macos-mas.sh
+
+MAS Identity: Guangqiang Bi (V57RT7LMFH)
+Build number: 8
+Building sidecar...
+
+> @syncflow/desktop@0.1.0 build:sidecar /Volumes/T7/Dev/Web/SyncFlow/apps/desktop
+> cd ../../services/sidecar-go && go build -o ../../apps/desktop/resources/syncflow-sidecar ./cmd/syncflow-sidecar/
+
+Packaging for Mac App Store (MAS)...
+  • electron-builder  version=26.8.1 os=25.0.0
+  • loaded configuration  file=/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/electron-builder.yml
+  • description is missed in the package.json  appPackageFile=/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/package.json
+  • author is missed in the package.json  appPackageFile=/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/package.json
+  • packageManager not detected by file, falling back to environment detection  resolvedPackageManager=pnpm detected=/Volumes/T7/Dev/Web/SyncFlow/apps/desktop
+  • detected workspace root for project using packageManager field  pm=pnpm config=pnpm@10.32.1 resolved=/Volumes/T7/Dev/Web/SyncFlow projectDir=/Volumes/T7/Dev/Web/SyncFlow/apps/desktop
+  • executing @electron/rebuild  electronVersion=41.0.3 arch=arm64 buildFromSource=false workspaceRoot=/Volumes/T7/Dev/Web/SyncFlow projectDir=./ appDir=./
+  • installing native dependencies  arch=arm64
+  • completed installing native dependencies
+  • packaging       platform=mas arch=arm64 electron=41.0.3 appOutDir=release/mas-arm64
+  • searching for node modules  pm=pnpm searchDir=/Volumes/T7/Dev/Web/SyncFlow/apps/desktop
+  • signing additional user-defined binaries for arch  binaries=["/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Resources/syncflow-sidecar"] arch=arm64
+  • executing custom sign  file=release/mas-arm64/SyncFlow.app platform=darwin type=distribution identityName=Developer ID Application: Guangqiang Bi (V57RT7LMFH) identityHash=8354228558C274405CDAB033B1AEB8174CD8400B provisioningProfile=none
+  ⨯ Failed to codesign your application with code: 1
+
+--prepared:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/SyncFlow Helper (GPU).app
+--validated:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/SyncFlow Helper (GPU).app
+--prepared:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/SyncFlow Helper (Plugin).app
+--validated:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/SyncFlow Helper (Plugin).app
+--prepared:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/SyncFlow Helper (Renderer).app
+--prepared:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/SyncFlow Helper.app
+--validated:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/SyncFlow Helper (Renderer).app
+--prepared:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Library/LoginItems/SyncFlow Login Helper.app
+--validated:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/SyncFlow Helper.app
+--prepared:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
+--validated:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
+SyncFlow.app: code has no resources but signature indicates they must be present
+In subcomponent: /Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Library/LoginItems/SyncFlow Login Helper.app
+
+
+Executable=/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/MacOS/SyncFlow
+Identifier=com.syncflow.mobile
+Format=app bundle with Mach-O thin (arm64)
+CodeDirectory v=20500 size=447 flags=0x10000(runtime) hashes=3+7 location=embedded
+VersionPlatform=1
+VersionMin=786432
+VersionSDK=1704448
+Hash type=sha256 size=32
+CandidateCDHash sha256=74d1ffda73691997b809fb06d47b654aa24f28b6
+CandidateCDHashFull sha256=74d1ffda73691997b809fb06d47b654aa24f28b671ba693164546f49bc44e934
+Hash choices=sha256
+CMSDigest=74d1ffda73691997b809fb06d47b654aa24f28b671ba693164546f49bc44e934
+CMSDigestType=2
+Executable Segment base=0
+Executable Segment limit=16384
+Executable Segment flags=0x1
+Page size=16384
+    -7=e1364fc190a8f645d058bb544e1f086d69cc44bd1b89219e4210259a59b2cefa
+    -6=0000000000000000000000000000000000000000000000000000000000000000
+    -5=e004ba424b0558d217ba2f2576bcffca48c33b0ac8d09ba156ecd4f25bdbeb2b
+    -4=0000000000000000000000000000000000000000000000000000000000000000
+    -3=5dabaf5909e35e614e1ba4ca6c060365af6b344b90368bcfa3917fcc9923a067
+    -2=50540ad67435bf25739f9f52e902d17a381a82d733d9e5016d7871fc7091d87a
+CDHash=74d1ffda73691997b809fb06d47b654aa24f28b6
+Signature size=8977
+Authority=Developer ID Application: Guangqiang Bi (V57RT7LMFH)
+Authority=Developer ID Certification Authority
+Authority=Apple Root CA
+Timestamp=Apr 1, 2026 at 1:54:19 PM
+Info.plist entries=32
+TeamIdentifier=V57RT7LMFH
+Runtime Version=26.2.0
+Sealed Resources version=2 rules=13 files=9
+Nested=Frameworks/SyncFlow Helper (Renderer).app
+Nested=Library/LoginItems/SyncFlow Login Helper.app
+Nested=Frameworks/Electron Framework.framework
+Nested=Frameworks/SyncFlow Helper (Plugin).app
+Nested=Frameworks/SyncFlow Helper (GPU).app
+Nested=Frameworks/SyncFlow Helper.app
+Internal requirements count=1 size=180
+  failedTask=build stackTrace=Error: Failed to codesign your application with code: 1
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       --prepared:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/SyncFlow Helper (GPU).app
+--validated:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/SyncFlow Helper (GPU).app
+--prepared:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/SyncFlow Helper (Plugin).app
+--validated:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/SyncFlow Helper (Plugin).app
+--prepared:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/SyncFlow Helper (Renderer).app
+--prepared:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/SyncFlow Helper.app
+--validated:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/SyncFlow Helper (Renderer).app
+--prepared:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Library/LoginItems/SyncFlow Login Helper.app
+--validated:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/SyncFlow Helper.app
+--prepared:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
+--validated:/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
+SyncFlow.app: code has no resources but signature indicates they must be present
+In subcomponent: /Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/Library/LoginItems/SyncFlow Login Helper.app
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       Executable=/Volumes/T7/Dev/Web/SyncFlow/apps/desktop/release/mas-arm64/SyncFlow.app/Contents/MacOS/SyncFlow
+Identifier=com.syncflow.mobile
+Format=app bundle with Mach-O thin (arm64)
+CodeDirectory v=20500 size=447 flags=0x10000(runtime) hashes=3+7 location=embedded
+VersionPlatform=1
+VersionMin=786432
+VersionSDK=1704448
+Hash type=sha256 size=32
+CandidateCDHash sha256=74d1ffda73691997b809fb06d47b654aa24f28b6
+CandidateCDHashFull sha256=74d1ffda73691997b809fb06d47b654aa24f28b671ba693164546f49bc44e934
+Hash choices=sha256
+CMSDigest=74d1ffda73691997b809fb06d47b654aa24f28b671ba693164546f49bc44e934
+CMSDigestType=2
+Executable Segment base=0
+Executable Segment limit=16384
+Executable Segment flags=0x1
+Page size=16384
+    -7=e1364fc190a8f645d058bb544e1f086d69cc44bd1b89219e4210259a59b2cefa
+    -6=0000000000000000000000000000000000000000000000000000000000000000
+    -5=e004ba424b0558d217ba2f2576bcffca48c33b0ac8d09ba156ecd4f25bdbeb2b
+    -4=0000000000000000000000000000000000000000000000000000000000000000
+    -3=5dabaf5909e35e614e1ba4ca6c060365af6b344b90368bcfa3917fcc9923a067
+    -2=50540ad67435bf25739f9f52e902d17a381a82d733d9e5016d7871fc7091d87a
+CDHash=74d1ffda73691997b809fb06d47b654aa24f28b6
+Signature size=8977
+Authority=Developer ID Application: Guangqiang Bi (V57RT7LMFH)
+Authority=Developer ID Certification Authority
+Authority=Apple Root CA
+Timestamp=Apr 1, 2026 at 1:54:19 PM
+Info.plist entries=32
+TeamIdentifier=V57RT7LMFH
+Runtime Version=26.2.0
+Sealed Resources version=2 rules=13 files=9
+Nested=Frameworks/SyncFlow Helper (Renderer).app
+Nested=Library/LoginItems/SyncFlow Login Helper.app
+Nested=Frameworks/Electron Framework.framework
+Nested=Frameworks/SyncFlow Helper (Plugin).app
+Nested=Frameworks/SyncFlow Helper (GPU).app
+Nested=Frameworks/SyncFlow Helper.app
+Internal requirements count=1 size=180
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           at /Volumes/T7/Dev/Web/SyncFlow/node_modules/.pnpm/@electron+notarize@2.5.0/node_modules/@electron/notarize/src/check-signature.ts:46:11
+    at Generator.next (<anonymous>)
+    at fulfilled (/Volumes/T7/Dev/Web/SyncFlow/node_modules/.pnpm/@electron+notarize@2.5.0/node_modules/@electron/notarize/lib/check-signature.js:28:58)
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+undefined
+/Volumes/T7/Dev/Web/SyncFlow/apps/desktop:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: electron-builder --mac mas -c.buildVersion=8 -c.extraMetadata.syncflowBuildNumber=8 -c.mac.identity=Guangqiang Bi (V57RT7LMFH)
+/Volumes/T7/Dev/Web/SyncFlow/apps/desktop:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @syncflow/desktop@0.1.0 package:mas: `bash ./scripts/package-macos-mas.sh`
+Exit status 1

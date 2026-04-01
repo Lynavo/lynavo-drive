@@ -35,7 +35,7 @@ function formatAppVersionLabel(appInfo?: Record<string, unknown>): string {
 
   const appName = typeof appInfo?.appName === 'string' && appInfo.appName
     ? appInfo.appName
-    : 'SyncFlow';
+    : '小豹闪传';
   const build = typeof appInfo?.build === 'string' && appInfo.build
     ? appInfo.build
     : '0';

@@ -64,7 +64,7 @@ export function BonjourRuntimeSection() {
             </div>
             <p className="text-xs text-muted-foreground">
               {runtime.bonjour.message ??
-                'SyncFlow 会在 Windows 上优先使用 Bonjour for Windows，让 iPhone 扫描更稳定。'}
+                '小豹闪传 会在 Windows 上优先使用 Bonjour for Windows，让 iPhone 扫描更稳定。'}
             </p>
           </div>
 

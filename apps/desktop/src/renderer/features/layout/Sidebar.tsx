@@ -38,12 +38,12 @@ export function Sidebar() {
       >
         <img
           src={syncflowLogo}
-          alt="SyncFlow"
+          alt="小豹闪传"
           draggable={false}
           className="h-9 w-9 object-contain"
         />
         <span className="text-base font-bold" style={{ color: '#1a2a3a' }}>
-          SyncFlow
+          小豹闪传
         </span>
       </div>
 
