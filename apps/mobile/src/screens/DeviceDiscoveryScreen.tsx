@@ -15,6 +15,9 @@ import {
   Keyboard,
   LayoutChangeEvent,
   Platform,
+  Modal,
+  Pressable,
+  KeyboardAvoidingView,
 } from 'react-native';
 import {
   SafeAreaView,
@@ -138,6 +141,10 @@ export function DeviceDiscoveryScreen() {
   const [manualHostError, setManualHostError] = useState<string | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [manualSectionHeight, setManualSectionHeight] = useState(0);
+
+  // Popover & Modal state
+  const [showPairingMenu, setShowPairingMenu] = useState(false);
+  const [showManualModal, setShowManualModal] = useState(false);
 
   // ---------------------------------------------------------------------------
   // Native module discovery
@@ -291,6 +298,7 @@ export function DeviceDiscoveryScreen() {
       `${manualDevice.name}/${manualDevice.ip}/${manualDevice.deviceId}/${manualDevice.type}`,
     );
     setManualHostError(null);
+    setShowManualModal(false);
     handleDevicePress(manualDevice);
   }, [handleDevicePress, manualHost]);
 
@@ -350,13 +358,11 @@ export function DeviceDiscoveryScreen() {
             <TouchableOpacity
               style={styles.scanButton}
               activeOpacity={0.8}
-              onPress={() => {
-                navigation.navigate('QRScanner');
-              }}
+              onPress={() => setShowPairingMenu(true)}
             >
-              <Icon name="scan-outline" size={16} color="#3b9fd8" />
+              <Icon name="settings-outline" size={16} color="#3b9fd8" />
               <Text style={styles.scanButtonText}>
-                扫码配对
+                手动配对
               </Text>
             </TouchableOpacity>
           </View>
@@ -411,7 +417,7 @@ export function DeviceDiscoveryScreen() {
           ]}
           onLayout={handleManualSectionLayout}
         >
-          {/* Fixed Rescan button above manual entry */}
+          {/* Fixed Rescan button */}
           {!scanning && (
             <View style={styles.manualSection}>
               <TouchableOpacity
@@ -428,56 +434,117 @@ export function DeviceDiscoveryScreen() {
               </TouchableOpacity>
             </View>
           )}
-
-          <View style={styles.manualSection}>
-            <View style={styles.manualCard}>
-              <Text style={styles.manualTitle}>{'手动输入 IP 配对'}</Text>
-              <Text style={styles.manualDescription}>
-                {
-                  '如果扫描不到电脑，尤其是 Windows 设备，可直接输入电脑端 IPv4 地址继续配对。'
-                }
-              </Text>
-              <View style={styles.manualInputRow}>
-                <TextInput
-                  style={[
-                    styles.manualInput,
-                    manualHostError && styles.manualInputError,
-                  ]}
-                  value={manualHost}
-                  onChangeText={value => {
-                    setManualHost(value);
-                    if (manualHostError) {
-                      setManualHostError(null);
-                    }
-                  }}
-                  placeholder="192.168.0.1"
-                  placeholderTextColor="#8aa9bc"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="decimal-pad"
-                  returnKeyType="done"
-                  onSubmitEditing={handleManualPair}
-                />
-                <TouchableOpacity
-                  style={styles.manualButton}
-                  activeOpacity={0.8}
-                  onPress={handleManualPair}
-                >
-                  <Text style={styles.manualButtonText}>{'继续'}</Text>
-                </TouchableOpacity>
-              </View>
-              {manualHostError ? (
-                <Text style={styles.manualErrorText}>{manualHostError}</Text>
-              ) : (
-                <Text style={styles.manualHint}>
-                  {
-                    '默认使用同步端口 39393，输入后仍需在下一步填写 6 位连接码。'
-                  }
-                </Text>
-              )}
-            </View>
-          </View>
         </View>
+
+        {/* Pairing Menu Popover */}
+        <Modal
+          visible={showPairingMenu}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowPairingMenu(false)}
+        >
+          <Pressable
+            style={styles.popoverOverlay}
+            onPress={() => setShowPairingMenu(false)}
+          >
+            <View style={[styles.popoverMenu, { top: insets.top + 60 }]}>
+              <TouchableOpacity
+                style={styles.popoverItem}
+                onPress={() => {
+                  setShowPairingMenu(false);
+                  setShowManualModal(true);
+                }}
+              >
+                <Icon name="create-outline" size={20} color="#3b9fd8" />
+                <Text style={styles.popoverText}>手动输入 IP</Text>
+              </TouchableOpacity>
+              <View style={styles.popoverDivider} />
+              <TouchableOpacity
+                style={styles.popoverItem}
+                onPress={() => {
+                  setShowPairingMenu(false);
+                  navigation.navigate('QRScanner');
+                }}
+              >
+                <Icon name="scan-outline" size={20} color="#3b9fd8" />
+                <Text style={styles.popoverText}>扫码配对</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Modal>
+
+        {/* Manual Input Modal */}
+        <Modal
+          visible={showManualModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowManualModal(false)}
+        >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setShowManualModal(false)}
+          >
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.modalContent}
+            >
+              <Pressable onPress={() => {}}>
+                <View style={styles.manualCard}>
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.manualTitle}>{'手动输入 IP 配对'}</Text>
+                    <TouchableOpacity onPress={() => setShowManualModal(false)}>
+                      <Icon name="close" size={22} color="#8aa9bc" />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.manualDescription}>
+                    {
+                      '如果扫描不到电脑，尤其是 Windows 设备，可直接输入电脑端 IPv4 地址继续配对。'
+                    }
+                  </Text>
+                  <View style={styles.manualInputRow}>
+                    <TextInput
+                      style={[
+                        styles.manualInput,
+                        manualHostError && styles.manualInputError,
+                      ]}
+                      value={manualHost}
+                      onChangeText={value => {
+                        setManualHost(value);
+                        if (manualHostError) {
+                          setManualHostError(null);
+                        }
+                      }}
+                      placeholder="192.168.0.1"
+                      placeholderTextColor="#8aa9bc"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="decimal-pad"
+                      returnKeyType="done"
+                      autoFocus
+                      onSubmitEditing={handleManualPair}
+                    />
+                    <TouchableOpacity
+                      style={styles.manualButton}
+                      activeOpacity={0.8}
+                      onPress={handleManualPair}
+                    >
+                      <Text style={styles.manualButtonText}>{'继续'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {manualHostError ? (
+                    <Text style={styles.manualErrorText}>{manualHostError}</Text>
+                  ) : (
+                    <Text style={styles.manualHint}>
+                      {
+                        '默认使用同步端口 39393，输入后仍需在下一步填写 6 位连接码。'
+                      }
+                    </Text>
+                  )}
+                </View>
+              </Pressable>
+            </KeyboardAvoidingView>
+          </Pressable>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -495,8 +562,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: undefined,
-    // Approximate linear gradient with layered background:
-    // top #c4e4f5 -> bottom #f2f8fd via the safeArea + container split
   },
   header: {
     paddingTop: 24,
@@ -544,9 +609,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 2,
-  },
-  scanButtonDisabled: {
-    opacity: 0.6,
   },
   scanButtonText: {
     fontSize: 13,
@@ -609,7 +671,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.9)',
-    // Shadow
     shadowColor: 'rgba(80,160,210,0.3)',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -623,7 +684,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    // Approximate gradient: #4db8ea -> #2e8fcc
     backgroundColor: '#3ba4dc',
     shadowColor: 'rgba(59,159,216,0.5)',
     shadowOffset: { width: 0, height: 3 },
@@ -666,23 +726,75 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.7)',
   },
-
   rescanText: {
     fontSize: 14,
     fontWeight: '500',
     color: '#5a9abf',
   },
-  manualCard: {
-    padding: 16,
-    borderRadius: 18,
-    backgroundColor: '#ffffff',
+
+  // Popover Styles
+  popoverOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+  },
+  popoverMenu: {
+    position: 'absolute',
+    right: 20,
+    width: 160,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingVertical: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.9)',
-    shadowColor: 'rgba(80,160,210,0.25)',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 2,
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  popoverItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  popoverText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.screenTitle,
+  },
+  popoverDivider: {
+    height: 1,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    marginHorizontal: 8,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  modalContent: {
+    width: '100%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  manualCard: {
+    padding: 20,
+    borderRadius: 24,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
   },
   manualSection: {
     paddingHorizontal: 20,
@@ -693,12 +805,12 @@ const styles = StyleSheet.create({
     right: 0,
   },
   manualTitle: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '700',
     color: colors.screenTitle,
   },
   manualDescription: {
-    marginTop: 6,
+    marginTop: 8,
     fontSize: 13,
     lineHeight: 19,
     color: '#6a96b8',
@@ -707,43 +819,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginTop: 14,
+    marginTop: 18,
   },
   manualInput: {
     flex: 1,
-    minHeight: 48,
-    paddingHorizontal: 14,
-    borderRadius: 14,
+    minHeight: 52,
+    paddingHorizontal: 16,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.85)',
-    backgroundColor: 'rgba(242,248,253,0.88)',
+    borderColor: '#e1eef5',
+    backgroundColor: '#f8fbfe',
     color: colors.screenTitle,
-    fontSize: 15,
+    fontSize: 16,
   },
   manualInputError: {
     borderColor: '#db6b6b',
   },
   manualButton: {
-    minHeight: 48,
-    paddingHorizontal: 18,
-    borderRadius: 14,
+    minHeight: 52,
+    paddingHorizontal: 20,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#3b9fd8',
   },
   manualButtonText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     color: '#fff',
   },
   manualHint: {
-    marginTop: 10,
+    marginTop: 12,
     fontSize: 12,
     lineHeight: 18,
     color: '#8aabbd',
   },
   manualErrorText: {
-    marginTop: 10,
+    marginTop: 12,
     fontSize: 12,
     lineHeight: 18,
     color: '#db6b6b',
