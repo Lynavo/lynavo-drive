@@ -144,7 +144,9 @@ export class SidecarManager extends EventEmitter {
         status: 'healthy',
         message: null,
         lastExitCode: null,
-        bonjour,
+        // Keep advertisedIP if it was already populated (e.g. from a previous
+        // session where the sidecar stdout was captured).
+        bonjour: { ...bonjour, advertisedIP: this.state.bonjour.advertisedIP },
       });
       log.info('[SidecarManager] reusing existing healthy sidecar');
       return;
@@ -245,7 +247,10 @@ export class SidecarManager extends EventEmitter {
         status: 'healthy',
         message: null,
         lastExitCode: null,
-        bonjour,
+        // Preserve advertisedIP that may have been parsed from stdout during
+        // waitForHealth — the `bonjour` snapshot captured before spawn still
+        // has advertisedIP: null, so we must not overwrite the live value.
+        bonjour: { ...bonjour, advertisedIP: this.state.bonjour.advertisedIP },
       });
       log.info('[SidecarManager] sidecar is healthy');
     } catch (err) {
