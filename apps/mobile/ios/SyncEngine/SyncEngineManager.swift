@@ -826,11 +826,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     }
 
     private func pushClientMetadataUpdateIfPossible() {
-        guard let binding = uploadStore?.getBinding(),
-              let token = bindingService.getPairingToken()
-        else {
-            return
-        }
+        guard let binding = uploadStore?.getBinding() else { return }
+        let token = resolvedPairingToken(for: binding)
+        guard let token else { return }
 
         let discoveredDevice = discoveredDevices[binding.deviceId]
 
@@ -1153,7 +1151,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         guard let binding = uploadStore?.getBinding() else {
             throw SyncEngineError.pairingError("No binding found — pair first")
         }
-        guard let token = bindingService.getPairingToken() else {
+        guard let token = resolvedPairingToken(for: binding) else {
             NSLog("[SyncPipeline] pairing token missing — clearing stale binding, need re-pair")
             syncDiagnosticsLog("SyncPipeline", "pairing token missing — clearing stale binding")
             try? uploadStore?.clearBinding()
@@ -2203,6 +2201,25 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     // MARK: - Pairing (LMUP/2 handshake — spec Section 7.2)
 
+    /// Returns the Keychain key under which the pairing token for a given server
+    /// should be stored. Using a per-server key prevents pairing with a second
+    /// device from overwriting the first device's token.
+    private func pairingTokenKeychainKey(for serverId: String) -> String {
+        return "syncflow_pairing_token_\(serverId)"
+    }
+
+    /// Retrieves the pairing token for the given binding, falling back to the
+    /// legacy single-key entry for bindings created before per-device storage.
+    private func resolvedPairingToken(for binding: BindingRecord) -> String? {
+        let token = bindingService.getPairingToken(forKey: binding.pairingTokenKeychainRef)
+        if token != nil { return token }
+        // Fallback: old binding used the global key — try it once for migration.
+        if binding.pairingTokenKeychainRef != BindingService.legacyPairingTokenKey {
+            return bindingService.getPairingToken(forKey: BindingService.legacyPairingTokenKey)
+        }
+        return nil
+    }
+
     func pairDevice(deviceId: String, host: String, port: Int, connectionCode: String) async throws {
         NSLog("[SyncEngine] pairDevice: deviceId=\(deviceId) host=\(host) port=\(port)")
 
@@ -2249,10 +2266,21 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         guard authRequired else {
             // Already bound on server — ensure we have a local binding record too
             NSLog("[SyncEngine] already bound on server, ensuring local binding exists")
-            if uploadStore?.getBinding() == nil {
-                // Recreate binding from HELLO_RES info
+            let serverId = helloRes["serverId"] as? String ?? deviceId
+            if let existingBinding = uploadStore?.getBinding() {
+                if existingBinding.deviceId != serverId {
+                    // Switching to a different device — reset queue so it receives all photos.
+                    NSLog(
+                        "[SyncEngine] device switch detected (authRequired=false): %@ → %@, resetting upload queue",
+                        existingBinding.deviceId, serverId
+                    )
+                    try? uploadStore?.resetUploadQueue()
+                    didAttemptRemoteHistoryReconciliation = false
+                }
+            } else {
+                // No local binding — recreate from HELLO_RES info
                 let serverName = helloRes["serverName"] as? String ?? ""
-                let serverId = helloRes["serverId"] as? String ?? deviceId
+                let keychainKey = pairingTokenKeychainKey(for: serverId)
                 let binding = BindingRecord(
                     deviceId: serverId,
                     deviceName: serverName,
@@ -2261,7 +2289,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     host: host,
                     port: port,
                     pairingId: "",
-                    pairingTokenKeychainRef: "syncflow_pairing_token",
+                    pairingTokenKeychainRef: keychainKey,
                     shareName: helloRes["serverCapabilities"].flatMap { ($0 as? [String: Any])?["shareName"] as? String },
                     lastBoundAt: ISO8601DateFormatter().string(from: Date())
                 )
@@ -2301,22 +2329,37 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             throw SyncEngineError.pairingError("Pairing rejected: \(errMsg)")
         }
 
-        // 4. Persist pairing token in Keychain
+        // 4. Persist pairing token in Keychain — keyed per server so that pairing
+        //    with a second device doesn't overwrite the first device's token.
+        let serverInfo = pairRes["serverInfo"] as? [String: Any] ?? [:]
+        let serverId = serverInfo["serverId"] as? String ?? deviceId
+        let keychainKey = pairingTokenKeychainKey(for: serverId)
         if let token = pairRes["pairingToken"] as? String {
-            bindingService.savePairingToken(token)
+            bindingService.savePairingToken(token, forKey: keychainKey)
         }
 
-        // 5. Persist binding record in SQLite
-        let serverInfo = pairRes["serverInfo"] as? [String: Any] ?? [:]
+        // 5. Persist binding record in SQLite.
+        //    If the user is switching to a DIFFERENT desktop device, reset the upload
+        //    queue so the new device starts from scratch and receives all photos.
+        //    daily_ledgers are kept so historical stats for the previous device are preserved.
+        if let existingBinding = uploadStore?.getBinding(), existingBinding.deviceId != serverId {
+            NSLog(
+                "[SyncEngine] device switch detected: %@ → %@, resetting upload queue",
+                existingBinding.deviceId, serverId
+            )
+            try? uploadStore?.resetUploadQueue()
+            didAttemptRemoteHistoryReconciliation = false
+        }
+
         let binding = BindingRecord(
-            deviceId: serverInfo["serverId"] as? String ?? deviceId,
+            deviceId: serverId,
             deviceName: serverInfo["serverName"] as? String ?? "",
             deviceAlias: nil,
             deviceType: inferredBindingDeviceType(for: deviceId),
             host: host,
             port: port,
             pairingId: pairRes["pairingId"] as? String ?? "",
-            pairingTokenKeychainRef: "syncflow_pairing_token",
+            pairingTokenKeychainRef: keychainKey,
             shareName: serverInfo["shareName"] as? String,
             lastBoundAt: ISO8601DateFormatter().string(from: Date())
         )
@@ -2338,7 +2381,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     func disconnectAndUnbind() async throws {
         NSLog("[SyncEngine] disconnectAndUnbind")
-        bindingService.clearPairingToken()
+        // Clear the token stored under the binding's per-device key (and the legacy
+        // global key for bindings created before per-device storage was introduced).
+        if let binding = uploadStore?.getBinding() {
+            bindingService.clearPairingToken(forKey: binding.pairingTokenKeychainRef)
+        }
+        bindingService.clearPairingToken()  // also wipe any legacy single-key token
         try uploadStore?.clearBinding()
         bindingConnectionState = .offline
         sidecarHost = nil
@@ -2496,7 +2544,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let clientPayload: [String: Any] = [
             "clientId": bindingService.getOrCreateClientId(),
             "displayName": getClientDisplayName(),
-            "hasPairingToken": bindingService.getPairingToken() != nil,
+            "hasPairingToken": {
+                if let b = uploadStore?.getBinding() {
+                    return resolvedPairingToken(for: b) != nil
+                }
+                return bindingService.getPairingToken() != nil
+            }(),
             "preferredIPv4": syncFlowPreferredClientIPv4() ?? NSNull(),
         ]
 

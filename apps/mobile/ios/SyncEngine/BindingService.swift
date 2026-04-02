@@ -7,6 +7,10 @@ class BindingService {
     private static let pairingTokenKey = "syncflow_pairing_token"
     private static let clientDisplayNameKey = "syncflow_client_display_name"
 
+    /// The single-key name used before per-device token storage was introduced.
+    /// Exposed so callers can detect and fall back to legacy tokens.
+    static let legacyPairingTokenKey = pairingTokenKey
+
     // MARK: - Client ID (generated once, persisted in Keychain)
 
     func getOrCreateClientId() -> String {
@@ -19,6 +23,23 @@ class BindingService {
     }
 
     // MARK: - Pairing Token
+
+    /// Save the pairing token under the given Keychain key (per-device storage).
+    func savePairingToken(_ token: String, forKey key: String) {
+        writeKeychain(key: key, value: token)
+    }
+
+    /// Retrieve the pairing token stored under the given Keychain key.
+    func getPairingToken(forKey key: String) -> String? {
+        return readKeychain(key: key)
+    }
+
+    /// Delete the pairing token stored under the given Keychain key.
+    func clearPairingToken(forKey key: String) {
+        deleteKeychain(key: key)
+    }
+
+    // MARK: - Legacy single-key helpers (kept for migration / diagnostics)
 
     func savePairingToken(_ token: String) {
         writeKeychain(key: Self.pairingTokenKey, value: token)

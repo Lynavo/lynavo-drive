@@ -698,7 +698,7 @@ const styles = StyleSheet.create({
   manualCard: {
     padding: 16,
     borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.72)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.9)',
     shadowColor: 'rgba(80,160,210,0.25)',

@@ -240,6 +240,15 @@ class UploadStore {
         }
     }
 
+    /// Clears the upload queue and in-progress sessions, but keeps daily_ledgers
+    /// so historical stats are not lost. Use when switching to a different desktop device.
+    func resetUploadQueue() throws {
+        try queue.sync {
+            try executeInternal("DELETE FROM upload_items")
+            try executeInternal("DELETE FROM sync_sessions")
+        }
+    }
+
     // MARK: - Upload Items CRUD
 
     func upsertUploadItem(_ item: UploadItemRecord) throws {
