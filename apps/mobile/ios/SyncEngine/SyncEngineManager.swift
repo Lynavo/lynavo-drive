@@ -1397,12 +1397,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             }
         }
 
-        // Find target device
+        // Find target device — only match by the binding's deviceId; do NOT fall back to
+        // an arbitrary mDNS device so we never upload to the wrong machine.
         func findDevice() -> DiscoveredDevice? {
-            if let exact = discoveredDevices[binding.deviceId] {
-                return exact
-            }
-            return discoveredDevices.values.first
+            return discoveredDevices[binding.deviceId]
         }
 
         var targetDevice = findDevice()
@@ -2294,9 +2292,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     lastBoundAt: ISO8601DateFormatter().string(from: Date())
                 )
                 try? uploadStore?.saveBinding(binding)
-                // Cache endpoint under binding deviceId so startSync finds it immediately
-                if let cachedDevice = discoveredDevices.values.first(where: { $0.endpoint != nil }) {
-                    discoveredDevices[serverId] = cachedDevice
+                // Re-index Bonjour entry under the server UUID (only if originally found via Bonjour).
+                if let bonjourDevice = discoveredDevices[deviceId] {
+                    discoveredDevices[serverId] = bonjourDevice
                 }
                 NSLog("[SyncEngine] recreated local binding for \(serverId)")
             }
@@ -2365,10 +2363,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         )
         try uploadStore?.saveBinding(binding)
 
-        // Cache endpoint under binding deviceId so startSync finds it immediately
+        // Re-index the Bonjour-discovered entry under the server's own UUID so that
+        // resolveSidecarHost can look it up by binding.deviceId in later rounds.
+        // Only do this when the device was found via Bonjour (discoveredDevices[deviceId]
+        // exists); for manually-entered IPs the entry won't exist and binding.host is used
+        // as the fallback — copying an arbitrary discovered device here would be wrong.
         let bindingDeviceId = serverInfo["serverId"] as? String ?? deviceId
-        if let cachedDevice = discoveredDevices.values.first(where: { $0.endpoint != nil }) {
-            discoveredDevices[bindingDeviceId] = cachedDevice
+        if let bonjourDevice = discoveredDevices[deviceId] {
+            discoveredDevices[bindingDeviceId] = bonjourDevice
         }
 
         // 6. Notify RN bridge
@@ -2642,8 +2644,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
 
         func findDevice() -> DiscoveredDevice? {
-            if let exact = discoveredDevices[binding.deviceId], exact.endpoint != nil { return exact }
-            return discoveredDevices.values.first(where: { $0.endpoint != nil })
+            // Only return the device that matches the current binding exactly.
+            // Do NOT fall back to any arbitrary mDNS-discovered device — if the
+            // bound device isn't in the Bonjour map (e.g. it was paired manually),
+            // connectSession will use binding.host as the fallback instead.
+            return discoveredDevices[binding.deviceId]
         }
 
         var targetDevice = findDevice()
