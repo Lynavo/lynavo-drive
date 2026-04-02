@@ -712,6 +712,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     // MARK: - Sync Pipeline (spec Section 7.3)
 
     private var isSyncing = false
+    private var isPairing = false
+
 
     private func bindingStatePayload(
         binding overrideBinding: BindingRecord? = nil,
@@ -2221,9 +2223,19 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     func pairDevice(deviceId: String, host: String, port: Int, connectionCode: String) async throws {
         NSLog("[SyncEngine] pairDevice: deviceId=\(deviceId) host=\(host) port=\(port)")
 
+        // Guard against concurrent pairing calls (e.g. QR scanner firing onCodeScanned
+        // many times before the stale-closure guard takes effect). Only one pairing
+        // attempt is allowed at a time.
+        guard !isPairing else {
+            NSLog("[SyncEngine] pairDevice: already pairing — ignoring concurrent call")
+            return
+        }
+        isPairing = true
+
         let session = ProtocolSession(transport: transport)
         protocolSession = session
         defer {
+            isPairing = false
             if protocolSession === session {
                 protocolSession = nil
             }

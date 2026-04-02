@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Alert } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
 import type { Code } from 'react-native-vision-camera';
 import { useNavigation } from '@react-navigation/native';
@@ -12,7 +12,9 @@ export function QRScannerScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const [hasPermission, setHasPermission] = useState(false);
   const device = useCameraDevice('back');
-  const [scanned, setScanned] = useState(false);
+  // Use a ref instead of state so that the onCodeScanned callback (fired on a
+  // native thread) always reads the latest value rather than a stale closure.
+  const scannedRef = useRef(false);
 
   useEffect(() => {
     (async () => {
@@ -24,7 +26,7 @@ export function QRScannerScreen() {
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
     onCodeScanned: (codes: Code[]) => {
-      if (scanned) return;
+      if (scannedRef.current) return;
       if (codes.length > 0) {
         const value = codes[0].value;
         if (value) {
@@ -44,9 +46,9 @@ export function QRScannerScreen() {
             }
           } catch {
             // Fallback to URI match (e.g. syncflow://pair?ip=...&code=...)
-            const ipMatch = value.match(/ip=([^&"}]+)/);
-            const codeMatch = value.match(/code=([^&"}]+)/);
-            const nameMatch = value.match(/name=([^&"}]+)/);
+            const ipMatch = value.match(/ip=([^&"]+)/);
+            const codeMatch = value.match(/code=([^&"]+)/);
+            const nameMatch = value.match(/name=([^&"]+)/);
             if (ipMatch && codeMatch) {
               ip = ipMatch[1].trim();
               code = codeMatch[1].trim();
@@ -57,7 +59,8 @@ export function QRScannerScreen() {
 
           if (isValid && ip && code) {
             console.log('[QRScanner] parsed QR — ip:', ip, 'code:', code, 'name:', deviceName);
-            setScanned(true);
+            // Immediately mark as scanned via ref to block all further callbacks
+            scannedRef.current = true;
             // Delay slightly to allow camera viewfinder to settle before navigating
             setTimeout(() => {
               navigation.replace('CodeVerify', {
@@ -101,7 +104,7 @@ export function QRScannerScreen() {
       <Camera
         style={StyleSheet.absoluteFill}
         device={device}
-        isActive={!scanned}
+        isActive={!scannedRef.current}
         codeScanner={codeScanner}
       />
       <View style={styles.overlay}>
