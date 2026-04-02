@@ -35,9 +35,10 @@ desktop main 负责 sidecar 生命周期管理。
 
 ### 1.3 打包产物内嵌 sidecar
 
-signed DMG / app 包内包含一份 sidecar 二进制：
+桌面端打包产物内都包含一份 sidecar 二进制：
 
-- `SyncFlow.app/Contents/Resources/syncflow-sidecar`
+- macOS：`SyncFlow.app/Contents/Resources/syncflow-sidecar`
+- Windows：`<InstallDir>\\resources\\syncflow-sidecar.exe`
 
 ## 2. 标准端口
 
@@ -50,29 +51,58 @@ signed DMG / app 包内包含一份 sidecar 二进制：
 
 ### 3.1 端口监听
 
+macOS：
+
 ```bash
 lsof -nP -iTCP:39393 -sTCP:LISTEN
 lsof -nP -iTCP:39394 -sTCP:LISTEN
 ```
 
+Windows（PowerShell）：
+
+```powershell
+Get-NetTCPConnection -State Listen -LocalPort 39393,39394 |
+  Select-Object LocalAddress,LocalPort,OwningProcess
+```
+
 ### 3.2 进程来源
+
+macOS：
 
 ```bash
 pgrep -af syncflow-sidecar
 ```
 
+Windows（PowerShell）：
+
+```powershell
+Get-CimInstance Win32_Process -Filter "Name='syncflow-sidecar.exe'" |
+  Select-Object ProcessId,ParentProcessId,ExecutablePath,CommandLine
+```
+
 判断点：
 
 1. 如果路径在 `go-build` cache 下，通常是本地源码临时运行残留
-2. 如果路径在 `SyncFlow.app/Contents/Resources/`，通常是 desktop 包内 sidecar
+2. 如果路径在 `SyncFlow.app/Contents/Resources/` 或安装目录 `resources\\` 下，通常是 desktop 包内 sidecar
 
 ### 3.3 Bonjour 广播
+
+macOS：
 
 ```bash
 dns-sd -B _syncflow._tcp local.
 ```
 
 应能看到 `_syncflow._tcp` 广播。
+
+Windows（PowerShell）：
+
+```powershell
+Get-Service -Name "Bonjour Service"
+dns-sd.exe -B _syncflow._tcp local.
+```
+
+如果 `dns-sd.exe` 不在 `PATH`，改用 Bonjour 安装目录或桌面端 `resources` 目录里的实际路径。
 
 ## 4. 常见残留问题
 
@@ -90,15 +120,23 @@ dns-sd -B _syncflow._tcp local.
 
 处理：
 
+macOS：
+
 ```bash
 pkill -f syncflow-sidecar
+```
+
+Windows（PowerShell）：
+
+```powershell
+Get-Process syncflow-sidecar -ErrorAction SilentlyContinue | Stop-Process -Force
 ```
 
 ## 4.2 假在线 Bonjour 广播
 
 现象：
 
-- Mac 实际没有监听端口
+- desktop 实际没有监听端口
 - 但 iPhone 发现页还能看到这台设备
 
 原因：
@@ -107,17 +145,58 @@ pkill -f syncflow-sidecar
 
 检查：
 
+macOS：
+
 ```bash
 pgrep -af 'dns-sd.*_syncflow._tcp'
 ```
 
+Windows（PowerShell）：
+
+```powershell
+Get-CimInstance Win32_Process -Filter "Name='dns-sd.exe'" |
+  Where-Object { $_.CommandLine -like '*_syncflow._tcp*' } |
+  Select-Object ProcessId,ExecutablePath,CommandLine
+```
+
 处理：
+
+macOS：
 
 ```bash
 pkill -f 'dns-sd.*_syncflow._tcp'
 ```
 
-## 4.3 桌面端和源码 sidecar 冲突
+Windows（PowerShell）：
+
+```powershell
+Get-CimInstance Win32_Process -Filter "Name='dns-sd.exe'" |
+  Where-Object { $_.CommandLine -like '*_syncflow._tcp*' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+```
+
+## 4.3 Windows 防火墙 / Bonjour 运行时
+
+现象：
+
+- sidecar 已监听，但 iPhone 扫描不到或能扫到却连不上
+- 设置页提示 Bonjour fallback 或共享入口异常
+
+检查：
+
+```powershell
+Get-Service -Name "Bonjour Service"
+netsh advfirewall firewall show rule name="SyncFlow Sidecar TCP"
+netsh advfirewall firewall show rule name="SyncFlow mDNS UDP"
+```
+
+处理原则：
+
+1. 先确认 `Bonjour Service` 已安装并处于 `Running`
+2. 再确认 `39393/TCP` 和 `5353/UDP` 防火墙规则存在且启用
+3. 如果规则缺失，优先重装最新 Windows 安装包，让 NSIS 安装脚本重新写入规则
+
+## 4.4 桌面端和源码 sidecar 冲突
 
 现象：
 
@@ -134,6 +213,8 @@ pkill -f 'dns-sd.*_syncflow._tcp'
 
 联调结束后，建议做一次：
 
+macOS：
+
 ```bash
 pkill -f syncflow-sidecar || true
 pkill -f 'dns-sd.*_syncflow._tcp' || true
@@ -141,9 +222,21 @@ pkill -f 'dns-sd.*_syncflow._tcp' || true
 
 然后再确认：
 
+macOS：
+
 ```bash
 lsof -nP -iTCP:39393 -sTCP:LISTEN
 lsof -nP -iTCP:39394 -sTCP:LISTEN
+```
+
+Windows（PowerShell）：
+
+```powershell
+Get-Process syncflow-sidecar -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-CimInstance Win32_Process -Filter "Name='dns-sd.exe'" |
+  Where-Object { $_.CommandLine -like '*_syncflow._tcp*' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+Get-NetTCPConnection -State Listen -LocalPort 39393,39394
 ```
 
 目标是：
@@ -163,7 +256,7 @@ desktop 诊断包足够回答这些问题：
 
 所以：
 
-- 如果问题主要在 Mac 端，优先收 desktop 诊断包
+- 如果问题主要在桌面端，优先收 desktop 诊断包
 - 如果问题主要在 app 状态机，优先和 mobile 诊断包对照
 
 ## 7. 发布前检查
@@ -171,6 +264,7 @@ desktop 诊断包足够回答这些问题：
 每次发布前，至少确认：
 
 1. 本机没有残留源码 sidecar
-2. 只测试最新 signed DMG 内的 sidecar
+2. 只测试本轮目标平台的最新安装包（macOS DMG / Windows NSIS）
 3. 端口监听、Bonjour、HTTP API 都正常
-4. `spctl` 和 notarization 都已通过
+4. macOS：`spctl` 和 notarization 都已通过
+5. Windows：安装器已写入防火墙规则，Bonjour 运行时路径或 fallback 模式都已验证

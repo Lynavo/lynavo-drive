@@ -6,14 +6,14 @@
 
 SyncFlow 当前的目标非常聚焦：
 
-1. iPhone 自动发现并绑定一台 Mac
-2. 在局域网内把相册素材无感增量同步到 Mac
+1. iPhone 自动发现并绑定一台 desktop
+2. 在局域网内把相册素材无感增量同步到 desktop
 3. 在中断、重连、后台、锁屏等场景下尽可能自动恢复
 4. 在 desktop 端提供队列、历史、存储、诊断和发布验证能力
 
 当前范围明确限制为：
 
-- 仅支持 `iPhone -> Mac`
+- 支持 `iPhone -> Desktop`（当前桌面端覆盖 macOS / Windows）
 - 仅支持局域网传输
 - 不支持用户在 UI 手动挑选、删除、跳过或调序队列
 - 同一台 iPhone 同一时间只传 1 个文件
@@ -79,7 +79,7 @@ SyncFlow 当前的目标非常聚焦：
 
 职责：
 
-1. 发现 Mac、维护绑定状态、心跳和短探活
+1. 发现 desktop、维护绑定状态、心跳和短探活
 2. 扫描相册、导出素材、维护本地上传队列
 3. 建立 TCP 协议会话并执行文件传输、续传、重连
 4. 对 RN 发出 binding、queue、sync state 和 diagnostics 事件
@@ -93,9 +93,10 @@ SyncFlow 当前的目标非常聚焦：
 ## 3.1 发现
 
 1. sidecar 通过 Bonjour 广播 `_syncflow._tcp`
-2. iPhone 使用 `Network.framework` 浏览局域网服务
-3. 当前实现优先使用 sidecar 广播的 IPv4 信息，避免 `fe80::` 链路本地 IPv6 误判
-4. 发现列表展示的是“可探活、可连接”的设备，而不是单纯有广播的设备
+2. macOS / Windows 优先使用原生 `dns-sd` 广播；Windows 缺失 Bonjour 时会回退到 zeroconf 兼容广播
+3. iPhone 使用 `Network.framework` 浏览局域网服务
+4. 当前实现优先使用 sidecar 广播的 IPv4 信息，避免 `fe80::` 链路本地 IPv6 误判
+5. 发现列表展示的是“可探活、可连接”的设备，而不是单纯有广播的设备
 
 ## 3.2 配对
 
@@ -106,7 +107,7 @@ SyncFlow 当前的目标非常聚焦：
 
 设备身份约束：
 
-- PC 端识别同一台手机依赖 `clientId`
+- desktop 端识别同一台手机依赖 `clientId`
 - 不是依赖设备名、IP 或目录名
 
 ## 3.3 上传
@@ -135,10 +136,10 @@ SyncFlow 当前的目标非常聚焦：
 
 ## 3.5 历史与统计
 
-当前已经统一到“以 sidecar/Mac 完成日为准”：
+当前已经统一到“以 sidecar/desktop 完成日为准”：
 
 1. sidecar 在文件完成时写 `uploads.completed_at`
-2. sidecar 在 `device_daily_stats` 中按 Mac 本地日做分桶
+2. sidecar 在 `device_daily_stats` 中按 desktop 本地日做分桶
 3. mobile 在 `FILE_END_RES` 中优先使用 sidecar 回传的 `ledgerDate`
 4. desktop detail/history 也以 sidecar 数据为准
 

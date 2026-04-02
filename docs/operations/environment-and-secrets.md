@@ -6,11 +6,11 @@
 
 ### 1.1 通用
 
-1. macOS
+1. macOS 或 Windows（desktop 开发 / 打包）
 2. Node.js >= 20
 3. pnpm >= 10
 4. Go >= 1.25.x
-5. Xcode + CocoaPods
+5. Xcode + CocoaPods（仅 iOS 构建，需 macOS）
 
 ### 1.2 项目安装
 
@@ -43,9 +43,23 @@ pnpm build
 
 - `docs/release/macos-desktop-signing.md`
 
+### 2.3 Windows 桌面打包
+
+当前仓库已包含 Windows `NSIS + zip` 打包入口：
+
+```bash
+pnpm package:desktop:win
+```
+
+当前实现里：
+
+1. 没有单独维护的 Windows 签名文档
+2. 也没有额外约定的 Windows 代码签名环境变量
+3. 如果后续接入 Windows 代码签名，再单独补文档，不要把 macOS 签名变量直接套用到 Windows
+
 ## 3. 本地密钥放置
 
-当前 desktop 打包脚本默认会从仓库根目录读取：
+当前 macOS signed desktop 打包脚本默认会从仓库根目录读取：
 
 - `AuthKey_49NX53FQZT.p8`
 
@@ -57,7 +71,7 @@ pnpm build
 
 ## 4. 关键环境变量
 
-## 4.1 Desktop 打包
+## 4.1 macOS Desktop 打包
 
 - `CSC_NAME`
 - `APPLE_API_KEY`
@@ -69,6 +83,16 @@ pnpm build
 
 1. `CSC_NAME` 不要带 `Developer ID Application:` 前缀
 2. `SYNCFLOW_BUILD_NUMBER` 默认从 iOS `CURRENT_PROJECT_VERSION` 推导
+
+## 4.2 Windows Desktop 打包
+
+当前 `pnpm package:desktop:win` 不要求额外环境变量。
+
+需要额外关注的不是密钥，而是：
+
+1. Windows 机器能正常编译 `syncflow-sidecar.exe`
+2. 安装包内包含 `syncflow-sidecar.exe / dns-sd.exe / dnssd.dll`
+3. 安装后防火墙规则能落地
 
 ## 4.2 iOS TestFlight 脚本
 
@@ -129,6 +153,7 @@ pnpm dev:desktop
 pnpm dev:mobile
 pnpm dev:sidecar
 
+pnpm package:desktop:win
 pnpm package:mobile:testflight
 pnpm package:desktop:signed
 pnpm tag:beta
@@ -142,3 +167,4 @@ pnpm tag:beta
 2. keychain 是否已有 `Developer ID Application`
 3. `.p8` 是否放在正确路径或已通过环境变量注入
 4. 是否理解哪些开关只允许在 Debug 使用
+5. 如果负责 Windows 联调，是否确认过 `pnpm package:desktop:win`、Bonjour 运行时和防火墙规则

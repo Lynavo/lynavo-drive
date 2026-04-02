@@ -1,11 +1,13 @@
 # SyncFlow Beta 发布手册
 
-本文件是当前 beta 发布的总入口。iOS TestFlight、macOS signed DMG 和 beta tag 都按这里的顺序执行。
+本文件是当前 beta 发布的总入口。iOS TestFlight、desktop 安装包（macOS / Windows）和 beta tag 都按这里的顺序执行。
 
 详细步骤仍然分别落在：
 
 - `docs/release/ios-testflight.md`
 - `docs/release/macos-desktop-signing.md`
+
+Windows 桌面包当前直接走根目录脚本 `pnpm package:desktop:win`，详细约束以当前代码和本文件为准。
 
 ## 1. 当前版本规则
 
@@ -80,7 +82,9 @@ pnpm package:mobile:testflight:upload
 2. 等 build 从 `Processing` 变为可用
 3. 填 beta 说明
 
-## 5. 出 desktop signed DMG
+## 5. 出 desktop 安装包
+
+### 5.1 macOS signed DMG
 
 从仓库根目录执行：
 
@@ -106,12 +110,32 @@ spctl --assess --type execute -vv apps/desktop/release/mac-arm64/SyncFlow.app
 hdiutil verify apps/desktop/release/SyncFlow-0.1.0-arm64.dmg
 ```
 
+### 5.2 Windows NSIS / ZIP
+
+从仓库根目录执行：
+
+```bash
+pnpm package:desktop:win
+```
+
+产物位置：
+
+- `apps/desktop/release/SyncFlow-Setup.exe`
+- `apps/desktop/release/SyncFlow-Setup.zip`
+
+发布前至少确认：
+
+1. fresh install 后 app 能正常启动
+2. `resources\syncflow-sidecar.exe` 已随包落地并能被 desktop 拉起
+3. 安装器已写入 `SyncFlow Sidecar TCP` 和 `SyncFlow mDNS UDP` 防火墙规则
+4. 设置页能看到 Bonjour 运行时信息，缺少 Bonjour 时 fallback 状态可解释
+
 ## 6. 打 beta tag
 
-只有在这两件事都完成后再打 tag：
+只有在这些发布物都完成后再打 tag：
 
 1. TestFlight 上传成功
-2. desktop signed DMG 已完成并验签
+2. 本轮目标平台的 desktop 安装包已完成并验收
 
 执行：
 
@@ -132,11 +156,12 @@ pnpm tag:beta:push
 1. 递增 iOS build number
 2. 跑预检测试
 3. 发 iOS TestFlight
-4. 出 desktop signed DMG
-5. 打 beta tag
-6. 确认工作区干净
-7. 推代码和 tag
-8. 等 TestFlight processing 完成后再扩大测试范围
+4. 出 macOS signed DMG
+5. 如本轮包含 Windows，出 Windows NSIS / ZIP
+6. 打 beta tag
+7. 确认工作区干净
+8. 推代码和 tag
+9. 等 TestFlight processing 完成后再扩大测试范围
 
 ## 8. 发布后的最小冒烟
 
@@ -158,12 +183,21 @@ pnpm tag:beta:push
 5. 诊断包导出正常
 6. detail 分页、排序、滚动正常
 
+### 8.3 Windows
+
+1. 从 `SyncFlow-Setup.exe` fresh install
+2. app 正常启动
+3. sidecar 正常监听和广播
+4. `SyncFlow Sidecar TCP / SyncFlow mDNS UDP` 防火墙规则已写入
+5. 设置页 Bonjour 运行时 / fallback 文案正常
+6. 诊断包导出正常
+
 ## 9. 发布物与记录
 
 建议每次 beta 都在发布记录里明确写出：
 
 1. iOS build：例如 `0.1.0 (6)`
-2. desktop build：例如 `0.1.0 (6)`
+2. desktop build：例如 `0.1.0 (6)`，并注明平台（macOS / Windows）
 3. git tag：例如 `beta/v0.1.0-b6`
 4. 对应提交 SHA
 5. 本轮重点验证项
@@ -176,6 +210,7 @@ pnpm tag:beta:push
 ```bash
 pnpm package:mobile:testflight
 pnpm package:desktop:signed
+pnpm package:desktop:win
 pnpm tag:beta
 ```
 

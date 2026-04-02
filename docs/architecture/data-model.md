@@ -8,7 +8,7 @@
 
 - **iPhone 身份**：`clientId`
 - 由 mobile 生成并持久化在 Keychain
-- PC 端识别“是不是同一台手机”依赖它，而不是设备名或 IP
+- desktop 端识别“是不是同一台手机”依赖它，而不是设备名或 IP
 
 ### 1.2 设备显示名
 
@@ -21,7 +21,7 @@
 共享 `HistoryLedgerCardDTO` 的 `deviceId` 在两端方向不同：
 
 - desktop：`deviceId = iPhone clientId`
-- mobile：`deviceId = Mac serverId`
+- mobile：`deviceId = desktop serverId`
 
 读代码时必须注意这个方向差异。
 
@@ -95,7 +95,7 @@ mobile SQLite 由 `UploadStore.swift` 管理。
 
 用途：
 
-1. 当前绑定的 Mac 信息
+1. 当前绑定的 desktop 信息
 2. 包括 `device_id / host / port / pairing_id / share_name / last_bound_at`
 
 ### 3.2 `upload_items`
@@ -137,7 +137,7 @@ mobile SQLite 由 `UploadStore.swift` 管理。
 用途：
 
 1. mobile 历史页和首页统计
-2. 保存“哪台 Mac、哪一天、传了多少”
+2. 保存“哪台 desktop、哪一天、传了多少”
 
 关键字段：
 
@@ -155,11 +155,11 @@ mobile SQLite 由 `UploadStore.swift` 管理。
 
 当前统一口径：
 
-- 以 **sidecar / Mac 完成日** 为准
+- 以 **sidecar / desktop 完成日** 为准
 
 原因：
 
-1. 真正落盘发生在 Mac
+1. 真正落盘发生在 desktop sidecar 接收目录
 2. desktop 统计本来就依赖 sidecar
 3. mobile 过去用 UTC 自己分桶，曾导致与 desktop 分桶错位
 
@@ -199,7 +199,10 @@ desktop detail 的完成时间来自：
 
 默认接收根目录：
 
-- `~/Library/Application Support/SyncFlow/received`
+- macOS：`~/Library/Application Support/小豹闪传/received`
+- Windows：`%AppData%\\小豹闪传\\received`
+
+以上默认值来自 sidecar 的 `os.UserConfigDir()/小豹闪传/received`。
 
 实际布局：
 
@@ -220,7 +223,7 @@ received/
 
 当前约束：
 
-1. PC 识别设备靠 `clientId`
+1. desktop 识别设备靠 `clientId`
 2. 设备名变化不应把设备识别成新设备
 3. 磁盘目录迁移不是 UI rename 的唯一触发条件；需要看 sidecar 实际落盘和目录重命名逻辑
 

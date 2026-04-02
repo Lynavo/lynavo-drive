@@ -110,7 +110,7 @@ bash /Volumes/workspace/work/sync-flow/scripts/ios/syncflow_upload_eval.sh \
 
 ### 4.1 首次安装
 
-1. 安装 desktop + sidecar
+1. 安装 desktop（macOS DMG 或 Windows NSIS）+ sidecar
 2. 安装 iPhone app
 3. 配对成功
 4. 首页显示已连接
@@ -138,6 +138,14 @@ bash /Volumes/workspace/work/sync-flow/scripts/ios/syncflow_upload_eval.sh \
 3. sidecar `committed_bytes` 持续增长
 4. 回到前台后进度继续推进
 
+### 4.5 Windows desktop 冒烟
+
+1. 从 `SyncFlow-Setup.exe` fresh install
+2. 安装后确认 `SyncFlow Sidecar TCP / SyncFlow mDNS UDP` 防火墙规则存在
+3. 设置页能看到 Bonjour 运行时或 fallback 状态
+4. iPhone 能发现并配对
+5. 触发一轮真实素材同步
+
 ## 5. 当前已覆盖的重点场景
 
 本轮已经验证过：
@@ -160,6 +168,7 @@ bash /Volumes/workspace/work/sync-flow/scripts/ios/syncflow_upload_eval.sh \
 3. iOS Debug/Release 构建通过
 4. `batch + recovery-sidecar + recovery-late-sidecar + recovery-app` 至少各过 1 轮
 5. 真实设备上手工验证一次：后台上传 + 断网恢复
+6. 如本轮包含 Windows 桌面包，至少完成一次 NSIS fresh install + 配对上传冒烟
 
 ## 7. 日志与产物
 

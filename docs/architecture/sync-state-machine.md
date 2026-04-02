@@ -54,7 +54,7 @@
 
 - `connected` 不等于“当前一定有一个长 TCP 会话在持续传输”
 - 空闲态下，app 会做短探活和 HTTP `/presence` 心跳
-- 因此 `connected` 只表示“当前这台 Mac 是可达且绑定有效的”
+- 因此 `connected` 只表示“当前这台 desktop 是可达且绑定有效的”
 
 ## 4. Upload State
 

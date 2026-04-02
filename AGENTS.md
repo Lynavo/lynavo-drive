@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-SyncFlow V2：iPhone → Mac 局域网素材无感增量同步工具。Monorepo 当前包含 Electron 桌面应用、Go sidecar、React Native 移动端，以及 iOS 原生 `SyncEngine`。
+SyncFlow V2：iPhone → Desktop（macOS / Windows）局域网素材无感增量同步工具。Monorepo 当前包含 Electron 桌面应用、Go sidecar、React Native 移动端，以及 iOS 原生 `SyncEngine`。
 
 ## 当前开发依据
 
@@ -37,7 +37,7 @@ SyncFlow V2：iPhone → Mac 局域网素材无感增量同步工具。Monorepo 
 
 ## 关键架构约束
 
-- **PC 仅 macOS**（v2 范围）
+- **Desktop 当前覆盖 macOS / Windows**；平台差异（如共享检测、签名/打包）按当前代码和对应文档处理
 - **队列绝对只读**：不允许用户在 UI 删除、调序、跳过队列项
 - **全自动增量同步**：不允许手动勾选文件
 - **单文件串行上传**：同一台手机同一时间只传 1 个文件
@@ -48,7 +48,7 @@ SyncFlow V2：iPhone → Mac 局域网素材无感增量同步工具。Monorepo 
 补充解释：
 
 - 设备身份以 **mobile `clientId`** 为准，不以设备名、IP、目录名为准
-- 历史“属于哪一天”以 **sidecar / Mac 完成日** 为准
+- 历史“属于哪一天”以 **sidecar / desktop 完成日** 为准
 - 真实上传集合必须来自 **mobile 本地 pending 队列**，不能只拿本轮新扫描素材
 - iCloud 素材在扫描阶段照常入队，导出阶段才会触发云端下载
 
@@ -132,6 +132,8 @@ pnpm format:check      # 格式检查
 1. [docs/release/release-playbook.md](./docs/release/release-playbook.md)
 2. [docs/release/ios-testflight.md](./docs/release/ios-testflight.md)
 3. [docs/release/macos-desktop-signing.md](./docs/release/macos-desktop-signing.md)
+
+Windows 桌面包当前跟随 `docs/release/release-playbook.md` 中的 Windows 小节，以及根目录脚本 `pnpm package:desktop:win`。
 
 ## Sidecar HTTP API 端口
 

@@ -7,7 +7,7 @@
 遇到问题时，先判断问题属于哪一层：
 
 1. **desktop / sidecar 层**
-   - Mac 没监听、没广播、签名包打不开、共享检测错误
+   - 桌面端没监听、没广播、Windows 防火墙挡住、Bonjour 运行时缺失、签名包打不开、共享检测错误
 2. **mobile 发现 / 绑定层**
    - 扫不到设备、连接失败、重启 app 后恢复
 3. **mobile 队列 / 导出层**
@@ -24,7 +24,7 @@
 优先要：
 
 1. desktop 诊断包
-2. 当前 signed DMG 或运行的 app 版本
+2. 当前 DMG / NSIS 安装包或运行的 app 版本
 3. `desktop-main.log`
 4. `sidecar.db`
 
@@ -94,13 +94,16 @@
 1. sidecar 是否真的监听 `39393 / 39394`
 2. 本机是否有残留的 `dns-sd` Bonjour 广播孤儿进程
 3. mobile 实际选到的是 IPv4 还是 `fe80::` IPv6
+4. Windows 下 `SyncFlow Sidecar TCP / SyncFlow mDNS UDP` 防火墙规则是否生效，`Bonjour Service` 是否正在运行
 
 历史上常见根因：
 
 - 残留 `dns-sd` 导致假在线
 - 旧路径优先用了 `fe80::` link-local IPv6
+- Windows 防火墙放行规则缺失或被策略覆盖
+- Windows 未安装 / 未启动 Bonjour for Windows，导致只能走兼容广播或发现失败
 
-## 3.5 “同一天统计在 app 和 PC 不一致”
+## 3.5 “同一天统计在 app 和 desktop 不一致”
 
 先对总量：
 
@@ -110,7 +113,7 @@
 如果总量一致但分桶不一致：
 
 - 先怀疑是历史分桶口径不一致
-- 当前正确口径应以 sidecar/Mac 完成日为准
+- 当前正确口径应以 sidecar/desktop 完成日为准
 
 ## 3.6 “iCloud 素材看起来卡住”
 
@@ -154,6 +157,7 @@ iCloud 问题通常卡在导出阶段，而不是 TCP 传输阶段。
 2. `desktop-main.log` 明确报 sidecar 启动失败
 3. 多台设备同时受影响
 4. DMG 安装后 sidecar 本体就没跑起来
+5. Windows 下 Bonjour 运行时或防火墙规则没有准备好
 
 ### 5.2 先怀疑 mobile
 
