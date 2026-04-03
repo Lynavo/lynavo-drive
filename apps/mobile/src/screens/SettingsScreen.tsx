@@ -10,6 +10,7 @@ import {
   NativeEventEmitter,
   Alert,
   Linking,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -17,7 +18,10 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/colors';
 import { Icon } from '../components/Icon';
-import { isDiagnosticsExportUnavailable, shareDiagnosticsArchive } from '../utils/shareDiagnosticsArchive';
+import {
+  isDiagnosticsExportUnavailable,
+  shareDiagnosticsArchive,
+} from '../utils/shareDiagnosticsArchive';
 import {
   getEffectiveConnectionState,
   type MobileConnectionState,
@@ -33,12 +37,12 @@ function formatAppVersionLabel(appInfo?: Record<string, unknown>): string {
   const version = typeof appInfo?.version === 'string' ? appInfo.version : '';
   if (!version) return '未知版本';
 
-  const appName = typeof appInfo?.appName === 'string' && appInfo.appName
-    ? appInfo.appName
-    : '小豹闪传';
-  const build = typeof appInfo?.build === 'string' && appInfo.build
-    ? appInfo.build
-    : '0';
+  const appName =
+    typeof appInfo?.appName === 'string' && appInfo.appName
+      ? appInfo.appName
+      : 'Vivi Drop';
+  const build =
+    typeof appInfo?.build === 'string' && appInfo.build ? appInfo.build : '0';
   return `${appName} v${version} (${build})`;
 }
 
@@ -60,9 +64,11 @@ function formatDateTimeLabel(iso?: string): string {
 
 export function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const isAndroid = Platform.OS === 'android';
   const [deviceName, setDeviceName] = useState('');
   const [deviceIp, setDeviceIp] = useState('');
-  const [connectionState, setConnectionState] = useState<MobileConnectionState>('offline');
+  const [connectionState, setConnectionState] =
+    useState<MobileConnectionState>('offline');
   const [syncOverviewState, setSyncOverviewState] = useState({
     progressPercent: 0,
     transferredBytes: 0,
@@ -70,7 +76,8 @@ export function SettingsScreen() {
   });
   const [latestSyncLabel, setLatestSyncLabel] = useState('暂无记录');
   const [appVersionLabel, setAppVersionLabel] = useState('读取中…');
-  const [isPhotoPermissionBlocked, setIsPhotoPermissionBlocked] = useState(false);
+  const [isPhotoPermissionBlocked, setIsPhotoPermissionBlocked] =
+    useState(false);
   const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false);
 
   // My iPhone display name
@@ -85,7 +92,9 @@ export function SettingsScreen() {
     let bindingSub: { remove: () => void } | undefined;
     let syncSub: { remove: () => void } | undefined;
 
-    const applyBindingState = (state: Record<string, unknown> | null | undefined) => {
+    const applyBindingState = (
+      state: Record<string, unknown> | null | undefined,
+    ) => {
       if (!state || !state.deviceId) {
         setDeviceName('');
         setDeviceIp('');
@@ -93,9 +102,13 @@ export function SettingsScreen() {
         return;
       }
 
-      setDeviceName((state.deviceAlias as string) || (state.deviceName as string) || '');
+      setDeviceName(
+        (state.deviceAlias as string) || (state.deviceName as string) || '',
+      );
       setDeviceIp((state.host as string) || '');
-      setConnectionState(((state.connectionState as typeof connectionState) || 'bound'));
+      setConnectionState(
+        (state.connectionState as typeof connectionState) || 'bound',
+      );
     };
 
     const loadState = async () => {
@@ -104,33 +117,50 @@ export function SettingsScreen() {
         if (!NativeSyncEngine) return;
 
         const emitter = new NativeEventEmitter(NativeSyncEngine);
-        bindingSub = emitter.addListener('onBindingStateChanged', applyBindingState);
-        syncSub = emitter.addListener('onSyncStateChanged', (state: Record<string, unknown>) => {
-          const uploadState = (state.uploadState as string) || 'idle';
-          setSyncOverviewState((prev) => ({
-            progressPercent: typeof state.progressPercent === 'number'
-              ? state.progressPercent
-              : prev.progressPercent,
-            transferredBytes: typeof state.transferredBytes === 'number'
-              ? state.transferredBytes
-              : prev.transferredBytes,
-            uploadState,
-          }));
-          setIsPhotoPermissionBlocked(uploadState === 'paused_no_permission');
-        });
+        bindingSub = emitter.addListener(
+          'onBindingStateChanged',
+          applyBindingState,
+        );
+        syncSub = emitter.addListener(
+          'onSyncStateChanged',
+          (state: Record<string, unknown>) => {
+            const uploadState = (state.uploadState as string) || 'idle';
+            setSyncOverviewState(prev => ({
+              progressPercent:
+                typeof state.progressPercent === 'number'
+                  ? state.progressPercent
+                  : prev.progressPercent,
+              transferredBytes:
+                typeof state.transferredBytes === 'number'
+                  ? state.transferredBytes
+                  : prev.transferredBytes,
+              uploadState,
+            }));
+            setIsPhotoPermissionBlocked(uploadState === 'paused_no_permission');
+          },
+        );
 
         // Safely call all methods with optional chaining to prevent synchronous TypeErrors
         // if any method isn't fully exported to the React Native bridge yet.
-        const [stateResult, clientNameResult, appInfoResult, historyResult, syncOverviewResult] = await Promise.allSettled([
+        const [
+          stateResult,
+          clientNameResult,
+          appInfoResult,
+          historyResult,
+          syncOverviewResult,
+        ] = await Promise.allSettled([
           NativeSyncEngine.getBindingState?.() ?? Promise.resolve(null),
-          NativeSyncEngine.getClientDisplayName?.() ?? Promise.resolve('iPhone'),
+          NativeSyncEngine.getClientDisplayName?.() ??
+            Promise.resolve('iPhone'),
           NativeSyncEngine.getAppInfo?.() ?? Promise.resolve(undefined),
           NativeSyncEngine.getHistoryDays?.(null) ?? Promise.resolve(undefined),
           NativeSyncEngine.getSyncOverview?.() ?? Promise.resolve(undefined),
         ]);
 
         if (stateResult.status === 'fulfilled' && stateResult.value) {
-          applyBindingState(stateResult.value as Record<string, unknown> | null | undefined);
+          applyBindingState(
+            stateResult.value as Record<string, unknown> | null | undefined,
+          );
         }
 
         if (clientNameResult.status === 'fulfilled' && clientNameResult.value) {
@@ -138,15 +168,24 @@ export function SettingsScreen() {
         }
 
         if (appInfoResult.status === 'fulfilled' && appInfoResult.value) {
-          setAppVersionLabel(formatAppVersionLabel(appInfoResult.value as Record<string, unknown> | undefined));
+          setAppVersionLabel(
+            formatAppVersionLabel(
+              appInfoResult.value as Record<string, unknown> | undefined,
+            ),
+          );
         } else {
           setAppVersionLabel('未知版本');
         }
 
-        const history = historyResult.status === 'fulfilled'
-          ? (historyResult.value as { items?: Array<Record<string, unknown>> } | undefined)
-          : undefined;
-        const items = history?.items as Array<Record<string, unknown>> | undefined;
+        const history =
+          historyResult.status === 'fulfilled'
+            ? (historyResult.value as
+                | { items?: Array<Record<string, unknown>> }
+                | undefined)
+            : undefined;
+        const items = history?.items as
+          | Array<Record<string, unknown>>
+          | undefined;
         if (items?.length) {
           let latestItem: Record<string, unknown> | null = null;
           for (const item of items) {
@@ -155,7 +194,9 @@ export function SettingsScreen() {
               continue;
             }
             const currentTs = new Date(String(item.updatedAt ?? 0)).getTime();
-            const latestTs = new Date(String(latestItem.updatedAt ?? 0)).getTime();
+            const latestTs = new Date(
+              String(latestItem.updatedAt ?? 0),
+            ).getTime();
             if (currentTs > latestTs) {
               latestItem = item;
             }
@@ -166,19 +207,24 @@ export function SettingsScreen() {
             );
           }
         }
-        const syncOverview = syncOverviewResult.status === 'fulfilled'
-          ? (syncOverviewResult.value as {
-              progressPercent?: number;
-              transferredBytes?: number;
-              uploadState?: string;
-            } | undefined)
-          : undefined;
+        const syncOverview =
+          syncOverviewResult.status === 'fulfilled'
+            ? (syncOverviewResult.value as
+                | {
+                    progressPercent?: number;
+                    transferredBytes?: number;
+                    uploadState?: string;
+                  }
+                | undefined)
+            : undefined;
         setSyncOverviewState({
           progressPercent: syncOverview?.progressPercent ?? 0,
           transferredBytes: syncOverview?.transferredBytes ?? 0,
           uploadState: syncOverview?.uploadState ?? 'idle',
         });
-        setIsPhotoPermissionBlocked(syncOverview?.uploadState === 'paused_no_permission');
+        setIsPhotoPermissionBlocked(
+          syncOverview?.uploadState === 'paused_no_permission',
+        );
       } catch (e) {
         setAppVersionLabel('未知版本');
         console.warn('Native module not available for Settings');
@@ -193,14 +239,21 @@ export function SettingsScreen() {
     };
   }, []);
 
-  const effectiveConnectionState = getEffectiveConnectionState(connectionState, syncOverviewState);
-  const connectionLabel = (
-    effectiveConnectionState === 'connected' ? '已连接'
-      : effectiveConnectionState === 'connecting' || effectiveConnectionState === 'discovering' ? '连接中'
-        : '未连接'
+  const effectiveConnectionState = getEffectiveConnectionState(
+    connectionState,
+    syncOverviewState,
   );
+  const connectionLabel =
+    effectiveConnectionState === 'connected'
+      ? '已连接'
+      : effectiveConnectionState === 'connecting' ||
+          effectiveConnectionState === 'discovering'
+        ? '连接中'
+        : '未连接';
   const isConnected = effectiveConnectionState === 'connected';
-  const isConnecting = effectiveConnectionState === 'connecting' || effectiveConnectionState === 'discovering';
+  const isConnecting =
+    effectiveConnectionState === 'connecting' ||
+    effectiveConnectionState === 'discovering';
 
   // ---------------------------------------------------------------------------
   // Save my iPhone display name
@@ -287,7 +340,6 @@ export function SettingsScreen() {
               Alert.alert('重置失败', '请稍后重試');
             }
           },
-
         },
       ],
     );
@@ -306,7 +358,10 @@ export function SettingsScreen() {
               if (navigation.canGoBack()) {
                 navigation.goBack();
               } else {
-                navigation.reset({ index: 0, routes: [{ name: 'SyncStatus' }] });
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'SyncStatus' }],
+                });
               }
             }}
             accessibilityLabel={'返回'}
@@ -320,12 +375,27 @@ export function SettingsScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {isAndroid ? (
+            <View style={styles.androidNoticeCard}>
+              <Text style={styles.androidNoticeTitle}>
+                {'Android 端能力说明'}
+              </Text>
+              <Text style={styles.androidNoticeBody}>
+                {
+                  '当前版本已提供 Android 壳层、局域网自动发现、基础配对与诊断导出入口；扫码配对、真实上传队列、后台重连和增量同步仍未移植到 Android 原生引擎。'
+                }
+              </Text>
+            </View>
+          ) : null}
+
           {/* My iPhone display name card */}
           <View style={styles.deviceCard}>
             <Text style={styles.sectionLabel}>{'我的设备名称'}</Text>
             <View style={styles.deviceRow}>
               {/* Phone icon */}
-              <View style={[styles.monitorIconWrapper, styles.phoneIconWrapper]}>
+              <View
+                style={[styles.monitorIconWrapper, styles.phoneIconWrapper]}
+              >
                 <Icon name="phone-portrait-outline" size={20} color="#fff" />
               </View>
 
@@ -364,9 +434,7 @@ export function SettingsScreen() {
                     </TouchableOpacity>
                   </View>
                 )}
-                <Text style={styles.myNameHint}>
-                  {'此名称将在 Mac 端显示'}
-                </Text>
+                <Text style={styles.myNameHint}>{'此名称将在 Mac 端显示'}</Text>
               </View>
             </View>
           </View>
@@ -404,9 +472,11 @@ export function SettingsScreen() {
           <View style={styles.deviceCard}>
             <Text style={styles.sectionLabel}>{'支持与诊断'}</Text>
             <Text style={styles.diagnosticsHint}>
-              {'导出当前设备状态、队列快照、本地数据库和最近日志，便于排查同步问题。'}
+              {
+                '导出当前设备状态、队列快照、本地数据库和最近日志，便于排查同步问题。'
+              }
             </Text>
-            
+
             <View style={styles.actionButtonGroup}>
               <TouchableOpacity
                 style={[
@@ -485,9 +555,7 @@ export function SettingsScreen() {
           </View>
 
           {/* Hint text */}
-          <Text style={styles.hintText}>
-            {'电脑端名称在电脑端设置中修改'}
-          </Text>
+          <Text style={styles.hintText}>{'电脑端名称在电脑端设置中修改'}</Text>
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -536,6 +604,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 40,
+  },
+  androidNoticeCard: {
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.76)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.88)',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 16,
+  },
+  androidNoticeTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#28597e',
+    marginBottom: 6,
+  },
+  androidNoticeBody: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#5d7f98',
   },
 
   // Device card

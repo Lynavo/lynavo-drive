@@ -32,18 +32,15 @@ export function Sidebar() {
       }}
     >
       {/* Logo */}
-      <div
-        className="flex items-center gap-3 px-5 py-5"
-        style={dragRegionStyle}
-      >
+      <div className="flex items-center gap-3 px-5 py-5" style={dragRegionStyle}>
         <img
           src={syncflowLogo}
-          alt="小豹闪传"
+          alt="Vivi Drop"
           draggable={false}
           className="h-9 w-9 object-contain"
         />
         <span className="text-base font-bold" style={{ color: '#1a2a3a' }}>
-          小豹闪传
+          Vivi Drop
         </span>
       </div>
 
@@ -56,9 +53,7 @@ export function Sidebar() {
               key={key}
               onClick={() => setView(key)}
               className={`flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-[color,background-color,box-shadow,transform] duration-150 ease-out active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-2 ${
-                active
-                  ? 'text-primary'
-                  : 'text-[#6b7a8d] hover:bg-white/70 hover:text-[#1a2a3a]'
+                active ? 'text-primary' : 'text-[#6b7a8d] hover:bg-white/70 hover:text-[#1a2a3a]'
               }`}
               style={active ? activeNavStyle : noDragRegionStyle}
             >

@@ -9,10 +9,12 @@ export async function shareDiagnosticsArchive(): Promise<string> {
   }
 
   const archivePath: string = await NativeSyncEngine.exportDiagnostics();
-  const archiveUrl = archivePath.startsWith('file://') ? archivePath : `file://${archivePath}`;
+  const archiveUrl = archivePath.startsWith('file://')
+    ? archivePath
+    : `file://${archivePath}`;
 
   await Share.share({
-    title: '小豹闪传 诊断包',
+    title: 'Vivi Drop 诊断包',
     url: archiveUrl,
   });
 
@@ -20,5 +22,7 @@ export async function shareDiagnosticsArchive(): Promise<string> {
 }
 
 export function isDiagnosticsExportUnavailable(error: unknown): boolean {
-  return error instanceof Error && error.message === EXPORT_DIAGNOSTICS_UNAVAILABLE;
+  return (
+    error instanceof Error && error.message === EXPORT_DIAGNOSTICS_UNAVAILABLE
+  );
 }

@@ -12,8 +12,8 @@ func TestGetShareConfig_DefaultSeeds(t *testing.T) {
 	if cfg.ReceiveRoot != "" {
 		t.Errorf("expected empty receive_root, got %q", cfg.ReceiveRoot)
 	}
-	if cfg.ShareName != "SyncFlow" {
-		t.Errorf("expected share_name 'SyncFlow', got %q", cfg.ShareName)
+	if cfg.ShareName != "Vivi Drop" {
+		t.Errorf("expected share_name 'Vivi Drop', got %q", cfg.ShareName)
 	}
 	if cfg.ShareURL != "" {
 		t.Errorf("expected empty share_url, got %q", cfg.ShareURL)

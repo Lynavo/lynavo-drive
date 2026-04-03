@@ -26,8 +26,8 @@ export function ShareAddressSection() {
   const isWindows = window.electronAPI?.platform.isWindows?.() ?? false;
   const hostName = window.electronAPI?.platform.getHostName?.() ?? '';
 
-  const effectiveStatus = validatingShare ? 'validating' : shareStatusInfo.status ?? shareStatus;
-  const effectiveShareName = shareStatusInfo.shareName || shareName || '小豹闪传';
+  const effectiveStatus = validatingShare ? 'validating' : (shareStatusInfo.status ?? shareStatus);
+  const effectiveShareName = shareStatusInfo.shareName || shareName || 'Vivi Drop';
   const recommendedShareAddress = `\\\\${hostName || '电脑名'}\\${effectiveShareName}`;
   const effectiveShareAddress = shareAddress || recommendedShareAddress;
 
@@ -119,9 +119,7 @@ export function ShareAddressSection() {
         )}
       </div>
 
-      <p className="mb-3 text-sm text-muted-foreground">
-        {meta.detail}
-      </p>
+      <p className="mb-3 text-sm text-muted-foreground">{meta.detail}</p>
 
       {showWindowsQuickActions ? (
         <p className="mb-3 text-xs text-muted-foreground">
@@ -132,9 +130,7 @@ export function ShareAddressSection() {
       {showWindowsQuickActions ? (
         <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50/70 p-3">
           <div className="mb-2">
-            <p className="text-sm font-medium text-sky-900">
-              Windows 快速配置
-            </p>
+            <p className="text-sm font-medium text-sky-900">Windows 快速配置</p>
             <p className="mt-1 text-xs text-sky-700">
               先打开系统共享设置，再打开当前接收目录做共享；共享名建议与应用里的目录别名保持一致。
             </p>
@@ -145,7 +141,9 @@ export function ShareAddressSection() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => void window.electronAPI?.files.openExternal(WINDOWS_SHARING_SETTINGS_URI)}
+              onClick={() =>
+                void window.electronAPI?.files.openExternal(WINDOWS_SHARING_SETTINGS_URI)
+              }
               className="bg-white"
             >
               <Settings2 className="h-4 w-4" />
@@ -166,9 +164,7 @@ export function ShareAddressSection() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() =>
-                void window.electronAPI?.files.copyToClipboard(effectiveShareAddress)
-              }
+              onClick={() => void window.electronAPI?.files.copyToClipboard(effectiveShareAddress)}
               className="bg-white"
             >
               <CopyPlus className="h-4 w-4" />

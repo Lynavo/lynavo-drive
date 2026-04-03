@@ -1,20 +1,28 @@
 package config
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
 	"strings"
 
+	_ "github.com/mattn/go-sqlite3"
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	currentDataDirName = "Vivi Drop"
+	legacyDataDirName  = "小豹闪传"
+	freshDBMaxBytes    = 8 * 1024
+)
+
 type Config struct {
-	HTTPPort              int    `yaml:"http_port"`
-	TCPPort               int    `yaml:"tcp_port"`
-	DataDir               string `yaml:"data_dir"`
-	ReceiveDir            string `yaml:"receive_dir"`
-	LogLevel              string `yaml:"log_level"`
-	DeviceName            string `yaml:"device_name"`
+	HTTPPort   int    `yaml:"http_port"`
+	TCPPort    int    `yaml:"tcp_port"`
+	DataDir    string `yaml:"data_dir"`
+	ReceiveDir string `yaml:"receive_dir"`
+	LogLevel   string `yaml:"log_level"`
+	DeviceName string `yaml:"device_name"`
 	// DeviceIP overrides the IP address advertised in the Bonjour/mDNS TXT
 	// record.  Leave empty to let the sidecar auto-detect the best LAN address.
 	// Useful on multi-homed Windows machines where auto-detection picks the
@@ -68,11 +76,112 @@ func (c *Config) setDefaults() {
 func defaultDataDir() string {
 	configDir, err := os.UserConfigDir()
 	if err == nil && configDir != "" {
-		return filepath.Join(configDir, "小豹闪传")
+		return selectDataDir(
+			filepath.Join(configDir, currentDataDirName),
+			filepath.Join(configDir, legacyDataDirName),
+		)
 	}
 
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "小豹闪传")
+	return selectDataDir(
+		filepath.Join(home, ".config", currentDataDirName),
+		filepath.Join(home, ".config", legacyDataDirName),
+	)
+}
+
+func selectDataDir(preferredPath string, legacyPath string) string {
+	if shouldPreferLegacyDataDir(preferredPath, legacyPath) {
+		return legacyPath
+	}
+	if isDir(preferredPath) {
+		return preferredPath
+	}
+	if isDir(legacyPath) {
+		return legacyPath
+	}
+	return preferredPath
+}
+
+func shouldPreferLegacyDataDir(preferredPath string, legacyPath string) bool {
+	legacyState := inspectDataDirState(legacyPath)
+	if !legacyState.hasDB {
+		return false
+	}
+
+	preferredState := inspectDataDirState(preferredPath)
+	if !preferredState.hasDB {
+		return true
+	}
+
+	if legacyState.hasMeaningfulState() && !preferredState.hasMeaningfulState() {
+		return true
+	}
+
+	if preferredState.hasMeaningfulState() {
+		return false
+	}
+
+	return preferredState.dbSize <= freshDBMaxBytes && legacyState.dbSize > preferredState.dbSize
+}
+
+type dataDirState struct {
+	hasDB         bool
+	dbSize        int64
+	sessions      int
+	uploads       int
+	pairedDevices int
+	shareStatus   string
+}
+
+func (s dataDirState) hasMeaningfulState() bool {
+	return s.sessions > 0 ||
+		s.uploads > 0 ||
+		s.pairedDevices > 0 ||
+		(s.shareStatus != "" && s.shareStatus != "unknown")
+}
+
+func inspectDataDirState(dirPath string) dataDirState {
+	size, hasDB := dbSize(dirPath)
+	if !hasDB {
+		return dataDirState{}
+	}
+
+	state := dataDirState{
+		hasDB:  true,
+		dbSize: size,
+	}
+
+	db, err := sql.Open("sqlite3", filepath.Join(dirPath, "sidecar.db"))
+	if err != nil {
+		return state
+	}
+	defer db.Close()
+
+	row := db.QueryRow(`
+		SELECT
+			(SELECT COUNT(*) FROM sessions),
+			(SELECT COUNT(*) FROM uploads),
+			(SELECT COUNT(*) FROM paired_devices),
+			COALESCE((SELECT share_status FROM share_config WHERE id = 1), '')
+	`)
+	if err := row.Scan(&state.sessions, &state.uploads, &state.pairedDevices, &state.shareStatus); err != nil {
+		return state
+	}
+
+	return state
+}
+
+func dbSize(dirPath string) (int64, bool) {
+	info, err := os.Stat(filepath.Join(dirPath, "sidecar.db"))
+	if err != nil || info.IsDir() {
+		return 0, false
+	}
+	return info.Size(), true
+}
+
+func isDir(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }
 
 func (c *Config) DBPath() string {

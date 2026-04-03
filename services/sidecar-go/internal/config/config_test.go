@@ -1,10 +1,13 @@
 package config
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func TestLoadMissingFileReturnsDefaults(t *testing.T) {
@@ -99,4 +102,183 @@ func TestSetDefaultsFillsDataDirReceiveDirDeviceName(t *testing.T) {
 	if cfg.DeviceName != expectedDeviceName {
 		t.Errorf("DeviceName = %q, want %q", cfg.DeviceName, expectedDeviceName)
 	}
+}
+
+func TestSelectDataDirPrefersCurrentBrandDir(t *testing.T) {
+	dir := t.TempDir()
+	preferredPath := filepath.Join(dir, currentDataDirName)
+	legacyPath := filepath.Join(dir, legacyDataDirName)
+
+	if err := os.MkdirAll(preferredPath, 0o755); err != nil {
+		t.Fatalf("MkdirAll(preferredPath): %v", err)
+	}
+	if err := os.MkdirAll(legacyPath, 0o755); err != nil {
+		t.Fatalf("MkdirAll(legacyPath): %v", err)
+	}
+
+	if got := selectDataDir(preferredPath, legacyPath); got != preferredPath {
+		t.Errorf("selectDataDir() = %q, want %q", got, preferredPath)
+	}
+}
+
+func TestSelectDataDirFallsBackToLegacyDir(t *testing.T) {
+	dir := t.TempDir()
+	preferredPath := filepath.Join(dir, currentDataDirName)
+	legacyPath := filepath.Join(dir, legacyDataDirName)
+
+	if err := os.MkdirAll(legacyPath, 0o755); err != nil {
+		t.Fatalf("MkdirAll(legacyPath): %v", err)
+	}
+
+	if got := selectDataDir(preferredPath, legacyPath); got != legacyPath {
+		t.Errorf("selectDataDir() = %q, want %q", got, legacyPath)
+	}
+}
+
+func TestSelectDataDirPrefersLegacyWhenPreferredHasFreshDB(t *testing.T) {
+	dir := t.TempDir()
+	preferredPath := filepath.Join(dir, currentDataDirName)
+	legacyPath := filepath.Join(dir, legacyDataDirName)
+
+	if err := os.MkdirAll(preferredPath, 0o755); err != nil {
+		t.Fatalf("MkdirAll(preferredPath): %v", err)
+	}
+	if err := os.MkdirAll(legacyPath, 0o755); err != nil {
+		t.Fatalf("MkdirAll(legacyPath): %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(preferredPath, "sidecar.db"), make([]byte, freshDBMaxBytes), 0o644); err != nil {
+		t.Fatalf("WriteFile(preferred sidecar.db): %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(legacyPath, "sidecar.db"), make([]byte, freshDBMaxBytes*4), 0o644); err != nil {
+		t.Fatalf("WriteFile(legacy sidecar.db): %v", err)
+	}
+
+	if got := selectDataDir(preferredPath, legacyPath); got != legacyPath {
+		t.Errorf("selectDataDir() = %q, want %q", got, legacyPath)
+	}
+}
+
+func TestSelectDataDirPrefersLegacyWhenLegacyHasMeaningfulState(t *testing.T) {
+	dir := t.TempDir()
+	preferredPath := filepath.Join(dir, currentDataDirName)
+	legacyPath := filepath.Join(dir, legacyDataDirName)
+
+	writeSQLiteState(t, preferredPath, sqliteState{
+		sessions:      0,
+		uploads:       0,
+		pairedDevices: 0,
+		shareStatus:   "unknown",
+	})
+	writeSQLiteState(t, legacyPath, sqliteState{
+		sessions:      2,
+		uploads:       5,
+		pairedDevices: 1,
+		shareStatus:   "share_registered",
+	})
+
+	if got := selectDataDir(preferredPath, legacyPath); got != legacyPath {
+		t.Errorf("selectDataDir() = %q, want %q", got, legacyPath)
+	}
+}
+
+func TestSelectDataDirKeepsPreferredWhenPreferredHasEstablishedDB(t *testing.T) {
+	dir := t.TempDir()
+	preferredPath := filepath.Join(dir, currentDataDirName)
+	legacyPath := filepath.Join(dir, legacyDataDirName)
+
+	if err := os.MkdirAll(preferredPath, 0o755); err != nil {
+		t.Fatalf("MkdirAll(preferredPath): %v", err)
+	}
+	if err := os.MkdirAll(legacyPath, 0o755); err != nil {
+		t.Fatalf("MkdirAll(legacyPath): %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(preferredPath, "sidecar.db"), make([]byte, freshDBMaxBytes*4), 0o644); err != nil {
+		t.Fatalf("WriteFile(preferred sidecar.db): %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(legacyPath, "sidecar.db"), make([]byte, freshDBMaxBytes*2), 0o644); err != nil {
+		t.Fatalf("WriteFile(legacy sidecar.db): %v", err)
+	}
+
+	if got := selectDataDir(preferredPath, legacyPath); got != preferredPath {
+		t.Errorf("selectDataDir() = %q, want %q", got, preferredPath)
+	}
+}
+
+func TestSelectDataDirKeepsPreferredWhenPreferredHasMeaningfulState(t *testing.T) {
+	dir := t.TempDir()
+	preferredPath := filepath.Join(dir, currentDataDirName)
+	legacyPath := filepath.Join(dir, legacyDataDirName)
+
+	writeSQLiteState(t, preferredPath, sqliteState{
+		sessions:      4,
+		uploads:       8,
+		pairedDevices: 1,
+		shareStatus:   "ready",
+	})
+	writeSQLiteState(t, legacyPath, sqliteState{
+		sessions:      0,
+		uploads:       0,
+		pairedDevices: 0,
+		shareStatus:   "unknown",
+	})
+
+	if got := selectDataDir(preferredPath, legacyPath); got != preferredPath {
+		t.Errorf("selectDataDir() = %q, want %q", got, preferredPath)
+	}
+}
+
+func TestSelectDataDirDefaultsToCurrentBrandDirWhenMissing(t *testing.T) {
+	dir := t.TempDir()
+	preferredPath := filepath.Join(dir, currentDataDirName)
+	legacyPath := filepath.Join(dir, legacyDataDirName)
+
+	if got := selectDataDir(preferredPath, legacyPath); got != preferredPath {
+		t.Errorf("selectDataDir() = %q, want %q", got, preferredPath)
+	}
+}
+
+type sqliteState struct {
+	sessions      int
+	uploads       int
+	pairedDevices int
+	shareStatus   string
+}
+
+func writeSQLiteState(t *testing.T, dirPath string, state sqliteState) {
+	t.Helper()
+
+	if err := os.MkdirAll(dirPath, 0o755); err != nil {
+		t.Fatalf("MkdirAll(%q): %v", dirPath, err)
+	}
+
+	db, err := sql.Open("sqlite3", filepath.Join(dirPath, "sidecar.db"))
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
+
+	for _, stmt := range []string{
+		`CREATE TABLE sessions (id INTEGER PRIMARY KEY);`,
+		`CREATE TABLE uploads (id INTEGER PRIMARY KEY);`,
+		`CREATE TABLE paired_devices (id INTEGER PRIMARY KEY);`,
+		`CREATE TABLE share_config (id INTEGER PRIMARY KEY, share_status TEXT NOT NULL);`,
+		`INSERT INTO share_config (id, share_status) VALUES (1, '` + state.shareStatus + `');`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("db.Exec(%q): %v", stmt, err)
+		}
+	}
+
+	insertRows := func(table string, count int) {
+		t.Helper()
+		for i := 0; i < count; i++ {
+			if _, err := db.Exec(`INSERT INTO ` + table + ` DEFAULT VALUES;`); err != nil {
+				t.Fatalf("insert into %s: %v", table, err)
+			}
+		}
+	}
+
+	insertRows("sessions", state.sessions)
+	insertRows("uploads", state.uploads)
+	insertRows("paired_devices", state.pairedDevices)
 }

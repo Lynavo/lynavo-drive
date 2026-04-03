@@ -10,6 +10,7 @@ import {
   NativeEventEmitter,
   Linking,
   AppState,
+  Platform,
   type AppStateStatus,
   type ListRenderItemInfo,
 } from 'react-native';
@@ -69,7 +70,12 @@ interface BindingState {
   deviceAlias?: string;
   deviceType?: 'mac' | 'win';
   host: string;
-  connectionState: 'bound' | 'connecting' | 'connected' | 'offline' | 'discovering';
+  connectionState:
+    | 'bound'
+    | 'connecting'
+    | 'connected'
+    | 'offline'
+    | 'discovering';
 }
 
 interface RetryBannerState {
@@ -127,9 +133,11 @@ const EMPTY_OVERVIEW: SyncOverview = {
 // ---------------------------------------------------------------------------
 
 function fileIcon(type: 'video' | 'image'): React.ReactElement {
-  return type === 'video'
-    ? <Icon name="videocam-outline" size={16} color="#3b82f6" />
-    : <Icon name="image-outline" size={16} color="#06b6d4" />;
+  return type === 'video' ? (
+    <Icon name="videocam-outline" size={16} color="#3b82f6" />
+  ) : (
+    <Icon name="image-outline" size={16} color="#06b6d4" />
+  );
 }
 
 function formatBytes(bytes: number): string {
@@ -154,64 +162,92 @@ function buildOverviewFromPayload(
     return previous;
   }
 
-  const nextUploadState = (payload.uploadState as string | undefined) ?? previous.uploadState;
-  const hasCurrentFile = Object.prototype.hasOwnProperty.call(payload, 'currentFile');
-  const hasCurrentFilename = Object.prototype.hasOwnProperty.call(payload, 'currentFilename');
-  const hasCurrentFileConfirmedBytes = Object.prototype.hasOwnProperty.call(payload, 'currentFileConfirmedBytes');
-  const hasCurrentFileTotalBytes = Object.prototype.hasOwnProperty.call(payload, 'currentFileTotalBytes');
+  const nextUploadState =
+    (payload.uploadState as string | undefined) ?? previous.uploadState;
+  const hasCurrentFile = Object.prototype.hasOwnProperty.call(
+    payload,
+    'currentFile',
+  );
+  const hasCurrentFilename = Object.prototype.hasOwnProperty.call(
+    payload,
+    'currentFilename',
+  );
+  const hasCurrentFileConfirmedBytes = Object.prototype.hasOwnProperty.call(
+    payload,
+    'currentFileConfirmedBytes',
+  );
+  const hasCurrentFileTotalBytes = Object.prototype.hasOwnProperty.call(
+    payload,
+    'currentFileTotalBytes',
+  );
 
   const nextCurrentFile = hasCurrentFile
-    ? (typeof payload.currentFile === 'string' ? payload.currentFile : undefined)
+    ? typeof payload.currentFile === 'string'
+      ? payload.currentFile
+      : undefined
     : previous.currentFile;
   const nextCurrentFilename = hasCurrentFilename
-    ? (typeof payload.currentFilename === 'string' ? payload.currentFilename : undefined)
+    ? typeof payload.currentFilename === 'string'
+      ? payload.currentFilename
+      : undefined
     : previous.currentFilename;
   const nextCurrentFileConfirmedBytes = hasCurrentFileConfirmedBytes
-    ? ((payload.currentFileConfirmedBytes as number | undefined)
-      ?? (payload.confirmedBytes as number | undefined)
-      ?? 0)
-    : (payload.confirmedBytes as number | undefined)
-    ?? previous.currentFileConfirmedBytes;
+    ? ((payload.currentFileConfirmedBytes as number | undefined) ??
+      (payload.confirmedBytes as number | undefined) ??
+      0)
+    : ((payload.confirmedBytes as number | undefined) ??
+      previous.currentFileConfirmedBytes);
   const nextCurrentFileTotalBytes = hasCurrentFileTotalBytes
     ? ((payload.currentFileTotalBytes as number | undefined) ?? 0)
     : previous.currentFileTotalBytes;
-  const derivedProgressPercent = nextCurrentFileTotalBytes > 0
-    ? Math.round((nextCurrentFileConfirmedBytes / nextCurrentFileTotalBytes) * 100)
-    : 0;
+  const derivedProgressPercent =
+    nextCurrentFileTotalBytes > 0
+      ? Math.round(
+          (nextCurrentFileConfirmedBytes / nextCurrentFileTotalBytes) * 100,
+        )
+      : 0;
 
   return {
-    progressPercent: (payload.progressPercent as number | undefined)
-      ?? derivedProgressPercent
-      ?? previous.progressPercent,
-    currentSpeedMbps: (payload.currentSpeedMbps as number | undefined)
-      ?? previous.currentSpeedMbps,
+    progressPercent:
+      (payload.progressPercent as number | undefined) ??
+      derivedProgressPercent ??
+      previous.progressPercent,
+    currentSpeedMbps:
+      (payload.currentSpeedMbps as number | undefined) ??
+      previous.currentSpeedMbps,
     uploadState: nextUploadState,
-    completedCount: (payload.completedCount as number | undefined)
-      ?? previous.completedCount,
-    totalCount: (payload.totalCount as number | undefined)
-      ?? (payload.queueTotalCount as number | undefined)
-      ?? previous.totalCount,
-    completedBytes: (payload.completedBytes as number | undefined)
-      ?? previous.completedBytes,
-    totalBytes: (payload.totalBytes as number | undefined)
-      ?? (payload.queueTotalBytes as number | undefined)
-      ?? previous.totalBytes,
-    currentFile: nextUploadState === 'completed' || nextUploadState === 'idle'
-      ? undefined
-      : nextCurrentFile,
-    currentFilename: nextUploadState === 'completed' || nextUploadState === 'idle'
-      ? undefined
-      : nextCurrentFilename,
-    currentFileConfirmedBytes: nextUploadState === 'completed' || nextUploadState === 'idle'
-      ? 0
-      : nextCurrentFileConfirmedBytes,
-    currentFileTotalBytes: nextUploadState === 'completed' || nextUploadState === 'idle'
-      ? 0
-      : nextCurrentFileTotalBytes,
-    retryAttempt: (payload.retryAttempt as number | undefined)
-      ?? previous.retryAttempt,
-    retryDelaySec: (payload.retryDelaySec as number | undefined)
-      ?? previous.retryDelaySec,
+    completedCount:
+      (payload.completedCount as number | undefined) ?? previous.completedCount,
+    totalCount:
+      (payload.totalCount as number | undefined) ??
+      (payload.queueTotalCount as number | undefined) ??
+      previous.totalCount,
+    completedBytes:
+      (payload.completedBytes as number | undefined) ?? previous.completedBytes,
+    totalBytes:
+      (payload.totalBytes as number | undefined) ??
+      (payload.queueTotalBytes as number | undefined) ??
+      previous.totalBytes,
+    currentFile:
+      nextUploadState === 'completed' || nextUploadState === 'idle'
+        ? undefined
+        : nextCurrentFile,
+    currentFilename:
+      nextUploadState === 'completed' || nextUploadState === 'idle'
+        ? undefined
+        : nextCurrentFilename,
+    currentFileConfirmedBytes:
+      nextUploadState === 'completed' || nextUploadState === 'idle'
+        ? 0
+        : nextCurrentFileConfirmedBytes,
+    currentFileTotalBytes:
+      nextUploadState === 'completed' || nextUploadState === 'idle'
+        ? 0
+        : nextCurrentFileTotalBytes,
+    retryAttempt:
+      (payload.retryAttempt as number | undefined) ?? previous.retryAttempt,
+    retryDelaySec:
+      (payload.retryDelaySec as number | undefined) ?? previous.retryDelaySec,
   };
 }
 
@@ -276,7 +312,9 @@ function CompletionCard({
         </Text>
         <Text style={styles.completionSubtext}>{'本次同步已全部完成'}</Text>
         {latestSyncLabel ? (
-          <Text style={styles.lastSyncText}>{`最近一次成功同步：${latestSyncLabel}`}</Text>
+          <Text
+            style={styles.lastSyncText}
+          >{`最近一次成功同步：${latestSyncLabel}`}</Text>
         ) : null}
       </View>
     </View>
@@ -302,7 +340,9 @@ function SyncSummaryCard({
 }) {
   return (
     <>
-      <Text style={styles.summaryEyebrow}>{summaryTitleForUploadState(uploadState)}</Text>
+      <Text style={styles.summaryEyebrow}>
+        {summaryTitleForUploadState(uploadState)}
+      </Text>
       <Text style={styles.summaryTitle}>
         {`${completedCount} / ${totalCount} 个文件已完成`}
       </Text>
@@ -315,7 +355,9 @@ function SyncSummaryCard({
         </View>
         <View style={styles.summaryStatCard}>
           <Text style={styles.summaryStatLabel}>{'当前速度'}</Text>
-          <Text style={styles.summaryStatValue}>{formatSpeedMbps(currentSpeedMbps)}</Text>
+          <Text style={styles.summaryStatValue}>
+            {formatSpeedMbps(currentSpeedMbps)}
+          </Text>
         </View>
       </View>
       {activeFileName ? (
@@ -342,7 +384,9 @@ function QueueItemRow({
   activeConfirmedBytes: number;
   activeTotalBytes: number;
 }) {
-  const isActive = item.status === 'uploading' || (item.fileKey.length > 0 && item.fileKey === activeFileKey);
+  const isActive =
+    item.status === 'uploading' ||
+    (item.fileKey.length > 0 && item.fileKey === activeFileKey);
   const showItemProgress = isActive && activeTotalBytes > 0;
   const itemStatusLabel = showItemProgress
     ? `传输中 ${activeProgressPercent}%`
@@ -352,7 +396,9 @@ function QueueItemRow({
         ? '准备中'
         : item.status === 'uploading'
           ? '传输中'
-          : item.status === 'ready' || item.status === 'discovered' || item.status === 'queued'
+          : item.status === 'ready' ||
+              item.status === 'discovered' ||
+              item.status === 'queued'
             ? '排队中'
             : null;
 
@@ -364,15 +410,15 @@ function QueueItemRow({
         isActive && styles.queueRowUploading,
       ]}
     >
-      <View style={styles.queueIcon}>
-        {fileIcon(item.type)}
-      </View>
+      <View style={styles.queueIcon}>{fileIcon(item.type)}</View>
       <View style={styles.queueInfo}>
         <Text style={styles.queueFileName} numberOfLines={1}>
           {item.name}
         </Text>
         <View style={styles.queueFileMeta}>
-          <Text style={styles.queueFileSize}>{formatBytes(item.rawFileSize)}</Text>
+          <Text style={styles.queueFileSize}>
+            {formatBytes(item.rawFileSize)}
+          </Text>
           {itemStatusLabel ? (
             <View style={styles.uploadingBadge}>
               <View style={styles.uploadingDot} />
@@ -392,7 +438,9 @@ function QueueItemRow({
               <View
                 style={[
                   styles.itemProgressFill,
-                  { width: `${Math.max(0, Math.min(100, activeProgressPercent))}%` },
+                  {
+                    width: `${Math.max(0, Math.min(100, activeProgressPercent))}%`,
+                  },
                 ]}
               />
             </View>
@@ -412,6 +460,7 @@ function QueueItemRow({
 
 export function SyncStatusScreen() {
   const navigation = useNavigation<SyncStatusNav>();
+  const isAndroid = Platform.OS === 'android';
   const [overview, setOverview] = useState<SyncOverview>(EMPTY_OVERVIEW);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [todayStats, setTodayStats] = useState({ fileCount: 0, totalBytes: 0 });
@@ -420,20 +469,26 @@ export function SyncStatusScreen() {
   const [retryBanner, setRetryBanner] = useState<RetryBannerState | null>(null);
   const [retryCountdownSec, setRetryCountdownSec] = useState(0);
   const [latestSync, setLatestSync] = useState<LatestSyncInfo | null>(null);
-  const [suppressInitialOfflineBanner, setSuppressInitialOfflineBanner] = useState(false);
+  const [suppressInitialOfflineBanner, setSuppressInitialOfflineBanner] =
+    useState(false);
   const [showConnectionBanner, setShowConnectionBanner] = useState(false);
-  const [holdCompletionCardUntilMs, setHoldCompletionCardUntilMs] = useState<number | null>(null);
+  const [holdCompletionCardUntilMs, setHoldCompletionCardUntilMs] = useState<
+    number | null
+  >(null);
 
-  const mapQueueItem = useCallback((item: Record<string, unknown>, index: number): QueueItem => ({
-    id: String(item.id ?? index),
-    name: (item.originalFilename as string) || 'Unknown',
-    fileKey: (item.fileKey as string) || '',
-    rawFileSize: (item.fileSize as number) ?? 0,
-    ackedOffset: (item.ackedOffset as number) ?? 0,
-    type: (item.mediaType as string) === 'video' ? 'video' : 'image',
-    status: ((item.status as string) ?? 'queued') as QueueItem['status'],
-    isCloudAsset: Boolean(item.isCloudAsset),
-  }), []);
+  const mapQueueItem = useCallback(
+    (item: Record<string, unknown>, index: number): QueueItem => ({
+      id: String(item.id ?? index),
+      name: (item.originalFilename as string) || 'Unknown',
+      fileKey: (item.fileKey as string) || '',
+      rawFileSize: (item.fileSize as number) ?? 0,
+      ackedOffset: (item.ackedOffset as number) ?? 0,
+      type: (item.mediaType as string) === 'video' ? 'video' : 'image',
+      status: ((item.status as string) ?? 'queued') as QueueItem['status'],
+      isCloudAsset: Boolean(item.isCloudAsset),
+    }),
+    [],
+  );
 
   const loadTodayStats = useCallback(async (engine?: any) => {
     try {
@@ -454,7 +509,9 @@ export function SyncStatusScreen() {
         setTodayStats(stats);
         return stats;
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return null;
   }, []);
 
@@ -463,7 +520,9 @@ export function SyncStatusScreen() {
       const mod = engine || NativeModules.NativeSyncEngine;
       if (!mod) return;
       const history = await mod.getHistoryDays(null);
-      const items = history?.items as Array<Record<string, unknown>> | undefined;
+      const items = history?.items as
+        | Array<Record<string, unknown>>
+        | undefined;
       if (!items?.length) {
         setLatestSync(null);
         return;
@@ -473,7 +532,10 @@ export function SyncStatusScreen() {
       for (const item of items) {
         const updatedAt = item.updatedAt as string | undefined;
         if (!updatedAt) continue;
-        if (!latest || new Date(updatedAt).getTime() > new Date(latest.updatedAt).getTime()) {
+        if (
+          !latest ||
+          new Date(updatedAt).getTime() > new Date(latest.updatedAt).getTime()
+        ) {
           latest = {
             updatedAt,
             deviceName: (item.deviceName as string) || '电脑',
@@ -481,7 +543,9 @@ export function SyncStatusScreen() {
         }
       }
       setLatestSync(latest);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   useEffect(() => {
@@ -511,7 +575,9 @@ export function SyncStatusScreen() {
     let bindingSub: { remove: () => void } | undefined;
     let startupBannerTimer: ReturnType<typeof setTimeout> | undefined;
 
-    const applyBindingState = (state: Record<string, unknown> | null | undefined) => {
+    const applyBindingState = (
+      state: Record<string, unknown> | null | undefined,
+    ) => {
       if (!state || !state.deviceId) {
         setBindingState(null);
         navigation.reset({ index: 0, routes: [{ name: 'DeviceDiscovery' }] });
@@ -524,10 +590,12 @@ export function SyncStatusScreen() {
         deviceAlias: state.deviceAlias as string | undefined,
         deviceType: state.deviceType as BindingState['deviceType'] | undefined,
         host: (state.host as string) || '',
-        connectionState: ((state.connectionState as BindingState['connectionState']) || 'bound'),
+        connectionState:
+          (state.connectionState as BindingState['connectionState']) || 'bound',
       });
 
-      const connectionState = (state.connectionState as BindingState['connectionState']) || 'bound';
+      const connectionState =
+        (state.connectionState as BindingState['connectionState']) || 'bound';
       if (connectionState === 'connected') {
         setSuppressInitialOfflineBanner(false);
       }
@@ -541,15 +609,21 @@ export function SyncStatusScreen() {
 
         // Listen for errors from native engine
         const debugEmitter = new NativeEventEmitter(NativeSyncEngine);
-        errorSub = debugEmitter.addListener('onError', (error: Record<string, unknown>) => {
-          console.error('[SyncStatus] Native error:', JSON.stringify(error));
-        });
+        errorSub = debugEmitter.addListener(
+          'onError',
+          (error: Record<string, unknown>) => {
+            console.error('[SyncStatus] Native error:', JSON.stringify(error));
+          },
+        );
 
         // Listen for binding cleared (e.g. token lost → need re-pair)
         const bindingEmitter = new NativeEventEmitter(NativeSyncEngine);
-        bindingSub = bindingEmitter.addListener('onBindingStateChanged', (state: Record<string, unknown>) => {
-          applyBindingState(state);
-        });
+        bindingSub = bindingEmitter.addListener(
+          'onBindingStateChanged',
+          (state: Record<string, unknown>) => {
+            applyBindingState(state);
+          },
+        );
 
         // Check binding before loading data
         const binding = await NativeSyncEngine.getBindingState();
@@ -567,27 +641,27 @@ export function SyncStatusScreen() {
         await loadLatestSync(NativeSyncEngine);
 
         const syncData = await NativeSyncEngine.getSyncOverview();
-        const initialOverview = buildOverviewFromPayload(syncData, EMPTY_OVERVIEW);
+        const initialOverview = buildOverviewFromPayload(
+          syncData,
+          EMPTY_OVERVIEW,
+        );
         if (syncData) {
           setOverview(initialOverview);
         }
 
         // Load initial queue
         const queueData = await NativeSyncEngine.getReadOnlyQueue();
-        const initialQueue = queueData
-          ? queueData.map(mapQueueItem)
-          : [];
+        const initialQueue = queueData ? queueData.map(mapQueueItem) : [];
         if (queueData) {
           setQueue(initialQueue);
         }
 
         const initialDone =
           initialOverview.uploadState === 'completed' ||
-          (
-            initialOverview.uploadState === 'idle' &&
+          (initialOverview.uploadState === 'idle' &&
             initialQueue.length === 0 &&
-            (initialOverview.progressPercent >= 100 || (loadedTodayStats?.fileCount ?? 0) > 0)
-          );
+            (initialOverview.progressPercent >= 100 ||
+              (loadedTodayStats?.fileCount ?? 0) > 0));
         if (initialDone) {
           setHoldCompletionCardUntilMs(Date.now() + COMPLETION_CARD_HOLD_MS);
         }
@@ -596,55 +670,74 @@ export function SyncStatusScreen() {
 
         // NOW trigger sync (after initial UI render, so no flash)
         await NativeSyncEngine.startDiscovery();
-        NativeSyncEngine.triggerSync?.()
-          .catch((e: Error) => console.warn('[SyncStatus] triggerSync failed:', e));
+        NativeSyncEngine.triggerSync?.().catch((e: Error) =>
+          console.warn('[SyncStatus] triggerSync failed:', e),
+        );
 
         // Subscribe to live updates
         const emitter = new NativeEventEmitter(NativeSyncEngine);
-        syncSub = emitter.addListener('onSyncStateChanged', (state: Record<string, unknown>) => {
-          const uploadState = (state.uploadState as string) ?? undefined;
-          if (uploadState === 'reconnecting') {
-            const nextRetryAttempt = Number(state.retryAttempt ?? 0);
-            const nextRetryDelaySec = Number(state.retryDelaySec ?? 0);
-            const now = Date.now();
-            setRetryBanner((prev) => ({
-              attempt: nextRetryAttempt,
-              retryAtMs: now + Math.max(nextRetryDelaySec, 0) * 1000,
-              startedAtMs: prev?.startedAtMs ?? now,
+        syncSub = emitter.addListener(
+          'onSyncStateChanged',
+          (state: Record<string, unknown>) => {
+            const uploadState = (state.uploadState as string) ?? undefined;
+            if (uploadState === 'reconnecting') {
+              const nextRetryAttempt = Number(state.retryAttempt ?? 0);
+              const nextRetryDelaySec = Number(state.retryDelaySec ?? 0);
+              const now = Date.now();
+              setRetryBanner(prev => ({
+                attempt: nextRetryAttempt,
+                retryAtMs: now + Math.max(nextRetryDelaySec, 0) * 1000,
+                startedAtMs: prev?.startedAtMs ?? now,
+              }));
+            } else if (
+              uploadState === 'uploading' ||
+              uploadState === 'completed'
+            ) {
+              setRetryBanner(null);
+              setSuppressInitialOfflineBanner(false);
+            }
+
+            if (
+              uploadState === 'preparing' ||
+              uploadState === 'uploading' ||
+              uploadState === 'reconnecting' ||
+              uploadState === 'paused_no_permission'
+            ) {
+              setHoldCompletionCardUntilMs(null);
+            }
+
+            setOverview(prev => ({
+              ...buildOverviewFromPayload(state, prev),
+              currentSpeedMbps:
+                uploadState === 'reconnecting'
+                  ? 0
+                  : ((state.currentSpeedMbps as number | undefined) ??
+                    prev.currentSpeedMbps),
+              retryAttempt:
+                uploadState === 'reconnecting'
+                  ? ((state.retryAttempt as number) ?? prev.retryAttempt ?? 0)
+                  : 0,
+              retryDelaySec:
+                uploadState === 'reconnecting'
+                  ? ((state.retryDelaySec as number) ?? prev.retryDelaySec ?? 0)
+                  : 0,
             }));
-          } else if (uploadState === 'uploading' || uploadState === 'completed') {
-            setRetryBanner(null);
-            setSuppressInitialOfflineBanner(false);
-          }
+            // Reload today stats when sync completes
+            if (state.uploadState === 'completed') {
+              loadTodayStats(NativeModules.NativeSyncEngine);
+              loadLatestSync(NativeModules.NativeSyncEngine);
+            }
+          },
+        );
 
-          if (uploadState === 'preparing' || uploadState === 'uploading' || uploadState === 'reconnecting' || uploadState === 'paused_no_permission') {
-            setHoldCompletionCardUntilMs(null);
-          }
-
-          setOverview((prev) => ({
-            ...buildOverviewFromPayload(state, prev),
-            currentSpeedMbps: uploadState === 'reconnecting'
-              ? 0
-              : ((state.currentSpeedMbps as number | undefined) ?? prev.currentSpeedMbps),
-            retryAttempt: uploadState === 'reconnecting'
-              ? ((state.retryAttempt as number) ?? prev.retryAttempt ?? 0)
-              : 0,
-            retryDelaySec: uploadState === 'reconnecting'
-              ? ((state.retryDelaySec as number) ?? prev.retryDelaySec ?? 0)
-              : 0,
-          }));
-          // Reload today stats when sync completes
-          if (state.uploadState === 'completed') {
-            loadTodayStats(NativeModules.NativeSyncEngine);
-            loadLatestSync(NativeModules.NativeSyncEngine);
-          }
-        });
-
-        queueSub = emitter.addListener('onQueueUpdated', (updatedQueue: Array<Record<string, unknown>>) => {
-          if (updatedQueue) {
-            setQueue(updatedQueue.map(mapQueueItem));
-          }
-        });
+        queueSub = emitter.addListener(
+          'onQueueUpdated',
+          (updatedQueue: Array<Record<string, unknown>>) => {
+            if (updatedQueue) {
+              setQueue(updatedQueue.map(mapQueueItem));
+            }
+          },
+        );
       } catch (e) {
         console.warn('Native module not available for SyncStatus');
         setInitialLoading(false);
@@ -667,20 +760,23 @@ export function SyncStatusScreen() {
   useEffect(() => {
     let appState = AppState.currentState;
     let foregroundBannerTimer: ReturnType<typeof setTimeout> | undefined;
-    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
-      const becameActive = appState !== 'active' && nextState === 'active';
-      appState = nextState;
-      if (!becameActive) {
-        return;
-      }
-      setSuppressInitialOfflineBanner(true);
-      if (foregroundBannerTimer) {
-        clearTimeout(foregroundBannerTimer);
-      }
-      foregroundBannerTimer = setTimeout(() => {
-        setSuppressInitialOfflineBanner(false);
-      }, STARTUP_CONNECTION_GRACE_MS);
-    });
+    const subscription = AppState.addEventListener(
+      'change',
+      (nextState: AppStateStatus) => {
+        const becameActive = appState !== 'active' && nextState === 'active';
+        appState = nextState;
+        if (!becameActive) {
+          return;
+        }
+        setSuppressInitialOfflineBanner(true);
+        if (foregroundBannerTimer) {
+          clearTimeout(foregroundBannerTimer);
+        }
+        foregroundBannerTimer = setTimeout(() => {
+          setSuppressInitialOfflineBanner(false);
+        }, STARTUP_CONNECTION_GRACE_MS);
+      },
+    );
 
     return () => {
       if (foregroundBannerTimer) {
@@ -720,20 +816,29 @@ export function SyncStatusScreen() {
 
   const keyExtractor = useCallback((item: QueueItem) => item.id, []);
 
-  const summaryTotalCount = Math.max(overview.totalCount, overview.completedCount + queue.length);
+  const summaryTotalCount = Math.max(
+    overview.totalCount,
+    overview.completedCount + queue.length,
+  );
   const summaryTotalBytes = Math.max(
     overview.totalBytes,
-    overview.completedBytes + queue.reduce((sum, item) => sum + item.rawFileSize, 0),
+    overview.completedBytes +
+      queue.reduce((sum, item) => sum + item.rawFileSize, 0),
   );
   const summaryTransferredBytes = Math.min(
     summaryTotalBytes,
     overview.completedBytes + overview.currentFileConfirmedBytes,
   );
-  const activeQueueItem = queue.find((item) => item.fileKey.length > 0 && item.fileKey === overview.currentFile);
+  const activeQueueItem = queue.find(
+    item => item.fileKey.length > 0 && item.fileKey === overview.currentFile,
+  );
   const activeFileName = overview.currentFilename || activeQueueItem?.name;
 
-  const isDone = overview.uploadState === 'completed' ||
-    (overview.uploadState === 'idle' && queue.length === 0 && todayStats.fileCount > 0);
+  const isDone =
+    overview.uploadState === 'completed' ||
+    (overview.uploadState === 'idle' &&
+      queue.length === 0 &&
+      todayStats.fileCount > 0);
   const holdCompletionCard =
     holdCompletionCardUntilMs !== null &&
     Date.now() < holdCompletionCardUntilMs &&
@@ -741,24 +846,27 @@ export function SyncStatusScreen() {
     overview.uploadState !== 'uploading' &&
     overview.uploadState !== 'reconnecting' &&
     overview.uploadState !== 'paused_no_permission';
-  const boundDeviceName = bindingState?.deviceAlias || bindingState?.deviceName || (
-    bindingState?.deviceType === 'win' ? 'Windows 电脑' : '电脑'
-  );
+  const boundDeviceName =
+    bindingState?.deviceAlias ||
+    bindingState?.deviceName ||
+    (bindingState?.deviceType === 'win' ? 'Windows 电脑' : '电脑');
   const effectiveConnectionState = getEffectiveConnectionState(
     bindingState?.connectionState,
     {
       progressPercent: overview.progressPercent,
       currentFileKey: overview.currentFile,
-      queueHasActiveItem: queue.some((item) => (
-        item.status === 'preparing' ||
-        item.status === 'cloud_downloading' ||
-        item.status === 'uploading'
-      )),
-      queueHasUploadingItem: queue.some((item) => item.status === 'uploading'),
+      queueHasActiveItem: queue.some(
+        item =>
+          item.status === 'preparing' ||
+          item.status === 'cloud_downloading' ||
+          item.status === 'uploading',
+      ),
+      queueHasUploadingItem: queue.some(item => item.status === 'uploading'),
       transferredBytes: overview.currentFileConfirmedBytes,
-      uploadState: overview.uploadState === 'cloud_downloading'
-        ? 'preparing'
-        : overview.uploadState,
+      uploadState:
+        overview.uploadState === 'cloud_downloading'
+          ? 'preparing'
+          : overview.uploadState,
     },
   );
   const isConnectingState =
@@ -766,64 +874,56 @@ export function SyncStatusScreen() {
     effectiveConnectionState === 'connecting' ||
     effectiveConnectionState === 'discovering';
   const isConnectionError = effectiveConnectionState === 'offline';
-  const isTransferInterrupted = retryBanner !== null || overview.uploadState === 'reconnecting';
+  const isTransferInterrupted =
+    retryBanner !== null || overview.uploadState === 'reconnecting';
   const isPermissionBlocked = overview.uploadState === 'paused_no_permission';
-  const suppressConnectionNotice = suppressInitialOfflineBanner && !isPermissionBlocked;
-  const reconnectElapsedMs = retryBanner ? Date.now() - retryBanner.startedAtMs : 0;
-  const isWaitingForNetworkRecovery = isTransferInterrupted && (
-    reconnectElapsedMs >= RECONNECT_PAUSED_THRESHOLD_MS ||
-    (retryBanner?.attempt ?? overview.retryAttempt ?? 0) >= RECONNECT_PAUSED_THRESHOLD_ATTEMPT
-  );
-  const isTransientReconnect = isTransferInterrupted && !isWaitingForNetworkRecovery;
+  const suppressConnectionNotice =
+    suppressInitialOfflineBanner && !isPermissionBlocked;
+  const reconnectElapsedMs = retryBanner
+    ? Date.now() - retryBanner.startedAtMs
+    : 0;
+  const isWaitingForNetworkRecovery =
+    isTransferInterrupted &&
+    (reconnectElapsedMs >= RECONNECT_PAUSED_THRESHOLD_MS ||
+      (retryBanner?.attempt ?? overview.retryAttempt ?? 0) >=
+        RECONNECT_PAUSED_THRESHOLD_ATTEMPT);
+  const isTransientReconnect =
+    isTransferInterrupted && !isWaitingForNetworkRecovery;
   const isBannerError =
     isPermissionBlocked ||
     isConnectionError ||
     (isTransferInterrupted && isWaitingForNetworkRecovery);
   const enableConnectionBanner = true;
-  const connectionNotice = (
-    isPermissionBlocked
-      ? '需要授予照片访问权限。'
-      : suppressConnectionNotice
+  const connectionNotice = isPermissionBlocked
+    ? '需要授予照片访问权限。'
+    : suppressConnectionNotice
       ? null
       : isTransferInterrupted
-      ? (
-        isWaitingForNetworkRecovery
+        ? isWaitingForNetworkRecovery
           ? '传输已暂停，等待网络恢复。'
           : `网络波动，正在重连“${boundDeviceName}”。`
-      )
-      : isConnectionError
-      ? (
-        `未连接到“${boundDeviceName}”，请确认电脑端 小豹闪传 正在运行。`
-      )
-      : isConnectingState
-        ? `正在连接到“${boundDeviceName}”。`
-        : null
-  );
-  const connectionDetail = (
-    isPermissionBlocked
-      ? '打开系统设置后允许访问照片，恢复后会自动继续同步。'
-      : suppressConnectionNotice
+        : isConnectionError
+          ? `未连接到“${boundDeviceName}”，请确认电脑端 Vivi Drop 正在运行。`
+          : isConnectingState
+            ? `正在连接到“${boundDeviceName}”。`
+            : null;
+  const connectionDetail = isPermissionBlocked
+    ? '打开系统设置后允许访问照片，恢复后会自动继续同步。'
+    : suppressConnectionNotice
       ? null
       : isTransferInterrupted
-              ? (
-                isWaitingForNetworkRecovery
-                  ? (
-                    retryCountdownSec > 0
-                      ? `已保留当前进度 ${formatBytes(summaryTransferredBytes)} / ${formatBytes(summaryTotalBytes)}，网络恢复后将在 ${retryCountdownSec} 秒后发起第 ${retryBanner?.attempt ?? overview.retryAttempt ?? 0} 次重试。`
-                      : `已保留当前进度 ${formatBytes(summaryTransferredBytes)} / ${formatBytes(summaryTotalBytes)}，网络恢复后会自动继续。`
-                  )
-                  : (
-                    retryCountdownSec > 0
-                      ? `已保留当前进度 ${formatBytes(summaryTransferredBytes)} / ${formatBytes(summaryTotalBytes)}，将在 ${retryCountdownSec} 秒后发起第 ${retryBanner?.attempt ?? overview.retryAttempt ?? 0} 次重试。`
-                      : `已保留当前进度 ${formatBytes(summaryTransferredBytes)} / ${formatBytes(summaryTotalBytes)}，正在重新建立连接。`
-                  )
-              )
-      : isConnectionError
-        ? '恢复网络或重新打开电脑端 小豹闪传 后会自动继续。'
-        : isConnectingState
-        ? '连接建立后会自动继续当前同步任务。'
-        : null
-  );
+        ? isWaitingForNetworkRecovery
+          ? retryCountdownSec > 0
+            ? `已保留当前进度 ${formatBytes(summaryTransferredBytes)} / ${formatBytes(summaryTotalBytes)}，网络恢复后将在 ${retryCountdownSec} 秒后发起第 ${retryBanner?.attempt ?? overview.retryAttempt ?? 0} 次重试。`
+            : `已保留当前进度 ${formatBytes(summaryTransferredBytes)} / ${formatBytes(summaryTotalBytes)}，网络恢复后会自动继续。`
+          : retryCountdownSec > 0
+            ? `已保留当前进度 ${formatBytes(summaryTransferredBytes)} / ${formatBytes(summaryTotalBytes)}，将在 ${retryCountdownSec} 秒后发起第 ${retryBanner?.attempt ?? overview.retryAttempt ?? 0} 次重试。`
+            : `已保留当前进度 ${formatBytes(summaryTransferredBytes)} / ${formatBytes(summaryTotalBytes)}，正在重新建立连接。`
+        : isConnectionError
+          ? '恢复网络或重新打开电脑端 Vivi Drop 后会自动继续。'
+          : isConnectingState
+            ? '连接建立后会自动继续当前同步任务。'
+            : null;
 
   useEffect(() => {
     if (!connectionNotice) {
@@ -870,7 +970,23 @@ export function SyncStatusScreen() {
         </View>
       </View>
 
-      {initialLoading || !enableConnectionBanner || !connectionNotice || !showConnectionBanner ? null : (
+      {isAndroid ? (
+        <View style={styles.androidNoticeCard}>
+          <Text style={styles.androidNoticeTitle}>
+            {'Android 端基线已接入'}
+          </Text>
+          <Text style={styles.androidNoticeBody}>
+            {
+              '当前版本已支持 Android 工程启动、局域网自动发现、手动配对入口与设置页；扫码配对、后台上传与增量同步引擎仍沿用 iOS 实现，尚未在 Android 落地。'
+            }
+          </Text>
+        </View>
+      ) : null}
+
+      {initialLoading ||
+      !enableConnectionBanner ||
+      !connectionNotice ||
+      !showConnectionBanner ? null : (
         <View
           style={[
             styles.connectionBanner,
@@ -916,20 +1032,26 @@ export function SyncStatusScreen() {
                 }}
                 style={styles.connectionBannerAction}
               >
-                <Text style={styles.connectionBannerActionText}>{'打开系统设置'}</Text>
+                <Text style={styles.connectionBannerActionText}>
+                  {'打开系统设置'}
+                </Text>
               </Pressable>
             ) : null}
           </View>
         </View>
       )}
 
-      {initialLoading ? null : (isDone || holdCompletionCard) ? (
+      {initialLoading ? null : isDone || holdCompletionCard ? (
         /* ---- Completion card ---- */
         <View style={styles.progressCard}>
           <CompletionCard
             fileCount={todayStats.fileCount}
             totalSize={formatBytes(todayStats.totalBytes)}
-            latestSyncLabel={latestSync ? `${formatDateTimeLabel(latestSync.updatedAt)} · ${latestSync.deviceName}` : undefined}
+            latestSyncLabel={
+              latestSync
+                ? `${formatDateTimeLabel(latestSync.updatedAt)} · ${latestSync.deviceName}`
+                : undefined
+            }
           />
         </View>
       ) : (
@@ -987,12 +1109,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 12,
-    zIndex: 30,  // Must be above connectionBannerFloating (zIndex: 20)
+    zIndex: 30, // Must be above connectionBannerFloating (zIndex: 20)
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: DARK,
+  },
+  androidNoticeCard: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.76)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.88)',
+  },
+  androidNoticeTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#28597e',
+    marginBottom: 6,
+  },
+  androidNoticeBody: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#5d7f98',
   },
   headerActions: {
     flexDirection: 'row',

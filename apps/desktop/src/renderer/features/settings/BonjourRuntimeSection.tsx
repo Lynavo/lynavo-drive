@@ -36,7 +36,8 @@ export function BonjourRuntimeSection() {
       toast.success(result.message);
     } catch (error) {
       toast.error('Bonjour 安装失败', {
-        description: error instanceof Error ? error.message : '请稍后重试，或改用苹果官方安装页面。',
+        description:
+          error instanceof Error ? error.message : '请稍后重试，或改用苹果官方安装页面。',
       });
     } finally {
       setInstalling(false);
@@ -64,7 +65,7 @@ export function BonjourRuntimeSection() {
             </div>
             <p className="text-xs text-muted-foreground">
               {runtime.bonjour.message ??
-                '小豹闪传 会在 Windows 上优先使用 Bonjour for Windows，让 iPhone 扫描更稳定。'}
+                'Vivi Drop 会在 Windows 上优先使用 Bonjour for Windows，让 iPhone 扫描更稳定。'}
             </p>
           </div>
 
@@ -87,7 +88,11 @@ export function BonjourRuntimeSection() {
               disabled={retrying || runtime.status === 'starting' || installing}
               onClick={() => void handleRetry()}
             >
-              {retrying ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+              {retrying ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RotateCcw className="h-4 w-4" />
+              )}
               重试后台服务
             </Button>
             {!usingBonjour && (
@@ -96,7 +101,9 @@ export function BonjourRuntimeSection() {
                 variant="ghost"
                 size="sm"
                 disabled={installing}
-                onClick={() => void window.electronAPI.files.openExternal(BONJOUR_WINDOWS_SUPPORT_URL)}
+                onClick={() =>
+                  void window.electronAPI.files.openExternal(BONJOUR_WINDOWS_SUPPORT_URL)
+                }
               >
                 打开苹果官方页面
               </Button>
@@ -106,9 +113,7 @@ export function BonjourRuntimeSection() {
 
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-xl bg-white/70 px-4 py-3">
-            <div className="mb-1 text-xs font-medium text-muted-foreground">
-              当前广播模式
-            </div>
+            <div className="mb-1 text-xs font-medium text-muted-foreground">当前广播模式</div>
             <p className="text-sm font-medium text-foreground">
               {usingBonjour ? 'Apple Bonjour' : '兼容模式（zeroconf fallback）'}
             </p>
@@ -122,16 +127,12 @@ export function BonjourRuntimeSection() {
               {runtime.bonjour.advertisedIP ?? '启动中…'}
             </p>
             {runtime.bonjour.advertisedIP ? (
-              <p className="mt-1 text-xs text-muted-foreground">
-                iPhone 需与此 IP 在同一局域网段
-              </p>
+              <p className="mt-1 text-xs text-muted-foreground">iPhone 需与此 IP 在同一局域网段</p>
             ) : null}
           </div>
 
           <div className="rounded-xl bg-white/70 px-4 py-3">
-            <div className="mb-1 text-xs font-medium text-muted-foreground">
-              运行时路径
-            </div>
+            <div className="mb-1 text-xs font-medium text-muted-foreground">运行时路径</div>
             <p className="break-all text-sm font-medium text-foreground">
               {runtime.bonjour.path ?? '未检测到 Bonjour 运行时'}
             </p>

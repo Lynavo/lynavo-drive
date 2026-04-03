@@ -83,8 +83,8 @@ func TestNew_SeedsExist(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetShareConfig: %v", err)
 	}
-	if cfg.ShareName != "SyncFlow" {
-		t.Errorf("expected share_name 'SyncFlow', got %q", cfg.ShareName)
+	if cfg.ShareName != "Vivi Drop" {
+		t.Errorf("expected share_name 'Vivi Drop', got %q", cfg.ShareName)
 	}
 	if cfg.ShareStatus != "unknown" {
 		t.Errorf("expected share_status 'unknown', got %q", cfg.ShareStatus)
