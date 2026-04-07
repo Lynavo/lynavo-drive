@@ -24,7 +24,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { DiscoveredDeviceDTO } from '@syncflow/contracts';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -35,6 +35,7 @@ import {
   shareDiagnosticsArchive,
 } from '../utils/shareDiagnosticsArchive';
 import { buildManualPairDevice } from './deviceDiscoveryManualPairing';
+import { shouldKeepCachedDevicesVisible } from './deviceDiscoveryRefresh';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -155,75 +156,110 @@ export function DeviceDiscoveryScreen() {
   // Popover & Modal state
   const [showPairingMenu, setShowPairingMenu] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
+  const devicesRef = useRef<DiscoveredDevice[]>([]);
+  const preserveCachedDevicesRef = useRef(false);
+
+  useEffect(() => {
+    devicesRef.current = devices;
+  }, [devices]);
 
   // ---------------------------------------------------------------------------
   // Native module discovery
   // ---------------------------------------------------------------------------
 
-  useEffect(() => {
-    console.log('[DiscoveryScreen] mounted');
-    let subscription: { remove: () => void } | undefined;
-    let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[DiscoveryScreen] focused, starting discovery session');
+      preserveCachedDevicesRef.current = devicesRef.current.length > 0;
+      setScanning(devicesRef.current.length === 0);
 
-    try {
-      const { NativeSyncEngine } = NativeModules;
-      if (NativeSyncEngine) {
-        console.log(
-          '[DiscoveryScreen] NativeSyncEngine available, subscribing to discovery events',
-        );
-        const emitter = new NativeEventEmitter(NativeSyncEngine);
-        subscription = emitter.addListener(
-          'onDiscoveredDevicesChanged',
-          (discoveredDevices: DiscoveredDevice[]) => {
-            console.log(
-              '[DiscoveryScreen] onDiscoveredDevicesChanged',
-              discoveredDevices.length,
-              deviceDiscoveryDebugSummary(discoveredDevices),
-            );
-            setDevices(discoveredDevices);
-            if (discoveredDevices.length > 0) {
-              setScanning(false);
-              if (timeoutTimer) {
-                clearTimeout(timeoutTimer);
-                timeoutTimer = undefined;
-              }
-            }
-          },
-        );
-        console.log('[DiscoveryScreen] calling startDiscovery');
-        NativeSyncEngine.startDiscovery()
-          .then(() => console.log('[DiscoveryScreen] startDiscovery resolved'))
-          .catch((e: Error) =>
-            console.warn('[DiscoveryScreen] startDiscovery failed:', e),
-          );
-        // Timeout fallback: if no devices found after 8s, stop scanning animation
-        timeoutTimer = setTimeout(() => {
+      let subscription: { remove: () => void } | undefined;
+      let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
+
+      try {
+        const { NativeSyncEngine } = NativeModules;
+        if (NativeSyncEngine) {
           console.log(
-            '[DiscoveryScreen] discovery timeout reached with no devices',
+            '[DiscoveryScreen] NativeSyncEngine available, subscribing to discovery events',
           );
+          const emitter = new NativeEventEmitter(NativeSyncEngine);
+          subscription = emitter.addListener(
+            'onDiscoveredDevicesChanged',
+            (discoveredDevices: DiscoveredDevice[]) => {
+              console.log(
+                '[DiscoveryScreen] onDiscoveredDevicesChanged',
+                discoveredDevices.length,
+                deviceDiscoveryDebugSummary(discoveredDevices),
+              );
+
+              if (
+                shouldKeepCachedDevicesVisible({
+                  currentDeviceCount: devicesRef.current.length,
+                  nextDeviceCount: discoveredDevices.length,
+                  preserveCachedDevices: preserveCachedDevicesRef.current,
+                })
+              ) {
+                console.log(
+                  '[DiscoveryScreen] keeping cached devices visible during discovery refresh',
+                );
+                return;
+              }
+
+              preserveCachedDevicesRef.current = false;
+              setDevices(discoveredDevices);
+              if (discoveredDevices.length > 0) {
+                setScanning(false);
+                if (timeoutTimer) {
+                  clearTimeout(timeoutTimer);
+                  timeoutTimer = undefined;
+                }
+              }
+            },
+          );
+          console.log('[DiscoveryScreen] calling startDiscovery');
+          NativeSyncEngine.startDiscovery()
+            .then(() => console.log('[DiscoveryScreen] startDiscovery resolved'))
+            .catch((e: Error) =>
+              console.warn('[DiscoveryScreen] startDiscovery failed:', e),
+            );
+          // Timeout fallback: if no devices found after 8s, stop scanning animation
+          timeoutTimer = setTimeout(() => {
+            console.log(
+              '[DiscoveryScreen] discovery timeout reached with no devices',
+            );
+            preserveCachedDevicesRef.current = false;
+            setScanning(false);
+          }, 8000);
+        } else {
+          console.log('[DiscoveryScreen] NativeSyncEngine unavailable');
           setScanning(false);
-        }, 8000);
-      } else {
-        console.log('[DiscoveryScreen] NativeSyncEngine unavailable');
+        }
+      } catch (e) {
+        console.warn('[DiscoveryScreen] setup error:', e);
         setScanning(false);
       }
-    } catch (e) {
-      console.warn('[DiscoveryScreen] setup error:', e);
-      setScanning(false);
-    }
 
+      return () => {
+        console.log(
+          '[DiscoveryScreen] blurred, cleaning up discovery listeners',
+        );
+        subscription?.remove();
+        if (timeoutTimer) clearTimeout(timeoutTimer);
+        preserveCachedDevicesRef.current = false;
+        try {
+          console.log('[DiscoveryScreen] calling stopDiscovery during cleanup');
+          NativeModules.NativeSyncEngine?.stopDiscovery();
+        } catch {
+          // ignore cleanup errors
+        }
+      };
+    }, []),
+  );
+
+  useEffect(() => {
+    console.log('[DiscoveryScreen] mounted');
     return () => {
-      console.log(
-        '[DiscoveryScreen] unmounting, cleaning up discovery listeners',
-      );
-      subscription?.remove();
-      if (timeoutTimer) clearTimeout(timeoutTimer);
-      try {
-        console.log('[DiscoveryScreen] calling stopDiscovery during cleanup');
-        NativeModules.NativeSyncEngine?.stopDiscovery();
-      } catch {
-        // ignore cleanup errors
-      }
+      console.log('[DiscoveryScreen] unmounted');
     };
   }, []);
 
@@ -277,11 +313,6 @@ export function DeviceDiscoveryScreen() {
           device.type
         }`,
       );
-      try {
-        NativeModules.NativeSyncEngine?.stopDiscovery();
-      } catch {
-        // ignore cleanup errors
-      }
       navigation.navigate('CodeVerify', {
         deviceId: device.deviceId,
         host: device.ip,
@@ -421,7 +452,7 @@ export function DeviceDiscoveryScreen() {
         )}
 
         {/* Device list */}
-        {!scanning && (
+        {(devices.length > 0 || !scanning) && (
           <View
             style={[styles.listSection, { paddingBottom: listBottomInset }]}
           >
