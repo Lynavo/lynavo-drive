@@ -91,15 +91,54 @@ func defaultDataDir() string {
 
 func selectDataDir(preferredPath string, legacyPath string) string {
 	if shouldPreferLegacyDataDir(preferredPath, legacyPath) {
+		if migrateLegacyDataDir(preferredPath, legacyPath) {
+			return preferredPath
+		}
 		return legacyPath
 	}
 	if isDir(preferredPath) {
 		return preferredPath
 	}
 	if isDir(legacyPath) {
+		if migrateLegacyDataDir(preferredPath, legacyPath) {
+			return preferredPath
+		}
 		return legacyPath
 	}
 	return preferredPath
+}
+
+func migrateLegacyDataDir(preferredPath string, legacyPath string) bool {
+	if !isDir(legacyPath) {
+		return false
+	}
+
+	if !isDir(preferredPath) {
+		return os.Rename(legacyPath, preferredPath) == nil
+	}
+
+	preferredState := inspectDataDirState(preferredPath)
+	if preferredState.hasMeaningfulState() {
+		return false
+	}
+
+	backupPath := preferredPath + ".pre-legacy-migration"
+	if _, err := os.Stat(backupPath); err == nil {
+		return false
+	} else if !os.IsNotExist(err) {
+		return false
+	}
+
+	if err := os.Rename(preferredPath, backupPath); err != nil {
+		return false
+	}
+
+	if err := os.Rename(legacyPath, preferredPath); err != nil {
+		_ = os.Rename(backupPath, preferredPath)
+		return false
+	}
+
+	return true
 }
 
 func shouldPreferLegacyDataDir(preferredPath string, legacyPath string) bool {

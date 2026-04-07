@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"syscall"
 	"time"
@@ -137,12 +138,22 @@ func main() {
 func bootstrapReconciliation(st *store.Store, cfg *config.Config) {
 	// If share_config.receive_root is empty, set it from config
 	shareConfig, err := st.GetShareConfig()
-	if err == nil && shareConfig.ReceiveRoot == "" {
-		shareConfig.ReceiveRoot = cfg.ReceiveDir
-		if err := st.UpdateShareConfig(*shareConfig); err != nil {
-			slog.Warn("bootstrap: failed to set receive_root", "err", err)
-		} else {
-			slog.Info("bootstrap: set receive_root", "path", cfg.ReceiveDir)
+	if err == nil {
+		if shareConfig.ReceiveRoot == "" {
+			shareConfig.ReceiveRoot = cfg.ReceiveDir
+			if err := st.UpdateShareConfig(*shareConfig); err != nil {
+				slog.Warn("bootstrap: failed to set receive_root", "err", err)
+			} else {
+				slog.Info("bootstrap: set receive_root", "path", cfg.ReceiveDir)
+			}
+		} else if shouldRewriteLegacyReceiveRoot(cfg, shareConfig.ReceiveRoot) {
+			previousRoot := shareConfig.ReceiveRoot
+			shareConfig.ReceiveRoot = cfg.ReceiveDir
+			if err := st.UpdateShareConfig(*shareConfig); err != nil {
+				slog.Warn("bootstrap: failed to rewrite legacy receive_root", "from", previousRoot, "to", cfg.ReceiveDir, "err", err)
+			} else {
+				slog.Info("bootstrap: rewrote legacy receive_root", "from", previousRoot, "to", cfg.ReceiveDir)
+			}
 		}
 	}
 
@@ -164,4 +175,14 @@ func bootstrapReconciliation(st *store.Store, cfg *config.Config) {
 			slog.Info("bootstrap: regenerated connection code", "code", newCode)
 		}
 	}
+}
+
+func shouldRewriteLegacyReceiveRoot(cfg *config.Config, currentReceiveRoot string) bool {
+	if filepath.Base(cfg.DataDir) != "Vivi Drop" {
+		return false
+	}
+
+	legacyReceiveRoot := filepath.Join(filepath.Dir(cfg.DataDir), "小豹闪传", "received")
+	return filepath.Clean(currentReceiveRoot) == filepath.Clean(legacyReceiveRoot) &&
+		filepath.Clean(cfg.ReceiveDir) != filepath.Clean(legacyReceiveRoot)
 }

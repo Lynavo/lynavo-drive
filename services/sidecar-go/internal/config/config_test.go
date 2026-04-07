@@ -130,8 +130,14 @@ func TestSelectDataDirFallsBackToLegacyDir(t *testing.T) {
 		t.Fatalf("MkdirAll(legacyPath): %v", err)
 	}
 
-	if got := selectDataDir(preferredPath, legacyPath); got != legacyPath {
-		t.Errorf("selectDataDir() = %q, want %q", got, legacyPath)
+	if got := selectDataDir(preferredPath, legacyPath); got != preferredPath {
+		t.Errorf("selectDataDir() = %q, want %q", got, preferredPath)
+	}
+	if !isDir(preferredPath) {
+		t.Fatalf("expected preferred path to exist after migration")
+	}
+	if isDir(legacyPath) {
+		t.Fatalf("expected legacy path to be moved to preferred path")
 	}
 }
 
@@ -153,8 +159,14 @@ func TestSelectDataDirPrefersLegacyWhenPreferredHasFreshDB(t *testing.T) {
 		t.Fatalf("WriteFile(legacy sidecar.db): %v", err)
 	}
 
-	if got := selectDataDir(preferredPath, legacyPath); got != legacyPath {
-		t.Errorf("selectDataDir() = %q, want %q", got, legacyPath)
+	if got := selectDataDir(preferredPath, legacyPath); got != preferredPath {
+		t.Errorf("selectDataDir() = %q, want %q", got, preferredPath)
+	}
+	if !isDir(preferredPath + ".pre-legacy-migration") {
+		t.Fatalf("expected fresh preferred dir to be backed up before migration")
+	}
+	if isDir(legacyPath) {
+		t.Fatalf("expected legacy path to be moved to preferred path")
 	}
 }
 
@@ -176,8 +188,14 @@ func TestSelectDataDirPrefersLegacyWhenLegacyHasMeaningfulState(t *testing.T) {
 		shareStatus:   "share_registered",
 	})
 
-	if got := selectDataDir(preferredPath, legacyPath); got != legacyPath {
-		t.Errorf("selectDataDir() = %q, want %q", got, legacyPath)
+	if got := selectDataDir(preferredPath, legacyPath); got != preferredPath {
+		t.Errorf("selectDataDir() = %q, want %q", got, preferredPath)
+	}
+	if !isDir(preferredPath + ".pre-legacy-migration") {
+		t.Fatalf("expected placeholder preferred dir to be backed up before migration")
+	}
+	if isDir(legacyPath) {
+		t.Fatalf("expected legacy path to be moved to preferred path")
 	}
 }
 
