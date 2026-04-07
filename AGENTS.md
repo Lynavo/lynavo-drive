@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-Vivi Drop V2：iPhone → Desktop（macOS / Windows）局域网素材无感增量同步工具。Monorepo 当前包含 Electron 桌面应用、Go sidecar、React Native 移动端，以及 iOS 原生 `SyncEngine`。
+Vivi Drop V2：移动端 → Desktop（macOS / Windows）局域网素材无感增量同步工具。Monorepo 当前包含 Electron 桌面应用、Go sidecar、React Native 移动端；其中 iOS 具备完整原生 `SyncEngine`，Android 当前为基础壳层和桥接入口。
 
 ## 当前开发依据
 
@@ -79,12 +79,14 @@ pnpm format:check      # 格式检查
 ## 编码规范
 
 ### TypeScript
+
 - strict 模式，不允许 `any`
 - 所有共享类型从 `@syncflow/contracts` 导入
 - 文件路径使用 `@renderer/` alias（在 renderer 内）
 - 组件使用 named export，不用 default export
 
 ### React (Desktop Renderer)
+
 - React 18.3（不是 19）
 - shadcn/ui new-york 风格，通过 `npx shadcn@latest add` 安装组件
 - 状态管理用 zustand，不用 Context 或 Redux
@@ -93,12 +95,14 @@ pnpm format:check      # 格式检查
 - 玻璃态效果用 `<GlassCard>` 组件 + `@syncflow/design-tokens` 的 elevation/glass token
 
 ### Electron
+
 - main/preload/renderer 严格隔离
 - IPC channel 名定义在 `src/main/ipc-handlers.ts` 的 `IPC` 常量对象
 - preload 通过 `contextBridge.exposeInMainWorld('electronAPI', ...)` 暴露 API
 - renderer 不直接访问 sidecar、文件系统、SQLite，全部通过 preload bridge / main 进程转发
 
 ### Go Sidecar
+
 - 独立 `go.mod`，不受 turbo 管理
 - 标准库优先（`net/http`, `log/slog`）
 - SQLite 用 `mattn/go-sqlite3`（CGO）
@@ -106,6 +110,7 @@ pnpm format:check      # 格式检查
 - 所有 SQL 查询必须使用参数化查询
 
 ### 测试
+
 - vitest 4.1（TypeScript），环境为 jsdom
 - 测试文件放在 `__tests__/` 目录下，紧挨被测模块
 - store 测试验证状态转换和 action 行为
@@ -116,7 +121,7 @@ pnpm format:check      # 格式检查
 
 - **Monorepo / Desktop / Sidecar / Mobile SyncEngine**：都已落地，不再是 greenfield 阶段
 - **当前重点**：异常恢复、后台上传、连接状态提示、beta 收口和发布验证
-- **回归基线**：以 `go test ./...`、`pnpm --filter @syncflow/mobile exec tsc --noEmit`、iOS 构建和 `docs/testing/beta-test-matrix.md` 为准
+- **回归基线**：以 `go test ./...`、`pnpm --filter @syncflow/mobile exec tsc --noEmit`、iOS 构建、Android Debug 构建（触及 Android 工程时）和 `docs/testing/beta-test-matrix.md` 为准
 - **交接基线**：新同事优先依赖 `docs/architecture/*`、`docs/operations/*`、`docs/release/release-playbook.md`
 
 ## 排障与发布入口

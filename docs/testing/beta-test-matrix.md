@@ -24,14 +24,14 @@ go test ./...
 
 当前关键用例：
 
-| 用例 | 位置 | 覆盖点 |
-| --- | --- | --- |
-| 默认配置加载 | `internal/config/config_test.go` | 默认端口、目录、设备名 |
-| 完整配对+传输 | `internal/server/connection_test.go` | `HELLO -> PAIR -> SYNC -> FILE_END` |
-| 断线后续传 | `internal/server/connection_test.go` | 部分写入、重连、`RESUME`、最终 hash 正确 |
-| ACK 定时 flush | `internal/server/connection_test.go` | 没有新 frame 时仍能按间隔发 ACK |
-| 错误路径 | `internal/server/connection_test.go` | 错误连接码、重复文件、hash mismatch |
-| FileWriter 续传 seek | `internal/server/file_writer_test.go` | `.part` 恢复后写指针正确 |
+| 用例                 | 位置                                  | 覆盖点                                   |
+| -------------------- | ------------------------------------- | ---------------------------------------- |
+| 默认配置加载         | `internal/config/config_test.go`      | 默认端口、目录、设备名                   |
+| 完整配对+传输        | `internal/server/connection_test.go`  | `HELLO -> PAIR -> SYNC -> FILE_END`      |
+| 断线后续传           | `internal/server/connection_test.go`  | 部分写入、重连、`RESUME`、最终 hash 正确 |
+| ACK 定时 flush       | `internal/server/connection_test.go`  | 没有新 frame 时仍能按间隔发 ACK          |
+| 错误路径             | `internal/server/connection_test.go`  | 错误连接码、重复文件、hash mismatch      |
+| FileWriter 续传 seek | `internal/server/file_writer_test.go` | `.part` 恢复后写指针正确                 |
 
 关键入口：
 
@@ -50,6 +50,9 @@ pnpm --filter @syncflow/mobile exec tsc --noEmit
 cd /Volumes/workspace/work/sync-flow/apps/mobile/ios
 xcodebuild -workspace Vivi DropMobile.xcworkspace -scheme Vivi DropMobile -configuration Debug -destination 'generic/platform=iOS' build
 xcodebuild -workspace Vivi DropMobile.xcworkspace -scheme Vivi DropMobile -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
+
+cd /Volumes/workspace/work/sync-flow/apps/mobile/android
+./gradlew assembleDebug
 ```
 
 验收口径：
@@ -57,6 +60,7 @@ xcodebuild -workspace Vivi DropMobile.xcworkspace -scheme Vivi DropMobile -confi
 1. TypeScript 通过
 2. iOS Debug 构建通过
 3. iOS Release smoke 构建通过
+4. Android Debug 构建通过（涉及 Android 工程或桥接时）
 
 ## 3. 真机脚本回归
 
@@ -76,15 +80,15 @@ bash /Volumes/workspace/work/sync-flow/scripts/ios/syncflow_upload_eval.sh \
 
 ### 3.1 可复跑模式
 
-| 模式 | 目的 | 说明 |
-| --- | --- | --- |
-| `batch` | 标准上传回归 | 单轮或多轮传输，观察吞吐与完成状态 |
-| `recovery-app` | App 重启恢复 | 传输中杀 app，再拉起，看是否 `RESUME` |
-| `recovery-sidecar` | Sidecar 重启恢复 | 传输中重启 sidecar，看是否自动续传 |
-| `recovery-late-sidecar` | Sidecar 晚启动 | app 先进入 backoff，再启动 sidecar，看是否恢复 |
-| `recovery-sidecar-pause` | ACK 黑洞/链路冻结 | `SIGSTOP` sidecar 一段时间，再恢复 |
-| `recovery-app-suspend` | App 挂起恢复 | 传输中 suspend app，再恢复 |
-| `all` | 全套串跑 | 依次执行上面所有模式 |
+| 模式                     | 目的              | 说明                                           |
+| ------------------------ | ----------------- | ---------------------------------------------- |
+| `batch`                  | 标准上传回归      | 单轮或多轮传输，观察吞吐与完成状态             |
+| `recovery-app`           | App 重启恢复      | 传输中杀 app，再拉起，看是否 `RESUME`          |
+| `recovery-sidecar`       | Sidecar 重启恢复  | 传输中重启 sidecar，看是否自动续传             |
+| `recovery-late-sidecar`  | Sidecar 晚启动    | app 先进入 backoff，再启动 sidecar，看是否恢复 |
+| `recovery-sidecar-pause` | ACK 黑洞/链路冻结 | `SIGSTOP` sidecar 一段时间，再恢复             |
+| `recovery-app-suspend`   | App 挂起恢复      | 传输中 suspend app，再恢复                     |
+| `all`                    | 全套串跑          | 依次执行上面所有模式                           |
 
 对应入口：
 

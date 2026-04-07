@@ -1,16 +1,19 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
-import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
-import type { Code } from 'react-native-vision-camera';
+import { StyleSheet, Text, View, TouchableOpacity, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { Icon } from '../components/Icon';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-export function QRScannerScreen() {
+function IOSQRScannerScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const [hasPermission, setHasPermission] = useState(false);
+  const {
+    Camera,
+    useCameraDevice,
+    useCodeScanner,
+  } = require('react-native-vision-camera') as typeof import('react-native-vision-camera');
   const device = useCameraDevice('back');
   // Use a ref instead of state so that the onCodeScanned callback (fired on a
   // native thread) always reads the latest value rather than a stale closure.
@@ -25,7 +28,11 @@ export function QRScannerScreen() {
 
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
-    onCodeScanned: (codes: Code[]) => {
+    onCodeScanned: (
+      codes: Array<{
+        value?: string | null;
+      }>,
+    ) => {
       if (scannedRef.current) return;
       if (codes.length > 0) {
         const value = codes[0].value;
@@ -123,6 +130,40 @@ export function QRScannerScreen() {
   );
 }
 
+function AndroidQRScannerFallback() {
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+
+  return (
+    <SafeAreaView style={styles.androidFallbackContainer}>
+      <View style={styles.androidFallbackCard}>
+        <View style={styles.androidFallbackIcon}>
+          <Icon name="scan-outline" size={28} color="#3b9fd8" />
+        </View>
+        <Text style={styles.androidFallbackTitle}>{'Android 暂未提供扫码配对'}</Text>
+        <Text style={styles.androidFallbackBody}>
+          {
+            '当前 Android 基线版本先开放基础桥接与手动配对入口。请返回上一页，使用“手动配对”输入桌面端 IPv4 地址继续。'
+          }
+        </Text>
+        <TouchableOpacity
+          style={styles.androidFallbackButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.androidFallbackButtonText}>{'返回手动配对'}</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+export function QRScannerScreen() {
+  if (Platform.OS === 'android') {
+    return <AndroidQRScannerFallback />;
+  }
+
+  return <IOSQRScannerScreen />;
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -194,5 +235,51 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-  }
+  },
+  androidFallbackContainer: {
+    flex: 1,
+    backgroundColor: '#d6ecf8',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  androidFallbackCard: {
+    backgroundColor: 'rgba(255,255,255,0.86)',
+    borderRadius: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 28,
+    alignItems: 'center',
+    gap: 16,
+  },
+  androidFallbackIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: '#eef6fc',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  androidFallbackTitle: {
+    color: '#1a3a5c',
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  androidFallbackBody: {
+    color: '#4a6a8a',
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  androidFallbackButton: {
+    marginTop: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 999,
+    backgroundColor: '#3b9fd8',
+  },
+  androidFallbackButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
 });

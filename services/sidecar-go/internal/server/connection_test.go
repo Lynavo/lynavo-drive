@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/binary"
@@ -438,6 +439,45 @@ func TestResumeAfterDisconnect(t *testing.T) {
 		if content[i] != payload[i] {
 			t.Fatalf("file content mismatch at byte %d after resume", i)
 		}
+	}
+}
+
+func TestPauseTransferWhenDiskFallsBelowThresholdMidFile(t *testing.T) {
+	client, st, cfg, cleanup := setupTestConnection(t)
+	defer cleanup()
+
+	_ = doPairing(t, client)
+
+	sessionID := "sess-low-disk-001"
+	fileKey := "photo-low-disk-001"
+	filename := "disk-low.jpg"
+	payload := bytes.Repeat([]byte("a"), 1024)
+
+	doSyncBegin(t, client, sessionID, 1, int64(len(payload)))
+
+	initRes := doFileInit(t, client, fileKey, filename, int64(len(payload)))
+	if initRes.Action != "UPLOAD" {
+		t.Fatalf("expected action=UPLOAD, got %q", initRes.Action)
+	}
+
+	cfg.LowDiskThresholdBytes = 1 << 60
+	sendFileData(t, client, fileKey, 0, payload[:512])
+
+	var errMsg protocol.ErrorMsg
+	recvJSON(t, client, protocol.TypeError, &errMsg)
+	if errMsg.Code != "LOW_DISK_PAUSED" {
+		t.Fatalf("expected LOW_DISK_PAUSED error, got %q", errMsg.Code)
+	}
+
+	upload, err := st.GetUpload(fileKey)
+	if err != nil {
+		t.Fatalf("GetUpload: %v", err)
+	}
+	if upload.Status != "paused_resumable" {
+		t.Fatalf("expected paused_resumable status, got %q", upload.Status)
+	}
+	if upload.CommittedBytes != 0 {
+		t.Fatalf("expected committed bytes to remain 0 before rejected chunk write, got %d", upload.CommittedBytes)
 	}
 }
 

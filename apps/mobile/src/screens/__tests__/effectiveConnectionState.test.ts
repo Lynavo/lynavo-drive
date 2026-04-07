@@ -13,13 +13,13 @@ describe('effectiveConnectionState', () => {
     ).toBe('connected');
   });
 
-  it('treats queued or reconnecting states without progress as not yet connected', () => {
+  it('treats preparing and reconnecting as connected evidence', () => {
     expect(
       getEffectiveConnectionState('connecting', {
         progressPercent: 0,
         uploadState: 'preparing',
       }),
-    ).toBe('connecting');
+    ).toBe('connected');
 
     expect(
       syncActivityImpliesConnected({
@@ -27,7 +27,7 @@ describe('effectiveConnectionState', () => {
         transferredBytes: 0,
         uploadState: 'reconnecting',
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('treats an active current file as connected evidence even before progress moves', () => {

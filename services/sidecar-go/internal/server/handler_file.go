@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nicksyncflow/sidecar/internal/disk"
 	"github.com/nicksyncflow/sidecar/internal/events"
 	"github.com/nicksyncflow/sidecar/internal/protocol"
 	"github.com/nicksyncflow/sidecar/internal/store"
@@ -64,6 +65,13 @@ func (c *connection) handleFileData(hdr *protocol.FrameHeader, body []byte) erro
 
 	if c.fileWriter == nil {
 		return fmt.Errorf("FILE_DATA received but no file writer active")
+	}
+
+	isLow, remainingBytes, err := disk.IsLow(c.config.ReceiveDir, c.config.LowDiskThresholdBytes)
+	if err != nil {
+		slog.Warn("disk check failed during file transfer, continuing", "fileKey", fileKey, "err", err)
+	} else if isLow {
+		return c.pauseTransferForLowDisk(fileKey, remainingBytes)
 	}
 
 	// Write data to .part file
@@ -135,6 +143,53 @@ func (c *connection) handleFileData(hdr *protocol.FrameHeader, body []byte) erro
 	)
 
 	return nil
+}
+
+func (c *connection) pauseTransferForLowDisk(fileKey string, remainingBytes uint64) error {
+	committedOffset := int64(0)
+	if c.fileWriter != nil {
+		committedOffset = c.fileWriter.CommittedOffset()
+	}
+
+	transmissionMs := c.transferElapsedMs(fileKey)
+	if transmissionMs <= 0 && c.fileWriter != nil {
+		transmissionMs = c.fileWriter.ElapsedMs()
+	}
+
+	slog.Warn("low disk space detected during file transfer, pausing upload",
+		"fileKey", fileKey,
+		"remainingBytes", remainingBytes,
+		"committedOffset", committedOffset,
+	)
+
+	if fileKey != "" {
+		if err := c.flushProgress(fileKey, committedOffset); err != nil {
+			slog.Warn("failed to flush upload progress before low disk pause", "fileKey", fileKey, "err", err)
+		}
+		if err := c.store.PauseUploadForLowDisk(fileKey, committedOffset, transmissionMs); err != nil {
+			slog.Warn("failed to mark upload paused for low disk", "fileKey", fileKey, "err", err)
+		}
+	}
+
+	c.clearTransferTimer(fileKey)
+	c.clearAckState(fileKey)
+
+	if c.fileWriter != nil {
+		if err := c.fileWriter.Close(); err != nil {
+			slog.Warn("failed to close file writer after low disk pause", "fileKey", fileKey, "err", err)
+		}
+		c.fileWriter = nil
+	}
+
+	c.hub.Broadcast(events.Event{
+		Type: "disk.low",
+		Payload: map[string]any{
+			"remainingBytes": remainingBytes,
+		},
+	})
+	c.hub.Broadcast(events.Event{Type: "dashboard.updated", Payload: nil})
+
+	return c.sendError("LOW_DISK_PAUSED", fmt.Sprintf("remaining disk bytes %d below threshold", remainingBytes))
 }
 
 // handleFileEnd processes FILE_END_REQ. It verifies the SHA256 hash of the

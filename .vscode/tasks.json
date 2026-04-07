@@ -100,6 +100,25 @@
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": []
+    },
+    {
+      "label": "mobile: run android",
+      "type": "process",
+      "command": "corepack",
+      "args": [
+        "pnpm",
+        "--filter",
+        "@syncflow/mobile",
+        "exec",
+        "react-native",
+        "run-android",
+        "--no-packager"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": ["mobile: start metro"],
+      "problemMatcher": []
     }
   ]
 }

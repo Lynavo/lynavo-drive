@@ -6,14 +6,14 @@
 
 Vivi Drop 目前的目標非常聚焦：
 
-1. iPhone 自動發現並綁定一台 desktop
+1. mobile 端自動或半自動綁定一台 desktop
 2. 在區域網內把相簿素材無感增量同步到 desktop
 3. 在中斷、重連、背景、鎖定螢幕等場景下盡可能自動恢復
 4. 在 desktop 端提供佇列、歷史、儲存、診斷和發佈驗證能力
 
 目前範圍明確限制為：
 
-- 支援 `iPhone -> Desktop`（目前桌面端覆蓋 macOS / Windows）
+- 支援 `iOS -> Desktop` 完整同步鏈路；`Android -> Desktop` 目前僅完成壳层、配對入口與基礎橋接
 - 僅支援區域網傳輸
 - 不支援使用者在 UI 手動挑選、刪除、跳過或重排佇列
 - 同一台 iPhone 同一時間只傳 1 個檔案
@@ -66,8 +66,9 @@ Vivi Drop 目前的目標非常聚焦：
 職責：
 
 1. 展示發現頁、同步狀態、歷史、設定
-2. 透過原生 bridge 呼叫 `SyncEngine`
-3. 只承載 UI，不直接負責真實傳輸
+2. 透過原生 bridge 呼叫對應平台能力
+3. iOS 連到原生 `SyncEngine`；Android 目前連到基礎 `NativeSyncEngine` shell
+4. 只承載 UI，不直接負責真實傳輸
 
 關鍵目錄：
 
@@ -87,6 +88,7 @@ Vivi Drop 目前的目標非常聚焦：
 關鍵目錄：
 
 - `apps/mobile/ios/SyncEngine`
+- `apps/mobile/android/app/src/main/java/com/syncflow/mobile/sync`
 
 ## 3. 關鍵資料流
 
@@ -94,7 +96,7 @@ Vivi Drop 目前的目標非常聚焦：
 
 1. sidecar 透過 Bonjour 廣播 `_syncflow._tcp`
 2. macOS / Windows 優先使用原生 `dns-sd` 廣播；Windows 缺失 Bonjour 時會回退到 zeroconf 相容廣播
-3. iPhone 使用 `Network.framework` 瀏覽區域網服務
+3. iOS 使用 `Network.framework` 瀏覽區域網服務；Android 使用 `NsdManager` 瀏覽 `_syncflow._tcp`，並在未發現設備時回退到手動輸入 IP
 4. 目前實作優先使用 sidecar 廣播的 IPv4 資訊，避免 `fe80::` 連結本地 IPv6 誤判
 5. 發現列表展示的是「可探活、可連接」的設備，而不是單純有廣播的設備
 
@@ -157,7 +159,7 @@ Vivi Drop 目前的目標非常聚焦：
 
 ```text
 apps/desktop      Electron 桌面端
-apps/mobile       React Native + iOS 原生 SyncEngine
+apps/mobile       React Native iOS/Android + iOS 原生 SyncEngine + Android shell
 packages/contracts 共享 DTO、常量、連接埠、事件名
 packages/design-tokens 共享設計 token
 services/sidecar-go Go sidecar

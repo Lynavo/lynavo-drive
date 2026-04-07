@@ -221,6 +221,29 @@ func (s *Store) CompleteUpload(fileKey, finalPath, sha256 string, transmissionMs
 	return nil
 }
 
+// PauseUploadForLowDisk marks an in-flight upload as resumable when disk space
+// falls below the configured threshold mid-transfer.
+func (s *Store) PauseUploadForLowDisk(fileKey string, committedBytes, transmissionMs int64) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	result, err := s.db.Exec(`
+		UPDATE uploads
+		SET status = 'paused_resumable',
+		    committed_bytes = ?,
+		    active_transmission_ms = active_transmission_ms + ?,
+		    updated_at = ?
+		WHERE file_key = ?`,
+		committedBytes, transmissionMs, now, fileKey,
+	)
+	if err != nil {
+		return fmt.Errorf("pause upload for low disk %q: %w", fileKey, err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("pause upload for low disk %q: %w", fileKey, ErrNoRows)
+	}
+	return nil
+}
+
 // UpsertDailyStats inserts or updates a device daily stats record.
 func (s *Store) UpsertDailyStats(stat DailyStats) error {
 	_, err := s.db.Exec(`

@@ -18,6 +18,13 @@
       "type": "node-terminal",
       "request": "launch",
       "command": "cd \"${workspaceFolder}\" && corepack pnpm --filter @syncflow/desktop dev"
+    },
+    {
+      "name": "Mobile: Android (quick launch)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd \"${workspaceFolder}\" && corepack pnpm --filter @syncflow/mobile exec react-native run-android --no-packager",
+      "preLaunchTask": "mobile: start metro"
     }
   ]
 }

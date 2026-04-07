@@ -979,7 +979,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             switch syncError {
             case .networkError:
                 return true
-            case .databaseError, .pairingError, .permissionError:
+            case .databaseError, .pairingError, .permissionError, .lowDiskPaused:
                 return false
             }
         }
@@ -1127,6 +1127,35 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 updateBindingConnectionState(.offline, reason: "pipeline_cancelled")
             }
             stopSyncLifecycle(finalState: .idle)
+        } catch let error as SyncEngineError {
+            switch error {
+            case .lowDiskPaused(let message):
+                NSLog("[SyncEngine] sync pipeline paused due to low disk: %@", message)
+                syncDiagnosticsLog("SyncEngine", "sync pipeline paused due to low disk: \(message)")
+                protocolSession?.disconnect()
+                protocolSession = nil
+                stopSyncLifecycle(finalState: .idle)
+                recordRecentError(code: "LOW_DISK_PAUSED", message: message)
+                NativeSyncEngineModule.shared?.emitError([
+                    "code": "LOW_DISK_PAUSED",
+                    "message": message,
+                ])
+            default:
+                NSLog("[SyncEngine] sync pipeline failed: \(error)")
+                syncDiagnosticsLog("SyncEngine", "sync pipeline failed: \(error)")
+                protocolSession?.disconnect()
+                protocolSession = nil
+                clearResolvedSidecarHost()
+                if uploadStore?.getBinding() != nil {
+                    updateBindingConnectionState(.offline, reason: "pipeline_failed")
+                }
+                stopSyncLifecycle(finalState: .idle)
+                recordRecentError(code: "SYNC_PIPELINE_ERROR", message: "\(error)")
+                NativeSyncEngineModule.shared?.emitError([
+                    "code": "SYNC_PIPELINE_ERROR",
+                    "message": "\(error)",
+                ])
+            }
         } catch {
             NSLog("[SyncEngine] sync pipeline failed: \(error)")
             syncDiagnosticsLog("SyncEngine", "sync pipeline failed: \(error)")
@@ -1382,6 +1411,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         )
         var activeSessionId: String?
         var uploadRoundCompleted = false
+        var uploadRoundPausedForLowDisk = false
 
         defer {
             if let activeSessionId, sessionService.currentSessionId == activeSessionId {
@@ -1392,9 +1422,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             }
             session.disconnect()
             if !uploadRoundCompleted {
-                clearResolvedSidecarHost()
-                if uploadStore?.getBinding() != nil {
-                    updateBindingConnectionState(.offline, reason: "upload_round_incomplete")
+                if uploadRoundPausedForLowDisk {
+                    if uploadStore?.getBinding() != nil {
+                        updateBindingConnectionState(.connected, reason: "upload_round_paused_low_disk")
+                    }
+                } else {
+                    clearResolvedSidecarHost()
+                    if uploadStore?.getBinding() != nil {
+                        updateBindingConnectionState(.offline, reason: "upload_round_incomplete")
+                    }
                 }
             }
         }
@@ -1516,6 +1552,23 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     recoveryMode: recoveryMode
                 )
             } catch {
+                if let syncError = error as? SyncEngineError,
+                   case .lowDiskPaused(let message) = syncError
+                {
+                    uploadRoundPausedForLowDisk = true
+                    NSLog("[SyncEngine] low disk paused upload for %@: %@", asset.fileKey, message)
+                    syncDiagnosticsLog("SyncEngine", "low disk paused upload for \(asset.fileKey): \(message)")
+                    recordRecentError(code: "LOW_DISK_PAUSED", message: message)
+                    try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "queued")
+                    emitQueueToJS()
+                    prefetchTask?.cancel()
+                    await prefetchTask?.value
+                    if let leakedExport = nextExport {
+                        exportService.cleanup(tempURL: leakedExport.tempURL)
+                        nextExport = nil
+                    }
+                    throw syncError
+                }
                 if isRetryableSyncError(error) {
                     NSLog("[SyncEngine] retryable upload failure for %@: %@", asset.fileKey, "\(error)")
                     syncDiagnosticsLog("SyncEngine", "retryable upload failure for \(asset.fileKey): \(error)")
@@ -1625,6 +1678,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 perfLog("file=\(asset.fileKey) action=REJECT reason=\(reason) size=\(exported.fileSize)")
             }
             NSLog("[SyncEngine] REJECT \(exported.originalFilename): \(reason)")
+            if reason == "LOW_DISK_PAUSED" {
+                try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "queued")
+                clearRuntimeCurrentFile()
+                emitQueueToJS()
+                throw SyncEngineError.lowDiskPaused(reason)
+            }
             try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "skipped")
             clearRuntimeCurrentFile()
             emitQueueToJS()
@@ -2064,7 +2123,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     )
                 }
             } else if ackType == .error {
+                let errCode = ackRes["code"] as? String ?? ""
                 let errMsg = ackRes["message"] as? String ?? "server error"
+                if errCode == "LOW_DISK_PAUSED" {
+                    throw SyncEngineError.lowDiskPaused(errMsg)
+                }
                 throw SyncEngineError.networkError("FILE_DATA error: \(errMsg)")
             }
             // For other unexpected types, just continue

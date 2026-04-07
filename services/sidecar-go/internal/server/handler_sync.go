@@ -93,11 +93,18 @@ func (c *connection) handleFileInit(body []byte) error {
 	)
 
 	// Check disk space
-	isLow, _, err := disk.IsLow(c.config.ReceiveDir, c.config.LowDiskThresholdBytes)
+	isLow, remainingBytes, err := disk.IsLow(c.config.ReceiveDir, c.config.LowDiskThresholdBytes)
 	if err != nil {
 		slog.Warn("disk check failed, continuing", "err", err)
 	} else if isLow {
 		slog.Warn("low disk space, rejecting file", "fileKey", req.FileKey)
+		c.hub.Broadcast(events.Event{
+			Type: "disk.low",
+			Payload: map[string]any{
+				"remainingBytes": remainingBytes,
+			},
+		})
+		c.hub.Broadcast(events.Event{Type: "dashboard.updated", Payload: nil})
 		return c.sendJSON(protocol.TypeFileInitRes, protocol.FileInitRes{
 			Action: "REJECT",
 			Reason: "LOW_DISK_PAUSED",
