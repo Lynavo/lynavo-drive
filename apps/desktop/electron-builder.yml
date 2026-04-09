@@ -1,6 +1,7 @@
 appId: com.syncflow.desktop
 productName: Vivi Drop
 mac:
+  artifactName: ViviDrop-${version}-${arch}.${ext}
   target:
     - dmg
     - zip
@@ -25,7 +26,7 @@ mas:
   provisioningProfile: resources/embedded.provisionprofile
   notarize: null
 win:
-  artifactName: ${productName}-Setup.${ext}
+  artifactName: ViviDrop-${version}-${arch}.${ext}
   target:
     - target: nsis
       arch:

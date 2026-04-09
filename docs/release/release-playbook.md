@@ -101,13 +101,17 @@ pnpm package:desktop:signed:dir
 產物位置：
 
 - `apps/desktop/release/ViviDrop-0.1.0-arm64.dmg`
-- `apps/desktop/release/mac-arm64/Vivi Drop.app`
+- `apps/desktop/release/ViviDrop-0.1.0-x64.dmg`
+- `apps/desktop/release/mac*/Vivi Drop.app`
 
 發佈前至少確認：
 
 ```bash
-spctl --assess --type execute -vv "apps/desktop/release/mac-arm64/Vivi Drop.app"
+for app in apps/desktop/release/mac*/Vivi\ Drop.app; do
+  spctl --assess --type execute -vv "$app"
+done
 hdiutil verify apps/desktop/release/ViviDrop-0.1.0-arm64.dmg
+hdiutil verify apps/desktop/release/ViviDrop-0.1.0-x64.dmg
 ```
 
 ### 5.2 Windows NSIS / ZIP
@@ -120,8 +124,8 @@ pnpm package:desktop:win
 
 產物位置：
 
-- `apps/desktop/release/ViviDrop-Setup.exe`
-- `apps/desktop/release/ViviDrop-Setup.zip`
+- `apps/desktop/release/ViviDrop-0.1.0-x64.exe`
+- `apps/desktop/release/ViviDrop-0.1.0-x64.zip`
 
 發佈前至少確認：
 

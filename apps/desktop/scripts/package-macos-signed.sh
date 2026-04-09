@@ -78,7 +78,7 @@ echo "Target: ${TARGET}"
 cd "${REPO_ROOT}"
 
 pnpm --filter @syncflow/desktop build
-pnpm --filter @syncflow/desktop build:sidecar
+pnpm --filter @syncflow/desktop build:sidecar:mac
 
 BUILD_ARGS=(
   "-c.buildVersion=${SYNCFLOW_BUILD_NUMBER}"
@@ -86,7 +86,7 @@ BUILD_ARGS=(
 )
 
 if [[ "${TARGET}" == "dir" ]]; then
-  pnpm --filter @syncflow/desktop exec electron-builder --mac dir -c.mac.notarize=false "${BUILD_ARGS[@]}"
+  pnpm --filter @syncflow/desktop exec electron-builder --mac dir --arm64 --x64 -c.mac.notarize=false "${BUILD_ARGS[@]}"
 else
-  pnpm --filter @syncflow/desktop exec electron-builder --mac dmg "${BUILD_ARGS[@]}"
+  pnpm --filter @syncflow/desktop exec electron-builder --mac dmg --arm64 --x64 "${BUILD_ARGS[@]}"
 fi

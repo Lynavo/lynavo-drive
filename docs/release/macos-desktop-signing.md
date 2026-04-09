@@ -58,6 +58,7 @@ bash /Volumes/workspace/work/sync-flow/apps/desktop/scripts/package-macos-signed
 3. 调用 Apple `notarytool` 提交公证并等待结果
 4. 输出最终 DMG 到：
    - `/Volumes/workspace/work/sync-flow/apps/desktop/release`
+   - 其中包含 `ViviDrop-<version>-arm64.dmg` 和 `ViviDrop-<version>-x64.dmg`
 
 ## 4. 本地快速验签
 
@@ -76,7 +77,7 @@ bash /Volumes/workspace/work/sync-flow/apps/desktop/scripts/package-macos-signed
 
 这会产出已签名但未 notarize 的 `.app` 目录：
 
-- `/Volumes/workspace/work/sync-flow/apps/desktop/release/mac-arm64/Vivi Drop.app`
+- `/Volumes/workspace/work/sync-flow/apps/desktop/release/mac*/Vivi Drop.app`
 
 ## 5. 可覆盖的环境变量
 
@@ -104,7 +105,9 @@ pnpm --filter @syncflow/desktop package:signed
 ### 6.1 主 app 签名
 
 ```bash
-codesign -dv --verbose=4 /Volumes/workspace/work/sync-flow/apps/desktop/release/mac-arm64/Vivi Drop.app
+for app in /Volumes/workspace/work/sync-flow/apps/desktop/release/mac*/Vivi\ Drop.app; do
+  codesign -dv --verbose=4 "$app"
+done
 ```
 
 预期看到：
@@ -116,7 +119,9 @@ codesign -dv --verbose=4 /Volumes/workspace/work/sync-flow/apps/desktop/release/
 ### 6.2 sidecar 签名
 
 ```bash
-codesign -dv --verbose=4 /Volumes/workspace/work/sync-flow/apps/desktop/release/mac-arm64/Vivi Drop.app/Contents/Resources/syncflow-sidecar
+for app in /Volumes/workspace/work/sync-flow/apps/desktop/release/mac*/Vivi\ Drop.app; do
+  codesign -dv --verbose=4 "$app/Contents/Resources/syncflow-sidecar"
+done
 ```
 
 预期同样看到 `Developer ID Application` 和正确的 `TeamIdentifier`。
@@ -124,7 +129,9 @@ codesign -dv --verbose=4 /Volumes/workspace/work/sync-flow/apps/desktop/release/
 ### 6.3 Gatekeeper 评估
 
 ```bash
-spctl --assess --type execute -vv /Volumes/workspace/work/sync-flow/apps/desktop/release/mac-arm64/Vivi Drop.app
+for app in /Volumes/workspace/work/sync-flow/apps/desktop/release/mac*/Vivi\ Drop.app; do
+  spctl --assess --type execute -vv "$app"
+done
 ```
 
 公证完成并 staple 后，不应再看到：
