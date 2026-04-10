@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { ArrowUpDown, ArrowUp, ArrowDown, ExternalLink } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Table,
   TableHeader,
@@ -103,10 +104,13 @@ export function FileLedgerTable({ storagePath }: { storagePath: string }) {
     return result;
   }, [files, sortField, sortDirection]);
 
-  const handleOpen = (relativePath?: string) => {
-    if (relativePath && storagePath) {
-      const fullPath = `${storagePath}/${relativePath}`;
-      window.electronAPI?.files.openFile(fullPath);
+  const handleOpen = async (relativePath?: string) => {
+    if (!relativePath || !storagePath) return;
+    const fullPath = `${storagePath}/${relativePath}`;
+    try {
+      await window.electronAPI?.files.openFile(fullPath);
+    } catch {
+      toast.error('文件不存在或已被移除', { description: fullPath });
     }
   };
 

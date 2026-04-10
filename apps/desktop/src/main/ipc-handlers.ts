@@ -27,6 +27,8 @@ export const IPC = {
   SIDECAR_INSTALL_BONJOUR: 'sidecar:install-bonjour',
   SIDECAR_SHARE_STATUS: 'sidecar:share-status',
   SIDECAR_VALIDATE_SHARE: 'sidecar:validate-share',
+  SIDECAR_TRANSFER_ACTIVE: 'sidecar:transfer-active',
+  SIDECAR_SHARED_LIST: 'sidecar:shared-list',
   SUPPORT_EXPORT_DIAGNOSTICS: 'support:export-diagnostics',
   SUPPORT_APP_INFO: 'support:app-info',
   FILES_OPEN_FOLDER: 'files:open-folder',
@@ -69,6 +71,10 @@ export function registerIpcHandlers(sidecarManager: SidecarManager): void {
   ipcMain.handle(IPC.SIDECAR_INSTALL_BONJOUR, () => installBonjourForWindows(sidecarManager));
   ipcMain.handle(IPC.SIDECAR_SHARE_STATUS, () => sidecarClient.getShareStatus());
   ipcMain.handle(IPC.SIDECAR_VALIDATE_SHARE, () => sidecarClient.validateShare());
+  ipcMain.handle(IPC.SIDECAR_TRANSFER_ACTIVE, () => sidecarClient.getTransferActive());
+  ipcMain.handle(IPC.SIDECAR_SHARED_LIST, (_e, path?: string) =>
+    sidecarClient.getSharedList(path),
+  );
   ipcMain.handle(IPC.SUPPORT_EXPORT_DIAGNOSTICS, () => exportDiagnostics(sidecarManager));
   ipcMain.handle(IPC.SUPPORT_APP_INFO, () => getAppInfo());
 

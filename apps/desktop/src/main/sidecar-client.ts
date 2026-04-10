@@ -51,6 +51,7 @@ export const sidecarClient = {
       pageSize?: number;
       sortField?: DeviceFileSortField;
       sortDirection?: SortDirection;
+      endDate?: string;
     },
   ) => {
     const params = new URLSearchParams({ date });
@@ -58,6 +59,7 @@ export const sidecarClient = {
     if (options?.pageSize) params.set('pageSize', String(options.pageSize));
     if (options?.sortField) params.set('sortField', options.sortField);
     if (options?.sortDirection) params.set('sortDirection', options.sortDirection);
+    if (options?.endDate) params.set('endDate', options.endDate);
     return request<DeviceFileLedgerPageDTO>('GET', `/devices/${id}/files?${params.toString()}`);
   },
   getDeviceDates: (id: string) => request<{ dates: string[] }>('GET', `/devices/${id}/dates`),
@@ -70,4 +72,10 @@ export const sidecarClient = {
     request<import('@syncflow/contracts').ShareStatusDTO>('GET', '/share/status'),
   validateShare: () =>
     request<import('@syncflow/contracts').ShareStatusDTO>('POST', '/share/validate'),
+  getTransferActive: () =>
+    request<{ active: boolean }>('GET', '/transfer/active'),
+  getSharedList: (path?: string) => {
+    const endpoint = path ? `/shared/list/${path}` : '/shared/list';
+    return request<import('@syncflow/contracts').SharedDirectoryDTO>('GET', endpoint);
+  },
 };

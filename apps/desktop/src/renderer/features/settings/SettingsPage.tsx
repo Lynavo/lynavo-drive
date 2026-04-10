@@ -1,25 +1,10 @@
-import { useEffect } from 'react';
 import { BonjourRuntimeSection } from './BonjourRuntimeSection';
-import { useSettingsStore } from '@renderer/stores/settings-store';
-import { useSidecarRuntimeStore } from '@renderer/stores/sidecar-runtime-store';
 import { ConnectionCodeSection } from './ConnectionCodeSection';
 import { DeviceNameSection } from './DeviceNameSection';
-import { FilePathSection } from './FilePathSection';
-import { ShareAddressSection } from './ShareAddressSection';
 import { SupportSection } from './SupportSection';
-import { SystemGuideSection } from './SystemGuideSection';
 
 export function SettingsPage() {
-  const refreshShareStatus = useSettingsStore((s) => s.refreshShareStatus);
-  const sidecarStatus = useSidecarRuntimeStore((s) => s.runtime.status);
   const isWindows = window.electronAPI?.platform.isWindows?.() ?? false;
-
-  useEffect(() => {
-    if (sidecarStatus !== 'healthy') {
-      return;
-    }
-    void refreshShareStatus(true);
-  }, [refreshShareStatus, sidecarStatus]);
 
   return (
     <div className="flex-1 overflow-auto">
@@ -28,9 +13,7 @@ export function SettingsPage() {
 
         {/* Device Name */}
         <section className="mb-8">
-          <h2 className="mb-1 text-sm font-semibold text-foreground">
-            设备名称
-          </h2>
+          <h2 className="mb-1 text-sm font-semibold text-foreground">设备名称</h2>
           <p className="mb-4 text-xs text-muted-foreground">
             此名称将在局域网中广播，方便手机识别本台电脑
           </p>
@@ -39,51 +22,20 @@ export function SettingsPage() {
 
         {/* Connection Code */}
         <section className="mb-8">
-          <h2 className="mb-1 text-sm font-semibold text-foreground">
-            连接码管理
-          </h2>
-          <p className="mb-4 text-xs text-muted-foreground">
-            所有设备通过此连接码与电脑配对
-          </p>
+          <h2 className="mb-1 text-sm font-semibold text-foreground">连接码管理</h2>
+          <p className="mb-4 text-xs text-muted-foreground">所有设备通过此连接码与电脑配对</p>
           <ConnectionCodeSection />
-        </section>
-
-        {/* File Path Config */}
-        <section className="mb-8">
-          <h2 className="mb-1 text-sm font-semibold text-foreground">
-            文件地址配置
-          </h2>
-          <p className="mb-4 text-xs text-muted-foreground">
-            配置文件接收路径和共享设置
-          </p>
-          <FilePathSection />
-          <div className="mt-4">
-            <ShareAddressSection />
-          </div>
         </section>
 
         {isWindows && (
           <section className="mb-8">
-            <h2 className="mb-1 text-sm font-semibold text-foreground">
-              Windows Bonjour 广播
-            </h2>
+            <h2 className="mb-1 text-sm font-semibold text-foreground">Windows Bonjour 广播</h2>
             <p className="mb-4 text-xs text-muted-foreground">
               iPhone 重新扫描主要依赖 Bonjour/mDNS。
             </p>
             <BonjourRuntimeSection />
           </section>
         )}
-
-        {/* System Guide */}
-        <section>
-          <h2 className="mb-1 text-sm font-semibold text-foreground">
-            系统权限指引
-          </h2>
-          <p className="mb-4 text-xs text-muted-foreground">
-            局域网共享需要开启系统文件共享权限，并按系统类型完成共享目录配置
-          </p>
-          <SystemGuideSection />
-        </section>
 
         <section className="mt-8">
           <SupportSection />

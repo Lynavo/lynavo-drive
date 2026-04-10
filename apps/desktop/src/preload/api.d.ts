@@ -4,6 +4,7 @@ import type {
   DeviceFileLedgerPageDTO,
   DeviceFileSortField,
   SettingsDTO,
+  SharedDirectoryDTO,
   ShareStatusDTO,
   SortDirection,
 } from '@syncflow/contracts';
@@ -24,6 +25,7 @@ export interface ElectronAPI {
         pageSize?: number;
         sortField?: DeviceFileSortField;
         sortDirection?: SortDirection;
+        endDate?: string;
       },
     ): Promise<DeviceFileLedgerPageDTO>;
     getDeviceDates(deviceId: string): Promise<{ dates: string[] }>;
@@ -36,6 +38,8 @@ export interface ElectronAPI {
     installBonjour(): Promise<BonjourInstallResult>;
     getShareStatus(): Promise<ShareStatusDTO>;
     validateShare(): Promise<ShareStatusDTO>;
+    getTransferActive(): Promise<{ active: boolean }>;
+    getSharedList(path?: string): Promise<SharedDirectoryDTO>;
   };
   files: {
     openFolder(path: string): Promise<void>;

@@ -7,6 +7,7 @@ interface StatCardProps {
   label: string;
   value: string | number;
   unit?: string;
+  alert?: boolean;
 }
 
 export function StatCard({
@@ -15,6 +16,7 @@ export function StatCard({
   label,
   value,
   unit,
+  alert,
 }: StatCardProps) {
   return (
     <GlassCard className="flex min-w-[200px] items-center gap-4 px-5 py-4">
@@ -29,7 +31,7 @@ export function StatCard({
       </div>
       <div>
         <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="mt-0.5 text-2xl font-bold tracking-tight">
+        <p className={`mt-0.5 text-2xl font-bold tracking-tight ${alert ? 'text-red-600' : ''}`}>
           {value}
           {unit && (
             <span className="ml-1 text-base font-normal text-muted-foreground">

@@ -29,7 +29,9 @@ export interface SettingsState {
 const initialSettings: SettingsDTO = {
   deviceName: '',
   connectionCode: '',
+  rootPath: '',
   receivePath: '',
+  sharedPath: '',
   shareAddress: '',
   shareStatus: 'unknown' as const,
   shareName: '',

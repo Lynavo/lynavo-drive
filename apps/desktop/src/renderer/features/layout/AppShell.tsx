@@ -2,8 +2,10 @@ import { lazy, Suspense, useEffect, type CSSProperties } from 'react';
 import { Skeleton } from '@renderer/components/ui/skeleton';
 import { useAppStore } from '@renderer/stores/app-store';
 import { useDashboardStore } from '@renderer/stores/dashboard-store';
+import { useDirectoryStore } from '@renderer/stores/directory-store';
 import { useSettingsStore } from '@renderer/stores/settings-store';
 import { useSidecarRuntimeStore } from '@renderer/stores/sidecar-runtime-store';
+import { ErrorBoundary } from '@renderer/components/shared/ErrorBoundary';
 import { Sidebar } from './Sidebar';
 import { SidecarStatusBanner } from './SidecarStatusBanner';
 
@@ -12,14 +14,24 @@ const Dashboard = lazy(() =>
     default: m.Dashboard,
   })),
 );
+const DirectoryPage = lazy(() =>
+  import('@renderer/features/directory/DirectoryPage').then((m) => ({
+    default: m.DirectoryPage,
+  })),
+);
 const SettingsPage = lazy(() =>
   import('@renderer/features/settings/SettingsPage').then((m) => ({
     default: m.SettingsPage,
   })),
 );
-const DeviceDetailModal = lazy(() =>
-  import('@renderer/features/device-detail/DeviceDetailModal').then((m) => ({
-    default: m.DeviceDetailModal,
+const HelpPage = lazy(() =>
+  import('@renderer/features/help/HelpPage').then((m) => ({
+    default: m.HelpPage,
+  })),
+);
+const DeviceDetailPage = lazy(() =>
+  import('@renderer/features/device-detail/DeviceDetailPage').then((m) => ({
+    default: m.DeviceDetailPage,
   })),
 );
 
@@ -29,7 +41,6 @@ function PageFallback() {
 
 export function AppShell() {
   const currentView = useAppStore((s) => s.currentView);
-  const isModalOpen = useAppStore((s) => s.isModalOpen);
   const sidecarStatus = useSidecarRuntimeStore((s) => s.runtime.status);
 
   useEffect(() => {
@@ -65,17 +76,18 @@ export function AppShell() {
           useDashboardStore.getState().updateSummary(event.payload);
           break;
         case 'upload.progress':
-          useDashboardStore.getState().updateDeviceProgress(
-            event.payload.deviceId,
-            event.payload.fileKey,
-            event.payload.progress,
-          );
+          useDashboardStore
+            .getState()
+            .updateDeviceProgress(
+              event.payload.deviceId,
+              event.payload.fileKey,
+              event.payload.progress,
+            );
           break;
         case 'device.state.changed':
-          useDashboardStore.getState().updateDeviceStatus(
-            event.payload.deviceId,
-            event.payload.status,
-          );
+          useDashboardStore
+            .getState()
+            .updateDeviceStatus(event.payload.deviceId, event.payload.status);
           break;
         case 'upload.completed':
         case 'upload.failed':
@@ -90,6 +102,9 @@ export function AppShell() {
           break;
         case 'share.status.changed':
           useSettingsStore.getState().fetchSettings();
+          break;
+        case 'shared.directory.changed':
+          useDirectoryStore.getState().fetchSharedFiles();
           break;
       }
     });
@@ -112,8 +127,7 @@ export function AppShell() {
     <div
       className="flex h-screen overflow-hidden"
       style={{
-        background:
-          'linear-gradient(135deg, #daeef8 0%, #e8f5fb 40%, #f0f8fd 70%, #f8fbff 100%)',
+        background: 'linear-gradient(135deg, #daeef8 0%, #e8f5fb 40%, #f0f8fd 70%, #f8fbff 100%)',
       }}
     >
       <Sidebar />
@@ -127,16 +141,16 @@ export function AppShell() {
         <SidecarStatusBanner />
         <Suspense fallback={<PageFallback />}>
           {currentView === 'dashboard' && <Dashboard />}
+          {currentView === 'device-detail' && <DeviceDetailPage />}
+          {currentView === 'directory' && <DirectoryPage />}
           {currentView === 'settings' && <SettingsPage />}
+          {currentView === 'help' && (
+            <ErrorBoundary fallbackMessage="帮助中心加载失败，请重试">
+              <HelpPage />
+            </ErrorBoundary>
+          )}
         </Suspense>
       </div>
-
-      {/* Device detail overlay */}
-      {isModalOpen && (
-        <Suspense fallback={null}>
-          <DeviceDetailModal />
-        </Suspense>
-      )}
     </div>
   );
 }

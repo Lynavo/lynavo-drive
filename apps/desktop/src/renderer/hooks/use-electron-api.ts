@@ -6,7 +6,9 @@ import { INITIAL_SIDECAR_RUNTIME_STATE } from '../../shared/sidecar-runtime';
 const defaultSettings: SettingsDTO = {
   deviceName: 'SyncFlow',
   connectionCode: '000000',
+  rootPath: '',
   receivePath: '',
+  sharedPath: '',
   shareAddress: '',
   shareStatus: 'unknown',
   shareName: 'SyncFlow',
@@ -56,6 +58,8 @@ const mockSidecar: ElectronAPI['sidecar'] = {
     status: 'unknown' as const,
     shareName: 'SyncFlow',
   }),
+  getTransferActive: async () => ({ active: false }),
+  getSharedList: async () => ({ path: '', files: [], totalCount: 0 }),
 };
 
 const mockFiles: ElectronAPI['files'] = {

@@ -1,11 +1,14 @@
 import { create } from 'zustand';
 import type { DashboardDeviceDTO } from '@syncflow/contracts';
 
+export type AppView = 'dashboard' | 'directory' | 'settings' | 'help' | 'device-detail';
+
 export interface AppState {
-  currentView: 'dashboard' | 'settings';
+  currentView: AppView;
   selectedDevice: DashboardDeviceDTO | null;
+  /** @deprecated Kept for backward compatibility. Use `currentView === 'device-detail'` instead. */
   isModalOpen: boolean;
-  setView(view: 'dashboard' | 'settings'): void;
+  setView(view: AppView): void;
   openDeviceDetail(device: DashboardDeviceDTO): void;
   closeDeviceDetail(): void;
 }
@@ -18,8 +21,8 @@ export const useAppStore = create<AppState>((set) => ({
   setView: (view) => set({ currentView: view }),
 
   openDeviceDetail: (device) =>
-    set({ selectedDevice: device, isModalOpen: true }),
+    set({ selectedDevice: device, currentView: 'device-detail', isModalOpen: true }),
 
   closeDeviceDetail: () =>
-    set({ selectedDevice: null, isModalOpen: false }),
+    set({ selectedDevice: null, currentView: 'dashboard', isModalOpen: false }),
 }));

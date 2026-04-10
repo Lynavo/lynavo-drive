@@ -2,12 +2,13 @@ import { FileVideo, HardDrive, Database } from 'lucide-react';
 import { useDashboardStore } from '@renderer/stores/dashboard-store';
 import { useAppStore } from '@renderer/stores/app-store';
 import { formatBytes, formatDateTime } from '@renderer/lib/format';
+import { ErrorState } from '@renderer/components/shared/ErrorState';
 import { DiskWarningBanner } from './DiskWarningBanner';
 import { StatCard } from './StatCard';
 import { DeviceCard } from './DeviceCard';
 
 export function Dashboard() {
-  const { summary, devices } = useDashboardStore();
+  const { summary, devices, error, fetchDashboard } = useDashboardStore();
   const openDeviceDetail = useAppStore((s) => s.openDeviceDetail);
 
   return (
@@ -42,21 +43,31 @@ export function Dashboard() {
           iconGradient="linear-gradient(135deg, #0ea5e9 0%, #38bdf8 100%)"
           label="设备剩余空间"
           value={formatBytes(summary.remainingBytes)}
+          alert={summary.isDiskLow}
         />
       </div>
 
-      {/* Device grid */}
-      <div className="px-6 pb-8">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {devices.map((device) => (
-            <DeviceCard
-              key={device.deviceId}
-              device={device}
-              onClick={() => openDeviceDetail(device)}
-            />
-          ))}
+      {/* Error state */}
+      {error && devices.length === 0 && (
+        <div className="px-6">
+          <ErrorState message={error} onRetry={fetchDashboard} />
         </div>
-      </div>
+      )}
+
+      {/* Device grid */}
+      {!(error && devices.length === 0) && (
+        <div className="px-6 pb-8">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {devices.map((device) => (
+              <DeviceCard
+                key={device.deviceId}
+                device={device}
+                onClick={() => openDeviceDetail(device)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

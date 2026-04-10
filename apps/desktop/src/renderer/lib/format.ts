@@ -25,6 +25,32 @@ export function formatDate(iso: string): string {
   return iso.slice(5).replace('-', '\u6708') + '\u65e5';
 }
 
+/** Smart relative date: 今天/昨天/周X/月日, with HH:MM time */
+export function formatSmartDate(iso?: string): string {
+  if (!iso) return '\u2014';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '\u2014';
+  const now = new Date();
+  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const targetStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.floor((todayStart.getTime() - targetStart.getTime()) / 86400000);
+
+  if (diffDays === 0) return `今天 ${time}`;
+  if (diffDays === 1) return `昨天 ${time}`;
+  if (diffDays > 1 && diffDays < 7) {
+    const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+    return `${weekdays[d.getDay()]} ${time}`;
+  }
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  if (d.getFullYear() !== now.getFullYear()) {
+    return `${d.getFullYear()}/${month}/${day} ${time}`;
+  }
+  return `${month}月${day}日 ${time}`;
+}
+
 export function formatDateTime(iso?: string): string {
   if (!iso) return '暂无记录';
   const date = new Date(iso);

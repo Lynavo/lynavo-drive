@@ -1,22 +1,23 @@
 import { useEffect, useMemo } from 'react';
-import {
-  Dialog,
-  DialogPortal,
-  DialogOverlay,
-  DialogContent,
-  DialogTitle,
-} from '@renderer/components/ui/dialog';
+import { ArrowLeft, Smartphone, Monitor, FolderOpen } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@renderer/components/ui/button';
+import { GlassCard } from '@renderer/components/shared/GlassCard';
+import { ErrorState } from '@renderer/components/shared/ErrorState';
 import { useAppStore } from '@renderer/stores/app-store';
 import { useDeviceDetailStore } from '@renderer/stores/device-detail-store';
-import { ErrorState } from '@renderer/components/shared/ErrorState';
-import { DeviceHeader } from './DeviceHeader';
 import { DateFilter } from './DateFilter';
 import { StatsBar } from './StatsBar';
 import { FileLedgerTable } from './FileLedgerTable';
 
-export function DeviceDetailModal() {
-  const isModalOpen = useAppStore((s) => s.isModalOpen);
+const colors = {
+  titleText: '#1a2a3a',
+  subtitleText: '#6b7a8d',
+  backText: '#6b7a8d',
+  folderButton: '#3b82f6',
+} as const;
+
+export function DeviceDetailPage() {
   const selectedDevice = useAppStore((s) => s.selectedDevice);
   const closeDeviceDetail = useAppStore((s) => s.closeDeviceDetail);
 
@@ -32,15 +33,15 @@ export function DeviceDetailModal() {
   const loading = useDeviceDetailStore((s) => s.loading);
   const error = useDeviceDetailStore((s) => s.error);
 
-  // Fetch files when modal opens with a device
+  // Fetch files when page mounts with a device
   useEffect(() => {
-    if (isModalOpen && selectedDevice) {
+    if (selectedDevice) {
       useDeviceDetailStore.getState().fetchDeviceFiles(selectedDevice.deviceId);
     }
-    if (!isModalOpen) {
+    return () => {
       useDeviceDetailStore.getState().reset();
-    }
-  }, [isModalOpen, selectedDevice]);
+    };
+  }, [selectedDevice]);
 
   const { totalPages, pageStart, pageEnd } = useMemo(() => {
     const safeTotalPages = Math.max(1, Math.ceil(totalItems / Math.max(pageSize, 1)));
@@ -52,45 +53,95 @@ export function DeviceDetailModal() {
 
   if (!selectedDevice) return null;
 
+  const isPhone = /iphone|ipad|galaxy|pixel|android|mobile/i.test(
+    selectedDevice.clientName,
+  );
+  const DeviceIcon = isPhone ? Smartphone : Monitor;
+
+  const hasMaterializedDateDir = availableDates.includes(selectedDate);
+  const selectedFolderPath =
+    hasMaterializedDateDir && selectedDate
+      ? `${selectedDevice.devicePath}/${selectedDate}`
+      : selectedDevice.devicePath;
+
+  const handleOpenFolder = async () => {
+    const api = window.electronAPI;
+    if (!api) return;
+    try {
+      await api.files.openFolder(selectedFolderPath);
+    } catch {
+      if (selectedFolderPath !== selectedDevice.devicePath) {
+        try {
+          await api.files.openFolder(selectedDevice.devicePath);
+          return;
+        } catch {
+          // Fall through to toast below.
+        }
+      }
+      toast.error('打开文件夹失败');
+    }
+  };
+
   return (
-    <Dialog open={isModalOpen} onOpenChange={(open) => { if (!open) closeDeviceDetail(); }}>
-      <DialogPortal>
-        <DialogOverlay
-          className="fixed inset-0 z-50"
-          style={{
-            background: 'rgba(180,210,235,0.35)',
-            backdropFilter: 'blur(8px)',
-          }}
-        />
-        <DialogContent
-          showCloseButton={false}
-          className="flex min-h-0 flex-col overflow-hidden border-none p-0"
-          style={{
-            background: 'rgba(248,252,255,0.88)',
-            backdropFilter: 'blur(24px)',
-            border: '1px solid rgba(255,255,255,0.85)',
-            borderRadius: 20,
-            boxShadow:
-              '0 24px 80px rgba(80,150,200,0.18), 0 4px 20px rgba(0,0,0,0.06)',
-            width: 'min(960px, 92vw)',
-            maxWidth: 'min(960px, 92vw)',
-            height: 'min(82vh, 760px)',
-            maxHeight: '82vh',
-          }}
+    <div className="flex flex-1 flex-col overflow-auto">
+      <div className="mx-auto w-full max-w-5xl px-6 py-8">
+        {/* Back button */}
+        <button
+          onClick={closeDeviceDetail}
+          className="mb-4 flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium transition-[color,background-color,transform] duration-150 ease-out hover:bg-white/70 hover:text-[#1a2a3a] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+          style={{ color: colors.backText }}
         >
-          {/* Visually hidden but accessible title */}
-          <DialogTitle className="sr-only">
-            {selectedDevice.clientName} 设备详情
-          </DialogTitle>
+          <ArrowLeft className="h-4 w-4" />
+          返回设备列表
+        </button>
 
-          <DeviceHeader
-            device={selectedDevice}
-            selectedDate={selectedDate}
-            availableDates={availableDates}
-            onClose={closeDeviceDetail}
-          />
+        {/* Device header */}
+        <GlassCard className="mb-6 px-6 py-5">
+          <div className="flex items-center gap-4">
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+              style={{
+                background: 'linear-gradient(135deg, #3b82f6 0%, #60c4f0 100%)',
+                boxShadow: '0 2px 8px rgba(59,130,246,0.3)',
+              }}
+            >
+              <DeviceIcon className="h-5 w-5 text-white" />
+            </div>
 
-          <div className="flex items-center gap-3 px-6 py-3">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl font-bold" style={{ color: colors.titleText }}>
+                {selectedDevice.clientName}
+                <span
+                  className="ml-2 text-xs font-normal"
+                  style={{ color: colors.subtitleText }}
+                >
+                  {selectedDevice.ip}
+                </span>
+              </h1>
+              <p className="mt-0.5 truncate text-xs" style={{ color: colors.subtitleText }}>
+                {selectedFolderPath}
+              </p>
+            </div>
+
+            <button
+              onClick={handleOpenFolder}
+              className="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-[opacity,transform,box-shadow] duration-150 ease-out hover:opacity-95 hover:shadow-sm active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-2"
+              style={{
+                background: 'rgba(59,130,246,0.08)',
+                color: colors.folderButton,
+                border: '1px solid rgba(59,130,246,0.15)',
+              }}
+            >
+              <FolderOpen className="h-3.5 w-3.5" />
+              打开文件夹
+            </button>
+          </div>
+        </GlassCard>
+
+        {/* File list card */}
+        <GlassCard className="flex min-h-0 flex-col">
+          {/* Date filter */}
+          <div className="flex items-center gap-3 px-6 py-4">
             <DateFilter
               dates={availableDates}
               startDate={startDate}
@@ -98,7 +149,6 @@ export function DeviceDetailModal() {
               onStartDateChange={(date) => {
                 if (selectedDevice) {
                   const store = useDeviceDetailStore.getState();
-                  // If new start > current end, also move end
                   const newEnd = date > endDate ? date : endDate;
                   store.setDateRange(date, newEnd);
                   store.fetchDeviceFiles(selectedDevice.deviceId, {
@@ -111,7 +161,6 @@ export function DeviceDetailModal() {
                 if (selectedDevice) {
                   const store = useDeviceDetailStore.getState();
                   store.setDateRange(startDate, date);
-                  // Reload from start date within range
                   store.fetchDeviceFiles(selectedDevice.deviceId, {
                     date: startDate,
                     page: 1,
@@ -121,13 +170,15 @@ export function DeviceDetailModal() {
             />
           </div>
 
+          {/* Stats */}
           <StatsBar
             fileCount={totalItems}
             totalBytes={totalBytes}
             activeTransmissionMs={totalTransmissionMs}
           />
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-4">
+          {/* File table */}
+          <div className="min-h-0 flex-1 px-4 pb-2">
             {loading ? (
               <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
                 加载中...
@@ -136,7 +187,9 @@ export function DeviceDetailModal() {
               <ErrorState
                 message={error}
                 onRetry={() =>
-                  useDeviceDetailStore.getState().fetchDeviceFiles(selectedDevice.deviceId)
+                  useDeviceDetailStore
+                    .getState()
+                    .fetchDeviceFiles(selectedDevice.deviceId)
                 }
               />
             ) : (
@@ -144,6 +197,7 @@ export function DeviceDetailModal() {
             )}
           </div>
 
+          {/* Pagination */}
           <div className="flex items-center justify-between border-t border-black/5 px-6 py-4">
             <div className="text-xs text-slate-500">
               {totalItems === 0
@@ -180,8 +234,8 @@ export function DeviceDetailModal() {
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </DialogPortal>
-    </Dialog>
+        </GlassCard>
+      </div>
+    </div>
   );
 }

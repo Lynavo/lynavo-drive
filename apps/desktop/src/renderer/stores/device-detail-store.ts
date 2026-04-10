@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { toast } from 'sonner';
 import type {
   DeviceFileLedgerDTO,
   DeviceFileSortField,
@@ -12,6 +13,8 @@ const DEFAULT_PAGE_SIZE = 200;
 export interface DeviceDetailState {
   files: DeviceFileLedgerDTO[];
   selectedDate: string;
+  startDate: string;
+  endDate: string;
   availableDates: string[];
   page: number;
   pageSize: number;
@@ -21,6 +24,7 @@ export interface DeviceDetailState {
   sortField: SortField;
   sortDirection: SortDirection;
   loading: boolean;
+  error: string | null;
   fetchDeviceFiles(
     deviceId: string,
     options?: {
@@ -29,6 +33,7 @@ export interface DeviceDetailState {
     },
   ): Promise<void>;
   setDate(date: string): void;
+  setDateRange(start: string, end: string): void;
   setAvailableDates(dates: string[]): void;
   toggleSort(deviceId: string, field: SortField): Promise<void>;
   setFiles(files: DeviceFileLedgerDTO[]): void;
@@ -38,6 +43,8 @@ export interface DeviceDetailState {
 export const useDeviceDetailStore = create<DeviceDetailState>((set, get) => ({
   files: [],
   selectedDate: '',
+  startDate: '',
+  endDate: '',
   availableDates: [],
   page: 1,
   pageSize: DEFAULT_PAGE_SIZE,
@@ -47,11 +54,12 @@ export const useDeviceDetailStore = create<DeviceDetailState>((set, get) => ({
   sortField: 'completedAt',
   sortDirection: 'desc',
   loading: false,
+  error: null,
 
   fetchDeviceFiles: async (deviceId, options) => {
     const api = window.electronAPI;
     if (!api) return;
-    set({ loading: true });
+    set({ loading: true, error: null });
     try {
       const datesRes = await api.sidecar.getDeviceDates(deviceId);
       const dates = datesRes.dates ?? [];
@@ -68,16 +76,26 @@ export const useDeviceDetailStore = create<DeviceDetailState>((set, get) => ({
       const nextPage =
         options?.page ??
         (nextDate && nextDate !== currentSelectedDate ? 1 : get().page || 1);
+      // Use date range if both start and end are set
+      const currentStartDate = get().startDate;
+      const currentEndDate = get().endDate;
+      const startDate = currentStartDate || selectedDate;
+      const endDate = currentEndDate || selectedDate;
+
       const pageData = await api.sidecar.getDeviceFiles(deviceId, selectedDate, {
         page: nextPage,
         pageSize: get().pageSize || DEFAULT_PAGE_SIZE,
         sortField: get().sortField,
         sortDirection: get().sortDirection,
+        endDate: endDate !== selectedDate ? endDate : undefined,
       });
+
       set({
         files: pageData.items,
         availableDates: dates,
         selectedDate,
+        startDate,
+        endDate,
         page: pageData.page,
         pageSize: pageData.pageSize,
         totalItems: pageData.totalItems,
@@ -87,11 +105,14 @@ export const useDeviceDetailStore = create<DeviceDetailState>((set, get) => ({
       });
     } catch (err) {
       console.error('Failed to fetch device files:', err);
-      set({ loading: false });
+      set({ loading: false, error: '加载文件记录失败' });
+      toast.error('加载文件记录失败', { description: '请稍后重试' });
     }
   },
 
   setDate: (date) => set({ selectedDate: date }),
+
+  setDateRange: (start, end) => set({ startDate: start, endDate: end }),
 
   setAvailableDates: (dates) => set({ availableDates: dates }),
 
@@ -114,6 +135,8 @@ export const useDeviceDetailStore = create<DeviceDetailState>((set, get) => ({
     set({
       files: [],
       selectedDate: '',
+      startDate: '',
+      endDate: '',
       availableDates: [],
       page: 1,
       pageSize: DEFAULT_PAGE_SIZE,
@@ -123,5 +146,6 @@ export const useDeviceDetailStore = create<DeviceDetailState>((set, get) => ({
       sortField: 'completedAt',
       sortDirection: 'desc',
       loading: false,
+      error: null,
     }),
 }));

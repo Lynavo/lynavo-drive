@@ -21,6 +21,8 @@ const IPC = {
   SIDECAR_INSTALL_BONJOUR: 'sidecar:install-bonjour',
   SIDECAR_SHARE_STATUS: 'sidecar:share-status',
   SIDECAR_VALIDATE_SHARE: 'sidecar:validate-share',
+  SIDECAR_TRANSFER_ACTIVE: 'sidecar:transfer-active',
+  SIDECAR_SHARED_LIST: 'sidecar:shared-list',
   SUPPORT_EXPORT_DIAGNOSTICS: 'support:export-diagnostics',
   SUPPORT_APP_INFO: 'support:app-info',
   FILES_OPEN_FOLDER: 'files:open-folder',
@@ -55,6 +57,8 @@ const electronAPI: ElectronAPI = {
     installBonjour: () => ipcRenderer.invoke(IPC.SIDECAR_INSTALL_BONJOUR),
     getShareStatus: () => ipcRenderer.invoke(IPC.SIDECAR_SHARE_STATUS),
     validateShare: () => ipcRenderer.invoke(IPC.SIDECAR_VALIDATE_SHARE),
+    getTransferActive: () => ipcRenderer.invoke(IPC.SIDECAR_TRANSFER_ACTIVE),
+    getSharedList: (path?: string) => ipcRenderer.invoke(IPC.SIDECAR_SHARED_LIST, path),
   },
   files: {
     openFolder: (path: string) => ipcRenderer.invoke(IPC.FILES_OPEN_FOLDER, path),
