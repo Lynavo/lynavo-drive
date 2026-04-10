@@ -360,7 +360,7 @@ export function SettingsScreen() {
               } else {
                 navigation.reset({
                   index: 0,
-                  routes: [{ name: 'SyncStatus' }],
+                  routes: [{ name: 'MainTabs' as never }],
                 });
               }
             }}

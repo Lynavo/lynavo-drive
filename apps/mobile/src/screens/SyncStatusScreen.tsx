@@ -1,3 +1,4 @@
+// DEPRECATED: Replaced by SyncActivityScreen in Vivi Drop update
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,

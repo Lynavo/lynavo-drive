@@ -58,7 +58,7 @@ class PhotoScanner: NSObject, PHPhotoLibraryChangeObserver {
 
         // PHChange.changeDetails requires a fresh PHChange instance — we can
         // achieve the same by re-fetching with the same options and diffing.
-        let fetchOptions = Self.defaultFetchOptions()
+        let fetchOptions = Self.defaultFetchOptions(configStore: autoUploadConfigStore)
         let current = PHAsset.fetchAssets(with: fetchOptions)
 
         // PHFetchResultChangeDetails computes a diff between two fetch results
@@ -116,7 +116,7 @@ class PhotoScanner: NSObject, PHPhotoLibraryChangeObserver {
 
     /// Scan all photos and videos, return items whose fileKey is not already tracked.
     func scanForUntrackedAssets(clientId: String, trackedFileKeys: Set<String>) -> [ScannedAsset] {
-        let fetchOptions = Self.defaultFetchOptions()
+        let fetchOptions = Self.defaultFetchOptions(configStore: autoUploadConfigStore)
         let assets = PHAsset.fetchAssets(with: fetchOptions)
 
         // Cache for future incremental scans
@@ -168,14 +168,63 @@ class PhotoScanner: NSObject, PHPhotoLibraryChangeObserver {
         scanForUntrackedAssets(clientId: clientId, trackedFileKeys: completedFileKeys)
     }
 
+    // MARK: - Auto Upload Config Integration
+
+    /// The auto upload config store, set by SyncEngineManager after initialization.
+    /// Used to apply media type and time range filters during automatic scanning.
+    weak var autoUploadConfigStore: AutoUploadConfigStore?
+
     // MARK: - Helpers
 
+    /// Build fetch options for automatic scanning. Applies auto upload config
+    /// predicates for media type and time range. This ONLY affects automatic
+    /// scanning, NOT the album browser (which always shows everything).
     private static func defaultFetchOptions() -> PHFetchOptions {
+        return defaultFetchOptions(configStore: nil)
+    }
+
+    static func defaultFetchOptions(configStore: AutoUploadConfigStore?) -> PHFetchOptions {
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        options.predicate = NSPredicate(format: "mediaType == %d OR mediaType == %d",
-                                         PHAssetMediaType.image.rawValue,
-                                         PHAssetMediaType.video.rawValue)
+
+        var predicates: [NSPredicate] = []
+
+        // Media type filter from config
+        let mediaFilter = configStore?.resolvedMediaFilter()
+        switch mediaFilter {
+        case "photos":
+            predicates.append(NSPredicate(
+                format: "mediaType == %d",
+                PHAssetMediaType.image.rawValue
+            ))
+        case "videos":
+            predicates.append(NSPredicate(
+                format: "mediaType == %d",
+                PHAssetMediaType.video.rawValue
+            ))
+        default:
+            // "all" or nil — include both images and videos
+            predicates.append(NSPredicate(
+                format: "mediaType == %d OR mediaType == %d",
+                PHAssetMediaType.image.rawValue,
+                PHAssetMediaType.video.rawValue
+            ))
+        }
+
+        // Time range filter from config
+        if let timeThreshold = configStore?.resolvedTimeThreshold() {
+            predicates.append(NSPredicate(
+                format: "creationDate >= %@",
+                timeThreshold as NSDate
+            ))
+        }
+
+        if predicates.count == 1 {
+            options.predicate = predicates[0]
+        } else {
+            options.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+        }
+
         return options
     }
 
@@ -195,6 +244,7 @@ struct ScannedAsset {
     let creationDate: Date?
     let originalFilename: String
     let estimatedSize: Int64
+    var source: String = "auto"  // "auto" | "manual"
 }
 
 extension Date {

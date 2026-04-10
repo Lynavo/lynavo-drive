@@ -260,7 +260,7 @@ export function HistoryScreen() {
               if (navigation.canGoBack()) {
                 navigation.goBack();
               } else {
-                navigation.reset({ index: 0, routes: [{ name: 'SyncStatus' }] });
+                navigation.reset({ index: 0, routes: [{ name: 'MainTabs' as never }] });
               }
             }}
             accessibilityLabel={'返回'}

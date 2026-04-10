@@ -11,7 +11,7 @@ import {
   type TextInputKeyPressEventData,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { CommonActions, useNavigation, useRoute } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -65,7 +65,12 @@ export function CodeVerifyScreen() {
             connectionCode: fullCode,
           });
           setVerifying(false);
-          navigation.replace('SyncStatus');
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: 'MainTabs', state: { routes: [{ name: 'AlbumWorkbench' }] } }],
+            }),
+          );
           return;
         }
       } catch (e: any) {
@@ -89,7 +94,12 @@ export function CodeVerifyScreen() {
       // Mock fallback: always succeed after delay
       setTimeout(() => {
         setVerifying(false);
-        navigation.replace('SyncStatus');
+        navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: 'MainTabs', state: { routes: [{ name: 'AlbumWorkbench' }] } }],
+            }),
+          );
       }, VERIFY_DELAY_MS);
     },
     [navigation, deviceId, host, port],

@@ -216,6 +216,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     let transport = TcpTransport()
     private var uploadStore: UploadStore?
     private var historyStore: HistoryLedgerStore?
+    private var albumBrowserService: AlbumBrowserService?
+    private var autoUploadConfigStore: AutoUploadConfigStore?
+    private var manualUploadService: ManualUploadService?
+    let sharedFilesService = SharedFilesService()
+    private var isAutoUploadPaused = false
     private var protocolSession: ProtocolSession?
     private var discoveredDevices: [String: DiscoveredDevice] = [:]  // keyed by deviceId
     private var photoLibraryChanged = false  // set by observer, consumed by watch loop
@@ -498,6 +503,19 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             derivedProgressPercent = uploadState == "completed" ? 100 : 0
         }
 
+        // Compute source-split queue counts for SyncActivityScreen
+        let pendingCounts = uploadStore?.getPendingCountsBySource() ?? (auto: 0, manual: 0)
+        let currentTaskSource: Any = uploadStore?.getCurrentUploadingSource() ?? NSNull()
+
+        let autoUploadState: String
+        if isAutoUploadPaused {
+            autoUploadState = "paused"
+        } else if autoUploadConfigStore?.getConfig().enabled == true {
+            autoUploadState = "active"
+        } else {
+            autoUploadState = "disabled"
+        }
+
         return [
             "currentDeviceId": currentBinding?.deviceId ?? NSNull(),
             "currentDeviceName": currentBinding?.deviceAlias ?? currentBinding?.deviceName ?? NSNull(),
@@ -520,13 +538,20 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             "activeTuningProfile": runtimeActiveTuningProfile,
             "isThermalLimited": runtimeIsThermalLimited,
             "uploadState": runtimeUploadState,
+            "currentTaskSource": currentTaskSource,
+            "autoUploadState": autoUploadState,
+            "manualBatchPending": pendingCounts.manual,
+            "autoPending": pendingCounts.auto,
         ]
     }
 
     private func buildPendingUploadAssets(clientId: String, limit: Int? = 200) -> [ScannedAsset] {
         guard let store = uploadStore else { return [] }
 
-        let pendingItems = store.getPendingUploadItems(limit: limit)
+        let pendingItems = store.getPendingUploadItemsSorted(
+            limit: limit,
+            excludeSource: isAutoUploadPaused ? "auto" : nil
+        )
         guard !pendingItems.isEmpty else { return [] }
 
         let localIdentifiers = pendingItems.map(\.assetLocalId)
@@ -574,7 +599,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 mediaType: mediaType,
                 creationDate: asset.creationDate,
                 originalFilename: originalFilename,
-                estimatedSize: estimatedSize
+                estimatedSize: estimatedSize,
+                source: item.source
             ))
         }
 
@@ -696,7 +722,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private func bridgeQueueItems(_ pending: [UploadItemRecord]) -> [[String: Any]] {
         scheduleCloudAssetDetection(for: pending)
         return pending.map { item in
-            [
+            var dict: [String: Any] = [
                 "id": item.id ?? 0,
                 "assetLocalId": item.assetLocalId,
                 "fileKey": item.fileKey ?? "",
@@ -706,7 +732,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 "ackedOffset": item.ackedOffset,
                 "status": item.status,
                 "isCloudAsset": cachedCloudAssetFlag(for: item) ?? false,
-            ] as [String: Any]
+                "source": item.source,
+            ]
+            if let batchId = item.batchId {
+                dict["batchId"] = batchId
+            }
+            return dict
         }
     }
 
@@ -807,6 +838,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         do {
             uploadStore = try UploadStore()
             historyStore = HistoryLedgerStore(store: uploadStore!)
+            albumBrowserService = AlbumBrowserService(uploadStore: uploadStore)
+            autoUploadConfigStore = AutoUploadConfigStore(store: uploadStore!)
+            manualUploadService = ManualUploadService(uploadStore: uploadStore, bindingService: bindingService)
+            photoScanner.autoUploadConfigStore = autoUploadConfigStore
         } catch {
             NSLog("[SyncEngine] Failed to init stores: \(error)")
         }
@@ -1437,7 +1472,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 tempFilePath: nil,
                 ackedOffset: 0,
                 lastErrorCode: nil,
-                updatedAt: now
+                updatedAt: now,
+                source: "auto",
+                batchId: nil,
+                priority: 0
             )
             try? store.upsertUploadItem(item)
         }
@@ -1668,7 +1706,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                             tempFilePath: nil,
                             ackedOffset: 0,
                             lastErrorCode: nil,
-                            updatedAt: ISO8601DateFormatter().string(from: Date())
+                            updatedAt: ISO8601DateFormatter().string(from: Date()),
+                            source: "auto",
+                            batchId: nil,
+                            priority: 0
                         )
                     }
                     try? uploadStore?.upsertUploadItems(queuedItems)
@@ -1885,6 +1926,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             fallbackPort: UInt16(binding.port)
         )
         sidecarHost = preferredSidecarHost(probedHost: newTransport.remoteHost, device: targetDevice)
+        sharedFilesService.sidecarHost = sidecarHost
         NSLog("[SyncPipeline] TCP connected to %@", sidecarHost ?? "unknown")
         syncDiagnosticsLog("SyncPipeline", "TCP connected to \(sidecarHost ?? "unknown")")
 
@@ -1961,7 +2003,18 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
 
         for (index, asset) in assets.enumerated() {
+            // Between files: skip auto items when paused, skip cancelled batch items
             if index > 0 {
+                if isAutoUploadPaused && asset.source == "auto" {
+                    NSLog("[SyncPipeline] skipping auto item %@ — auto upload paused", asset.fileKey)
+                    continue
+                }
+                // Check if this item was cancelled in DB (e.g. manual batch cancel)
+                if let item = uploadStore?.getUploadItemByFileKey(asset.fileKey),
+                   item.status == "cancelled" {
+                    NSLog("[SyncPipeline] skipping cancelled item %@", asset.fileKey)
+                    continue
+                }
                 emitPreparingStateForNextFile(nextAsset: asset)
             }
 
@@ -2017,6 +2070,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 }
             }
 
+            // Pre-upload cancel check: if this item was cancelled after export
+            // but before TCP upload begins, skip it and clean up the temp file.
+            if let item = uploadStore?.getUploadItemByFileKey(asset.fileKey),
+               item.status == "cancelled" {
+                NSLog("[SyncPipeline] skipping cancelled item %@ before TCP upload", asset.fileKey)
+                exportService.cleanup(tempURL: exported.tempURL)
+                continue
+            }
+
             do {
                 defer {
                     exportService.cleanup(tempURL: exported.tempURL)
@@ -2030,6 +2092,30 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     session: session,
                     recoveryMode: recoveryMode
                 )
+
+                // After each file: check if a higher-priority item was inserted
+                // (e.g. manual item while auto batch is running). If DB queue head
+                // differs from our next batch item, break so outer loop re-fetches.
+                let nextIndex = index + 1
+                if nextIndex < assets.count {
+                    if let queueHead = uploadStore?.getPendingUploadItemsSorted(
+                        limit: 1,
+                        excludeSource: isAutoUploadPaused ? "auto" : nil
+                    ).first {
+                        let nextBatchFileKey = assets[nextIndex].fileKey
+                        if queueHead.fileKey != nil && queueHead.fileKey != nextBatchFileKey {
+                            NSLog("[SyncPipeline] queue head changed (priority preemption) — breaking batch")
+                            // Cancel prefetch for the now-stale next item
+                            prefetchTask?.cancel()
+                            await prefetchTask?.value
+                            if let staleExport = nextExport {
+                                exportService.cleanup(tempURL: staleExport.tempURL)
+                                nextExport = nil
+                            }
+                            break
+                        }
+                    }
+                }
             } catch {
                 if let syncError = error as? SyncEngineError,
                    case .lowDiskPaused(let message) = syncError
@@ -2697,7 +2783,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     private func emitQueueToJS() {
         guard let store = uploadStore else { return }
-        let pending = store.getPendingUploadItems(limit: 100)
+        let pending = store.getPendingUploadItemsSorted(limit: 100)
         NativeSyncEngineModule.shared?.emitQueueUpdated(bridgeQueueItems(pending))
     }
 
@@ -2908,7 +2994,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 }
                 NSLog("[SyncEngine] recreated local binding for \(serverId)")
             }
-            startSync()
+            // Sync is no longer triggered automatically after pairing.
+            // The user will initiate sync from the album workbench or sync screen.
             return
         }
 
@@ -2987,8 +3074,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         bindingConnectionState = .bound
         NativeSyncEngineModule.shared?.emitBindingStateChanged(bindingStatePayload(binding: binding))
 
-        NSLog("[SyncEngine] pairing successful — starting sync")
-        startSync()
+        NSLog("[SyncEngine] pairing successful — sync deferred until user action")
     }
 
     func disconnectAndUnbind() async throws {
@@ -3030,7 +3116,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     func getReadOnlyQueue() async -> [[String: Any]] {
         // Return pending items from the upload store if available
         guard let store = uploadStore else { return [] }
-        let pending = store.getPendingUploadItems(limit: 100)
+        let pending = store.getPendingUploadItemsSorted(limit: 100)
         let mapped = bridgeQueueItems(pending)
         return pending.enumerated().map { index, item in
             var row = mapped[index]
@@ -3283,6 +3369,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             fallbackPort: UInt16(binding.port)
         )
         sidecarHost = preferredSidecarHost(probedHost: transport.remoteHost, device: targetDevice)
+        sharedFilesService.sidecarHost = sidecarHost
         NSLog("[SyncPipeline] resolved sidecar host: %@", sidecarHost ?? "nil")
 
         // Auth so sidecar registers us as connected
@@ -3358,7 +3445,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     tempFilePath: nil,
                     ackedOffset: asset.estimatedSize,
                     lastErrorCode: nil,
-                    updatedAt: now
+                    updatedAt: now,
+                    source: "auto",
+                    batchId: nil,
+                    priority: 0
                 )
             }
             try store.upsertUploadItems(restoredItems)
@@ -3478,6 +3568,261 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         bindingService.saveClientDisplayName(trimmed)
         UserDefaults.standard.removeObject(forKey: Self.legacyClientNameKey)
         pushClientMetadataUpdateIfPossible()
+    }
+
+    // MARK: - Auto Upload Pause / Resume
+
+    /// Pause auto upload: skips auto items in queue, only processes manual items.
+    func pauseAutoUpload() {
+        guard !isAutoUploadPaused else { return }
+        isAutoUploadPaused = true
+        NSLog("[SyncEngine] auto upload paused")
+        syncDiagnosticsLog("SyncEngine", "auto upload paused")
+        sessionService.transitionTo(.pausedAutoUpload)
+        NativeSyncEngineModule.shared?.emitSyncStateChanged(
+            runtimeSyncOverviewPayload(uploadState: "paused_auto_upload")
+        )
+    }
+
+    /// Resume auto upload: resumes processing auto items.
+    func resumeAutoUpload() {
+        guard isAutoUploadPaused else { return }
+        isAutoUploadPaused = false
+        NSLog("[SyncEngine] auto upload resumed")
+        syncDiagnosticsLog("SyncEngine", "auto upload resumed")
+        if isSyncing {
+            sessionService.transitionTo(.scanning)
+        }
+        NativeSyncEngineModule.shared?.emitSyncStateChanged(
+            runtimeSyncOverviewPayload(uploadState: isSyncing ? "scanning" : "idle")
+        )
+        // Wake up the watch loop if it's sleeping so the newly resumed auto items get processed
+        resumeWatchLoopIfNeeded()
+    }
+
+    /// Cancel remaining items in a manual batch.
+    func cancelManualBatch(batchId: String) throws {
+        try uploadStore?.cancelManualBatch(batchId: batchId)
+        NSLog("[SyncEngine] cancelled manual batch %@", batchId)
+        syncDiagnosticsLog("SyncEngine", "cancelled manual batch \(batchId)")
+        emitQueueToJS()
+    }
+
+    // MARK: - Album Browser
+
+    private lazy var thumbnailCacheDir: URL = {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("syncflow_album_thumbs", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }()
+
+    func browseAlbum(
+        mediaFilter: String,
+        transferFilter: String,
+        offset: Int,
+        limit: Int,
+        collectionId: String? = nil
+    ) -> [[String: Any]] {
+        guard let service = albumBrowserService else { return [] }
+        let assets = service.fetchAlbumAssets(
+            mediaFilter: mediaFilter,
+            transferFilter: transferFilter,
+            offset: offset,
+            limit: limit,
+            collectionId: collectionId
+        )
+        let thumbSize = CGSize(width: 200, height: 200)
+        return assets.map { asset in
+            // Generate cached thumbnail file
+            let thumbUri = cachedThumbnailUri(
+                service: service,
+                assetLocalId: asset.assetLocalId,
+                size: thumbSize
+            )
+            return [
+                "assetLocalId": asset.assetLocalId,
+                "filename": asset.filename,
+                "mediaType": asset.mediaType,
+                "fileSize": asset.fileSize,
+                "creationDate": asset.creationDate,
+                "thumbnailUri": thumbUri,
+                "isTransferred": asset.isTransferred,
+                "isQueued": asset.isQueued,
+            ] as [String: Any]
+        }
+    }
+
+    private func cachedThumbnailUri(
+        service: AlbumBrowserService,
+        assetLocalId: String,
+        size: CGSize
+    ) -> String {
+        // Use a sanitized version of the asset ID as filename
+        let safeId = assetLocalId
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: ":", with: "_")
+        let thumbFile = thumbnailCacheDir.appendingPathComponent("\(safeId).jpg")
+
+        // Return cached file if it exists
+        if FileManager.default.fileExists(atPath: thumbFile.path) {
+            return thumbFile.absoluteString
+        }
+
+        // Generate thumbnail
+        guard let image = service.getThumbnail(assetLocalId: assetLocalId, size: size),
+              let data = image.jpegData(compressionQuality: 0.7) else {
+            return ""
+        }
+        try? data.write(to: thumbFile, options: .atomic)
+        return thumbFile.absoluteString
+    }
+
+    func getAlbumStats() -> [String: Any] {
+        guard let service = albumBrowserService else {
+            return ["totalCount": 0, "transferredCount": 0, "queuedCount": 0]
+        }
+        let stats = service.getAlbumStats()
+        return [
+            "totalCount": stats.totalCount,
+            "transferredCount": stats.transferredCount,
+            "queuedCount": stats.queuedCount,
+        ]
+    }
+
+    func getAlbumCollections(mediaFilter: String) -> [[String: Any]] {
+        guard let service = albumBrowserService else { return [] }
+        return service.getAlbumCollections(mediaFilter: mediaFilter)
+    }
+
+    // MARK: - Manual Upload
+
+    func submitManualUpload(assetLocalIds: [String]) -> [String: Any] {
+        guard let service = manualUploadService else {
+            return ["queuedCount": 0, "skippedCount": 0, "batchId": ""]
+        }
+
+        // Fetch PHAssets for the given local identifiers
+        let fetchResult = PHAsset.fetchAssets(
+            withLocalIdentifiers: assetLocalIds,
+            options: nil
+        )
+        var assets: [PHAsset] = []
+        fetchResult.enumerateObjects { asset, _, _ in
+            assets.append(asset)
+        }
+
+        let result = service.submitManualUpload(assets: assets)
+
+        // Emit queue update to JS
+        emitQueueToJS()
+
+        // If we're syncing, wake up the watch loop so manual items get processed
+        if isSyncing {
+            resumeWatchLoopIfNeeded()
+        }
+
+        return [
+            "queuedCount": result.queuedCount,
+            "skippedCount": result.skippedCount,
+            "batchId": result.batchId,
+        ]
+    }
+
+    // MARK: - Auto Upload Config
+
+    func getAutoUploadConfig() -> [String: Any] {
+        guard let configStore = autoUploadConfigStore else {
+            return [
+                "enabled": false,
+                "mediaFilter": "all",
+                "timeRangeMode": "from_now",
+                "state": "disabled",
+            ]
+        }
+        let config = configStore.getConfig()
+        let state: String
+        if !config.enabled {
+            state = "disabled"
+        } else if isAutoUploadPaused {
+            state = "paused"
+        } else {
+            state = "active"
+        }
+        var result: [String: Any] = [
+            "enabled": config.enabled,
+            "mediaFilter": config.mediaFilter,
+            "timeRangeMode": config.timeRangeMode,
+            "state": state,
+        ]
+        if let customTimeFrom = config.customTimeFrom {
+            result["customTimeFrom"] = customTimeFrom
+        }
+        return result
+    }
+
+    func saveAutoUploadConfig(config: [String: Any]) throws {
+        guard let configStore = autoUploadConfigStore else {
+            throw SyncEngineError.databaseError("Auto upload config store not initialized")
+        }
+        let wasEnabled = configStore.getConfig().enabled
+        let record = AutoUploadConfigRecord(
+            enabled: config["enabled"] as? Bool ?? false,
+            mediaFilter: config["mediaFilter"] as? String ?? "all",
+            timeRangeMode: config["timeRangeMode"] as? String ?? "from_now",
+            customTimeFrom: config["customTimeFrom"] as? String,
+            updatedAt: ISO8601DateFormatter().string(from: Date())
+        )
+        try configStore.saveConfig(record)
+
+        // When auto-upload is newly enabled (or config changed while active),
+        // wake the watch loop so it picks up the new config immediately.
+        if record.enabled && (!wasEnabled || isSyncing) {
+            NSLog("[SyncEngine] auto-upload config changed — waking scan loop")
+            photoLibraryChanged = true
+            resumeWatchLoopIfNeeded()
+        }
+    }
+
+    // MARK: - Shared Files
+
+    func browseSharedFiles(path: String) async throws -> [String: Any] {
+        let directory = try await sharedFilesService.listSharedFiles(path: path)
+        let files: [[String: Any]] = directory.files.map { file in
+            var fileDict: [String: Any] = [
+                "name": file.name,
+                "path": file.path,
+                "type": file.type,
+                "size": file.size,
+                "modifiedAt": file.modifiedAt,
+                "isDirectory": file.isDirectory,
+            ]
+            // Build absolute URLs for thumbnails and video streams
+            if file.type == "image", let thumbUrl = sharedFilesService.getThumbnailUrl(path: file.path) {
+                fileDict["thumbnailUrl"] = thumbUrl.absoluteString
+            }
+            if file.type == "video", let streamUrl = sharedFilesService.getStreamUrl(path: file.path) {
+                fileDict["streamUrl"] = streamUrl.absoluteString
+            }
+            return fileDict
+        }
+        return [
+            "path": directory.path,
+            "files": files,
+            "totalCount": directory.totalCount,
+        ]
+    }
+
+    func downloadSharedFile(path: String) async throws -> [String: Any] {
+        let result = try await sharedFilesService.downloadFile(path: path)
+        return [
+            "savedToPhotos": result.savedToPhotos,
+            "localPath": result.localPath ?? NSNull(),
+        ]
+    }
+
+    func getSharedFileStreamUrl(path: String) -> String? {
+        return sharedFilesService.getStreamUrl(path: path)?.absoluteString
     }
 
     // MARK: - Settings

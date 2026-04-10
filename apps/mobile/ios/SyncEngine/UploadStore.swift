@@ -24,11 +24,22 @@ struct UploadItemRecord {
     var originalFilename: String?
     var fileKey: String?
     var fileSize: Int64?
-    var status: String  // MobileUploadItemStatus values: discovered, preparing, ready, cloud_downloading, uploading, completed, failed, skipped
+    var status: String  // MobileUploadItemStatus values: discovered, preparing, ready, cloud_downloading, uploading, completed, failed, skipped, cancelled
     var tempFilePath: String?
     var ackedOffset: Int64
     var lastErrorCode: String?
     let updatedAt: String
+    var source: String  // 'auto' | 'manual'
+    var batchId: String?
+    var priority: Int  // 0 = auto (default), 1 = manual (higher priority)
+}
+
+struct AutoUploadConfigRecord {
+    var enabled: Bool
+    var mediaFilter: String  // 'all' | 'photos' | 'videos'
+    var timeRangeMode: String  // 'from_now' | 'from_today' | 'all' | 'custom'
+    var customTimeFrom: String?
+    var updatedAt: String
 }
 
 struct SessionRecord {
@@ -181,6 +192,32 @@ class UploadStore {
             """)
             NSLog("[UploadStore] migration complete")
         }
+
+        // Migration: add source, batch_id, priority columns to upload_items (Vivi Drop)
+        let columnCheck = queryInternal(
+            "SELECT COUNT(*) AS cnt FROM pragma_table_info('upload_items') WHERE name = 'source'",
+            bind: []
+        )
+        let hasSourceColumn = (columnCheck.first?["cnt"] as? Int64 ?? 0) > 0
+        if !hasSourceColumn {
+            NSLog("[UploadStore] migrating upload_items: adding source, batch_id, priority columns")
+            try executeInternal("ALTER TABLE upload_items ADD COLUMN source TEXT NOT NULL DEFAULT 'auto'")
+            try executeInternal("ALTER TABLE upload_items ADD COLUMN batch_id TEXT")
+            try executeInternal("ALTER TABLE upload_items ADD COLUMN priority INTEGER NOT NULL DEFAULT 0")
+            NSLog("[UploadStore] Vivi Drop columns migration complete")
+        }
+
+        // Create auto_upload_config table (single-row config)
+        try executeInternal("""
+            CREATE TABLE IF NOT EXISTS auto_upload_config (
+              id                INTEGER PRIMARY KEY CHECK (id = 1),
+              enabled           INTEGER NOT NULL DEFAULT 0,
+              media_filter      TEXT NOT NULL DEFAULT 'all',
+              time_range_mode   TEXT NOT NULL DEFAULT 'from_now',
+              custom_time_from  TEXT,
+              updated_at        TEXT NOT NULL DEFAULT ''
+            );
+        """)
     }
 
     // MARK: - Binding CRUD
@@ -357,8 +394,8 @@ class UploadStore {
 
     private func upsertUploadItemsInternal(_ items: [UploadItemRecord]) throws {
         let sql = """
-        INSERT INTO upload_items (asset_local_id, modified_at, media_type, original_filename, file_key, file_size, status, temp_file_path, acked_offset, last_error_code, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+        INSERT INTO upload_items (asset_local_id, modified_at, media_type, original_filename, file_key, file_size, status, temp_file_path, acked_offset, last_error_code, updated_at, source, batch_id, priority)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
         ON CONFLICT(asset_local_id) DO UPDATE SET
           media_type = excluded.media_type,
           original_filename = excluded.original_filename,
@@ -368,7 +405,10 @@ class UploadStore {
           temp_file_path = excluded.temp_file_path,
           acked_offset = excluded.acked_offset,
           last_error_code = excluded.last_error_code,
-          updated_at = excluded.updated_at
+          updated_at = excluded.updated_at,
+          source = excluded.source,
+          batch_id = excluded.batch_id,
+          priority = excluded.priority
         """
 
         try executeInternal("BEGIN IMMEDIATE TRANSACTION")
@@ -385,13 +425,152 @@ class UploadStore {
                     .textOrNull(item.tempFilePath),
                     .int(item.ackedOffset),
                     .textOrNull(item.lastErrorCode),
-                    .text(item.updatedAt)
+                    .text(item.updatedAt),
+                    .text(item.source),
+                    .textOrNull(item.batchId),
+                    .int(Int64(item.priority))
                 ])
             }
             try executeInternal("COMMIT")
         } catch {
             try? executeInternal("ROLLBACK")
             throw error
+        }
+    }
+
+    // MARK: - Priority-Sorted Pending Items
+
+    /// Returns pending items sorted by priority DESC (manual first), then id ASC.
+    /// This ensures manually selected items are uploaded before auto-scanned items.
+    func getPendingUploadItemsSorted(limit: Int? = nil, excludeSource: String? = nil) -> [UploadItemRecord] {
+        return queue.sync {
+            var sql = """
+            SELECT * FROM upload_items
+            WHERE status IN ('queued', 'discovered', 'preparing', 'ready', 'cloud_downloading', 'uploading')
+            """
+            var bindings: [BindingValue] = []
+            if let excludeSource = excludeSource {
+                sql += " AND source != ?1"
+                bindings.append(.text(excludeSource))
+            }
+            sql += " ORDER BY priority DESC, id ASC"
+            if let limit = limit {
+                sql += " LIMIT \(limit)"
+            }
+            let rows = queryInternal(sql, bind: bindings)
+            return rows.compactMap { uploadItemFromRow($0) }
+        }
+    }
+
+    /// Count pending items split by source (auto vs manual).
+    func getPendingCountsBySource() -> (auto: Int, manual: Int) {
+        return queue.sync {
+            let sql = """
+            SELECT source, COUNT(*) as cnt FROM upload_items
+            WHERE status IN ('queued', 'discovered', 'preparing', 'ready', 'cloud_downloading')
+            GROUP BY source
+            """
+            let rows = queryInternal(sql, bind: [])
+            var autoCount = 0
+            var manualCount = 0
+            for row in rows {
+                let source = row["source"] as? String ?? "auto"
+                let count = (row["cnt"] as? Int64).map(Int.init) ?? 0
+                if source == "manual" {
+                    manualCount = count
+                } else {
+                    autoCount = count
+                }
+            }
+            return (auto: autoCount, manual: manualCount)
+        }
+    }
+
+    /// Get the source of the currently active upload item (if any).
+    /// Checks all in-progress statuses, not just 'uploading', so that
+    /// the task source is visible during preparing / cloud_downloading too.
+    func getCurrentUploadingSource() -> String? {
+        return queue.sync {
+            let sql = """
+            SELECT source FROM upload_items
+            WHERE status IN ('uploading', 'preparing', 'cloud_downloading', 'ready')
+            ORDER BY CASE status
+                WHEN 'uploading' THEN 0
+                WHEN 'cloud_downloading' THEN 1
+                WHEN 'preparing' THEN 2
+                WHEN 'ready' THEN 3
+            END
+            LIMIT 1
+            """
+            let rows = queryInternal(sql, bind: [])
+            return rows.first?["source"] as? String
+        }
+    }
+
+    /// Cancel all pending and in-progress items in a manual batch.
+    /// Three checkpoints in the upload loop enforce this:
+    ///   1. Between files (index > 0): skips cancelled items before export
+    ///   2. After export, before TCP upload: skips and cleans up temp file
+    ///   3. Already in TCP: current file finishes (no mid-stream abort), then stops
+    func cancelManualBatch(batchId: String) throws {
+        try queue.sync {
+            let now = ISO8601DateFormatter().string(from: Date())
+            let sql = """
+            UPDATE upload_items SET status = 'cancelled', updated_at = ?1
+            WHERE batch_id = ?2 AND status IN ('queued', 'discovered', 'preparing', 'ready', 'uploading', 'cloud_downloading')
+            """
+            try executeWithBindings(sql, bindings: [
+                .text(now),
+                .text(batchId)
+            ])
+        }
+    }
+
+    /// Get a single upload item by its asset local identifier (for deduplication).
+    func getItemByAssetId(_ assetId: String) -> UploadItemRecord? {
+        return queue.sync {
+            let sql = "SELECT * FROM upload_items WHERE asset_local_id = ?1"
+            let rows = queryInternal(sql, bind: [.text(assetId)])
+            return rows.first.flatMap { uploadItemFromRow($0) }
+        }
+    }
+
+    // MARK: - Auto Upload Config CRUD
+
+    func getAutoUploadConfig() -> AutoUploadConfigRecord? {
+        return queue.sync {
+            let sql = "SELECT * FROM auto_upload_config WHERE id = 1"
+            let rows = queryInternal(sql, bind: [])
+            guard let row = rows.first else { return nil }
+            return AutoUploadConfigRecord(
+                enabled: (row["enabled"] as? Int64 ?? 0) != 0,
+                mediaFilter: row["media_filter"] as? String ?? "all",
+                timeRangeMode: row["time_range_mode"] as? String ?? "from_now",
+                customTimeFrom: row["custom_time_from"] as? String,
+                updatedAt: row["updated_at"] as? String ?? ""
+            )
+        }
+    }
+
+    func saveAutoUploadConfig(_ config: AutoUploadConfigRecord) throws {
+        try queue.sync {
+            let sql = """
+            INSERT INTO auto_upload_config (id, enabled, media_filter, time_range_mode, custom_time_from, updated_at)
+            VALUES (1, ?1, ?2, ?3, ?4, ?5)
+            ON CONFLICT(id) DO UPDATE SET
+              enabled = excluded.enabled,
+              media_filter = excluded.media_filter,
+              time_range_mode = excluded.time_range_mode,
+              custom_time_from = excluded.custom_time_from,
+              updated_at = excluded.updated_at
+            """
+            try executeWithBindings(sql, bindings: [
+                .int(config.enabled ? 1 : 0),
+                .text(config.mediaFilter),
+                .text(config.timeRangeMode),
+                .textOrNull(config.customTimeFrom),
+                .text(config.updatedAt)
+            ])
         }
     }
 
@@ -606,7 +785,10 @@ class UploadStore {
             tempFilePath: row["temp_file_path"] as? String,
             ackedOffset: row["acked_offset"] as? Int64 ?? 0,
             lastErrorCode: row["last_error_code"] as? String,
-            updatedAt: updatedAt
+            updatedAt: updatedAt,
+            source: row["source"] as? String ?? "auto",
+            batchId: row["batch_id"] as? String,
+            priority: Int(row["priority"] as? Int64 ?? 0)
         )
     }
 
