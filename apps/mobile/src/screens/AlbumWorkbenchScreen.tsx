@@ -40,7 +40,8 @@ import { sortAlbumAssetsForDisplay } from '../utils/sortAlbumAssets';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const GRID_COLUMNS = 3;
 const GRID_GAP = 2;
-const GRID_ITEM_SIZE = (SCREEN_WIDTH - GRID_GAP * (GRID_COLUMNS + 1)) / GRID_COLUMNS;
+const GRID_ITEM_SIZE =
+  (SCREEN_WIDTH - GRID_GAP * (GRID_COLUMNS + 1)) / GRID_COLUMNS;
 const PAGE_SIZE = 60;
 
 const BLUE = '#3b9fd8';
@@ -59,7 +60,7 @@ const TRANSFER_FILTER_TABS: { key: TransferFilter; label: string }[] = [
 
 const MEDIA_FILTER_TABS: { key: MediaFilter; label: string }[] = [
   { key: 'all', label: '全部' },
-  { key: 'photos', label: '图片' },
+  { key: 'photos', label: '照片' },
   { key: 'videos', label: '视频' },
 ];
 
@@ -192,7 +193,14 @@ export function AlbumWorkbenchScreen() {
     void loadAssets(mediaFilter, transferFilter, true, collectionId);
     void loadStats();
     void loadConfig();
-  }, [mediaFilter, transferFilter, collectionId, loadAssets, loadStats, loadConfig]);
+  }, [
+    mediaFilter,
+    transferFilter,
+    collectionId,
+    loadAssets,
+    loadStats,
+    loadConfig,
+  ]);
 
   // Refresh all currently visible assets (re-fetch from 0 to current offset)
   // without changing scroll position or loading more pages.
@@ -233,39 +241,36 @@ export function AlbumWorkbenchScreen() {
   // Selection handlers
   // ---------------------------------------------------------------------------
 
-  const handleToggleSelect = useCallback(
-    (assetLocalId: string) => {
-      setSelectedIds(prev => {
-        const next = new Set(prev);
-        if (next.has(assetLocalId)) {
-          next.delete(assetLocalId);
-        } else {
-          next.add(assetLocalId);
-        }
-        if (next.size === 0) {
-          setMultiSelectMode(false);
-        }
-        return next;
-      });
-    },
-    [],
-  );
-
-  const handleLongPress = useCallback(
-    (assetLocalId: string) => {
-      setMultiSelectMode(true);
-      setSelectedIds(prev => {
-        const next = new Set(prev);
+  const handleToggleSelect = useCallback((assetLocalId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(assetLocalId)) {
+        next.delete(assetLocalId);
+      } else {
         next.add(assetLocalId);
-        return next;
-      });
-    },
-    [],
-  );
+      }
+      if (next.size === 0) {
+        setMultiSelectMode(false);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleLongPress = useCallback((assetLocalId: string) => {
+    setMultiSelectMode(true);
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.add(assetLocalId);
+      return next;
+    });
+  }, []);
 
   const handleSelectAll = useCallback(() => {
     const selectableAssets = assets.filter(a => !a.isTransferred);
-    if (selectedIds.size === selectableAssets.length && selectableAssets.length > 0) {
+    if (
+      selectedIds.size === selectableAssets.length &&
+      selectableAssets.length > 0
+    ) {
       // Deselect all
       setSelectedIds(new Set());
       setMultiSelectMode(false);
@@ -275,6 +280,28 @@ export function AlbumWorkbenchScreen() {
       setSelectedIds(new Set(selectableAssets.map(a => a.assetLocalId)));
     }
   }, [assets, selectedIds.size]);
+
+  const handleTransferFilterPress = useCallback(
+    (nextFilter: TransferFilter) => {
+      setTransferFilter(current => {
+        if (nextFilter !== 'all' && current === nextFilter) {
+          return 'all';
+        }
+        return nextFilter;
+      });
+      setSelectedIds(new Set());
+      setMultiSelectMode(false);
+    },
+    [],
+  );
+
+  const handleMediaFilterPress = useCallback((nextFilter: MediaFilter) => {
+    setMediaFilter(nextFilter);
+    setCollectionId(null);
+    setCollectionTitle(null);
+    setSelectedIds(new Set());
+    setMultiSelectMode(false);
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Upload handler
@@ -329,7 +356,14 @@ export function AlbumWorkbenchScreen() {
     } finally {
       setUploading(false);
     }
-  }, [selectedIds, loadAssets, mediaFilter, transferFilter, collectionId, loadStats]);
+  }, [
+    selectedIds,
+    loadAssets,
+    mediaFilter,
+    transferFilter,
+    collectionId,
+    loadStats,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Auto-upload config handlers
@@ -424,7 +458,15 @@ export function AlbumWorkbenchScreen() {
     if (!loadingMore && hasMore && !loading) {
       void loadAssets(mediaFilter, transferFilter, false, collectionId);
     }
-  }, [loadingMore, hasMore, loading, loadAssets, mediaFilter, transferFilter, collectionId]);
+  }, [
+    loadingMore,
+    hasMore,
+    loading,
+    loadAssets,
+    mediaFilter,
+    transferFilter,
+    collectionId,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Collection filter handlers
@@ -510,9 +552,7 @@ export function AlbumWorkbenchScreen() {
                 isSelected && styles.selectionCircleActive,
               ]}
             >
-              {isSelected && (
-                <Icon name="checkmark" size={14} color="#fff" />
-              )}
+              {isSelected && <Icon name="checkmark" size={14} color="#fff" />}
             </View>
           )}
         </TouchableOpacity>
@@ -573,9 +613,7 @@ export function AlbumWorkbenchScreen() {
                 isSelected && styles.listCheckboxActive,
               ]}
             >
-              {isSelected && (
-                <Icon name="checkmark" size={14} color="#fff" />
-              )}
+              {isSelected && <Icon name="checkmark" size={14} color="#fff" />}
             </View>
           )}
         </TouchableOpacity>
@@ -590,7 +628,8 @@ export function AlbumWorkbenchScreen() {
   );
 
   const selectableCount = assets.filter(a => !a.isTransferred).length;
-  const allSelected = selectableCount > 0 && selectedIds.size === selectableCount;
+  const allSelected =
+    selectableCount > 0 && selectedIds.size === selectableCount;
 
   // ---------------------------------------------------------------------------
   // Render
@@ -613,9 +652,7 @@ export function AlbumWorkbenchScreen() {
             size={18}
             color={collectionId ? BLUE : DARK}
           />
-          {collectionId != null && (
-            <View style={styles.headerFilterDot} />
-          )}
+          {collectionId != null && <View style={styles.headerFilterDot} />}
         </TouchableOpacity>
       </View>
 
@@ -771,10 +808,16 @@ export function AlbumWorkbenchScreen() {
                       if (text.length > 0) {
                         const parsed = new Date(text);
                         if (isNaN(parsed.getTime())) {
-                          Alert.alert('时间格式无效', '请使用 YYYY-MM-DDTHH:mm:ss 格式');
+                          Alert.alert(
+                            '时间格式无效',
+                            '请使用 YYYY-MM-DDTHH:mm:ss 格式',
+                          );
                           return;
                         }
-                        void handleConfigChange('customTimeFrom', parsed.toISOString());
+                        void handleConfigChange(
+                          'customTimeFrom',
+                          parsed.toISOString(),
+                        );
                       }
                     }}
                   />
@@ -785,102 +828,102 @@ export function AlbumWorkbenchScreen() {
         </View>
       )}
 
-      {/* Transfer filter */}
-      <View style={styles.filterRow}>
-        {TRANSFER_FILTER_TABS.map(tab => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[
-              styles.filterTab,
-              transferFilter === tab.key && styles.filterTabActive,
-            ]}
-            activeOpacity={0.7}
-            onPress={() => {
-              setTransferFilter(tab.key);
-              setSelectedIds(new Set());
-              setMultiSelectMode(false);
-            }}
-          >
-            <Text
-              style={[
-                styles.filterTabText,
-                transferFilter === tab.key && styles.filterTabTextActive,
-              ]}
-            >
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-        <View style={styles.filterSpacer} />
-        <View style={styles.viewModeGroup}>
-          <TouchableOpacity
-            style={[
-              styles.viewModeBtn,
-              viewMode === 'grid' && styles.viewModeBtnActive,
-            ]}
-            activeOpacity={0.7}
-            onPress={() => setViewMode('grid')}
-          >
-            <Icon
-              name="grid-outline"
-              size={16}
-              color={viewMode === 'grid' ? BLUE : '#8aabbd'}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.viewModeBtn,
-              viewMode === 'list' && styles.viewModeBtnActive,
-            ]}
-            activeOpacity={0.7}
-            onPress={() => setViewMode('list')}
-          >
-            <Icon
-              name="list-outline"
-              size={16}
-              color={viewMode === 'list' ? BLUE : '#8aabbd'}
-            />
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity
-          style={styles.selectAllBtn}
-          activeOpacity={0.7}
-          onPress={handleSelectAll}
-        >
-          <Text style={styles.selectAllText}>
-            {allSelected ? '取消全选' : '全选'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* Filter toolbar */}
+      <View style={styles.toolbarWrap}>
+        <View style={styles.toolbar}>
+          <View style={styles.toolbarChipGroup}>
+            {MEDIA_FILTER_TABS.map(tab => (
+              <TouchableOpacity
+                key={tab.key}
+                style={[
+                  styles.toolbarChip,
+                  mediaFilter === tab.key && styles.toolbarChipActive,
+                ]}
+                activeOpacity={0.7}
+                onPress={() => handleMediaFilterPress(tab.key)}
+              >
+                <Text
+                  style={[
+                    styles.toolbarChipText,
+                    mediaFilter === tab.key && styles.toolbarChipTextActive,
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-      {/* Media filter */}
-      <View style={styles.filterRowSecondary}>
-        {MEDIA_FILTER_TABS.map(tab => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[
-              styles.filterTab,
-              mediaFilter === tab.key && styles.filterTabActive,
-            ]}
-            activeOpacity={0.7}
-            onPress={() => {
-              setMediaFilter(tab.key);
-              setCollectionId(null);
-              setCollectionTitle(null);
-              setSelectedIds(new Set());
-              setMultiSelectMode(false);
-            }}
-          >
-            <Text
+          <View style={styles.toolbarChipGroup}>
+            {TRANSFER_FILTER_TABS.filter(tab => tab.key !== 'all').map(tab => (
+              <TouchableOpacity
+                key={tab.key}
+                style={[
+                  styles.toolbarChip,
+                  transferFilter === tab.key && styles.toolbarChipActive,
+                ]}
+                activeOpacity={0.7}
+                onPress={() => handleTransferFilterPress(tab.key)}
+              >
+                <Text
+                  style={[
+                    styles.toolbarChipText,
+                    transferFilter === tab.key && styles.toolbarChipTextActive,
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.toolbarSpacer} />
+
+          <View style={styles.toolbarActions}>
+            <TouchableOpacity
               style={[
-                styles.filterTabText,
-                mediaFilter === tab.key && styles.filterTabTextActive,
+                styles.toolbarIconButton,
+                viewMode === 'grid' && styles.toolbarIconButtonActive,
               ]}
+              activeOpacity={0.7}
+              onPress={() => setViewMode('grid')}
             >
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <Icon
+                name="grid-outline"
+                size={16}
+                color={viewMode === 'grid' ? DARK : '#7fa4bf'}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.toolbarIconButton,
+                viewMode === 'list' && styles.toolbarIconButtonActive,
+              ]}
+              activeOpacity={0.7}
+              onPress={() => setViewMode('list')}
+            >
+              <Icon
+                name="list-outline"
+                size={16}
+                color={viewMode === 'list' ? DARK : '#7fa4bf'}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {(multiSelectMode || selectedIds.size > 0) && (
+          <View style={styles.selectionAssistRow}>
+            <TouchableOpacity
+              style={styles.selectionAssistButton}
+              activeOpacity={0.7}
+              onPress={handleSelectAll}
+            >
+              <Text style={styles.selectionAssistText}>
+                {allSelected ? '取消全选' : '全选'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* Stats bar */}
@@ -905,7 +948,10 @@ export function AlbumWorkbenchScreen() {
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: BLUE }]}>
-              {Math.max(0, stats.totalCount - stats.transferredCount - stats.queuedCount)}
+              {Math.max(
+                0,
+                stats.totalCount - stats.transferredCount - stats.queuedCount,
+              )}
             </Text>
             <Text style={styles.statLabel}>新增</Text>
           </View>
@@ -922,9 +968,7 @@ export function AlbumWorkbenchScreen() {
         <View style={styles.emptyContainer}>
           <Icon name="image-outline" size={48} color="#b0c8da" />
           <Text style={styles.emptyText}>暂无素材</Text>
-          <Text style={styles.emptySubText}>
-            请确保已授予照片访问权限
-          </Text>
+          <Text style={styles.emptySubText}>请确保已授予照片访问权限</Text>
         </View>
       ) : viewMode === 'grid' ? (
         <FlatList
@@ -980,7 +1024,8 @@ export function AlbumWorkbenchScreen() {
         <TouchableOpacity
           style={[
             styles.uploadButton,
-            (uploading || selectedIds.size === 0) && styles.uploadButtonDisabled,
+            (uploading || selectedIds.size === 0) &&
+              styles.uploadButtonDisabled,
           ]}
           activeOpacity={0.7}
           onPress={() => void handleUpload()}
@@ -1257,65 +1302,79 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
 
-  // Filter tabs
-  filterRow: {
+  // Filter toolbar
+  toolbarWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 4,
+    paddingBottom: 10,
+    gap: 8,
+  },
+  toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    padding: 6,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.84)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.92)',
+    gap: 6,
+  },
+  toolbarChipGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  toolbarChip: {
+    minWidth: 46,
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    gap: 4,
-  },
-  filterRowSecondary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 0,
-    paddingBottom: 8,
-    gap: 4,
-  },
-  filterTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 14,
-  },
-  filterTabActive: {
-    backgroundColor: 'rgba(59,159,216,0.15)',
-  },
-  filterTabText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#8aabbd',
-  },
-  filterTabTextActive: {
-    color: BLUE,
-    fontWeight: '700',
-  },
-  filterSpacer: {
-    flex: 1,
-  },
-  viewModeGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.6)',
-    borderRadius: 8,
-    padding: 2,
-    gap: 2,
-  },
-  viewModeBtn: {
-    width: 30,
-    height: 28,
-    borderRadius: 6,
+    borderRadius: 13,
+    backgroundColor: '#e8f3fb',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  viewModeBtnActive: {
-    backgroundColor: 'rgba(59,159,216,0.12)',
+  toolbarChipActive: {
+    backgroundColor: DARK,
   },
-  selectAllBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  toolbarChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#7d9cb5',
   },
-  selectAllText: {
+  toolbarChipTextActive: {
+    color: '#fff',
+  },
+  toolbarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 14,
+    backgroundColor: '#edf6fc',
+    gap: 2,
+  },
+  toolbarSpacer: {
+    flex: 1,
+  },
+  toolbarIconButton: {
+    width: 32,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toolbarIconButtonActive: {
+    backgroundColor: '#d8eaf6',
+  },
+  selectionAssistRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  selectionAssistButton: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  selectionAssistText: {
     fontSize: 13,
     fontWeight: '600',
     color: BLUE,
