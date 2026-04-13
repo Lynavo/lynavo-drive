@@ -20,6 +20,8 @@ const tabDescriptions: Record<DirectoryTab, string> = {
   shared: '共享目录中的文件，可供局域网内其他设备访问',
 };
 
+const DIRECTORY_AUTO_REFRESH_MS = 3000;
+
 function TabButton({
   active,
   label,
@@ -62,6 +64,45 @@ export function DirectoryPage() {
     void fetchSettings();
     void fetchAll();
   }, [fetchSettings, fetchAll]);
+
+  useEffect(() => {
+    const refreshDirectory = () => {
+      void useDirectoryStore.getState().fetchAll();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshDirectory();
+      }
+    };
+
+    window.addEventListener('focus', refreshDirectory);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', refreshDirectory);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (document.visibilityState !== 'visible') {
+      return;
+    }
+
+    const refreshActiveTab = () => {
+      const { activeTab: currentTab, fetchReceivedFiles, fetchSharedFiles } =
+        useDirectoryStore.getState();
+      if (currentTab === 'received') {
+        void fetchReceivedFiles();
+      } else {
+        void fetchSharedFiles();
+      }
+    };
+
+    const intervalId = window.setInterval(refreshActiveTab, DIRECTORY_AUTO_REFRESH_MS);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [activeTab]);
 
   const handleTabChange = (tab: DirectoryTab) => {
     setTab(tab);

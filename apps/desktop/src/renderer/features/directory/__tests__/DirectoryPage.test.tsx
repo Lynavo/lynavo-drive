@@ -61,6 +61,7 @@ function setupElectronAPI() {
 
 describe('DirectoryPage', () => {
   beforeEach(() => {
+    vi.useRealTimers();
     Reflect.deleteProperty(window, 'electronAPI');
     useDirectoryStore.setState(useDirectoryStore.getInitialState());
     useSettingsStore.setState({
@@ -101,6 +102,27 @@ describe('DirectoryPage', () => {
     fireEvent.click(sharedTabButton);
 
     expect(useDirectoryStore.getState().activeTab).toBe('shared');
+  });
+
+  it('polls the active tab while the page stays visible', async () => {
+    vi.useFakeTimers();
+
+    const fetchReceivedFiles = vi.fn().mockResolvedValue(undefined);
+    const fetchSharedFiles = vi.fn().mockResolvedValue(undefined);
+    const fetchAll = vi.fn().mockResolvedValue(undefined);
+    useDirectoryStore.setState({
+      activeTab: 'received',
+      fetchReceivedFiles,
+      fetchSharedFiles,
+      fetchAll,
+    });
+
+    render(<DirectoryPage />);
+
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(fetchReceivedFiles).toHaveBeenCalledTimes(1);
+    expect(fetchSharedFiles).not.toHaveBeenCalled();
   });
 });
 

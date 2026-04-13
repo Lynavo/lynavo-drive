@@ -429,6 +429,59 @@ func TestDeviceExistingFileKeys(t *testing.T) {
 	}
 }
 
+func TestDeviceFilesSkipsDeletedFinalFiles(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	finalPathMissing := filepath.Join("Test iPhone", "2026-03-22", "IMG_0002.JPG")
+	if err := st.UpsertUpload(store.Upload{
+		FileKey:          "file-missing",
+		ClientID:         "test-device-1",
+		OriginalFilename: "IMG_0002.JPG",
+		MediaType:        "image",
+		FileSize:         4,
+		Status:           "completed",
+		FinalPath:        &finalPathMissing,
+		CommittedBytes:   4,
+		CompletedAt:      &now,
+		UpdatedAt:        now,
+	}); err != nil {
+		t.Fatalf("insert missing upload: %v", err)
+	}
+
+	resp, err := http.Get(srv.URL + "/devices/test-device-1/files?date=" + time.Now().Format("2006-01-02"))
+	if err != nil {
+		t.Fatalf("GET /devices/.../files: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var body struct {
+		Items      []map[string]any `json:"items"`
+		TotalItems int              `json:"totalItems"`
+		TotalBytes int64            `json:"totalBytes"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if len(body.Items) != 0 {
+		t.Fatalf("expected no device files after final file deletion, got %d", len(body.Items))
+	}
+	if body.TotalItems != 0 {
+		t.Fatalf("expected totalItems 0 after final file deletion, got %d", body.TotalItems)
+	}
+	if body.TotalBytes != 0 {
+		t.Fatalf("expected totalBytes 0 after final file deletion, got %d", body.TotalBytes)
+	}
+}
+
 func TestGetSettings(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
