@@ -230,7 +230,7 @@ func (c *connection) handlePair(body []byte) error {
 
 	if req.ConnectionCode != expectedCode {
 		slog.Warn("pair rejected: wrong connection code", "clientID", req.ClientID)
-		_ = c.sendJSON(protocol.TypePairRes, protocol.PairRes{OK: false})
+		_ = c.sendJSON(protocol.TypePairRes, protocol.PairRes{OK: false, Error: "连接码错误"})
 		return fmt.Errorf("invalid connection code from %s", req.ClientID)
 	}
 

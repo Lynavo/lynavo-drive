@@ -60,6 +60,7 @@ type PairReq struct {
 // PairRes is the server's response to PairReq.
 type PairRes struct {
 	OK           bool       `json:"ok"`
+	Error        string     `json:"error,omitempty"`
 	PairingID    string     `json:"pairingId"`
 	PairingToken string     `json:"pairingToken"`
 	ServerInfo   ServerInfo `json:"serverInfo"`

@@ -92,6 +92,28 @@ func (c *connection) handle() {
 		c.conn.Close()
 		if c.clientID != "" && c.server != nil {
 			c.server.RemoveClient(c.clientID)
+
+			// Broadcast offline event so desktop UI updates immediately
+			// (without this, the UI stays stuck on "transferring" until
+			// the next REST poll because no WebSocket push is sent).
+			c.hub.Broadcast(events.Event{
+				Type: "device.state.changed",
+				Payload: map[string]any{
+					"deviceId": c.clientID,
+					"status":   "offline",
+				},
+			})
+			c.hub.Broadcast(events.Event{Type: "dashboard.updated", Payload: nil})
+
+			// Clean up stale session state — if the client disconnected
+			// without sending SYNC_END_REQ, the session row is stuck in
+			// "transferring" forever. Mark it as interrupted.
+			if c.sessionID != "" {
+				if err := c.store.UpdateSessionState(c.sessionID, "interrupted"); err != nil {
+					slog.Warn("failed to mark session interrupted on disconnect",
+						"sessionID", c.sessionID, "err", err)
+				}
+			}
 		}
 		slog.Info("tcp client disconnected", "remote", c.conn.RemoteAddr(), "clientID", c.clientID)
 	}()

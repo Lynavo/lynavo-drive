@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/nicksyncflow/sidecar/internal/events"
 )
 
 // PresenceTracker tracks lightweight heartbeats from mobile clients.
@@ -39,5 +41,14 @@ func (s *Server) handlePresence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.presence.Touch(clientID)
+	if s.hub != nil {
+		s.hub.Broadcast(events.Event{
+			Type: "device.state.changed",
+			Payload: map[string]string{
+				"deviceId": clientID,
+				"status":   "connected_idle",
+			},
+		})
+	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }

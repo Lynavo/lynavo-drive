@@ -36,9 +36,10 @@ struct UploadItemRecord {
 
 struct AutoUploadConfigRecord {
     var enabled: Bool
-    var mediaFilter: String  // 'all' | 'photos' | 'videos'
+    // media_filter column remains in SQLite but is no longer used — auto upload uploads everything
     var timeRangeMode: String  // 'from_now' | 'from_today' | 'all' | 'custom'
     var customTimeFrom: String?
+    var state: String  // 'disabled' | 'active' | 'interrupted' — persisted source of truth
     var updatedAt: String
 }
 
@@ -215,9 +216,24 @@ class UploadStore {
               media_filter      TEXT NOT NULL DEFAULT 'all',
               time_range_mode   TEXT NOT NULL DEFAULT 'from_now',
               custom_time_from  TEXT,
+              state             TEXT NOT NULL DEFAULT 'disabled',
               updated_at        TEXT NOT NULL DEFAULT ''
             );
         """)
+
+        // Migrate: add state column for existing databases that lack it
+        let stateColumnCheck = queryInternal(
+            "SELECT COUNT(*) AS cnt FROM pragma_table_info('auto_upload_config') WHERE name = 'state'",
+            bind: []
+        )
+        let hasStateColumn = (stateColumnCheck.first?["cnt"] as? Int64 ?? 0) > 0
+        if !hasStateColumn {
+            NSLog("[UploadStore] migrating auto_upload_config: adding state column")
+            try executeInternal("ALTER TABLE auto_upload_config ADD COLUMN state TEXT NOT NULL DEFAULT 'disabled'")
+            // Backfill: if enabled=1, state should be 'active' (not 'disabled')
+            try executeInternal("UPDATE auto_upload_config SET state = 'active' WHERE enabled = 1")
+            NSLog("[UploadStore] auto_upload_config state column migration complete")
+        }
     }
 
     // MARK: - Binding CRUD
@@ -507,6 +523,20 @@ class UploadStore {
         }
     }
 
+    /// Cancel all pending auto-upload items. Called when user closes auto upload
+    /// so the queue is clean for manual uploads and re-enabling auto upload
+    /// starts a fresh scan.
+    func cancelPendingAutoItems() throws {
+        try queue.sync {
+            let now = ISO8601DateFormatter().string(from: Date())
+            let sql = """
+            UPDATE upload_items SET status = 'cancelled', updated_at = ?1
+            WHERE source = 'auto' AND status IN ('queued', 'discovered', 'preparing', 'ready', 'cloud_downloading')
+            """
+            try executeWithBindings(sql, bindings: [.text(now)])
+        }
+    }
+
     /// Cancel all pending and in-progress items in a manual batch.
     /// Three checkpoints in the upload loop enforce this:
     ///   1. Between files (index > 0): skips cancelled items before export
@@ -522,6 +552,22 @@ class UploadStore {
             try executeWithBindings(sql, bindings: [
                 .text(now),
                 .text(batchId)
+            ])
+        }
+    }
+
+    /// Cancel all pending and in-progress manual items, regardless of which
+    /// batch they came from. Manual upload is modeled in the PRD as one
+    /// continuously appended queue, not isolated per-submit batches.
+    func cancelAllManualUploads() throws {
+        try queue.sync {
+            let now = ISO8601DateFormatter().string(from: Date())
+            let sql = """
+            UPDATE upload_items SET status = 'cancelled', updated_at = ?1
+            WHERE source = 'manual' AND status IN ('queued', 'discovered', 'preparing', 'ready', 'uploading', 'cloud_downloading')
+            """
+            try executeWithBindings(sql, bindings: [
+                .text(now),
             ])
         }
     }
@@ -544,9 +590,10 @@ class UploadStore {
             guard let row = rows.first else { return nil }
             return AutoUploadConfigRecord(
                 enabled: (row["enabled"] as? Int64 ?? 0) != 0,
-                mediaFilter: row["media_filter"] as? String ?? "all",
+                // media_filter column ignored — auto upload uploads everything
                 timeRangeMode: row["time_range_mode"] as? String ?? "from_now",
                 customTimeFrom: row["custom_time_from"] as? String,
+                state: row["state"] as? String ?? "disabled",
                 updatedAt: row["updated_at"] as? String ?? ""
             )
         }
@@ -554,21 +601,23 @@ class UploadStore {
 
     func saveAutoUploadConfig(_ config: AutoUploadConfigRecord) throws {
         try queue.sync {
+            // media_filter column kept in schema but always written as 'all' — auto upload uploads everything
             let sql = """
-            INSERT INTO auto_upload_config (id, enabled, media_filter, time_range_mode, custom_time_from, updated_at)
-            VALUES (1, ?1, ?2, ?3, ?4, ?5)
+            INSERT INTO auto_upload_config (id, enabled, media_filter, time_range_mode, custom_time_from, state, updated_at)
+            VALUES (1, ?1, 'all', ?2, ?3, ?4, ?5)
             ON CONFLICT(id) DO UPDATE SET
               enabled = excluded.enabled,
-              media_filter = excluded.media_filter,
+              media_filter = 'all',
               time_range_mode = excluded.time_range_mode,
               custom_time_from = excluded.custom_time_from,
+              state = excluded.state,
               updated_at = excluded.updated_at
             """
             try executeWithBindings(sql, bindings: [
                 .int(config.enabled ? 1 : 0),
-                .text(config.mediaFilter),
                 .text(config.timeRangeMode),
                 .textOrNull(config.customTimeFrom),
+                .text(config.state),
                 .text(config.updatedAt)
             ])
         }

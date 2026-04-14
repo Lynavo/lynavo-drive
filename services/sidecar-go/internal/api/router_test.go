@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/nicksyncflow/sidecar/internal/api"
 	"github.com/nicksyncflow/sidecar/internal/config"
 	"github.com/nicksyncflow/sidecar/internal/events"
@@ -134,6 +135,60 @@ func TestDashboardDevices(t *testing.T) {
 	// Should be an empty array (not null)
 	if body == nil {
 		t.Error("expected empty array, got nil")
+	}
+}
+
+func TestPresenceHeartbeatBroadcastsConnectedIdleEvent(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/events/stream"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial ws: %v", err)
+	}
+	defer conn.Close()
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/presence/client-1", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST /presence: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, message, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("read ws message: %v", err)
+	}
+
+	var event struct {
+		Type    string         `json:"type"`
+		Payload map[string]any `json:"payload"`
+	}
+	if err := json.Unmarshal(message, &event); err != nil {
+		t.Fatalf("unmarshal event: %v", err)
+	}
+
+	if event.Type != "device.state.changed" {
+		t.Fatalf("expected device.state.changed, got %q", event.Type)
+	}
+	if event.Payload["deviceId"] != "client-1" {
+		t.Fatalf("expected deviceId client-1, got %v", event.Payload["deviceId"])
+	}
+	if event.Payload["status"] != "connected_idle" {
+		t.Fatalf("expected status connected_idle, got %v", event.Payload["status"])
 	}
 }
 

@@ -260,14 +260,26 @@ class NativeSyncEngineModule: RCTEventEmitter {
         }
     }
 
+    @objc
+    func cancelAllManualUploads(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        do {
+            try SyncEngineManager.shared.cancelAllManualUploads()
+            resolve(nil)
+        } catch {
+            reject("CANCEL_MANUAL_QUEUE_ERROR", error.localizedDescription, error)
+        }
+    }
+
     // MARK: - Vivi Drop: Auto Upload Control
 
+    // DEPRECATED: RN side uses saveAutoUploadConfig() instead. To be removed next release cycle.
     @objc
     func pauseAutoUpload(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         SyncEngineManager.shared.pauseAutoUpload()
         resolve(nil)
     }
 
+    // DEPRECATED: RN side uses saveAutoUploadConfig() instead. To be removed next release cycle.
     @objc
     func resumeAutoUpload(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         SyncEngineManager.shared.resumeAutoUpload()

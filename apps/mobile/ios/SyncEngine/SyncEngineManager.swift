@@ -220,7 +220,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private var autoUploadConfigStore: AutoUploadConfigStore?
     private var manualUploadService: ManualUploadService?
     let sharedFilesService = SharedFilesService()
-    private var isAutoUploadPaused = false
+    private var isAutoUploadInterrupted = false
     private var protocolSession: ProtocolSession?
     private var discoveredDevices: [String: DiscoveredDevice] = [:]  // keyed by deviceId
     private var photoLibraryChanged = false  // set by observer, consumed by watch loop
@@ -507,14 +507,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let pendingCounts = uploadStore?.getPendingCountsBySource() ?? (auto: 0, manual: 0)
         let currentTaskSource: Any = uploadStore?.getCurrentUploadingSource() ?? NSNull()
 
-        let autoUploadState: String
-        if isAutoUploadPaused {
-            autoUploadState = "paused"
-        } else if autoUploadConfigStore?.getConfig().enabled == true {
-            autoUploadState = "active"
-        } else {
-            autoUploadState = "disabled"
-        }
+        let autoUploadState = autoUploadConfigStore?.getConfig().state ?? "disabled"
 
         return [
             "currentDeviceId": currentBinding?.deviceId ?? NSNull(),
@@ -540,7 +533,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             "uploadState": runtimeUploadState,
             "currentTaskSource": currentTaskSource,
             "autoUploadState": autoUploadState,
-            "manualBatchPending": pendingCounts.manual,
+            "manualPending": pendingCounts.manual,
             "autoPending": pendingCounts.auto,
         ]
     }
@@ -550,7 +543,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
         let pendingItems = store.getPendingUploadItemsSorted(
             limit: limit,
-            excludeSource: isAutoUploadPaused ? "auto" : nil
+            excludeSource: isAutoUploadInterrupted ? "auto" : nil
         )
         guard !pendingItems.isEmpty else { return [] }
 
@@ -835,6 +828,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     private override init() {
         super.init()
+        // Migrate keychain from old bundle ID before any keychain access
+        bindingService.migrateKeychainIfNeeded()
         do {
             uploadStore = try UploadStore()
             historyStore = HistoryLedgerStore(store: uploadStore!)
@@ -842,6 +837,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             autoUploadConfigStore = AutoUploadConfigStore(store: uploadStore!)
             manualUploadService = ManualUploadService(uploadStore: uploadStore, bindingService: bindingService)
             photoScanner.autoUploadConfigStore = autoUploadConfigStore
+
+            // Restore interrupted state from persisted config across app restarts
+            if autoUploadConfigStore?.getConfig().state == "interrupted" {
+                isAutoUploadInterrupted = true
+                NSLog("[SyncEngine] restored interrupted state from persisted config")
+            }
         } catch {
             NSLog("[SyncEngine] Failed to init stores: \(error)")
         }
@@ -1428,6 +1429,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private func performIncrementalQueueRescan(reason: String) {
         guard isSyncing, let store = uploadStore else { return }
 
+        // Skip auto-discovery when auto upload is not active
+        let autoUploadActive = autoUploadConfigStore?.getConfig().state == "active"
+        guard autoUploadActive else {
+            NSLog("[SyncEngine] skipping incremental rescan — auto upload not active (%@)", reason)
+            return
+        }
+
         let clientId = bindingService.getOrCreateClientId()
         let trackedFileKeys = Set(store.getTrackedFileKeys())
 
@@ -1492,10 +1500,31 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     /// Start a full photo scan and serial upload session over the open TCP connection.
     func startSync() {
         guard !isSyncing else {
-            NSLog("[SyncEngine] startSync skipped — already syncing")
-            syncDiagnosticsLog("SyncEngine", "startSync skipped — already syncing")
+            // Already running — wake the watch loop so it picks up newly
+            // queued items (e.g. manual upload submitted while pipeline is
+            // idle-waiting for photoLibraryChanged).
+            NSLog("[SyncEngine] startSync: already syncing — waking watch loop")
+            syncDiagnosticsLog("SyncEngine", "startSync: already syncing — waking watch loop")
+            photoLibraryChanged = true
+            resumeWatchLoopIfNeeded()
             return
         }
+
+        // Check if there's anything to sync: auto upload must be active,
+        // OR there must be pending manual items. If neither, skip starting
+        // the full sync lifecycle (no background task, no audio session).
+        let configState = autoUploadConfigStore?.getConfig().state ?? "disabled"
+        let manualPending = uploadStore?.getPendingCountsBySource().manual ?? 0
+        if configState != "active" && manualPending == 0 {
+            NSLog("[SyncEngine] startSync skipped — auto upload %@, no manual pending", configState)
+            syncDiagnosticsLog("SyncEngine", "startSync skipped — auto upload \(configState), no manual pending")
+            // Emit current state so pages render correctly
+            NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                runtimeSyncOverviewPayload(uploadState: configState == "interrupted" ? "paused_auto_upload" : "idle")
+            )
+            return
+        }
+
         isSyncing = true
         NSLog("[SyncEngine] startSync")
         syncDiagnosticsLog("SyncEngine", "startSync")
@@ -1689,7 +1718,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                         syncDiagnosticsLog("SyncPipeline", "restored \(restoredCount) historical completed uploads before scan")
                     }
                 }
-                newAssets = photoScanner.scanForUntrackedAssets(clientId: clientId, trackedFileKeys: trackedKeys)
+                // Only auto-scan when auto upload is active (PRD: disabled/interrupted = no auto discovery)
+                let autoUploadActive = autoUploadConfigStore?.getConfig().state == "active"
+                if autoUploadActive {
+                    newAssets = photoScanner.scanForUntrackedAssets(clientId: clientId, trackedFileKeys: trackedKeys)
+                }
 
                 if !newAssets.isEmpty {
                     let queuePersistStart = CFAbsoluteTimeGetCurrent()
@@ -1748,17 +1781,39 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             syncDiagnosticsLog("SyncPipeline", "round \(roundNumber): \(pendingAssets.count) pending assets (\(newAssets.count) new, tracked: \(trackedAssetCount))")
 
             if pendingAssets.isEmpty {
-                // Nothing to upload — wait for photo library changes
-                NativeSyncEngineModule.shared?.emitSyncStateChanged(([
-                    "uploadState": "completed",
-                    "progressPercent": 100,
-                ] as [String: Any]).merging(
-                    runtimeSyncOverviewPayload(uploadState: "completed", progressPercent: 100)
-                ) { _, new in new })
+                // Determine idle reason based on auto upload state
+                let configState = autoUploadConfigStore?.getConfig().state ?? "disabled"
 
-                NSLog("[SyncPipeline] idle — waiting for new photos...")
-                syncDiagnosticsLog("SyncPipeline", "idle — waiting for new photos")
-                sessionService.transitionTo(.idle)
+                if configState == "interrupted" || isAutoUploadInterrupted {
+                    // Interrupted: report interrupted state regardless of pending count
+                    let autoPendingCount = uploadStore?.getPendingCountsBySource().auto ?? 0
+                    NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                        runtimeSyncOverviewPayload(uploadState: "paused_auto_upload")
+                    )
+                    NSLog("[SyncPipeline] idle — auto upload interrupted (auto pending: %d)", autoPendingCount)
+                    syncDiagnosticsLog("SyncPipeline", "idle — auto interrupted (auto pending: \(autoPendingCount))")
+                    sessionService.transitionTo(.interruptedAutoUpload)
+                } else if configState == "disabled" {
+                    // Disabled: emit idle, NOT completed — page should show "自动上传未开启"
+                    NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                        runtimeSyncOverviewPayload(uploadState: "idle")
+                    )
+                    NSLog("[SyncPipeline] idle — auto upload disabled")
+                    syncDiagnosticsLog("SyncPipeline", "idle — auto upload disabled")
+                    sessionService.transitionTo(.idle)
+                } else {
+                    // Active + empty queue: truly completed
+                    NativeSyncEngineModule.shared?.emitSyncStateChanged(([
+                        "uploadState": "completed",
+                        "progressPercent": 100,
+                    ] as [String: Any]).merging(
+                        runtimeSyncOverviewPayload(uploadState: "completed", progressPercent: 100)
+                    ) { _, new in new })
+
+                    NSLog("[SyncPipeline] idle — all items completed, waiting for new photos...")
+                    syncDiagnosticsLog("SyncPipeline", "idle — all completed, waiting for new photos")
+                    sessionService.transitionTo(.idle)
+                }
                 photoLibraryChanged = false
 
                 // Wait loop: send HTTP presence heartbeat every 30s while idle
@@ -2003,10 +2058,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
 
         for (index, asset) in assets.enumerated() {
-            // Between files: skip auto items when paused, skip cancelled batch items
+            // Between files: skip auto items when interrupted, skip cancelled batch items
             if index > 0 {
-                if isAutoUploadPaused && asset.source == "auto" {
-                    NSLog("[SyncPipeline] skipping auto item %@ — auto upload paused", asset.fileKey)
+                if isAutoUploadInterrupted && asset.source == "auto" {
+                    NSLog("[SyncPipeline] skipping auto item %@ — auto upload interrupted", asset.fileKey)
                     continue
                 }
                 // Check if this item was cancelled in DB (e.g. manual batch cancel)
@@ -2100,7 +2155,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 if nextIndex < assets.count {
                     if let queueHead = uploadStore?.getPendingUploadItemsSorted(
                         limit: 1,
-                        excludeSource: isAutoUploadPaused ? "auto" : nil
+                        excludeSource: isAutoUploadInterrupted ? "auto" : nil
                     ).first {
                         let nextBatchFileKey = assets[nextIndex].fileKey
                         if queueHead.fileKey != nil && queueHead.fileKey != nextBatchFileKey {
@@ -3020,8 +3075,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         else { pairOk = (pairType == .pairRes) }
 
         guard pairOk else {
-            let errMsg = pairRes["error"] as? String ?? "unknown"
-            throw SyncEngineError.pairingError("Pairing rejected: \(errMsg)")
+            let errMsg = pairRes["error"] as? String ?? "连接码错误或已过期"
+            throw SyncEngineError.pairingError(errMsg)
         }
 
         // 4. Persist pairing token in Keychain — keyed per server so that pairing
@@ -3070,9 +3125,16 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             discoveredDevices[bindingDeviceId] = bonjourDevice
         }
 
-        // 6. Notify RN bridge
-        bindingConnectionState = .bound
+        // 6. Notify RN bridge — mark as connected (not just bound) because
+        //    we just confirmed the host is reachable via TCP during pairing.
+        //    Also cache sidecarHost so presence heartbeats can reach the desktop.
+        sidecarHost = host
+        bindingConnectionState = .connected
         NativeSyncEngineModule.shared?.emitBindingStateChanged(bindingStatePayload(binding: binding))
+
+        // 7. Send a presence heartbeat so the desktop UI shows device as online
+        //    immediately after pairing, without waiting for a full sync cycle.
+        sendPresenceHeartbeat(clientId: clientId)
 
         NSLog("[SyncEngine] pairing successful — sync deferred until user action")
     }
@@ -3570,34 +3632,81 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         pushClientMetadataUpdateIfPossible()
     }
 
-    // MARK: - Auto Upload Pause / Resume
+    // MARK: - Auto Upload Interrupt / Enable
 
-    /// Pause auto upload: skips auto items in queue, only processes manual items.
-    func pauseAutoUpload() {
-        guard !isAutoUploadPaused else { return }
-        isAutoUploadPaused = true
-        NSLog("[SyncEngine] auto upload paused")
-        syncDiagnosticsLog("SyncEngine", "auto upload paused")
-        sessionService.transitionTo(.pausedAutoUpload)
+    /// Interrupt auto upload: skips auto items in queue, only processes manual items.
+    /// Once interrupted, user must explicitly re-enable.
+    func interruptAutoUpload() {
+        guard !isAutoUploadInterrupted else { return }
+        isAutoUploadInterrupted = true
+
+        // Persist interrupted state so it survives app restart
+        if var config = autoUploadConfigStore?.getConfig() {
+            config.state = "interrupted"
+            config.updatedAt = ISO8601DateFormatter().string(from: Date())
+            do {
+                try autoUploadConfigStore?.saveConfig(config)
+            } catch {
+                NSLog("[SyncEngine] WARN: failed to persist interrupted state: %@", "\(error)")
+            }
+        }
+
+        // Clear pending auto items so they don't block manual uploads
+        // (dedup check) and re-enabling auto upload starts a fresh scan.
+        do {
+            try uploadStore?.cancelPendingAutoItems()
+        } catch {
+            NSLog("[SyncEngine] WARN: failed to cancel pending auto items: %@", "\(error)")
+        }
+        emitQueueToJS()
+
+        NSLog("[SyncEngine] auto upload interrupted")
+        syncDiagnosticsLog("SyncEngine", "auto upload interrupted")
+        sessionService.transitionTo(.interruptedAutoUpload)
         NativeSyncEngineModule.shared?.emitSyncStateChanged(
             runtimeSyncOverviewPayload(uploadState: "paused_auto_upload")
         )
     }
 
-    /// Resume auto upload: resumes processing auto items.
-    func resumeAutoUpload() {
-        guard isAutoUploadPaused else { return }
-        isAutoUploadPaused = false
-        NSLog("[SyncEngine] auto upload resumed")
-        syncDiagnosticsLog("SyncEngine", "auto upload resumed")
+    // DEPRECATED: to be removed, use enableAutoUpload/interruptAutoUpload instead
+    func pauseAutoUpload() {
+        interruptAutoUpload()
+    }
+
+    /// Re-enable auto upload: resumes processing auto items after interruption.
+    func enableAutoUpload() {
+        isAutoUploadInterrupted = false
+
+        // Persist active state so it survives app restart
+        if var config = autoUploadConfigStore?.getConfig() {
+            config.enabled = true
+            config.state = "active"
+            config.updatedAt = ISO8601DateFormatter().string(from: Date())
+            do {
+                try autoUploadConfigStore?.saveConfig(config)
+            } catch {
+                NSLog("[SyncEngine] WARN: failed to persist active state: %@", "\(error)")
+            }
+        }
+
+        NSLog("[SyncEngine] auto upload re-enabled")
+        syncDiagnosticsLog("SyncEngine", "auto upload re-enabled")
         if isSyncing {
             sessionService.transitionTo(.scanning)
         }
         NativeSyncEngineModule.shared?.emitSyncStateChanged(
             runtimeSyncOverviewPayload(uploadState: isSyncing ? "scanning" : "idle")
         )
-        // Wake up the watch loop if it's sleeping so the newly resumed auto items get processed
+        // Signal the watch loop that a re-scan is needed. Without this,
+        // resumeWatchLoopIfNeeded() wakes the loop but it immediately
+        // goes back to sleep because photoLibraryChanged is still false.
+        photoLibraryChanged = true
         resumeWatchLoopIfNeeded()
+    }
+
+    // DEPRECATED: to be removed, use enableAutoUpload/interruptAutoUpload instead
+    func resumeAutoUpload() {
+        enableAutoUpload()
     }
 
     /// Cancel remaining items in a manual batch.
@@ -3605,6 +3714,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         try uploadStore?.cancelManualBatch(batchId: batchId)
         NSLog("[SyncEngine] cancelled manual batch %@", batchId)
         syncDiagnosticsLog("SyncEngine", "cancelled manual batch \(batchId)")
+        emitQueueToJS()
+    }
+
+    func cancelAllManualUploads() throws {
+        try uploadStore?.cancelAllManualUploads()
+        NSLog("[SyncEngine] cancelled entire manual upload queue")
+        syncDiagnosticsLog("SyncEngine", "cancelled entire manual upload queue")
         emitQueueToJS()
     }
 
@@ -3717,8 +3833,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         // Emit queue update to JS
         emitQueueToJS()
 
-        // If we're syncing, wake up the watch loop so manual items get processed
-        if isSyncing {
+        // Manual uploads must start immediately even when auto upload is disabled.
+        // If the loop is already alive, just wake it; otherwise bootstrap it.
+        if result.queuedCount > 0 {
+            if isSyncing {
+                resumeWatchLoopIfNeeded()
+            } else {
+                startSync()
+            }
+        } else if isSyncing {
             resumeWatchLoopIfNeeded()
         }
 
@@ -3735,25 +3858,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         guard let configStore = autoUploadConfigStore else {
             return [
                 "enabled": false,
-                "mediaFilter": "all",
                 "timeRangeMode": "from_now",
                 "state": "disabled",
             ]
         }
         let config = configStore.getConfig()
-        let state: String
-        if !config.enabled {
-            state = "disabled"
-        } else if isAutoUploadPaused {
-            state = "paused"
-        } else {
-            state = "active"
-        }
         var result: [String: Any] = [
             "enabled": config.enabled,
-            "mediaFilter": config.mediaFilter,
             "timeRangeMode": config.timeRangeMode,
-            "state": state,
+            "state": config.state,
         ]
         if let customTimeFrom = config.customTimeFrom {
             result["customTimeFrom"] = customTimeFrom
@@ -3765,19 +3878,39 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         guard let configStore = autoUploadConfigStore else {
             throw SyncEngineError.databaseError("Auto upload config store not initialized")
         }
-        let wasEnabled = configStore.getConfig().enabled
+        let currentConfig = configStore.getConfig()
+        let newEnabled = config["enabled"] as? Bool ?? currentConfig.enabled
+
+        // Determine the persisted state from the state machine source of truth.
+        // `enabled` is now legacy compatibility data and may not reflect the UI state.
+        let newState: String
+        if !newEnabled {
+            newState = "disabled"
+        } else if currentConfig.state == "disabled" {
+            newState = "active"
+        } else {
+            newState = currentConfig.state
+        }
+
         let record = AutoUploadConfigRecord(
-            enabled: config["enabled"] as? Bool ?? false,
-            mediaFilter: config["mediaFilter"] as? String ?? "all",
-            timeRangeMode: config["timeRangeMode"] as? String ?? "from_now",
-            customTimeFrom: config["customTimeFrom"] as? String,
+            enabled: newEnabled,
+            timeRangeMode: config["timeRangeMode"] as? String ?? currentConfig.timeRangeMode,
+            customTimeFrom: config["customTimeFrom"] as? String ?? currentConfig.customTimeFrom,
+            state: newState,
             updatedAt: ISO8601DateFormatter().string(from: Date())
         )
         try configStore.saveConfig(record)
 
-        // When auto-upload is newly enabled (or config changed while active),
-        // wake the watch loop so it picks up the new config immediately.
-        if record.enabled && (!wasEnabled || isSyncing) {
+        // When newly enabled from disabled, clear interrupt flag and wake scan loop
+        if newEnabled && currentConfig.state == "disabled" {
+            isAutoUploadInterrupted = false
+            NSLog("[SyncEngine] auto-upload enabled — waking scan loop")
+            photoLibraryChanged = true
+            resumeWatchLoopIfNeeded()
+        }
+
+        // Config changed while already active — wake loop to pick up changes
+        if newEnabled && currentConfig.state == "active" && isSyncing {
             NSLog("[SyncEngine] auto-upload config changed — waking scan loop")
             photoLibraryChanged = true
             resumeWatchLoopIfNeeded()

@@ -189,27 +189,12 @@ class PhotoScanner: NSObject, PHPhotoLibraryChangeObserver {
 
         var predicates: [NSPredicate] = []
 
-        // Media type filter from config
-        let mediaFilter = configStore?.resolvedMediaFilter()
-        switch mediaFilter {
-        case "photos":
-            predicates.append(NSPredicate(
-                format: "mediaType == %d",
-                PHAssetMediaType.image.rawValue
-            ))
-        case "videos":
-            predicates.append(NSPredicate(
-                format: "mediaType == %d",
-                PHAssetMediaType.video.rawValue
-            ))
-        default:
-            // "all" or nil — include both images and videos
-            predicates.append(NSPredicate(
-                format: "mediaType == %d OR mediaType == %d",
-                PHAssetMediaType.image.rawValue,
-                PHAssetMediaType.video.rawValue
-            ))
-        }
+        // Auto upload uploads everything — no media type filter
+        predicates.append(NSPredicate(
+            format: "mediaType == %d OR mediaType == %d",
+            PHAssetMediaType.image.rawValue,
+            PHAssetMediaType.video.rawValue
+        ))
 
         // Time range filter from config
         if let timeThreshold = configStore?.resolvedTimeThreshold() {
