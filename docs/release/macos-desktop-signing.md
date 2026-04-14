@@ -9,7 +9,7 @@
 1. 已安装 `Developer ID Application` 证书到当前 Mac 的 keychain
 2. 已下载 App Store Connect Team API Key（`.p8`）
 3. 仓库根目录存在本地 API key 文件：
-   - `/Volumes/workspace/work/sync-flow/AuthKey_49NX53FQZT.p8`
+   - `/Volumes/T7/Dev/Web/sync-flow-pack/AuthKey_HY8CAHGPW9.p8`
 4. sidecar 与 desktop 当前代码都已通过基本验证：
    - `/Volumes/workspace/work/sync-flow/services/sidecar-go` 下 `go test ./...`
    - `/Volumes/workspace/work/sync-flow` 下 `pnpm --filter @syncflow/desktop test`
@@ -26,13 +26,13 @@
 当前本机默认值如下：
 
 1. Developer ID identity：
-   - `Developer ID Application: Guangqiang Bi (V57RT7LMFH)`
+   - `Developer ID Application: Shenzhen Kaiyun Information Technology Co., Ltd. (GKN7JQNCMC)`
 2. `APPLE_API_KEY_ID`：
-   - `49NX53FQZT`
+   - `HY8CAHGPW9`
 3. `APPLE_API_ISSUER`：
-   - `a4c17482-b579-4670-8d58-dec6ec282e36`
+   - `54cad458-4184-4fc6-a1c7-cb4b0c6ded0e`
 4. `APPLE_API_KEY` 默认路径：
-   - `/Volumes/workspace/work/sync-flow/AuthKey_49NX53FQZT.p8`
+   - `/Volumes/T7/Dev/Web/sync-flow-pack/AuthKey_HY8CAHGPW9.p8`
 
 脚本会自动探测当前 keychain 里的 `Developer ID Application` 证书，并自动去掉 electron-builder 不接受的前缀。
 
@@ -41,14 +41,14 @@
 从仓库根目录执行：
 
 ```bash
-cd /Volumes/workspace/work/sync-flow
+cd /Volumes/T7/Dev/Web/sync-flow-pack
 pnpm --filter @syncflow/desktop package:signed
 ```
 
 等价脚本入口：
 
 ```bash
-bash /Volumes/workspace/work/sync-flow/apps/desktop/scripts/package-macos-signed.sh dmg
+bash /Volumes/T7/Dev/Web/sync-flow-pack/apps/desktop/scripts/package-macos-signed.sh dmg
 ```
 
 这条路径会执行：
@@ -58,6 +58,7 @@ bash /Volumes/workspace/work/sync-flow/apps/desktop/scripts/package-macos-signed
 3. 调用 Apple `notarytool` 提交公证并等待结果
 4. 输出最终 DMG 到：
    - `/Volumes/workspace/work/sync-flow/apps/desktop/release`
+   - `/Volumes/T7/Dev/Web/sync-flow-pack/apps/desktop/release`
    - 其中包含 `ViviDrop-<version>-arm64.dmg` 和 `ViviDrop-<version>-x64.dmg`
 
 ## 4. 本地快速验签
@@ -65,29 +66,29 @@ bash /Volumes/workspace/work/sync-flow/apps/desktop/scripts/package-macos-signed
 如果只想先验证签名，不想等待 Apple notarization，可以执行：
 
 ```bash
-cd /Volumes/workspace/work/sync-flow
+cd /Volumes/T7/Dev/Web/sync-flow-pack
 pnpm --filter @syncflow/desktop package:signed:dir
 ```
 
 等价脚本入口：
 
 ```bash
-bash /Volumes/workspace/work/sync-flow/apps/desktop/scripts/package-macos-signed.sh dir
+bash /Volumes/T7/Dev/Web/sync-flow-pack/apps/desktop/scripts/package-macos-signed.sh dir
 ```
 
 这会产出已签名但未 notarize 的 `.app` 目录：
 
-- `/Volumes/workspace/work/sync-flow/apps/desktop/release/mac*/Vivi Drop.app`
+- `/Volumes/T7/Dev/Web/sync-flow-pack/apps/desktop/release/mac*/Vivi Drop.app`
 
 ## 5. 可覆盖的环境变量
 
 如果本机签名材料变化，可以覆盖下面这些变量：
 
 ```bash
-export CSC_NAME='Guangqiang Bi (V57RT7LMFH)'
+export CSC_NAME='Shenzhen Kaiyun Information Technology Co., Ltd. (GKN7JQNCMC)'
 export APPLE_API_KEY='/absolute/path/to/AuthKey_xxxxxx.p8'
-export APPLE_API_KEY_ID='49NX53FQZT'
-export APPLE_API_ISSUER='a4c17482-b579-4670-8d58-dec6ec282e36'
+export APPLE_API_KEY_ID='HY8CAHGPW9'
+export APPLE_API_ISSUER='54cad458-4184-4fc6-a1c7-cb4b0c6ded0e'
 
 pnpm --filter @syncflow/desktop package:signed
 ```
@@ -105,7 +106,7 @@ pnpm --filter @syncflow/desktop package:signed
 ### 6.1 主 app 签名
 
 ```bash
-for app in /Volumes/workspace/work/sync-flow/apps/desktop/release/mac*/Vivi\ Drop.app; do
+for app in /Volumes/T7/Dev/Web/sync-flow-pack/apps/desktop/release/mac*/Vivi\ Drop.app; do
   codesign -dv --verbose=4 "$app"
 done
 ```
@@ -113,13 +114,13 @@ done
 预期看到：
 
 1. `Authority=Developer ID Application: ...`
-2. `TeamIdentifier=V57RT7LMFH`
+2. `TeamIdentifier=GKN7JQNCMC`
 3. `Runtime Version` 存在
 
 ### 6.2 sidecar 签名
 
 ```bash
-for app in /Volumes/workspace/work/sync-flow/apps/desktop/release/mac*/Vivi\ Drop.app; do
+for app in /Volumes/T7/Dev/Web/sync-flow-pack/apps/desktop/release/mac*/Vivi\ Drop.app; do
   codesign -dv --verbose=4 "$app/Contents/Resources/syncflow-sidecar"
 done
 ```
@@ -129,7 +130,7 @@ done
 ### 6.3 Gatekeeper 评估
 
 ```bash
-for app in /Volumes/workspace/work/sync-flow/apps/desktop/release/mac*/Vivi\ Drop.app; do
+for app in /Volumes/T7/Dev/Web/sync-flow-pack/apps/desktop/release/mac*/Vivi\ Drop.app; do
   spctl --assess --type execute -vv "$app"
 done
 ```

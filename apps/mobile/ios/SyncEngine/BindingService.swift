@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 class BindingService {
-    private static let keychainServiceName = "com.syncflow.mobile"
+    private static let keychainServiceName = "com.vividrop.mobile.china"
     private static let clientIdKey = "syncflow_client_id"
     private static let pairingTokenKey = "syncflow_pairing_token"
     private static let clientDisplayNameKey = "syncflow_client_display_name"

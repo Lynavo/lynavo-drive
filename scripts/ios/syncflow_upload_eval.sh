@@ -56,7 +56,7 @@ Examples:
   bash scripts/ios/syncflow_upload_eval.sh \
     --mode batch \
     --device 88D18636-8E5D-5111-80CF-8A540F81DA1D \
-    --app com.syncflow.mobile \
+    --app com.vividrop.mobile.china \
     --file-key c42c4420... \
     --chunk-mb 16 \
     --window-mb 256 \
@@ -67,7 +67,7 @@ Examples:
   bash scripts/ios/syncflow_upload_eval.sh \
     --mode recovery-app \
     --device 88D18636-8E5D-5111-80CF-8A540F81DA1D \
-    --app com.syncflow.mobile \
+    --app com.vividrop.mobile.china \
     --file-key c42c4420...
 EOF
 }

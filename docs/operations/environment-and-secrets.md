@@ -28,7 +28,7 @@ pnpm build
 需要：
 
 1. 本机 Xcode 已登录有效 Apple 账号
-2. App Store Connect 已存在 `com.syncflow.mobile`
+2. App Store Connect 已存在 `com.vividrop.mobile.china`
 3. `Vivi DropMobile.xcworkspace` 能正常 archive 和 export
 
 ### 2.2 macOS 签名与公证
@@ -61,7 +61,7 @@ pnpm package:desktop:win
 
 当前 macOS signed desktop 打包脚本默认会从仓库根目录读取：
 
-- `AuthKey_49NX53FQZT.p8`
+- `AuthKey_HY8CAHGPW9.p8`
 
 注意：
 

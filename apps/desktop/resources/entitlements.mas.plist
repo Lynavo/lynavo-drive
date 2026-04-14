@@ -18,11 +18,11 @@
     <true/>
     <key>com.apple.security.application-groups</key>
     <array>
-      <string>V57RT7LMFH.com.syncflow.desktop</string>
+      <string>V57RT7LMFH.com.vividrop.desktop.china</string>
     </array>
     <key>com.apple.developer.team-identifier</key>
     <string>V57RT7LMFH</string>
     <key>com.apple.application-identifier</key>
-    <string>V57RT7LMFH.com.syncflow.desktop</string>
+    <string>V57RT7LMFH.com.vividrop.desktop.china</string>
   </dict>
 </plist>

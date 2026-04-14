@@ -120,6 +120,10 @@ async function collectExecutableFiles(dir, files = []) {
   return files;
 }
 
+function pathDepth(target) {
+  return target.split(path.sep).length;
+}
+
 async function signTarget(opts, target, extraArgs = []) {
   const signOptions = opts.optionsForFile ? opts.optionsForFile(target) : {};
 
@@ -171,7 +175,9 @@ module.exports = async function sign(opts) {
     ...(await collectExecutableFiles(frameworksDir)),
     ...(await collectExecutableFiles(loginItemsDir)),
     ...(await collectExecutableFiles(helpersDir)),
-  ];
+  ].sort((left, right) => {
+    return pathDepth(right) - pathDepth(left) || right.length - left.length || left.localeCompare(right);
+  });
 
   const binaries = Array.isArray(opts.binaries) ? opts.binaries : [];
   for (const binary of binaries) {

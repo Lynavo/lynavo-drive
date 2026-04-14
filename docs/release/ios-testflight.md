@@ -6,7 +6,7 @@
 
 - Marketing Version：`0.1.0`
 - Build Number：`CURRENT_PROJECT_VERSION`
-- Bundle ID：`com.syncflow.mobile`
+- Bundle ID：`com.vividrop.mobile.china`
 
 说明：
 
@@ -115,7 +115,7 @@ pnpm package:mobile:testflight:upload
 
 1. 当前 Mac 的 Xcode 账号已登录
 2. 对应团队在本机可用
-3. `com.syncflow.mobile` 已在 App Store Connect 建立 app 记录
+3. `com.vividrop.mobile.china` 已在 App Store Connect 建立 app 记录
 
 ## 7. App Store Connect 操作
 

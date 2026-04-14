@@ -74,7 +74,7 @@ cd /Volumes/workspace/work/sync-flow/apps/mobile/android
 bash /Volumes/workspace/work/sync-flow/scripts/ios/syncflow_upload_eval.sh \
   --mode <MODE> \
   --device <DEVICE_UDID> \
-  --app com.syncflow.mobile \
+  --app com.vividrop.mobile.china \
   --file-key <FILE_KEY>
 ```
 

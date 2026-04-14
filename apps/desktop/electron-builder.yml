@@ -1,4 +1,4 @@
-appId: com.syncflow.desktop
+appId: com.vividrop.desktop.china
 productName: Vivi Drop
 mac:
   artifactName: ViviDrop-${version}-${arch}.${ext}
