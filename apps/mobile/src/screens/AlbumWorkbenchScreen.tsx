@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  Animated,
   ActivityIndicator,
   AppState,
   Dimensions,
@@ -15,8 +16,20 @@ import {
   Modal,
   Platform,
   type AppStateStatus,
+  type ImageSourcePropType,
   type ListRenderItemInfo,
 } from 'react-native';
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const IC_ALBUM_PICKER: ImageSourcePropType = require('../assets/icons/album-picker.png');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const IC_SWITCH_GRID: ImageSourcePropType = require('../assets/icons/switch-grid.png');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const IC_SWITCH_LIST: ImageSourcePropType = require('../assets/icons/switch-list.png');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const IC_AUTO_UPLOAD: ImageSourcePropType = require('../assets/icons/auto-upload.png');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const IC_ARROW_DOWN: ImageSourcePropType = require('../assets/icons/arrow-down.png');
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import DateTimePicker, {
@@ -167,6 +180,40 @@ export function AlbumWorkbenchScreen() {
   // Upload
   const [uploading, setUploading] = useState(false);
 
+  // Device connection state — used to disable upload button when offline
+  const [deviceConnected, setDeviceConnected] = useState(false);
+
+  // Radar pulse animation for auto-upload active icon
+  const radarAnims = useRef(
+    Array.from({ length: 3 }, () => new Animated.Value(0)),
+  ).current;
+
+  useEffect(() => {
+    if (autoUploadConfig?.state !== 'active') {
+      radarAnims.forEach(a => a.setValue(0));
+      return;
+    }
+    const animations = radarAnims.map((anim, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 600),
+          Animated.timing(anim, {
+            toValue: 1,
+            duration: 1800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(anim, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ]),
+      ),
+    );
+    animations.forEach(a => a.start());
+    return () => animations.forEach(a => a.stop());
+  }, [autoUploadConfig?.state, radarAnims]);
+
   // ---------------------------------------------------------------------------
   // Data loading
   // ---------------------------------------------------------------------------
@@ -243,6 +290,17 @@ export function AlbumWorkbenchScreen() {
     void loadAssets(mediaFilter, transferFilter, true, collectionId);
     void loadStats();
     void loadConfig();
+    // Seed initial connection state
+    void (async () => {
+      try {
+        const binding =
+          await NativeModules.NativeSyncEngine?.getBindingState();
+        const conn = (binding?.connectionState as string) || '';
+        setDeviceConnected(conn === 'connected' || conn === 'bound');
+      } catch {
+        setDeviceConnected(false);
+      }
+    })();
   }, [
     mediaFilter,
     transferFilter,
@@ -281,9 +339,17 @@ export function AlbumWorkbenchScreen() {
     const stateSub = emitter.addListener('onSyncStateChanged', () => {
       void loadStats();
     });
+    const bindingSub = emitter.addListener(
+      'onBindingStateChanged',
+      (state: Record<string, unknown> | null) => {
+        const conn = (state?.connectionState as string) || '';
+        setDeviceConnected(conn === 'connected' || conn === 'bound');
+      },
+    );
     return () => {
       queueSub.remove();
       stateSub.remove();
+      bindingSub.remove();
     };
   }, [mediaFilter, refreshVisibleAssets, loadStats]);
 
@@ -795,7 +861,7 @@ export function AlbumWorkbenchScreen() {
             onPress={() => setConfigExpanded(prev => !prev)}
           >
             <View style={styles.configTitleRow}>
-              <Icon name="options-outline" size={16} color={DARK} />
+              <Image source={IC_AUTO_UPLOAD} style={styles.configTitleIcon} />
               <Text style={styles.configTitle}>自动上传</Text>
               <View
                 style={[
@@ -817,10 +883,12 @@ export function AlbumWorkbenchScreen() {
                 </Text>
               </View>
             </View>
-            <Icon
-              name={configExpanded ? 'chevron-up' : 'chevron-down'}
-              size={16}
-              color="#8aabbd"
+            <Image
+              source={IC_ARROW_DOWN}
+              style={[
+                styles.configArrowIcon,
+                configExpanded && styles.configArrowIconExpanded,
+              ]}
             />
           </TouchableOpacity>
 
@@ -829,17 +897,27 @@ export function AlbumWorkbenchScreen() {
             <View style={styles.configBody}>
               {/* Enable/Disable toggle */}
               <TouchableOpacity
-                style={styles.configRow}
+                style={[
+                  styles.configRow,
+                  !isAutoUploadActive && !deviceConnected && styles.configRowDisabled,
+                ]}
                 activeOpacity={0.7}
                 onPress={handleToggleAutoUpload}
+                disabled={!isAutoUploadActive && !deviceConnected}
               >
-                <Text style={styles.configLabel}>
+                <Text
+                  style={[
+                    styles.configLabel,
+                    !isAutoUploadActive && !deviceConnected && styles.configLabelDisabled,
+                  ]}
+                >
                   {isAutoUploadActive ? '暂停自动上传' : '恢复自动上传'}
                 </Text>
                 <View
                   style={[
                     styles.toggleTrack,
                     isAutoUploadActive && styles.toggleTrackOn,
+                    !isAutoUploadActive && !deviceConnected && styles.toggleTrackDisabled,
                   ]}
                 >
                   <View
@@ -910,7 +988,31 @@ export function AlbumWorkbenchScreen() {
           {isAutoUploadActive && stats && (
             <View style={styles.summaryCard}>
               <View style={styles.summaryHeaderRow}>
-                <View style={styles.summaryDot} />
+                <View style={styles.radarContainer}>
+                  {radarAnims.map((anim, i) => (
+                    <Animated.View
+                      key={i}
+                      style={[
+                        styles.radarRing,
+                        {
+                          opacity: anim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0.5, 0],
+                          }),
+                          transform: [
+                            {
+                              scale: anim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [1, 2.8],
+                              }),
+                            },
+                          ],
+                        },
+                      ]}
+                    />
+                  ))}
+                  <View style={styles.summaryDot} />
+                </View>
                 <Text style={styles.summaryTitle}>自动上传运行中</Text>
               </View>
               <Text style={styles.summarySubtitle}>
@@ -1028,10 +1130,12 @@ export function AlbumWorkbenchScreen() {
                 activeOpacity={0.7}
                 onPress={() => setViewMode('grid')}
               >
-                <Icon
-                  name="apps-outline"
-                  size={16}
-                  color={viewMode === 'grid' ? DARK : '#8aabbd'}
+                <Image
+                  source={IC_SWITCH_GRID}
+                  style={[
+                    styles.viewToggleIcon,
+                    { tintColor: viewMode === 'grid' ? DARK : '#8aabbd' },
+                  ]}
                 />
               </TouchableOpacity>
               <TouchableOpacity
@@ -1042,10 +1146,12 @@ export function AlbumWorkbenchScreen() {
                 activeOpacity={0.7}
                 onPress={() => setViewMode('list')}
               >
-                <Icon
-                  name="menu-outline"
-                  size={16}
-                  color={viewMode === 'list' ? DARK : '#8aabbd'}
+                <Image
+                  source={IC_SWITCH_LIST}
+                  style={[
+                    styles.viewToggleIcon,
+                    { tintColor: viewMode === 'list' ? DARK : '#8aabbd' },
+                  ]}
                 />
               </TouchableOpacity>
             </View>
@@ -1084,7 +1190,7 @@ export function AlbumWorkbenchScreen() {
           activeOpacity={0.7}
           onPress={() => void handleOpenCollectionSheet()}
         >
-          <Icon name="apps-outline" size={20} color={DARK} />
+          <Image source={IC_ALBUM_PICKER} style={styles.headerFilterIcon} />
         </TouchableOpacity>
       </View>
 
@@ -1148,27 +1254,29 @@ export function AlbumWorkbenchScreen() {
         />
       )}
 
-      {/* Bottom bar — hidden during auto upload running, visible otherwise */}
-      {!isAutoUploadActive && <View style={styles.uploadBar}>
+      {/* Bottom bar — always visible, button disabled when auto-upload active / offline */}
+      <View style={styles.uploadBar}>
         <Text
           style={[
             styles.uploadBarText,
-            selectedIds.size > 0 && styles.uploadBarTextActive,
+            selectedIds.size > 0 && !isAutoUploadActive && styles.uploadBarTextActive,
           ]}
         >
-          {selectedIds.size > 0
-            ? `已选 ${selectedIds.size} 个素材`
-            : '未选择素材'}
+          {isAutoUploadActive
+            ? '自动上传中，手动上传不可用'
+            : selectedIds.size > 0
+              ? `已选 ${selectedIds.size} 个素材`
+              : '未选择素材'}
         </Text>
         <TouchableOpacity
           style={[
             styles.uploadButton,
-            (uploading || selectedIds.size === 0) &&
+            (uploading || selectedIds.size === 0 || !deviceConnected || isAutoUploadActive) &&
               styles.uploadButtonDisabled,
           ]}
           activeOpacity={0.7}
           onPress={() => void handleUpload()}
-          disabled={uploading || selectedIds.size === 0}
+          disabled={uploading || selectedIds.size === 0 || !deviceConnected || isAutoUploadActive}
         >
           {uploading ? (
             <ActivityIndicator size="small" color="#fff" />
@@ -1176,7 +1284,7 @@ export function AlbumWorkbenchScreen() {
             <Text style={styles.uploadButtonText}>开始上传</Text>
           )}
         </TouchableOpacity>
-      </View>}
+      </View>
       {/* Date/time picker modal for custom time range */}
       <Modal
         visible={showDatePicker}
@@ -1326,6 +1434,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerFilterIcon: {
+    width: 20,
+    height: 20,
+    tintColor: DARK,
+  },
   headerFilterDot: {
     position: 'absolute',
     top: 6,
@@ -1358,6 +1471,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  configTitleIcon: {
+    width: 16,
+    height: 16,
+  },
+  radarContainer: {
+    width: 10,
+    height: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radarRing: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#22c55e',
+  },
+  configArrowIcon: {
+    width: 14,
+    height: 8,
+    resizeMode: 'contain',
+    tintColor: '#8aabbd',
+  },
+  configArrowIconExpanded: {
+    transform: [{ rotate: '180deg' }],
   },
   configTitle: {
     fontSize: 14,
@@ -1404,9 +1543,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: 12,
   },
+  configRowDisabled: {
+    opacity: 0.4,
+  },
   configLabel: {
     fontSize: 14,
     color: DARK,
+  },
+  configLabelDisabled: {
+    color: '#9ca3af',
   },
   toggleTrack: {
     width: 44,
@@ -1418,6 +1563,9 @@ const styles = StyleSheet.create({
   },
   toggleTrackOn: {
     backgroundColor: '#22c55e',
+  },
+  toggleTrackDisabled: {
+    backgroundColor: '#e5e7eb',
   },
   toggleThumb: {
     width: 22,
@@ -1887,6 +2035,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 2,
     elevation: 1,
+  },
+  viewToggleIcon: {
+    width: 16,
+    height: 16,
   },
 
   // Album collection picker modal
