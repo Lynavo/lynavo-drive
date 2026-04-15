@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -80,7 +80,32 @@ interface BindingState {
 const BLUE = '#3b9fd8';
 const DARK = '#1a3a5c';
 const SCREEN_BG = '#d6ecf8';
-const CARD_BG = 'rgba(255,255,255,0.62)';
+const CARD_BG = '#ffffff';
+const CARD_BORDER = 'rgba(187, 214, 233, 0.72)';
+const ICON_SURFACE = '#eaf4fb';
+const HEADER_ICON = '#6d86a3';
+const PRIMARY_NAVY = '#24466e';
+const PRIMARY_NAVY_PRESSED = '#1f3d60';
+const OUTLINE_SURFACE = '#eef6fd';
+const OUTLINE_BORDER = '#b6d3ee';
+const OUTLINE_TEXT = '#274a72';
+const ONLINE_GREEN = '#22c55e';
+const ONLINE_TEXT = '#1ebc63';
+const CONNECTING_AMBER = '#f3b24c';
+const CONNECTING_TEXT = '#c68a23';
+const OFFLINE_SLATE = '#94a3b8';
+const OFFLINE_TEXT = '#72859a';
+const SOFT_TEXT = '#8eaac0';
+const MUTED_TEXT = '#7893ab';
+const EMPTY_INFO_BG = '#edf6fd';
+const EMPTY_INFO_ICON = '#8faabd';
+const EMPTY_OFFLINE_BG = '#edf6fd';
+const EMPTY_OFFLINE_ICON = '#df7266';
+
+/** Grace period on mount / foreground before showing offline state (ms). */
+const STARTUP_CONNECTION_GRACE_MS = 2500;
+/** Delay before transitioning to offline display (ms). */
+const OFFLINE_DISPLAY_DELAY_MS = 800;
 
 const EMPTY_OVERVIEW: SyncOverview = {
   progressPercent: 0,
@@ -120,6 +145,11 @@ export function SyncActivityScreen() {
   const [todayStats, setTodayStats] = useState({ fileCount: 0, totalBytes: 0 });
   const [initialLoading, setInitialLoading] = useState(true);
   const [cancellingBatch, setCancellingBatch] = useState(false);
+
+  // Offline debounce: stabilize isOffline to avoid rapid UI flicker
+  const [stableOffline, setStableOffline] = useState(false);
+  const offlineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountGraceRef = useRef(true);
 
   // ---------------------------------------------------------------------------
   // Data loading
@@ -241,20 +271,39 @@ export function SyncActivityScreen() {
     };
   }, [loadTodayStats]);
 
-  // Foreground refresh
+  // Foreground refresh + reset mount grace on foreground transitions
   useEffect(() => {
     let appState = AppState.currentState;
+    let foregroundGraceTimer: ReturnType<typeof setTimeout> | undefined;
     const subscription = AppState.addEventListener(
       'change',
       (nextState: AppStateStatus) => {
-        if (appState !== 'active' && nextState === 'active') {
-          void loadTodayStats();
-        }
+        const becameActive = appState !== 'active' && nextState === 'active';
         appState = nextState;
+        if (!becameActive) return;
+        void loadTodayStats();
+        // Re-suppress offline display during foreground grace period
+        mountGraceRef.current = true;
+        setStableOffline(false);
+        if (foregroundGraceTimer) clearTimeout(foregroundGraceTimer);
+        foregroundGraceTimer = setTimeout(() => {
+          mountGraceRef.current = false;
+        }, STARTUP_CONNECTION_GRACE_MS);
       },
     );
-    return () => subscription.remove();
+    return () => {
+      if (foregroundGraceTimer) clearTimeout(foregroundGraceTimer);
+      subscription.remove();
+    };
   }, [loadTodayStats]);
+
+  // Mount grace period — suppress offline display for initial connection time
+  useEffect(() => {
+    const t = setTimeout(() => {
+      mountGraceRef.current = false;
+    }, STARTUP_CONNECTION_GRACE_MS);
+    return () => clearTimeout(t);
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Control handlers
@@ -425,6 +474,26 @@ export function SyncActivityScreen() {
   const isConnecting = connectionBadgeState === 'connecting';
   const isOffline = connectionBadgeState === 'offline';
 
+  // Debounce offline transitions: delay going offline, instant recovery
+  useEffect(() => {
+    if (isOffline && !mountGraceRef.current) {
+      offlineTimerRef.current = setTimeout(() => {
+        setStableOffline(true);
+      }, OFFLINE_DISPLAY_DELAY_MS);
+    } else {
+      if (offlineTimerRef.current) {
+        clearTimeout(offlineTimerRef.current);
+        offlineTimerRef.current = null;
+      }
+      setStableOffline(false);
+    }
+    return () => {
+      if (offlineTimerRef.current) {
+        clearTimeout(offlineTimerRef.current);
+      }
+    };
+  }, [isOffline]);
+
   const isSyncing =
     overview.uploadState === 'uploading' ||
     overview.uploadState === 'preparing' ||
@@ -468,7 +537,7 @@ export function SyncActivityScreen() {
 
   type MainCardState = 'running' | 'not_started' | 'offline';
 
-  const mainCardState: MainCardState = isOffline && !isSyncing
+  const mainCardState: MainCardState = stableOffline && !isSyncing
     ? 'offline'
     : (isAutoUploadActive || hasManualUploadWork)
       ? 'running'
@@ -493,13 +562,13 @@ export function SyncActivityScreen() {
               activeOpacity={0.7}
               onPress={() => navigation.navigate('History')}
             >
-              <Icon name="time-outline" size={22} color={DARK} />
+              <Icon name="time-outline" size={22} color={HEADER_ICON} />
             </TouchableOpacity>
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => navigation.navigate('Settings')}
             >
-              <Icon name="settings-outline" size={22} color={DARK} />
+              <Icon name="settings-outline" size={22} color={HEADER_ICON} />
             </TouchableOpacity>
           </View>
         </View>
@@ -509,7 +578,7 @@ export function SyncActivityScreen() {
           {/* Device info row — always shown at top of card */}
           <View style={styles.deviceRow}>
             <View style={styles.deviceIconBox}>
-              <Icon name="desktop-outline" size={22} color="#fff" />
+              <Icon name="desktop-outline" size={22} color={BLUE} />
             </View>
             <View style={styles.deviceInfo}>
               <Text style={styles.deviceName}>{boundDeviceName}</Text>
@@ -671,8 +740,12 @@ export function SyncActivityScreen() {
           {/* ---- State 2: Auto Upload Not Started ---- */}
           {mainCardState === 'not_started' && (
             <View style={styles.cardBodyCentered}>
-              <View style={styles.emptyIconBox}>
-                <Icon name="cloud-upload-outline" size={44} color={BLUE} />
+              <View style={styles.notStartedIconCircle}>
+                <Icon
+                  name="alert-circle-outline"
+                  size={38}
+                  color={EMPTY_INFO_ICON}
+                />
               </View>
               <Text style={styles.centeredTitle}>自动上传未开启</Text>
               <Text style={styles.centeredSubtitle}>
@@ -700,23 +773,27 @@ export function SyncActivityScreen() {
           {/* ---- State 3: Device Offline ---- */}
           {mainCardState === 'offline' && (
             <View style={styles.cardBodyCentered}>
-              <View style={styles.emptyIconBox}>
-                <Icon name="alert-circle-outline" size={44} color="#e53935" />
+              <View style={styles.offlineIconCircle}>
+                <Icon
+                  name="alert-circle-outline"
+                  size={38}
+                  color={EMPTY_OFFLINE_ICON}
+                />
               </View>
               <Text style={styles.centeredTitle}>当前设备已离线</Text>
               <Text style={styles.centeredSubtitle}>
-                请检查电脑是否在线并连接同一局域网。恢复后可继续上传或访问共享目录
+                请检查电脑是否在线并连接同一局域网，恢复后可继续上传或访问共享目录
               </Text>
               <View style={styles.twoButtonRow}>
                 <TouchableOpacity
-                  style={[styles.rowButton, styles.rowButtonOutlined]}
+                  style={[styles.rowButton, styles.offlineButtonOutlined]}
                   activeOpacity={0.7}
                   onPress={handleSwitchDevice}
                 >
-                  <Text style={styles.rowButtonOutlinedText}>切换设备</Text>
+                  <Text style={styles.offlineButtonOutlinedText}>切换设备</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.rowButton, styles.rowButtonPrimary]}
+                  style={[styles.rowButton, styles.offlineButtonPrimary]}
                   activeOpacity={0.7}
                   onPress={handleReconnect}
                 >
@@ -897,15 +974,16 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginBottom: 12,
     borderRadius: 20,
-    paddingVertical: 20,
+    paddingTop: 18,
+    paddingBottom: 20,
     paddingHorizontal: 20,
     backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.9)',
-    shadowColor: '#50a0d2',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 24,
+    borderColor: CARD_BORDER,
+    shadowColor: '#4f8fbc',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 28,
     elevation: 4,
   },
 
@@ -914,19 +992,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    paddingBottom: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#d6e7f4',
   },
   deviceIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 52,
+    height: 52,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#3ba4dc',
-    shadowColor: 'rgba(59,159,216,0.5)',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 3,
+    backgroundColor: ICON_SURFACE,
   },
   deviceInfo: {
     flex: 1,
@@ -949,26 +1025,26 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   statusDotOnline: {
-    backgroundColor: '#22c55e',
+    backgroundColor: ONLINE_GREEN,
   },
   statusDotConnecting: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: CONNECTING_AMBER,
   },
   statusDotOffline: {
-    backgroundColor: '#94a3b8',
+    backgroundColor: OFFLINE_SLATE,
   },
   statusText: {
     fontSize: 12,
     fontWeight: '500',
   },
   statusTextOnline: {
-    color: '#16a34a',
+    color: ONLINE_TEXT,
   },
   statusTextConnecting: {
-    color: '#d97706',
+    color: CONNECTING_TEXT,
   },
   statusTextOffline: {
-    color: '#64748b',
+    color: OFFLINE_TEXT,
   },
 
   // Card body for state 1 (running)
@@ -1005,7 +1081,7 @@ const styles = StyleSheet.create({
   },
   badgeLabel: {
     fontSize: 12,
-    color: '#6a96b8',
+    color: MUTED_TEXT,
   },
   runningTitleRow: {
     flexDirection: 'row',
@@ -1020,7 +1096,7 @@ const styles = StyleSheet.create({
   },
   idleSubtitle: {
     fontSize: 14,
-    color: '#6b8da0',
+    color: MUTED_TEXT,
     marginTop: 4,
     marginBottom: 8,
   },
@@ -1032,7 +1108,7 @@ const styles = StyleSheet.create({
   progressBarTrack: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: 'rgba(59,159,216,0.12)',
+    backgroundColor: 'rgba(59,159,216,0.16)',
     overflow: 'hidden',
     marginBottom: 10,
   },
@@ -1043,7 +1119,7 @@ const styles = StyleSheet.create({
   },
   currentFileName: {
     fontSize: 12,
-    color: '#6a96b8',
+    color: MUTED_TEXT,
     marginBottom: 12,
   },
   statsRow: {
@@ -1052,7 +1128,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 8,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: '#f5fbff',
     marginBottom: 10,
   },
   statItem: {
@@ -1062,11 +1138,11 @@ const styles = StyleSheet.create({
   statDivider: {
     width: 1,
     height: 24,
-    backgroundColor: 'rgba(106,150,184,0.2)',
+    backgroundColor: 'rgba(118, 153, 184, 0.18)',
   },
   statLabel: {
     fontSize: 10,
-    color: '#8aabbd',
+    color: SOFT_TEXT,
   },
   statValue: {
     fontSize: 13,
@@ -1076,7 +1152,7 @@ const styles = StyleSheet.create({
   },
   queueInfoText: {
     fontSize: 12,
-    color: '#6a96b8',
+    color: MUTED_TEXT,
     textAlign: 'center',
     marginBottom: 12,
   },
@@ -1088,14 +1164,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(26,58,92,0.18)',
-    backgroundColor: 'rgba(255,255,255,0.75)',
+    borderColor: OUTLINE_BORDER,
+    backgroundColor: OUTLINE_SURFACE,
     marginTop: 4,
   },
   outlinedButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: DARK,
+    color: OUTLINE_TEXT,
   },
   dangerButton: {
     backgroundColor: 'rgba(229,57,53,0.06)',
@@ -1115,6 +1191,24 @@ const styles = StyleSheet.create({
   emptyIconBox: {
     marginBottom: 14,
   },
+  notStartedIconCircle: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: EMPTY_INFO_BG,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  offlineIconCircle: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: EMPTY_OFFLINE_BG,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
   centeredTitle: {
     fontSize: 18,
     fontWeight: '700',
@@ -1123,7 +1217,7 @@ const styles = StyleSheet.create({
   },
   centeredSubtitle: {
     fontSize: 13,
-    color: '#8aabbd',
+    color: SOFT_TEXT,
     textAlign: 'center',
     lineHeight: 19,
     marginBottom: 20,
@@ -1142,22 +1236,33 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   rowButtonOutlined: {
-    backgroundColor: '#fff',
+    backgroundColor: OUTLINE_SURFACE,
     borderWidth: 1,
-    borderColor: 'rgba(26,58,92,0.18)',
+    borderColor: OUTLINE_BORDER,
   },
   rowButtonOutlinedText: {
     fontSize: 14,
     fontWeight: '600',
-    color: DARK,
+    color: OUTLINE_TEXT,
   },
   rowButtonPrimary: {
-    backgroundColor: BLUE,
+    backgroundColor: PRIMARY_NAVY,
   },
   rowButtonPrimaryText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#fff',
+  },
+  offlineButtonOutlined: {
+    backgroundColor: OUTLINE_SURFACE,
+  },
+  offlineButtonOutlinedText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: OUTLINE_TEXT,
+  },
+  offlineButtonPrimary: {
+    backgroundColor: PRIMARY_NAVY_PRESSED,
   },
 
   // Quick entry section
@@ -1166,10 +1271,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   sectionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6a96b8',
-    marginBottom: 10,
+    fontSize: 15,
+    fontWeight: '700',
+    color: DARK,
+    marginBottom: 12,
   },
   quickEntryRow: {
     flexDirection: 'row',
@@ -1180,13 +1285,13 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingVertical: 18,
     paddingHorizontal: 16,
-    backgroundColor: CARD_BG,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.9)',
-    shadowColor: 'rgba(80,160,210,0.3)',
-    shadowOffset: { width: 0, height: 2 },
+    borderColor: CARD_BORDER,
+    shadowColor: '#4f8fbc',
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
-    shadowRadius: 16,
+    shadowRadius: 18,
     elevation: 2,
   },
   quickEntryIcon: {
@@ -1205,6 +1310,6 @@ const styles = StyleSheet.create({
   },
   quickEntryDesc: {
     fontSize: 11,
-    color: '#8aabbd',
+    color: SOFT_TEXT,
   },
 });

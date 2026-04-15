@@ -61,7 +61,7 @@ describe('effectiveConnectionState', () => {
     ).toBe('connected');
   });
 
-  it('builds online badge state from current file evidence even if binding temporarily reports offline', () => {
+  it('respects native offline even if stale sync evidence exists', () => {
     expect(
       getConnectionBadgeState(
         'offline',
@@ -70,7 +70,7 @@ describe('effectiveConnectionState', () => {
           uploadState: 'idle',
         }),
       ),
-    ).toBe('online');
+    ).toBe('offline');
   });
 
   it('keeps connecting badge state distinct from online when no sync evidence exists', () => {

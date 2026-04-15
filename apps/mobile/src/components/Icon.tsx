@@ -34,7 +34,7 @@ const ionicons: Record<string, number> = {
   'stop-circle-outline': 61093,
   'arrow-down-circle-outline': 60076,
   'sync-outline': 61121,
-  'alert-circle-outline': 60030,
+  'alert-circle-outline': 59925,
   'home-outline': 60514,
   'flash-outline': 60418,
   'ellipse': 60370,

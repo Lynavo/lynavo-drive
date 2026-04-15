@@ -72,6 +72,13 @@ export function getEffectiveConnectionState(
     return 'connected';
   }
 
+  // When the native layer explicitly says offline, only override if the queue
+  // proves a transfer is truly in-flight right now — stale progress values
+  // (e.g. 100% from a previous completed upload) must not keep the badge green.
+  if (connectionState === 'offline') {
+    return 'offline';
+  }
+
   if (syncActivityImpliesConnected(evidence)) {
     return 'connected';
   }
