@@ -86,3 +86,32 @@ func TestBootstrapReconciliationKeepsCustomReceiveRoot(t *testing.T) {
 		t.Fatalf("ReceiveRoot = %q, want %q", updated.ReceiveRoot, filepath.Join(dir, "custom-received"))
 	}
 }
+
+func TestEnsureRuntimeDirsCreatesSharedDirAtStartup(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &config.Config{
+		DataDir:    filepath.Join(dir, "Vivi Drop"),
+		ReceiveDir: filepath.Join(dir, "Vivi Drop", "received"),
+		DeviceName: "test-device",
+	}
+
+	if err := ensureRuntimeDirs(cfg); err != nil {
+		t.Fatalf("ensureRuntimeDirs: %v", err)
+	}
+
+	for _, path := range []string{
+		cfg.DataDir,
+		cfg.ReceiveDir,
+		cfg.SharedDir(),
+		cfg.StagingDir(),
+		cfg.LogDir(),
+	} {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("Stat(%q): %v", path, err)
+		}
+		if !info.IsDir() {
+			t.Fatalf("%q is not a directory", path)
+		}
+	}
+}

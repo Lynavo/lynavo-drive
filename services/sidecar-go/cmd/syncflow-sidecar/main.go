@@ -37,9 +37,9 @@ func main() {
 	logging.Setup(cfg.LogLevel)
 	slog.Info("starting vivi-drop-sidecar", "http_port", cfg.HTTPPort, "tcp_port", cfg.TCPPort)
 
-	// Ensure data directories exist
-	for _, dir := range []string{cfg.DataDir, cfg.ReceiveDir, cfg.SharedDir(), cfg.StagingDir(), cfg.LogDir()} {
-		os.MkdirAll(dir, 0755)
+	if err := ensureRuntimeDirs(cfg); err != nil {
+		slog.Error("failed to create runtime directories", "err", err)
+		os.Exit(1)
 	}
 
 	// Init store
@@ -227,6 +227,15 @@ func watchSharedDirectory(ctx context.Context, cfg *config.Config, hub *events.H
 			}
 		}
 	}
+}
+
+func ensureRuntimeDirs(cfg *config.Config) error {
+	for _, dir := range []string{cfg.DataDir, cfg.ReceiveDir, cfg.SharedDir(), cfg.StagingDir(), cfg.LogDir()} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("create runtime dir %q: %w", dir, err)
+		}
+	}
+	return nil
 }
 
 func shouldRewriteLegacyReceiveRoot(cfg *config.Config, currentReceiveRoot string) bool {

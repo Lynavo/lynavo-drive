@@ -93,6 +93,7 @@ func (c *connection) handleHello(body []byte) error {
 
 		shouldUpsertDevice := false
 		metadataChanged := false
+		aliasChanged := false
 		if req.ClientName != "" && device.ClientName != req.ClientName {
 			device.ClientName = req.ClientName
 			shouldUpsertDevice = true
@@ -102,6 +103,7 @@ func (c *connection) handleHello(body []byte) error {
 			device.DeviceAlias = &req.DeviceAlias
 			shouldUpsertDevice = true
 			metadataChanged = true
+			aliasChanged = true
 		}
 		if c.clientIP != "" && (device.LastIP == nil || *device.LastIP != c.clientIP) {
 			device.LastIP = &c.clientIP
@@ -117,6 +119,16 @@ func (c *connection) handleHello(body []byte) error {
 		} else if err := c.store.UpdateLastSeen(req.ClientID, c.clientIP); err != nil {
 			slog.Warn("failed to update last_seen", "err", err)
 		}
+
+		// Migrate receive directory when device alias changes
+		if aliasChanged && device.ReceiveDirName != nil && *device.ReceiveDirName != "" {
+			newDirName := SanitizeDirName(req.DeviceAlias)
+			if *device.ReceiveDirName != newDirName {
+				MigrateDeviceDir(c.config.ReceiveDir, *device.ReceiveDirName, req.DeviceAlias)
+				_ = c.store.UpdateReceiveDirName(c.clientID, newDirName)
+			}
+		}
+
 		if metadataChanged && c.hub != nil {
 			c.hub.Broadcast(events.Event{Type: "dashboard.updated", Payload: nil})
 		}
