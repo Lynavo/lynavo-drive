@@ -662,6 +662,95 @@ func TestEnsureReceiveDirName_LegacyDevice_DoesClaimOrphanDir(t *testing.T) {
 	}
 }
 
+// -------------------------------------------------------------------
+// ReconcileReceiveDirNames
+// -------------------------------------------------------------------
+
+func TestReconcileReceiveDirNames_FixesStaleEntry(t *testing.T) {
+	st := newTestStoreForDir(t)
+	receiveDir := t.TempDir()
+
+	// Simulate the bug: DB says "iPhone app2" but actual directory is "iPhone app".
+	// The device's clientName matches the old directory name.
+	insertDevice(t, st, "dev-1", "iPhone app", strPtr("iPhone app3"))
+	if err := st.UpdateReceiveDirName("dev-1", "iPhone app2"); err != nil {
+		t.Fatalf("UpdateReceiveDirName: %v", err)
+	}
+	mkDir(t, receiveDir, "iPhone app") // actual directory on disk
+
+	ReconcileReceiveDirNames(st, receiveDir)
+
+	dev, err := st.GetPairedDevice("dev-1")
+	if err != nil {
+		t.Fatalf("GetPairedDevice: %v", err)
+	}
+	// Legacy claim should find "iPhone app" (via clientName match).
+	if dev.ReceiveDirName == nil || *dev.ReceiveDirName != "iPhone app" {
+		t.Fatalf("expected reconciled receive_dir_name=%q, got %v", "iPhone app", dev.ReceiveDirName)
+	}
+}
+
+func TestReconcileReceiveDirNames_NoMatchCreatesDir(t *testing.T) {
+	st := newTestStoreForDir(t)
+	receiveDir := t.TempDir()
+
+	// DB says "OldName" but no matching directory exists at all.
+	insertDevice(t, st, "dev-1", "NewName", strPtr("NewAlias"))
+	if err := st.UpdateReceiveDirName("dev-1", "OldName"); err != nil {
+		t.Fatalf("UpdateReceiveDirName: %v", err)
+	}
+
+	ReconcileReceiveDirNames(st, receiveDir)
+
+	dev, err := st.GetPairedDevice("dev-1")
+	if err != nil {
+		t.Fatalf("GetPairedDevice: %v", err)
+	}
+	// No legacy dir to claim; should generate from alias.
+	if dev.ReceiveDirName == nil || *dev.ReceiveDirName != "NewAlias" {
+		t.Fatalf("expected new receive_dir_name=%q, got %v", "NewAlias", dev.ReceiveDirName)
+	}
+	// Directory should have been created.
+	if !dirExists(receiveDir, "NewAlias") {
+		t.Fatal("expected directory to be materialised after reconcile")
+	}
+}
+
+func TestReconcileReceiveDirNames_SkipsValidEntry(t *testing.T) {
+	st := newTestStoreForDir(t)
+	receiveDir := t.TempDir()
+
+	insertDevice(t, st, "dev-1", "iPhone 15", nil)
+	if err := st.UpdateReceiveDirName("dev-1", "iPhone 15"); err != nil {
+		t.Fatalf("UpdateReceiveDirName: %v", err)
+	}
+	mkDir(t, receiveDir, "iPhone 15")
+
+	ReconcileReceiveDirNames(st, receiveDir)
+
+	dev, err := st.GetPairedDevice("dev-1")
+	if err != nil {
+		t.Fatalf("GetPairedDevice: %v", err)
+	}
+	if dev.ReceiveDirName == nil || *dev.ReceiveDirName != "iPhone 15" {
+		t.Fatalf("expected unchanged receive_dir_name=%q, got %v", "iPhone 15", dev.ReceiveDirName)
+	}
+}
+
+func TestPairDeviceWithDirName_CreatesDirectory(t *testing.T) {
+	st := newTestStoreForDir(t)
+	receiveDir := t.TempDir()
+
+	device := newPairDevice("dev-1", "My iPhone", nil)
+	got, err := PairDeviceWithDirName(st, receiveDir, device)
+	if err != nil {
+		t.Fatalf("PairDeviceWithDirName: %v", err)
+	}
+	if !dirExists(receiveDir, got) {
+		t.Fatalf("expected directory %q to exist after PairDeviceWithDirName", got)
+	}
+}
+
 func TestPairDeviceWithDirName_OrphanDir_Plus_DBConflict(t *testing.T) {
 	st := newTestStoreForDir(t)
 	receiveDir := t.TempDir()

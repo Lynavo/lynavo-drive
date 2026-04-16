@@ -43,6 +43,11 @@ func PairDeviceWithDirName(st *store.Store, receiveDir string, device store.Pair
 		return "", fmt.Errorf("PairDeviceWithDirName: store %q: %w", device.ClientID, err)
 	}
 
+	// Materialise the directory so "open folder" never targets a non-existent path.
+	if err := os.MkdirAll(filepath.Join(receiveDir, dirName), 0o755); err != nil {
+		slog.Warn("PairDeviceWithDirName: mkdir failed (non-fatal)", "dir", dirName, "err", err)
+	}
+
 	slog.Info("new device paired with dir name", "clientID", device.ClientID, "dirName", dirName)
 	return dirName, nil
 }
@@ -70,6 +75,11 @@ func ensureReceiveDirName(st *store.Store, receiveDir string, clientID string, s
 	// 3. Persist.
 	if err := st.UpdateReceiveDirName(clientID, result); err != nil {
 		return "", fmt.Errorf("ensureReceiveDirName: persist for %q: %w", clientID, err)
+	}
+
+	// Materialise the directory so "open folder" never targets a non-existent path.
+	if err := os.MkdirAll(filepath.Join(receiveDir, result), 0o755); err != nil {
+		slog.Warn("ensureReceiveDirName: mkdir failed (non-fatal)", "dir", result, "err", err)
 	}
 
 	slog.Info("receive dir name assigned", "clientID", clientID, "dirName", result)
@@ -191,6 +201,54 @@ func buildTakenSet(st *store.Store, receiveDir string) (map[string]bool, error) 
 func dirExists(receiveDir, name string) bool {
 	info, err := os.Stat(filepath.Join(receiveDir, name))
 	return err == nil && info.IsDir()
+}
+
+// ReconcileReceiveDirNames verifies that every device's receive_dir_name points
+// to a directory that actually exists on disk. If the directory is missing
+// (e.g. a previous rename wrote the DB but failed to move the folder), the
+// stale name is cleared and EnsureReceiveDirName re-runs, which will attempt
+// legacy directory claiming before generating a fresh name.
+// Called once at startup, after BackfillReceiveDirNames.
+func ReconcileReceiveDirNames(st *store.Store, receiveDir string) {
+	devices, err := st.ListPairedDevices()
+	if err != nil {
+		slog.Warn("reconcile: failed to list paired devices", "err", err)
+		return
+	}
+
+	reconciled := 0
+	for _, d := range devices {
+		if d.ReceiveDirName == nil || *d.ReceiveDirName == "" {
+			continue
+		}
+		if dirExists(receiveDir, *d.ReceiveDirName) {
+			continue
+		}
+
+		// Directory missing — clear stale name and re-derive.
+		oldName := *d.ReceiveDirName
+		if err := st.UpdateReceiveDirName(d.ClientID, ""); err != nil {
+			slog.Warn("reconcile: failed to clear stale receive_dir_name",
+				"clientID", d.ClientID, "oldName", oldName, "err", err)
+			continue
+		}
+
+		newName, err := EnsureReceiveDirName(st, receiveDir, d.ClientID)
+		if err != nil {
+			slog.Warn("reconcile: failed to re-derive receive_dir_name",
+				"clientID", d.ClientID, "err", err)
+			continue
+		}
+
+		reconciled++
+		slog.Info("reconcile: fixed stale receive_dir_name",
+			"clientID", d.ClientID,
+			"oldName", oldName,
+			"newName", newName)
+	}
+	if reconciled > 0 {
+		slog.Info("reconcile: completed", "fixed", reconciled)
+	}
 }
 
 // BackfillReceiveDirNames iterates all paired devices and ensures each has a

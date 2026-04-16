@@ -140,6 +140,9 @@ func TestDashboardDevices(t *testing.T) {
 
 func TestPresenceHeartbeatBroadcastsConnectedIdleEvent(t *testing.T) {
 	st, cfg, hub := testEnv(t)
+	if err := st.SetDeviceName("Desk Renamed"); err != nil {
+		t.Fatalf("SetDeviceName: %v", err)
+	}
 	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
@@ -165,6 +168,14 @@ func TestPresenceHeartbeatBroadcastsConnectedIdleEvent(t *testing.T) {
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode presence response: %v", err)
+	}
+	if body["serverName"] != "Desk Renamed" {
+		t.Fatalf("expected serverName Desk Renamed, got %v", body["serverName"])
 	}
 
 	conn.SetReadDeadline(time.Now().Add(2 * time.Second))

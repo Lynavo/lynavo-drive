@@ -1002,6 +1002,65 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         NativeSyncEngineModule.shared?.emitBindingStateChanged(bindingStatePayload())
     }
 
+    private func refreshBoundServerMetadata(
+        serverName rawServerName: String?,
+        shareName rawShareName: String?,
+        host rawHost: String? = nil
+    ) {
+        guard var binding = uploadStore?.getBinding() else { return }
+
+        let normalizedServerName = rawServerName?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedShareName = rawShareName?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedHost = rawHost?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        var changedFields: [String] = []
+
+        if let serverName = normalizedServerName,
+           !serverName.isEmpty,
+           binding.deviceName != serverName
+        {
+            binding.deviceName = serverName
+            changedFields.append("deviceName")
+        }
+
+        if let shareName = normalizedShareName,
+           !shareName.isEmpty,
+           binding.shareName != shareName
+        {
+            binding.shareName = shareName
+            changedFields.append("shareName")
+        }
+
+        if let host = normalizedHost,
+           !host.isEmpty,
+           binding.host != host
+        {
+            binding.host = host
+            changedFields.append("host")
+        }
+
+        guard !changedFields.isEmpty else { return }
+
+        do {
+            try uploadStore?.saveBinding(binding)
+            syncDiagnosticsLog(
+                "SyncEngine",
+                "binding metadata refreshed fields=\(changedFields.joined(separator: ",")) serverName=\(binding.deviceName)"
+            )
+            NativeSyncEngineModule.shared?.emitBindingStateChanged(
+                bindingStatePayload(binding: binding)
+            )
+        } catch {
+            syncDiagnosticsLog(
+                "SyncEngine",
+                "failed to refresh binding metadata error=\(error)"
+            )
+        }
+    }
+
     private func updateBindingConnectionState(_ newState: BindingConnectionState, reason: String) {
         guard bindingConnectionState != newState else { return }
         NSLog("[SyncEngine] binding connection state %@ -> %@ (%@)",
@@ -2173,6 +2232,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         guard helloType == .helloRes else {
             throw SyncEngineError.networkError("Expected HELLO_RES")
         }
+        refreshBoundServerMetadata(
+            serverName: helloRes["serverName"] as? String,
+            shareName: helloRes["serverCapabilities"]
+                .flatMap { ($0 as? [String: Any])?["shareName"] as? String },
+            host: sidecarHost
+        )
         if let nonce = helloRes["nonce"] as? String {
             let hmac = newTransport.computeHMAC(token: token, nonce: nonce)
             let (authType, _) = try await session.sendAndReceive(type: .authReq, payload: [
@@ -3671,6 +3736,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             type: .helloReq,
             payload: await buildClientHelloPayload(clientId: clientId, pairingToken: token)
         )
+        if helloType == .helloRes {
+            refreshBoundServerMetadata(
+                serverName: helloRes["serverName"] as? String,
+                shareName: helloRes["serverCapabilities"]
+                    .flatMap { ($0 as? [String: Any])?["shareName"] as? String },
+                host: sidecarHost
+            )
+        }
         if helloType == .helloRes, let nonce = helloRes["nonce"] as? String {
             let hmac = transport.computeHMAC(token: token, nonce: nonce)
             let _ = try? await session.sendAndReceive(type: .authReq, payload: [
@@ -3830,7 +3903,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = 5
-        heartbeatSession.dataTask(with: request) { _, response, error in
+        heartbeatSession.dataTask(with: request) { data, response, error in
             if let error {
                 NSLog("[Presence] heartbeat failed: %@", "\(error)")
                 syncDiagnosticsLog("Presence", "heartbeat failed host=\(host) reason=\(failureReason) error=\(error)")
@@ -3845,6 +3918,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 } else {
                     NSLog("[Presence] heartbeat succeeded")
                     syncDiagnosticsLog("Presence", "heartbeat succeeded host=\(host) reason=\(successReason)")
+                }
+                if let data,
+                   let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                {
+                    self.refreshBoundServerMetadata(
+                        serverName: payload["serverName"] as? String,
+                        shareName: payload["shareName"] as? String,
+                        host: host
+                    )
                 }
                 self.updateBindingConnectionState(.connected, reason: successReason)
                 completion?(true)

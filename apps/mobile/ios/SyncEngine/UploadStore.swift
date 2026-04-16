@@ -5,10 +5,10 @@ import SQLite3
 
 struct BindingRecord {
     let deviceId: String
-    let deviceName: String
+    var deviceName: String
     var deviceAlias: String?
     let deviceType: String
-    let host: String
+    var host: String
     let port: Int
     let pairingId: String
     let pairingTokenKeychainRef: String

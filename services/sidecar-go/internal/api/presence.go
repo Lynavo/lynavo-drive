@@ -1,6 +1,7 @@
 package api
 
 import (
+	"database/sql"
 	"net/http"
 	"sync"
 	"time"
@@ -50,5 +51,26 @@ func (s *Server) handlePresence(w http.ResponseWriter, r *http.Request) {
 			},
 		})
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+
+	serverName, err := s.store.GetDeviceName()
+	if err != nil && err != sql.ErrNoRows {
+		writeError(w, http.StatusInternalServerError, "failed to get device name")
+		return
+	}
+
+	var shareName any = nil
+	shareConfig, err := s.store.GetShareConfig()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get share config")
+		return
+	}
+	if shareConfig != nil && shareConfig.ShareName != "" {
+		shareName = shareConfig.ShareName
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":         true,
+		"serverName": serverName,
+		"shareName":  shareName,
+	})
 }

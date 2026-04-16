@@ -61,6 +61,11 @@ func main() {
 	// before the TCP server accepts connections.
 	server.BackfillReceiveDirNames(st, cfg.ReceiveDir)
 
+	// Verify that every device's receive directory actually exists on disk.
+	// Fixes stale DB entries left by the old rename-on-alias-change code
+	// (which updated the DB even when the directory rename failed).
+	server.ReconcileReceiveDirNames(st, cfg.ReceiveDir)
+
 	// Create TCP server first (API needs its client state tracker)
 	tcpSrv := server.NewTCPServer(st, cfg, hub)
 	if err := tcpSrv.Start(fmt.Sprintf(":%d", cfg.TCPPort)); err != nil {
