@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ActivitySquare, Archive, CheckCircle2, Loader2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivitySquare, Archive, CheckCircle2, Loader2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@renderer/components/ui/button';
 import { formatDateTime } from '@renderer/lib/format';
@@ -13,6 +13,9 @@ export function SupportSection() {
     buildNumber: string;
   } | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const confirmTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     const api = window.electronAPI;
@@ -49,6 +52,43 @@ export function SupportSection() {
     }
   };
 
+  const handleResetClick = useCallback(() => {
+    if (resetting) return;
+
+    if (!confirmReset) {
+      setConfirmReset(true);
+      confirmTimerRef.current = setTimeout(() => setConfirmReset(false), 4000);
+      return;
+    }
+
+    clearTimeout(confirmTimerRef.current);
+    setConfirmReset(false);
+    void handleReset();
+  }, [confirmReset, resetting]);
+
+  const handleReset = async () => {
+    const api = window.electronAPI;
+    if (!api || resetting) return;
+
+    try {
+      setResetting(true);
+      await api.sidecar.resetState();
+      toast.success('已重置所有数据', {
+        description: '配对设备、上传记录、会话已全部清除',
+      });
+    } catch (error) {
+      toast.error('重置失败', {
+        description: error instanceof Error ? error.message : '请稍后重试',
+      });
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => clearTimeout(confirmTimerRef.current);
+  }, []);
+
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <div className="flex flex-col gap-4">
@@ -59,20 +99,36 @@ export function SupportSection() {
               内测阶段遇到同步、重连或共享问题时，建议先导出诊断包再反馈。
             </p>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={exporting}
-            onClick={() => void handleExport()}
-          >
-            {exporting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Archive className="h-4 w-4" />
-            )}
-            导出诊断包
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={exporting}
+              onClick={() => void handleExport()}
+            >
+              {exporting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Archive className="h-4 w-4" />
+              )}
+              导出诊断包
+            </Button>
+            <Button
+              type="button"
+              variant={confirmReset ? 'destructive' : 'outline'}
+              size="sm"
+              disabled={resetting}
+              onClick={handleResetClick}
+            >
+              {resetting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RotateCcw className="h-4 w-4" />
+              )}
+              {confirmReset ? '确认重置？' : '重置数据'}
+            </Button>
+          </div>
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
