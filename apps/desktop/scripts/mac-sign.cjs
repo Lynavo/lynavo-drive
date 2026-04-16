@@ -120,6 +120,19 @@ async function collectExecutableFiles(dir, files = []) {
   return files;
 }
 
+function sortPathsDeepestFirst(paths) {
+  return [...paths].sort((left, right) => {
+    const leftDepth = left.split(path.sep).length;
+    const rightDepth = right.split(path.sep).length;
+
+    if (leftDepth !== rightDepth) {
+      return rightDepth - leftDepth;
+    }
+
+    return left.localeCompare(right);
+  });
+}
+
 async function signTarget(opts, target, extraArgs = []) {
   const signOptions = opts.optionsForFile ? opts.optionsForFile(target) : {};
 
@@ -167,11 +180,11 @@ module.exports = async function sign(opts) {
 
   const frameworks = await listImmediateChildren(frameworksDir, '.framework');
 
-  const nestedExecutables = [
+  const nestedExecutables = sortPathsDeepestFirst([
     ...(await collectExecutableFiles(frameworksDir)),
     ...(await collectExecutableFiles(loginItemsDir)),
     ...(await collectExecutableFiles(helpersDir)),
-  ];
+  ]);
 
   const binaries = Array.isArray(opts.binaries) ? opts.binaries : [];
   for (const binary of binaries) {

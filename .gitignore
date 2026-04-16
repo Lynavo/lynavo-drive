@@ -4,21 +4,15 @@ out/
 .turbo/
 *.tsbuildinfo
 .DS_Store
+*.exe
+*.dmg
 
 # Playwright
 .playwright-mcp/
-*.png
-!apps/desktop/resources/icon-1024.png
-!apps/desktop/resources/icon.iconset/*.png
-!apps/desktop/src/renderer/assets/*.png
-!apps/mobile/ios/SyncFlowMobile/Images.xcassets/AppIcon.appiconset/*.png
 
 # Desktop release/resources
 apps/desktop/release/
-apps/desktop/resources/syncflow-sidecar
-apps/desktop/resources/syncflow-sidecar.exe
-apps/desktop/resources/dns-sd.exe
-apps/desktop/resources/dnssd.dll
+apps/desktop/resources/.sidecar-build/
 tools/node/
 
 # Go sidecar
@@ -29,4 +23,10 @@ services/sidecar-go/syncflow.db-shm
 tmp/sidecar-eval.db
 AuthKey_*.p8
 
+# IDE / tooling
 .vscode/
+.claude/
+
+# Local docs (not tracked)
+Vivi-Drop-*.md
+UI/

@@ -18,6 +18,20 @@ mac:
   extraResources:
     - from: resources/syncflow-sidecar
       to: syncflow-sidecar
+dmg:
+  backgroundColor: '#f5f7fb'
+  iconSize: 128
+  window:
+    width: 540
+    height: 380
+  contents:
+    - x: 150
+      y: 210
+      type: file
+    - x: 390
+      y: 210
+      type: link
+      path: /Applications
 mas:
   extendInfo:
     ITSAppUsesNonExemptEncryption: false
