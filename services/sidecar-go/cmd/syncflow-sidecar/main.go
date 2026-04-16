@@ -75,6 +75,7 @@ func main() {
 
 	// Create API server (uses tcpSrv for live client state)
 	apiSrv, handler := api.NewServer(st, cfg, hub, tcpSrv)
+	tcpSrv.SetPresenceProvider(apiSrv.PresenceTracker())
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
 		Handler: handler,

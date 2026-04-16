@@ -306,3 +306,48 @@ func TestGetDashboardDevices(t *testing.T) {
 		t.Errorf("expected 2048 bytes, got %d", devices[0].TotalBytes)
 	}
 }
+
+func TestGetDashboardDevices_IgnoresCompletedLatestSessionAsCurrentTransfer(t *testing.T) {
+	s := newTestStore(t)
+	today := "2026-03-21"
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	dirName := "WorkPhone"
+	d := PairedDevice{
+		ClientID: "c1", ClientName: "iPhone 15", ReceiveDirName: &dirName,
+		Platform: "ios", PairingID: "p1", PairingTokenHash: "h1",
+		CreatedAt: now, LastSeenAt: now,
+	}
+	if err := s.UpsertPairedDevice(d); err != nil {
+		t.Fatalf("UpsertPairedDevice: %v", err)
+	}
+
+	fileKey := "file-complete"
+	sess := sampleSession("sess-complete", "c1")
+	sess.State = "completed"
+	sess.ActiveFileKey = &fileKey
+	if err := s.UpsertSession(sess); err != nil {
+		t.Fatalf("UpsertSession: %v", err)
+	}
+
+	u := sampleUpload(fileKey, "c1")
+	u.OriginalFilename = "IMG_9999.JPG"
+	u.Status = "completed"
+	if err := s.UpsertUpload(u); err != nil {
+		t.Fatalf("UpsertUpload: %v", err)
+	}
+
+	devices, err := s.GetDashboardDevices(today)
+	if err != nil {
+		t.Fatalf("GetDashboardDevices: %v", err)
+	}
+	if len(devices) != 1 {
+		t.Fatalf("expected 1 device, got %d", len(devices))
+	}
+	if devices[0].CurrentFile != nil {
+		t.Fatalf("expected no current file for completed session, got %v", *devices[0].CurrentFile)
+	}
+	if devices[0].SessionState != nil {
+		t.Fatalf("expected no session state for completed session, got %v", *devices[0].SessionState)
+	}
+}

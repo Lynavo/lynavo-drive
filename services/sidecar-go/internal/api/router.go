@@ -23,6 +23,10 @@ type Server struct {
 	OnDeviceRenamed func(newName string) // called when device name changes, to restart Bonjour
 }
 
+func (s *Server) PresenceTracker() *PresenceTracker {
+	return s.presence
+}
+
 // NewServer creates a new HTTP handler with all API routes registered.
 func NewServer(s *store.Store, cfg *config.Config, hub *events.Hub, csp ClientStateProvider) (*Server, http.Handler) {
 	srv := &Server{store: s, config: cfg, hub: hub, clientStates: csp, presence: NewPresenceTracker()}

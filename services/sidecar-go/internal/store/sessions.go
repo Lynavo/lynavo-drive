@@ -77,7 +77,7 @@ func (s *Store) GetActiveSession(clientID string) (*Session, error) {
 	err := s.db.QueryRow(`
 		SELECT session_id, client_id, client_name, state, active_file_key, active_offset, started_at, updated_at
 		FROM sessions
-		WHERE client_id = ? AND state NOT IN ('ended', 'error')
+		WHERE client_id = ? AND state NOT IN ('ended', 'error', 'completed', 'interrupted')
 		ORDER BY updated_at DESC
 		LIMIT 1`, clientID,
 	).Scan(

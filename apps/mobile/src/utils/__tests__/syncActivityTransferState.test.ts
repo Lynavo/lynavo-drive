@@ -88,4 +88,39 @@ describe('syncActivityTransferState', () => {
 
     expect(getSyncActivityMainCardState(snapshot, false)).toBe('running');
   });
+
+  it('does not keep the running card after auto upload is interrupted', () => {
+    const snapshot = {
+      uploadState: 'paused_auto_upload',
+      autoUploadState: 'interrupted' as const,
+      completedCount: 1,
+      totalCount: 3,
+      autoPending: 2,
+      manualPending: 0,
+      currentTaskSource: undefined,
+      currentFileConfirmedBytes: 0,
+      currentFileTotalBytes: 0,
+    };
+
+    expect(hasOutstandingSyncRoundWork(snapshot)).toBe(false);
+    expect(isSyncActivityActivelyTransferring(snapshot)).toBe(false);
+    expect(getSyncActivityMainCardState(snapshot, false)).toBe('not_started');
+  });
+
+  it('keeps the running card during active transfer even if offline is briefly reported', () => {
+    const snapshot = {
+      uploadState: 'uploading',
+      autoUploadState: 'active' as const,
+      completedCount: 1,
+      totalCount: 3,
+      autoPending: 1,
+      manualPending: 0,
+      currentTaskSource: 'auto' as const,
+      currentFileConfirmedBytes: 50,
+      currentFileTotalBytes: 200,
+    };
+
+    expect(isSyncActivityActivelyTransferring(snapshot)).toBe(true);
+    expect(getSyncActivityMainCardState(snapshot, true)).toBe('running');
+  });
 });

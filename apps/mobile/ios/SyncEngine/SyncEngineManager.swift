@@ -221,6 +221,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private var manualUploadService: ManualUploadService?
     let sharedFilesService = SharedFilesService()
     private var isAutoUploadInterrupted = false
+    private var shouldAbortActiveAutoUpload = false
     private var protocolSession: ProtocolSession?
     private var discoveredDevices: [String: DiscoveredDevice] = [:]  // keyed by deviceId
     private var photoLibraryChanged = false  // set by observer, consumed by watch loop
@@ -446,6 +447,20 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         runtimeCurrentFilename = nil
         runtimeCurrentFileConfirmedBytes = 0
         runtimeCurrentFileTotalBytes = 0
+    }
+
+    private func clearRuntimeSyncRoundProgress(uploadState: String? = nil) {
+        runtimeQueueTotalCount = 0
+        runtimeQueueCompletedCount = 0
+        runtimeQueueTotalBytes = 0
+        runtimeQueueCompletedBytes = 0
+        clearRuntimeCurrentFile()
+        runtimeCurrentSpeedMbps = 0
+        runtimeLastSpeedCheckTime = 0
+        runtimeLastBytesTransferred = 0
+        if let uploadState {
+            runtimeUploadState = uploadState
+        }
     }
 
     private func clearRuntimeReconnectError() {
@@ -1080,6 +1095,19 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
     }
 
+    private func maintainConnectedBindingState(reason: String) {
+        guard uploadStore?.getBinding() != nil else { return }
+        if bindingConnectionState != .connected {
+            updateBindingConnectionState(.connected, reason: reason)
+            return
+        }
+
+        syncDiagnosticsLog("SyncEngine", "binding connection state remains connected (\(reason))")
+        cancelPresenceRecoveryProbe(reason: reason)
+        startPresenceHeartbeatTimer()
+        emitBindingStateChanged()
+    }
+
     // MARK: - Standalone Presence Heartbeat Timer
 
     /// Runs independently of the sync pipeline so we detect desktop disappearance
@@ -1361,6 +1389,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     private func stopSyncLifecycle(finalState: SessionService.SyncEngineState) {
         isSyncing = false
+        shouldAbortActiveAutoUpload = false
         didAttemptRemoteHistoryReconciliation = false
         endBackgroundTransitionIfNeeded(reason: "syncStopped")
         SilentAudioService.shared.stop()
@@ -1555,7 +1584,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             switch syncError {
             case .networkError:
                 return true
-            case .databaseError, .pairingError, .permissionError, .lowDiskPaused:
+            case .databaseError, .pairingError, .permissionError, .lowDiskPaused, .autoUploadInterrupted:
                 return false
             }
         }
@@ -1823,6 +1852,22 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             stopSyncLifecycle(finalState: .idle)
         } catch let error as SyncEngineError {
             switch error {
+            case .autoUploadInterrupted:
+                NSLog("[SyncEngine] sync pipeline interrupted by user")
+                syncDiagnosticsLog("SyncEngine", "sync pipeline interrupted by user")
+                maintainConnectedBindingState(reason: "auto_upload_interrupted")
+                let clientId = bindingService.getOrCreateClientId()
+                sendPresenceHeartbeat(
+                    clientId: clientId,
+                    successReason: "auto_upload_interrupted_presence_restored",
+                    failureReason: "auto_upload_interrupted_presence_failed",
+                    updateStateOnFailure: false
+                )
+                clearRuntimeSyncRoundProgress(uploadState: "paused_auto_upload")
+                NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                    runtimeSyncOverviewPayload(uploadState: "paused_auto_upload")
+                )
+                stopSyncLifecycle(finalState: .interruptedAutoUpload)
             case .lowDiskPaused(let message):
                 NSLog("[SyncEngine] sync pipeline paused due to low disk: %@", message)
                 syncDiagnosticsLog("SyncEngine", "sync pipeline paused due to low disk: \(message)")
@@ -2174,6 +2219,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         var activeSessionId: String?
         var uploadRoundCompleted = false
         var uploadRoundPausedForLowDisk = false
+        var uploadRoundInterruptedByUser = false
 
         defer {
             if let activeSessionId, sessionService.currentSessionId == activeSessionId {
@@ -2183,15 +2229,23 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 protocolSession = nil
             }
             session.disconnect()
-            if !uploadRoundCompleted {
-                if uploadRoundPausedForLowDisk {
-                    if uploadStore?.getBinding() != nil {
-                        updateBindingConnectionState(.connected, reason: "upload_round_paused_low_disk")
-                    }
-                } else {
-                    clearResolvedSidecarHost()
-                    if uploadStore?.getBinding() != nil {
-                        updateBindingConnectionState(.offline, reason: "upload_round_incomplete")
+            if uploadRoundInterruptedByUser {
+                // User interrupted auto upload — close the TCP session so the
+                // sidecar clears its live "syncing" state, but keep the mobile
+                // binding state connected. The caller restores desktop presence
+                // immediately via a heartbeat.
+                maintainConnectedBindingState(reason: "upload_round_interrupted")
+            } else {
+                if !uploadRoundCompleted {
+                    if uploadRoundPausedForLowDisk {
+                        if uploadStore?.getBinding() != nil {
+                            updateBindingConnectionState(.connected, reason: "upload_round_paused_low_disk")
+                        }
+                    } else {
+                        clearResolvedSidecarHost()
+                        if uploadStore?.getBinding() != nil {
+                            updateBindingConnectionState(.offline, reason: "upload_round_incomplete")
+                        }
                     }
                 }
             }
@@ -2419,6 +2473,20 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 }
             } catch {
                 if let syncError = error as? SyncEngineError,
+                   case .autoUploadInterrupted = syncError
+                {
+                    uploadRoundInterruptedByUser = true
+                    NSLog("[SyncEngine] auto upload interrupted during file %@", asset.fileKey)
+                    syncDiagnosticsLog("SyncEngine", "auto upload interrupted during file \(asset.fileKey)")
+                    prefetchTask?.cancel()
+                    await prefetchTask?.value
+                    if let leakedExport = nextExport {
+                        exportService.cleanup(tempURL: leakedExport.tempURL)
+                        nextExport = nil
+                    }
+                    throw syncError
+                }
+                if let syncError = error as? SyncEngineError,
                    case .lowDiskPaused(let message) = syncError
                 {
                     uploadRoundPausedForLowDisk = true
@@ -2502,165 +2570,192 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             runtimeSyncOverviewPayload(uploadState: "uploading", progressPercent: 0)
         )
 
-        // FILE_INIT_REQ → FILE_INIT_RES
-        let (initType, initRes) = try await session.sendAndReceive(type: .fileInitReq, payload: [
-            "sessionId": sessionId,
-            "fileKey": asset.fileKey,
-            "originalFilename": exported.originalFilename,
-            "mediaType": exported.mediaType,
-            "mimeType": exported.mimeType,
-            "fileSize": exported.fileSize,
-            "createdAt": exported.createdAt,
-            "modifiedAt": exported.modifiedAt,
-            "queueIndex": index,
-            "queueTotalCount": total,
-        ])
-
-        guard initType == .fileInitRes else {
-            throw SyncEngineError.networkError("Expected FILE_INIT_RES, got \(initType)")
-        }
-
-        let action = initRes["action"] as? String ?? "REJECT"
-
-        switch action {
-        case "SKIP":
-            if tuning.perfLoggingEnabled {
-                perfLog("file=\(asset.fileKey) action=SKIP size=\(exported.fileSize)")
+        do {
+            if asset.source == "auto" && shouldAbortActiveAutoUpload {
+                shouldAbortActiveAutoUpload = false
+                try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "cancelled")
+                clearRuntimeCurrentFile()
+                runtimeCurrentSpeedMbps = 0
+                emitQueueToJS()
+                throw SyncEngineError.autoUploadInterrupted
             }
-            NSLog("[SyncEngine] SKIP \(exported.originalFilename) (already exists)")
-            try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "completed")
-            runtimeQueueCompletedCount = max(runtimeQueueCompletedCount, index + 1)
-            runtimeQueueCompletedBytes += exported.fileSize
-            runtimeCurrentFileConfirmedBytes = exported.fileSize
-            runtimeCurrentFileTotalBytes = exported.fileSize
-            runtimeCurrentSpeedMbps = 0
-            emitQueueToJS()
-            NativeSyncEngineModule.shared?.emitSyncStateChanged(
-                runtimeSyncOverviewPayload(uploadState: "uploading", progressPercent: 100)
-            )
-            return
-        case "REJECT":
-            let reason = initRes["reason"] as? String ?? "unknown"
-            if tuning.perfLoggingEnabled {
-                perfLog("file=\(asset.fileKey) action=REJECT reason=\(reason) size=\(exported.fileSize)")
+
+            // FILE_INIT_REQ → FILE_INIT_RES
+            let (initType, initRes) = try await session.sendAndReceive(type: .fileInitReq, payload: [
+                "sessionId": sessionId,
+                "fileKey": asset.fileKey,
+                "originalFilename": exported.originalFilename,
+                "mediaType": exported.mediaType,
+                "mimeType": exported.mimeType,
+                "fileSize": exported.fileSize,
+                "createdAt": exported.createdAt,
+                "modifiedAt": exported.modifiedAt,
+                "queueIndex": index,
+                "queueTotalCount": total,
+            ])
+
+            guard initType == .fileInitRes else {
+                throw SyncEngineError.networkError("Expected FILE_INIT_RES, got \(initType)")
             }
-            NSLog("[SyncEngine] REJECT \(exported.originalFilename): \(reason)")
-            if reason == "LOW_DISK_PAUSED" {
-                try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "queued")
+
+            let action = initRes["action"] as? String ?? "REJECT"
+
+            switch action {
+            case "SKIP":
+                if tuning.perfLoggingEnabled {
+                    perfLog("file=\(asset.fileKey) action=SKIP size=\(exported.fileSize)")
+                }
+                NSLog("[SyncEngine] SKIP \(exported.originalFilename) (already exists)")
+                try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "completed")
+                runtimeQueueCompletedCount = max(runtimeQueueCompletedCount, index + 1)
+                runtimeQueueCompletedBytes += exported.fileSize
+                runtimeCurrentFileConfirmedBytes = exported.fileSize
+                runtimeCurrentFileTotalBytes = exported.fileSize
+                runtimeCurrentSpeedMbps = 0
+                emitQueueToJS()
+                NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                    runtimeSyncOverviewPayload(uploadState: "uploading", progressPercent: 100)
+                )
+                return
+            case "REJECT":
+                let reason = initRes["reason"] as? String ?? "unknown"
+                if tuning.perfLoggingEnabled {
+                    perfLog("file=\(asset.fileKey) action=REJECT reason=\(reason) size=\(exported.fileSize)")
+                }
+                NSLog("[SyncEngine] REJECT \(exported.originalFilename): \(reason)")
+                if reason == "LOW_DISK_PAUSED" {
+                    try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "queued")
+                    clearRuntimeCurrentFile()
+                    emitQueueToJS()
+                    throw SyncEngineError.lowDiskPaused(reason)
+                }
+                try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "skipped")
                 clearRuntimeCurrentFile()
                 emitQueueToJS()
-                throw SyncEngineError.lowDiskPaused(reason)
-            }
-            try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "skipped")
-            clearRuntimeCurrentFile()
-            emitQueueToJS()
-            return
-        case "RESUME":
-            let offset = initRes["resumeOffset"] as? Int64 ?? 0
-            if tuning.perfLoggingEnabled {
-                perfLog("file=\(asset.fileKey) action=RESUME resumeOffset=\(offset) size=\(exported.fileSize)")
-            }
-            NSLog("[SyncEngine] RESUME \(exported.originalFilename) from offset \(offset)")
-            try await streamFileData(
-                fileURL: exported.tempURL, fileKey: asset.fileKey,
-                startOffset: offset, fileSize: exported.fileSize,
-                recoveryMode: true
-            )
-        case "UPLOAD":
-            if tuning.perfLoggingEnabled {
-                perfLog("file=\(asset.fileKey) action=UPLOAD size=\(exported.fileSize)")
-            }
-            NSLog("[SyncEngine] UPLOAD \(exported.originalFilename) (\(exported.fileSize) bytes)")
-            try await streamFileData(
-                fileURL: exported.tempURL, fileKey: asset.fileKey,
-                startOffset: 0, fileSize: exported.fileSize,
-                recoveryMode: recoveryMode
-            )
-        default:
-            throw SyncEngineError.networkError("Unknown FILE_INIT action: \(action)")
-        }
-
-        // FILE_END_REQ → FILE_END_RES
-        let sha256 = "" // Skip SHA256 for speed; server validates file size instead
-
-        var (endType, endRes) = try await session.sendAndReceive(type: .fileEndReq, payload: [
-            "fileKey": asset.fileKey,
-            "fileSize": exported.fileSize,
-            "sha256": sha256,
-        ])
-
-        // FILE_ACK can still arrive in-flight because FILE_DATA uses a small pipeline.
-        // Keep draining until we get FILE_END_RES / ERROR.
-        if endType != .fileEndRes && endType != .error {
-            for _ in 0..<8 {
-                let (nextType, nextRes) = try await session.waitForNextMessage()
-                endType = nextType
-                endRes = nextRes
-                if endType == .fileEndRes || endType == .error {
-                    break
+                return
+            case "RESUME":
+                let offset = initRes["resumeOffset"] as? Int64 ?? 0
+                if tuning.perfLoggingEnabled {
+                    perfLog("file=\(asset.fileKey) action=RESUME resumeOffset=\(offset) size=\(exported.fileSize)")
                 }
-            }
-        }
-
-        // Check ok field — NSNumber from JSON might need special handling
-        let isOk: Bool
-        if let okBool = endRes["ok"] as? Bool { isOk = okBool }
-        else if let okNum = endRes["ok"] as? NSNumber { isOk = okNum.boolValue }
-        else if let okInt = endRes["ok"] as? Int { isOk = okInt != 0 }
-        else { isOk = (endType == .fileEndRes) }
-
-        // Always mark as completed + update history if we got a response
-        try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: isOk ? "completed" : "failed")
-        emitQueueToJS()
-
-        if isOk {
-            runtimeQueueCompletedCount = max(runtimeQueueCompletedCount, index + 1)
-            runtimeQueueCompletedBytes += exported.fileSize
-            runtimeCurrentFileConfirmedBytes = exported.fileSize
-            runtimeCurrentFileTotalBytes = exported.fileSize
-            updateRuntimeSpeed()
-            emitQueueToJS()
-            NativeSyncEngineModule.shared?.emitSyncStateChanged(
-                runtimeSyncOverviewPayload(uploadState: "uploading", progressPercent: 100)
-            )
-
-            let transmissionMs = endRes["activeTransmissionMs"] as? Int64
-                ?? (endRes["activeTransmissionMs"] as? NSNumber)?.int64Value
-                ?? 100
-            let binding = uploadStore?.getBinding()
-            if let binding = binding {
-                let dateStr = (endRes["ledgerDate"] as? String) ?? localDateKey()
-                let ip = binding.host.isEmpty ? (binding.deviceAlias ?? binding.deviceName) : binding.host
-                do {
-                    try historyStore?.upsertDailyLedger(
-                        date: dateStr,
-                        deviceId: binding.deviceId,
-                        deviceName: binding.deviceName,
-                        deviceIp: ip,
-                        fileCount: 1,
-                        totalBytes: exported.fileSize,
-                        transmissionMs: max(transmissionMs, 100)
-                    )
-                } catch {
-                    NSLog("[SyncUpload] [%d/%d] ledger update FAILED: %@", index + 1, total, error.localizedDescription)
-                }
-                NativeSyncEngineModule.shared?.emitHistoryUpdated()
-            }
-            if tuning.perfLoggingEnabled {
-                let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - fileTransferStart) * 1000)
-                perfLog(
-                    "file=\(asset.fileKey) action=COMPLETE size=\(exported.fileSize) endToEndMs=\(elapsedMs) sidecarActiveMs=\(transmissionMs)"
+                NSLog("[SyncEngine] RESUME \(exported.originalFilename) from offset \(offset)")
+                try await streamFileData(
+                    fileURL: exported.tempURL,
+                    fileKey: asset.fileKey,
+                    source: asset.source,
+                    startOffset: offset,
+                    fileSize: exported.fileSize,
+                    recoveryMode: true
                 )
+            case "UPLOAD":
+                if tuning.perfLoggingEnabled {
+                    perfLog("file=\(asset.fileKey) action=UPLOAD size=\(exported.fileSize)")
+                }
+                NSLog("[SyncEngine] UPLOAD \(exported.originalFilename) (\(exported.fileSize) bytes)")
+                try await streamFileData(
+                    fileURL: exported.tempURL,
+                    fileKey: asset.fileKey,
+                    source: asset.source,
+                    startOffset: 0,
+                    fileSize: exported.fileSize,
+                    recoveryMode: recoveryMode
+                )
+            default:
+                throw SyncEngineError.networkError("Unknown FILE_INIT action: \(action)")
             }
-            NSLog("[SyncUpload] [%d/%d] completed %@", index + 1, total, exported.originalFilename)
-        } else {
-            runtimeCurrentSpeedMbps = 0
-            if tuning.perfLoggingEnabled {
-                let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - fileTransferStart) * 1000)
-                perfLog("file=\(asset.fileKey) action=FAILED size=\(exported.fileSize) endToEndMs=\(elapsedMs)")
+
+            // FILE_END_REQ → FILE_END_RES
+            let sha256 = "" // Skip SHA256 for speed; server validates file size instead
+
+            var (endType, endRes) = try await session.sendAndReceive(type: .fileEndReq, payload: [
+                "fileKey": asset.fileKey,
+                "fileSize": exported.fileSize,
+                "sha256": sha256,
+            ])
+
+            // FILE_ACK can still arrive in-flight because FILE_DATA uses a small pipeline.
+            // Keep draining until we get FILE_END_RES / ERROR.
+            if endType != .fileEndRes && endType != .error {
+                for _ in 0..<8 {
+                    let (nextType, nextRes) = try await session.waitForNextMessage()
+                    endType = nextType
+                    endRes = nextRes
+                    if endType == .fileEndRes || endType == .error {
+                        break
+                    }
+                }
             }
-            NSLog("[SyncUpload] [%d/%d] FILE_END not ok for %@", index + 1, total, exported.originalFilename)
-            clearRuntimeCurrentFile()
+
+            // Check ok field — NSNumber from JSON might need special handling
+            let isOk: Bool
+            if let okBool = endRes["ok"] as? Bool { isOk = okBool }
+            else if let okNum = endRes["ok"] as? NSNumber { isOk = okNum.boolValue }
+            else if let okInt = endRes["ok"] as? Int { isOk = okInt != 0 }
+            else { isOk = (endType == .fileEndRes) }
+
+            // Always mark as completed + update history if we got a response
+            try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: isOk ? "completed" : "failed")
+            emitQueueToJS()
+
+            if isOk {
+                runtimeQueueCompletedCount = max(runtimeQueueCompletedCount, index + 1)
+                runtimeQueueCompletedBytes += exported.fileSize
+                runtimeCurrentFileConfirmedBytes = exported.fileSize
+                runtimeCurrentFileTotalBytes = exported.fileSize
+                updateRuntimeSpeed()
+                emitQueueToJS()
+                NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                    runtimeSyncOverviewPayload(uploadState: "uploading", progressPercent: 100)
+                )
+
+                let transmissionMs = endRes["activeTransmissionMs"] as? Int64
+                    ?? (endRes["activeTransmissionMs"] as? NSNumber)?.int64Value
+                    ?? 100
+                let binding = uploadStore?.getBinding()
+                if let binding = binding {
+                    let dateStr = (endRes["ledgerDate"] as? String) ?? localDateKey()
+                    let ip = binding.host.isEmpty ? (binding.deviceAlias ?? binding.deviceName) : binding.host
+                    do {
+                        try historyStore?.upsertDailyLedger(
+                            date: dateStr,
+                            deviceId: binding.deviceId,
+                            deviceName: binding.deviceName,
+                            deviceIp: ip,
+                            fileCount: 1,
+                            totalBytes: exported.fileSize,
+                            transmissionMs: max(transmissionMs, 100)
+                        )
+                    } catch {
+                        NSLog("[SyncUpload] [%d/%d] ledger update FAILED: %@", index + 1, total, error.localizedDescription)
+                    }
+                    NativeSyncEngineModule.shared?.emitHistoryUpdated()
+                }
+                if tuning.perfLoggingEnabled {
+                    let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - fileTransferStart) * 1000)
+                    perfLog(
+                        "file=\(asset.fileKey) action=COMPLETE size=\(exported.fileSize) endToEndMs=\(elapsedMs) sidecarActiveMs=\(transmissionMs)"
+                    )
+                }
+                NSLog("[SyncUpload] [%d/%d] completed %@", index + 1, total, exported.originalFilename)
+            } else {
+                runtimeCurrentSpeedMbps = 0
+                if tuning.perfLoggingEnabled {
+                    let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - fileTransferStart) * 1000)
+                    perfLog("file=\(asset.fileKey) action=FAILED size=\(exported.fileSize) endToEndMs=\(elapsedMs)")
+                }
+                NSLog("[SyncUpload] [%d/%d] FILE_END not ok for %@", index + 1, total, exported.originalFilename)
+                clearRuntimeCurrentFile()
+            }
+        } catch {
+            if asset.source == "auto" && shouldAbortActiveAutoUpload {
+                shouldAbortActiveAutoUpload = false
+                try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "cancelled")
+                clearRuntimeCurrentFile()
+                runtimeCurrentSpeedMbps = 0
+                emitQueueToJS()
+                throw SyncEngineError.autoUploadInterrupted
+            }
+            throw error
         }
     }
 
@@ -2669,6 +2764,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private func streamFileData(
         fileURL: URL,
         fileKey: String,
+        source: String,
         startOffset: Int64,
         fileSize: Int64,
         recoveryMode: Bool
@@ -2833,6 +2929,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             emitStreamSummary()
         }
 
+        func throwIfActiveAutoUploadWasInterrupted() throws {
+            if source == "auto" && shouldAbortActiveAutoUpload {
+                streamOutcome = "STREAM_INTERRUPTED"
+                streamFailure = "auto upload interrupted by user"
+                throw SyncEngineError.autoUploadInterrupted
+            }
+        }
+
         if tuning.perfLoggingEnabled {
             perfLog(
                 "file=\(fileKey) action=STREAM_START chunkMiB=\(String(format: "%.1f", Double(chunkSize) / (1024 * 1024))) windowMiB=\(String(format: "%.1f", Double(steadyStateMaxInFlightBytes) / (1024 * 1024))) pipelineChunks=\(steadyStatePipelineWindowChunks) ackTimeoutNs=\(ackTimeoutNs) recoveryMode=\(conservativeStart) recoveryWindowMiB=\(String(format: "%.1f", Double(recoveryMaxInFlightBytes) / (1024 * 1024))) recoveryAckTimeoutNs=\(recoveryAckTimeoutNs)"
@@ -2840,6 +2944,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
 
         while acknowledgedOffset < fileSize {
+            try throwIfActiveAutoUploadWasInterrupted()
             let activeMaxInFlightBytes = conservativeStart && ackCount == 0
                 ? recoveryMaxInFlightBytes
                 : steadyStateMaxInFlightBytes
@@ -2850,6 +2955,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             var windowFillChunks = 0
             let windowFillStartOffset = nextOffset
             while nextOffset < fileSize && inFlightBytes < activeMaxInFlightBytes {
+                try throwIfActiveAutoUploadWasInterrupted()
                 let remaining = fileSize - nextOffset
                 let readSize = Int(min(Int64(chunkSize), remaining))
                 let readStart = CFAbsoluteTimeGetCurrent()
@@ -2975,6 +3081,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 break
             }
 
+            try throwIfActiveAutoUploadWasInterrupted()
             // Drain one ACK per loop and advance cumulative progress.
             let ackWaitStart = CFAbsoluteTimeGetCurrent()
             let ackType: LMUPMessageType
@@ -3997,6 +4104,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         } catch {
             NSLog("[SyncEngine] WARN: failed to cancel pending auto items: %@", "\(error)")
         }
+
+        let currentTaskSource = uploadStore?.getCurrentUploadingSource()
+        if isSyncing && currentTaskSource == "auto" {
+            shouldAbortActiveAutoUpload = true
+            clearRuntimeSyncRoundProgress(uploadState: "paused_auto_upload")
+            maintainConnectedBindingState(reason: "interrupt_auto_upload_requested")
+            syncDiagnosticsLog("SyncEngine", "interrupting in-flight auto upload")
+            protocolSession?.interruptPendingResponse(error: SyncEngineError.autoUploadInterrupted)
+        }
         emitQueueToJS()
 
         NSLog("[SyncEngine] auto upload interrupted")
@@ -4015,6 +4131,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     /// Re-enable auto upload: resumes processing auto items after interruption.
     func enableAutoUpload() {
         isAutoUploadInterrupted = false
+        shouldAbortActiveAutoUpload = false
 
         // Persist active state so it survives app restart
         if var config = autoUploadConfigStore?.getConfig() {

@@ -1,10 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useDashboardStore } from '../dashboard-store';
+import {
+  resetPendingOfflineStatusDebounceForTests,
+  useDashboardStore,
+} from '../dashboard-store';
 import type { DashboardDeviceDTO, DashboardSummaryDTO } from '@syncflow/contracts';
 import { useSidecarRuntimeStore } from '../sidecar-runtime-store';
 
 describe('dashboard-store', () => {
   beforeEach(() => {
+    resetPendingOfflineStatusDebounceForTests();
+    vi.useRealTimers();
     Reflect.deleteProperty(window, 'electronAPI');
     useSidecarRuntimeStore.setState((state) => ({
       runtime: {
@@ -13,49 +18,51 @@ describe('dashboard-store', () => {
         message: null,
       },
     }));
-    useDashboardStore.getState().updateDevices([
-      {
-        deviceId: 'd4',
-        displayName: 'GoPro Hero 12',
-        clientName: 'GoPro Hero 12',
-        platform: 'other',
-        ip: '192.168.1.188',
-        status: 'offline',
-        todayFileCount: 0,
-        todayBytes: 0,
-        storageLeft: '--',
-        storagePath: '/Users/alice/SyncFlow',
-        devicePath: '/Users/alice/SyncFlow/GoPro12',
-      },
-      {
-        deviceId: 'd1',
-        displayName: 'iPhone 15 Pro',
-        clientName: 'iPhone 15 Pro',
-        platform: 'ios',
-        ip: '192.168.1.201',
-        status: 'transferring',
-        todayFileCount: 12,
-        todayBytes: 24.5 * 1024 ** 3,
-        storageLeft: '1.2 TB',
-        storagePath: '/Users/alice/SyncFlow',
-        devicePath: '/Users/alice/SyncFlow/iPhone_15_Pro',
-        currentFile: { filename: 'DJI_0421_4K_RAW.mp4', progress: 67, fileSize: 3_435_973_837 },
-      },
-      {
-        deviceId: 'd2',
-        displayName: 'Galaxy S24 Ultra',
-        clientName: 'Galaxy S24 Ultra',
-        platform: 'android',
-        ip: '192.168.1.205',
-        status: 'connected_idle',
-        todayFileCount: 8,
-        todayBytes: 16.3 * 1024 ** 3,
-        storageLeft: '860 GB',
-        storagePath: '/Users/alice/SyncFlow',
-        devicePath: '/Users/alice/SyncFlow/GalaxyS24',
-      },
-    ]);
-    useDashboardStore.setState({ diskWarningDismissed: false });
+    useDashboardStore.setState({
+      devices: [
+        {
+          deviceId: 'd1',
+          displayName: 'iPhone 15 Pro',
+          clientName: 'iPhone 15 Pro',
+          platform: 'ios',
+          ip: '192.168.1.201',
+          status: 'transferring',
+          todayFileCount: 12,
+          todayBytes: 24.5 * 1024 ** 3,
+          storageLeft: '1.2 TB',
+          storagePath: '/Users/alice/SyncFlow',
+          devicePath: '/Users/alice/SyncFlow/iPhone_15_Pro',
+          currentFile: { filename: 'DJI_0421_4K_RAW.mp4', progress: 67, fileSize: 3_435_973_837 },
+        },
+        {
+          deviceId: 'd2',
+          displayName: 'Galaxy S24 Ultra',
+          clientName: 'Galaxy S24 Ultra',
+          platform: 'android',
+          ip: '192.168.1.205',
+          status: 'connected_idle',
+          todayFileCount: 8,
+          todayBytes: 16.3 * 1024 ** 3,
+          storageLeft: '860 GB',
+          storagePath: '/Users/alice/SyncFlow',
+          devicePath: '/Users/alice/SyncFlow/GalaxyS24',
+        },
+        {
+          deviceId: 'd4',
+          displayName: 'GoPro Hero 12',
+          clientName: 'GoPro Hero 12',
+          platform: 'other',
+          ip: '192.168.1.188',
+          status: 'offline',
+          todayFileCount: 0,
+          todayBytes: 0,
+          storageLeft: '--',
+          storagePath: '/Users/alice/SyncFlow',
+          devicePath: '/Users/alice/SyncFlow/GoPro12',
+        },
+      ],
+      diskWarningDismissed: false,
+    });
   });
 
   it('sorts devices: transferring > connected_idle > offline', () => {
@@ -155,11 +162,270 @@ describe('dashboard-store', () => {
   });
 
   it('updateDeviceStatus to offline moves device to end', () => {
+    vi.useFakeTimers();
+
     useDashboardStore.getState().updateDeviceStatus('d1', 'offline');
-    const devices = useDashboardStore.getState().devices;
+
+    let devices = useDashboardStore.getState().devices;
+    expect(devices[0].status).toBe('transferring');
+    expect(devices[1].status).toBe('connected_idle');
+
+    vi.advanceTimersByTime(3_000);
+
+    devices = useDashboardStore.getState().devices;
     expect(devices[0].status).toBe('connected_idle');
     expect(devices[1].status).toBe('offline');
     expect(devices[2].status).toBe('offline');
+  });
+
+  it('cancels a pending offline update when the device reconnects before debounce expires', () => {
+    vi.useFakeTimers();
+
+    useDashboardStore.getState().updateDeviceStatus('d2', 'offline');
+    useDashboardStore.getState().updateDeviceStatus('d2', 'connected_idle');
+
+    vi.advanceTimersByTime(3_000);
+
+    const d2 = useDashboardStore.getState().devices.find((d) => d.deviceId === 'd2');
+
+    expect(d2?.status).toBe('connected_idle');
+  });
+
+  it('cancels a pending offline update when a fresh device snapshot arrives', () => {
+    vi.useFakeTimers();
+
+    useDashboardStore.getState().updateDeviceStatus('d2', 'offline');
+    useDashboardStore.getState().updateDevices([
+      {
+        deviceId: 'd4',
+        displayName: 'GoPro Hero 12',
+        clientName: 'GoPro Hero 12',
+        platform: 'other',
+        ip: '192.168.1.188',
+        status: 'offline',
+        todayFileCount: 0,
+        todayBytes: 0,
+        storageLeft: '--',
+        storagePath: '/Users/alice/SyncFlow',
+        devicePath: '/Users/alice/SyncFlow/GoPro12',
+      },
+      {
+        deviceId: 'd1',
+        displayName: 'iPhone 15 Pro',
+        clientName: 'iPhone 15 Pro',
+        platform: 'ios',
+        ip: '192.168.1.201',
+        status: 'transferring',
+        todayFileCount: 12,
+        todayBytes: 24.5 * 1024 ** 3,
+        storageLeft: '1.2 TB',
+        storagePath: '/Users/alice/SyncFlow',
+        devicePath: '/Users/alice/SyncFlow/iPhone_15_Pro',
+        currentFile: { filename: 'DJI_0421_4K_RAW.mp4', progress: 67, fileSize: 3_435_973_837 },
+      },
+      {
+        deviceId: 'd2',
+        displayName: 'Galaxy S24 Ultra',
+        clientName: 'Galaxy S24 Ultra',
+        platform: 'android',
+        ip: '192.168.1.205',
+        status: 'connected_idle',
+        todayFileCount: 8,
+        todayBytes: 16.3 * 1024 ** 3,
+        storageLeft: '860 GB',
+        storagePath: '/Users/alice/SyncFlow',
+        devicePath: '/Users/alice/SyncFlow/GalaxyS24',
+      },
+    ]);
+
+    vi.advanceTimersByTime(3_000);
+
+    const d2 = useDashboardStore.getState().devices.find((d) => d.deviceId === 'd2');
+
+    expect(d2?.status).toBe('connected_idle');
+  });
+
+  it('keeps the previous connected status when fetchDashboard briefly returns offline', async () => {
+    vi.useFakeTimers();
+
+    (window as Window & { electronAPI?: unknown }).electronAPI = {
+      sidecar: {
+        getDashboardSummary: vi.fn().mockResolvedValue(null),
+        getDashboardDevices: vi.fn().mockResolvedValue([
+          {
+            deviceId: 'd4',
+            displayName: 'GoPro Hero 12',
+            clientName: 'GoPro Hero 12',
+            platform: 'other',
+            ip: '192.168.1.188',
+            status: 'offline',
+            todayFileCount: 0,
+            todayBytes: 0,
+            storageLeft: '--',
+            storagePath: '/Users/alice/SyncFlow',
+            devicePath: '/Users/alice/SyncFlow/GoPro12',
+          },
+          {
+            deviceId: 'd1',
+            displayName: 'iPhone 15 Pro',
+            clientName: 'iPhone 15 Pro',
+            platform: 'ios',
+            ip: '192.168.1.201',
+            status: 'offline',
+            todayFileCount: 12,
+            todayBytes: 24.5 * 1024 ** 3,
+            storageLeft: '1.2 TB',
+            storagePath: '/Users/alice/SyncFlow',
+            devicePath: '/Users/alice/SyncFlow/iPhone_15_Pro',
+          },
+          {
+            deviceId: 'd2',
+            displayName: 'Galaxy S24 Ultra',
+            clientName: 'Galaxy S24 Ultra',
+            platform: 'android',
+            ip: '192.168.1.205',
+            status: 'offline',
+            todayFileCount: 8,
+            todayBytes: 16.3 * 1024 ** 3,
+            storageLeft: '860 GB',
+            storagePath: '/Users/alice/SyncFlow',
+            devicePath: '/Users/alice/SyncFlow/GalaxyS24',
+          },
+        ]),
+      },
+    } as unknown as Window['electronAPI'];
+
+    await useDashboardStore.getState().fetchDashboard();
+
+    let d1 = useDashboardStore.getState().devices.find((d) => d.deviceId === 'd1');
+    let d2 = useDashboardStore.getState().devices.find((d) => d.deviceId === 'd2');
+
+    expect(d1?.status).toBe('transferring');
+    expect(d2?.status).toBe('connected_idle');
+
+    vi.advanceTimersByTime(3_000);
+
+    d1 = useDashboardStore.getState().devices.find((d) => d.deviceId === 'd1');
+    d2 = useDashboardStore.getState().devices.find((d) => d.deviceId === 'd2');
+
+    expect(d1?.status).toBe('offline');
+    expect(d2?.status).toBe('offline');
+  });
+
+  it('cancels a pending offline snapshot when fetchDashboard recovers before debounce expires', async () => {
+    vi.useFakeTimers();
+
+    const getDashboardDevices = vi
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          deviceId: 'd4',
+          displayName: 'GoPro Hero 12',
+          clientName: 'GoPro Hero 12',
+          platform: 'other',
+          ip: '192.168.1.188',
+          status: 'offline',
+          todayFileCount: 0,
+          todayBytes: 0,
+          storageLeft: '--',
+          storagePath: '/Users/alice/SyncFlow',
+          devicePath: '/Users/alice/SyncFlow/GoPro12',
+        },
+        {
+          deviceId: 'd1',
+          displayName: 'iPhone 15 Pro',
+          clientName: 'iPhone 15 Pro',
+          platform: 'ios',
+          ip: '192.168.1.201',
+          status: 'offline',
+          todayFileCount: 12,
+          todayBytes: 24.5 * 1024 ** 3,
+          storageLeft: '1.2 TB',
+          storagePath: '/Users/alice/SyncFlow',
+          devicePath: '/Users/alice/SyncFlow/iPhone_15_Pro',
+        },
+        {
+          deviceId: 'd2',
+          displayName: 'Galaxy S24 Ultra',
+          clientName: 'Galaxy S24 Ultra',
+          platform: 'android',
+          ip: '192.168.1.205',
+          status: 'offline',
+          todayFileCount: 8,
+          todayBytes: 16.3 * 1024 ** 3,
+          storageLeft: '860 GB',
+          storagePath: '/Users/alice/SyncFlow',
+          devicePath: '/Users/alice/SyncFlow/GalaxyS24',
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          deviceId: 'd4',
+          displayName: 'GoPro Hero 12',
+          clientName: 'GoPro Hero 12',
+          platform: 'other',
+          ip: '192.168.1.188',
+          status: 'offline',
+          todayFileCount: 0,
+          todayBytes: 0,
+          storageLeft: '--',
+          storagePath: '/Users/alice/SyncFlow',
+          devicePath: '/Users/alice/SyncFlow/GoPro12',
+        },
+        {
+          deviceId: 'd1',
+          displayName: 'iPhone 15 Pro',
+          clientName: 'iPhone 15 Pro',
+          platform: 'ios',
+          ip: '192.168.1.201',
+          status: 'connected_idle',
+          todayFileCount: 12,
+          todayBytes: 24.5 * 1024 ** 3,
+          storageLeft: '1.2 TB',
+          storagePath: '/Users/alice/SyncFlow',
+          devicePath: '/Users/alice/SyncFlow/iPhone_15_Pro',
+        },
+        {
+          deviceId: 'd2',
+          displayName: 'Galaxy S24 Ultra',
+          clientName: 'Galaxy S24 Ultra',
+          platform: 'android',
+          ip: '192.168.1.205',
+          status: 'connected_idle',
+          todayFileCount: 8,
+          todayBytes: 16.3 * 1024 ** 3,
+          storageLeft: '860 GB',
+          storagePath: '/Users/alice/SyncFlow',
+          devicePath: '/Users/alice/SyncFlow/GalaxyS24',
+        },
+      ]);
+
+    (window as Window & { electronAPI?: unknown }).electronAPI = {
+      sidecar: {
+        getDashboardSummary: vi.fn().mockResolvedValue(null),
+        getDashboardDevices,
+      },
+    } as unknown as Window['electronAPI'];
+
+    await useDashboardStore.getState().fetchDashboard();
+    await useDashboardStore.getState().fetchDashboard();
+
+    vi.advanceTimersByTime(3_000);
+
+    const d1 = useDashboardStore.getState().devices.find((d) => d.deviceId === 'd1');
+    const d2 = useDashboardStore.getState().devices.find((d) => d.deviceId === 'd2');
+
+    expect(d1?.status).toBe('transferring');
+    expect(d2?.status).toBe('connected_idle');
+  });
+
+  it('clears stale currentFile when device leaves transferring state', () => {
+    useDashboardStore.getState().updateDeviceStatus('d1', 'connected_idle');
+
+    const d1 = useDashboardStore.getState().devices.find((d) => d.deviceId === 'd1');
+
+    expect(d1?.status).toBe('connected_idle');
+    expect(d1?.currentFile).toBeUndefined();
   });
 
   it('skips dashboard fetch until sidecar is healthy', async () => {
@@ -219,5 +485,115 @@ describe('dashboard-store', () => {
 
     expect(useDashboardStore.getState().summary).toEqual(summary);
     expect(useDashboardStore.getState().devices).toEqual(devices);
+  });
+
+  it('does not preserve a stale 100 percent transfer over an idle snapshot', async () => {
+    useDashboardStore.getState().updateDevices([
+      {
+        deviceId: 'd1',
+        displayName: 'iPhone 15 Pro',
+        clientName: 'iPhone 15 Pro',
+        platform: 'ios',
+        ip: '192.168.1.201',
+        status: 'transferring',
+        todayFileCount: 12,
+        todayBytes: 24.5 * 1024 ** 3,
+        storageLeft: '1.2 TB',
+        storagePath: '/Users/alice/SyncFlow',
+        devicePath: '/Users/alice/SyncFlow/iPhone_15_Pro',
+        currentFile: {
+          filename: 'DJI_0421_4K_RAW.mp4',
+          progress: 100,
+          fileSize: 3_435_973_837,
+        },
+      },
+    ]);
+
+    const devices: DashboardDeviceDTO[] = [
+      {
+        deviceId: 'd1',
+        displayName: 'iPhone 15 Pro',
+        clientName: 'iPhone 15 Pro',
+        platform: 'ios',
+        ip: '192.168.1.201',
+        status: 'connected_idle',
+        todayFileCount: 12,
+        todayBytes: 24.5 * 1024 ** 3,
+        storageLeft: '1.2 TB',
+        storagePath: '/Users/alice/SyncFlow',
+        devicePath: '/Users/alice/SyncFlow/iPhone_15_Pro',
+      },
+    ];
+
+    (window as Window & { electronAPI?: unknown }).electronAPI = {
+      sidecar: {
+        getDashboardSummary: vi.fn().mockResolvedValue(null),
+        getDashboardDevices: vi.fn().mockResolvedValue(devices),
+      },
+    } as unknown as Window['electronAPI'];
+
+    await useDashboardStore.getState().fetchDashboard();
+
+    expect(useDashboardStore.getState().devices).toEqual(devices);
+  });
+
+  it('still preserves an in-flight transfer when the snapshot lags behind', async () => {
+    useDashboardStore.getState().updateDevices([
+      {
+        deviceId: 'd1',
+        displayName: 'iPhone 15 Pro',
+        clientName: 'iPhone 15 Pro',
+        platform: 'ios',
+        ip: '192.168.1.201',
+        status: 'transferring',
+        todayFileCount: 12,
+        todayBytes: 24.5 * 1024 ** 3,
+        storageLeft: '1.2 TB',
+        storagePath: '/Users/alice/SyncFlow',
+        devicePath: '/Users/alice/SyncFlow/iPhone_15_Pro',
+        currentFile: {
+          filename: 'DJI_0421_4K_RAW.mp4',
+          progress: 87,
+          fileSize: 3_435_973_837,
+        },
+      },
+    ]);
+
+    const devices: DashboardDeviceDTO[] = [
+      {
+        deviceId: 'd1',
+        displayName: 'iPhone 15 Pro',
+        clientName: 'iPhone 15 Pro',
+        platform: 'ios',
+        ip: '192.168.1.201',
+        status: 'connected_idle',
+        todayFileCount: 12,
+        todayBytes: 24.5 * 1024 ** 3,
+        storageLeft: '1.2 TB',
+        storagePath: '/Users/alice/SyncFlow',
+        devicePath: '/Users/alice/SyncFlow/iPhone_15_Pro',
+      },
+    ];
+
+    (window as Window & { electronAPI?: unknown }).electronAPI = {
+      sidecar: {
+        getDashboardSummary: vi.fn().mockResolvedValue(null),
+        getDashboardDevices: vi.fn().mockResolvedValue(devices),
+      },
+    } as unknown as Window['electronAPI'];
+
+    await useDashboardStore.getState().fetchDashboard();
+
+    expect(useDashboardStore.getState().devices).toEqual([
+      {
+        ...devices[0],
+        status: 'transferring',
+        currentFile: {
+          filename: 'DJI_0421_4K_RAW.mp4',
+          progress: 87,
+          fileSize: 3_435_973_837,
+        },
+      },
+    ]);
   });
 });

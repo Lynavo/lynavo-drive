@@ -57,6 +57,21 @@ class ProtocolSession: NSObject, TcpTransportDelegate {
         transport.disconnect()
     }
 
+    /// Abort the current in-flight await without tearing down the underlying TCP
+    /// connection. This is used when the user interrupts auto upload: the sync
+    /// pipeline should stop immediately, but the desktop must not briefly mark
+    /// the phone as offline just because we cancelled a pending request/ACK wait.
+    func interruptPendingResponse(error: Error) {
+        lock.lock()
+        disconnectedError = error
+        let msgCont = pendingContinuation
+        pendingContinuation = nil
+        bufferedMessages.removeAll(keepingCapacity: false)
+        lock.unlock()
+
+        msgCont?.resume(throwing: error)
+    }
+
     // MARK: - Binary Send (FILE_DATA)
 
     /// Send binary FILE_DATA frame through the correct transport
@@ -189,6 +204,10 @@ class ProtocolSession: NSObject, TcpTransportDelegate {
         }
 
         lock.lock()
+        if disconnectedError != nil {
+            lock.unlock()
+            return
+        }
         let cont = pendingContinuation
         if cont != nil {
             pendingContinuation = nil

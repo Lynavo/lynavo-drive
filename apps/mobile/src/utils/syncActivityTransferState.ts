@@ -21,6 +21,15 @@ const ACTIVE_TRANSFER_STATES = new Set([
   'scanning',
 ]);
 
+function isAutoUploadInterrupted(
+  snapshot: SyncActivityTransferSnapshot | null | undefined,
+): boolean {
+  return (
+    snapshot?.uploadState === 'paused_auto_upload' ||
+    snapshot?.autoUploadState === 'interrupted'
+  );
+}
+
 function clampPercent(value: number): number {
   if (!Number.isFinite(value)) {
     return 0;
@@ -31,6 +40,14 @@ function clampPercent(value: number): number {
 export function hasOutstandingSyncRoundWork(
   snapshot: SyncActivityTransferSnapshot | null | undefined,
 ): boolean {
+  if (
+    isAutoUploadInterrupted(snapshot) &&
+    !hasPendingManualWork(snapshot) &&
+    snapshot?.currentTaskSource !== 'manual'
+  ) {
+    return false;
+  }
+
   const totalCount = snapshot?.totalCount ?? 0;
   const completedCount = snapshot?.completedCount ?? 0;
   return totalCount > 0 && completedCount < totalCount;
@@ -39,6 +56,14 @@ export function hasOutstandingSyncRoundWork(
 export function isSyncActivityActivelyTransferring(
   snapshot: SyncActivityTransferSnapshot | null | undefined,
 ): boolean {
+  if (
+    isAutoUploadInterrupted(snapshot) &&
+    !hasPendingManualWork(snapshot) &&
+    snapshot?.currentTaskSource !== 'manual'
+  ) {
+    return false;
+  }
+
   return (
     ACTIVE_TRANSFER_STATES.has(snapshot?.uploadState ?? '') ||
     hasPendingManualWork(snapshot) ||

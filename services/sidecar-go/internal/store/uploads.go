@@ -330,6 +330,7 @@ func (s *Store) GetDashboardDevices(today string) ([]DashboardDeviceResult, erro
 			SELECT client_id, state, active_file_key,
 				ROW_NUMBER() OVER (PARTITION BY client_id ORDER BY started_at DESC) AS rn
 			FROM sessions
+			WHERE state = 'transferring'
 		) latest_sess ON latest_sess.client_id = pd.client_id AND latest_sess.rn = 1
 		LEFT JOIN uploads u ON u.file_key = latest_sess.active_file_key
 		WHERE pd.revoked_at IS NULL

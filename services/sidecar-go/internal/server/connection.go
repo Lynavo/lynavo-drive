@@ -93,15 +93,16 @@ func (c *connection) handle() {
 		c.conn.Close()
 		if c.clientID != "" && c.server != nil {
 			c.server.RemoveClient(c.clientID)
+			status := c.server.DisconnectBroadcastStatus(c.clientID)
 
-			// Broadcast offline event so desktop UI updates immediately
-			// (without this, the UI stays stuck on "transferring" until
-			// the next REST poll because no WebSocket push is sent).
+			// Broadcast the derived post-disconnect state immediately so
+			// WebSocket consumers stay consistent with the dashboard API:
+			// presence-alive clients are still "connected_idle", otherwise offline.
 			c.hub.Broadcast(events.Event{
 				Type: "device.state.changed",
 				Payload: map[string]any{
 					"deviceId": c.clientID,
-					"status":   "offline",
+					"status":   status,
 				},
 			})
 			c.hub.Broadcast(events.Event{Type: "dashboard.updated", Payload: nil})

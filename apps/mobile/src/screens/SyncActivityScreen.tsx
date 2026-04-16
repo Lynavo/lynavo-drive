@@ -499,11 +499,6 @@ export function SyncActivityScreen() {
     };
   }, [isOffline]);
 
-  const isSyncing =
-    overview.uploadState === 'uploading' ||
-    overview.uploadState === 'preparing' ||
-    overview.uploadState === 'cloud_downloading';
-
   const isAutoUploadActive = overview.autoUploadState === 'active';
   const currentTaskSource = overview.currentTaskSource;
   const hasManualUploadWork = hasPendingManualWork({
@@ -527,7 +522,7 @@ export function SyncActivityScreen() {
 
   const isManualUploading = hasManualUploadWork;
 
-  const mainCardState = getSyncActivityMainCardState(overview, stableOffline && !isSyncing);
+  const mainCardState = getSyncActivityMainCardState(overview, stableOffline);
 
   // ---------------------------------------------------------------------------
   // Render
@@ -896,6 +891,10 @@ export function buildOverview(
   const currentFileTotalBytes =
     (payload.currentFileTotalBytes as number | undefined) ??
     prev.currentFileTotalBytes;
+  const shouldClearActiveFile =
+    uploadState === 'completed' ||
+    uploadState === 'idle' ||
+    uploadState === 'paused_auto_upload';
 
   return {
     progressPercent:
@@ -922,7 +921,7 @@ export function buildOverview(
       (payload.queueTotalBytes as number | undefined) ??
       prev.totalBytes,
     currentFile:
-      uploadState === 'completed' || uploadState === 'idle'
+      shouldClearActiveFile
         ? undefined
         : 'currentFile' in payload
           ? typeof payload.currentFile === 'string'
@@ -930,7 +929,7 @@ export function buildOverview(
             : undefined
           : prev.currentFile,
     currentFilename:
-      uploadState === 'completed' || uploadState === 'idle'
+      shouldClearActiveFile
         ? undefined
         : 'currentFilename' in payload
           ? typeof payload.currentFilename === 'string'
@@ -938,13 +937,13 @@ export function buildOverview(
             : undefined
           : prev.currentFilename,
     currentFileConfirmedBytes:
-      uploadState === 'completed' || uploadState === 'idle'
+      shouldClearActiveFile
         ? 0
         : 'currentFileConfirmedBytes' in payload || 'confirmedBytes' in payload
           ? currentFileConfirmedBytes
           : prev.currentFileConfirmedBytes,
     currentFileTotalBytes:
-      uploadState === 'completed' || uploadState === 'idle'
+      shouldClearActiveFile
         ? 0
         : 'currentFileTotalBytes' in payload
           ? currentFileTotalBytes

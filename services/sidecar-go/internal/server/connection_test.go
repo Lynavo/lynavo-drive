@@ -19,6 +19,14 @@ import (
 	"github.com/nicksyncflow/sidecar/internal/store"
 )
 
+type fakePresenceStateProvider struct {
+	alive bool
+}
+
+func (f fakePresenceStateProvider) IsAlive(clientID string, window time.Duration) bool {
+	return f.alive
+}
+
 const (
 	testClientID    = "test-iphone-001"
 	testClientName  = "Test iPhone"
@@ -520,6 +528,24 @@ func TestReturningHelloRefreshesClientNameAndIPv4(t *testing.T) {
 	}
 	if paired.LastIP == nil || *paired.LastIP != advertisedIPv4 {
 		t.Fatalf("last ip=%v, want %q", paired.LastIP, advertisedIPv4)
+	}
+}
+
+func TestDisconnectBroadcastStatus_UsesPresenceState(t *testing.T) {
+	tcpSrv := NewTCPServer(nil, nil, events.NewHub())
+
+	if got := tcpSrv.DisconnectBroadcastStatus(testClientID); got != "offline" {
+		t.Fatalf("expected offline without presence, got %q", got)
+	}
+
+	tcpSrv.SetPresenceProvider(fakePresenceStateProvider{alive: true})
+	if got := tcpSrv.DisconnectBroadcastStatus(testClientID); got != "connected_idle" {
+		t.Fatalf("expected connected_idle with live presence, got %q", got)
+	}
+
+	tcpSrv.SetPresenceProvider(fakePresenceStateProvider{alive: false})
+	if got := tcpSrv.DisconnectBroadcastStatus(testClientID); got != "offline" {
+		t.Fatalf("expected offline with stale presence, got %q", got)
 	}
 }
 
