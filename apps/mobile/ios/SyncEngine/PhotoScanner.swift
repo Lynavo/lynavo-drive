@@ -115,16 +115,25 @@ class PhotoScanner: NSObject, PHPhotoLibraryChangeObserver {
     // MARK: - Full scan (initial / fallback)
 
     /// Scan all photos and videos, return items whose fileKey is not already tracked.
-    func scanForUntrackedAssets(clientId: String, trackedFileKeys: Set<String>) -> [ScannedAsset] {
+    /// - Parameter onProgress: Optional callback invoked every 200 assets with (scannedSoFar, totalInLibrary).
+    func scanForUntrackedAssets(
+        clientId: String,
+        trackedFileKeys: Set<String>,
+        onProgress: ((_ scanned: Int, _ total: Int) -> Void)? = nil
+    ) -> [ScannedAsset] {
         let fetchOptions = Self.defaultFetchOptions(configStore: autoUploadConfigStore)
         let assets = PHAsset.fetchAssets(with: fetchOptions)
 
         // Cache for future incremental scans
         lastFetchResult = assets
 
-        NSLog("[PhotoScanner] library has %d authorized assets, %d tracked keys", assets.count, trackedFileKeys.count)
+        let libraryTotal = assets.count
+        NSLog("[PhotoScanner] library has %d authorized assets, %d tracked keys", libraryTotal, trackedFileKeys.count)
         var results: [ScannedAsset] = []
         var skippedCount = 0
+        var processedCount = 0
+
+        onProgress?(0, libraryTotal)
 
         assets.enumerateObjects { asset, _, _ in
             let fileKey = Self.computeFileKey(
@@ -157,7 +166,15 @@ class PhotoScanner: NSObject, PHPhotoLibraryChangeObserver {
                     estimatedSize: estimatedSize
                 ))
             }
+
+            processedCount += 1
+            if processedCount % 200 == 0 {
+                onProgress?(processedCount, libraryTotal)
+            }
         }
+
+        // Final progress callback so UI sees 100%
+        onProgress?(libraryTotal, libraryTotal)
 
         NSLog("[PhotoScanner] scan result: %d new, %d skipped (already tracked)", results.count, skippedCount)
         return results

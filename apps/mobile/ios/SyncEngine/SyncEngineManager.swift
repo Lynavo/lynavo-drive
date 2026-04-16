@@ -566,6 +566,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         ]
     }
 
+    private func emitScanningProgress(scanned: Int, total: Int) {
+        NativeSyncEngineModule.shared?.emitSyncStateChanged(
+            runtimeSyncOverviewPayload(uploadState: "scanning").merging([
+                "scannedCount": scanned,
+                "libraryTotal": total,
+            ] as [String: Any]) { _, new in new }
+        )
+    }
+
     private func buildPendingUploadAssets(clientId: String, limit: Int? = 200) -> [ScannedAsset] {
         guard let store = uploadStore else { return [] }
 
@@ -2003,7 +2012,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 // Only auto-scan when auto upload is active (PRD: disabled/interrupted = no auto discovery)
                 let autoUploadActive = autoUploadConfigStore?.getConfig().state == "active"
                 if autoUploadActive {
-                    newAssets = photoScanner.scanForUntrackedAssets(clientId: clientId, trackedFileKeys: trackedKeys)
+                    newAssets = photoScanner.scanForUntrackedAssets(
+                        clientId: clientId,
+                        trackedFileKeys: trackedKeys
+                    ) { [weak self] scanned, total in
+                        self?.emitScanningProgress(scanned: scanned, total: total)
+                    }
                 }
 
                 if !newAssets.isEmpty {
@@ -3818,13 +3832,24 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         var endpoint = targetDevice?.endpoint
         if endpoint == nil {
             discoveryService.startBrowsing()
-            for _ in 0..<20 {
+            NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                runtimeSyncOverviewPayload(uploadState: "discovering").merging([
+                    "discoveryElapsedSec": 0,
+                ] as [String: Any]) { _, new in new }
+            )
+            for pollIndex in 0..<20 {
                 try await Task.sleep(nanoseconds: 500_000_000)
                 if let found = findDevice() {
                     targetDevice = found
                     endpoint = found.endpoint
                     break
                 }
+                let elapsed = Double(pollIndex + 1) * 0.5
+                NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                    runtimeSyncOverviewPayload(uploadState: "discovering").merging([
+                        "discoveryElapsedSec": elapsed,
+                    ] as [String: Any]) { _, new in new }
+                )
             }
         }
         let transport = TcpTransport()
@@ -3882,6 +3907,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             return 0
         }
         didAttemptRemoteHistoryReconciliation = true
+
+        NativeSyncEngineModule.shared?.emitSyncStateChanged(
+            runtimeSyncOverviewPayload(uploadState: "reconciling")
+        )
 
         do {
             let remoteCompletedFileKeys = try await fetchRemoteExistingFileKeys(clientId: clientId, host: host)

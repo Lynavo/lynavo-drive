@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
   NativeModules,
   NativeEventEmitter,
   Alert,
@@ -62,6 +63,12 @@ interface SyncOverview {
   manualPending?: number;
   autoPending?: number;
   lastErrorCode?: string;
+  /** Seconds elapsed during Bonjour device discovery */
+  discoveryElapsedSec?: number;
+  /** Total photos in the library during scan phase */
+  libraryTotal?: number;
+  /** Number of photos scanned so far */
+  scannedCount?: number;
 }
 
 interface BindingState {
@@ -137,6 +144,45 @@ function formatSpeedMbps(speedMbps: number): string {
     return '0 MB/s';
   }
   return `${speedMbps >= 10 ? speedMbps.toFixed(0) : speedMbps.toFixed(1)} MB/s`;
+}
+
+const PREPARATION_STATES = new Set(['discovering', 'reconciling', 'scanning', 'preparing']);
+
+function isPreparationPhase(uploadState: string): boolean {
+  return PREPARATION_STATES.has(uploadState);
+}
+
+function getPreparationTitle(uploadState: string): string {
+  switch (uploadState) {
+    case 'discovering': return '正在搜索电脑…';
+    case 'reconciling': return '正在同步历史记录…';
+    case 'scanning': return '正在扫描相册…';
+    case 'preparing': return '正在建立连接…';
+    default: return '准备中…';
+  }
+}
+
+function getPreparationSubtitle(overview: SyncOverview): string {
+  switch (overview.uploadState) {
+    case 'discovering': {
+      const sec = Math.round(overview.discoveryElapsedSec ?? 0);
+      return sec > 0 ? `已等待 ${sec} 秒` : '正在局域网中搜索';
+    }
+    case 'reconciling':
+      return '首次使用需要核对已传文件';
+    case 'scanning': {
+      const scanned = overview.scannedCount ?? 0;
+      const total = overview.libraryTotal ?? 0;
+      if (total > 0) {
+        return `已扫描 ${scanned} / ${total} 张`;
+      }
+      return '正在读取相册';
+    }
+    case 'preparing':
+      return '正在与电脑建立安全连接';
+    default:
+      return '';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -609,7 +655,17 @@ export function SyncActivityScreen() {
                 </Text>
               </View>
 
-              {(isActivelyTransferring || isManualUploading) ? (
+              {isPreparationPhase(overview.uploadState) ? (
+                <View style={styles.preparationBody}>
+                  <ActivityIndicator size="small" color={BLUE} />
+                  <Text style={styles.preparationTitle}>
+                    {getPreparationTitle(overview.uploadState)}
+                  </Text>
+                  <Text style={styles.preparationSubtitle}>
+                    {getPreparationSubtitle(overview)}
+                  </Text>
+                </View>
+              ) : (isActivelyTransferring || isManualUploading) ? (
                 <>
                   {/* Title row with percentage */}
                   <View style={styles.runningTitleRow}>
@@ -966,6 +1022,12 @@ export function buildOverview(
       typeof payload.lastErrorCode === 'string'
         ? payload.lastErrorCode
         : prev.lastErrorCode,
+    discoveryElapsedSec:
+      (payload.discoveryElapsedSec as number | undefined) ?? undefined,
+    libraryTotal:
+      (payload.libraryTotal as number | undefined) ?? undefined,
+    scannedCount:
+      (payload.scannedCount as number | undefined) ?? undefined,
   };
 }
 
@@ -1135,6 +1197,21 @@ const styles = StyleSheet.create({
     color: MUTED_TEXT,
     marginTop: 4,
     marginBottom: 8,
+  },
+  preparationBody: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    gap: 8,
+  },
+  preparationTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: DARK,
+    marginTop: 4,
+  },
+  preparationSubtitle: {
+    fontSize: 13,
+    color: MUTED_TEXT,
   },
   runningPercent: {
     fontSize: 18,

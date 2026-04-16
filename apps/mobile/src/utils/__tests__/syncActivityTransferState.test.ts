@@ -107,6 +107,40 @@ describe('syncActivityTransferState', () => {
     expect(getSyncActivityMainCardState(snapshot, false)).toBe('not_started');
   });
 
+  it('treats discovering state as actively transferring for preparation phase', () => {
+    const snapshot = {
+      uploadState: 'discovering',
+      autoUploadState: 'active' as const,
+      completedCount: 0,
+      totalCount: 0,
+      autoPending: 0,
+      manualPending: 0,
+      currentTaskSource: undefined,
+      currentFileConfirmedBytes: 0,
+      currentFileTotalBytes: 0,
+    };
+
+    expect(isSyncActivityActivelyTransferring(snapshot)).toBe(true);
+    expect(getSyncActivityMainCardState(snapshot, false)).toBe('running');
+  });
+
+  it('treats reconciling state as actively transferring for preparation phase', () => {
+    const snapshot = {
+      uploadState: 'reconciling',
+      autoUploadState: 'active' as const,
+      completedCount: 0,
+      totalCount: 0,
+      autoPending: 0,
+      manualPending: 0,
+      currentTaskSource: undefined,
+      currentFileConfirmedBytes: 0,
+      currentFileTotalBytes: 0,
+    };
+
+    expect(isSyncActivityActivelyTransferring(snapshot)).toBe(true);
+    expect(getSyncActivityMainCardState(snapshot, false)).toBe('running');
+  });
+
   it('keeps the running card during active transfer even if offline is briefly reported', () => {
     const snapshot = {
       uploadState: 'uploading',

@@ -19,6 +19,8 @@ const ACTIVE_TRANSFER_STATES = new Set([
   'preparing',
   'cloud_downloading',
   'scanning',
+  'discovering',
+  'reconciling',
 ]);
 
 function isAutoUploadInterrupted(
