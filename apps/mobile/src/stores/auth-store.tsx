@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Keychain from 'react-native-keychain';
 import i18next from 'i18next';
 import { ApiError, ERROR_CODE } from '../services/api';
+import { useIapLifecycle } from '../hooks/useIapLifecycle';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -346,6 +347,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: 'SET_LOADING', isLoading: false });
     }
   }, []);
+
+  useIapLifecycle({ isLoggedIn: state.isLoggedIn, loadSubscription });
 
   // Single profile-load orchestrator used both by the auto-trigger effect
   // below and by the manual retryProfileLoad() exposed to the UI. Sets
