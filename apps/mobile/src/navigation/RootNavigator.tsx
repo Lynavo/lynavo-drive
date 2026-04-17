@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
+import { useTranslation } from 'react-i18next';
 
 import { useAuth } from '../stores/auth-store';
 import { FEATURES } from '../constants/features';
@@ -188,7 +189,7 @@ function LoadingScreen() {
 // Rendered when the post-login profile load fails (transient network /
 // server error). Without this screen the user would be stranded on the
 // LoadingScreen forever because the auto-load effect won't re-fire on its
-// own — the user must tap "重试" or "退出登录".
+// own — the user must tap Retry or Log out.
 function ProfileErrorScreen({
   message,
   retrying,
@@ -200,10 +201,11 @@ function ProfileErrorScreen({
   onRetry: () => void;
   onLogout: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.errorRoot}>
-      <Text style={styles.errorTitle}>无法加载账号信息</Text>
-      <Text style={styles.errorMessage}>{message || '请稍后再试'}</Text>
+      <Text style={styles.errorTitle}>{t('errors.profileLoadTitle')}</Text>
+      <Text style={styles.errorMessage}>{message || t('errors.authTryLater')}</Text>
       <TouchableOpacity
         style={[styles.errorButton, retrying && styles.errorButtonDisabled]}
         onPress={onRetry}
@@ -213,7 +215,7 @@ function ProfileErrorScreen({
         {retrying ? (
           <ActivityIndicator size="small" color="#ffffff" />
         ) : (
-          <Text style={styles.errorButtonText}>重试</Text>
+          <Text style={styles.errorButtonText}>{t('common.retry')}</Text>
         )}
       </TouchableOpacity>
       <TouchableOpacity
@@ -221,7 +223,7 @@ function ProfileErrorScreen({
         onPress={onLogout}
         activeOpacity={0.6}
       >
-        <Text style={styles.errorSecondaryText}>退出登录</Text>
+        <Text style={styles.errorSecondaryText}>{t('settings.actions.logout')}</Text>
       </TouchableOpacity>
     </View>
   );

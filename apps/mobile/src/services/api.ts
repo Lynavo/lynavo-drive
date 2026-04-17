@@ -1,3 +1,4 @@
+import i18next from 'i18next';
 import { getAccessToken, getRefreshToken } from '../stores/auth-store';
 import { describeInsecureBaseUrl, getBaseUrl } from './config';
 
@@ -130,7 +131,7 @@ async function request<T>(
     );
   } catch {
     // Covers AbortError (timeout) and genuine network failures alike.
-    throw new ApiError(ERROR_CODE.NETWORK_ERROR, '网络错误，请检查网络连接');
+    throw new ApiError(ERROR_CODE.NETWORK_ERROR, i18next.t('errors.networkCheckRetry'));
   }
 
   // Server errors / proxy interception — surface as a typed error and skip
@@ -138,7 +139,7 @@ async function request<T>(
   if (res.status >= 500) {
     throw new ApiError(
       ERROR_CODE.SERVER_ERROR,
-      `服务器错误 (HTTP ${res.status})`,
+      i18next.t('errors.serverErrorHttp', { status: res.status }),
     );
   }
 
@@ -148,7 +149,7 @@ async function request<T>(
   } catch {
     // Captive portal / non-JSON response — treat as server error so the
     // caller can decide to retry rather than wiping local auth state.
-    throw new ApiError(ERROR_CODE.SERVER_ERROR, '响应解析失败');
+    throw new ApiError(ERROR_CODE.SERVER_ERROR, i18next.t('errors.responseParseError'));
   }
 
   if (json.code === 0) {

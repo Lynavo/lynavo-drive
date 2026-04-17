@@ -36,7 +36,11 @@
     "smsSendFailed": "驗證碼發送失敗",
     "pairingWrongCode": "连接码错误，请重新输入",
     "pairingConnectFailed": "连接失败：{{msg}}",
-    "exportDiagnosticsUnavailable": "当前版本暂不支持导出诊断包"
+    "exportDiagnosticsUnavailable": "当前版本暂不支持导出诊断包",
+    "serverErrorHttp": "服务器错误 (HTTP {{status}})",
+    "responseParseError": "响应解析失败",
+    "profileLoadFailed": "加载用户信息失败",
+    "profileLoadTitle": "无法加载账号信息"
   },
   "auth": {
     "login": {

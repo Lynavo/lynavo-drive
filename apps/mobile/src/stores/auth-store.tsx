@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Keychain from 'react-native-keychain';
+import i18next from 'i18next';
 import { ApiError, ERROR_CODE } from '../services/api';
 
 // ---------------------------------------------------------------------------
@@ -344,7 +345,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const apiErr =
         err instanceof ApiError
           ? err
-          : new ApiError(ERROR_CODE.SERVER_ERROR, '加载用户信息失败');
+          : new ApiError(ERROR_CODE.SERVER_ERROR, i18next.t('errors.profileLoadFailed'));
       dispatch({ type: 'PROFILE_LOAD_FAILURE', error: apiErr });
     }
   }, [loadProfile, loadSubscription]);
