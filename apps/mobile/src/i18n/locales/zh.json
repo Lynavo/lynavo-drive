@@ -445,6 +445,57 @@
       "previewFailedMessage": "无法获取文件预览"
     }
   },
+  "subscription": {
+    "title": "会员订阅",
+    "hero": {
+      "title": "解锁完整版",
+      "subtitle": "7 天免费体验，到期后订阅继续使用全部功能。"
+    },
+    "divider": "订阅后可使用",
+    "features": {
+      "autoUpload": "自动上传相册新增素材",
+      "customTime": "自定义自动上传起始时间，支持精确到时分秒",
+      "sharedDir": "访问并下载当前连接电脑的共享目录内容",
+      "preview": "预览共享目录中的图片与视频",
+      "multiDevice": "多设备连接与切换使用",
+      "unlimited": "无限量上传素材"
+    },
+    "plans": {
+      "monthly": {
+        "name": "月度订阅",
+        "title": "按月订阅",
+        "unit": "/月"
+      },
+      "tenMonth": {
+        "name": "10个月套餐",
+        "title": "长期优惠",
+        "unit": "/10个月",
+        "badge": "8.8折"
+      },
+      "fallback": "订阅"
+    },
+    "status": {
+      "trialing": "试用中，还剩 {{days}} 天",
+      "trialExpired": "试用已结束",
+      "subscribed": "已订阅",
+      "subExpired": "订阅已到期"
+    },
+    "actions": {
+      "subscribe": "立即订阅",
+      "start": "开始使用"
+    },
+    "footer": "订阅即表示您同意自动续费条款，可随时取消",
+    "modal": {
+      "paymentSuccess": "支付成功",
+      "successSubtitle": "订阅成功，继续使用 Vivi Drop 吧！",
+      "validUntil": "有效期至 {{date}}"
+    },
+    "alert": {
+      "devTitle": "提示",
+      "devBody": "支付功能开发中，敬请期待",
+      "devConfirm": "知道了"
+    }
+  },
   "history": {
     "title": "历史记录",
     "emptyState": {

@@ -13,6 +13,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { Icon } from '../components/Icon';
 import { useAuth } from '../stores/auth-store';
@@ -65,14 +67,14 @@ function formatExpireDate(dateStr: string | null): string {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-function getPlanDisplayName(plan: string): string {
+function getPlanDisplayName(plan: string, t: TFunction): string {
   switch (plan) {
     case 'monthly':
-      return '月度订阅';
+      return t('subscription.plans.monthly.name');
     case 'ten_month':
-      return '10个月套餐';
+      return t('subscription.plans.tenMonth.name');
     default:
-      return plan || '订阅';
+      return plan || t('subscription.plans.fallback');
   }
 }
 
@@ -80,13 +82,13 @@ function getPlanDisplayName(plan: string): string {
 // Feature list
 // ---------------------------------------------------------------------------
 
-const FEATURES = [
-  '自动上传相册新增素材',
-  '自定义自动上传起始时间，支持精确到时分秒',
-  '访问并下载当前连接电脑的共享目录内容',
-  '预览共享目录中的图片与视频',
-  '多设备连接与切换使用',
-  '无限量上传素材',
+const FEATURE_KEYS = [
+  'subscription.features.autoUpload',
+  'subscription.features.customTime',
+  'subscription.features.sharedDir',
+  'subscription.features.preview',
+  'subscription.features.multiDevice',
+  'subscription.features.unlimited',
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -96,9 +98,11 @@ const FEATURES = [
 function StatusBadge({
   status,
   trialEnd,
+  t,
 }: {
   status: AccountStatus | undefined;
   trialEnd: string | null | undefined;
+  t: TFunction;
 }) {
   let dotColor: string;
   let label: string;
@@ -107,20 +111,20 @@ function StatusBadge({
     case 'trialing': {
       const days = getTrialRemainingDays(trialEnd ?? null);
       dotColor = SUCCESS_GREEN;
-      label = `试用中，还剩 ${days} 天`;
+      label = t('subscription.status.trialing', { days });
       break;
     }
     case 'trial_expired':
       dotColor = DESTRUCTIVE_RED;
-      label = '试用已结束';
+      label = t('subscription.status.trialExpired');
       break;
     case 'subscribed':
       dotColor = SUCCESS_GREEN;
-      label = '已订阅';
+      label = t('subscription.status.subscribed');
       break;
     case 'sub_expired':
       dotColor = DESTRUCTIVE_RED;
-      label = '订阅已到期';
+      label = t('subscription.status.subExpired');
       break;
     default:
       return null;
@@ -159,13 +163,13 @@ const badgeStyles = StyleSheet.create({
 
 // ---------------------------------------------------------------------------
 
-function FeatureList() {
+function FeatureList({ t }: { t: TFunction }) {
   return (
     <View style={featureStyles.container}>
-      {FEATURES.map((text) => (
-        <View key={text} style={featureStyles.row}>
+      {FEATURE_KEYS.map((key) => (
+        <View key={key} style={featureStyles.row}>
           <Icon name="checkmark-circle" size={20} color={SUCCESS_GREEN} />
-          <Text style={featureStyles.text}>{text}</Text>
+          <Text style={featureStyles.text}>{t(key)}</Text>
         </View>
       ))}
     </View>
@@ -326,11 +330,13 @@ function PaymentSuccessModal({
   plan,
   expireAt,
   onDismiss,
+  t,
 }: {
   visible: boolean;
   plan: string;
   expireAt: string | null;
   onDismiss: () => void;
+  t: TFunction;
 }) {
   const expiry = formatExpireDate(expireAt);
 
@@ -346,19 +352,19 @@ function PaymentSuccessModal({
           <View style={modalStyles.iconCircle}>
             <Icon name="checkmark-circle" size={48} color={SUCCESS_GREEN} />
           </View>
-          <Text style={modalStyles.title}>支付成功</Text>
+          <Text style={modalStyles.title}>{t('subscription.modal.paymentSuccess')}</Text>
           <Text style={modalStyles.subtitle}>
-            订阅成功，继续使用 Vivi Drop 吧！
+            {t('subscription.modal.successSubtitle')}
           </Text>
 
           <View style={modalStyles.planRow}>
             <Icon name="calendar-outline" size={18} color={BLUE} />
             <Text style={modalStyles.planText}>
-              {getPlanDisplayName(plan)}
+              {getPlanDisplayName(plan, t)}
             </Text>
             {expiry ? (
               <Text style={modalStyles.expiryText}>
-                有效期至 {expiry}
+                {t('subscription.modal.validUntil', { date: expiry })}
               </Text>
             ) : null}
           </View>
@@ -368,7 +374,7 @@ function PaymentSuccessModal({
             activeOpacity={0.7}
             onPress={onDismiss}
           >
-            <Text style={modalStyles.buttonText}>开始使用</Text>
+            <Text style={modalStyles.buttonText}>{t('subscription.actions.start')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -447,6 +453,7 @@ const modalStyles = StyleSheet.create({
 
 export function SubscriptionScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const { t } = useTranslation();
   const { user, subscription } = useAuth();
   // loadSubscription() will be called after real IAP verification succeeds
 
@@ -496,7 +503,7 @@ export function SubscriptionScreen() {
     // and the dismiss handler had no way to navigate back to a usable view.
     setTimeout(() => {
       setIsLoading(false);
-      Alert.alert('提示', '支付功能开发中，敬请期待', [{ text: '知道了' }]);
+      Alert.alert(t('subscription.alert.devTitle'), t('subscription.alert.devBody'), [{ text: t('subscription.alert.devConfirm') }]);
     }, 600);
   }, []);
 
@@ -527,11 +534,11 @@ export function SubscriptionScreen() {
               navigation.goBack();
             }
           }}
-          accessibilityLabel="返回"
+          accessibilityLabel={t('common.back')}
         >
           <Icon name="chevron-back" size={20} color={DARK} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>会员订阅</Text>
+        <Text style={styles.headerTitle}>{t('subscription.title')}</Text>
       </View>
 
       <ScrollView
@@ -540,45 +547,45 @@ export function SubscriptionScreen() {
       >
         {/* Hero section */}
         <View style={styles.heroSection}>
-          <Text style={styles.heroTitle}>解锁完整版</Text>
+          <Text style={styles.heroTitle}>{t('subscription.hero.title')}</Text>
           <Text style={styles.heroSubtitle}>
-            7 天免费体验，到期后订阅继续使用全部功能。
+            {t('subscription.hero.subtitle')}
           </Text>
         </View>
 
         {/* Status badge */}
         {status ? (
           <View style={styles.badgeWrapper}>
-            <StatusBadge status={status} trialEnd={trialEnd} />
+            <StatusBadge status={status} trialEnd={trialEnd} t={t} />
           </View>
         ) : null}
 
         {/* Divider with label */}
         <View style={styles.dividerRow}>
           <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>订阅后可使用</Text>
+          <Text style={styles.dividerText}>{t('subscription.divider')}</Text>
           <View style={styles.dividerLine} />
         </View>
 
         {/* Feature list */}
         <View style={styles.featureCard}>
-          <FeatureList />
+          <FeatureList t={t} />
         </View>
 
         {/* Plan selection */}
         <View style={styles.planRow}>
           <PlanCard
-            title="按月订阅"
+            title={t('subscription.plans.monthly.title')}
             price="¥9.9"
-            unit="/月"
+            unit={t('subscription.plans.monthly.unit')}
             selected={selectedPlan === 'monthly'}
             onPress={() => setSelectedPlan('monthly')}
           />
           <PlanCard
-            title="长期优惠"
+            title={t('subscription.plans.tenMonth.title')}
             price="¥88"
-            unit="/10个月"
-            discountBadge="8.8折"
+            unit={t('subscription.plans.tenMonth.unit')}
+            discountBadge={t('subscription.plans.tenMonth.badge')}
             selected={selectedPlan === 'ten_month'}
             onPress={() => setSelectedPlan('ten_month')}
           />
@@ -596,13 +603,13 @@ export function SubscriptionScreen() {
           {isLoading ? (
             <ActivityIndicator color="#ffffff" size="small" />
           ) : (
-            <Text style={styles.subscribeButtonText}>立即订阅</Text>
+            <Text style={styles.subscribeButtonText}>{t('subscription.actions.subscribe')}</Text>
           )}
         </TouchableOpacity>
 
         {/* Footer disclaimer */}
         <Text style={styles.footerText}>
-          订阅即表示您同意自动续费条款，可随时取消
+          {t('subscription.footer')}
         </Text>
 
         <View style={styles.bottomSpacer} />
@@ -614,6 +621,7 @@ export function SubscriptionScreen() {
         plan={confirmedPlan}
         expireAt={confirmedExpireAt}
         onDismiss={handlePaymentSuccessDismiss}
+        t={t}
       />
     </SafeAreaView>
   );

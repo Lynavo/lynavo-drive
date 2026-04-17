@@ -446,6 +446,57 @@
       "previewFailedMessage": "Could not load file preview"
     }
   },
+  "subscription": {
+    "title": "Subscription",
+    "hero": {
+      "title": "Unlock the full version",
+      "subtitle": "7-day free trial. Subscribe after to keep using all features."
+    },
+    "divider": "Available after subscribing",
+    "features": {
+      "autoUpload": "Auto-upload new photos and videos from your library",
+      "customTime": "Custom start time for auto upload, down to seconds",
+      "sharedDir": "Browse and download the shared directory on your connected computer",
+      "preview": "Preview images and videos in the shared directory",
+      "multiDevice": "Connect and switch between multiple devices",
+      "unlimited": "Unlimited media uploads"
+    },
+    "plans": {
+      "monthly": {
+        "name": "Monthly plan",
+        "title": "Monthly",
+        "unit": "/mo"
+      },
+      "tenMonth": {
+        "name": "10-month plan",
+        "title": "Best value",
+        "unit": "/10 months",
+        "badge": "Save 12%"
+      },
+      "fallback": "Subscription"
+    },
+    "status": {
+      "trialing": "Trial — {{days}} days left",
+      "trialExpired": "Trial ended",
+      "subscribed": "Subscribed",
+      "subExpired": "Subscription expired"
+    },
+    "actions": {
+      "subscribe": "Subscribe now",
+      "start": "Get started"
+    },
+    "footer": "Subscribing means you agree to auto-renewal. Cancel any time.",
+    "modal": {
+      "paymentSuccess": "Payment successful",
+      "successSubtitle": "You're subscribed — enjoy Vivi Drop!",
+      "validUntil": "Valid until {{date}}"
+    },
+    "alert": {
+      "devTitle": "Coming soon",
+      "devBody": "Payment is under development. Stay tuned!",
+      "devConfirm": "Got it"
+    }
+  },
   "history": {
     "title": "History",
     "emptyState": {
