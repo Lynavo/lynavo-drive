@@ -69,5 +69,15 @@
     "downloadBody": "下載共享目錄的內容需要有效的訂閱。",
     "goSubscribe": "查看方案",
     "cancel": "暫不"
+  },
+  "reminder": {
+    "warn7Title": "訂閱即將到期",
+    "warn7Body": "你的訂閱將在 {{days}} 天後到期。續訂以繼續使用全部功能。",
+    "warnTodayTitle": "訂閱今日到期",
+    "warnTodayBody": "請在今天續訂以避免功能受限。",
+    "expiredTitle": "訂閱已到期",
+    "expiredBody": "續訂以繼續使用 Vivi Drop。",
+    "renewNow": "立即續訂",
+    "later": "稍後"
   }
 }

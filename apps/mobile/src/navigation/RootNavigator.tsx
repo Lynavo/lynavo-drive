@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   NativeModules,
   ActivityIndicator,
@@ -8,9 +8,12 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
+import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 
 import { useAuth } from '../stores/auth-store';
+import type { SubscriptionInfo } from '../stores/auth-store';
+import { useExpiryReminder } from '../hooks/useExpiryReminder';
 import { FEATURES } from '../constants/features';
 import { LoginScreen } from '../screens/LoginScreen';
 import { SmsVerifyScreen } from '../screens/SmsVerifyScreen';
@@ -99,7 +102,12 @@ export function RootNavigator() {
     return <LoadingScreen />;
   }
 
-  return <AuthedStack userStatus={auth.user.status} />;
+  return (
+    <AuthedStack
+      userStatus={auth.user.status}
+      subscription={auth.subscription}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -119,10 +127,36 @@ function UnauthStack() {
 }
 
 // ---------------------------------------------------------------------------
+// Expiry reminder watcher — rendered inside AuthedStack so it is always
+// under NavigationContainer and can call useNavigation() safely.
+// ---------------------------------------------------------------------------
+
+function ExpiryReminderWatcher({
+  subscription,
+}: {
+  subscription: SubscriptionInfo | null;
+}) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const navigation = useNavigation<any>();
+  const onRenew = useCallback(
+    () => navigation.navigate('Subscription' as never),
+    [navigation],
+  );
+  useExpiryReminder({ subscription, onRenew });
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Authenticated stack
 // ---------------------------------------------------------------------------
 
-function AuthedStack({ userStatus }: { userStatus: string }) {
+function AuthedStack({
+  userStatus,
+  subscription,
+}: {
+  userStatus: string;
+  subscription: SubscriptionInfo | null;
+}) {
   const [initialRoute, setInitialRoute] =
     useState<keyof RootStackParamList | null>(null);
 
@@ -164,21 +198,24 @@ function AuthedStack({ userStatus }: { userStatus: string }) {
   }
 
   return (
-    <Stack.Navigator
-      initialRouteName={initialRoute}
-      screenOptions={{ headerShown: false }}
-    >
-      <Stack.Screen name="DeviceDiscovery" component={DeviceDiscoveryScreen} />
-      <Stack.Screen name="QRScanner" component={QRScannerScreen} />
-      <Stack.Screen name="CodeVerify" component={CodeVerifyScreen} />
-      <Stack.Screen name="SyncActivity" component={SyncActivityScreen} />
-      <Stack.Screen name="AlbumWorkbench" component={AlbumWorkbenchScreen} />
-      <Stack.Screen name="SharedFiles" component={SharedFilesScreen} />
-      <Stack.Screen name="History" component={HistoryScreen} />
-      <Stack.Screen name="Settings" component={SettingsScreen} />
-      <Stack.Screen name="Help" component={HelpScreen} />
-      <Stack.Screen name="Subscription" component={SubscriptionScreen} />
-    </Stack.Navigator>
+    <>
+      <ExpiryReminderWatcher subscription={subscription} />
+      <Stack.Navigator
+        initialRouteName={initialRoute}
+        screenOptions={{ headerShown: false }}
+      >
+        <Stack.Screen name="DeviceDiscovery" component={DeviceDiscoveryScreen} />
+        <Stack.Screen name="QRScanner" component={QRScannerScreen} />
+        <Stack.Screen name="CodeVerify" component={CodeVerifyScreen} />
+        <Stack.Screen name="SyncActivity" component={SyncActivityScreen} />
+        <Stack.Screen name="AlbumWorkbench" component={AlbumWorkbenchScreen} />
+        <Stack.Screen name="SharedFiles" component={SharedFilesScreen} />
+        <Stack.Screen name="History" component={HistoryScreen} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="Help" component={HelpScreen} />
+        <Stack.Screen name="Subscription" component={SubscriptionScreen} />
+      </Stack.Navigator>
+    </>
   );
 }
 

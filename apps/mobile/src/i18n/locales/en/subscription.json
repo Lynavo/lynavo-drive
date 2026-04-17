@@ -69,5 +69,15 @@
     "downloadBody": "Downloads from the shared folder need an active subscription.",
     "goSubscribe": "View Plans",
     "cancel": "Not now"
+  },
+  "reminder": {
+    "warn7Title": "Subscription expiring soon",
+    "warn7Body": "Your subscription ends in {{days}} days. Renew to keep all features.",
+    "warnTodayTitle": "Subscription expires today",
+    "warnTodayBody": "Renew today to avoid losing access.",
+    "expiredTitle": "Subscription expired",
+    "expiredBody": "Renew to keep using Vivi Drop.",
+    "renewNow": "Renew",
+    "later": "Later"
   }
 }
