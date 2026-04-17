@@ -14,4 +14,18 @@ export const FEATURES = {
    * are deployed — without those the user lands in a non-recoverable dead end.
    */
   SUBSCRIPTION_ENFORCEMENT: false,
+
+  /**
+   * Master switch for the entire Apple IAP integration. When false:
+   *  - `useIapLifecycle` is a no-op (no initConnection, no listeners)
+   *  - `SubscriptionScreen` falls back to its mock "coming soon" alert
+   *  - Restore Purchases button is hidden regardless of IAP_RESTORE_ENABLED
+   */
+  IAP_ENABLED: false,
+
+  /**
+   * Controls Restore Purchases button visibility. Gated separately so we can
+   * ship "purchase only" first and enable Restore once sandbox-verified.
+   */
+  IAP_RESTORE_ENABLED: false,
 } as const;
