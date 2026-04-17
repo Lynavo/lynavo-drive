@@ -259,6 +259,19 @@
       "thermalThrottled": "Device is running hot — transfer throttled"
     }
   },
+  "qrScanner": {
+    "title": "Scan pairing QR code",
+    "instruction": "Place the QR code in the frame to connect automatically",
+    "permissionDenied": {
+      "text": "Camera access is required to scan the QR code"
+    },
+    "noCameraDevice": "No camera found",
+    "android": {
+      "title": "QR pairing not available on Android",
+      "body": "This Android build only includes basic bridging and manual pairing. Go back and use \"Manual pairing\" to enter the desktop IPv4 address instead.",
+      "backToManual": "Back to manual pairing"
+    }
+  },
   "deviceDiscovery": {
     "title": "Find devices",
     "subtitle": {
