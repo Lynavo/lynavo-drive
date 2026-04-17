@@ -50,5 +50,89 @@
       "resendCountdown": "Resend in {{seconds}}s",
       "resendButton": "Get a new code"
     }
+  },
+  "settings": {
+    "title": "Settings",
+    "versionLabel": "v{{version}} ({{build}})",
+    "sections": {
+      "connectedDevice": "Connected device",
+      "supportHelp": "Support & Help"
+    },
+    "android": {
+      "title": "Android capability notes",
+      "body": "This build ships the Android shell, LAN auto-discovery, basic pairing, and diagnostics export. QR pairing, the real upload queue, background reconnection, and incremental sync have not yet been ported to the Android native engine."
+    },
+    "connection": {
+      "online": "Online",
+      "connecting": "Connecting",
+      "offline": "Offline",
+      "notConnected": "Not connected"
+    },
+    "subscription": {
+      "subscribed": "Subscription",
+      "trial": "Trial",
+      "trialDays": "{{days}} days",
+      "freeTrial": "Free trial",
+      "expired": "Expired",
+      "active": "Active",
+      "subscribeCta": "Subscribe now"
+    },
+    "myDevice": {
+      "label": "My device name",
+      "hint": "This name will be shown on your Mac"
+    },
+    "photoPermission": {
+      "title": "Photo access is off",
+      "body": "Allow access to Photos to keep auto-sync running.",
+      "openSettings": "Open system settings"
+    },
+    "rows": {
+      "currentAccount": "Current account",
+      "latestSync": "Latest sync",
+      "appVersion": "App version"
+    },
+    "actions": {
+      "exportDiagnostics": "Export diagnostics bundle",
+      "exportingDiagnostics": "Exporting diagnostics bundle...",
+      "help": "Help",
+      "resetSyncStatus": "Reset sync status",
+      "logout": "Log out",
+      "switch": "Switch"
+    },
+    "status": {
+      "noRecord": "No records yet",
+      "reading": "Loading...",
+      "notBound": "Not bound"
+    },
+    "dates": {
+      "todayAt": "Today {{time}}",
+      "monthDayAt": "{{month}}/{{day}} at {{time}}",
+      "fullDate": "{{year}}/{{month}}/{{day}} {{time}}"
+    },
+    "dialogs": {
+      "switchDevice": {
+        "title": "Switch device",
+        "body": "Disconnect from the current computer and switch to another device? You will need to enter a new pairing code.",
+        "confirm": "Confirm switch"
+      },
+      "resetSync": {
+        "title": "Reset all sync state",
+        "body": "This clears all sync records and disconnects the current device. You will need to re-enter a pairing code. Photos on your phone and Mac will not be deleted.",
+        "confirm": "Confirm reset"
+      },
+      "logout": {
+        "title": "Log out",
+        "body": "Are you sure you want to log out?",
+        "confirm": "Confirm log out"
+      },
+      "exportUnavailable": {
+        "title": "Cannot export",
+        "body": "This build does not support exporting the diagnostics bundle."
+      },
+      "exportFailed": {
+        "title": "Export failed",
+        "body": "Failed to export the diagnostics bundle. Please try again later."
+      }
+    }
   }
 }

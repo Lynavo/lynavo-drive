@@ -15,6 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { Icon } from '../components/Icon';
 import {
@@ -71,32 +73,44 @@ type SettingsSyncOverviewState = {
   uploadState: string;
 };
 
-function formatAppVersionLabel(appInfo?: Record<string, unknown>): string {
+function formatAppVersionLabel(
+  appInfo: Record<string, unknown> | undefined,
+  t: TFunction,
+): string {
   const version = typeof appInfo?.version === 'string' ? appInfo.version : '';
-  if (!version) return '未知版本';
+  if (!version) return t('common.unknownVersion');
   const build =
     typeof appInfo?.build === 'string' && appInfo.build ? appInfo.build : '0';
-  return `v${version} (${build})`;
+  return t('settings.versionLabel', { version, build });
 }
 
-function formatDateTimeLabel(iso?: string): string {
-  if (!iso) return '暂无记录';
+function formatDateTimeLabel(iso: string | undefined, t: TFunction): string {
+  if (!iso) return t('settings.status.noRecord');
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '暂无记录';
+  if (Number.isNaN(date.getTime())) return t('settings.status.noRecord');
 
   const now = new Date();
   const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   if (date.toDateString() === now.toDateString()) {
-    return `今天 ${time}`;
+    return t('settings.dates.todayAt', { time });
   }
   if (date.getFullYear() === now.getFullYear()) {
-    return `${date.getMonth() + 1}月${date.getDate()}日 ${time}`;
+    return t('settings.dates.monthDayAt', {
+      month: date.getMonth() + 1,
+      day: date.getDate(),
+      time,
+    });
   }
-  return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()} ${time}`;
+  return t('settings.dates.fullDate', {
+    year: date.getFullYear(),
+    month: date.getMonth() + 1,
+    day: date.getDate(),
+    time,
+  });
 }
 
-function maskPhone(phone?: string): string {
-  if (!phone) return '未绑定';
+function maskPhone(phone: string | undefined, t: TFunction): string {
+  if (!phone) return t('settings.status.notBound');
   if (phone.length >= 7) {
     return phone.slice(0, 3) + '****' + phone.slice(-4);
   }
@@ -109,6 +123,7 @@ function maskPhone(phone?: string): string {
 
 export function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const { t } = useTranslation();
   const auth = useAuth();
   const isAndroid = Platform.OS === 'android';
   const [deviceName, setDeviceName] = useState('');
@@ -123,8 +138,12 @@ export function SettingsScreen() {
       currentFileConfirmedBytes: 0,
       uploadState: 'idle',
     });
-  const [latestSyncLabel, setLatestSyncLabel] = useState('暂无记录');
-  const [appVersionLabel, setAppVersionLabel] = useState('读取中…');
+  const [latestSyncLabel, setLatestSyncLabel] = useState(
+    t('settings.status.noRecord'),
+  );
+  const [appVersionLabel, setAppVersionLabel] = useState(
+    t('settings.status.reading'),
+  );
   const [isPhotoPermissionBlocked, setIsPhotoPermissionBlocked] =
     useState(false);
   const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false);
@@ -230,10 +249,11 @@ export function SettingsScreen() {
           setAppVersionLabel(
             formatAppVersionLabel(
               appInfoResult.value as Record<string, unknown> | undefined,
+              t,
             ),
           );
         } else {
-          setAppVersionLabel('未知版本');
+          setAppVersionLabel(t('common.unknownVersion'));
         }
 
         const history =
@@ -262,7 +282,7 @@ export function SettingsScreen() {
           }
           if (latestItem?.updatedAt) {
             setLatestSyncLabel(
-              `${formatDateTimeLabel(String(latestItem.updatedAt))} · ${String(latestItem.deviceName || 'Mac')}`,
+              `${formatDateTimeLabel(String(latestItem.updatedAt), t)} · ${String(latestItem.deviceName || 'Mac')}`,
             );
           }
         }
@@ -293,7 +313,7 @@ export function SettingsScreen() {
           syncOverview?.uploadState === 'paused_no_permission',
         );
       } catch (e) {
-        setAppVersionLabel('未知版本');
+        setAppVersionLabel(t('common.unknownVersion'));
         console.warn('Native module not available for Settings');
       }
     };
@@ -304,7 +324,7 @@ export function SettingsScreen() {
       bindingSub?.remove();
       syncSub?.remove();
     };
-  }, []);
+  }, [t]);
 
   const connectionEvidence = buildSyncConnectionEvidence(syncOverviewState);
   const connectionBadgeState = getConnectionBadgeState(
@@ -334,12 +354,12 @@ export function SettingsScreen() {
 
   const handleSwitchDevice = useCallback(() => {
     Alert.alert(
-      '切换设备',
-      '确定要断开当前电脑并切换到其他设备吗？断开后需要重新输入连接码配对。',
+      t('settings.dialogs.switchDevice.title'),
+      t('settings.dialogs.switchDevice.body'),
       [
-        { text: '取消', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: '确定切换',
+          text: t('settings.dialogs.switchDevice.confirm'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -358,7 +378,7 @@ export function SettingsScreen() {
         },
       ],
     );
-  }, [navigation]);
+  }, [navigation, t]);
 
   const handleExportDiagnostics = useCallback(async () => {
     try {
@@ -366,23 +386,29 @@ export function SettingsScreen() {
       await shareDiagnosticsArchive();
     } catch (error) {
       if (isDiagnosticsExportUnavailable(error)) {
-        Alert.alert('无法导出', '当前版本暂不支持导出诊断包');
+        Alert.alert(
+          t('settings.dialogs.exportUnavailable.title'),
+          t('settings.dialogs.exportUnavailable.body'),
+        );
       } else {
-        Alert.alert('导出失败', '诊断包导出失败，请稍后重试');
+        Alert.alert(
+          t('settings.dialogs.exportFailed.title'),
+          t('settings.dialogs.exportFailed.body'),
+        );
       }
     } finally {
       setIsExportingDiagnostics(false);
     }
-  }, []);
+  }, [t]);
 
   const handleResetSyncStatus = useCallback(() => {
     Alert.alert(
-      '重置所有同步状态',
-      '将清除所有同步记录并断开当前设备连接，需要重新输入连接码配对。手机和电脑上的照片不会被删除。',
+      t('settings.dialogs.resetSync.title'),
+      t('settings.dialogs.resetSync.body'),
       [
-        { text: '取消', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: '确定重置',
+          text: t('settings.dialogs.resetSync.confirm'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -404,13 +430,13 @@ export function SettingsScreen() {
         },
       ],
     );
-  }, [navigation]);
+  }, [navigation, t]);
 
   const handleLogout = useCallback(() => {
-    Alert.alert('退出登录', '确定要退出登录吗？', [
-      { text: '取消', style: 'cancel' },
+    Alert.alert(t('settings.dialogs.logout.title'), t('settings.dialogs.logout.body'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: '确定退出',
+        text: t('settings.dialogs.logout.confirm'),
         style: 'destructive',
         onPress: () => {
           // Snapshot the refresh token before clearAuth wipes it.
@@ -446,7 +472,7 @@ export function SettingsScreen() {
         },
       },
     ]);
-  }, [auth, navigation]);
+  }, [auth, navigation, t]);
 
   // Subscription derived state
   const userStatus = auth.user?.status;
@@ -479,11 +505,11 @@ export function SettingsScreen() {
               });
             }
           }}
-          accessibilityLabel="返回"
+          accessibilityLabel={t('common.back')}
         >
           <Icon name="chevron-back" size={20} color={DARK} />
         </TouchableOpacity>
-        <Text style={styles.title}>设置</Text>
+        <Text style={styles.title}>{t('settings.title')}</Text>
       </View>
 
       <ScrollView
@@ -493,11 +519,10 @@ export function SettingsScreen() {
         {isAndroid ? (
           <View style={styles.androidNoticeCard}>
             <Text style={styles.androidNoticeTitle}>
-              Android 端能力说明
+              {t('settings.android.title')}
             </Text>
             <Text style={styles.androidNoticeBody}>
-              当前版本已提供 Android 壳层、局域网自动发现、基础配对与诊断导出入口；扫码配对、真实上传队列、后台重连和增量同步仍未移植到
-              Android 原生引擎。
+              {t('settings.android.body')}
             </Text>
           </View>
         ) : null}
@@ -512,10 +537,10 @@ export function SettingsScreen() {
               <View style={styles.wifiIconCircle}>
                 <Icon name="wifi" size={18} color="#fff" />
               </View>
-              <Text style={styles.topCardSmallLabel}>已连接设备</Text>
+              <Text style={styles.topCardSmallLabel}>{t('settings.sections.connectedDevice')}</Text>
             </View>
             <Text style={styles.topCardTitle} numberOfLines={1}>
-              {deviceName || '未连接'}
+              {deviceName || t('settings.connection.notConnected')}
             </Text>
             {deviceIp ? (
               <Text style={styles.topCardSubtext}>{deviceIp}</Text>
@@ -542,7 +567,11 @@ export function SettingsScreen() {
                         : styles.statusTextOffline,
                   ]}
                 >
-                  {isConnected ? '在线' : isConnecting ? '连接中' : '离线'}
+                  {isConnected
+                    ? t('settings.connection.online')
+                    : isConnecting
+                      ? t('settings.connection.connecting')
+                      : t('settings.connection.offline')}
                 </Text>
               </View>
               <TouchableOpacity
@@ -550,7 +579,7 @@ export function SettingsScreen() {
                 activeOpacity={0.6}
                 onPress={handleSwitchDevice}
               >
-                <Text style={styles.switchButtonText}>切换</Text>
+                <Text style={styles.switchButtonText}>{t('settings.actions.switch')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -573,27 +602,31 @@ export function SettingsScreen() {
                 />
               </View>
               <Text style={styles.topCardSmallLabel}>
-                {isSubscribed || isSubExpired ? '订阅服务' : '试用服务'}
+                {isSubscribed || isSubExpired
+                  ? t('settings.subscription.subscribed')
+                  : t('settings.subscription.trial')}
               </Text>
             </View>
             {isTrialing ? (
               <>
                 <Text style={styles.topCardTitle}>
-                  {trialDays} 天
+                  {t('settings.subscription.trialDays', { days: trialDays })}
                 </Text>
-                <Text style={styles.topCardSubtext}>免费试用</Text>
+                <Text style={styles.topCardSubtext}>
+                  {t('settings.subscription.freeTrial')}
+                </Text>
               </>
             ) : isTrialExpired ? (
               <Text style={[styles.topCardTitle, { color: DANGER_RED }]}>
-                已到期
+                {t('settings.subscription.expired')}
               </Text>
             ) : isSubscribed ? (
               <Text style={[styles.topCardTitle, { color: SUB_GREEN }]}>
-                有效
+                {t('settings.subscription.active')}
               </Text>
             ) : isSubExpired ? (
               <Text style={[styles.topCardTitle, { color: DANGER_RED }]}>
-                已到期
+                {t('settings.subscription.expired')}
               </Text>
             ) : (
               <Text style={styles.topCardTitle}>--</Text>
@@ -604,7 +637,9 @@ export function SettingsScreen() {
                 onPress={() => navigation.navigate('Subscription')}
                 style={styles.subCtaRow}
               >
-                <Text style={styles.subCtaText}>立即订阅</Text>
+                <Text style={styles.subCtaText}>
+                  {t('settings.subscription.subscribeCta')}
+                </Text>
                 <Icon name="chevron-forward" size={13} color={BLUE} />
               </TouchableOpacity>
             ) : null}
@@ -620,7 +655,7 @@ export function SettingsScreen() {
               <Icon name="phone-portrait-outline" size={20} color="#fff" />
             </View>
             <View style={styles.myDeviceInfo}>
-              <Text style={styles.myDeviceLabel}>我的设备名称</Text>
+              <Text style={styles.myDeviceLabel}>{t('settings.myDevice.label')}</Text>
               {editingMyName ? (
                 <View style={styles.editRow}>
                   <TextInput
@@ -656,7 +691,7 @@ export function SettingsScreen() {
               )}
             </View>
           </View>
-          <Text style={styles.myDeviceHint}>此名称将在 Mac 端显示</Text>
+          <Text style={styles.myDeviceHint}>{t('settings.myDevice.hint')}</Text>
         </View>
 
         {/* ============================================================= */}
@@ -666,9 +701,9 @@ export function SettingsScreen() {
           {isPhotoPermissionBlocked ? (
             <>
               <View style={styles.warningBox}>
-                <Text style={styles.warningTitle}>照片权限未开启</Text>
+                <Text style={styles.warningTitle}>{t('settings.photoPermission.title')}</Text>
                 <Text style={styles.warningText}>
-                  需要允许访问照片后才能继续自动同步。
+                  {t('settings.photoPermission.body')}
                 </Text>
                 <TouchableOpacity
                   style={styles.warningAction}
@@ -677,7 +712,7 @@ export function SettingsScreen() {
                     void Linking.openSettings();
                   }}
                 >
-                  <Text style={styles.warningActionText}>打开系统设置</Text>
+                  <Text style={styles.warningActionText}>{t('settings.photoPermission.openSettings')}</Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.listSep} />
@@ -686,23 +721,23 @@ export function SettingsScreen() {
           <View style={styles.infoRow}>
             <View style={styles.infoRowLeft}>
               <Icon name="person-outline" size={16} color={MUTED_TEXT} />
-              <Text style={styles.infoRowLabel}>当前账号</Text>
+              <Text style={styles.infoRowLabel}>{t('settings.rows.currentAccount')}</Text>
             </View>
             <Text style={styles.infoRowValue}>
-              {maskPhone(auth.user?.phone)}
+              {maskPhone(auth.user?.phone, t)}
             </Text>
           </View>
           <View style={styles.listSep} />
           <View style={styles.infoRow}>
             <View style={styles.infoRowLeft}>
               <Icon name="time-outline" size={16} color={MUTED_TEXT} />
-              <Text style={styles.infoRowLabel}>最近同步</Text>
+              <Text style={styles.infoRowLabel}>{t('settings.rows.latestSync')}</Text>
             </View>
             <Text style={styles.infoRowValue}>{latestSyncLabel}</Text>
           </View>
           <View style={styles.listSep} />
           <View style={styles.infoRow}>
-            <Text style={styles.infoRowLabel}>应用版本</Text>
+            <Text style={styles.infoRowLabel}>{t('settings.rows.appVersion')}</Text>
             <Text style={styles.infoRowValue}>{appVersionLabel}</Text>
           </View>
         </View>
@@ -710,7 +745,7 @@ export function SettingsScreen() {
         {/* ============================================================= */}
         {/* Support & Help section                                         */}
         {/* ============================================================= */}
-        <Text style={styles.sectionLabel}>支持与帮助</Text>
+        <Text style={styles.sectionLabel}>{t('settings.sections.supportHelp')}</Text>
         <View style={styles.listCard}>
           <TouchableOpacity
             style={styles.actionRow}
@@ -723,7 +758,9 @@ export function SettingsScreen() {
             <View style={styles.actionRowLeft}>
               <Icon name="download-outline" size={18} color={BLUE} />
               <Text style={styles.actionRowText}>
-                {isExportingDiagnostics ? '正在导出诊断包…' : '导出诊断包'}
+                {isExportingDiagnostics
+                  ? t('settings.actions.exportingDiagnostics')
+                  : t('settings.actions.exportDiagnostics')}
               </Text>
             </View>
             <Icon name="chevron-forward" size={16} color={ROW_CHEVRON} />
@@ -736,7 +773,7 @@ export function SettingsScreen() {
           >
             <View style={styles.actionRowLeft}>
               <Icon name="help-circle-outline" size={18} color={BLUE} />
-              <Text style={styles.actionRowText}>帮助</Text>
+              <Text style={styles.actionRowText}>{t('settings.actions.help')}</Text>
             </View>
             <Icon name="chevron-forward" size={16} color={ROW_CHEVRON} />
           </TouchableOpacity>
@@ -753,7 +790,7 @@ export function SettingsScreen() {
           >
             <View style={styles.actionRowLeft}>
               <Icon name="refresh-outline" size={18} color={DANGER_RED} />
-              <Text style={styles.dangerRowText}>重置同步状态</Text>
+              <Text style={styles.dangerRowText}>{t('settings.actions.resetSyncStatus')}</Text>
             </View>
             <Icon name="chevron-forward" size={16} color={ROW_CHEVRON} />
           </TouchableOpacity>
@@ -770,7 +807,7 @@ export function SettingsScreen() {
           >
             <View style={styles.actionRowLeft}>
               <Icon name="log-out-outline" size={18} color={DANGER_RED} />
-              <Text style={styles.dangerRowText}>退出登录</Text>
+              <Text style={styles.dangerRowText}>{t('settings.actions.logout')}</Text>
             </View>
             <Icon name="chevron-forward" size={16} color={ROW_CHEVRON} />
           </TouchableOpacity>
