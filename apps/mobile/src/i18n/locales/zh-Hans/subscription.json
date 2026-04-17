@@ -16,7 +16,9 @@
   "plans": {
     "monthly": {
       "name": "月度订阅",
-      "unit": "/月"
+      "unit": "/月",
+      "subtitle": "¥9.9/月",
+      "trialOffer": "7 天免费试用，之后 ¥9.9/月"
     },
     "yearly": {
       "name": "12 个月方案",
@@ -25,6 +27,21 @@
       "savings": "立省 ¥14.8"
     },
     "fallback": "订阅"
+  },
+  "restore": {
+    "action": "恢复购买",
+    "inProgress": "恢复中...",
+    "success": "已恢复你的订阅",
+    "empty": "没有可恢复的订阅",
+    "failed": "恢复失败，请稍后重试"
+  },
+  "errors": {
+    "iapFailed": "支付失败，请稍后重试",
+    "verifyFailed": "验证失败，请稍后重试",
+    "verifyRetrying": "正在验证付款...",
+    "productUnavailable": "商品不可用，请联系客服",
+    "productMismatch": "产品设置有误，请联系客服",
+    "deferred": "付款等待核准中"
   },
   "status": {
     "trialing": "试用中，还剩 {{days}} 天",

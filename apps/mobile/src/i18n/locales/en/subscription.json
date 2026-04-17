@@ -16,7 +16,9 @@
   "plans": {
     "monthly": {
       "name": "Monthly Plan",
-      "unit": "/mo"
+      "unit": "/mo",
+      "subtitle": "¥9.9/month",
+      "trialOffer": "7-day free trial, then ¥9.9/month"
     },
     "yearly": {
       "name": "12-Month Plan",
@@ -25,6 +27,21 @@
       "savings": "Save ¥14.8"
     },
     "fallback": "Subscription"
+  },
+  "restore": {
+    "action": "Restore Purchases",
+    "inProgress": "Restoring...",
+    "success": "Your subscription has been restored",
+    "empty": "No subscription to restore",
+    "failed": "Restore failed, please try again"
+  },
+  "errors": {
+    "iapFailed": "Payment failed. Please try again.",
+    "verifyFailed": "Verification failed. Please try again.",
+    "verifyRetrying": "Payment is being verified...",
+    "productUnavailable": "This product is unavailable. Please contact support.",
+    "productMismatch": "Product configuration error. Please contact support.",
+    "deferred": "Purchase pending approval."
   },
   "status": {
     "trialing": "Trial — {{days}} days left",
