@@ -12,7 +12,8 @@
     "deviceNames": {
       "default": "电脑",
       "windows": "Windows 电脑"
-    }
+    },
+    "diagnosticsArchiveTitle": "Vivi Drop 诊断包"
   },
   "errors": {
     "title": "错误",
@@ -34,7 +35,8 @@
     "networkCheckRetry": "網路錯誤，請檢查連線後重試",
     "smsSendFailed": "驗證碼發送失敗",
     "pairingWrongCode": "连接码错误，请重新输入",
-    "pairingConnectFailed": "连接失败：{{msg}}"
+    "pairingConnectFailed": "连接失败：{{msg}}",
+    "exportDiagnosticsUnavailable": "当前版本暂不支持导出诊断包"
   },
   "auth": {
     "login": {

@@ -12,7 +12,8 @@
     "deviceNames": {
       "default": "Computer",
       "windows": "Windows PC"
-    }
+    },
+    "diagnosticsArchiveTitle": "Vivi Drop Diagnostics"
   },
   "errors": {
     "title": "Error",
@@ -34,7 +35,8 @@
     "networkCheckRetry": "Network error, please check your connection and try again",
     "smsSendFailed": "Failed to send verification code",
     "pairingWrongCode": "Incorrect pairing code — please try again",
-    "pairingConnectFailed": "Connection failed: {{msg}}"
+    "pairingConnectFailed": "Connection failed: {{msg}}",
+    "exportDiagnosticsUnavailable": "This build does not support exporting the diagnostics bundle."
   },
   "auth": {
     "login": {

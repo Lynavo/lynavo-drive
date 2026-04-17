@@ -1,11 +1,13 @@
 import { NativeModules, Share } from 'react-native';
+import i18next from 'i18next';
+import { AppError } from './app-error';
 
-const EXPORT_DIAGNOSTICS_UNAVAILABLE = 'EXPORT_DIAGNOSTICS_UNAVAILABLE';
+const EXPORT_DIAGNOSTICS_UNAVAILABLE_CODE = 'errors.exportDiagnosticsUnavailable';
 
 export async function shareDiagnosticsArchive(): Promise<string> {
   const { NativeSyncEngine } = NativeModules;
   if (!NativeSyncEngine?.exportDiagnostics) {
-    throw new Error(EXPORT_DIAGNOSTICS_UNAVAILABLE);
+    throw new AppError(EXPORT_DIAGNOSTICS_UNAVAILABLE_CODE);
   }
 
   const archivePath: string = await NativeSyncEngine.exportDiagnostics();
@@ -14,7 +16,7 @@ export async function shareDiagnosticsArchive(): Promise<string> {
     : `file://${archivePath}`;
 
   await Share.share({
-    title: 'Vivi Drop 诊断包',
+    title: i18next.t('common.diagnosticsArchiveTitle'),
     url: archiveUrl,
   });
 
@@ -22,7 +24,5 @@ export async function shareDiagnosticsArchive(): Promise<string> {
 }
 
 export function isDiagnosticsExportUnavailable(error: unknown): boolean {
-  return (
-    error instanceof Error && error.message === EXPORT_DIAGNOSTICS_UNAVAILABLE
-  );
+  return error instanceof AppError && error.code === EXPORT_DIAGNOSTICS_UNAVAILABLE_CODE;
 }
