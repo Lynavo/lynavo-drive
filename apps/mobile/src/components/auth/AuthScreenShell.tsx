@@ -13,6 +13,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { Icon } from '../Icon';
 
 const AUTH_LOGO = require('../../assets/icons/auth-logo.png');
@@ -50,6 +51,7 @@ export function AuthScreenShell({
   onBack,
   contentStyle,
 }: AuthScreenShellProps) {
+  const { t } = useTranslation();
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={AUTH_COLORS.background} />
@@ -66,7 +68,7 @@ export function AuthScreenShell({
         {onBack ? (
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="返回"
+            accessibilityLabel={t('common.back')}
             activeOpacity={0.8}
             onPress={onBack}
             style={styles.backButton}
