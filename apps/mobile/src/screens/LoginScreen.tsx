@@ -173,11 +173,11 @@ export function LoginScreen() {
           <Text style={styles.agreementText}>
             {t('auth.login.agreePrefix')}
             <Text style={styles.linkText} onPress={handleOpenUserAgreement}>
-              {t('auth.login.termsOfService')}
+              {t('common.termsOfService')}
             </Text>
             {t('auth.login.agreeConjunction')}
             <Text style={styles.linkText} onPress={handleOpenPrivacyPolicy}>
-              {t('auth.login.privacyPolicy')}
+              {t('common.privacyPolicy')}
             </Text>
           </Text>
         </TouchableOpacity>

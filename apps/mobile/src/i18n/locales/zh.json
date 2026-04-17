@@ -7,6 +7,8 @@
     "retry": "重试",
     "loading": "加载中",
     "unknownVersion": "未知版本",
+    "privacyPolicy": "《隐私政策》",
+    "termsOfService": "《用户协议》",
     "deviceNames": {
       "default": "电脑",
       "windows": "Windows 电脑"
@@ -30,7 +32,9 @@
     "smsTooManyAttempts": "驗證碼嘗試次數過多，請重新取得",
     "smsVerifyFailedRetry": "驗證失敗，請稍後重試",
     "networkCheckRetry": "網路錯誤，請檢查連線後重試",
-    "smsSendFailed": "驗證碼發送失敗"
+    "smsSendFailed": "驗證碼發送失敗",
+    "pairingWrongCode": "连接码错误，请重新输入",
+    "pairingConnectFailed": "连接失败：{{msg}}"
   },
   "auth": {
     "login": {
@@ -41,9 +45,7 @@
       "phoneInvalidSimplified": "请输入正确的手机号码",
       "phoneInvalidTraditional": "手機號碼格式不正確",
       "agreePrefix": "我已閱讀並同意",
-      "termsOfService": "《使用者協議》",
       "agreeConjunction": "與",
-      "privacyPolicy": "《隱私政策》",
       "requestCode": "獲取驗證碼",
       "requesting": "發送中..."
     },
@@ -263,11 +265,7 @@
     "deviceLabel": "正在连接：{{deviceName}} ({{host}})",
     "prompt": "请输入电脑端显示的 6 位连接码",
     "verifying": "正在验证连接码...",
-    "helpText": "请确保手机与电脑处于同一局域网下，在电脑端打开应用即可看到连接码",
-    "errors": {
-      "wrongCode": "连接码错误，请重新输入",
-      "connectFailed": "连接失败：{{msg}}"
-    }
+    "helpText": "请确保手机与电脑处于同一局域网下，在电脑端打开应用即可看到连接码"
   },
   "qrScanner": {
     "title": "扫描配对二维码",
@@ -292,7 +290,8 @@
       "text": "扫描中，请稍候..."
     },
     "devices": {
-      "foundCount": "发现 {{count}} 台设备"
+      "foundCount": "发现 {{count}} 台设备",
+      "foundCount_other": "发现 {{count}} 台设备"
     },
     "emptyState": {
       "default": "未发现设备",
@@ -302,9 +301,7 @@
       "manualPair": "手动配对",
       "rescan": "重新扫描",
       "manualInputIp": "手动输入 IP",
-      "qrPair": "扫码配对",
-      "privacyPolicy": "隐私政策",
-      "termsOfService": "用户协议"
+      "qrPair": "扫码配对"
     },
     "dialogs": {
       "openLinkFailed": {

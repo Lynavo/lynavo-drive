@@ -514,20 +514,20 @@ export function DeviceDiscoveryScreen() {
                   style={styles.legalLinkButton}
                   activeOpacity={0.7}
                   onPress={() =>
-                    void openLegalLink(PRIVACY_POLICY_URL, t('deviceDiscovery.actions.privacyPolicy'))
+                    void openLegalLink(PRIVACY_POLICY_URL, t('common.privacyPolicy'))
                   }
                 >
-                  <Text style={styles.legalLinkText}>{t('deviceDiscovery.actions.privacyPolicy')}</Text>
+                  <Text style={styles.legalLinkText}>{t('common.privacyPolicy')}</Text>
                 </TouchableOpacity>
                 <Text style={styles.legalLinkDivider}>{'/'}</Text>
                 <TouchableOpacity
                   style={styles.legalLinkButton}
                   activeOpacity={0.7}
                   onPress={() =>
-                    void openLegalLink(TERMS_OF_SERVICE_URL, t('deviceDiscovery.actions.termsOfService'))
+                    void openLegalLink(TERMS_OF_SERVICE_URL, t('common.termsOfService'))
                   }
                 >
-                  <Text style={styles.legalLinkText}>{t('deviceDiscovery.actions.termsOfService')}</Text>
+                  <Text style={styles.legalLinkText}>{t('common.termsOfService')}</Text>
                 </TouchableOpacity>
               </View>
             </View>

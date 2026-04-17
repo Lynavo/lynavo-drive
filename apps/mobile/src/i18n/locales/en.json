@@ -7,6 +7,8 @@
     "retry": "Retry",
     "loading": "Loading",
     "unknownVersion": "Unknown version",
+    "privacyPolicy": "Privacy Policy",
+    "termsOfService": "Terms of Service",
     "deviceNames": {
       "default": "Computer",
       "windows": "Windows PC"
@@ -30,7 +32,9 @@
     "smsTooManyAttempts": "Too many attempts, please request a new code",
     "smsVerifyFailedRetry": "Verification failed, please try again",
     "networkCheckRetry": "Network error, please check your connection and try again",
-    "smsSendFailed": "Failed to send verification code"
+    "smsSendFailed": "Failed to send verification code",
+    "pairingWrongCode": "Incorrect pairing code — please try again",
+    "pairingConnectFailed": "Connection failed: {{msg}}"
   },
   "auth": {
     "login": {
@@ -41,9 +45,7 @@
       "phoneInvalidSimplified": "Please enter a valid phone number",
       "phoneInvalidTraditional": "Phone number format is invalid",
       "agreePrefix": "I have read and agree to the",
-      "termsOfService": "Terms of Service",
       "agreeConjunction": "and",
-      "privacyPolicy": "Privacy Policy",
       "requestCode": "Get code",
       "requesting": "Sending..."
     },
@@ -263,11 +265,7 @@
     "deviceLabel": "Connecting to: {{deviceName}} ({{host}})",
     "prompt": "Enter the 6-digit pairing code shown on your computer",
     "verifying": "Verifying pairing code...",
-    "helpText": "Make sure your phone and computer are on the same network. Open the app on your computer to see the pairing code.",
-    "errors": {
-      "wrongCode": "Incorrect pairing code — please try again",
-      "connectFailed": "Connection failed: {{msg}}"
-    }
+    "helpText": "Make sure your phone and computer are on the same network. Open the app on your computer to see the pairing code."
   },
   "qrScanner": {
     "title": "Scan pairing QR code",
@@ -292,7 +290,9 @@
       "text": "Scanning, please wait..."
     },
     "devices": {
-      "foundCount": "{{count}} device found"
+      "foundCount": "{{count}} device found",
+      "foundCount_one": "{{count}} device found",
+      "foundCount_other": "{{count}} devices found"
     },
     "emptyState": {
       "default": "No devices found",
@@ -302,9 +302,7 @@
       "manualPair": "Manual pairing",
       "rescan": "Scan again",
       "manualInputIp": "Enter IP manually",
-      "qrPair": "Scan QR code",
-      "privacyPolicy": "Privacy Policy",
-      "termsOfService": "Terms of Service"
+      "qrPair": "Scan QR code"
     },
     "dialogs": {
       "openLinkFailed": {

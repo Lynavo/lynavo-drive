@@ -83,9 +83,9 @@ export function CodeVerifyScreen() {
         // Include actual error message so the user knows if it's a network timeout vs incorrect code
         const msg = e?.message || '';
         if (msg.includes('Pairing rejected')) {
-           setErrorMsg(t('codeVerify.errors.wrongCode'));
+           setErrorMsg(t('errors.pairingWrongCode'));
         } else {
-           setErrorMsg(t('codeVerify.errors.connectFailed', { msg }));
+           setErrorMsg(t('errors.pairingConnectFailed', { msg }));
         }
         setCode(Array(CODE_LENGTH).fill(''));
         Vibration.vibrate(300);
@@ -215,7 +215,7 @@ export function CodeVerifyScreen() {
         {/* Status: error */}
         {error && (
           <Text style={styles.errorText} numberOfLines={2}>
-            {errorMsg || t('codeVerify.errors.wrongCode')}
+            {errorMsg || t('errors.pairingWrongCode')}
           </Text>
         )}
 
