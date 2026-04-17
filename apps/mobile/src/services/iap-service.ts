@@ -4,11 +4,14 @@ import {
   purchaseUpdatedListener,
   purchaseErrorListener,
   requestSubscription,
+  finishTransaction as rnFinishTransaction,
   type Purchase,
   type PurchaseError,
 } from 'react-native-iap';
 import { type EmitterSubscription } from 'react-native';
-import { type IapProductId } from '../constants/iap';
+import { type IapProductId, productIdToPlan } from '../constants/iap';
+import { verifyIapReceipt } from './subscription-service';
+import { ApiError, ERROR_CODE } from './api';
 
 export interface PurchaseReceipt {
   transactionReceipt: string;
@@ -43,6 +46,7 @@ class IapServiceImpl implements IapService {
       timeout: ReturnType<typeof setTimeout>;
     }
   >();
+  private orphanListeners = new Set<() => void>();
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -92,14 +96,20 @@ class IapServiceImpl implements IapService {
   async restore(): Promise<PurchaseReceipt[]> {
     throw new Error('restore() not implemented yet');
   }
-  async finishTransaction(_transactionId: string): Promise<void> {
-    throw new Error('finishTransaction() not implemented yet');
+  async finishTransaction(transactionId: string): Promise<void> {
+    // react-native-iap v12 accepts either a Purchase object or transactionId
+    // via `purchase`; we keep a minimal stub shape it understands.
+    await rnFinishTransaction({
+      purchase: { transactionId } as Purchase,
+      isConsumable: false,
+    });
   }
   async checkEligibility(): Promise<EligibilityResult[]> {
     throw new Error('checkEligibility() not implemented yet');
   }
-  onOrphanPurchaseVerified(_cb: () => void): () => void {
-    throw new Error('onOrphanPurchaseVerified() not implemented yet');
+  onOrphanPurchaseVerified(cb: () => void): () => void {
+    this.orphanListeners.add(cb);
+    return () => this.orphanListeners.delete(cb);
   }
 
   private async handlePurchaseEvent(p: Purchase): Promise<void> {
@@ -129,8 +139,34 @@ class IapServiceImpl implements IapService {
     pending.reject(err);
   }
 
-  private async handleOrphanPurchase(_p: Purchase): Promise<void> {
-    // Filled in by Task 6.
+  private async handleOrphanPurchase(p: Purchase): Promise<void> {
+    const productId = p.productId;
+    const txId = p.transactionId ?? '';
+    const plan = productIdToPlan(productId);
+    if (!plan) {
+      // Unknown product — finish to unjam the queue but do not notify.
+      await this.finishTransaction(txId).catch(() => {});
+      return;
+    }
+    try {
+      await verifyIapReceipt(p.transactionReceipt, plan);
+      await this.finishTransaction(txId).catch(() => {});
+      this.orphanListeners.forEach((cb) => cb());
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.code === ERROR_CODE.RECEIPT_ALREADY_USED) {
+          await this.finishTransaction(txId).catch(() => {});
+          this.orphanListeners.forEach((cb) => cb());
+          return;
+        }
+        if (err.code === ERROR_CODE.PRODUCT_ID_MISMATCH) {
+          await this.finishTransaction(txId).catch(() => {});
+          return;
+        }
+      }
+      // Network / 5xx / 2001 — leave the transaction unfinished so Apple
+      // redelivers it on next startup.
+    }
   }
 }
 
