@@ -62,6 +62,12 @@ describe('AlbumWorkbenchScreen', () => {
     await i18n.changeLanguage('zh');
   });
 
+  afterAll(async () => {
+    await ReactTestRenderer.act(async () => {
+      await i18n.changeLanguage('zh');
+    });
+  });
+
   beforeEach(() => {
     jest.restoreAllMocks();
     jest.spyOn(Animated, 'loop').mockReturnValue({
