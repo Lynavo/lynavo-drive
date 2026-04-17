@@ -138,12 +138,8 @@ export function SettingsScreen() {
       currentFileConfirmedBytes: 0,
       uploadState: 'idle',
     });
-  const [latestSyncLabel, setLatestSyncLabel] = useState(
-    t('settings.status.noRecord'),
-  );
-  const [appVersionLabel, setAppVersionLabel] = useState(
-    t('settings.status.reading'),
-  );
+  const [latestSyncLabel, setLatestSyncLabel] = useState('');
+  const [appVersionLabel, setAppVersionLabel] = useState('');
   const [isPhotoPermissionBlocked, setIsPhotoPermissionBlocked] =
     useState(false);
   const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false);
@@ -284,7 +280,11 @@ export function SettingsScreen() {
             setLatestSyncLabel(
               `${formatDateTimeLabel(String(latestItem.updatedAt), t)} · ${String(latestItem.deviceName || 'Mac')}`,
             );
+          } else {
+            setLatestSyncLabel(t('settings.status.noRecord'));
           }
+        } else {
+          setLatestSyncLabel(t('settings.status.noRecord'));
         }
         const syncOverview =
           syncOverviewResult.status === 'fulfilled'
