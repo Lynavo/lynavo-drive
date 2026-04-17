@@ -3,6 +3,7 @@ import {
   endConnection,
   purchaseUpdatedListener,
   purchaseErrorListener,
+  requestSubscription,
   type Purchase,
   type PurchaseError,
 } from 'react-native-iap';
@@ -34,6 +35,14 @@ class IapServiceImpl implements IapService {
   private initialized = false;
   private purchaseSub: EmitterSubscription | null = null;
   private errorSub: EmitterSubscription | null = null;
+  private pendingPurchase = new Map<
+    IapProductId,
+    {
+      resolve: (r: PurchaseReceipt) => void;
+      reject: (err: unknown) => void;
+      timeout: ReturnType<typeof setTimeout>;
+    }
+  >();
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -57,10 +66,29 @@ class IapServiceImpl implements IapService {
     this.initialized = false;
   }
 
-  // Stubs filled in by later tasks.
-  async purchase(_productId: IapProductId): Promise<PurchaseReceipt> {
-    throw new Error('purchase() not implemented yet');
+  async purchase(productId: IapProductId): Promise<PurchaseReceipt> {
+    if (!this.initialized) {
+      throw new Error('iapService.initialize() must be called before purchase()');
+    }
+    if (this.pendingPurchase.has(productId)) {
+      throw new Error(`purchase already in flight for ${productId}`);
+    }
+    return new Promise<PurchaseReceipt>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingPurchase.delete(productId);
+        reject(new Error('purchase timed out after 60s'));
+      }, 60_000);
+      this.pendingPurchase.set(productId, { resolve, reject, timeout });
+      void Promise.resolve(requestSubscription({ sku: productId })).catch((err) => {
+        const entry = this.pendingPurchase.get(productId);
+        if (!entry) return;
+        clearTimeout(entry.timeout);
+        this.pendingPurchase.delete(productId);
+        reject(err);
+      });
+    });
   }
+
   async restore(): Promise<PurchaseReceipt[]> {
     throw new Error('restore() not implemented yet');
   }
@@ -74,12 +102,35 @@ class IapServiceImpl implements IapService {
     throw new Error('onOrphanPurchaseVerified() not implemented yet');
   }
 
-  private async handlePurchaseEvent(_p: Purchase): Promise<void> {
-    // Filled in by Tasks 5 and 6.
+  private async handlePurchaseEvent(p: Purchase): Promise<void> {
+    const productId = p.productId as IapProductId;
+    const pending = this.pendingPurchase.get(productId);
+    if (pending) {
+      clearTimeout(pending.timeout);
+      this.pendingPurchase.delete(productId);
+      pending.resolve({
+        productId,
+        transactionReceipt: p.transactionReceipt,
+        transactionId: p.transactionId ?? '',
+      });
+      return;
+    }
+    // Orphan — Task 6 handles this.
+    await this.handleOrphanPurchase(p);
   }
 
-  private handleErrorEvent(_err: PurchaseError): void {
-    // Filled in by Task 5.
+  private handleErrorEvent(err: PurchaseError): void {
+    const productId = err.productId as IapProductId | undefined;
+    if (!productId) return;
+    const pending = this.pendingPurchase.get(productId);
+    if (!pending) return;
+    clearTimeout(pending.timeout);
+    this.pendingPurchase.delete(productId);
+    pending.reject(err);
+  }
+
+  private async handleOrphanPurchase(_p: Purchase): Promise<void> {
+    // Filled in by Task 6.
   }
 }
 

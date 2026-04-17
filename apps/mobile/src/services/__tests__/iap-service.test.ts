@@ -65,3 +65,79 @@ describe('iapService — lifecycle', () => {
     expect(endConnection).not.toHaveBeenCalled();
   });
 });
+
+import { requestSubscription } from 'react-native-iap';
+import { IAP_PRODUCTS } from '../../constants/iap';
+
+describe('iapService — purchase', () => {
+  let updatedCb: ((p: any) => void) | null = null;
+  let errorCb: ((e: any) => void) | null = null;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    (purchaseUpdatedListener as jest.Mock).mockImplementation((cb) => {
+      updatedCb = cb;
+      return { remove: jest.fn() };
+    });
+    (purchaseErrorListener as jest.Mock).mockImplementation((cb) => {
+      errorCb = cb;
+      return { remove: jest.fn() };
+    });
+    await iapService.initialize();
+  });
+
+  afterEach(async () => {
+    await iapService.teardown();
+    updatedCb = null;
+    errorCb = null;
+  });
+
+  test('resolves with PurchaseReceipt when matching event arrives', async () => {
+    const pending = iapService.purchase(IAP_PRODUCTS.monthly);
+    expect(requestSubscription).toHaveBeenCalledWith({
+      sku: IAP_PRODUCTS.monthly,
+    });
+
+    // Simulate Apple pushing a purchase event.
+    updatedCb?.({
+      productId: IAP_PRODUCTS.monthly,
+      transactionReceipt: 'BASE64BLOB',
+      transactionId: 'tx_1',
+    });
+
+    const receipt = await pending;
+    expect(receipt).toEqual({
+      productId: IAP_PRODUCTS.monthly,
+      transactionReceipt: 'BASE64BLOB',
+      transactionId: 'tx_1',
+    });
+  });
+
+  test('rejects when error listener fires with the pending productId', async () => {
+    const pending = iapService.purchase(IAP_PRODUCTS.yearly);
+    errorCb?.({ code: 'E_USER_CANCELLED', productId: IAP_PRODUCTS.yearly });
+
+    await expect(pending).rejects.toMatchObject({ code: 'E_USER_CANCELLED' });
+  });
+
+  test('times out after 60s when no event arrives', async () => {
+    jest.useFakeTimers();
+    const pending = iapService.purchase(IAP_PRODUCTS.monthly);
+
+    jest.advanceTimersByTime(60_000);
+
+    await expect(pending).rejects.toThrow(/timed out/i);
+    jest.useRealTimers();
+  });
+
+  test('event for a productId without a pending Deferred is an orphan (not rejected)', async () => {
+    // No purchase() called — event comes in "cold".
+    expect(() =>
+      updatedCb?.({
+        productId: IAP_PRODUCTS.monthly,
+        transactionReceipt: 'BLOB',
+        transactionId: 'tx_orphan',
+      }),
+    ).not.toThrow();
+  });
+});
