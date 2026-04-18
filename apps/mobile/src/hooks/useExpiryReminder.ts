@@ -13,6 +13,38 @@ export interface Classification {
 
 const MS_PER_DAY = 86_400_000;
 
+// Grace window after an explicit purchase / restore. Within this window
+// the hook suppresses reminder alerts so users who just activated a
+// subscription aren't immediately warned about expiry. Most noticeable
+// during sandbox testing, where a monthly subscription is only 5 min —
+// expireAt < 24h always, so warnToday fires right after success. In
+// production it also smooths over the brief window between state flip
+// and the user putting the device down.
+const GRACE_MS = 60_000;
+
+// Session-only timestamp. Not persisted: cold launch → grace inactive
+// (by then any real expiry alert is legitimately worth showing).
+let justActivatedAt: number | null = null;
+
+/** Call from purchase / restore success path to skip the next reminder
+ *  firing within GRACE_MS. `now` is injectable for deterministic tests. */
+export function markSubscriptionJustActivated(now: number = Date.now()): void {
+  justActivatedAt = now;
+}
+
+/** Exposed as pure helper so reminder grace behavior is testable without
+ *  mounting the hook. Returns true iff markSubscriptionJustActivated was
+ *  called within the last GRACE_MS. */
+export function isWithinActivationGrace(now: number): boolean {
+  if (justActivatedAt === null) return false;
+  return now - justActivatedAt < GRACE_MS;
+}
+
+/** Test-only reset — production code must not touch this. */
+export function __resetJustActivatedForTesting(): void {
+  justActivatedAt = null;
+}
+
 export function classifyReminder(
   sub: Pick<SubscriptionInfo, 'status'> & Partial<Pick<SubscriptionInfo, 'expireAt' | 'trialEnd'>> | null,
   now: number,
@@ -72,6 +104,13 @@ export function useExpiryReminder({
   useEffect(() => {
     if (shownRef.current) return;
     if (!subscription) return;
+
+    // Grace window: user just activated via purchase/restore. Skip the
+    // first reminder so they don't see "expires today" immediately after
+    // a successful purchase alert. Don't mark shownRef — if grace lapses
+    // and a legitimate reminder is warranted (e.g. they navigate back
+    // much later in a sandbox session after expiry), it can still fire.
+    if (isWithinActivationGrace(Date.now())) return;
 
     const cls = classifyReminder(subscription, Date.now());
     if (cls.level === 'none') return;

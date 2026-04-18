@@ -27,6 +27,7 @@ import { resetCurrentDesktopSidecarIfReachable } from '../services/sidecar-reset
 import { clearUserScopedStorage } from '../utils/clearUserScopedStorage';
 import { FEATURES } from '../constants/features';
 import { iapService } from '../services/iap-service';
+import { markSubscriptionJustActivated } from '../hooks/useExpiryReminder';
 import { ApiError } from '../services/api';
 import {
   isDiagnosticsExportUnavailable,
@@ -565,6 +566,7 @@ export function SettingsScreen() {
         return;
       }
       await auth.loadSubscription();
+      markSubscriptionJustActivated();
       Alert.alert(t('subscription.restore.success'));
     } catch {
       Alert.alert(t('subscription.restore.failed'));

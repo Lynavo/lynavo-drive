@@ -21,6 +21,7 @@ import { useAuth } from '../stores/auth-store';
 import { iapService } from '../services/iap-service';
 import { IAP_PRODUCTS, planToProductId } from '../constants/iap';
 import { classifyIapError, IapErrorClass } from '../services/iap-errors';
+import { markSubscriptionJustActivated } from '../hooks/useExpiryReminder';
 import { verifyIapReceipt } from '../services/subscription-service';
 import { FEATURES } from '../constants/features';
 import {
@@ -600,6 +601,7 @@ export function SubscriptionScreen() {
         // Fall through — modal will just hide the expiry line.
       }
       await iapService.finishTransaction(receipt.transactionId);
+      markSubscriptionJustActivated();
       setConfirmedPlan(selectedPlan);
       setConfirmedExpireAt(fresh?.expireAt ?? null);
       setShowPaymentSuccess(true);

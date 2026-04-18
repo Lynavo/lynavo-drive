@@ -1,5 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { classifyReminder, shouldShowReminderToday } from '../useExpiryReminder';
+import {
+  classifyReminder,
+  shouldShowReminderToday,
+  markSubscriptionJustActivated,
+  isWithinActivationGrace,
+  __resetJustActivatedForTesting,
+} from '../useExpiryReminder';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(),
@@ -84,5 +90,45 @@ describe('shouldShowReminderToday', () => {
     const now = new Date('2026-04-17T10:00:00Z').getTime();
     const ok = await shouldShowReminderToday('warn7', now);
     expect(ok).toBe(false);
+  });
+});
+
+describe('activation grace window', () => {
+  beforeEach(() => {
+    __resetJustActivatedForTesting();
+  });
+
+  test('no prior mark → not within grace', () => {
+    expect(isWithinActivationGrace(1_000_000)).toBe(false);
+  });
+
+  test('immediately after mark → within grace', () => {
+    const T = 1_000_000;
+    markSubscriptionJustActivated(T);
+    expect(isWithinActivationGrace(T)).toBe(true);
+    expect(isWithinActivationGrace(T + 30_000)).toBe(true);
+  });
+
+  test('at grace boundary (60s) → no longer within grace', () => {
+    // Repro of the original user-visible issue: sandbox monthly expires
+    // ~5 min after purchase, so warnToday fires within seconds of
+    // activation. Grace must suppress that first firing, but not lock
+    // out legitimate reminders indefinitely.
+    const T = 1_000_000;
+    markSubscriptionJustActivated(T);
+    expect(isWithinActivationGrace(T + 59_999)).toBe(true);
+    expect(isWithinActivationGrace(T + 60_000)).toBe(false);
+    expect(isWithinActivationGrace(T + 120_000)).toBe(false);
+  });
+
+  test('mark is idempotent — second call refreshes the window', () => {
+    const T = 1_000_000;
+    markSubscriptionJustActivated(T);
+    // 50 s later, another activation (e.g. user restored after purchase).
+    markSubscriptionJustActivated(T + 50_000);
+    // From the refreshed anchor, 30s later still within grace.
+    expect(isWithinActivationGrace(T + 80_000)).toBe(true);
+    // 70s after the refresh → out of grace.
+    expect(isWithinActivationGrace(T + 121_000)).toBe(false);
   });
 });
