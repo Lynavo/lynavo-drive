@@ -154,6 +154,7 @@ import i18n from '../../i18n';
 import { SettingsScreen } from '../SettingsScreen';
 import { Alert, NativeModules, NativeEventEmitter } from 'react-native';
 import { deleteAccount as mockDeleteAccount } from '../../services/auth-service';
+import type { RenderAPI } from '@testing-library/react-native';
 
 const mockNativeSyncEngine = {
   getBindingState: jest.fn().mockResolvedValue(null),
@@ -175,22 +176,26 @@ const mockNativeSyncEngine = {
   removeListeners: jest.fn(),
 };
 
+async function flushScreenEffects(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
+async function renderSettingsScreen(): Promise<RenderAPI> {
+  const screen = render(<SettingsScreen />);
+  await act(async () => {
+    await flushScreenEffects();
+  });
+  return screen;
+}
+
 /**
  * Drive `Alert.alert` to the button whose `text` matches. The production
  * flow runs through one (logout) or two (delete-account) nested alerts;
  * each alert's `onPress` is the only path that kicks off the awaited
  * cleanup we want to assert on.
- *
- * Intentionally does NOT wrap `onPress()` in `act()`: the "blocking
- * overlay" test observes mid-flight state by capturing the returned
- * promise without awaiting, and an outer `act` would hold back the
- * React state flush the overlay assertion depends on. Tests that want
- * act-boundary discipline wrap their own call site (see the
- * "blocks logout when wipeSyncIdentity rejects" test). The resulting
- * stray `act(...)` warnings on pre-existing tests are cosmetic, not
- * behavioural.
  */
-async function pressAlertButton(buttonText: string): Promise<void> {
+async function pressAlertButtonRaw(buttonText: string): Promise<void> {
   const call = (Alert.alert as jest.Mock).mock.calls.at(-1);
   if (!call) {
     throw new Error('Alert.alert was never called');
@@ -206,6 +211,13 @@ async function pressAlertButton(buttonText: string): Promise<void> {
     );
   }
   await match.onPress();
+}
+
+async function pressAlertButton(buttonText: string): Promise<void> {
+  await act(async () => {
+    await pressAlertButtonRaw(buttonText);
+    await flushScreenEffects();
+  });
 }
 
 describe('SettingsScreen — account-identity-reset (Phase 1)', () => {
@@ -247,7 +259,7 @@ describe('SettingsScreen — account-identity-reset (Phase 1)', () => {
         callOrder.push('clearAuth');
       });
 
-      const { getByText } = render(<SettingsScreen />);
+      const { getByText } = await renderSettingsScreen();
       fireEvent.press(getByText('登出'));
       await pressAlertButton('確定退出');
 
@@ -264,13 +276,11 @@ describe('SettingsScreen — account-identity-reset (Phase 1)', () => {
       // leave auth untouched.
       mockWipeSyncIdentity.mockRejectedValueOnce(new Error('wipe exploded'));
 
-      const { getByText } = render(<SettingsScreen />);
+      const { getByText } = await renderSettingsScreen();
       await act(async () => {
         fireEvent.press(getByText('登出'));
       });
-      await act(async () => {
-        await pressAlertButton('確定退出');
-      });
+      await pressAlertButton('確定退出');
 
       expect(mockWipeSyncIdentity).toHaveBeenCalledTimes(1);
       expect(mockClearUserScopedStorage).not.toHaveBeenCalled();
@@ -287,7 +297,7 @@ describe('SettingsScreen — account-identity-reset (Phase 1)', () => {
     test('proceeds with later steps even if sidecar reset rejects (belt + braces)', async () => {
       mockResetSidecar.mockRejectedValueOnce(new Error('sidecar errored'));
 
-      const { getByText } = render(<SettingsScreen />);
+      const { getByText } = await renderSettingsScreen();
       fireEvent.press(getByText('登出'));
       await pressAlertButton('確定退出');
 
@@ -315,7 +325,7 @@ describe('SettingsScreen — account-identity-reset (Phase 1)', () => {
         callOrder.push('transition');
       });
 
-      const { getByText } = render(<SettingsScreen />);
+      const { getByText } = await renderSettingsScreen();
       fireEvent.press(getByText('刪除帳號'));
       await pressAlertButton('繼續');
       await pressAlertButton('確定刪除');
@@ -341,13 +351,16 @@ describe('SettingsScreen — account-identity-reset (Phase 1)', () => {
       });
       mockResetSidecar.mockImplementationOnce(() => sidecarGate);
 
-      const { getByText, queryByText } = render(<SettingsScreen />);
+      const { getByText, queryByText } = await renderSettingsScreen();
       fireEvent.press(getByText('刪除帳號'));
       await pressAlertButton('繼續');
 
       // Fire the final confirm but do NOT await it — we want to sample
       // the UI while the handler is mid-flight, parked on sidecarGate.
-      const callPromise = pressAlertButton('確定刪除');
+      let callPromise!: Promise<void>;
+      act(() => {
+        callPromise = pressAlertButtonRaw('確定刪除');
+      });
 
       // `deleteAccount` (server call) resolves before the sidecar reset
       // is even kicked off, so we wait until the handler has reached the
@@ -384,16 +397,12 @@ describe('SettingsScreen — account-identity-reset (Phase 1)', () => {
       // sentinel + next-login owner-guard are the backstops.
       mockWipeSyncIdentity.mockRejectedValueOnce(new Error('wipe exploded'));
 
-      const { getByText } = render(<SettingsScreen />);
+      const { getByText } = await renderSettingsScreen();
       await act(async () => {
         fireEvent.press(getByText('刪除帳號'));
       });
-      await act(async () => {
-        await pressAlertButton('繼續');
-      });
-      await act(async () => {
-        await pressAlertButton('確定刪除');
-      });
+      await pressAlertButton('繼續');
+      await pressAlertButton('確定刪除');
 
       expect(mockWipeSyncIdentity).toHaveBeenCalledTimes(1);
       expect(mockAuth.clearAuth).toHaveBeenCalledTimes(1);
@@ -404,7 +413,7 @@ describe('SettingsScreen — account-identity-reset (Phase 1)', () => {
         new Error('server down'),
       );
 
-      const { getByText } = render(<SettingsScreen />);
+      const { getByText } = await renderSettingsScreen();
       fireEvent.press(getByText('刪除帳號'));
       await pressAlertButton('繼續');
       await pressAlertButton('確定刪除');
