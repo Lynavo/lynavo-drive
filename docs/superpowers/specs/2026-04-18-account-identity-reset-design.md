@@ -279,7 +279,8 @@ if marker == nil {
 
 ### 5.3 測試矩陣邊界
 
-- **wipe 中失敗**：模擬 SyncEngine.wipe reject → 斷言 auth-store 進 profileError 狀態、RootNavigator 渲染 ProfileErrorScreen
+- **wipe 失敗 / bootstrap owner-mismatch 路徑**：模擬 `wipeSyncIdentity()` reject → 斷言 `bootstrapAuthedSession` 回 `error`、auth-store 進 `profileError` 狀態、RootNavigator 渲染 ProfileErrorScreen（見 `apps/mobile/src/stores/bootstrapAuthedSession.ts:102-107`）
+- **wipe 失敗 / explicit logout 路徑**：`handleLogout` 中 `wipeSyncIdentity()` reject → 斷言**不**呼叫 `serverLogout` / `clearAuth`、顯示「登出失敗」alert、`isLoggingOut` 重置、使用者留在 Settings 畫面維持登入態（見 `apps/mobile/src/screens/SettingsScreen.tsx:507-522`）。與 bootstrap 路徑不同：此時 user 已在 AuthedStack，fail-closed 的表達是「不放行這次登出」而不是「進 ProfileErrorScreen」
 - **首次啟動**（new install）：UserDefaults 沒 marker + Keychain 也沒 token → 直接設 marker、不觸發無意義 wipe
 - **owner mismatch + desktop 可達**：應同時呼叫 sidecar reset + mobile wipe，兩邊都不保留舊測試資料
 
@@ -294,7 +295,10 @@ if marker == nil {
 3. ✅ iOS 刪 App 重裝 → 登入任意帳號 → **無自動帶出舊 binding**
 4. ✅ 帳號切換後 **clientId 輪換**，server log 可見新舊 clientId 不同
 5. ✅ RootNavigator **僅在 owner 一致時**才依 binding 直進 SyncActivity
-6. ✅（新）`wipeSyncIdentity` 中途失敗 → UI 進入 ProfileErrorScreen，**不**進 AuthedStack
+6. ✅（新）`wipeSyncIdentity` 中途失敗 — UX 依呼叫路徑分流：
+   - **Bootstrap（owner-mismatch 路徑）**：UI 進入 ProfileErrorScreen，**不**進 AuthedStack
+   - **Explicit logout（已在 AuthedStack）**：留在當前畫面，跳「登出失敗」alert，維持登入態；等待使用者重試或重啟 app
+   兩者都 fail-closed（絕不帶著「半清乾淨」的 native state 往下走），只是呈現方式不同
 7. ✅（新）owner mismatch / explicit logout 後 `reminder-shown` 被清空 — 新用戶當天可看到自己的 reminder
 8. ✅ `clientDisplayName` 與 debug override 在 wipe 後**仍保留**
 9. ✅ Desktop sidecar 在 mac / windows 執行 `reset-state` 後，不再保留舊 paired device / uploads / history / receive dir 測試資料
