@@ -174,6 +174,35 @@ describe('iapService — purchase', () => {
       }),
     ).not.toThrow();
   });
+
+  test('ignores non-fatal error codes so a trailing success event still resolves pending', async () => {
+    // Repro of sandbox flake: Apple fires purchaseErrorListener with a
+    // non-fatal code BEFORE the real success event. Old behavior rejected
+    // the pending Promise → SubscriptionScreen showed a fake "付款失敗"
+    // alert despite Apple having actually processed the purchase. Fix
+    // treats only codes in FATAL_ERROR_CODES as terminal.
+    const pending = iapService.purchase(IAP_PRODUCTS.monthly);
+
+    // Apple's flaky early error — not in the FATAL allowlist.
+    errorCb?.({ code: 'E_UNKNOWN', productId: IAP_PRODUCTS.monthly });
+
+    // Real success event arrives moments later.
+    updatedCb?.({
+      productId: IAP_PRODUCTS.monthly,
+      transactionReceipt: 'BLOB_LATE',
+      transactionId: 'tx_late',
+    });
+
+    const receipt = await pending;
+    expect(receipt.transactionReceipt).toBe('BLOB_LATE');
+    expect(receipt.transactionId).toBe('tx_late');
+  });
+
+  test('fatal E_ITEM_UNAVAILABLE code still rejects pending (regression guard)', async () => {
+    const pending = iapService.purchase(IAP_PRODUCTS.yearly);
+    errorCb?.({ code: 'E_ITEM_UNAVAILABLE', productId: IAP_PRODUCTS.yearly });
+    await expect(pending).rejects.toMatchObject({ code: 'E_ITEM_UNAVAILABLE' });
+  });
 });
 
 import { finishTransaction as finishTxMock } from 'react-native-iap';

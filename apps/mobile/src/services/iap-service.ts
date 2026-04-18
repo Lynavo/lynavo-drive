@@ -22,6 +22,20 @@ import { ApiError, ERROR_CODE } from './api';
 
 const MAX_RESTORE_RECEIPTS = 10;
 
+// Apple's purchaseErrorListener may fire transient / interrupted errors
+// even when the transaction ultimately succeeds (observed in sandbox as an
+// early "unknown" error followed a moment later by a successful update
+// event). Only codes in this allowlist are treated as terminal for the
+// pending Promise; anything else is logged and ignored so the pending
+// can still be resolved by purchaseUpdatedListener — or fall through to
+// the 60s safety timeout if the transaction truly never arrives.
+const FATAL_ERROR_CODES: ReadonlySet<string> = new Set([
+  'E_USER_CANCELLED',
+  'E_DEFERRED_PAYMENT',
+  'E_ALREADY_OWNED',
+  'E_ITEM_UNAVAILABLE',
+]);
+
 export interface PurchaseReceipt {
   transactionReceipt: string;
   productId: IapProductId;
@@ -225,6 +239,15 @@ class IapServiceImpl implements IapService {
   }
 
   private handleErrorEvent(err: PurchaseError): void {
+    const code = err.code != null ? String(err.code) : '';
+    if (!FATAL_ERROR_CODES.has(code)) {
+      // Transient Apple signal (e.g. sandbox often emits an unknown/
+      // interrupted error before the successful update event). Don't
+      // reject the pending Promise — let purchaseUpdatedListener resolve
+      // it, or let the 60s timeout fail-safe it.
+      console.warn('[iap-service] non-fatal error event — ignoring', err);
+      return;
+    }
     const productId = err.productId as IapProductId | undefined;
     if (!productId) return;
     const pending = this.pendingPurchase.get(productId);
