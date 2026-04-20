@@ -12,10 +12,7 @@
  */
 import React from 'react';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
-import type {
-  SubscriptionInfo,
-  UserProfile,
-} from '../../stores/auth-store';
+import type { SubscriptionInfo, UserProfile } from '../../stores/auth-store';
 
 jest.mock('react-native-localize', () => ({
   getLocales: () => [
@@ -42,7 +39,7 @@ jest.mock('@react-navigation/native', () => ({
     dispatch: mockDispatch,
   }),
   CommonActions: {
-    reset: jest.fn((payload) => payload),
+    reset: jest.fn(payload => payload),
   },
 }));
 
@@ -152,11 +149,17 @@ jest.mock('../../constants/features', () => ({
 
 import i18n from '../../i18n';
 import { SettingsScreen } from '../SettingsScreen';
-import { Alert, NativeModules, NativeEventEmitter } from 'react-native';
+import {
+  Alert,
+  Linking,
+  NativeModules,
+  NativeEventEmitter,
+} from 'react-native';
 import {
   deleteAccount as mockDeleteAccount,
   logout as mockServerLogout,
 } from '../../services/auth-service';
+import { ApiError } from '../../services/api';
 import type { RenderAPI } from '@testing-library/react-native';
 
 const mockNativeSyncEngine = {
@@ -207,10 +210,12 @@ async function pressAlertButtonRaw(buttonText: string): Promise<void> {
     text: string;
     onPress?: () => void | Promise<void>;
   }>;
-  const match = buttons.find((b) => b.text === buttonText);
+  const match = buttons.find(b => b.text === buttonText);
   if (!match || !match.onPress) {
     throw new Error(
-      `No button "${buttonText}" found. Available: ${buttons.map((b) => b.text).join(', ')}`,
+      `No button "${buttonText}" found. Available: ${buttons
+        .map(b => b.text)
+        .join(', ')}`,
     );
   }
   await match.onPress();
@@ -236,7 +241,7 @@ describe('SettingsScreen — account-identity-reset (Phase 1)', () => {
     NativeModules.NativeSyncEngine = mockNativeSyncEngine;
     jest
       .spyOn(NativeEventEmitter.prototype, 'addListener')
-      .mockImplementation(() => ({ remove: jest.fn() }) as never);
+      .mockImplementation(() => ({ remove: jest.fn() } as never));
     alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
@@ -374,7 +379,7 @@ describe('SettingsScreen — account-identity-reset (Phase 1)', () => {
       // `resolveSidecar()` the handler is parked on the first cleanup
       // await with `isDeletingAccount === true`.
       let resolveSidecar: (() => void) | undefined;
-      const sidecarGate = new Promise<void>((resolve) => {
+      const sidecarGate = new Promise<void>(resolve => {
         resolveSidecar = resolve;
       });
       mockResetSidecar.mockImplementationOnce(() => sidecarGate);
@@ -453,6 +458,36 @@ describe('SettingsScreen — account-identity-reset (Phase 1)', () => {
       // A user-visible error alert gets raised (title + message) so the
       // user knows their account is still alive on the backend.
       expect(alertSpy.mock.calls.length).toBeGreaterThanOrEqual(3);
+    });
+
+    test('prompts user to cancel Apple subscription before deleting account', async () => {
+      const openUrlSpy = jest
+        .spyOn(Linking, 'openURL')
+        .mockResolvedValueOnce(undefined);
+      (mockDeleteAccount as jest.Mock).mockRejectedValueOnce(
+        new ApiError(1109, '請先取消 Apple 訂閱後再刪除帳號'),
+      );
+
+      const { getByText } = await renderSettingsScreen();
+      fireEvent.press(getByText('刪除帳號'));
+      await pressAlertButton('繼續');
+      await pressAlertButton('確定刪除');
+
+      expect(mockResetSidecar).not.toHaveBeenCalled();
+      expect(mockWipeSyncIdentity).not.toHaveBeenCalled();
+      expect(mockClearUserScopedStorage).not.toHaveBeenCalled();
+      expect(mockAuth.clearAuth).not.toHaveBeenCalled();
+
+      const lastAlert = (Alert.alert as jest.Mock).mock.calls.at(-1);
+      expect(lastAlert?.[0]).toBe('請先取消訂閱');
+      expect(lastAlert?.[1]).toContain('Apple 訂閱管理');
+
+      await pressAlertButton('管理訂閱');
+
+      expect(openUrlSpy).toHaveBeenCalledWith(
+        'https://apps.apple.com/account/subscriptions',
+      );
+      openUrlSpy.mockRestore();
     });
   });
 });

@@ -32,7 +32,7 @@ import { FEATURES } from '../constants/features';
 import { iapService } from '../services/iap-service';
 import { classifyIapError } from '../services/iap-errors';
 import { markSubscriptionJustActivated } from '../hooks/useExpiryReminder';
-import { ApiError } from '../services/api';
+import { ApiError, ERROR_CODE } from '../services/api';
 import {
   isDiagnosticsExportUnavailable,
   shareDiagnosticsArchive,
@@ -68,6 +68,7 @@ const SUB_GREEN = '#22c55e';
 const SUB_GREEN_BG = 'rgba(34,197,94,0.12)';
 const TRIAL_PURPLE = '#8b5cf6';
 const TRIAL_PURPLE_BG = 'rgba(139,92,246,0.10)';
+const APPLE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -113,6 +114,39 @@ function resolveDeleteOverlayTitle(language: string | undefined): string {
     return '删除账号中…';
   }
   return '刪除帳號中…';
+}
+
+/**
+ * Copy shown when the server blocks account deletion because an Apple
+ * subscription is still auto-renewing. Kept with the same per-language
+ * fallback pattern as `resolveDeleteOverlayTitle` because `settings.json` is
+ * not reliably tracked in this repo yet.
+ */
+function resolveDeleteSubscriptionBlockCopy(language: string | undefined): {
+  title: string;
+  body: string;
+  manageSubscription: string;
+} {
+  const tag = (language ?? 'zh-Hant').toLowerCase();
+  if (tag.startsWith('en')) {
+    return {
+      title: 'Cancel subscription first',
+      body: 'Your Apple subscription is still set to renew. Open Apple subscription management, cancel it, then return to delete your account.',
+      manageSubscription: 'Manage Subscription',
+    };
+  }
+  if (tag.startsWith('zh-hans') || tag.startsWith('zh-cn')) {
+    return {
+      title: '请先取消订阅',
+      body: '你的 Apple 订阅仍在自动续订中。请先前往 Apple 订阅管理取消订阅，再回来删除帐号。',
+      manageSubscription: '管理订阅',
+    };
+  }
+  return {
+    title: '請先取消訂閱',
+    body: '你的 Apple 訂閱仍在自動續訂中。請先前往 Apple 訂閱管理取消訂閱，再回來刪除帳號。',
+    manageSubscription: '管理訂閱',
+  };
 }
 
 function formatDateTimeLabel(iso: string | undefined, t: TFunction): string {
@@ -606,10 +640,13 @@ export function SettingsScreen() {
   // find AND to double-check, and this is irreversible on the server:
   // the user row is soft-deleted, every identity + refresh token is wiped,
   // token_version bumps so any cached access token dies immediately, and
-  // an active subscription is marked cancelled. No undo.
+  // an active non-renewing subscription is marked cancelled. No undo.
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const handleDeleteAccount = useCallback(() => {
     if (isDeletingAccount) return;
+    const subscriptionBlockCopy = resolveDeleteSubscriptionBlockCopy(
+      i18n.language,
+    );
     Alert.alert(
       t('settings.dialogs.deleteAccount.title'),
       t('settings.dialogs.deleteAccount.body'),
@@ -638,6 +675,32 @@ export function SettingsScreen() {
                       // network would log them out with their account
                       // still alive on the backend.
                       setIsDeletingAccount(false);
+                      if (
+                        e instanceof ApiError &&
+                        e.code === ERROR_CODE.DELETE_BLOCKED_ACTIVE_SUBSCRIPTION
+                      ) {
+                        Alert.alert(
+                          subscriptionBlockCopy.title,
+                          subscriptionBlockCopy.body,
+                          [
+                            { text: t('common.cancel'), style: 'cancel' },
+                            {
+                              text: subscriptionBlockCopy.manageSubscription,
+                              onPress: () => {
+                                void Linking.openURL(
+                                  APPLE_SUBSCRIPTIONS_URL,
+                                ).catch(err => {
+                                  console.warn(
+                                    '[Settings] open Apple subscriptions failed:',
+                                    err,
+                                  );
+                                });
+                              },
+                            },
+                          ],
+                        );
+                        return;
+                      }
                       const msg =
                         e instanceof ApiError
                           ? e.message

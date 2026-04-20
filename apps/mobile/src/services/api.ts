@@ -29,6 +29,7 @@ export const ERROR_CODE = {
   IDENTITY_CONFLICT: 1106,
   ACCOUNT_DELETED: 1107,
   DELETE_CONFIRM_INVALID: 1108,
+  DELETE_BLOCKED_ACTIVE_SUBSCRIPTION: 1109,
   IAP_VERIFY_FAILED: 2001,
   RECEIPT_ALREADY_USED: 2002,
   PRODUCT_ID_MISMATCH: 2003,
@@ -140,7 +141,10 @@ async function request<T>(
     );
   } catch {
     // Covers AbortError (timeout) and genuine network failures alike.
-    throw new ApiError(ERROR_CODE.NETWORK_ERROR, i18next.t('errors.networkCheckRetry'));
+    throw new ApiError(
+      ERROR_CODE.NETWORK_ERROR,
+      i18next.t('errors.networkCheckRetry'),
+    );
   }
 
   // Server errors / proxy interception — surface as a typed error and skip
@@ -158,7 +162,10 @@ async function request<T>(
   } catch {
     // Captive portal / non-JSON response — treat as server error so the
     // caller can decide to retry rather than wiping local auth state.
-    throw new ApiError(ERROR_CODE.SERVER_ERROR, i18next.t('errors.responseParseError'));
+    throw new ApiError(
+      ERROR_CODE.SERVER_ERROR,
+      i18next.t('errors.responseParseError'),
+    );
   }
 
   if (json.code === 0) {
@@ -258,7 +265,10 @@ async function clearAuthFromModule() {
 // Public API
 // ---------------------------------------------------------------------------
 
-export async function apiGet<T>(path: string, options?: RequestOptions): Promise<T> {
+export async function apiGet<T>(
+  path: string,
+  options?: RequestOptions,
+): Promise<T> {
   return request<T>('GET', path, undefined, options);
 }
 
@@ -270,7 +280,10 @@ export async function apiPost<T>(
   return request<T>('POST', path, body, options);
 }
 
-export async function apiPostNoAuth<T>(path: string, body?: unknown): Promise<T> {
+export async function apiPostNoAuth<T>(
+  path: string,
+  body?: unknown,
+): Promise<T> {
   return request<T>('POST', path, body, { skipAuth: true });
 }
 
