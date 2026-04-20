@@ -654,6 +654,20 @@ export function SubscriptionScreen() {
 
     setIsLoading(true);
     try {
+      try {
+        const fresh = await getSubscriptionStatus();
+        setSubscription(fresh);
+        const freshPlan = resolveCurrentPlan(fresh);
+        if (
+          (freshPlan != null && selectedPlan === freshPlan) ||
+          isDowngradePlan(freshPlan, selectedPlan)
+        ) {
+          return;
+        }
+      } catch (err) {
+        console.warn('[subscription] preflight refresh failed', err);
+      }
+
       const productId = planToProductId(selectedPlan);
       const receipt = await iapService.purchase(productId);
       let receiptData = receipt.transactionReceipt;

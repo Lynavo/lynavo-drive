@@ -130,6 +130,12 @@ describe('SubscriptionScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (getSubscriptionStatus as jest.Mock).mockResolvedValue({
+      status: 'trial_expired',
+      plan: '',
+      expireAt: null,
+      trialEnd: null,
+    });
     mockAuthState.user = { id: 1, status: 'trial_expired' };
     mockAuthState.subscription = null;
     mockLoadSubscription.mockResolvedValue(null);
@@ -177,6 +183,36 @@ describe('SubscriptionScreen', () => {
 
     await waitFor(() => expect(iapService.purchase).toHaveBeenCalled());
     await waitFor(() => expect(verifyIapReceipt).toHaveBeenCalled());
+  });
+
+  test('preflight refresh blocks stale yearly-to-monthly downgrade before StoreKit', async () => {
+    (getSubscriptionStatus as jest.Mock)
+      .mockResolvedValueOnce({
+        status: 'trial_expired',
+        plan: '',
+        expireAt: null,
+        trialEnd: null,
+      })
+      .mockResolvedValueOnce({
+        status: 'subscribed',
+        plan: 'yearly',
+        expireAt: '2026-04-20T08:31:34Z',
+        trialEnd: null,
+      });
+
+    const { getByText } = renderScreen();
+    fireEvent.press(getByText('¥9.9'));
+    fireEvent.press(getByText(/立即订阅|立即訂閱|Subscribe Now/));
+
+    await waitFor(() => {
+      expect(mockSetSubscription).toHaveBeenCalledWith({
+        status: 'subscribed',
+        plan: 'yearly',
+        expireAt: '2026-04-20T08:31:34Z',
+        trialEnd: null,
+      });
+    });
+    expect(iapService.purchase).not.toHaveBeenCalled();
   });
 
   test('restore tap invokes iapService.restore', async () => {
