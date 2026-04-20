@@ -902,7 +902,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             uploadStore = try UploadStore()
             historyStore = HistoryLedgerStore(store: uploadStore!)
             albumBrowserService = AlbumBrowserService(uploadStore: uploadStore)
-            cleanupPreviewCacheIfNeeded()
             autoUploadConfigStore = AutoUploadConfigStore(store: uploadStore!)
             manualUploadService = ManualUploadService(uploadStore: uploadStore, bindingService: bindingService)
             photoScanner.autoUploadConfigStore = autoUploadConfigStore
@@ -923,6 +922,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 isAutoUploadInterrupted = true
                 NSLog("[SyncEngine] restored interrupted state from persisted config")
             }
+
+            // Cleanup is safe to run at any point during init — it only uses
+            // the static AlbumBrowserService.previewCacheDir() helper and
+            // dispatches its work onto a utility queue asynchronously.
+            cleanupPreviewCacheIfNeeded()
         } catch {
             NSLog("[SyncEngine] Failed to init stores: \(error)")
         }
