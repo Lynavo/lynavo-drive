@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Photos
 import UIKit
@@ -339,8 +340,34 @@ class AlbumBrowserService {
     }
 
     private func fetchVideoPreview(asset: PHAsset) -> [String: Any] {
-        // Implemented in Task 3 (next task).
-        return ["uri": "", "mediaType": "video", "error": "not_found"]
+        let options = PHVideoRequestOptions()
+        options.isNetworkAccessAllowed = true
+        options.deliveryMode = .automatic
+        options.version = .current
+
+        let semaphore = DispatchSemaphore(value: 0)
+        var resultUrl: URL?
+        let requestId = PHImageManager.default().requestAVAsset(
+            forVideo: asset,
+            options: options
+        ) { avAsset, _, _ in
+            if let urlAsset = avAsset as? AVURLAsset {
+                resultUrl = urlAsset.url
+            }
+            semaphore.signal()
+        }
+
+        // 15-second timeout for iCloud fetches
+        let timeoutResult = semaphore.wait(timeout: .now() + 15)
+        if timeoutResult == .timedOut {
+            PHImageManager.default().cancelImageRequest(requestId)
+            return ["uri": "", "mediaType": "video", "error": "cloud_unavailable"]
+        }
+
+        guard let url = resultUrl else {
+            return ["uri": "", "mediaType": "video", "error": "cloud_unavailable"]
+        }
+        return ["uri": url.absoluteString, "mediaType": "video"]
     }
 
     static func previewCacheDir() -> URL {
