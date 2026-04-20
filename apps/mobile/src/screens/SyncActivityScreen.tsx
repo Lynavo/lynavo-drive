@@ -346,6 +346,11 @@ export function SyncActivityScreen() {
   const autoUploadPreparingClearTimerRef = useRef<
     ReturnType<typeof setTimeout> | null
   >(null);
+  // Tracks whether the native pipeline has visibly woken up (entered a
+  // preparation / uploading phase) during the current optimistic window.
+  // Used to detect "scan finished with zero new items" so we can exit
+  // optimistic without waiting for the 35 s safety timeout.
+  const autoUploadObservedWakeRef = useRef(false);
   const lastAutoUploadingVisualRef = useRef<{
     currentFilename?: string;
     currentSpeedMbps: number;
@@ -532,6 +537,7 @@ export function SyncActivityScreen() {
   // ---------------------------------------------------------------------------
 
   const startAutoUploadPreparing = useCallback(() => {
+    autoUploadObservedWakeRef.current = false;
     setAutoUploadPreparing(true);
     autoUploadPreparingMinUntilRef.current =
       Date.now() + AUTO_UPLOAD_PREPARING_MIN_MS;
@@ -930,20 +936,41 @@ export function SyncActivityScreen() {
     };
   }, []);
 
-  // Clear the optimistic "preparing auto-upload" state as soon as the native
-  // pipeline confirms it has woken up: uploadState leaves idle into any
-  // preparation / uploading phase, or auto items become pending, or the
-  // current task switches to an auto item.
+  // Clear the optimistic "preparing auto-upload" state only once there is
+  // concrete evidence that auto-upload has taken over. We intentionally do
+  // NOT clear the moment native enters 'scanning' — between scan-end and
+  // the first auto item actually uploading there is a transient gap where
+  // rawMainCardState regresses to 'manual_completed' (because
+  // lastCompletedTaskSource stays 'manual' until a new round starts).
+  // Keeping optimistic ON across that gap prevents the visible flash back
+  // to the manual-completed card.
+  //
+  // Edge case: if the scan finishes with zero new items (nothing new to
+  // upload), we'd otherwise wait out the 35 s safety timeout. We avoid
+  // that by tracking "native was observed to wake up" and clearing once
+  // the pipeline has settled back to a non-active state.
   useEffect(() => {
     if (!autoUploadPreparing) return;
-    const nativeAwake =
+    if (
+      isPreparationPhase(overview.uploadState) ||
+      overview.uploadState === 'uploading' ||
+      overview.uploadState === 'cloud_downloading'
+    ) {
+      autoUploadObservedWakeRef.current = true;
+    }
+    const concreteAutoActivity =
       overview.autoUploadState === 'active' &&
-      (overview.uploadState === 'uploading' ||
-        overview.uploadState === 'cloud_downloading' ||
-        isPreparationPhase(overview.uploadState) ||
-        (overview.autoPending ?? 0) > 0 ||
-        overview.currentTaskSource === 'auto');
-    if (nativeAwake) {
+      (overview.currentTaskSource === 'auto' ||
+        (overview.autoPending ?? 0) > 0);
+    const scanEndedEmpty =
+      autoUploadObservedWakeRef.current &&
+      overview.autoUploadState === 'active' &&
+      !isPreparationPhase(overview.uploadState) &&
+      overview.uploadState !== 'uploading' &&
+      overview.uploadState !== 'cloud_downloading' &&
+      (overview.autoPending ?? 0) === 0 &&
+      overview.currentTaskSource !== 'auto';
+    if (concreteAutoActivity || scanEndedEmpty) {
       clearAutoUploadPreparing();
     }
   }, [
