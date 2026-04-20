@@ -15,13 +15,27 @@ import type { AlbumAssetDTO, AssetPreviewSourceDTO } from '@syncflow/contracts';
 import { Icon } from './Icon';
 import { getAssetPreviewSource } from '../services/SyncEngineModule';
 
+const pageStyles = StyleSheet.create({
+  page: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  media: { width: '100%', height: '100%' },
+  errorText: { color: '#f87171', fontSize: 14 },
+});
+
+const PageShell: React.FC<{ width: number; children?: React.ReactNode }> = ({
+  width,
+  children,
+}) => <View style={[pageStyles.page, { width }]}>{children}</View>;
+
 interface PreviewPageProps {
   asset: AlbumAssetDTO;
   isActive: boolean;
   width: number;
 }
 
-const PreviewPage: React.FC<PreviewPageProps> = ({ asset, isActive: _isActive, width }) => {
+const PreviewPage: React.FC<PreviewPageProps> = ({ asset, isActive, width }) => {
   const { t } = useTranslation();
   const [source, setSource] = useState<AssetPreviewSourceDTO | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,9 +63,9 @@ const PreviewPage: React.FC<PreviewPageProps> = ({ asset, isActive: _isActive, w
 
   if (loading) {
     return (
-      <View style={[pageStyles.page, { width }]}>
+      <PageShell width={width}>
         <ActivityIndicator size="large" color="#fff" />
-      </View>
+      </PageShell>
     );
   }
 
@@ -61,36 +75,27 @@ const PreviewPage: React.FC<PreviewPageProps> = ({ asset, isActive: _isActive, w
         ? 'albumWorkbench.preview.cloudUnavailable'
         : 'albumWorkbench.preview.notFound';
     return (
-      <View style={[pageStyles.page, { width }]}>
+      <PageShell width={width}>
         <Text style={pageStyles.errorText}>{t(key)}</Text>
-      </View>
+      </PageShell>
     );
   }
 
   if (source?.mediaType === 'image') {
     return (
-      <View style={[pageStyles.page, { width }]}>
+      <PageShell width={width}>
         <Image
           source={{ uri: source.uri }}
           style={pageStyles.media}
           resizeMode="contain"
         />
-      </View>
+      </PageShell>
     );
   }
 
-  // Video branch is implemented in Task 10.
-  return <View style={[pageStyles.page, { width }]} />;
+  // TODO(Task 10): Replace with <Video source={{ uri: source.uri }} paused={!isActive} resizeMode="contain" />
+  return <PageShell width={width} />;
 };
-
-const pageStyles = StyleSheet.create({
-  page: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  media: { width: '100%', height: '100%' },
-  errorText: { color: '#f87171', fontSize: 14 },
-});
 
 export interface AssetPreviewModalProps {
   visible: boolean;
@@ -155,7 +160,7 @@ export const AssetPreviewModal: React.FC<AssetPreviewModalProps> = ({
           renderItem={({ item, index }) => (
             <PreviewPage asset={item} isActive={index === activeIndex} width={width} />
           )}
-          extraData={width}
+          extraData={`${width}-${activeIndex}`}
         />
       </View>
     </Modal>
