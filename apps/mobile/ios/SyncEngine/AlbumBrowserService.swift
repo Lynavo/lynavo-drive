@@ -342,7 +342,7 @@ class AlbumBrowserService {
     private func fetchVideoPreview(asset: PHAsset) -> [String: Any] {
         let options = PHVideoRequestOptions()
         options.isNetworkAccessAllowed = true
-        options.deliveryMode = .automatic
+        options.deliveryMode = .highQualityFormat
         options.version = .current
 
         let semaphore = DispatchSemaphore(value: 0)
@@ -351,6 +351,9 @@ class AlbumBrowserService {
             forVideo: asset,
             options: options
         ) { avAsset, _, _ in
+            // Non-AVURLAsset sources (slow-motion composition, rare iCloud formats) yield nil
+            // here and fall through to cloud_unavailable. Acceptable for MVP; revisit if diagnostics
+            // indicate frequent misclassification.
             if let urlAsset = avAsset as? AVURLAsset {
                 resultUrl = urlAsset.url
             }
