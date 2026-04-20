@@ -173,7 +173,6 @@ export function AlbumWorkbenchScreen() {
 
   // Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [multiSelectMode, setMultiSelectMode] = useState(false);
 
   // Preview modal
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -431,18 +430,6 @@ export function AlbumWorkbenchScreen() {
       } else {
         next.add(assetLocalId);
       }
-      if (next.size === 0) {
-        setMultiSelectMode(false);
-      }
-      return next;
-    });
-  }, []);
-
-  const handleLongPress = useCallback((assetLocalId: string) => {
-    setMultiSelectMode(true);
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      next.add(assetLocalId);
       return next;
     });
   }, []);
@@ -485,7 +472,6 @@ export function AlbumWorkbenchScreen() {
         break;
     }
     setSelectedIds(new Set());
-    setMultiSelectMode(false);
   }, []);
 
   // ---------------------------------------------------------------------------
@@ -555,7 +541,6 @@ export function AlbumWorkbenchScreen() {
         );
       }
       setSelectedIds(new Set());
-      setMultiSelectMode(false);
       // Reload assets to update transferred/queued states
       void loadAssets(mediaFilter, transferFilter, true, collectionId);
       void loadStats();
@@ -787,7 +772,6 @@ export function AlbumWorkbenchScreen() {
       setCollectionTitle(title);
       setCollectionSheetVisible(false);
       setSelectedIds(new Set());
-      setMultiSelectMode(false);
     },
     [],
   );
