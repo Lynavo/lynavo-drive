@@ -1,7 +1,8 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
-import { Text, TouchableOpacity } from 'react-native';
+import { Text, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import type { AlbumAssetDTO } from '@syncflow/contracts';
+import { getAssetPreviewSource } from '../../services/SyncEngineModule';
 
 jest.mock('../../services/SyncEngineModule', () => ({
   getAssetPreviewSource: jest.fn().mockResolvedValue({
@@ -18,6 +19,17 @@ jest.mock('../Icon', () => ({
     const { Text: MockText } = require('react-native');
     return React.createElement(MockText, null, name);
   },
+}));
+
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      if (key === 'albumWorkbench.preview.cloudUnavailable')
+        return 'iCloud 影片未下載，無法預覽';
+      if (key === 'albumWorkbench.preview.notFound') return '素材找不到';
+      return key;
+    },
+  }),
 }));
 
 import { AssetPreviewModal } from '../AssetPreviewModal';
@@ -82,5 +94,56 @@ describe('AssetPreviewModal', () => {
       closeButton.props.onPress();
     });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows ActivityIndicator while loading, then Image when resolved', async () => {
+    (getAssetPreviewSource as jest.Mock).mockResolvedValueOnce({
+      uri: 'file:///tmp/full.jpg',
+      mediaType: 'image',
+    });
+
+    let tree: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      tree = ReactTestRenderer.create(
+        <AssetPreviewModal
+          visible
+          assets={assets}
+          initialIndex={0}
+          onClose={() => {}}
+        />,
+      );
+    });
+    await ReactTestRenderer.act(async () => {
+      await Promise.resolve();
+    });
+    const images = tree!.root.findAllByType(Image);
+    expect(images.length).toBeGreaterThan(0);
+    expect(images[0].props.source).toEqual({ uri: 'file:///tmp/full.jpg' });
+  });
+
+  it('shows error text when preview source returns cloud_unavailable', async () => {
+    (getAssetPreviewSource as jest.Mock).mockResolvedValueOnce({
+      uri: '',
+      mediaType: 'video',
+      error: 'cloud_unavailable',
+    });
+    let tree: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      tree = ReactTestRenderer.create(
+        <AssetPreviewModal
+          visible
+          assets={assets}
+          initialIndex={0}
+          onClose={() => {}}
+        />,
+      );
+    });
+    await ReactTestRenderer.act(async () => {
+      await Promise.resolve();
+    });
+    const texts = tree!.root.findAllByType(Text).map(n => n.props.children);
+    expect(
+      texts.some((t: unknown) => typeof t === 'string' && t.toLowerCase().includes('icloud')),
+    ).toBe(true);
   });
 });

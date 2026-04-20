@@ -7,9 +7,90 @@ import {
   StyleSheet,
   FlatList,
   useWindowDimensions,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
-import type { AlbumAssetDTO } from '@syncflow/contracts';
+import { useTranslation } from 'react-i18next';
+import type { AlbumAssetDTO, AssetPreviewSourceDTO } from '@syncflow/contracts';
 import { Icon } from './Icon';
+import { getAssetPreviewSource } from '../services/SyncEngineModule';
+
+interface PreviewPageProps {
+  asset: AlbumAssetDTO;
+  isActive: boolean;
+  width: number;
+}
+
+const PreviewPage: React.FC<PreviewPageProps> = ({ asset, isActive: _isActive, width }) => {
+  const { t } = useTranslation();
+  const [source, setSource] = useState<AssetPreviewSourceDTO | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    getAssetPreviewSource(asset.assetLocalId)
+      .then(result => {
+        if (!cancelled) {
+          setSource(result);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSource({ uri: '', mediaType: asset.mediaType, error: 'not_found' });
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [asset.assetLocalId, asset.mediaType]);
+
+  if (loading) {
+    return (
+      <View style={[pageStyles.page, { width }]}>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
+  }
+
+  if (source?.error) {
+    const key =
+      source.error === 'cloud_unavailable'
+        ? 'albumWorkbench.preview.cloudUnavailable'
+        : 'albumWorkbench.preview.notFound';
+    return (
+      <View style={[pageStyles.page, { width }]}>
+        <Text style={pageStyles.errorText}>{t(key)}</Text>
+      </View>
+    );
+  }
+
+  if (source?.mediaType === 'image') {
+    return (
+      <View style={[pageStyles.page, { width }]}>
+        <Image
+          source={{ uri: source.uri }}
+          style={pageStyles.media}
+          resizeMode="contain"
+        />
+      </View>
+    );
+  }
+
+  // Video branch is implemented in Task 10.
+  return <View style={[pageStyles.page, { width }]} />;
+};
+
+const pageStyles = StyleSheet.create({
+  page: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  media: { width: '100%', height: '100%' },
+  errorText: { color: '#f87171', fontSize: 14 },
+});
 
 export interface AssetPreviewModalProps {
   visible: boolean;
@@ -71,7 +152,9 @@ export const AssetPreviewModal: React.FC<AssetPreviewModalProps> = ({
             );
             setActiveIndex(newIndex);
           }}
-          renderItem={({ item: _item }) => <View style={{ width }} />}
+          renderItem={({ item, index }) => (
+            <PreviewPage asset={item} isActive={index === activeIndex} width={width} />
+          )}
           extraData={width}
         />
       </View>

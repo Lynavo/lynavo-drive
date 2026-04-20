@@ -93,6 +93,10 @@
     "title": "Choose Album",
     "allPhotos": "All Photos"
   },
+  "preview": {
+    "cloudUnavailable": "iCloud video not downloaded, cannot preview",
+    "notFound": "Asset not found"
+  },
   "dialogs": {
     "cannotUpload": {
       "title": "Cannot Upload",

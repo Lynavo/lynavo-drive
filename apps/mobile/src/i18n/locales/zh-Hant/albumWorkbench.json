@@ -93,6 +93,10 @@
     "title": "選擇相簿",
     "allPhotos": "全部照片"
   },
+  "preview": {
+    "cloudUnavailable": "iCloud 影片未下載，無法預覽",
+    "notFound": "素材找不到"
+  },
   "dialogs": {
     "cannotUpload": {
       "title": "無法上傳",
