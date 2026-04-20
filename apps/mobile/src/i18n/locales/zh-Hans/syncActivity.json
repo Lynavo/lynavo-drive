@@ -11,7 +11,9 @@
     "reconcilingSubtitle": "首次使用需要核对已传文件",
     "scanningSubtitleProgress": "已扫描 {{scanned}} / {{total}} 张",
     "scanningSubtitleReading": "正在读取相册",
-    "preparingSubtitle": "正在与电脑建立安全连接"
+    "preparingSubtitle": "正在与电脑建立安全连接",
+    "autoPreparingTitle": "正在开启自动同步…",
+    "autoPreparingSubtitle": "即将开始扫描新照片"
   },
   "badges": {
     "manual": "手动",

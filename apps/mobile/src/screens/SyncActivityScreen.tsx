@@ -131,6 +131,10 @@ const STARTUP_CONNECTION_GRACE_MS = 2500;
 /** Delay before transitioning to offline display (ms). */
 const OFFLINE_DISPLAY_DELAY_MS = 800;
 const AUTO_COMPLETION_VISUAL_HOLD_MS = 350;
+/** Minimum time the optimistic "enabling auto-upload" card stays visible. */
+const AUTO_UPLOAD_PREPARING_MIN_MS = 400;
+/** Safety timeout — force-clear optimistic preparing state if native never confirms. */
+const AUTO_UPLOAD_PREPARING_SAFETY_MS = 35000;
 
 const EMPTY_OVERVIEW: SyncOverview = {
   progressPercent: 0,
@@ -331,6 +335,17 @@ export function SyncActivityScreen() {
   const [stableOffline, setStableOffline] = useState(false);
   const offlineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoCompletionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Optimistic UI: show "preparing auto-upload" immediately after the toggle,
+  // since the native pipeline can sit in a ~30 s heartbeat wait after the
+  // manual batch drains before it re-enters the scan loop.
+  const [autoUploadPreparing, setAutoUploadPreparing] = useState(false);
+  const autoUploadPreparingMinUntilRef = useRef<number | null>(null);
+  const autoUploadPreparingSafetyTimerRef = useRef<
+    ReturnType<typeof setTimeout> | null
+  >(null);
+  const autoUploadPreparingClearTimerRef = useRef<
+    ReturnType<typeof setTimeout> | null
+  >(null);
   const lastAutoUploadingVisualRef = useRef<{
     currentFilename?: string;
     currentSpeedMbps: number;
@@ -516,6 +531,49 @@ export function SyncActivityScreen() {
   // Control handlers
   // ---------------------------------------------------------------------------
 
+  const startAutoUploadPreparing = useCallback(() => {
+    setAutoUploadPreparing(true);
+    autoUploadPreparingMinUntilRef.current =
+      Date.now() + AUTO_UPLOAD_PREPARING_MIN_MS;
+    if (autoUploadPreparingClearTimerRef.current) {
+      clearTimeout(autoUploadPreparingClearTimerRef.current);
+      autoUploadPreparingClearTimerRef.current = null;
+    }
+    if (autoUploadPreparingSafetyTimerRef.current) {
+      clearTimeout(autoUploadPreparingSafetyTimerRef.current);
+    }
+    autoUploadPreparingSafetyTimerRef.current = setTimeout(() => {
+      autoUploadPreparingSafetyTimerRef.current = null;
+      autoUploadPreparingMinUntilRef.current = null;
+      setAutoUploadPreparing(false);
+    }, AUTO_UPLOAD_PREPARING_SAFETY_MS);
+  }, []);
+
+  const clearAutoUploadPreparing = useCallback(() => {
+    const finish = () => {
+      autoUploadPreparingMinUntilRef.current = null;
+      if (autoUploadPreparingSafetyTimerRef.current) {
+        clearTimeout(autoUploadPreparingSafetyTimerRef.current);
+        autoUploadPreparingSafetyTimerRef.current = null;
+      }
+      autoUploadPreparingClearTimerRef.current = null;
+      setAutoUploadPreparing(false);
+    };
+    const minUntil = autoUploadPreparingMinUntilRef.current;
+    const now = Date.now();
+    if (minUntil !== null && now < minUntil) {
+      if (autoUploadPreparingClearTimerRef.current) {
+        clearTimeout(autoUploadPreparingClearTimerRef.current);
+      }
+      autoUploadPreparingClearTimerRef.current = setTimeout(
+        finish,
+        minUntil - now,
+      );
+      return;
+    }
+    finish();
+  }, []);
+
   const handleCancelManualBatch = useCallback(() => {
     Alert.alert(
       t('syncActivity.dialogs.cancelManual.title'),
@@ -555,6 +613,7 @@ export function SyncActivityScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              clearAutoUploadPreparing();
               await interruptAutoUpload();
               // Reload overview to reflect the new state
               const syncData = await NativeModules.NativeSyncEngine?.getSyncOverview();
@@ -572,7 +631,7 @@ export function SyncActivityScreen() {
         },
       ],
     );
-  }, [t]);
+  }, [t, clearAutoUploadPreparing]);
 
   const handleReconnect = useCallback(async () => {
     try {
@@ -651,6 +710,7 @@ export function SyncActivityScreen() {
             {
               text: t('syncActivity.dialogs.switchUploadMode.confirm'),
               onPress: async () => {
+                startAutoUploadPreparing();
                 try {
                   await cancelAllManualUploads();
                   await enableAutoUpload();
@@ -662,6 +722,7 @@ export function SyncActivityScreen() {
                   }
                 } catch (e) {
                   console.warn('[SyncActivity] enableAutoUpload error:', e);
+                  clearAutoUploadPreparing();
                   Alert.alert(
                     t('syncActivity.dialogs.enableAutoFailed.title'),
                     t('syncActivity.dialogs.enableAutoFailed.body'),
@@ -674,6 +735,7 @@ export function SyncActivityScreen() {
         return;
       }
 
+      startAutoUploadPreparing();
       await enableAutoUpload();
       await NativeModules.NativeSyncEngine?.triggerSync();
       const nextSyncData = await NativeModules.NativeSyncEngine?.getSyncOverview();
@@ -682,12 +744,13 @@ export function SyncActivityScreen() {
       }
     } catch (e) {
       console.warn('[SyncActivity] enableAutoUpload error:', e);
+      clearAutoUploadPreparing();
       Alert.alert(
         t('syncActivity.dialogs.enableAutoFailed.title'),
         t('syncActivity.dialogs.enableAutoFailed.body'),
       );
     }
-  }, [t]);
+  }, [t, startAutoUploadPreparing, clearAutoUploadPreparing]);
 
   // ---------------------------------------------------------------------------
   // Derived state
@@ -760,9 +823,10 @@ export function SyncActivityScreen() {
     autoCompletionVisualHoldUntilMs,
     Date.now(),
   );
-  const mainCardState = shouldDelayAutoCompletion
-    ? 'running'
-    : rawMainCardState;
+  const mainCardState =
+    shouldDelayAutoCompletion || autoUploadPreparing
+      ? 'running'
+      : rawMainCardState;
   const displayProgressPercent = getSyncActivityDisplayProgressPercent(
     overview,
     shouldDelayAutoCompletion,
@@ -795,7 +859,7 @@ export function SyncActivityScreen() {
       overview.currentSpeedMbps
     : overview.currentSpeedMbps;
   const shouldRenderPreparationPhase =
-    isPreparationPhase(overview.uploadState) &&
+    (autoUploadPreparing || isPreparationPhase(overview.uploadState)) &&
     !shouldDelayAutoCompletion &&
     !isBetweenItems;
   const shouldRenderUploadProgress = shouldRenderSyncActivityProgress(
@@ -862,6 +926,44 @@ export function SyncActivityScreen() {
       if (autoCompletionTimerRef.current) {
         clearTimeout(autoCompletionTimerRef.current);
         autoCompletionTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Clear the optimistic "preparing auto-upload" state as soon as the native
+  // pipeline confirms it has woken up: uploadState leaves idle into any
+  // preparation / uploading phase, or auto items become pending, or the
+  // current task switches to an auto item.
+  useEffect(() => {
+    if (!autoUploadPreparing) return;
+    const nativeAwake =
+      overview.autoUploadState === 'active' &&
+      (overview.uploadState === 'uploading' ||
+        overview.uploadState === 'cloud_downloading' ||
+        isPreparationPhase(overview.uploadState) ||
+        (overview.autoPending ?? 0) > 0 ||
+        overview.currentTaskSource === 'auto');
+    if (nativeAwake) {
+      clearAutoUploadPreparing();
+    }
+  }, [
+    autoUploadPreparing,
+    overview.autoUploadState,
+    overview.uploadState,
+    overview.autoPending,
+    overview.currentTaskSource,
+    clearAutoUploadPreparing,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (autoUploadPreparingSafetyTimerRef.current) {
+        clearTimeout(autoUploadPreparingSafetyTimerRef.current);
+        autoUploadPreparingSafetyTimerRef.current = null;
+      }
+      if (autoUploadPreparingClearTimerRef.current) {
+        clearTimeout(autoUploadPreparingClearTimerRef.current);
+        autoUploadPreparingClearTimerRef.current = null;
       }
     };
   }, []);
@@ -955,10 +1057,16 @@ export function SyncActivityScreen() {
                 <View style={styles.preparationBody}>
                   <ActivityIndicator size="small" color={BLUE} />
                   <Text style={styles.preparationTitle}>
-                    {getPreparationTitle(overview.uploadState, t)}
+                    {autoUploadPreparing &&
+                    !isPreparationPhase(overview.uploadState)
+                      ? t('syncActivity.phases.autoPreparingTitle')
+                      : getPreparationTitle(overview.uploadState, t)}
                   </Text>
                   <Text style={styles.preparationSubtitle}>
-                    {getPreparationSubtitle(overview, t)}
+                    {autoUploadPreparing &&
+                    !isPreparationPhase(overview.uploadState)
+                      ? t('syncActivity.phases.autoPreparingSubtitle')
+                      : getPreparationSubtitle(overview, t)}
                   </Text>
                 </View>
               ) : shouldRenderUploadProgress ? (
@@ -1459,18 +1567,58 @@ export function buildOverview(
     (payload.manualPending as number | undefined) ?? prev.manualPending;
   const nextAutoPending =
     (payload.autoPending as number | undefined) ?? prev.autoPending;
+  const nextAutoUploadState =
+    (payload.autoUploadState as AutoUploadState | undefined) ??
+    prev.autoUploadState;
+  const isManualFinalFileSettlingToIdle =
+    (uploadState === 'idle' || uploadState === 'paused_auto_upload') &&
+    (nextAutoUploadState === 'disabled' ||
+      nextAutoUploadState === 'interrupted') &&
+    (prev.currentTaskSource === 'manual' ||
+      prev.lastCompletedTaskSource === 'manual' ||
+      (prev.autoUploadState !== 'active' &&
+        prev.totalCount > 0 &&
+        prev.completedCount >= prev.totalCount) ||
+      (prev.autoUploadState !== 'active' &&
+        prev.currentFileTotalBytes > 0 &&
+        prev.currentFileConfirmedBytes >= prev.currentFileTotalBytes)) &&
+    nextManualPending === 0 &&
+    nextAutoPending === 0 &&
+    nextCompletedCount === 0 &&
+    nextTotalCount === 0;
+  const effectiveCompletedCount = isManualFinalFileSettlingToIdle
+    ? prev.totalCount
+    : nextCompletedCount;
+  const effectiveTotalCount = isManualFinalFileSettlingToIdle
+    ? prev.totalCount
+    : nextTotalCount;
+  const effectiveCompletedBytes = isManualFinalFileSettlingToIdle
+    ? prev.completedCount >= prev.totalCount
+      ? Math.max(prev.totalBytes, prev.completedBytes)
+      : Math.max(
+          prev.totalBytes,
+          prev.completedBytes + prev.currentFileConfirmedBytes,
+        )
+    : ((payload.completedBytes as number | undefined) ??
+      prev.completedBytes);
+  const effectiveTotalBytes = isManualFinalFileSettlingToIdle
+    ? Math.max(prev.totalBytes, effectiveCompletedBytes)
+    : ((payload.totalBytes as number | undefined) ??
+      (payload.queueTotalBytes as number | undefined) ??
+      prev.totalBytes);
   const roundSettledStates = new Set(['idle', 'paused_auto_upload']);
   const roundCompletionBridgeStates = new Set([
     ...roundSettledStates,
     'scanning',
   ]);
   const roundFinishedWithoutCompletedPulse =
-    roundCompletionBridgeStates.has(uploadState) &&
-    !roundCompletionBridgeStates.has(prev.uploadState) &&
-    nextTotalCount > 0 &&
-    nextCompletedCount >= nextTotalCount &&
-    nextManualPending === 0 &&
-    nextAutoPending === 0;
+    isManualFinalFileSettlingToIdle ||
+    (roundCompletionBridgeStates.has(uploadState) &&
+      !roundCompletionBridgeStates.has(prev.uploadState) &&
+      effectiveTotalCount > 0 &&
+      effectiveCompletedCount >= effectiveTotalCount &&
+      nextManualPending === 0 &&
+      nextAutoPending === 0);
   const derivedLastCompletedTaskSource =
     uploadState === 'completed'
       ? nextCurrentTaskSource ??
@@ -1495,14 +1643,10 @@ export function buildOverview(
         : ((payload.currentSpeedMbps as number | undefined) ??
           prev.currentSpeedMbps),
     uploadState,
-    completedCount: nextCompletedCount,
-    totalCount: nextTotalCount,
-    completedBytes:
-      (payload.completedBytes as number | undefined) ?? prev.completedBytes,
-    totalBytes:
-      (payload.totalBytes as number | undefined) ??
-      (payload.queueTotalBytes as number | undefined) ??
-      prev.totalBytes,
+    completedCount: effectiveCompletedCount,
+    totalCount: effectiveTotalCount,
+    completedBytes: effectiveCompletedBytes,
+    totalBytes: effectiveTotalBytes,
     currentFile:
       shouldClearActiveFile
         ? undefined
@@ -1536,9 +1680,7 @@ export function buildOverview(
     currentTaskSource:
       nextCurrentTaskSource,
     lastCompletedTaskSource: derivedLastCompletedTaskSource,
-    autoUploadState:
-      (payload.autoUploadState as AutoUploadState | undefined) ??
-      prev.autoUploadState,
+    autoUploadState: nextAutoUploadState,
     manualPending: nextManualPending,
     autoPending: nextAutoPending,
     lastErrorCode:

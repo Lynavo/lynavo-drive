@@ -11,7 +11,9 @@
     "reconcilingSubtitle": "First-time setup: verifying previously uploaded files",
     "scanningSubtitleProgress": "Scanned {{scanned}} / {{total}}",
     "scanningSubtitleReading": "Reading photo library",
-    "preparingSubtitle": "Establishing a secure connection to your computer"
+    "preparingSubtitle": "Establishing a secure connection to your computer",
+    "autoPreparingTitle": "Enabling auto-upload…",
+    "autoPreparingSubtitle": "Preparing to scan for new photos"
   },
   "badges": {
     "manual": "Manual",

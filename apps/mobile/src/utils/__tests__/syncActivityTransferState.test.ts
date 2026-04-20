@@ -255,6 +255,26 @@ describe('syncActivityTransferState', () => {
     );
   });
 
+  it('shows manual completed state when the final upload pulse has cleared current source', () => {
+    const snapshot = {
+      uploadState: 'uploading',
+      autoUploadState: 'interrupted' as const,
+      completedCount: 22,
+      totalCount: 22,
+      autoPending: 0,
+      manualPending: 0,
+      currentTaskSource: undefined,
+      lastCompletedTaskSource: undefined,
+      currentFileConfirmedBytes: 546828,
+      currentFileTotalBytes: 546828,
+    };
+
+    expect(isSyncActivityActivelyTransferring(snapshot)).toBe(false);
+    expect(getSyncActivityMainCardState(snapshot, false)).toBe(
+      'manual_completed',
+    );
+  });
+
   it('keeps manual completed state when native emits a scanning pulse after the last file', () => {
     const snapshot = {
       uploadState: 'scanning',

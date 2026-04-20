@@ -597,6 +597,33 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         ]
     }
 
+    private func overviewLogValue(_ value: Any?) -> String {
+        guard let value, !(value is NSNull) else { return "nil" }
+        return String(describing: value)
+    }
+
+    private func logSyncOverviewEmission(_ context: String, payload: [String: Any]) {
+        let message = String(
+            format: "emit %@ state=%@ auto=%@ source=%@ completed=%@/%@ bytes=%@/%@ pending(manual=%@ auto=%@) currentFile=%@ currentBytes=%@/%@ progress=%@",
+            context,
+            overviewLogValue(payload["uploadState"]),
+            overviewLogValue(payload["autoUploadState"]),
+            overviewLogValue(payload["currentTaskSource"]),
+            overviewLogValue(payload["completedCount"]),
+            overviewLogValue(payload["totalCount"]),
+            overviewLogValue(payload["completedBytes"]),
+            overviewLogValue(payload["totalBytes"]),
+            overviewLogValue(payload["manualPending"]),
+            overviewLogValue(payload["autoPending"]),
+            overviewLogValue(payload["currentFile"]),
+            overviewLogValue(payload["currentFileConfirmedBytes"]),
+            overviewLogValue(payload["currentFileTotalBytes"]),
+            overviewLogValue(payload["progressPercent"])
+        )
+        NSLog("[SyncOverview] %@", message)
+        syncDiagnosticsLog("SyncOverview", message)
+    }
+
     private func isAutoUploadActiveForDiscovery() -> Bool {
         let config = autoUploadConfigStore?.getConfig()
         return config?.enabled == true &&
@@ -1833,8 +1860,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             NSLog("[SyncEngine] startSync skipped — auto upload %@, no manual pending", configState)
             syncDiagnosticsLog("SyncEngine", "startSync skipped — auto upload \(configState), no manual pending")
             // Emit current state so pages render correctly
+            let payload = runtimeSyncOverviewPayload(uploadState: configState == "interrupted" ? "paused_auto_upload" : "idle")
+            logSyncOverviewEmission("start_sync_skipped", payload: payload)
             NativeSyncEngineModule.shared?.emitSyncStateChanged(
-                runtimeSyncOverviewPayload(uploadState: configState == "interrupted" ? "paused_auto_upload" : "idle")
+                payload
             )
             return
         }
@@ -1917,8 +1946,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     updateStateOnFailure: false
                 )
                 clearRuntimeSyncRoundProgress(uploadState: "paused_auto_upload")
+                let payload = runtimeSyncOverviewPayload(uploadState: "paused_auto_upload")
+                logSyncOverviewEmission("pipeline_auto_interrupted", payload: payload)
                 NativeSyncEngineModule.shared?.emitSyncStateChanged(
-                    runtimeSyncOverviewPayload(uploadState: "paused_auto_upload")
+                    payload
                 )
                 stopSyncLifecycle(finalState: .interruptedAutoUpload)
             case .lowDiskPaused(let message):
@@ -2133,16 +2164,20 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 if configState == "interrupted" || isAutoUploadInterrupted {
                     // Interrupted: report interrupted state regardless of pending count
                     let autoPendingCount = uploadStore?.getPendingCountsBySource().auto ?? 0
+                    let payload = runtimeSyncOverviewPayload(uploadState: "paused_auto_upload")
+                    logSyncOverviewEmission("empty_queue_interrupted", payload: payload)
                     NativeSyncEngineModule.shared?.emitSyncStateChanged(
-                        runtimeSyncOverviewPayload(uploadState: "paused_auto_upload")
+                        payload
                     )
                     NSLog("[SyncPipeline] idle — auto upload interrupted (auto pending: %d)", autoPendingCount)
                     syncDiagnosticsLog("SyncPipeline", "idle — auto interrupted (auto pending: \(autoPendingCount))")
                     sessionService.transitionTo(.interruptedAutoUpload)
                 } else if configState == "disabled" {
                     // Disabled: emit idle, NOT completed — page should show "自动上传未开启"
+                    let payload = runtimeSyncOverviewPayload(uploadState: "idle")
+                    logSyncOverviewEmission("empty_queue_disabled", payload: payload)
                     NativeSyncEngineModule.shared?.emitSyncStateChanged(
-                        runtimeSyncOverviewPayload(uploadState: "idle")
+                        payload
                     )
                     NSLog("[SyncPipeline] idle — auto upload disabled")
                     syncDiagnosticsLog("SyncPipeline", "idle — auto upload disabled")
@@ -2151,12 +2186,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     // Active + empty queue: truly completed
                     clearRuntimeCurrentFile()
                     runtimeCurrentSpeedMbps = 0
-                    NativeSyncEngineModule.shared?.emitSyncStateChanged(([
+                    let payload = ([
                         "uploadState": "completed",
                         "progressPercent": 100,
                     ] as [String: Any]).merging(
                         runtimeSyncOverviewPayload(uploadState: "completed", progressPercent: 100)
-                    ) { _, new in new })
+                    ) { _, new in new }
+                    logSyncOverviewEmission("empty_queue_completed", payload: payload)
+                    NativeSyncEngineModule.shared?.emitSyncStateChanged(payload)
 
                     NSLog("[SyncPipeline] idle — all items completed, waiting for new photos...")
                     syncDiagnosticsLog("SyncPipeline", "idle — all completed, waiting for new photos")
@@ -2701,8 +2738,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 runtimeCurrentFileTotalBytes = exported.fileSize
                 runtimeCurrentSpeedMbps = 0
                 emitQueueToJS()
+                let payload = runtimeSyncOverviewPayload(uploadState: "uploading", progressPercent: 100)
+                if asset.source == "manual" || index + 1 >= total {
+                    logSyncOverviewEmission(
+                        "file_skipped_completed source=\(asset.source) index=\(index + 1)/\(total)",
+                        payload: payload
+                    )
+                }
                 NativeSyncEngineModule.shared?.emitSyncStateChanged(
-                    runtimeSyncOverviewPayload(uploadState: "uploading", progressPercent: 100)
+                    payload
                 )
                 return
             case "REJECT":
@@ -2792,8 +2836,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 runtimeCurrentFileTotalBytes = exported.fileSize
                 updateRuntimeSpeed()
                 emitQueueToJS()
+                let payload = runtimeSyncOverviewPayload(uploadState: "uploading", progressPercent: 100)
+                if asset.source == "manual" || index + 1 >= total {
+                    logSyncOverviewEmission(
+                        "file_completed source=\(asset.source) index=\(index + 1)/\(total)",
+                        payload: payload
+                    )
+                }
                 NativeSyncEngineModule.shared?.emitSyncStateChanged(
-                    runtimeSyncOverviewPayload(uploadState: "uploading", progressPercent: 100)
+                    payload
                 )
 
                 let transmissionMs = endRes["activeTransmissionMs"] as? Int64
@@ -4221,8 +4272,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         NSLog("[SyncEngine] auto upload interrupted")
         syncDiagnosticsLog("SyncEngine", "auto upload interrupted")
         sessionService.transitionTo(.interruptedAutoUpload)
+        let payload = runtimeSyncOverviewPayload(uploadState: "paused_auto_upload")
+        logSyncOverviewEmission("interrupt_auto_upload", payload: payload)
         NativeSyncEngineModule.shared?.emitSyncStateChanged(
-            runtimeSyncOverviewPayload(uploadState: "paused_auto_upload")
+            payload
         )
     }
 
@@ -4262,8 +4315,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             // start it so auto upload actually begins scanning and uploading.
             startSync()
         }
+        let payload = runtimeSyncOverviewPayload(uploadState: isSyncing ? "scanning" : "idle")
+        logSyncOverviewEmission("enable_auto_upload", payload: payload)
         NativeSyncEngineModule.shared?.emitSyncStateChanged(
-            runtimeSyncOverviewPayload(uploadState: isSyncing ? "scanning" : "idle")
+            payload
         )
     }
 

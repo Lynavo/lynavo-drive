@@ -4,6 +4,9 @@ import {
   shouldDelayAutoCompletionCard,
   shouldRenderSyncActivityProgress,
 } from '../SyncActivityScreen';
+import {
+  getSyncActivityMainCardState,
+} from '../../utils/syncActivityTransferState';
 
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({
@@ -253,6 +256,96 @@ describe('buildOverview', () => {
     expect(next.uploadState).toBe('scanning');
     expect(next.currentTaskSource).toBeUndefined();
     expect(next.lastCompletedTaskSource).toBe('manual');
+  });
+
+  it('keeps manual completion context through a transient idle disabled payload', () => {
+    const prev = {
+      progressPercent: 100,
+      currentSpeedMbps: 0,
+      uploadState: 'uploading',
+      completedCount: 0,
+      totalCount: 1,
+      completedBytes: 0,
+      totalBytes: 8192,
+      currentFile: 'file-key-6',
+      currentFilename: 'clip-6.mov',
+      currentFileConfirmedBytes: 8192,
+      currentFileTotalBytes: 8192,
+      currentTaskSource: 'manual' as const,
+      lastCompletedTaskSource: null,
+      autoUploadState: 'disabled' as const,
+      manualPending: 1,
+      autoPending: 0,
+    };
+
+    const next = buildOverview(
+      {
+        uploadState: 'idle',
+        completedCount: 0,
+        totalCount: 0,
+        completedBytes: 0,
+        totalBytes: 0,
+        currentTaskSource: null,
+        manualPending: 0,
+        autoPending: 0,
+        autoUploadState: 'disabled',
+      },
+      prev,
+    );
+
+    expect(next.completedCount).toBe(1);
+    expect(next.totalCount).toBe(1);
+    expect(next.completedBytes).toBe(8192);
+    expect(next.totalBytes).toBe(8192);
+    expect(next.lastCompletedTaskSource).toBe('manual');
+    expect(getSyncActivityMainCardState(next, false)).toBe(
+      'manual_completed',
+    );
+  });
+
+  it('keeps manual completion after the final upload pulse clears current source', () => {
+    const prev = {
+      progressPercent: 100,
+      currentSpeedMbps: 0,
+      uploadState: 'uploading',
+      completedCount: 10,
+      totalCount: 10,
+      completedBytes: 63406077,
+      totalBytes: 63406077,
+      currentFile: 'file-key-7',
+      currentFilename: 'CAP_741A2D58.jpg',
+      currentFileConfirmedBytes: 230748,
+      currentFileTotalBytes: 230748,
+      currentTaskSource: undefined,
+      lastCompletedTaskSource: null,
+      autoUploadState: 'interrupted' as const,
+      manualPending: 0,
+      autoPending: 0,
+    };
+
+    const next = buildOverview(
+      {
+        uploadState: 'idle',
+        completedCount: 0,
+        totalCount: 0,
+        completedBytes: 0,
+        totalBytes: 0,
+        currentTaskSource: null,
+        manualPending: 0,
+        autoPending: 0,
+        autoUploadState: 'interrupted',
+      },
+      prev,
+    );
+
+    expect(next.completedCount).toBe(10);
+    expect(next.totalCount).toBe(10);
+    expect(next.completedBytes).toBe(63406077);
+    expect(next.totalBytes).toBe(63406077);
+    expect(next.lastCompletedTaskSource).toBe('manual');
+    expect(getSyncActivityMainCardState(next, false)).toBe(
+      'manual_completed',
+    );
   });
 });
 

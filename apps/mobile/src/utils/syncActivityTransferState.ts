@@ -64,6 +64,15 @@ function hasFinishedSyncRound(
   return totalCount > 0 && completedCount >= totalCount;
 }
 
+function hasNoPendingQueueWork(
+  snapshot: SyncActivityTransferSnapshot | null | undefined,
+): boolean {
+  return (
+    (snapshot?.manualPending ?? 0) === 0 &&
+    (snapshot?.autoPending ?? 0) === 0
+  );
+}
+
 export function isSyncActivityActivelyTransferring(
   snapshot: SyncActivityTransferSnapshot | null | undefined,
 ): boolean {
@@ -110,6 +119,13 @@ function getCompletedTaskSource(
     return 'auto';
   }
   if (snapshot?.autoUploadState === 'disabled') {
+    return 'manual';
+  }
+  if (
+    snapshot?.autoUploadState === 'interrupted' &&
+    hasFinishedSyncRound(snapshot) &&
+    hasNoPendingQueueWork(snapshot)
+  ) {
     return 'manual';
   }
   return undefined;
