@@ -9,7 +9,7 @@ import {
 describe('constants/iap', () => {
   test('IAP_PRODUCTS has monthly and yearly with expected IDs', () => {
     expect(IAP_PRODUCTS.monthly).toBe('com.vividrop.mobile.china.monthly.999');
-    expect(IAP_PRODUCTS.yearly).toBe('com.vividrop.mobile.china.yearly.104');
+    expect(IAP_PRODUCTS.yearly).toBe('com.vividrop.mobile.china.yearly.10400');
   });
 
   test('ALL_PRODUCT_IDS contains both products', () => {

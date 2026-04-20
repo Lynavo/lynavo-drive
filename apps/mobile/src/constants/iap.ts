@@ -2,7 +2,7 @@ import type { SubscriptionPlan } from '../stores/auth-store';
 
 export const IAP_PRODUCTS = {
   monthly: 'com.vividrop.mobile.china.monthly.999',
-  yearly: 'com.vividrop.mobile.china.yearly.104',
+  yearly: 'com.vividrop.mobile.china.yearly.10400',
 } as const;
 
 export type IapProductId = (typeof IAP_PRODUCTS)[keyof typeof IAP_PRODUCTS];

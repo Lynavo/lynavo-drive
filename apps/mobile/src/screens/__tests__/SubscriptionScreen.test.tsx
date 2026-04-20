@@ -129,7 +129,7 @@ describe('SubscriptionScreen', () => {
 
   test('subscribe tap invokes iapService.purchase then verify', async () => {
     (iapService.purchase as jest.Mock).mockResolvedValueOnce({
-      productId: 'com.vividrop.mobile.china.yearly.104',
+      productId: 'com.vividrop.mobile.china.yearly.10400',
       transactionReceipt: 'BLOB',
       transactionId: 'tx_1',
     });
@@ -150,7 +150,7 @@ describe('SubscriptionScreen', () => {
 
   test('2002 from verify is treated as success (success modal shown)', async () => {
     (iapService.purchase as jest.Mock).mockResolvedValueOnce({
-      productId: 'com.vividrop.mobile.china.yearly.104',
+      productId: 'com.vividrop.mobile.china.yearly.10400',
       transactionReceipt: 'BLOB',
       transactionId: 'tx_1',
     });
@@ -189,7 +189,7 @@ describe('SubscriptionScreen', () => {
 
   test('success modal reflects expireAt from freshly-loaded subscription', async () => {
     (iapService.purchase as jest.Mock).mockResolvedValueOnce({
-      productId: 'com.vividrop.mobile.china.yearly.104',
+      productId: 'com.vividrop.mobile.china.yearly.10400',
       transactionReceipt: 'BLOB',
       transactionId: 'tx_1',
     });

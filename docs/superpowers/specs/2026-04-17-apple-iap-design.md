@@ -87,7 +87,7 @@
 | Monthly Product ID | `com.vividrop.mobile.china.monthly.999` |
 | Monthly 價格 | ¥9.9 / 月（auto-renewable） |
 | Monthly Introductory Offer | **7 天免費試用**（free trial） |
-| Yearly Product ID | `com.vividrop.mobile.china.yearly.104` |
+| Yearly Product ID | `com.vividrop.mobile.china.yearly.10400` |
 | Yearly 價格 | ¥104 / 年（auto-renewable，無 trial） |
 | Subscription Group | 同一組（允許月 ↔ 年升降級） |
 | Family Sharing | **關閉** |
@@ -150,7 +150,7 @@ import type { SubscriptionPlan } from '../stores/auth-store';
 
 export const IAP_PRODUCTS = {
   monthly: 'com.vividrop.mobile.china.monthly.999',
-  yearly:  'com.vividrop.mobile.china.yearly.104',
+  yearly:  'com.vividrop.mobile.china.yearly.10400',
 } as const;
 
 export type IapProductId = (typeof IAP_PRODUCTS)[keyof typeof IAP_PRODUCTS];
