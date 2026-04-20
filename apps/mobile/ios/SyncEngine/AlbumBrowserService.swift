@@ -307,15 +307,23 @@ class AlbumBrowserService {
         let options = PHImageRequestOptions()
         options.deliveryMode = .highQualityFormat
         options.isNetworkAccessAllowed = true
-        options.isSynchronous = true
+        options.isSynchronous = false
         options.resizeMode = .none
 
+        let semaphore = DispatchSemaphore(value: 0)
         var resultData: Data?
-        PHImageManager.default().requestImageDataAndOrientation(
+        let requestId = PHImageManager.default().requestImageDataAndOrientation(
             for: asset,
             options: options
         ) { data, _, _, _ in
             resultData = data
+            semaphore.signal()
+        }
+
+        let timeoutResult = semaphore.wait(timeout: .now() + 15)
+        if timeoutResult == .timedOut {
+            PHImageManager.default().cancelImageRequest(requestId)
+            return ["uri": "", "mediaType": "image", "error": "cloud_unavailable"]
         }
 
         guard let data = resultData else {
