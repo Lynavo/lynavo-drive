@@ -283,6 +283,16 @@ class NativeSyncEngineModule: RCTEventEmitter {
         }
     }
 
+    @objc
+    func getAssetPreviewSource(_ assetLocalId: NSString, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        Task {
+            let result = SyncEngineManager.shared.getAssetPreviewSource(
+                assetLocalId: assetLocalId as String
+            )
+            resolve(result)
+        }
+    }
+
     // MARK: - Vivi Drop: Manual Upload
 
     @objc

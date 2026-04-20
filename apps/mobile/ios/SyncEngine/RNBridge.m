@@ -26,6 +26,7 @@ RCT_EXTERN_METHOD(resetAllStatus:(RCTPromiseResolveBlock)resolve reject:(RCTProm
 RCT_EXTERN_METHOD(browseAlbum:(NSDictionary *)params resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(getAlbumStats:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(getAlbumCollections:(NSString *)mediaFilter resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(getAssetPreviewSource:(NSString *)assetLocalId resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 
 // Vivi Drop: Manual Upload
 RCT_EXTERN_METHOD(submitManualUpload:(NSDictionary *)params resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)

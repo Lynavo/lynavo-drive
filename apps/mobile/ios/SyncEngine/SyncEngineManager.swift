@@ -4360,6 +4360,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         return service.getAlbumCollections(mediaFilter: mediaFilter)
     }
 
+    func getAssetPreviewSource(assetLocalId: String) -> [String: Any] {
+        guard let service = albumBrowserService else {
+            return ["uri": "", "mediaType": "image", "error": "not_found"]
+        }
+        return service.getPreviewSource(assetLocalId: assetLocalId)
+    }
+
     // MARK: - Album Preview Cache
 
     private func cleanupPreviewCacheIfNeeded() {
