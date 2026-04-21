@@ -14,10 +14,7 @@ import {
   type AppStateStatus,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  useNavigation,
-  CommonActions,
-} from '@react-navigation/native';
+import { useNavigation, CommonActions } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -166,7 +163,9 @@ function formatSpeedMbps(speedMbps: number): string {
   if (!Number.isFinite(speedMbps) || speedMbps <= 0) {
     return '0 MB/s';
   }
-  return `${speedMbps >= 10 ? speedMbps.toFixed(0) : speedMbps.toFixed(1)} MB/s`;
+  return `${
+    speedMbps >= 10 ? speedMbps.toFixed(0) : speedMbps.toFixed(1)
+  } MB/s`;
 }
 
 const PREPARATION_STATES = new Set([
@@ -175,21 +174,28 @@ const PREPARATION_STATES = new Set([
   'scanning',
   'preparing',
   'backoff_waiting',
+  'reconnecting',
 ]);
 
-function isPreparationPhase(uploadState: string): boolean {
+export function isPreparationPhase(uploadState: string): boolean {
   return PREPARATION_STATES.has(uploadState);
 }
 
 function getPreparationTitle(uploadState: string, t: TFunction): string {
   switch (uploadState) {
-    case 'discovering': return t('syncActivity.phases.discoveringTitle');
-    case 'reconciling': return t('syncActivity.phases.reconcilingTitle');
-    case 'scanning': return t('syncActivity.phases.scanningTitle');
+    case 'discovering':
+      return t('syncActivity.phases.discoveringTitle');
+    case 'reconciling':
+      return t('syncActivity.phases.reconcilingTitle');
+    case 'scanning':
+      return t('syncActivity.phases.scanningTitle');
     case 'preparing':
     case 'backoff_waiting':
       return t('syncActivity.phases.preparingTitle');
-    default: return t('syncActivity.phases.defaultTitle');
+    case 'reconnecting':
+      return t('syncActivity.phases.reconnectingTitle');
+    default:
+      return t('syncActivity.phases.defaultTitle');
   }
 }
 
@@ -207,13 +213,18 @@ function getPreparationSubtitle(overview: SyncOverview, t: TFunction): string {
       const scanned = overview.scannedCount ?? 0;
       const total = overview.libraryTotal ?? 0;
       if (total > 0) {
-        return t('syncActivity.phases.scanningSubtitleProgress', { scanned, total });
+        return t('syncActivity.phases.scanningSubtitleProgress', {
+          scanned,
+          total,
+        });
       }
       return t('syncActivity.phases.scanningSubtitleReading');
     }
     case 'preparing':
     case 'backoff_waiting':
       return t('syncActivity.phases.preparingSubtitle');
+    case 'reconnecting':
+      return t('syncActivity.phases.reconnectingSubtitle');
     default:
       return '';
   }
@@ -235,7 +246,9 @@ function formatDateTimeLabel(iso: string | undefined, t: TFunction): string {
   if (Number.isNaN(date.getTime())) return t('settings.status.noRecord');
 
   const now = new Date();
-  const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  const time = `${String(date.getHours()).padStart(2, '0')}:${String(
+    date.getMinutes(),
+  ).padStart(2, '0')}`;
   if (date.toDateString() === now.toDateString()) {
     return t('settings.dates.todayAt', { time });
   }
@@ -349,18 +362,20 @@ export function SyncActivityScreen() {
   // Offline debounce: stabilize isOffline to avoid rapid UI flicker
   const [stableOffline, setStableOffline] = useState(false);
   const offlineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const autoCompletionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoCompletionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   // Optimistic UI: show "preparing auto-upload" immediately after the toggle,
   // since the native pipeline can sit in a ~30 s heartbeat wait after the
   // manual batch drains before it re-enters the scan loop.
   const [autoUploadPreparing, setAutoUploadPreparing] = useState(false);
   const autoUploadPreparingMinUntilRef = useRef<number | null>(null);
-  const autoUploadPreparingSafetyTimerRef = useRef<
-    ReturnType<typeof setTimeout> | null
-  >(null);
-  const autoUploadPreparingClearTimerRef = useRef<
-    ReturnType<typeof setTimeout> | null
-  >(null);
+  const autoUploadPreparingSafetyTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const autoUploadPreparingClearTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
   // Tracks whether the native pipeline has visibly woken up (entered a
   // preparation / uploading phase) during the current optimistic window.
   // Used to detect "scan finished with zero new items" so we can exit
@@ -376,48 +391,51 @@ export function SyncActivityScreen() {
   // Data loading
   // ---------------------------------------------------------------------------
 
-  const loadTodayStats = useCallback(async (engine?: Record<string, Function>) => {
-    try {
-      const mod = engine ?? NativeModules.NativeSyncEngine;
-      if (!mod) return;
-      const history = await mod.getHistoryDays(null);
-      if (history?.items) {
-        const today = formatLocalDateKey(new Date());
-        let totalFiles = 0;
-        let totalBytesSum = 0;
-        let latestUpdatedAt: string | undefined;
-        for (const item of history.items) {
-          if ((item.ledgerDate || item.dateKey) === today) {
-            totalFiles += item.fileCount || 0;
-            totalBytesSum += item.totalBytes || 0;
-            const updatedAt =
-              typeof item.updatedAt === 'string' ? item.updatedAt : undefined;
-            if (
-              updatedAt &&
-              (!latestUpdatedAt ||
-                new Date(updatedAt).getTime() >
-                  new Date(latestUpdatedAt).getTime())
-            ) {
-              latestUpdatedAt = updatedAt;
+  const loadTodayStats = useCallback(
+    async (engine?: Record<string, Function>) => {
+      try {
+        const mod = engine ?? NativeModules.NativeSyncEngine;
+        if (!mod) return;
+        const history = await mod.getHistoryDays(null);
+        if (history?.items) {
+          const today = formatLocalDateKey(new Date());
+          let totalFiles = 0;
+          let totalBytesSum = 0;
+          let latestUpdatedAt: string | undefined;
+          for (const item of history.items) {
+            if ((item.ledgerDate || item.dateKey) === today) {
+              totalFiles += item.fileCount || 0;
+              totalBytesSum += item.totalBytes || 0;
+              const updatedAt =
+                typeof item.updatedAt === 'string' ? item.updatedAt : undefined;
+              if (
+                updatedAt &&
+                (!latestUpdatedAt ||
+                  new Date(updatedAt).getTime() >
+                    new Date(latestUpdatedAt).getTime())
+              ) {
+                latestUpdatedAt = updatedAt;
+              }
             }
           }
+          setTodayStats(prev =>
+            prev.fileCount === totalFiles &&
+            prev.totalBytes === totalBytesSum &&
+            prev.latestUpdatedAt === latestUpdatedAt
+              ? prev
+              : {
+                  fileCount: totalFiles,
+                  totalBytes: totalBytesSum,
+                  latestUpdatedAt,
+                },
+          );
         }
-        setTodayStats(prev =>
-          prev.fileCount === totalFiles &&
-          prev.totalBytes === totalBytesSum &&
-          prev.latestUpdatedAt === latestUpdatedAt
-            ? prev
-            : {
-                fileCount: totalFiles,
-                totalBytes: totalBytesSum,
-                latestUpdatedAt,
-              },
-        );
+      } catch {
+        /* ignore */
       }
-    } catch {
-      /* ignore */
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     let syncSub: { remove: () => void } | undefined;
@@ -491,13 +509,10 @@ export function SyncActivityScreen() {
           },
         );
 
-        errorSub = emitter.addListener(
-          'onError',
-          (error: SyncErrorEvent) => {
-            const msg = resolveSyncErrorAlertMessage(error, t);
-            Alert.alert(t('syncActivity.dialogs.syncError.title'), msg);
-          },
-        );
+        errorSub = emitter.addListener('onError', (error: SyncErrorEvent) => {
+          const msg = resolveSyncErrorAlertMessage(error, t);
+          Alert.alert(t('syncActivity.dialogs.syncError.title'), msg);
+        });
       } catch (e) {
         console.warn('[SyncActivity] loadReal error:', e);
         setInitialLoading(false);
@@ -600,7 +615,10 @@ export function SyncActivityScreen() {
       t('syncActivity.dialogs.cancelManual.title'),
       t('syncActivity.dialogs.cancelManual.body'),
       [
-        { text: t('syncActivity.dialogs.cancelManual.rethink'), style: 'cancel' },
+        {
+          text: t('syncActivity.dialogs.cancelManual.rethink'),
+          style: 'cancel',
+        },
         {
           text: t('syncActivity.dialogs.cancelManual.confirm'),
           style: 'destructive',
@@ -637,7 +655,8 @@ export function SyncActivityScreen() {
               clearAutoUploadPreparing();
               await interruptAutoUpload();
               // Reload overview to reflect the new state
-              const syncData = await NativeModules.NativeSyncEngine?.getSyncOverview();
+              const syncData =
+                await NativeModules.NativeSyncEngine?.getSyncOverview();
               if (syncData) {
                 setOverview(prev => buildOverview(syncData, prev));
               }
@@ -759,7 +778,8 @@ export function SyncActivityScreen() {
       startAutoUploadPreparing();
       await enableAutoUpload();
       await NativeModules.NativeSyncEngine?.triggerSync();
-      const nextSyncData = await NativeModules.NativeSyncEngine?.getSyncOverview();
+      const nextSyncData =
+        await NativeModules.NativeSyncEngine?.getSyncOverview();
       if (nextSyncData) {
         setOverview(prev => buildOverview(nextSyncData, prev));
       }
@@ -836,7 +856,10 @@ export function SyncActivityScreen() {
 
   const isManualUploading = hasManualUploadWork;
 
-  const rawMainCardState = getSyncActivityMainCardState(overview, stableOffline);
+  const rawMainCardState = getSyncActivityMainCardState(
+    overview,
+    stableOffline,
+  );
   const shouldDelayAutoCompletion = shouldDelayAutoCompletionCard(
     rawMainCardState,
     overview.uploadState,
@@ -1056,8 +1079,8 @@ export function SyncActivityScreen() {
                     connectionBadgeState === 'offline'
                       ? styles.statusDotOffline
                       : connectionBadgeState === 'connecting'
-                        ? styles.statusDotConnecting
-                        : styles.statusDotOnline,
+                      ? styles.statusDotConnecting
+                      : styles.statusDotOnline,
                   ]}
                 />
                 <Text
@@ -1066,15 +1089,15 @@ export function SyncActivityScreen() {
                     connectionBadgeState === 'offline'
                       ? styles.statusTextOffline
                       : connectionBadgeState === 'connecting'
-                        ? styles.statusTextConnecting
-                        : styles.statusTextOnline,
+                      ? styles.statusTextConnecting
+                      : styles.statusTextOnline,
                   ]}
                 >
                   {connectionBadgeState === 'offline'
                     ? t('settings.connection.offline')
                     : isConnecting
-                      ? t('settings.connection.connecting')
-                      : t('settings.connection.online')}
+                    ? t('settings.connection.connecting')
+                    : t('settings.connection.online')}
                 </Text>
               </View>
             </View>
@@ -1085,13 +1108,27 @@ export function SyncActivityScreen() {
             <View style={styles.cardBody}>
               {/* Badge row — dynamic based on upload source */}
               <View style={styles.badgeRow}>
-                <View style={isManualUploading ? styles.manualBadge : styles.autoBadge}>
-                  <Text style={isManualUploading ? styles.manualBadgeText : styles.autoBadgeText}>
-                    {isManualUploading ? t('syncActivity.badges.manual') : t('syncActivity.badges.auto')}
+                <View
+                  style={
+                    isManualUploading ? styles.manualBadge : styles.autoBadge
+                  }
+                >
+                  <Text
+                    style={
+                      isManualUploading
+                        ? styles.manualBadgeText
+                        : styles.autoBadgeText
+                    }
+                  >
+                    {isManualUploading
+                      ? t('syncActivity.badges.manual')
+                      : t('syncActivity.badges.auto')}
                   </Text>
                 </View>
                 <Text style={styles.badgeLabel}>
-                  {isManualUploading ? t('syncActivity.badges.manualUploading') : t('syncActivity.badges.autoEnabled')}
+                  {isManualUploading
+                    ? t('syncActivity.badges.manualUploading')
+                    : t('syncActivity.badges.autoEnabled')}
                 </Text>
               </View>
 
@@ -1116,7 +1153,9 @@ export function SyncActivityScreen() {
                   {/* Title row with percentage */}
                   <View style={styles.runningTitleRow}>
                     <Text style={styles.runningTitle}>
-                      {isManualUploading ? t('syncActivity.running.manualTitle') : t('syncActivity.running.autoTitle')}
+                      {isManualUploading
+                        ? t('syncActivity.running.manualTitle')
+                        : t('syncActivity.running.autoTitle')}
                     </Text>
                     <Text style={styles.runningPercent}>
                       {displayProgressPercent}%
@@ -1143,21 +1182,27 @@ export function SyncActivityScreen() {
                   {/* Stats row */}
                   <View style={styles.statsRow}>
                     <View style={styles.statItem}>
-                      <Text style={styles.statLabel}>{t('syncActivity.stats.speed')}</Text>
+                      <Text style={styles.statLabel}>
+                        {t('syncActivity.stats.speed')}
+                      </Text>
                       <Text style={styles.statValue}>
                         {formatSpeedMbps(displayCurrentSpeedMbps)}
                       </Text>
                     </View>
                     <View style={styles.statDivider} />
                     <View style={styles.statItem}>
-                      <Text style={styles.statLabel}>{t('syncActivity.stats.progress')}</Text>
+                      <Text style={styles.statLabel}>
+                        {t('syncActivity.stats.progress')}
+                      </Text>
                       <Text style={styles.statValue}>
                         {`${overview.completedCount} / ${overview.totalCount}`}
                       </Text>
                     </View>
                     <View style={styles.statDivider} />
                     <View style={styles.statItem}>
-                      <Text style={styles.statLabel}>{t('syncActivity.stats.transferred')}</Text>
+                      <Text style={styles.statLabel}>
+                        {t('syncActivity.stats.transferred')}
+                      </Text>
                       <Text style={styles.statValue}>
                         {formatBytes(overview.completedBytes)}
                       </Text>
@@ -1167,28 +1212,75 @@ export function SyncActivityScreen() {
                   {/* Queue info */}
                   {totalPending > 0 && (
                     <Text style={styles.queueInfoText}>
-                      {t('syncActivity.running.queueInfo', { queued: totalPendingDisplay })}
+                      {t('syncActivity.running.queueInfo', {
+                        queued: totalPendingDisplay,
+                      })}
                     </Text>
+                  )}
+                </>
+              ) : isManualUploading ? (
+                <>
+                  {/* Manual batch in flight but pipeline is in a transient gap
+                      (e.g. Wi-Fi flip, backoff). Show manual-context copy and
+                      fall through to the manual cancel button below — NEVER
+                      the auto-running fallback, which produced a Frankenstein
+                      UI mixing manual badge with "自動上傳執行中" text. */}
+                  <Text style={styles.runningTitle}>
+                    {t('syncActivity.running.manualTitle')}
+                  </Text>
+                  <Text style={styles.idleSubtitle}>
+                    {t('syncActivity.phases.preparingSubtitle')}
+                  </Text>
+                  {overview.completedCount > 0 && (
+                    <View style={styles.statsRow}>
+                      <View style={styles.statItem}>
+                        <Text style={styles.statLabel}>
+                          {t('syncActivity.stats.transferred')}
+                        </Text>
+                        <Text style={styles.statValue}>
+                          {t('syncActivity.stats.transferredCount', {
+                            count: overview.completedCount,
+                          })}
+                        </Text>
+                      </View>
+                      <View style={styles.statDivider} />
+                      <View style={styles.statItem}>
+                        <Text style={styles.statLabel}>
+                          {t('syncActivity.stats.dataAmount')}
+                        </Text>
+                        <Text style={styles.statValue}>
+                          {formatBytes(overview.completedBytes)}
+                        </Text>
+                      </View>
+                    </View>
                   )}
                 </>
               ) : (
                 <>
-                  {/* Active but idle — monitoring for new photos */}
-                  <Text style={styles.runningTitle}>{t('syncActivity.running.autoRunningTitle')}</Text>
+                  {/* Active but idle — auto upload watching for new photos */}
+                  <Text style={styles.runningTitle}>
+                    {t('syncActivity.running.autoRunningTitle')}
+                  </Text>
                   <Text style={styles.idleSubtitle}>
                     {t('syncActivity.running.autoRunningSubtitle')}
                   </Text>
                   {overview.completedCount > 0 && (
                     <View style={styles.statsRow}>
                       <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>{t('syncActivity.stats.transferred')}</Text>
+                        <Text style={styles.statLabel}>
+                          {t('syncActivity.stats.transferred')}
+                        </Text>
                         <Text style={styles.statValue}>
-                          {t('syncActivity.stats.transferredCount', { count: overview.completedCount })}
+                          {t('syncActivity.stats.transferredCount', {
+                            count: overview.completedCount,
+                          })}
                         </Text>
                       </View>
                       <View style={styles.statDivider} />
                       <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>{t('syncActivity.stats.dataAmount')}</Text>
+                        <Text style={styles.statLabel}>
+                          {t('syncActivity.stats.dataAmount')}
+                        </Text>
                         <Text style={styles.statValue}>
                           {formatBytes(overview.completedBytes)}
                         </Text>
@@ -1207,7 +1299,9 @@ export function SyncActivityScreen() {
                   disabled={cancellingBatch}
                 >
                   <Text style={styles.dangerButtonText}>
-                    {cancellingBatch ? t('syncActivity.actions.cancelling') : t('syncActivity.actions.cancelManualBatch')}
+                    {cancellingBatch
+                      ? t('syncActivity.actions.cancelling')
+                      : t('syncActivity.actions.cancelManualBatch')}
                   </Text>
                 </TouchableOpacity>
               ) : (
@@ -1216,7 +1310,9 @@ export function SyncActivityScreen() {
                   activeOpacity={0.7}
                   onPress={handleCloseAutoUpload}
                 >
-                  <Text style={styles.outlinedButtonText}>{t('syncActivity.actions.closeAutoUpload')}</Text>
+                  <Text style={styles.outlinedButtonText}>
+                    {t('syncActivity.actions.closeAutoUpload')}
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -1227,9 +1323,13 @@ export function SyncActivityScreen() {
             <View style={styles.cardBody}>
               <View style={styles.badgeRow}>
                 <View style={styles.autoBadge}>
-                  <Text style={styles.autoBadgeText}>{t('syncActivity.badges.auto')}</Text>
+                  <Text style={styles.autoBadgeText}>
+                    {t('syncActivity.badges.auto')}
+                  </Text>
                 </View>
-                <Text style={styles.badgeLabel}>{t('syncActivity.badges.autoEnabled')}</Text>
+                <Text style={styles.badgeLabel}>
+                  {t('syncActivity.badges.autoEnabled')}
+                </Text>
               </View>
 
               <View style={styles.runningTitleRow}>
@@ -1241,8 +1341,18 @@ export function SyncActivityScreen() {
                 </Text>
               </View>
 
-              <View style={[styles.progressBarTrack, styles.progressBarTrackComplete]}>
-                <View style={[styles.progressBarFill, styles.progressBarFillComplete]} />
+              <View
+                style={[
+                  styles.progressBarTrack,
+                  styles.progressBarTrackComplete,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    styles.progressBarFillComplete,
+                  ]}
+                />
               </View>
 
               <Text style={styles.completionSubtitle}>
@@ -1287,7 +1397,11 @@ export function SyncActivityScreen() {
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.rowButton, styles.rowButtonOutlined, styles.completionDangerButton]}
+                  style={[
+                    styles.rowButton,
+                    styles.rowButtonOutlined,
+                    styles.completionDangerButton,
+                  ]}
                   activeOpacity={0.7}
                   onPress={handleCloseAutoUpload}
                 >
@@ -1304,9 +1418,13 @@ export function SyncActivityScreen() {
             <View style={styles.cardBody}>
               <View style={styles.badgeRow}>
                 <View style={styles.manualBadge}>
-                  <Text style={styles.manualBadgeText}>{t('syncActivity.badges.manual')}</Text>
+                  <Text style={styles.manualBadgeText}>
+                    {t('syncActivity.badges.manual')}
+                  </Text>
                 </View>
-                <Text style={styles.badgeLabel}>{t('syncActivity.badges.manualUploading')}</Text>
+                <Text style={styles.badgeLabel}>
+                  {t('syncActivity.badges.manualUploading')}
+                </Text>
               </View>
 
               <View style={styles.runningTitleRow}>
@@ -1318,8 +1436,18 @@ export function SyncActivityScreen() {
                 </Text>
               </View>
 
-              <View style={[styles.progressBarTrack, styles.progressBarTrackComplete]}>
-                <View style={[styles.progressBarFill, styles.progressBarFillComplete]} />
+              <View
+                style={[
+                  styles.progressBarTrack,
+                  styles.progressBarTrackComplete,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    styles.progressBarFillComplete,
+                  ]}
+                />
               </View>
 
               <Text style={styles.completionSubtitle}>
@@ -1379,12 +1507,18 @@ export function SyncActivityScreen() {
             <View style={styles.cardBody}>
               <View style={styles.badgeRow}>
                 <View style={styles.autoBadge}>
-                  <Text style={styles.autoBadgeText}>{t('syncActivity.badges.auto')}</Text>
+                  <Text style={styles.autoBadgeText}>
+                    {t('syncActivity.badges.auto')}
+                  </Text>
                 </View>
-                <Text style={styles.badgeLabel}>{t('syncActivity.badges.autoEnabled')}</Text>
+                <Text style={styles.badgeLabel}>
+                  {t('syncActivity.badges.autoEnabled')}
+                </Text>
               </View>
 
-              <Text style={styles.runningTitle}>{t('syncActivity.standby.title')}</Text>
+              <Text style={styles.runningTitle}>
+                {t('syncActivity.standby.title')}
+              </Text>
               <Text style={styles.idleSubtitle}>
                 {t('syncActivity.standby.subtitle')}
               </Text>
@@ -1392,14 +1526,20 @@ export function SyncActivityScreen() {
               {overview.completedCount > 0 && (
                 <View style={styles.statsRow}>
                   <View style={styles.statItem}>
-                    <Text style={styles.statLabel}>{t('syncActivity.stats.transferred')}</Text>
+                    <Text style={styles.statLabel}>
+                      {t('syncActivity.stats.transferred')}
+                    </Text>
                     <Text style={styles.statValue}>
-                      {t('syncActivity.stats.transferredCount', { count: overview.completedCount })}
+                      {t('syncActivity.stats.transferredCount', {
+                        count: overview.completedCount,
+                      })}
                     </Text>
                   </View>
                   <View style={styles.statDivider} />
                   <View style={styles.statItem}>
-                    <Text style={styles.statLabel}>{t('syncActivity.stats.dataAmount')}</Text>
+                    <Text style={styles.statLabel}>
+                      {t('syncActivity.stats.dataAmount')}
+                    </Text>
                     <Text style={styles.statValue}>
                       {formatBytes(overview.completedBytes)}
                     </Text>
@@ -1412,7 +1552,9 @@ export function SyncActivityScreen() {
                 activeOpacity={0.7}
                 onPress={handleCloseAutoUpload}
               >
-                <Text style={styles.outlinedButtonText}>{t('syncActivity.actions.closeAutoUpload')}</Text>
+                <Text style={styles.outlinedButtonText}>
+                  {t('syncActivity.actions.closeAutoUpload')}
+                </Text>
               </TouchableOpacity>
             </View>
           )}
@@ -1427,7 +1569,9 @@ export function SyncActivityScreen() {
                   color={EMPTY_INFO_ICON}
                 />
               </View>
-              <Text style={styles.centeredTitle}>{t('syncActivity.notStarted.title')}</Text>
+              <Text style={styles.centeredTitle}>
+                {t('syncActivity.notStarted.title')}
+              </Text>
               <Text style={styles.centeredSubtitle}>
                 {t('syncActivity.notStarted.subtitle')}
               </Text>
@@ -1437,14 +1581,18 @@ export function SyncActivityScreen() {
                   activeOpacity={0.7}
                   onPress={() => navigation.navigate('AlbumWorkbench')}
                 >
-                  <Text style={styles.rowButtonOutlinedText}>{t('syncActivity.notStarted.goToAlbum')}</Text>
+                  <Text style={styles.rowButtonOutlinedText}>
+                    {t('syncActivity.notStarted.goToAlbum')}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.rowButton, styles.rowButtonPrimary]}
                   activeOpacity={0.7}
                   onPress={() => void handleEnableAutoUpload()}
                 >
-                  <Text style={styles.rowButtonPrimaryText}>{t('syncActivity.notStarted.enableAuto')}</Text>
+                  <Text style={styles.rowButtonPrimaryText}>
+                    {t('syncActivity.notStarted.enableAuto')}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1460,7 +1608,9 @@ export function SyncActivityScreen() {
                   color={EMPTY_OFFLINE_ICON}
                 />
               </View>
-              <Text style={styles.centeredTitle}>{t('syncActivity.offline.title')}</Text>
+              <Text style={styles.centeredTitle}>
+                {t('syncActivity.offline.title')}
+              </Text>
               <Text style={styles.centeredSubtitle}>
                 {t('syncActivity.offline.subtitle')}
               </Text>
@@ -1470,14 +1620,18 @@ export function SyncActivityScreen() {
                   activeOpacity={0.7}
                   onPress={handleSwitchDevice}
                 >
-                  <Text style={styles.offlineButtonOutlinedText}>{t('syncActivity.offline.switchDevice')}</Text>
+                  <Text style={styles.offlineButtonOutlinedText}>
+                    {t('syncActivity.offline.switchDevice')}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.rowButton, styles.offlineButtonPrimary]}
                   activeOpacity={0.7}
                   onPress={handleReconnect}
                 >
-                  <Text style={styles.rowButtonPrimaryText}>{t('syncActivity.offline.reconnect')}</Text>
+                  <Text style={styles.rowButtonPrimaryText}>
+                    {t('syncActivity.offline.reconnect')}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1486,7 +1640,9 @@ export function SyncActivityScreen() {
 
         {/* Quick entry cards */}
         <View style={styles.quickEntrySection}>
-          <Text style={styles.sectionLabel}>{t('syncActivity.quickEntry.title')}</Text>
+          <Text style={styles.sectionLabel}>
+            {t('syncActivity.quickEntry.title')}
+          </Text>
           <View style={styles.quickEntryRow}>
             <TouchableOpacity
               style={styles.quickEntryCard}
@@ -1501,8 +1657,12 @@ export function SyncActivityScreen() {
               >
                 <Icon name="albums-outline" size={22} color={BLUE} />
               </View>
-              <Text style={styles.quickEntryTitle}>{t('syncActivity.quickEntry.albumTitle')}</Text>
-              <Text style={styles.quickEntryDesc}>{t('syncActivity.quickEntry.albumDesc')}</Text>
+              <Text style={styles.quickEntryTitle}>
+                {t('syncActivity.quickEntry.albumTitle')}
+              </Text>
+              <Text style={styles.quickEntryDesc}>
+                {t('syncActivity.quickEntry.albumDesc')}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -1518,8 +1678,12 @@ export function SyncActivityScreen() {
               >
                 <Icon name="folder-outline" size={22} color="#22c55e" />
               </View>
-              <Text style={styles.quickEntryTitle}>{t('syncActivity.quickEntry.sharedFilesTitle')}</Text>
-              <Text style={styles.quickEntryDesc}>{t('syncActivity.quickEntry.sharedFilesDesc')}</Text>
+              <Text style={styles.quickEntryTitle}>
+                {t('syncActivity.quickEntry.sharedFilesTitle')}
+              </Text>
+              <Text style={styles.quickEntryDesc}>
+                {t('syncActivity.quickEntry.sharedFilesDesc')}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1531,18 +1695,15 @@ export function SyncActivityScreen() {
       {FEATURES.SUBSCRIPTION_ENFORCEMENT &&
         auth.isLoggedIn &&
         !isFeatureAccessAllowed(auth.user?.status) && (
-          <Modal
-            visible
-            transparent
-            animationType="fade"
-            statusBarTranslucent
-          >
+          <Modal visible transparent animationType="fade" statusBarTranslucent>
             <View style={styles.expiredOverlay}>
               <View style={styles.expiredCard}>
                 <View style={styles.expiredIconCircle}>
                   <Icon name="shield-outline" size={36} color="#8b5cf6" />
                 </View>
-                <Text style={styles.expiredTitle}>{t('syncActivity.expired.title')}</Text>
+                <Text style={styles.expiredTitle}>
+                  {t('syncActivity.expired.title')}
+                </Text>
                 <Text style={styles.expiredSubtitle}>
                   {t('syncActivity.expired.subtitle')}
                 </Text>
@@ -1551,13 +1712,17 @@ export function SyncActivityScreen() {
                   activeOpacity={0.7}
                   onPress={() => navigation.navigate('Subscription')}
                 >
-                  <Text style={styles.expiredPrimaryButtonText}>{t('syncActivity.expired.subscribeCta')}</Text>
+                  <Text style={styles.expiredPrimaryButtonText}>
+                    {t('syncActivity.expired.subscribeCta')}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   activeOpacity={0.6}
                   onPress={() => navigation.navigate('Help')}
                 >
-                  <Text style={styles.expiredSecondaryText}>{t('syncActivity.expired.viewHelp')}</Text>
+                  <Text style={styles.expiredSecondaryText}>
+                    {t('syncActivity.expired.viewHelp')}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1594,11 +1759,9 @@ export function buildOverview(
     uploadState === 'completed' ||
     uploadState === 'idle' ||
     uploadState === 'paused_auto_upload';
-  const nextCurrentTaskSource =
-    hasCurrentTaskSource
-      ? ((payload.currentTaskSource as UploadTaskSource | undefined) ??
-        undefined)
-      : prev.currentTaskSource;
+  const nextCurrentTaskSource = hasCurrentTaskSource
+    ? (payload.currentTaskSource as UploadTaskSource | undefined) ?? undefined
+    : prev.currentTaskSource;
   const nextCompletedCount =
     (payload.completedCount as number | undefined) ?? prev.completedCount;
   const nextTotalCount =
@@ -1640,13 +1803,12 @@ export function buildOverview(
           prev.totalBytes,
           prev.completedBytes + prev.currentFileConfirmedBytes,
         )
-    : ((payload.completedBytes as number | undefined) ??
-      prev.completedBytes);
+    : (payload.completedBytes as number | undefined) ?? prev.completedBytes;
   const effectiveTotalBytes = isManualFinalFileSettlingToIdle
     ? Math.max(prev.totalBytes, effectiveCompletedBytes)
-    : ((payload.totalBytes as number | undefined) ??
+    : (payload.totalBytes as number | undefined) ??
       (payload.queueTotalBytes as number | undefined) ??
-      prev.totalBytes);
+      prev.totalBytes;
   const roundSettledStates = new Set(['idle', 'paused_auto_upload']);
   const roundCompletionBridgeStates = new Set([
     ...roundSettledStates,
@@ -1665,11 +1827,15 @@ export function buildOverview(
       ? nextCurrentTaskSource ??
         prev.currentTaskSource ??
         prev.lastCompletedTaskSource ??
-        ((prev.autoUploadState === 'active' ? 'auto' : 'manual') as UploadTaskSource)
+        ((prev.autoUploadState === 'active'
+          ? 'auto'
+          : 'manual') as UploadTaskSource)
       : roundFinishedWithoutCompletedPulse
-        ? prev.currentTaskSource ??
-          prev.lastCompletedTaskSource ??
-          ((prev.autoUploadState === 'active' ? 'auto' : 'manual') as UploadTaskSource)
+      ? prev.currentTaskSource ??
+        prev.lastCompletedTaskSource ??
+        ((prev.autoUploadState === 'active'
+          ? 'auto'
+          : 'manual') as UploadTaskSource)
       : prev.lastCompletedTaskSource;
 
   return {
@@ -1681,45 +1847,40 @@ export function buildOverview(
     currentSpeedMbps:
       uploadState === 'reconnecting'
         ? 0
-        : ((payload.currentSpeedMbps as number | undefined) ??
-          prev.currentSpeedMbps),
+        : (payload.currentSpeedMbps as number | undefined) ??
+          prev.currentSpeedMbps,
     uploadState,
     completedCount: effectiveCompletedCount,
     totalCount: effectiveTotalCount,
     completedBytes: effectiveCompletedBytes,
     totalBytes: effectiveTotalBytes,
-    currentFile:
-      shouldClearActiveFile
-        ? undefined
-        : 'currentFile' in payload
-          ? typeof payload.currentFile === 'string'
-            ? payload.currentFile
-            : undefined
-          : prev.currentFile,
-    currentFilename:
-      shouldClearActiveFile
-        ? undefined
-        : 'currentFilename' in payload
-          ? typeof payload.currentFilename === 'string'
-            ? payload.currentFilename
-            : undefined
-          : prev.currentFilename,
-    currentFileConfirmedBytes:
-      shouldClearActiveFile
-        ? 0
-        : 'currentFileConfirmedBytes' in payload || 'confirmedBytes' in payload
-          ? currentFileConfirmedBytes
-          : prev.currentFileConfirmedBytes,
-    currentFileTotalBytes:
-      shouldClearActiveFile
-        ? 0
-        : 'currentFileTotalBytes' in payload
-          ? currentFileTotalBytes
-          : prev.currentFileTotalBytes,
+    currentFile: shouldClearActiveFile
+      ? undefined
+      : 'currentFile' in payload
+      ? typeof payload.currentFile === 'string'
+        ? payload.currentFile
+        : undefined
+      : prev.currentFile,
+    currentFilename: shouldClearActiveFile
+      ? undefined
+      : 'currentFilename' in payload
+      ? typeof payload.currentFilename === 'string'
+        ? payload.currentFilename
+        : undefined
+      : prev.currentFilename,
+    currentFileConfirmedBytes: shouldClearActiveFile
+      ? 0
+      : 'currentFileConfirmedBytes' in payload || 'confirmedBytes' in payload
+      ? currentFileConfirmedBytes
+      : prev.currentFileConfirmedBytes,
+    currentFileTotalBytes: shouldClearActiveFile
+      ? 0
+      : 'currentFileTotalBytes' in payload
+      ? currentFileTotalBytes
+      : prev.currentFileTotalBytes,
     // Native sends null (NSNull) when no task is active — respect it as
     // "clear". Only fall back to prev when the key is absent from payload.
-    currentTaskSource:
-      nextCurrentTaskSource,
+    currentTaskSource: nextCurrentTaskSource,
     lastCompletedTaskSource: derivedLastCompletedTaskSource,
     autoUploadState: nextAutoUploadState,
     manualPending: nextManualPending,
@@ -1730,10 +1891,8 @@ export function buildOverview(
         : prev.lastErrorCode,
     discoveryElapsedSec:
       (payload.discoveryElapsedSec as number | undefined) ?? undefined,
-    libraryTotal:
-      (payload.libraryTotal as number | undefined) ?? undefined,
-    scannedCount:
-      (payload.scannedCount as number | undefined) ?? undefined,
+    libraryTotal: (payload.libraryTotal as number | undefined) ?? undefined,
+    scannedCount: (payload.scannedCount as number | undefined) ?? undefined,
   };
 }
 

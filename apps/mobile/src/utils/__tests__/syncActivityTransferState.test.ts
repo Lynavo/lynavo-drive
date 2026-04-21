@@ -173,7 +173,9 @@ describe('syncActivityTransferState', () => {
     };
 
     expect(isSyncActivityActivelyTransferring(snapshot)).toBe(false);
-    expect(getSyncActivityMainCardState(snapshot, false)).toBe('auto_completed');
+    expect(getSyncActivityMainCardState(snapshot, false)).toBe(
+      'auto_completed',
+    );
   });
 
   it('shows manual completed state after a manual round finishes', () => {
@@ -309,5 +311,50 @@ describe('syncActivityTransferState', () => {
     };
 
     expect(getSyncActivityMainCardState(snapshot, false)).toBe('running');
+  });
+
+  // Regression: during Wi-Fi flip mid-manual-batch the native layer emits
+  // uploadState='reconnecting'. Before this was added to the preparation-
+  // phase list the running card fell through to the "auto upload running"
+  // fallback, producing a Frankenstein UI mixing manual badge + auto title
+  // + "取消本次手動上傳" button. Both the selector (mainCardState) and
+  // the screen's PREPARATION_STATES must agree that reconnecting is a
+  // preparation phase so the active-but-idle else-branch is never reached.
+  it('keeps running state during reconnecting when a manual batch is pending', () => {
+    const snapshot = {
+      uploadState: 'reconnecting',
+      autoUploadState: 'interrupted' as const,
+      completedCount: 0,
+      totalCount: 1,
+      autoPending: 0,
+      manualPending: 1,
+      currentTaskSource: 'manual' as const,
+      lastCompletedTaskSource: undefined,
+      currentFileConfirmedBytes: 0,
+      currentFileTotalBytes: 0,
+    };
+
+    // Offline debounce may or may not have fired; selector behaviour must
+    // be the same either way because hasManualWork short-circuits first.
+    expect(getSyncActivityMainCardState(snapshot, false)).toBe('running');
+    expect(getSyncActivityMainCardState(snapshot, true)).toBe('running');
+  });
+
+  it('keeps running state during reconnecting mid-batch (after a file has completed)', () => {
+    const snapshot = {
+      uploadState: 'reconnecting',
+      autoUploadState: 'interrupted' as const,
+      completedCount: 3,
+      totalCount: 6,
+      autoPending: 0,
+      manualPending: 3,
+      currentTaskSource: 'manual' as const,
+      lastCompletedTaskSource: 'manual' as const,
+      currentFileConfirmedBytes: 0,
+      currentFileTotalBytes: 0,
+    };
+
+    expect(getSyncActivityMainCardState(snapshot, false)).toBe('running');
+    expect(getSyncActivityMainCardState(snapshot, true)).toBe('running');
   });
 });

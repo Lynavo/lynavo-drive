@@ -1,4 +1,10 @@
-import React, { createContext, useCallback, useContext, useEffect, useReducer } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useReducer,
+} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Keychain from 'react-native-keychain';
 import i18next from 'i18next';
@@ -17,11 +23,15 @@ import { bootstrapAuthedSession } from './bootstrapAuthedSession';
 // Types
 // ---------------------------------------------------------------------------
 
-export type AccountStatus = 'trialing' | 'subscribed' | 'trial_expired' | 'sub_expired';
+export type AccountStatus =
+  | 'trialing'
+  | 'subscribed'
+  | 'trial_expired'
+  | 'sub_expired';
 export type SubscriptionPlan = 'monthly' | 'yearly' | '';
 
 export interface IdentityDescriptor {
-  type: string;   // 'phone_cn' | 'email' | 'apple' | 'google'
+  type: string; // 'phone_cn' | 'email' | 'apple' | 'google'
   display: string; // server-side masked
 }
 
@@ -85,6 +95,7 @@ const LEGACY_STORAGE_KEY_REFRESH = '@vividrop/auth/refresh_token';
 
 let _accessToken: string | null = null;
 let _refreshToken: string | null = null;
+let _authSessionGeneration = 0;
 
 export function getAccessToken(): string | null {
   return _accessToken;
@@ -97,6 +108,24 @@ export function getRefreshToken(): string | null {
 function syncTokensToModule(access: string | null, refresh: string | null) {
   _accessToken = access;
   _refreshToken = refresh;
+}
+
+function bumpAuthSessionGeneration() {
+  _authSessionGeneration += 1;
+}
+
+function loadAuthService(): Promise<typeof import('../services/auth-service')> {
+  return Promise.resolve(
+    require('../services/auth-service') as typeof import('../services/auth-service'),
+  );
+}
+
+function loadSubscriptionService(): Promise<
+  typeof import('../services/subscription-service')
+> {
+  return Promise.resolve(
+    require('../services/subscription-service') as typeof import('../services/subscription-service'),
+  );
 }
 
 // Persist tokens to the Keychain. Fire-and-forget: in-memory tokens drive the
@@ -126,7 +155,9 @@ async function loadPersistedTokens(): Promise<{
 }> {
   // 1. Try the Keychain first.
   try {
-    const cred = await Keychain.getGenericPassword({ service: KEYCHAIN_SERVICE });
+    const cred = await Keychain.getGenericPassword({
+      service: KEYCHAIN_SERVICE,
+    });
     if (cred && cred.password) {
       const parsed = JSON.parse(cred.password) as {
         access?: string;
@@ -300,6 +331,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback((accessToken: string, refreshToken: string) => {
+    bumpAuthSessionGeneration();
     dispatch({ type: 'LOGIN', accessToken, refreshToken });
     persistTokens(accessToken, refreshToken);
   }, []);
@@ -317,27 +349,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'SET_SUBSCRIPTION', subscription: info });
   }, []);
 
-  const setSignedOutTransition = useCallback((transition: SignedOutTransition) => {
-    dispatch({ type: 'SET_SIGNED_OUT_TRANSITION', transition });
-  }, []);
+  const setSignedOutTransition = useCallback(
+    (transition: SignedOutTransition) => {
+      dispatch({ type: 'SET_SIGNED_OUT_TRANSITION', transition });
+    },
+    [],
+  );
 
   const clearAuth = useCallback(() => {
+    bumpAuthSessionGeneration();
     dispatch({ type: 'CLEAR' });
     syncTokensToModule(null, null);
     persistTokens(null, null);
   }, []);
 
   // Register store actions so the API layer can update tokens / force logout
-  // without importing React context directly. Lazy import avoids circular dep.
+  // without importing React context directly. Lazy require avoids circular dep.
   useEffect(() => {
-    import('../services/auth-service').then(({ registerAuthStoreActions }) =>
+    loadAuthService().then(({ registerAuthStoreActions }) =>
       registerAuthStoreActions(
         (access, refresh) => {
-          dispatch({ type: 'SET_TOKENS', accessToken: access, refreshToken: refresh });
+          dispatch({
+            type: 'SET_TOKENS',
+            accessToken: access,
+            refreshToken: refresh,
+          });
           syncTokensToModule(access, refresh);
           persistTokens(access, refresh);
         },
         () => {
+          bumpAuthSessionGeneration();
           dispatch({ type: 'CLEAR' });
           syncTokensToModule(null, null);
           persistTokens(null, null);
@@ -347,8 +388,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loadProfile = useCallback(async () => {
-    // Lazy import to avoid circular dependency (api -> auth-store -> auth-service -> api)
-    const { getUserProfile } = await import('../services/auth-service');
+    // Lazy require to avoid circular dependency (api -> auth-store -> auth-service -> api)
+    const { getUserProfile } = await loadAuthService();
     dispatch({ type: 'SET_LOADING', isLoading: true });
     try {
       const profile = await getUserProfile();
@@ -359,7 +400,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loadSubscription = useCallback(async (): Promise<SubscriptionInfo> => {
-    const { getSubscriptionStatus } = await import('../services/subscription-service');
+    const { getSubscriptionStatus } = await loadSubscriptionService();
     dispatch({ type: 'SET_LOADING', isLoading: true });
     try {
       const info = await getSubscriptionStatus();
@@ -376,54 +417,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // cleanup sequence to `bootstrapAuthedSession` (a pure function,
   // exhaustively unit-tested) and maps its outcome to reducer dispatches.
   //
-  // Cancellation: we capture the access token at entry and poll it
-  // between each step. Any change (external logout, refresh-token
-  // failure, racing login) makes this run stale and all further
-  // dispatches are suppressed.
+  // Cancellation: capture the auth session generation at entry and poll it
+  // between each step. A silent refresh rotates tokens during normal
+  // bootstrap and must not strand the profile loader as "cancelled". External
+  // logout, refresh-token failure, and racing login all bump the generation
+  // and suppress further dispatches from the old run.
   const ensureProfileLoaded = useCallback(async () => {
-    const capturedAccessToken = _accessToken;
-    const isStale = () => _accessToken !== capturedAccessToken;
+    const capturedAuthSessionGeneration = _authSessionGeneration;
+    const isStale = () =>
+      _authSessionGeneration !== capturedAuthSessionGeneration;
 
     dispatch({ type: 'PROFILE_LOAD_START' });
 
-    const { getUserProfile } = await import('../services/auth-service');
-    const { getSubscriptionStatus } = await import(
-      '../services/subscription-service'
-    );
+    try {
+      const { getUserProfile } = await loadAuthService();
+      const { getSubscriptionStatus } = await loadSubscriptionService();
 
-    const outcome = await bootstrapAuthedSession(
-      {
-        fetchProfile: getUserProfile,
-        fetchSubscription: getSubscriptionStatus,
-        getOwnerUserId: nativeGetOwnerUserId,
-        setOwnerUserId: nativeSetOwnerUserId,
-        wipeSyncIdentity: nativeWipeSyncIdentity,
-        resetSidecar: resetCurrentDesktopSidecarIfReachable,
-        clearUserScopedStorage,
-      },
-      isStale,
-    );
+      const outcome = await bootstrapAuthedSession(
+        {
+          fetchProfile: getUserProfile,
+          fetchSubscription: getSubscriptionStatus,
+          getOwnerUserId: nativeGetOwnerUserId,
+          setOwnerUserId: nativeSetOwnerUserId,
+          wipeSyncIdentity: nativeWipeSyncIdentity,
+          resetSidecar: resetCurrentDesktopSidecarIfReachable,
+          clearUserScopedStorage,
+        },
+        isStale,
+      );
 
-    if (isStale()) return;
+      if (isStale()) return;
 
-    switch (outcome.kind) {
-      case 'ready':
-        dispatch({ type: 'SET_USER', user: outcome.profile });
-        if (outcome.subscription) {
-          dispatch({
-            type: 'SET_SUBSCRIPTION',
-            subscription: outcome.subscription,
-          });
-        }
-        dispatch({ type: 'PROFILE_LOAD_SUCCESS' });
-        return;
-      case 'error':
-        dispatch({ type: 'PROFILE_LOAD_FAILURE', error: outcome.error });
-        return;
-      case 'cancelled':
-        // Auth was torn down mid-bootstrap (CLEAR, LOGIN race, etc.).
-        // The reducer already moved on — don't dispatch anything.
-        return;
+      switch (outcome.kind) {
+        case 'ready':
+          dispatch({ type: 'SET_USER', user: outcome.profile });
+          if (outcome.subscription) {
+            dispatch({
+              type: 'SET_SUBSCRIPTION',
+              subscription: outcome.subscription,
+            });
+          }
+          dispatch({ type: 'PROFILE_LOAD_SUCCESS' });
+          return;
+        case 'error':
+          dispatch({ type: 'PROFILE_LOAD_FAILURE', error: outcome.error });
+          return;
+        case 'cancelled':
+          // Auth was torn down mid-bootstrap (CLEAR, LOGIN race, etc.).
+          // The reducer already moved on — don't dispatch anything.
+          return;
+      }
+    } catch (err) {
+      if (isStale()) return;
+      dispatch({
+        type: 'PROFILE_LOAD_FAILURE',
+        error:
+          err instanceof ApiError
+            ? err
+            : new ApiError(
+                ERROR_CODE.SERVER_ERROR,
+                i18next.t('errors.profileLoadFailed'),
+              ),
+      });
     }
   }, []);
 

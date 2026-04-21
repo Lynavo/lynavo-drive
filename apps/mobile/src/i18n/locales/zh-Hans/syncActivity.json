@@ -12,6 +12,8 @@
     "scanningSubtitleProgress": "已扫描 {{scanned}} / {{total}} 张",
     "scanningSubtitleReading": "正在读取相册",
     "preparingSubtitle": "正在与电脑建立安全连接",
+    "reconnectingTitle": "网络波动，正在重连…",
+    "reconnectingSubtitle": "恢复连线后会继续本次上传",
     "autoPreparingTitle": "正在开启自动同步…",
     "autoPreparingSubtitle": "即将开始扫描新照片"
   },

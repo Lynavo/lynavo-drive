@@ -12,6 +12,8 @@
     "scanningSubtitleProgress": "Scanned {{scanned}} / {{total}}",
     "scanningSubtitleReading": "Reading photo library",
     "preparingSubtitle": "Establishing a secure connection to your computer",
+    "reconnectingTitle": "Network hiccup — reconnecting…",
+    "reconnectingSubtitle": "Upload will resume once the connection is back",
     "autoPreparingTitle": "Enabling auto-upload…",
     "autoPreparingSubtitle": "Preparing to scan for new photos"
   },

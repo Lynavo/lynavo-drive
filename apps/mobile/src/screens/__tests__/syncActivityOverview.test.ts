@@ -1,13 +1,12 @@
 import {
   buildOverview,
   getSyncActivityDisplayProgressPercent,
+  isPreparationPhase,
   resolveSyncErrorAlertMessage,
   shouldDelayAutoCompletionCard,
   shouldRenderSyncActivityProgress,
 } from '../SyncActivityScreen';
-import {
-  getSyncActivityMainCardState,
-} from '../../utils/syncActivityTransferState';
+import { getSyncActivityMainCardState } from '../../utils/syncActivityTransferState';
 import type { TFunction } from 'i18next';
 
 jest.mock('@react-navigation/native', () => ({
@@ -300,9 +299,7 @@ describe('buildOverview', () => {
     expect(next.completedBytes).toBe(8192);
     expect(next.totalBytes).toBe(8192);
     expect(next.lastCompletedTaskSource).toBe('manual');
-    expect(getSyncActivityMainCardState(next, false)).toBe(
-      'manual_completed',
-    );
+    expect(getSyncActivityMainCardState(next, false)).toBe('manual_completed');
   });
 
   it('keeps manual completion after the final upload pulse clears current source', () => {
@@ -345,9 +342,7 @@ describe('buildOverview', () => {
     expect(next.completedBytes).toBe(63406077);
     expect(next.totalBytes).toBe(63406077);
     expect(next.lastCompletedTaskSource).toBe('manual');
-    expect(getSyncActivityMainCardState(next, false)).toBe(
-      'manual_completed',
-    );
+    expect(getSyncActivityMainCardState(next, false)).toBe('manual_completed');
   });
 
   it('does not convert a manual auto-upload interruption into auto completion', () => {
@@ -472,13 +467,7 @@ describe('shouldDelayAutoCompletionCard', () => {
   it('stops holding once the visual hold window expires', () => {
     const now = Date.now();
     expect(
-      shouldDelayAutoCompletionCard(
-        'standby',
-        'idle',
-        'active',
-        now - 1,
-        now,
-      ),
+      shouldDelayAutoCompletionCard('standby', 'idle', 'active', now - 1, now),
     ).toBe(false);
   });
 
@@ -529,6 +518,31 @@ describe('shouldRenderSyncActivityProgress', () => {
       true,
     );
   });
+});
+
+describe('isPreparationPhase', () => {
+  // Regression: native emits uploadState='reconnecting' on every retryable
+  // upload failure (SyncEngineManager.swift). Without this membership the
+  // running card's preparation guard evaluates false and the fallback
+  // else-branch renders the auto-running title over a manual batch — the
+  // Frankenstein UI bug reproduced by flipping desktop Wi-Fi mid-upload.
+  it.each([
+    'discovering',
+    'reconciling',
+    'scanning',
+    'preparing',
+    'backoff_waiting',
+    'reconnecting',
+  ])('treats %s as a preparation phase', state => {
+    expect(isPreparationPhase(state)).toBe(true);
+  });
+
+  it.each(['uploading', 'completed', 'idle', 'paused_auto_upload'])(
+    'does not treat %s as a preparation phase',
+    state => {
+      expect(isPreparationPhase(state)).toBe(false);
+    },
+  );
 });
 
 describe('getSyncActivityDisplayProgressPercent', () => {
