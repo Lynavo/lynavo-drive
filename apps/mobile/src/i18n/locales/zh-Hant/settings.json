@@ -1,0 +1,106 @@
+{
+  "title": "設定",
+  "versionLabel": "v{{version}} ({{build}})",
+  "sections": {
+    "connectedDevice": "已連接設備",
+    "supportHelp": "支援與幫助"
+  },
+  "android": {
+    "title": "Android 端能力說明",
+    "body": "目前版本已提供 Android 殼層、區域網路自動發現、基礎配對與診斷匯出入口；掃碼配對、真實上傳隊列、後台重連和增量同步仍未移植到 Android 原生引擎。"
+  },
+  "connection": {
+    "online": "在線",
+    "connecting": "連接中",
+    "offline": "離線",
+    "notConnected": "未連接"
+  },
+  "subscription": {
+    "subscribed": "訂閱服務",
+    "trial": "試用服務",
+    "trialDays": "{{days}} 天",
+    "freeTrial": "免費試用",
+    "introTrial": "月訂閱免費期",
+    "expired": "已到期",
+    "active": "有效",
+    "subscribeCta": "立即訂閱"
+  },
+  "myDevice": {
+    "label": "我的設備名稱",
+    "hint": "此名稱將在 Mac 端顯示"
+  },
+  "photoPermission": {
+    "title": "照片權限未開啟",
+    "body": "需要允許存取照片後才能繼續自動同步。",
+    "openSettings": "開啟系統設定"
+  },
+  "rows": {
+    "currentAccount": "當前帳號",
+    "latestSync": "最近同步",
+    "appVersion": "應用版本",
+    "language": "語言"
+  },
+  "language": {
+    "system": "跟隨系統",
+    "traditionalChinese": "繁中",
+    "simplifiedChinese": "簡中",
+    "english": "English"
+  },
+  "actions": {
+    "exportDiagnostics": "匯出診斷包",
+    "exportingDiagnostics": "正在匯出診斷包…",
+    "help": "幫助",
+    "resetSyncStatus": "重置同步狀態",
+    "logout": "登出",
+    "switch": "切換",
+    "deleteAccount": "刪除帳號",
+    "deletingAccount": "刪除中…"
+  },
+  "status": {
+    "noRecord": "暫無記錄",
+    "reading": "讀取中…",
+    "notBound": "未綁定"
+  },
+  "dates": {
+    "todayAt": "今天 {{time}}",
+    "monthDayAt": "{{month}}月{{day}}日 {{time}}",
+    "fullDate": "{{year}}/{{month}}/{{day}} {{time}}"
+  },
+  "dialogs": {
+    "switchDevice": {
+      "title": "切換設備",
+      "body": "確定要斷開當前電腦並切換到其他設備嗎？斷開後需要重新輸入連接碼配對。",
+      "confirm": "確定切換"
+    },
+    "resetSync": {
+      "title": "重置所有同步狀態",
+      "body": "將清除所有同步記錄並斷開當前設備連接，需要重新輸入連接碼配對。手機和電腦上的照片不會被刪除。",
+      "confirm": "確定重置"
+    },
+    "logout": {
+      "title": "登出",
+      "body": "確定要登出嗎？",
+      "confirm": "確定退出"
+    },
+    "exportUnavailable": {
+      "title": "無法導出",
+      "body": "目前版本暫不支援匯出診斷包"
+    },
+    "exportFailed": {
+      "title": "匯出失敗",
+      "body": "診斷包匯出失敗，請稍後重試"
+    },
+    "languageSaveFailed": {
+      "title": "無法切換語言",
+      "body": "語言設定保存失敗，請稍後再試。"
+    },
+    "deleteAccount": {
+      "title": "刪除帳號",
+      "body": "此動作將永久刪除你的帳號、所有登入方式與使用紀錄。此動作無法復原。",
+      "continue": "繼續",
+      "confirmAgainTitle": "確定刪除帳號？",
+      "confirmAgainBody": "這是最後一次確認。刪除後資料無法救回。",
+      "confirmAgainButton": "確定刪除"
+    }
+  }
+}

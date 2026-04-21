@@ -3,11 +3,16 @@ import { StatusBar, StyleSheet, useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as RNLocalize from 'react-native-localize';
 
 import { AuthProvider } from './stores/auth-store';
 import { RootNavigator } from './navigation/RootNavigator';
 import { loadDebugBaseUrlOverride } from './services/config';
-import './i18n';
+import i18n from './i18n';
+import {
+  loadStoredLanguagePreference,
+  resolveLanguagePreference,
+} from './i18n/language-preference';
 
 export function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -16,7 +21,16 @@ export function App() {
   // mounts and triggers its first request — see services/config.ts for the
   // real-device debug instructions.
   useEffect(() => {
-    loadDebugBaseUrlOverride();
+    void loadDebugBaseUrlOverride();
+    void loadStoredLanguagePreference().then(preference => {
+      const language = resolveLanguagePreference(
+        preference,
+        RNLocalize.getLocales(),
+      );
+      if (i18n.language !== language) {
+        void i18n.changeLanguage(language);
+      }
+    });
   }, []);
 
   return (
@@ -24,7 +38,9 @@ export function App() {
       <GestureHandlerRootView style={styles.root}>
         <SafeAreaProvider>
           <NavigationContainer>
-            <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+            <StatusBar
+              barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+            />
             <RootNavigator />
           </NavigationContainer>
         </SafeAreaProvider>

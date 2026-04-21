@@ -1,6 +1,7 @@
 import React from 'react';
 import { Alert } from 'react-native';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SubscriptionInfo, UserProfile } from '../../stores/auth-store';
 
 jest.mock('react-native-localize', () => ({
@@ -38,6 +39,7 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
+  __esModule: true,
   default: {
     getItem: jest.fn(),
     setItem: jest.fn(),
@@ -143,6 +145,7 @@ import { SettingsScreen } from '../SettingsScreen';
 import { NativeModules, NativeEventEmitter } from 'react-native';
 import { ApiError, ERROR_CODE } from '../../services/api';
 import { iapService } from '../../services/iap-service';
+import { LANGUAGE_PREFERENCE_STORAGE_KEY } from '../../i18n/language-preference';
 
 const mockNativeSyncEngine = {
   getBindingState: jest.fn().mockResolvedValue(null),
@@ -170,11 +173,14 @@ describe('SettingsScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(null);
+    (AsyncStorage.setItem as jest.Mock).mockResolvedValue(undefined);
+    (AsyncStorage.removeItem as jest.Mock).mockResolvedValue(undefined);
     resetMockAuth();
     NativeModules.NativeSyncEngine = mockNativeSyncEngine;
     jest
       .spyOn(NativeEventEmitter.prototype, 'addListener')
-      .mockImplementation(() => ({ remove: jest.fn() } as never));
+      .mockImplementation(() => ({ remove: jest.fn() }) as never);
   });
 
   test('subscription card prefers subscription status over stale user status', async () => {
@@ -231,5 +237,26 @@ describe('SettingsScreen', () => {
     await waitFor(() => expect(alertSpy).toHaveBeenCalled());
     expect(alertSpy.mock.calls[0]?.[0]).toMatch(/Apple.*綁定/);
     alertSpy.mockRestore();
+  });
+
+  test('language selector persists the selected language and updates the screen immediately', async () => {
+    const { getByText } = render(<SettingsScreen />);
+
+    await waitFor(() => {
+      expect(getByText('語言')).toBeTruthy();
+    });
+
+    fireEvent.press(getByText('English'));
+
+    await waitFor(() => {
+      expect(i18n.language).toBe('en');
+    });
+
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      LANGUAGE_PREFERENCE_STORAGE_KEY,
+      'en',
+    );
+    expect(getByText('Settings')).toBeTruthy();
+    expect(getByText('Language')).toBeTruthy();
   });
 });

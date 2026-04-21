@@ -18,6 +18,7 @@ import { useNavigation, CommonActions } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
+import * as RNLocalize from 'react-native-localize';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { Icon } from '../components/Icon';
 import { useAuth } from '../stores/auth-store';
@@ -43,6 +44,12 @@ import {
   type MobileConnectionState,
 } from '../utils/effectiveConnectionState';
 import { resolveSubscriptionDisplayState } from '../utils/subscriptionStatusDisplay';
+import {
+  loadStoredLanguagePreference,
+  resolveLanguagePreference,
+  saveLanguagePreference,
+  type LanguagePreference,
+} from '../i18n/language-preference';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -82,6 +89,21 @@ type SettingsSyncOverviewState = {
   currentFileConfirmedBytes: number;
   uploadState: string;
 };
+type LanguageOption = {
+  value: LanguagePreference;
+  labelKey:
+    | 'settings.language.system'
+    | 'settings.language.traditionalChinese'
+    | 'settings.language.simplifiedChinese'
+    | 'settings.language.english';
+};
+
+const LANGUAGE_OPTIONS: readonly LanguageOption[] = [
+  { value: 'system', labelKey: 'settings.language.system' },
+  { value: 'zh-Hant', labelKey: 'settings.language.traditionalChinese' },
+  { value: 'zh-Hans', labelKey: 'settings.language.simplifiedChinese' },
+  { value: 'en', labelKey: 'settings.language.english' },
+];
 
 function formatAppVersionLabel(
   appInfo: Record<string, unknown> | undefined,
@@ -202,10 +224,33 @@ export function SettingsScreen() {
   const [isPhotoPermissionBlocked, setIsPhotoPermissionBlocked] =
     useState(false);
   const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false);
+  const [languagePreference, setLanguagePreference] =
+    useState<LanguagePreference>('system');
+  const [isChangingLanguage, setIsChangingLanguage] = useState(false);
 
   // My iPhone display name
   const [myName, setMyName] = useState('iPhone');
   const [editingMyName, setEditingMyName] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    loadStoredLanguagePreference()
+      .then(preference => {
+        if (!cancelled) {
+          setLanguagePreference(preference);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLanguagePreference('system');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Load real binding state + client display name from native module
@@ -493,6 +538,35 @@ export function SettingsScreen() {
       ],
     );
   }, [navigation, t]);
+
+  const handleLanguagePreferenceChange = useCallback(
+    async (preference: LanguagePreference) => {
+      if (preference === languagePreference || isChangingLanguage) return;
+
+      const previousPreference = languagePreference;
+      setLanguagePreference(preference);
+      setIsChangingLanguage(true);
+      try {
+        await saveLanguagePreference(preference);
+        const nextLanguage = resolveLanguagePreference(
+          preference,
+          RNLocalize.getLocales(),
+        );
+        if (i18n.language !== nextLanguage) {
+          await i18n.changeLanguage(nextLanguage);
+        }
+      } catch (error) {
+        setLanguagePreference(previousPreference);
+        Alert.alert(
+          t('settings.dialogs.languageSaveFailed.title'),
+          t('settings.dialogs.languageSaveFailed.body'),
+        );
+      } finally {
+        setIsChangingLanguage(false);
+      }
+    },
+    [i18n, isChangingLanguage, languagePreference, t],
+  );
 
   // Guards against double-submission. A single full logout path runs roughly
   // sidecar-timeout + native-wipe + AsyncStorage sweep — sub-second in the
@@ -861,8 +935,8 @@ export function SettingsScreen() {
                     isConnected
                       ? styles.statusDotOnline
                       : isConnecting
-                      ? styles.statusDotConnecting
-                      : styles.statusDotOffline,
+                        ? styles.statusDotConnecting
+                        : styles.statusDotOffline,
                   ]}
                 />
                 <Text
@@ -871,15 +945,15 @@ export function SettingsScreen() {
                     isConnected
                       ? styles.statusTextOnline
                       : isConnecting
-                      ? styles.statusTextConnecting
-                      : styles.statusTextOffline,
+                        ? styles.statusTextConnecting
+                        : styles.statusTextOffline,
                   ]}
                 >
                   {isConnected
                     ? t('settings.connection.online')
                     : isConnecting
-                    ? t('settings.connection.connecting')
-                    : t('settings.connection.offline')}
+                      ? t('settings.connection.connecting')
+                      : t('settings.connection.offline')}
                 </Text>
               </View>
               <TouchableOpacity
@@ -931,8 +1005,8 @@ export function SettingsScreen() {
                 isSubscriptionIntroTrial
                   ? t('settings.subscription.subscribed')
                   : isAccountTrial || isTrialExpired
-                  ? t('settings.subscription.trial')
-                  : t('subscription.title')}
+                    ? t('settings.subscription.trial')
+                    : t('subscription.title')}
               </Text>
             </View>
             {isAccountTrial || isSubscriptionIntroTrial ? (
@@ -1091,6 +1165,48 @@ export function SettingsScreen() {
               {t('settings.rows.appVersion')}
             </Text>
             <Text style={styles.infoRowValue}>{appVersionLabel}</Text>
+          </View>
+          <View style={styles.listSep} />
+          <View style={styles.languageRow}>
+            <View style={styles.languageHeaderRow}>
+              <Text style={styles.infoRowLabel}>
+                {t('settings.rows.language')}
+              </Text>
+            </View>
+            <View style={styles.languageOptions}>
+              {LANGUAGE_OPTIONS.map(option => {
+                const isSelected = languagePreference === option.value;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.languageOption,
+                      isSelected ? styles.languageOptionSelected : null,
+                    ]}
+                    activeOpacity={0.75}
+                    disabled={isChangingLanguage}
+                    onPress={() => {
+                      void handleLanguagePreferenceChange(option.value);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityState={{
+                      selected: isSelected,
+                      disabled: isChangingLanguage,
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.languageOptionText,
+                        isSelected ? styles.languageOptionTextSelected : null,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {t(option.labelKey)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
         </View>
 
@@ -1594,6 +1710,43 @@ const styles = StyleSheet.create({
     color: MUTED_TEXT,
     flexShrink: 1,
     textAlign: 'right',
+  },
+  languageRow: {
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    gap: 10,
+  },
+  languageHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  languageOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  languageOption: {
+    minHeight: 34,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#d4e5f1',
+    backgroundColor: '#f7fbfe',
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  languageOptionSelected: {
+    borderColor: BLUE,
+    backgroundColor: 'rgba(59,159,216,0.12)',
+  },
+  languageOptionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: MUTED_TEXT,
+  },
+  languageOptionTextSelected: {
+    color: BLUE,
   },
 
   // Action rows (support & help)

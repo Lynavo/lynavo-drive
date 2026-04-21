@@ -1,0 +1,106 @@
+{
+  "title": "Settings",
+  "versionLabel": "v{{version}} ({{build}})",
+  "sections": {
+    "connectedDevice": "Connected Device",
+    "supportHelp": "Support & Help"
+  },
+  "android": {
+    "title": "Android Capability Notes",
+    "body": "This build ships the Android shell, LAN auto-discovery, basic pairing, and diagnostics export. QR pairing, the real upload queue, background reconnection, and incremental sync have not yet been ported to the Android native engine."
+  },
+  "connection": {
+    "online": "Online",
+    "connecting": "Connecting",
+    "offline": "Offline",
+    "notConnected": "Not connected"
+  },
+  "subscription": {
+    "subscribed": "Subscription",
+    "trial": "Trial",
+    "trialDays": "{{days}} days",
+    "freeTrial": "Free trial",
+    "introTrial": "Monthly intro trial",
+    "expired": "Expired",
+    "active": "Active",
+    "subscribeCta": "Subscribe Now"
+  },
+  "myDevice": {
+    "label": "My Device Name",
+    "hint": "This name will be shown on your Mac."
+  },
+  "photoPermission": {
+    "title": "Photo Access Is Off",
+    "body": "Allow access to Photos to keep auto-sync running.",
+    "openSettings": "Open System Settings"
+  },
+  "rows": {
+    "currentAccount": "Current Account",
+    "latestSync": "Latest Sync",
+    "appVersion": "App Version",
+    "language": "Language"
+  },
+  "language": {
+    "system": "System",
+    "traditionalChinese": "繁中",
+    "simplifiedChinese": "简中",
+    "english": "English"
+  },
+  "actions": {
+    "exportDiagnostics": "Export Diagnostics",
+    "exportingDiagnostics": "Exporting diagnostics...",
+    "help": "Help",
+    "resetSyncStatus": "Reset Sync Status",
+    "logout": "Log Out",
+    "switch": "Switch",
+    "deleteAccount": "Delete account",
+    "deletingAccount": "Deleting…"
+  },
+  "status": {
+    "noRecord": "No records yet",
+    "reading": "Loading...",
+    "notBound": "Not bound"
+  },
+  "dates": {
+    "todayAt": "Today at {{time}}",
+    "monthDayAt": "{{month}}/{{day}} at {{time}}",
+    "fullDate": "{{year}}/{{month}}/{{day}} {{time}}"
+  },
+  "dialogs": {
+    "switchDevice": {
+      "title": "Switch Device",
+      "body": "Disconnect from the current computer and switch to another device? You will need to enter a new pairing code.",
+      "confirm": "Confirm Switch"
+    },
+    "resetSync": {
+      "title": "Reset All Sync State",
+      "body": "This clears all sync records and disconnects the current device. You will need to re-enter a pairing code. Photos on your phone and Mac will not be deleted.",
+      "confirm": "Confirm Reset"
+    },
+    "logout": {
+      "title": "Log Out",
+      "body": "Are you sure you want to log out?",
+      "confirm": "Confirm Log Out"
+    },
+    "exportUnavailable": {
+      "title": "Cannot Export",
+      "body": "This build does not support exporting the diagnostics bundle."
+    },
+    "exportFailed": {
+      "title": "Export Failed",
+      "body": "Failed to export the diagnostics bundle. Please try again later."
+    },
+    "languageSaveFailed": {
+      "title": "Cannot Change Language",
+      "body": "Failed to save the language setting. Please try again later."
+    },
+    "deleteAccount": {
+      "title": "Delete account",
+      "body": "This permanently deletes your account, every sign-in method, and all usage history. This cannot be undone.",
+      "continue": "Continue",
+      "confirmAgainTitle": "Delete your account?",
+      "confirmAgainBody": "This is your final confirmation. Deleted data cannot be recovered.",
+      "confirmAgainButton": "Delete account"
+    }
+  }
+}
