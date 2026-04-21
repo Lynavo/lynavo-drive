@@ -5,12 +5,14 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/nicksyncflow/sidecar/internal/disk"
@@ -18,6 +20,33 @@ import (
 	"github.com/nicksyncflow/sidecar/internal/protocol"
 	"github.com/nicksyncflow/sidecar/internal/store"
 )
+
+// windowsErrorDiskFull mirrors the Windows system error code returned when a
+// write fails because the volume is full. Defined as a constant so the check
+// compiles on non-Windows platforms too.
+const windowsErrorDiskFull syscall.Errno = 112
+
+// isDiskFullError reports whether err represents an out-of-space condition.
+// It combines the canonical POSIX ENOSPC check, a raw Windows ERROR_DISK_FULL
+// errno probe, and a last-resort message sniff to cover cases where the
+// underlying platform layer returns an uncategorised error whose string still
+// reveals the cause (seen on Windows via os.File.WriteAt in our field logs).
+func isDiskFullError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, syscall.ENOSPC) {
+		return true
+	}
+	var errno syscall.Errno
+	if errors.As(err, &errno) && errno == windowsErrorDiskFull {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no space left") ||
+		strings.Contains(msg, "not enough space on the disk") ||
+		strings.Contains(msg, "disk is full")
+}
 
 var (
 	uploadPerfLoggingOnce    sync.Once
@@ -79,6 +108,24 @@ func (c *connection) handleFileData(hdr *protocol.FrameHeader, body []byte) erro
 	committedOffset, err := c.fileWriter.WriteAt(data, offset)
 	writeElapsed := time.Since(writeStart)
 	if err != nil {
+		if isDiskFullError(err) {
+			// The pre-check at the top of this handler (and the one at
+			// FILE_INIT) looked OK, but the OS layer still ran out of room
+			// mid-write. Route through the structured pause path so the
+			// client receives LOW_DISK_PAUSED instead of a raw write error
+			// that would be classified as a retryable network fault.
+			_, remainingBytes, checkErr := disk.IsLow(c.config.ReceiveDir, c.config.LowDiskThresholdBytes)
+			if checkErr != nil {
+				remainingBytes = 0
+			}
+			slog.Warn("write failed due to disk full, routing to low-disk pause",
+				"fileKey", fileKey,
+				"offset", offset,
+				"remainingBytes", remainingBytes,
+				"err", err,
+			)
+			return c.pauseTransferForLowDisk(fileKey, remainingBytes)
+		}
 		return fmt.Errorf("write file data: %w", err)
 	}
 
