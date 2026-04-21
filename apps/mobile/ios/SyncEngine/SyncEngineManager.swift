@@ -2352,6 +2352,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let newTransport = TcpTransport()
         let session = ProtocolSession(transport: newTransport)
         protocolSession = session
+        let wasConnectedBeforeUpload = bindingConnectionState == .connected
+        let trimmedBindingHost = binding.host.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasForcedSidecarTarget = resolvedForcedSidecarTarget() != nil
+        let canUseKnownConnectedHost =
+            wasConnectedBeforeUpload &&
+            !trimmedBindingHost.isEmpty &&
+            !hasForcedSidecarTarget
         if !recoveryMode {
             updateBindingConnectionState(.connecting, reason: "connect_and_upload_started")
         }
@@ -2407,7 +2414,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
 
         var targetDevice = findDevice()
-        if targetDevice == nil {
+        if targetDevice == nil && canUseKnownConnectedHost {
+            discoveryService.startBrowsing()
+            syncDiagnosticsLog(
+                "SyncPipeline",
+                "using connected binding host without blocking discovery host=\(trimmedBindingHost)"
+            )
+        } else if targetDevice == nil && !hasForcedSidecarTarget {
             discoveryService.startBrowsing()
             for _ in 0..<20 {
                 try await Task.sleep(nanoseconds: 500_000_000)
@@ -2425,6 +2438,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             fallbackPort: UInt16(binding.port)
         )
         sidecarHost = preferredSidecarHost(probedHost: newTransport.remoteHost, device: targetDevice)
+            ?? (trimmedBindingHost.isEmpty ? nil : trimmedBindingHost)
         slog("[SyncPipeline] TCP connected to %@", sidecarHost ?? "unknown")
         syncDiagnosticsLog("SyncPipeline", "TCP connected to \(sidecarHost ?? "unknown")")
 
