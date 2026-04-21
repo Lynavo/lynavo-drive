@@ -6,10 +6,8 @@
 // Flip to `true` only when the corresponding backend / IAP plumbing is wired,
 // QA'd and ready to ship to real users.
 
-// NOTE (2026-04-18, Task 22 sandbox testing): three flags temporarily gated on
-// `__DEV__` so dev builds enable the real IAP flow while release builds stay
-// off-by-default. Revert to literal `false` before landing Task 23's permanent
-// flip — that commit should be the ONLY place all three flags read `true`.
+// NOTE (2026-04-21, TestFlight IAP testing): enabled for release/TestFlight
+// builds so Apple sandbox purchases can be exercised outside dev builds.
 
 export const FEATURES = {
   /**
@@ -18,7 +16,7 @@ export const FEATURES = {
    * screen. Disabled until real Apple IAP + server-side receipt verification
    * are deployed — without those the user lands in a non-recoverable dead end.
    */
-  SUBSCRIPTION_ENFORCEMENT: __DEV__,
+  SUBSCRIPTION_ENFORCEMENT: true,
 
   /**
    * Master switch for the entire Apple IAP integration. When false:
@@ -26,11 +24,11 @@ export const FEATURES = {
    *  - `SubscriptionScreen` falls back to its mock "coming soon" alert
    *  - Restore Purchases button is hidden regardless of IAP_RESTORE_ENABLED
    */
-  IAP_ENABLED: __DEV__,
+  IAP_ENABLED: true,
 
   /**
    * Controls Restore Purchases button visibility. Gated separately so we can
    * ship "purchase only" first and enable Restore once sandbox-verified.
    */
-  IAP_RESTORE_ENABLED: __DEV__,
+  IAP_RESTORE_ENABLED: true,
 } as const;
