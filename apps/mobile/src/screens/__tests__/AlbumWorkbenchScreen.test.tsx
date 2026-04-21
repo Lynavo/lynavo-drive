@@ -208,6 +208,75 @@ describe('AlbumWorkbenchScreen', () => {
     });
   });
 
+  it('ignores stale album requests that finish after a newer filter request', async () => {
+    let resolveStale: ((value: unknown) => void) | undefined;
+    const staleAsset = {
+      assetLocalId: 'stale',
+      filename: 'STALE.JPG',
+      mediaType: 'image',
+      fileSize: 1024,
+      creationDate: '2026-04-01T00:00:00Z',
+      thumbnailUri: 'file:///tmp/stale.jpg',
+      isTransferred: true,
+      isQueued: false,
+    };
+    const freshAsset = {
+      assetLocalId: 'fresh',
+      filename: 'FRESH.JPG',
+      mediaType: 'image',
+      fileSize: 1024,
+      creationDate: '2026-04-02T00:00:00Z',
+      thumbnailUri: 'file:///tmp/fresh.jpg',
+      isTransferred: false,
+      isQueued: false,
+    };
+
+    mockedBrowseAlbum
+      .mockResolvedValueOnce([])
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveStale = resolve;
+          }),
+      )
+      .mockResolvedValueOnce([freshAsset]);
+
+    let tree: ReactTestRenderer.ReactTestRenderer | undefined;
+
+    await ReactTestRenderer.act(async () => {
+      tree = ReactTestRenderer.create(<AlbumWorkbenchScreen />);
+    });
+
+    const findTab = (label: string) =>
+      tree!.root
+        .findAll(node => typeof node.props.onPress === 'function')
+        .find(node => {
+          const textNodes = node.findAllByType(Text);
+          return textNodes.some(textNode => textNode.props.children === label);
+        });
+
+    await ReactTestRenderer.act(async () => {
+      findTab('已传')!.props.onPress();
+    });
+
+    await ReactTestRenderer.act(async () => {
+      findTab('未传')!.props.onPress();
+    });
+
+    await ReactTestRenderer.act(async () => {
+      resolveStale?.([staleAsset]);
+    });
+
+    const { Image } = require('react-native');
+    const imageUris = tree!.root
+      .findAllByType(Image)
+      .map(node => node.props.source?.uri)
+      .filter(Boolean);
+
+    expect(imageUris).toContain('file:///tmp/fresh.jpg');
+    expect(imageUris).not.toContain('file:///tmp/stale.jpg');
+  });
+
   it('shows limited-access CTA when permission is limited and no assets', async () => {
     // Simulate: limited permission, 0 authorized assets
     mockedGetPhotoAuthorizationStatus.mockResolvedValue('limited');

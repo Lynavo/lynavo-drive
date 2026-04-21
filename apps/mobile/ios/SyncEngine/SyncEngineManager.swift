@@ -291,6 +291,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private var runtimeActiveTuningProfile = "normal"
     private var runtimeIsThermalLimited = false
     private var runtimeThermalReason: ThermalPerformanceReason?
+    private let albumBrowserQueue = DispatchQueue(
+        label: "com.syncflow.album-browser",
+        qos: .userInitiated
+    )
+    private let albumBrowserQueueKey = DispatchSpecificKey<Void>()
 
     private func preferredSidecarHost(probedHost: String?, device: DiscoveredDevice?) -> String? {
         if let probedHost, !probedHost.isEmpty, !probedHost.contains(":") {
@@ -931,6 +936,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     private override init() {
         super.init()
+        albumBrowserQueue.setSpecific(key: albumBrowserQueueKey, value: ())
         // Migrate keychain from old bundle ID before any keychain access
         bindingService.migrateKeychainIfNeeded()
         do {
@@ -4415,6 +4421,18 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         return dir
     }()
 
+    private func runOnAlbumBrowserQueue<T>(_ operation: () -> T) -> T {
+        if DispatchQueue.getSpecific(key: albumBrowserQueueKey) != nil {
+            return operation()
+        }
+        return albumBrowserQueue.sync(execute: operation)
+    }
+
+    private func canReadPhotoLibrary() -> Bool {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        return status == .authorized || status == .limited
+    }
+
     func browseAlbum(
         mediaFilter: String,
         transferFilter: String,
@@ -4422,32 +4440,46 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         limit: Int,
         collectionId: String? = nil
     ) -> [[String: Any]] {
-        guard let service = albumBrowserService else { return [] }
-        let assets = service.fetchAlbumAssets(
-            mediaFilter: mediaFilter,
-            transferFilter: transferFilter,
-            offset: offset,
-            limit: limit,
-            collectionId: collectionId
-        )
-        let thumbSize = CGSize(width: 200, height: 200)
-        return assets.map { asset in
-            // Generate cached thumbnail file
-            let thumbUri = cachedThumbnailUri(
-                service: service,
-                assetLocalId: asset.assetLocalId,
-                size: thumbSize
+        runOnAlbumBrowserQueue {
+            guard let service = albumBrowserService else { return [] }
+            var assets = service.fetchAlbumAssets(
+                mediaFilter: mediaFilter,
+                transferFilter: transferFilter,
+                offset: offset,
+                limit: limit,
+                collectionId: collectionId
             )
-            return [
-                "assetLocalId": asset.assetLocalId,
-                "filename": asset.filename,
-                "mediaType": asset.mediaType,
-                "fileSize": asset.fileSize,
-                "creationDate": asset.creationDate,
-                "thumbnailUri": thumbUri,
-                "isTransferred": asset.isTransferred,
-                "isQueued": asset.isQueued,
-            ] as [String: Any]
+
+            if assets.isEmpty && offset == 0 && canReadPhotoLibrary() {
+                Thread.sleep(forTimeInterval: 0.25)
+                assets = service.fetchAlbumAssets(
+                    mediaFilter: mediaFilter,
+                    transferFilter: transferFilter,
+                    offset: offset,
+                    limit: limit,
+                    collectionId: collectionId
+                )
+            }
+
+            let thumbSize = CGSize(width: 200, height: 200)
+            return assets.map { asset in
+                // Generate cached thumbnail file
+                let thumbUri = cachedThumbnailUri(
+                    service: service,
+                    assetLocalId: asset.assetLocalId,
+                    size: thumbSize
+                )
+                return [
+                    "assetLocalId": asset.assetLocalId,
+                    "filename": asset.filename,
+                    "mediaType": asset.mediaType,
+                    "fileSize": asset.fileSize,
+                    "creationDate": asset.creationDate,
+                    "thumbnailUri": thumbUri,
+                    "isTransferred": asset.isTransferred,
+                    "isQueued": asset.isQueued,
+                ] as [String: Any]
+            }
         }
     }
 
@@ -4467,8 +4499,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             return thumbFile.absoluteString
         }
 
-        // Generate thumbnail
-        guard let image = service.getThumbnail(assetLocalId: assetLocalId, size: size),
+        // Generate thumbnail. PhotoKit's backing XPC service can be restarted by
+        // iOS under pressure; a short retry avoids transient blank cells.
+        var image = service.getThumbnail(assetLocalId: assetLocalId, size: size)
+        if image == nil && canReadPhotoLibrary() {
+            Thread.sleep(forTimeInterval: 0.15)
+            image = service.getThumbnail(assetLocalId: assetLocalId, size: size)
+        }
+        guard let image,
               let data = image.jpegData(compressionQuality: 0.7) else {
             return ""
         }
@@ -4477,33 +4515,53 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     }
 
     func getAlbumStats() -> [String: Any] {
-        guard let service = albumBrowserService else {
+        runOnAlbumBrowserQueue {
+            guard let service = albumBrowserService else {
+                return [
+                    "totalCount": 0,
+                    "transferredCount": 0,
+                    "queuedCount": 0,
+                    "pendingCount": 0,
+                ]
+            }
+            var stats = service.getAlbumStats()
+            if stats.totalCount == 0 && canReadPhotoLibrary() {
+                Thread.sleep(forTimeInterval: 0.25)
+                stats = service.getAlbumStats()
+            }
             return [
-                "totalCount": 0,
-                "transferredCount": 0,
-                "queuedCount": 0,
-                "pendingCount": 0,
+                "totalCount": stats.totalCount,
+                "transferredCount": stats.transferredCount,
+                "queuedCount": stats.queuedCount,
+                "pendingCount": stats.pendingCount,
             ]
         }
-        let stats = service.getAlbumStats()
-        return [
-            "totalCount": stats.totalCount,
-            "transferredCount": stats.transferredCount,
-            "queuedCount": stats.queuedCount,
-            "pendingCount": stats.pendingCount,
-        ]
     }
 
     func getAlbumCollections(mediaFilter: String) -> [[String: Any]] {
-        guard let service = albumBrowserService else { return [] }
-        return service.getAlbumCollections(mediaFilter: mediaFilter)
+        runOnAlbumBrowserQueue {
+            guard let service = albumBrowserService else { return [] }
+            var collections = service.getAlbumCollections(mediaFilter: mediaFilter)
+            if collections.isEmpty && canReadPhotoLibrary() {
+                Thread.sleep(forTimeInterval: 0.25)
+                collections = service.getAlbumCollections(mediaFilter: mediaFilter)
+            }
+            return collections
+        }
     }
 
     func getAssetPreviewSource(assetLocalId: String) -> [String: Any] {
-        guard let service = albumBrowserService else {
-            return ["uri": "", "mediaType": "image", "error": "not_found"]
+        runOnAlbumBrowserQueue {
+            guard let service = albumBrowserService else {
+                return ["uri": "", "mediaType": "image", "error": "not_found"]
+            }
+            var result = service.getPreviewSource(assetLocalId: assetLocalId)
+            if (result["error"] as? String) == "not_found" && canReadPhotoLibrary() {
+                Thread.sleep(forTimeInterval: 0.25)
+                result = service.getPreviewSource(assetLocalId: assetLocalId)
+            }
+            return result
         }
-        return service.getPreviewSource(assetLocalId: assetLocalId)
     }
 
     // MARK: - Album Preview Cache

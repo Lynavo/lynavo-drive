@@ -172,6 +172,7 @@ export function AlbumWorkbenchScreen() {
   const [hasMore, setHasMore] = useState(true);
   const offsetRef = useRef(0);
   const hasLoadedInitialAssetsRef = useRef(false);
+  const assetListRequestRef = useRef(0);
 
   // Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -247,6 +248,8 @@ export function AlbumWorkbenchScreen() {
       reset: boolean,
       colId?: string | null,
     ) => {
+      const requestId = assetListRequestRef.current + 1;
+      assetListRequestRef.current = requestId;
       try {
         const offset = reset ? 0 : offsetRef.current;
         if (reset && !hasLoadedInitialAssetsRef.current) {
@@ -264,6 +267,9 @@ export function AlbumWorkbenchScreen() {
           PAGE_SIZE,
           colId ?? undefined,
         );
+        if (requestId !== assetListRequestRef.current) {
+          return;
+        }
         if (reset) {
           setAssets(sortAlbumAssetsForDisplay(result));
           offsetRef.current = result.length;
@@ -274,13 +280,15 @@ export function AlbumWorkbenchScreen() {
         setHasMore(result.length >= PAGE_SIZE);
       } catch (e) {
         console.warn('[AlbumWorkbench] loadAssets error:', e);
-        if (reset) {
+        if (reset && requestId === assetListRequestRef.current) {
           setAssets([]);
         }
       } finally {
-        hasLoadedInitialAssetsRef.current = true;
-        setLoading(false);
-        setLoadingMore(false);
+        if (requestId === assetListRequestRef.current) {
+          hasLoadedInitialAssetsRef.current = true;
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
     },
     [],
@@ -346,6 +354,8 @@ export function AlbumWorkbenchScreen() {
     try {
       const currentCount = offsetRef.current;
       if (currentCount <= 0) return;
+      const requestId = assetListRequestRef.current + 1;
+      assetListRequestRef.current = requestId;
       const result = await browseAlbum(
         mediaFilter,
         transferFilter,
@@ -353,6 +363,9 @@ export function AlbumWorkbenchScreen() {
         currentCount,
         collectionId ?? undefined,
       );
+      if (requestId !== assetListRequestRef.current) {
+        return;
+      }
       setAssets(sortAlbumAssetsForDisplay(result));
     } catch (e) {
       console.warn('[AlbumWorkbench] refreshVisibleAssets error:', e);
