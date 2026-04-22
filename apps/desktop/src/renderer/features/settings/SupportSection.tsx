@@ -102,7 +102,7 @@ export function SupportSection() {
           <div className="space-y-1">
             <h3 className="text-sm font-semibold text-foreground">支持与诊断</h3>
             <p className="text-xs text-muted-foreground">
-              内测阶段遇到同步、重连或共享问题时，建议先导出诊断包再反馈。
+              遇到同步、重连或共享问题时，建议先导出诊断包再反馈。
             </p>
           </div>
           <div className="flex items-center gap-2">

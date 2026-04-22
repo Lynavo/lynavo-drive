@@ -44,7 +44,7 @@
     "productMismatch": "产品设置有误，请联系客服",
     "deferred": "付款等待核准中",
     "alreadyOwned": "你已有有效订阅。如要切换方案，请重试或在 App Store 订阅设置中管理。",
-    "receiptBoundToOther": "此 Apple 订阅已绑定其他账号。请改用原账号登入，或切换一个 Apple 测试账号重新购买。"
+    "receiptBoundToOther": "此 Apple 订阅已绑定其他账号。请改用原账号登入后再试。"
   },
   "status": {
     "trialing": "试用中，还剩 {{days}} 天",

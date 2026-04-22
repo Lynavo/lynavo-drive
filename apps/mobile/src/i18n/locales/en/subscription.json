@@ -44,7 +44,7 @@
     "productMismatch": "Product configuration error. Please contact support.",
     "deferred": "Purchase pending approval.",
     "alreadyOwned": "You already have an active subscription. If you want to switch plans, please retry or manage it in App Store settings.",
-    "receiptBoundToOther": "This Apple subscription is linked to another account. Please sign in with the original account, or switch to a different Apple Sandbox Tester to test a new purchase."
+    "receiptBoundToOther": "This Apple subscription is linked to another account. Please sign in with the original account to continue."
   },
   "status": {
     "trialing": "Trial — {{days}} days left",
