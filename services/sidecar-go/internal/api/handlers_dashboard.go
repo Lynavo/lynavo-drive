@@ -4,11 +4,18 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/nicksyncflow/sidecar/internal/disk"
+	"github.com/nicksyncflow/sidecar/internal/uploadfs"
 )
+
+type dashboardExistingFileStats struct {
+	FileCount  int
+	TotalBytes int64
+}
 
 func (s *Server) handleDashboardSummary(w http.ResponseWriter, _ *http.Request) {
 	if !s.ensureStorageDirsForRequest(w, "dashboard.summary") {
@@ -22,6 +29,12 @@ func (s *Server) handleDashboardSummary(w http.ResponseWriter, _ *http.Request) 
 		slog.Error("get dashboard summary", "err", err)
 		writeError(w, http.StatusInternalServerError, "failed to get dashboard summary")
 		return
+	}
+	if stats, err := s.dashboardExistingFileStatsForToday(today); err != nil {
+		slog.Warn("get dashboard existing file stats", "err", err)
+	} else {
+		summary.TotalFiles = stats.FileCount
+		summary.TotalBytes = stats.TotalBytes
 	}
 
 	isDiskLow, remainingBytes, err := disk.IsLow(s.config.ReceiveDir, s.config.LowDiskThresholdBytes)
@@ -129,6 +142,12 @@ func (s *Server) handleDashboardDevices(w http.ResponseWriter, _ *http.Request) 
 			StoragePath:    s.config.ReceiveDir,
 			DevicePath:     devicePath,
 		}
+		if stats, err := s.dashboardExistingFileStatsForDevice(d.ClientID, today); err != nil {
+			slog.Warn("get dashboard device existing file stats", "err", err, "clientID", d.ClientID)
+		} else {
+			dto.TodayFileCount = stats.FileCount
+			dto.TodayBytes = stats.TotalBytes
+		}
 		// Phase 5 observability: expose alias & dir name for diagnostics
 		if d.DeviceAlias != nil {
 			dto.DeviceAlias = *d.DeviceAlias
@@ -151,6 +170,65 @@ func (s *Server) handleDashboardDevices(w http.ResponseWriter, _ *http.Request) 
 	}
 
 	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) dashboardExistingFileStatsForToday(today string) (dashboardExistingFileStats, error) {
+	devices, err := s.store.GetDashboardDevices(today)
+	if err != nil {
+		return dashboardExistingFileStats{}, err
+	}
+
+	var total dashboardExistingFileStats
+	for _, device := range devices {
+		stats, err := s.dashboardExistingFileStatsForDevice(device.ClientID, today)
+		if err != nil {
+			return dashboardExistingFileStats{}, err
+		}
+		total.FileCount += stats.FileCount
+		total.TotalBytes += stats.TotalBytes
+	}
+
+	return total, nil
+}
+
+func (s *Server) dashboardExistingFileStatsForDevice(deviceID, today string) (dashboardExistingFileStats, error) {
+	uploads, err := s.store.ListCompletedUploadsByDeviceAndDateRange(
+		deviceID,
+		today,
+		"",
+		"completedAt",
+		"desc",
+	)
+	if err != nil {
+		return dashboardExistingFileStats{}, err
+	}
+
+	var stats dashboardExistingFileStats
+	for _, upload := range uploads {
+		absolutePath, ok := uploadfs.ResolveFinalPath(s.config.ReceiveDir, upload.FinalPath)
+		if !ok {
+			continue
+		}
+		info, err := os.Stat(absolutePath)
+		if err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		stats.FileCount++
+		stats.TotalBytes += info.Size()
+	}
+
+	if stats.FileCount > 0 || len(uploads) > 0 {
+		return stats, nil
+	}
+
+	fsUploads, err := s.filesystemUploadsPage(deviceID, today, "completedAt", "desc", 1, 10000)
+	if err != nil {
+		return dashboardExistingFileStats{}, err
+	}
+	return dashboardExistingFileStats{
+		FileCount:  fsUploads.TotalItems,
+		TotalBytes: fsUploads.TotalBytes,
+	}, nil
 }
 
 func formatBytesHuman(b uint64) string {

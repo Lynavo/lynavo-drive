@@ -17,6 +17,8 @@ const colors = {
   folderButton: '#3b82f6',
 } as const;
 
+const DETAIL_REFRESH_INTERVAL_MS = 10_000;
+
 export function DeviceDetailPage() {
   const selectedDevice = useAppStore((s) => s.selectedDevice);
   const closeDeviceDetail = useAppStore((s) => s.closeDeviceDetail);
@@ -41,6 +43,18 @@ export function DeviceDetailPage() {
     return () => {
       useDeviceDetailStore.getState().reset();
     };
+  }, [selectedDevice]);
+
+  useEffect(() => {
+    if (!selectedDevice) return;
+
+    const interval = setInterval(() => {
+      useDeviceDetailStore
+        .getState()
+        .fetchDeviceFiles(selectedDevice.deviceId, { silent: true });
+    }, DETAIL_REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(interval);
   }, [selectedDevice]);
 
   const { totalPages, pageStart, pageEnd } = useMemo(() => {

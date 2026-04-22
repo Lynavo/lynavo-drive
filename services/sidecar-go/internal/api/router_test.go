@@ -148,6 +148,169 @@ func TestDashboardDevices(t *testing.T) {
 	}
 }
 
+func TestDashboardStatsIgnoreDeletedFinalFiles(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	now := time.Now()
+	today := now.Format("2006-01-02")
+	nowText := now.Format(time.RFC3339)
+	dirName := "Test iPhone"
+	if err := st.UpsertPairedDevice(store.PairedDevice{
+		ClientID:         "test-device-1",
+		ClientName:       "Test iPhone",
+		Platform:         "ios",
+		PairingID:        "pair-1",
+		PairingTokenHash: "hash-1",
+		CreatedAt:        nowText,
+		LastSeenAt:       nowText,
+		ReceiveDirName:   &dirName,
+	}); err != nil {
+		t.Fatalf("UpsertPairedDevice: %v", err)
+	}
+	if err := st.UpsertDailyStats(store.DailyStats{
+		StatDate:             today,
+		ClientID:             "test-device-1",
+		ClientNameSnapshot:   "Test iPhone",
+		FileCount:            2,
+		TotalBytes:           12,
+		ActiveTransmissionMs: 50,
+		UpdatedAt:            nowText,
+	}); err != nil {
+		t.Fatalf("UpsertDailyStats: %v", err)
+	}
+
+	dateDir := filepath.Join(cfg.ReceiveDir, dirName, today)
+	if err := os.MkdirAll(dateDir, 0o755); err != nil {
+		t.Fatalf("mkdir date dir: %v", err)
+	}
+	existingPath := filepath.Join(dirName, today, "IMG_0001.JPG")
+	deletedPath := filepath.Join(dirName, today, "IMG_0002.JPG")
+	if err := os.WriteFile(filepath.Join(cfg.ReceiveDir, existingPath), []byte("actual"), 0o644); err != nil {
+		t.Fatalf("write existing file: %v", err)
+	}
+	for _, upload := range []store.Upload{
+		{
+			FileKey:          "file-existing",
+			ClientID:         "test-device-1",
+			OriginalFilename: "IMG_0001.JPG",
+			MediaType:        "image",
+			FileSize:         4,
+			Status:           "completed",
+			FinalPath:        &existingPath,
+			CommittedBytes:   4,
+			CompletedAt:      &nowText,
+			UpdatedAt:        nowText,
+		},
+		{
+			FileKey:          "file-deleted",
+			ClientID:         "test-device-1",
+			OriginalFilename: "IMG_0002.JPG",
+			MediaType:        "image",
+			FileSize:         8,
+			Status:           "completed",
+			FinalPath:        &deletedPath,
+			CommittedBytes:   8,
+			CompletedAt:      &nowText,
+			UpdatedAt:        nowText,
+		},
+	} {
+		if err := st.UpsertUpload(upload); err != nil {
+			t.Fatalf("UpsertUpload %s: %v", upload.FileKey, err)
+		}
+	}
+
+	resp, err := http.Get(srv.URL + "/dashboard/devices")
+	if err != nil {
+		t.Fatalf("GET /dashboard/devices: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var devices []struct {
+		DeviceID       string `json:"deviceId"`
+		TodayFileCount int    `json:"todayFileCount"`
+		TodayBytes     int64  `json:"todayBytes"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&devices); err != nil {
+		t.Fatalf("decode devices: %v", err)
+	}
+	if len(devices) != 1 {
+		t.Fatalf("expected one dashboard device, got %d", len(devices))
+	}
+	if devices[0].TodayFileCount != 1 {
+		t.Fatalf("expected dashboard device file count 1, got %d", devices[0].TodayFileCount)
+	}
+	if devices[0].TodayBytes != 6 {
+		t.Fatalf("expected dashboard device bytes 6, got %d", devices[0].TodayBytes)
+	}
+
+	summaryResp, err := http.Get(srv.URL + "/dashboard/summary")
+	if err != nil {
+		t.Fatalf("GET /dashboard/summary: %v", err)
+	}
+	defer summaryResp.Body.Close()
+
+	var summary struct {
+		TodayUploadCount   int   `json:"todayUploadCount"`
+		TodayOccupiedBytes int64 `json:"todayOccupiedBytes"`
+	}
+	if err := json.NewDecoder(summaryResp.Body).Decode(&summary); err != nil {
+		t.Fatalf("decode summary: %v", err)
+	}
+	if summary.TodayUploadCount != 1 {
+		t.Fatalf("expected summary file count 1, got %d", summary.TodayUploadCount)
+	}
+	if summary.TodayOccupiedBytes != 6 {
+		t.Fatalf("expected summary bytes 6, got %d", summary.TodayOccupiedBytes)
+	}
+
+	if err := os.Remove(filepath.Join(cfg.ReceiveDir, existingPath)); err != nil {
+		t.Fatalf("remove existing file: %v", err)
+	}
+
+	respAfterDelete, err := http.Get(srv.URL + "/dashboard/devices")
+	if err != nil {
+		t.Fatalf("GET /dashboard/devices after delete: %v", err)
+	}
+	defer respAfterDelete.Body.Close()
+
+	var devicesAfterDelete []struct {
+		TodayFileCount int   `json:"todayFileCount"`
+		TodayBytes     int64 `json:"todayBytes"`
+	}
+	if err := json.NewDecoder(respAfterDelete.Body).Decode(&devicesAfterDelete); err != nil {
+		t.Fatalf("decode devices after delete: %v", err)
+	}
+	if devicesAfterDelete[0].TodayFileCount != 0 {
+		t.Fatalf("expected dashboard device file count 0 after deletion, got %d", devicesAfterDelete[0].TodayFileCount)
+	}
+	if devicesAfterDelete[0].TodayBytes != 0 {
+		t.Fatalf("expected dashboard device bytes 0 after deletion, got %d", devicesAfterDelete[0].TodayBytes)
+	}
+
+	summaryAfterDeleteResp, err := http.Get(srv.URL + "/dashboard/summary")
+	if err != nil {
+		t.Fatalf("GET /dashboard/summary after delete: %v", err)
+	}
+	defer summaryAfterDeleteResp.Body.Close()
+
+	var summaryAfterDelete struct {
+		TodayUploadCount   int   `json:"todayUploadCount"`
+		TodayOccupiedBytes int64 `json:"todayOccupiedBytes"`
+	}
+	if err := json.NewDecoder(summaryAfterDeleteResp.Body).Decode(&summaryAfterDelete); err != nil {
+		t.Fatalf("decode summary after delete: %v", err)
+	}
+	if summaryAfterDelete.TodayUploadCount != 0 {
+		t.Fatalf("expected summary file count 0 after deletion, got %d", summaryAfterDelete.TodayUploadCount)
+	}
+	if summaryAfterDelete.TodayOccupiedBytes != 0 {
+		t.Fatalf("expected summary bytes 0 after deletion, got %d", summaryAfterDelete.TodayOccupiedBytes)
+	}
+}
+
 func TestPresenceHeartbeatBroadcastsConnectedIdleEvent(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	if err := st.SetDeviceName("Desk Renamed"); err != nil {
