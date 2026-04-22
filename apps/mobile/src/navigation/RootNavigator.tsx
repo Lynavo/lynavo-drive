@@ -11,8 +11,8 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 
-import { useAuth } from '../stores/auth-store';
-import type { SubscriptionInfo } from '../stores/auth-store';
+import { isFeatureAccessAllowed, useAuth } from '../stores/auth-store';
+import type { AccountStatus, SubscriptionInfo } from '../stores/auth-store';
 import { useExpiryReminder } from '../hooks/useExpiryReminder';
 import { FEATURES } from '../constants/features';
 import { LoginScreen } from '../screens/LoginScreen';
@@ -27,7 +27,10 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { HelpScreen } from '../screens/HelpScreen';
 import { QRScannerScreen } from '../screens/QRScannerScreen';
 import { SubscriptionScreen } from '../screens/SubscriptionScreen';
-import { AUTH_COLORS, AuthScreenShell } from '../components/auth/AuthScreenShell';
+import {
+  AUTH_COLORS,
+  AuthScreenShell,
+} from '../components/auth/AuthScreenShell';
 import { wipeSyncIdentity } from '../services/SyncEngineModule';
 import { resetCurrentDesktopSidecarIfReachable } from '../services/sidecar-reset-service';
 import { clearUserScopedStorage } from '../utils/clearUserScopedStorage';
@@ -190,44 +193,35 @@ function AuthedStack({
   userStatus,
   subscription,
 }: {
-  userStatus: string;
+  userStatus: AccountStatus;
   subscription: SubscriptionInfo | null;
 }) {
-  const [initialRoute, setInitialRoute] =
-    useState<keyof RootStackParamList | null>(null);
+  const [initialRoute, setInitialRoute] = useState<
+    keyof RootStackParamList | null
+  >(null);
 
   useEffect(() => {
     let cancelled = false;
     const decide = async () => {
+      const effectiveStatus = subscription?.status ?? userStatus;
       // Subscription enforcement is feature-flagged off until real IAP
       // verification ships — without that, expired users get sent into a
       // dead end on SubscriptionScreen with no working purchase path.
       if (
         FEATURES.SUBSCRIPTION_ENFORCEMENT &&
-        (userStatus === 'trial_expired' || userStatus === 'sub_expired')
+        !isFeatureAccessAllowed(effectiveStatus)
       ) {
         if (!cancelled) setInitialRoute('Subscription');
         return;
       }
-      try {
-        const { NativeSyncEngine } = NativeModules;
-        if (NativeSyncEngine) {
-          const binding = await NativeSyncEngine.getBindingState();
-          if (binding && binding.deviceId) {
-            if (!cancelled) setInitialRoute('SyncActivity');
-            return;
-          }
-        }
-      } catch {
-        /* fall through to DeviceDiscovery */
-      }
-      if (!cancelled) setInitialRoute('DeviceDiscovery');
+      const route = await resolveDefaultAuthedRoute();
+      if (!cancelled) setInitialRoute(route);
     };
     decide();
     return () => {
       cancelled = true;
     };
-  }, [userStatus]);
+  }, [subscription?.status, userStatus]);
 
   if (!initialRoute) {
     return <LoadingScreen />;
@@ -236,11 +230,18 @@ function AuthedStack({
   return (
     <>
       <ExpiryReminderWatcher subscription={subscription} />
+      <SubscriptionGateReleaseWatcher
+        subscription={subscription}
+        userStatus={userStatus}
+      />
       <Stack.Navigator
         initialRouteName={initialRoute}
         screenOptions={{ headerShown: false }}
       >
-        <Stack.Screen name="DeviceDiscovery" component={DeviceDiscoveryScreen} />
+        <Stack.Screen
+          name="DeviceDiscovery"
+          component={DeviceDiscoveryScreen}
+        />
         <Stack.Screen name="QRScanner" component={QRScannerScreen} />
         <Stack.Screen name="CodeVerify" component={CodeVerifyScreen} />
         <Stack.Screen name="SyncActivity" component={SyncActivityScreen} />
@@ -255,6 +256,64 @@ function AuthedStack({
   );
 }
 
+async function resolveDefaultAuthedRoute(): Promise<
+  Extract<keyof RootStackParamList, 'DeviceDiscovery' | 'SyncActivity'>
+> {
+  try {
+    const { NativeSyncEngine } = NativeModules;
+    if (NativeSyncEngine) {
+      const binding = await NativeSyncEngine.getBindingState();
+      if (binding && binding.deviceId) {
+        return 'SyncActivity';
+      }
+    }
+  } catch {
+    /* fall through to DeviceDiscovery */
+  }
+  return 'DeviceDiscovery';
+}
+
+function SubscriptionGateReleaseWatcher({
+  userStatus,
+  subscription,
+}: {
+  userStatus: AccountStatus;
+  subscription: SubscriptionInfo | null;
+}) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const navigation = useNavigation<any>();
+
+  useEffect(() => {
+    if (!FEATURES.SUBSCRIPTION_ENFORCEMENT) return;
+
+    const subscriptionAllowsAccess = isFeatureAccessAllowed(
+      subscription?.status,
+    );
+    if (isFeatureAccessAllowed(userStatus) || !subscriptionAllowsAccess) {
+      return;
+    }
+
+    const state = navigation.getState?.();
+    const currentRoute = state?.routes?.[state.index ?? 0]?.name;
+    if (currentRoute !== 'Subscription') return;
+
+    let cancelled = false;
+    void resolveDefaultAuthedRoute().then(route => {
+      if (cancelled) return;
+      navigation.reset({
+        index: 0,
+        routes: [{ name: route }],
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigation, subscription?.status, userStatus]);
+
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Shared loading screen
 // ---------------------------------------------------------------------------
@@ -267,11 +326,7 @@ function LoadingScreen() {
   );
 }
 
-function SignedOutTransitionScreen({
-  onComplete,
-}: {
-  onComplete: () => void;
-}) {
+function SignedOutTransitionScreen({ onComplete }: { onComplete: () => void }) {
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -287,8 +342,12 @@ function SignedOutTransitionScreen({
         <View style={styles.transitionIcon}>
           <Text style={styles.transitionIconGlyph}>✓</Text>
         </View>
-        <Text style={styles.transitionTitle}>{t('auth.accountDeleted.title')}</Text>
-        <Text style={styles.transitionMessage}>{t('auth.accountDeleted.subtitle')}</Text>
+        <Text style={styles.transitionTitle}>
+          {t('auth.accountDeleted.title')}
+        </Text>
+        <Text style={styles.transitionMessage}>
+          {t('auth.accountDeleted.subtitle')}
+        </Text>
         <ActivityIndicator
           size="small"
           color={AUTH_COLORS.primary}
@@ -318,7 +377,9 @@ function ProfileErrorScreen({
   return (
     <View style={styles.errorRoot}>
       <Text style={styles.errorTitle}>{t('errors.profileLoadTitle')}</Text>
-      <Text style={styles.errorMessage}>{message || t('errors.authTryLater')}</Text>
+      <Text style={styles.errorMessage}>
+        {message || t('errors.authTryLater')}
+      </Text>
       <TouchableOpacity
         style={[styles.errorButton, retrying && styles.errorButtonDisabled]}
         onPress={onRetry}
@@ -336,7 +397,9 @@ function ProfileErrorScreen({
         onPress={onLogout}
         activeOpacity={0.6}
       >
-        <Text style={styles.errorSecondaryText}>{t('settings.actions.logout')}</Text>
+        <Text style={styles.errorSecondaryText}>
+          {t('settings.actions.logout')}
+        </Text>
       </TouchableOpacity>
     </View>
   );

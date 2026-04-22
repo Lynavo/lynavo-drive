@@ -17,7 +17,8 @@ import { NativeModules } from 'react-native';
 // react-native-gesture-handler — must be mocked before @react-navigation/stack
 // ---------------------------------------------------------------------------
 jest.mock('react-native-gesture-handler', () => ({
-  GestureHandlerRootView: ({ children }: { children: React.ReactNode }) => children,
+  GestureHandlerRootView: ({ children }: { children: React.ReactNode }) =>
+    children,
   PanGestureHandler: ({ children }: { children: React.ReactNode }) => children,
   GestureDetector: ({ children }: { children: React.ReactNode }) => children,
   State: {},
@@ -60,7 +61,11 @@ jest.mock('react-native-safe-area-context', () => {
   return {
     SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
     SafeAreaProvider: ({ children }: { children: React.ReactNode }) =>
-      React.createElement(SafeAreaInsetsContext.Provider, { value: insets }, children),
+      React.createElement(
+        SafeAreaInsetsContext.Provider,
+        { value: insets },
+        children,
+      ),
     useSafeAreaInsets: () => insets,
     SafeAreaInsetsContext,
     initialWindowMetrics: {
@@ -91,7 +96,9 @@ jest.mock('react-native-keychain', () => ({
   getGenericPassword: jest.fn().mockResolvedValue(false),
   setGenericPassword: jest.fn().mockResolvedValue(true),
   resetGenericPassword: jest.fn().mockResolvedValue(true),
-  ACCESSIBLE: { AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 'AfterFirstUnlockThisDeviceOnly' },
+  ACCESSIBLE: {
+    AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 'AfterFirstUnlockThisDeviceOnly',
+  },
 }));
 
 jest.mock('../../services/iap-service', () => ({
@@ -109,9 +116,19 @@ jest.mock('../../services/SyncEngineModule', () => ({
   interruptAutoUpload: jest.fn(),
   enableAutoUpload: jest.fn(),
   browseAlbum: jest.fn().mockResolvedValue([]),
-  getAlbumStats: jest.fn().mockResolvedValue({ totalCount: 0, transferredCount: 0, queuedCount: 0, pendingCount: 0 }),
+  getAlbumStats: jest.fn().mockResolvedValue({
+    totalCount: 0,
+    transferredCount: 0,
+    queuedCount: 0,
+    pendingCount: 0,
+  }),
   submitManualUpload: jest.fn(),
-  getAutoUploadConfig: jest.fn().mockResolvedValue({ enabled: false, state: 'disabled', timeRangeMode: 'all', customTimeFrom: null }),
+  getAutoUploadConfig: jest.fn().mockResolvedValue({
+    enabled: false,
+    state: 'disabled',
+    timeRangeMode: 'all',
+    customTimeFrom: null,
+  }),
   saveAutoUploadConfig: jest.fn(),
   getPhotoAuthorizationStatus: jest.fn().mockResolvedValue('authorized'),
   presentLimitedPhotoPicker: jest.fn(),
@@ -125,7 +142,11 @@ jest.mock('../../screens/SubscriptionScreen', () => ({
   SubscriptionScreen: () => {
     const R = require('react');
     const { Text } = require('react-native');
-    return R.createElement(Text, { testID: 'subscription-screen' }, 'Subscription');
+    return R.createElement(
+      Text,
+      { testID: 'subscription-screen' },
+      'Subscription',
+    );
   },
 }));
 
@@ -133,7 +154,11 @@ jest.mock('../../screens/DeviceDiscoveryScreen', () => ({
   DeviceDiscoveryScreen: () => {
     const R = require('react');
     const { Text } = require('react-native');
-    return R.createElement(Text, { testID: 'device-discovery-screen' }, 'DeviceDiscovery');
+    return R.createElement(
+      Text,
+      { testID: 'device-discovery-screen' },
+      'DeviceDiscovery',
+    );
   },
 }));
 
@@ -141,7 +166,11 @@ jest.mock('../../screens/SyncActivityScreen', () => ({
   SyncActivityScreen: () => {
     const R = require('react');
     const { Text } = require('react-native');
-    return R.createElement(Text, { testID: 'sync-activity-screen' }, 'SyncActivity');
+    return R.createElement(
+      Text,
+      { testID: 'sync-activity-screen' },
+      'SyncActivity',
+    );
   },
 }));
 
@@ -165,7 +194,11 @@ jest.mock('../../screens/CodeVerifyScreen', () => ({
   CodeVerifyScreen: () => {
     const R = require('react');
     const { Text } = require('react-native');
-    return R.createElement(Text, { testID: 'code-verify-screen' }, 'CodeVerify');
+    return R.createElement(
+      Text,
+      { testID: 'code-verify-screen' },
+      'CodeVerify',
+    );
   },
 }));
 
@@ -173,7 +206,11 @@ jest.mock('../../screens/AlbumWorkbenchScreen', () => ({
   AlbumWorkbenchScreen: () => {
     const R = require('react');
     const { Text } = require('react-native');
-    return R.createElement(Text, { testID: 'album-workbench-screen' }, 'AlbumWorkbench');
+    return R.createElement(
+      Text,
+      { testID: 'album-workbench-screen' },
+      'AlbumWorkbench',
+    );
   },
 }));
 
@@ -181,7 +218,11 @@ jest.mock('../../screens/SharedFilesScreen', () => ({
   SharedFilesScreen: () => {
     const R = require('react');
     const { Text } = require('react-native');
-    return R.createElement(Text, { testID: 'shared-files-screen' }, 'SharedFiles');
+    return R.createElement(
+      Text,
+      { testID: 'shared-files-screen' },
+      'SharedFiles',
+    );
   },
 }));
 
@@ -246,12 +287,17 @@ import i18n from '../../i18n';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function mockAuthForStatus(status: string) {
+function mockAuthForStatus(status: string, subscriptionStatus = status) {
   (useAuth as jest.Mock).mockReturnValue({
     isLoggedIn: true,
     isLoading: false,
     user: { id: 1, status },
-    subscription: { status, plan: '', expireAt: null, trialEnd: null },
+    subscription: {
+      status: subscriptionStatus,
+      plan: '',
+      expireAt: null,
+      trialEnd: null,
+    },
     profileLoading: false,
     profileError: null,
     signedOutTransition: null,
@@ -262,8 +308,8 @@ function mockAuthForStatus(status: string) {
   });
 }
 
-function renderWith(status: string) {
-  mockAuthForStatus(status);
+function renderWith(status: string, subscriptionStatus = status) {
+  mockAuthForStatus(status, subscriptionStatus);
   return render(
     <NavigationContainer>
       <RootNavigator />
@@ -321,5 +367,13 @@ describe('RootNavigator — SUBSCRIPTION_ENFORCEMENT', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('subscription-screen')).toBeNull();
     });
+  });
+
+  test('prefers active subscription snapshot over stale expired user status', async () => {
+    renderWith('trial_expired', 'subscribed');
+    await waitFor(() =>
+      expect(screen.getByTestId('device-discovery-screen')).toBeTruthy(),
+    );
+    expect(screen.queryByTestId('subscription-screen')).toBeNull();
   });
 });

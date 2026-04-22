@@ -1736,7 +1736,9 @@ export function SyncActivityScreen() {
           subscription screen with no working purchase flow). */}
       {FEATURES.SUBSCRIPTION_ENFORCEMENT &&
         auth.isLoggedIn &&
-        !isFeatureAccessAllowed(auth.user?.status) && (
+        !isFeatureAccessAllowed(
+          auth.subscription?.status ?? auth.user?.status,
+        ) && (
           <Modal visible transparent animationType="fade" statusBarTranslucent>
             <View style={styles.expiredOverlay}>
               <View style={styles.expiredCard}>

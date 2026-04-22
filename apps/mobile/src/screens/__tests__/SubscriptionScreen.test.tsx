@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, NativeModules } from 'react-native';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 
 // Must mock react-native-localize before i18n import
@@ -15,11 +15,14 @@ jest.mock('react-native-localize', () => ({
   ],
 }));
 
+const mockNavigation = {
+  goBack: jest.fn(),
+  canGoBack: jest.fn(),
+  reset: jest.fn(),
+};
+
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({
-    goBack: jest.fn(),
-    canGoBack: jest.fn().mockReturnValue(true),
-  }),
+  useNavigation: () => mockNavigation,
   useFocusEffect: (callback: () => void | (() => void)) => {
     const ReactInner = require('react');
     ReactInner.useEffect(callback, [callback]);
@@ -130,6 +133,10 @@ describe('SubscriptionScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockNavigation.canGoBack.mockReturnValue(true);
+    (NativeModules as Record<string, unknown>).NativeSyncEngine = {
+      getBindingState: jest.fn().mockResolvedValue(null),
+    };
     (getSubscriptionStatus as jest.Mock).mockResolvedValue({
       status: 'trial_expired',
       plan: '',
@@ -152,6 +159,21 @@ describe('SubscriptionScreen', () => {
     expect(
       getByText(/恢復已購買訂閱|恢复已购买订阅|Restore Purchases/),
     ).toBeTruthy();
+  });
+
+  test('hides back button when expired subscription paywall is the root screen', () => {
+    mockNavigation.canGoBack.mockReturnValue(false);
+    mockAuthState.user = { id: 1, status: 'trial_expired' };
+    mockAuthState.subscription = {
+      status: 'trial_expired',
+      plan: '',
+      expireAt: null,
+      trialEnd: null,
+    };
+
+    const { queryByLabelText } = renderScreen();
+
+    expect(queryByLabelText(/返回|Back/)).toBeNull();
   });
 
   test('refreshes subscription status when screen is focused', async () => {
@@ -302,6 +324,64 @@ describe('SubscriptionScreen', () => {
 
     // The modal's "valid until" line formats as YYYY/M/D (formatExpireDate).
     expect(await findByText(/2027\/5\/20/)).toBeTruthy();
+  });
+
+  test('success dismiss resets root paywall to SyncActivity when a binding exists', async () => {
+    mockNavigation.canGoBack.mockReturnValue(false);
+    (NativeModules as Record<string, unknown>).NativeSyncEngine = {
+      getBindingState: jest.fn().mockResolvedValue({ deviceId: 'desktop-1' }),
+    };
+    (iapService.purchase as jest.Mock).mockResolvedValueOnce({
+      productId: 'com.vividrop.mobile.china.yearly.10400',
+      transactionReceipt: 'BLOB',
+      transactionId: 'tx_1',
+    });
+    (verifyIapReceipt as jest.Mock).mockResolvedValueOnce(undefined);
+    mockLoadSubscription.mockResolvedValueOnce({
+      status: 'subscribed',
+      plan: 'yearly',
+      expireAt: '2027-05-20T00:00:00Z',
+      trialEnd: null,
+    });
+
+    const { getByText, findByText } = renderScreen();
+    fireEvent.press(getByText(/立即订阅|立即訂閱|Subscribe Now/));
+    fireEvent.press(await findByText(/開始使用|开始使用|Start Using/));
+
+    await waitFor(() =>
+      expect(mockNavigation.reset).toHaveBeenCalledWith({
+        index: 0,
+        routes: [{ name: 'SyncActivity' }],
+      }),
+    );
+    expect(mockNavigation.goBack).not.toHaveBeenCalled();
+  });
+
+  test('success dismiss resets root paywall to DeviceDiscovery without a binding', async () => {
+    mockNavigation.canGoBack.mockReturnValue(false);
+    (iapService.purchase as jest.Mock).mockResolvedValueOnce({
+      productId: 'com.vividrop.mobile.china.yearly.10400',
+      transactionReceipt: 'BLOB',
+      transactionId: 'tx_1',
+    });
+    (verifyIapReceipt as jest.Mock).mockResolvedValueOnce(undefined);
+    mockLoadSubscription.mockResolvedValueOnce({
+      status: 'subscribed',
+      plan: 'yearly',
+      expireAt: '2027-05-20T00:00:00Z',
+      trialEnd: null,
+    });
+
+    const { getByText, findByText } = renderScreen();
+    fireEvent.press(getByText(/立即订阅|立即訂閱|Subscribe Now/));
+    fireEvent.press(await findByText(/開始使用|开始使用|Start Using/));
+
+    await waitFor(() =>
+      expect(mockNavigation.reset).toHaveBeenCalledWith({
+        index: 0,
+        routes: [{ name: 'DeviceDiscovery' }],
+      }),
+    );
   });
 
   test('plan switch retries PRODUCT_ID_MISMATCH with a refreshed receipt', async () => {

@@ -9,6 +9,7 @@ import {
   Modal,
   ActivityIndicator,
   Dimensions,
+  NativeModules,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -17,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { Icon } from '../components/Icon';
-import { useAuth } from '../stores/auth-store';
+import { isFeatureAccessAllowed, useAuth } from '../stores/auth-store';
 import { iapService } from '../services/iap-service';
 import { IAP_PRODUCTS, planToProductId } from '../constants/iap';
 import { classifyIapError, IapErrorClass } from '../services/iap-errors';
@@ -52,6 +53,10 @@ const PLAN_CARD_WIDTH =
   (SCREEN_WIDTH - PLAN_CARD_HORIZONTAL_PADDING * 2 - PLAN_CARD_GAP) / 2;
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'Subscription'>;
+type PostSubscriptionRoute = Extract<
+  keyof RootStackParamList,
+  'DeviceDiscovery' | 'SyncActivity'
+>;
 
 /** Returns the Apple-level plan the user currently holds, or null for
  *  account-level trials / expired states where no Apple IAP applies.
@@ -81,6 +86,21 @@ function formatExpireDate(dateStr: string | null): string {
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return '';
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+async function resolvePostSubscriptionRoute(): Promise<PostSubscriptionRoute> {
+  try {
+    const { NativeSyncEngine } = NativeModules;
+    if (NativeSyncEngine) {
+      const binding = await NativeSyncEngine.getBindingState();
+      if (binding && binding.deviceId) {
+        return 'SyncActivity';
+      }
+    }
+  } catch {
+    /* fall through to DeviceDiscovery */
+  }
+  return 'DeviceDiscovery';
 }
 
 function getPlanDisplayName(plan: string, t: TFunction): string {
@@ -260,8 +280,8 @@ function PlanCard({
         disabled
           ? planStyles.cardDisabled
           : selected
-          ? planStyles.cardSelected
-          : planStyles.cardUnselected,
+            ? planStyles.cardSelected
+            : planStyles.cardUnselected,
       ]}
       activeOpacity={0.82}
       onPress={onPress}
@@ -278,8 +298,8 @@ function PlanCard({
           disabled
             ? planStyles.textDisabled
             : selected
-            ? planStyles.textSelected
-            : planStyles.textUnselected,
+              ? planStyles.textSelected
+              : planStyles.textUnselected,
         ]}
       >
         {price}
@@ -290,8 +310,8 @@ function PlanCard({
           disabled
             ? planStyles.unitDisabled
             : selected
-            ? planStyles.unitSelected
-            : planStyles.unitUnselected,
+              ? planStyles.unitSelected
+              : planStyles.unitUnselected,
         ]}
       >
         {unit}
@@ -613,6 +633,10 @@ export function SubscriptionScreen() {
     subscription,
     user,
   });
+  const canExitRootPaywall = isFeatureAccessAllowed(
+    subscription?.status ?? user?.status,
+  );
+  const showBackButton = navigation.canGoBack() || canExitRootPaywall;
 
   const [isRestoring, setIsRestoring] = useState(false);
 
@@ -775,6 +799,14 @@ export function SubscriptionScreen() {
     }
   }, [t, selectedPlan, currentPlan, loadSubscription, setSubscription]);
 
+  const resetToPostSubscriptionRoute = useCallback(async () => {
+    const route = await resolvePostSubscriptionRoute();
+    navigation.reset({
+      index: 0,
+      routes: [{ name: route }],
+    });
+  }, [navigation]);
+
   const handlePaymentSuccessDismiss = useCallback(() => {
     setShowPaymentSuccess(false);
     // Came from Settings / elsewhere → return there. Came from login
@@ -783,36 +815,41 @@ export function SubscriptionScreen() {
     if (navigation.canGoBack()) {
       navigation.goBack();
     } else {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'DeviceDiscovery' }],
-      });
+      void resetToPostSubscriptionRoute();
     }
-  }, [navigation]);
+  }, [navigation, resetToPostSubscriptionRoute]);
+
+  const handleBackPress = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    if (canExitRootPaywall) {
+      void resetToPostSubscriptionRoute();
+    }
+  }, [canExitRootPaywall, navigation, resetToPostSubscriptionRoute]);
 
   const subscribeButtonLabel =
     currentPlan === 'yearly'
       ? t('subscription.actions.currentYearly')
       : currentPlan && selectedPlan !== currentPlan
-      ? t('subscription.actions.switchPlan')
-      : t('subscription.actions.subscribe');
+        ? t('subscription.actions.switchPlan')
+        : t('subscription.actions.subscribe');
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          activeOpacity={0.6}
-          hitSlop={{ top: 15, bottom: 15, left: 15, right: 30 }}
-          onPress={() => {
-            if (navigation.canGoBack()) {
-              navigation.goBack();
-            }
-          }}
-          accessibilityLabel={t('common.back')}
-        >
-          <Icon name="chevron-back" size={20} color={DARK} />
-        </TouchableOpacity>
+        {showBackButton ? (
+          <TouchableOpacity
+            style={styles.backButton}
+            activeOpacity={0.6}
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 30 }}
+            onPress={handleBackPress}
+            accessibilityLabel={t('common.back')}
+          >
+            <Icon name="chevron-back" size={20} color={DARK} />
+          </TouchableOpacity>
+        ) : null}
         <Text style={styles.headerTitle}>{t('subscription.title')}</Text>
       </View>
 
