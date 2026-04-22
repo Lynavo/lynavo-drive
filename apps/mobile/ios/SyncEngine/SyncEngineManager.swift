@@ -1401,9 +1401,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
             if success {
                 self.cancelPresenceRecoveryProbe(reason: "heartbeat_succeeded")
-                if !self.isSyncing {
-                    self.startSync()
-                }
+                self.resumeSyncAfterConnectionRecovery(reason: "presence_recovery_succeeded")
                 return
             }
 
@@ -1425,6 +1423,34 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             self.setPresenceRecoveryWorkItem(workItem)
             self.presenceRecoveryQueue.asyncAfter(deadline: .now() + retryInterval, execute: workItem)
         }
+    }
+
+    private func resumeSyncAfterConnectionRecovery(reason: String) {
+        let configState = autoUploadConfigStore?.getConfig().state ?? "disabled"
+        let pendingCounts = uploadStore?.getPendingCountsBySource() ?? (auto: 0, manual: 0)
+        let shouldResume = configState == "active" || pendingCounts.manual > 0
+
+        guard shouldResume else {
+            syncDiagnosticsLog(
+                "SyncEngine",
+                "connection recovery did not resume sync (\(reason)) auto=\(configState) pending(manual=\(pendingCounts.manual) auto=\(pendingCounts.auto))"
+            )
+            return
+        }
+
+        if isSyncing && sessionService.state == .pausedNoTarget {
+            syncDiagnosticsLog(
+                "SyncEngine",
+                "connection recovery correcting stale syncing flag before resume (\(reason))"
+            )
+            isSyncing = false
+        }
+
+        syncDiagnosticsLog(
+            "SyncEngine",
+            "connection recovery resuming sync (\(reason)) auto=\(configState) pending(manual=\(pendingCounts.manual) auto=\(pendingCounts.auto)) isSyncing=\(isSyncing) session=\(sessionService.state.rawValue)"
+        )
+        startSync()
     }
 
     private func verifyPresenceWithRecovery(

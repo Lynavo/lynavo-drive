@@ -1366,7 +1366,19 @@ export function AlbumWorkbenchScreen() {
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'SyncActivity' as never }],
+              });
+            }
+          }}
+        >
           <Icon name="chevron-back" size={22} color={DARK} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
