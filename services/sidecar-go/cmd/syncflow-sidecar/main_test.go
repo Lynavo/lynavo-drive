@@ -33,11 +33,13 @@ func TestBootstrapReconciliationUpdatesLegacyDefaultReceiveRoot(t *testing.T) {
 		t.Fatalf("UpdateShareConfig: %v", err)
 	}
 
-	bootstrapReconciliation(st, &config.Config{
+	runtimeConfig := &config.Config{
 		DataDir:    dataDir,
 		ReceiveDir: filepath.Join(dataDir, "received"),
 		DeviceName: "test-device",
-	})
+	}
+
+	bootstrapReconciliation(st, runtimeConfig)
 
 	updated, err := st.GetShareConfig()
 	if err != nil {
@@ -45,6 +47,9 @@ func TestBootstrapReconciliationUpdatesLegacyDefaultReceiveRoot(t *testing.T) {
 	}
 	if updated.ReceiveRoot != filepath.Join(dataDir, "received") {
 		t.Fatalf("ReceiveRoot = %q, want %q", updated.ReceiveRoot, filepath.Join(dataDir, "received"))
+	}
+	if runtimeConfig.ReceiveDir != filepath.Join(dataDir, "received") {
+		t.Fatalf("runtime ReceiveDir = %q, want %q", runtimeConfig.ReceiveDir, filepath.Join(dataDir, "received"))
 	}
 }
 
@@ -72,11 +77,13 @@ func TestBootstrapReconciliationKeepsCustomReceiveRoot(t *testing.T) {
 		t.Fatalf("UpdateShareConfig: %v", err)
 	}
 
-	bootstrapReconciliation(st, &config.Config{
+	runtimeConfig := &config.Config{
 		DataDir:    dataDir,
 		ReceiveDir: filepath.Join(dataDir, "received"),
 		DeviceName: "test-device",
-	})
+	}
+
+	bootstrapReconciliation(st, runtimeConfig)
 
 	updated, err := st.GetShareConfig()
 	if err != nil {
@@ -84,6 +91,9 @@ func TestBootstrapReconciliationKeepsCustomReceiveRoot(t *testing.T) {
 	}
 	if updated.ReceiveRoot != filepath.Join(dir, "custom-received") {
 		t.Fatalf("ReceiveRoot = %q, want %q", updated.ReceiveRoot, filepath.Join(dir, "custom-received"))
+	}
+	if runtimeConfig.ReceiveDir != filepath.Join(dir, "custom-received") {
+		t.Fatalf("runtime ReceiveDir = %q, want %q", runtimeConfig.ReceiveDir, filepath.Join(dir, "custom-received"))
 	}
 }
 

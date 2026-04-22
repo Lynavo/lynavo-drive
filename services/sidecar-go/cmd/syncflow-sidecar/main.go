@@ -72,6 +72,10 @@ func main() {
 
 	// Bootstrap reconciliation: ensure DB has config defaults
 	bootstrapReconciliation(st, cfg)
+	if err := ensureRuntimeDirs(cfg); err != nil {
+		slog.Error("create reconciled runtime dirs", "err", err)
+		os.Exit(1)
+	}
 
 	// Backfill receive_dir_name for any legacy devices that lack it.
 	// This runs once at startup so all devices are in a clean state
@@ -255,21 +259,25 @@ func bootstrapReconciliation(st *store.Store, cfg *config.Config) {
 	// If share_config.receive_root is empty, set it from config
 	shareConfig, err := st.GetShareConfig()
 	if err == nil {
-		if shareConfig.ReceiveRoot == "" {
+		receiveRoot := strings.TrimSpace(shareConfig.ReceiveRoot)
+		if receiveRoot == "" {
 			shareConfig.ReceiveRoot = cfg.ReceiveDir
 			if err := st.UpdateShareConfig(*shareConfig); err != nil {
 				slog.Warn("bootstrap: failed to set receive_root", "err", err)
 			} else {
 				slog.Info("bootstrap: set receive_root", "path", cfg.ReceiveDir)
 			}
-		} else if shouldRewriteLegacyReceiveRoot(cfg, shareConfig.ReceiveRoot) {
-			previousRoot := shareConfig.ReceiveRoot
+		} else if shouldRewriteLegacyReceiveRoot(cfg, receiveRoot) {
+			previousRoot := receiveRoot
 			shareConfig.ReceiveRoot = cfg.ReceiveDir
 			if err := st.UpdateShareConfig(*shareConfig); err != nil {
 				slog.Warn("bootstrap: failed to rewrite legacy receive_root", "from", previousRoot, "to", cfg.ReceiveDir, "err", err)
 			} else {
 				slog.Info("bootstrap: rewrote legacy receive_root", "from", previousRoot, "to", cfg.ReceiveDir)
 			}
+		} else {
+			cfg.ReceiveDir = receiveRoot
+			slog.Info("bootstrap: hydrated receive_dir from store", "path", cfg.ReceiveDir)
 		}
 	}
 
