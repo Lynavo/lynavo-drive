@@ -190,13 +190,13 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       console.error('Failed to fetch dashboard:', err);
       const storageUnavailable = isStorageUnavailableError(err);
       const message = storageUnavailable
-        ? '接收目錄不可用，請重新選擇或恢復資料夾'
-        : '載入設備列表失敗';
+        ? '接收目录不可用，请重新选择或恢复文件夹'
+        : '加载设备列表失败';
       set({ error: message });
       toast.error(message, {
         description: storageUnavailable
-          ? '電腦端仍在線，但目前無法存取設定的接收位置'
-          : '請檢查網路連線後重試',
+          ? '电脑端仍在线，但目前无法存取设置的接收位置'
+          : '请检查网络连接后重试',
       });
     }
   },

@@ -209,7 +209,7 @@ describe('directory-store', () => {
     await useDirectoryStore.getState().fetchSharedFiles();
 
     expect(useDirectoryStore.getState().sharedFiles).toEqual([]);
-    expect(useDirectoryStore.getState().sharedError).toBe('載入共享檔案列表失敗');
+    expect(useDirectoryStore.getState().sharedError).toBe('加载共享文件列表失败');
   });
 
   it('fetchSharedFiles uses storage unavailable copy when the directory is missing', async () => {
@@ -225,7 +225,7 @@ describe('directory-store', () => {
 
     expect(useDirectoryStore.getState().sharedFiles).toEqual([]);
     expect(useDirectoryStore.getState().sharedError).toBe(
-      '共享目錄不可用，請重新選擇或恢復資料夾',
+      '共享目录不可用，请重新选择或恢复文件夹',
     );
   });
 
@@ -241,7 +241,7 @@ describe('directory-store', () => {
     await useDirectoryStore.getState().fetchReceivedFiles();
 
     expect(useDirectoryStore.getState().receivedError).toBe(
-      '接收目錄不可用，請重新選擇或恢復資料夾',
+      '接收目录不可用，请重新选择或恢复文件夹',
     );
   });
 
@@ -259,7 +259,7 @@ describe('directory-store', () => {
     } as unknown as Window['electronAPI'];
 
     // Pre-set an error to verify it gets cleared
-    useDirectoryStore.setState({ sharedError: '載入共享檔案列表失敗' });
+    useDirectoryStore.setState({ sharedError: '加载共享文件列表失败' });
 
     await useDirectoryStore.getState().fetchSharedFiles();
 

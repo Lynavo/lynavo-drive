@@ -144,8 +144,8 @@ export const useDirectoryStore = create<DirectoryState>((set, get) => ({
       set({
         loading: false,
         receivedError: isStorageUnavailableError(err)
-          ? '接收目錄不可用，請重新選擇或恢復資料夾'
-          : '載入接收檔案列表失敗',
+          ? '接收目录不可用，请重新选择或恢复文件夹'
+          : '加载接收文件列表失败',
       });
     }
   },
@@ -180,8 +180,8 @@ export const useDirectoryStore = create<DirectoryState>((set, get) => ({
       set({
         sharedFiles: [],
         sharedError: isStorageUnavailableError(err)
-          ? '共享目錄不可用，請重新選擇或恢復資料夾'
-          : '載入共享檔案列表失敗',
+          ? '共享目录不可用，请重新选择或恢复文件夹'
+          : '加载共享文件列表失败',
       });
     }
   },

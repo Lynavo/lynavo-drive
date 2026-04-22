@@ -45,14 +45,14 @@ export function DirectoryPathCard() {
     const api = window.electronAPI;
     if (!api) return;
     if (transferActive) {
-      toast.error('正在接收檔案，完成後再變更根目錄');
+      toast.error('正在接收文件，完成后再变更根目录');
       return;
     }
     try {
       const latestTransferState = await api.sidecar.getTransferActive();
       if (latestTransferState.active) {
         setTransferActive(true);
-        toast.error('正在接收檔案，完成後再變更根目錄');
+        toast.error('正在接收文件，完成后再变更根目录');
         return;
       }
 
@@ -67,17 +67,17 @@ export function DirectoryPathCard() {
     } catch (err: unknown) {
       const body = err instanceof Error ? err.message : '';
       if (body.includes('transfer')) {
-        toast.error('目前正在接收檔案，暫時無法修改接收目錄');
+        toast.error('目前正在接收文件，暂时无法修改接收目录');
       } else if (
         body.includes('cannot create') ||
         body.includes('not writable') ||
         body.includes('read-only')
       ) {
-        toast.error('所選位置不可寫入，請選擇其他資料夾');
+        toast.error('所选位置不可写入，请选择其他文件夹');
       } else if (body.includes('must not be empty') || body.includes('absolute')) {
-        toast.error('請選擇有效目錄');
+        toast.error('请选择有效目录');
       } else {
-        toast.error('目錄不可用');
+        toast.error('目录不可用');
       }
     } finally {
       setSaving(false);
@@ -109,7 +109,7 @@ export function DirectoryPathCard() {
             {transferActive && (
               <div className="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
                 <Lock className="h-3 w-3" />
-                正在接收檔案，完成後可變更
+                正在接收文件，完成后可变更
               </div>
             )}
             <code

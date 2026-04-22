@@ -503,7 +503,7 @@ describe('dashboard-store', () => {
     await useDashboardStore.getState().fetchDashboard();
 
     expect(useDashboardStore.getState().error).toBe(
-      '接收目錄不可用，請重新選擇或恢復資料夾',
+      '接收目录不可用，请重新选择或恢复文件夹',
     );
   });
 

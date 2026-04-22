@@ -203,7 +203,7 @@ describe('DirectoryPathCard', () => {
     render(<DirectoryPathCard />);
 
     await waitFor(() => {
-      expect(screen.getByText('正在接收檔案，完成後可變更')).toBeInTheDocument();
+      expect(screen.getByText('正在接收文件，完成后可变更')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole('button', { name: '更改' }));
