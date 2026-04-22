@@ -228,6 +228,13 @@ func (c *Config) DBPath() string {
 }
 
 func (c *Config) StagingDir() string {
+	if c.ReceiveDir != "" {
+		return filepath.Join(filepath.Dir(c.ReceiveDir), "staging")
+	}
+	return filepath.Join(c.DataDir, "staging")
+}
+
+func (c *Config) LegacyStagingDir() string {
 	return filepath.Join(c.DataDir, "staging")
 }
 

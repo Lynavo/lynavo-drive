@@ -20,6 +20,7 @@ import (
 	"github.com/nicksyncflow/sidecar/internal/events"
 	"github.com/nicksyncflow/sidecar/internal/logging"
 	"github.com/nicksyncflow/sidecar/internal/mdns"
+	"github.com/nicksyncflow/sidecar/internal/runtimefs"
 	"github.com/nicksyncflow/sidecar/internal/server"
 	"github.com/nicksyncflow/sidecar/internal/store"
 )
@@ -38,9 +39,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create the log directory before Setup so file logging works on first run.
-	if err := ensureRuntimeDirs(cfg); err != nil {
-		fmt.Fprintf(os.Stderr, "create runtime dirs: %v\n", err)
+	// Create sidecar-owned state directories before Setup so file logging and
+	// SQLite work even if a user-facing receive root is currently unavailable.
+	if err := ensureCoreRuntimeDirs(cfg); err != nil {
+		fmt.Fprintf(os.Stderr, "create core runtime dirs: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -72,20 +74,24 @@ func main() {
 
 	// Bootstrap reconciliation: ensure DB has config defaults
 	bootstrapReconciliation(st, cfg)
-	if err := ensureRuntimeDirs(cfg); err != nil {
-		slog.Error("create reconciled runtime dirs", "err", err)
-		os.Exit(1)
+	storageReady := ensureStorageDirsAtStartup(cfg)
+	if err := cleanupLegacyStagingDir(cfg); err != nil {
+		slog.Warn("cleanup legacy staging dir failed", "path", cfg.LegacyStagingDir(), "err", err)
 	}
 
-	// Backfill receive_dir_name for any legacy devices that lack it.
-	// This runs once at startup so all devices are in a clean state
-	// before the TCP server accepts connections.
-	server.BackfillReceiveDirNames(st, cfg.ReceiveDir)
+	if storageReady {
+		// Backfill receive_dir_name for any legacy devices that lack it.
+		// This runs once at startup so all devices are in a clean state
+		// before the TCP server accepts connections.
+		server.BackfillReceiveDirNames(st, cfg.ReceiveDir)
 
-	// Verify that every device's receive directory actually exists on disk.
-	// Fixes stale DB entries left by the old rename-on-alias-change code
-	// (which updated the DB even when the directory rename failed).
-	server.ReconcileReceiveDirNames(st, cfg.ReceiveDir)
+		// Verify that every device's receive directory actually exists on disk.
+		// Fixes stale DB entries left by the old rename-on-alias-change code
+		// (which updated the DB even when the directory rename failed).
+		server.ReconcileReceiveDirNames(st, cfg.ReceiveDir)
+	} else {
+		slog.Warn("startup receive-dir reconciliation skipped because storage is unavailable", "receiveDir", cfg.ReceiveDir)
+	}
 
 	// Create TCP server first (API needs its client state tracker)
 	tcpSrv := server.NewTCPServer(st, cfg, hub)
@@ -317,10 +323,23 @@ func watchSharedDirectory(ctx context.Context, cfg *config.Config, hub *events.H
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			result, err := runtimefs.EnsureStorageDirs(cfg)
+			if err != nil {
+				slog.Warn("watch shared directory: runtime dirs unavailable", "err", err)
+				continue
+			}
 			sharedDir := cfg.SharedDir()
 			info, err := os.Stat(sharedDir)
 			if err != nil {
 				continue
+			}
+			if len(result.Recreated) > 0 {
+				slog.Warn("watch shared directory: runtime dirs recreated", "paths", result.Recreated)
+				hub.Broadcast(events.Event{
+					Type:    "shared.directory.changed",
+					Payload: map[string]any{"path": sharedDir},
+				})
+				hub.Broadcast(events.Event{Type: "dashboard.updated", Payload: nil})
 			}
 
 			// Quick check: directory mod time changed, or count files at top level
@@ -351,11 +370,49 @@ func watchSharedDirectory(ctx context.Context, cfg *config.Config, hub *events.H
 }
 
 func ensureRuntimeDirs(cfg *config.Config) error {
-	for _, dir := range []string{cfg.DataDir, cfg.ReceiveDir, cfg.SharedDir(), cfg.StagingDir(), cfg.LogDir()} {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return fmt.Errorf("create runtime dir %q: %w", dir, err)
-		}
+	_, err := runtimefs.EnsureRuntimeDirs(cfg)
+	return err
+}
+
+func ensureCoreRuntimeDirs(cfg *config.Config) error {
+	_, err := runtimefs.EnsureCoreDirs(cfg)
+	return err
+}
+
+func ensureStorageDirsAtStartup(cfg *config.Config) bool {
+	result, err := runtimefs.EnsureStorageDirs(cfg)
+	if err != nil {
+		slog.Warn("startup storage dirs unavailable", "receiveDir", cfg.ReceiveDir, "err", err)
+		return false
 	}
+	if len(result.Recreated) > 0 {
+		slog.Info("startup storage dirs created", "paths", result.Recreated)
+	}
+	return true
+}
+
+func cleanupLegacyStagingDir(cfg *config.Config) error {
+	legacyStagingDir := filepath.Clean(cfg.LegacyStagingDir())
+	activeStagingDir := filepath.Clean(cfg.StagingDir())
+	if legacyStagingDir == activeStagingDir {
+		return nil
+	}
+
+	entries, err := os.ReadDir(legacyStagingDir)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read legacy staging dir: %w", err)
+	}
+	if len(entries) == 0 {
+		return nil
+	}
+
+	if err := os.RemoveAll(legacyStagingDir); err != nil {
+		return fmt.Errorf("remove legacy staging dir: %w", err)
+	}
+	slog.Info("legacy staging dir cleaned", "path", legacyStagingDir, "entries", len(entries))
 	return nil
 }
 

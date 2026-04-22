@@ -239,6 +239,12 @@ func (s *Store) CompleteUpload(fileKey, finalPath, sha256 string, transmissionMs
 // PauseUploadForLowDisk marks an in-flight upload as resumable when disk space
 // falls below the configured threshold mid-transfer.
 func (s *Store) PauseUploadForLowDisk(fileKey string, committedBytes, transmissionMs int64) error {
+	return s.PauseUploadResumable(fileKey, committedBytes, transmissionMs)
+}
+
+// PauseUploadResumable marks an in-flight upload as resumable after an
+// environmental pause such as low disk space or unavailable storage path.
+func (s *Store) PauseUploadResumable(fileKey string, committedBytes, transmissionMs int64) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	result, err := s.db.Exec(`
 		UPDATE uploads
@@ -250,11 +256,11 @@ func (s *Store) PauseUploadForLowDisk(fileKey string, committedBytes, transmissi
 		committedBytes, transmissionMs, now, fileKey,
 	)
 	if err != nil {
-		return fmt.Errorf("pause upload for low disk %q: %w", fileKey, err)
+		return fmt.Errorf("pause upload resumable %q: %w", fileKey, err)
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {
-		return fmt.Errorf("pause upload for low disk %q: %w", fileKey, ErrNoRows)
+		return fmt.Errorf("pause upload resumable %q: %w", fileKey, ErrNoRows)
 	}
 	return nil
 }

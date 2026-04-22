@@ -1,7 +1,9 @@
 package server
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -141,7 +143,9 @@ func (fw *FileWriter) ElapsedMs() int64 {
 // Close closes the underlying file handle.
 func (fw *FileWriter) Close() error {
 	if fw.file != nil {
-		return fw.file.Close()
+		err := fw.file.Close()
+		fw.file = nil
+		return err
 	}
 	return nil
 }
@@ -193,8 +197,8 @@ func (fw *FileWriter) Finalize(receivePath, dirName, date, filename, fileKey str
 		finalPath = filepath.Join(dir, fmt.Sprintf("%s_%s%s", base, suffix, ext))
 	}
 
-	if err := os.Rename(fw.partPath, finalPath); err != nil {
-		return "", fmt.Errorf("rename part to final: %w", err)
+	if err := movePartToFinal(fw.partPath, finalPath); err != nil {
+		return "", err
 	}
 
 	// Return path relative to receivePath
@@ -203,6 +207,66 @@ func (fw *FileWriter) Finalize(receivePath, dirName, date, filename, fileKey str
 		return filepath.Base(finalPath), nil
 	}
 	return rel, nil
+}
+
+func movePartToFinal(partPath, finalPath string) error {
+	if err := os.Rename(partPath, finalPath); err != nil {
+		if !isCrossDeviceRenameError(err) {
+			return fmt.Errorf("rename part to final: %w", err)
+		}
+		if copyErr := copyPartToFinal(partPath, finalPath); copyErr != nil {
+			return fmt.Errorf("rename part to final: %w; copy fallback: %w", err, copyErr)
+		}
+		if removeErr := os.Remove(partPath); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+			return fmt.Errorf("remove copied part file: %w", removeErr)
+		}
+	}
+	return nil
+}
+
+func isCrossDeviceRenameError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "cross-device link") ||
+		strings.Contains(message, "different disk drive") ||
+		strings.Contains(message, "not same device")
+}
+
+func copyPartToFinal(partPath, finalPath string) error {
+	src, err := os.Open(partPath)
+	if err != nil {
+		return fmt.Errorf("open part file: %w", err)
+	}
+	defer src.Close()
+
+	dst, err := os.OpenFile(finalPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o640)
+	if err != nil {
+		return fmt.Errorf("create final file: %w", err)
+	}
+
+	copied := false
+	defer func() {
+		if !copied {
+			_ = os.Remove(finalPath)
+		}
+	}()
+
+	if _, err := io.Copy(dst, src); err != nil {
+		_ = dst.Close()
+		return fmt.Errorf("copy data: %w", err)
+	}
+	if err := dst.Sync(); err != nil {
+		_ = dst.Close()
+		return fmt.Errorf("sync final file: %w", err)
+	}
+	if err := dst.Close(); err != nil {
+		return fmt.Errorf("close final file: %w", err)
+	}
+
+	copied = true
+	return nil
 }
 
 // SanitizeDirName replaces characters unsafe for directory names.

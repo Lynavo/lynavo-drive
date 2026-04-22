@@ -47,6 +47,16 @@ func testEnv(t *testing.T) (*store.Store, *config.Config, *events.Hub) {
 	return st, cfg, hub
 }
 
+type fakeClientStates map[string]string
+
+func (f fakeClientStates) ConnectedClientStates() map[string]string {
+	states := make(map[string]string, len(f))
+	for clientID, state := range f {
+		states[clientID] = state
+	}
+	return states
+}
+
 func TestHealthEndpoint(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
@@ -611,8 +621,50 @@ func TestUpdateSettings(t *testing.T) {
 	}
 }
 
+func TestSharedListRecreatesDeletedSharedDirectory(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := os.MkdirAll(cfg.SharedDir(), 0o755); err != nil {
+		t.Fatalf("mkdir shared dir: %v", err)
+	}
+	if err := os.RemoveAll(cfg.SharedDir()); err != nil {
+		t.Fatalf("remove shared dir: %v", err)
+	}
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/shared/list")
+	if err != nil {
+		t.Fatalf("GET /shared/list: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var body struct {
+		Files      []map[string]any `json:"files"`
+		TotalCount int              `json:"totalCount"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body.TotalCount != 0 {
+		t.Fatalf("expected empty shared dir, got %d", body.TotalCount)
+	}
+	if info, err := os.Stat(cfg.SharedDir()); err != nil || !info.IsDir() {
+		t.Fatalf("expected shared dir to be recreated, info=%v err=%v", info, err)
+	}
+}
+
 func TestResetState(t *testing.T) {
 	st, cfg, hub := testEnv(t)
+	cfg.ReceiveDir = filepath.Join(t.TempDir(), "external", "received")
+	if err := os.MkdirAll(cfg.ReceiveDir, 0o755); err != nil {
+		t.Fatalf("mkdir external receive dir: %v", err)
+	}
 	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
@@ -692,6 +744,14 @@ func TestResetState(t *testing.T) {
 	}
 	if err := os.WriteFile(filepath.Join(cfg.StagingDir(), "resume.part"), []byte("partial"), 0o644); err != nil {
 		t.Fatalf("write staging file: %v", err)
+	}
+	if cfg.LegacyStagingDir() != cfg.StagingDir() {
+		if err := os.MkdirAll(cfg.LegacyStagingDir(), 0o755); err != nil {
+			t.Fatalf("mkdir legacy staging path: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(cfg.LegacyStagingDir(), "legacy.part"), []byte("legacy partial"), 0o644); err != nil {
+			t.Fatalf("write legacy staging file: %v", err)
+		}
 	}
 
 	resp, err := http.Post(srv.URL+"/settings/reset-state", "application/json", strings.NewReader("{}"))
@@ -775,6 +835,80 @@ func TestResetState(t *testing.T) {
 	}
 	if len(stagingEntries) != 0 {
 		t.Fatalf("expected staging dir to be empty, got %d entries", len(stagingEntries))
+	}
+
+	if cfg.LegacyStagingDir() != cfg.StagingDir() {
+		legacyEntries, err := os.ReadDir(cfg.LegacyStagingDir())
+		if err != nil {
+			t.Fatalf("ReadDir legacy staging: %v", err)
+		}
+		if len(legacyEntries) != 0 {
+			t.Fatalf("expected legacy staging dir to be empty, got %d entries", len(legacyEntries))
+		}
+	}
+}
+
+func TestResetStateReturnsUnavailableWhenStorageParentMissing(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	missingMount := filepath.Join(t.TempDir(), "MissingExternalDisk")
+	cfg.ReceiveDir = filepath.Join(missingMount, "ViviDrop", "received")
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Post(srv.URL+"/settings/reset-state", "application/json", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatalf("POST /settings/reset-state: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d", resp.StatusCode)
+	}
+	if _, err := os.Stat(missingMount); !os.IsNotExist(err) {
+		t.Fatalf("expected missing mount point not to be created, err=%v", err)
+	}
+}
+
+func TestResetStateRejectsActiveTransfer(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	now := time.Now().UTC().Format(time.RFC3339)
+	if err := st.UpsertPairedDevice(store.PairedDevice{
+		ClientID:         "client-active",
+		ClientName:       "Phone",
+		Platform:         "ios",
+		PairingID:        "pair-active",
+		PairingTokenHash: "hash-active",
+		CreatedAt:        now,
+		LastSeenAt:       now,
+	}); err != nil {
+		t.Fatalf("UpsertPairedDevice: %v", err)
+	}
+
+	handler := func() http.Handler {
+		_, h := api.NewServer(st, cfg, hub, fakeClientStates{"client-active": "syncing"})
+		return h
+	}()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Post(srv.URL+"/settings/reset-state", "application/json", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatalf("POST /settings/reset-state: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("expected 409, got %d", resp.StatusCode)
+	}
+
+	var count int
+	if err := st.DB().QueryRow("SELECT COUNT(*) FROM paired_devices").Scan(&count); err != nil {
+		t.Fatalf("count paired_devices: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected paired device to remain after rejected reset, got %d", count)
 	}
 }
 

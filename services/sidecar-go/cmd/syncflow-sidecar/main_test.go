@@ -126,6 +126,111 @@ func TestEnsureRuntimeDirsCreatesSharedDirAtStartup(t *testing.T) {
 	}
 }
 
+func TestEnsureCoreRuntimeDirsSkipsUnavailableStorageRoot(t *testing.T) {
+	dir := t.TempDir()
+	missingMount := filepath.Join(dir, "MissingExternalDisk")
+	cfg := &config.Config{
+		DataDir:    filepath.Join(dir, "Vivi Drop"),
+		ReceiveDir: filepath.Join(missingMount, "ViviDrop", "received"),
+		DeviceName: "test-device",
+	}
+
+	if err := ensureCoreRuntimeDirs(cfg); err != nil {
+		t.Fatalf("ensureCoreRuntimeDirs: %v", err)
+	}
+
+	for _, path := range []string{cfg.DataDir, cfg.LogDir()} {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("Stat(%q): %v", path, err)
+		}
+		if !info.IsDir() {
+			t.Fatalf("%q is not a directory", path)
+		}
+	}
+	if _, err := os.Stat(missingMount); !os.IsNotExist(err) {
+		t.Fatalf("expected missing storage root not to be created, err=%v", err)
+	}
+}
+
+func TestEnsureStorageDirsAtStartupReturnsFalseForUnavailableStorage(t *testing.T) {
+	dir := t.TempDir()
+	missingMount := filepath.Join(dir, "MissingExternalDisk")
+	cfg := &config.Config{
+		DataDir:    filepath.Join(dir, "Vivi Drop"),
+		ReceiveDir: filepath.Join(missingMount, "ViviDrop", "received"),
+		DeviceName: "test-device",
+	}
+
+	if ready := ensureStorageDirsAtStartup(cfg); ready {
+		t.Fatal("expected unavailable storage to return false")
+	}
+	if _, err := os.Stat(missingMount); !os.IsNotExist(err) {
+		t.Fatalf("expected missing storage root not to be created, err=%v", err)
+	}
+}
+
+func TestCleanupLegacyStagingDirRemovesObsoletePartFiles(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &config.Config{
+		DataDir:    filepath.Join(dir, "Vivi Drop"),
+		ReceiveDir: filepath.Join(dir, "external", "received"),
+		DeviceName: "test-device",
+	}
+
+	legacyStaging := cfg.LegacyStagingDir()
+	if err := os.MkdirAll(legacyStaging, 0o755); err != nil {
+		t.Fatalf("MkdirAll(legacyStaging): %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(legacyStaging, "old.part"), []byte("partial"), 0o644); err != nil {
+		t.Fatalf("WriteFile(old.part): %v", err)
+	}
+
+	if err := ensureRuntimeDirs(cfg); err != nil {
+		t.Fatalf("ensureRuntimeDirs: %v", err)
+	}
+	activeStaging := cfg.StagingDir()
+	if activeStaging == legacyStaging {
+		t.Fatalf("test setup expected distinct staging dirs")
+	}
+
+	if err := cleanupLegacyStagingDir(cfg); err != nil {
+		t.Fatalf("cleanupLegacyStagingDir: %v", err)
+	}
+
+	if _, err := os.Stat(legacyStaging); !os.IsNotExist(err) {
+		t.Fatalf("expected legacy staging to be removed, stat err=%v", err)
+	}
+	if info, err := os.Stat(activeStaging); err != nil || !info.IsDir() {
+		t.Fatalf("expected active staging to remain, info=%v err=%v", info, err)
+	}
+}
+
+func TestCleanupLegacyStagingDirSkipsActiveStaging(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &config.Config{
+		DataDir:    filepath.Join(dir, "Vivi Drop"),
+		ReceiveDir: filepath.Join(dir, "Vivi Drop", "received"),
+		DeviceName: "test-device",
+	}
+
+	if err := ensureRuntimeDirs(cfg); err != nil {
+		t.Fatalf("ensureRuntimeDirs: %v", err)
+	}
+	partPath := filepath.Join(cfg.StagingDir(), "active.part")
+	if err := os.WriteFile(partPath, []byte("partial"), 0o644); err != nil {
+		t.Fatalf("WriteFile(active.part): %v", err)
+	}
+
+	if err := cleanupLegacyStagingDir(cfg); err != nil {
+		t.Fatalf("cleanupLegacyStagingDir: %v", err)
+	}
+
+	if _, err := os.Stat(partPath); err != nil {
+		t.Fatalf("expected active staging part to remain: %v", err)
+	}
+}
+
 func TestShouldRestartBonjourForIPChange(t *testing.T) {
 	tests := []struct {
 		name         string

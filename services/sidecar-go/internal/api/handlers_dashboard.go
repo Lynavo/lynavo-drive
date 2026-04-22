@@ -11,6 +11,10 @@ import (
 )
 
 func (s *Server) handleDashboardSummary(w http.ResponseWriter, _ *http.Request) {
+	if !s.ensureStorageDirsForRequest(w, "dashboard.summary") {
+		return
+	}
+
 	today := time.Now().Format("2006-01-02")
 
 	summary, err := s.store.GetDashboardSummary(today)
@@ -38,6 +42,10 @@ func (s *Server) handleDashboardSummary(w http.ResponseWriter, _ *http.Request) 
 }
 
 func (s *Server) handleDashboardDevices(w http.ResponseWriter, _ *http.Request) {
+	if !s.ensureStorageDirsForRequest(w, "dashboard.devices") {
+		return
+	}
+
 	today := time.Now().Format("2006-01-02")
 
 	devices, err := s.store.GetDashboardDevices(today)
