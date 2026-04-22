@@ -1045,7 +1045,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         // .connected state even though the desktop is no longer reachable.
         if bindingConnectionState == .connected || bindingConnectionState == .bound {
             let clientId = bindingService.getOrCreateClientId()
-            sendPresenceHeartbeat(clientId: clientId)
+            verifyPresenceWithRecovery(clientId: clientId)
         }
     }
 
@@ -1342,6 +1342,22 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             }
             self.setPresenceRecoveryWorkItem(workItem)
             self.presenceRecoveryQueue.asyncAfter(deadline: .now() + retryInterval, execute: workItem)
+        }
+    }
+
+    private func verifyPresenceWithRecovery(
+        clientId: String,
+        successReason: String = "presence_heartbeat_succeeded",
+        failureReason: String = "presence_heartbeat_failed"
+    ) {
+        sendPresenceHeartbeat(
+            clientId: clientId,
+            successReason: successReason,
+            failureReason: failureReason,
+            updateStateOnFailure: false
+        ) { [weak self] success in
+            guard let self = self, !success else { return }
+            self.startPresenceRecoveryProbe(clientId: clientId)
         }
     }
 
@@ -1688,7 +1704,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             switch syncError {
             case .networkError:
                 return true
-            case .databaseError, .pairingError, .permissionError, .lowDiskPaused, .autoUploadInterrupted:
+            case .databaseError, .pairingError, .permissionError, .lowDiskPaused, .storageUnavailable, .autoUploadInterrupted:
                 return false
             }
         }
@@ -1987,6 +2003,27 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     "code": "LOW_DISK_PAUSED",
                     "message": message,
                 ])
+            case .storageUnavailable(let message, let source):
+                slog("[SyncEngine] sync pipeline paused because desktop storage is unavailable: %@ source=%@", message, source)
+                syncDiagnosticsLog("SyncEngine", "sync pipeline paused because desktop storage is unavailable: \(message) source=\(source)")
+                protocolSession?.disconnect()
+                protocolSession = nil
+                maintainConnectedBindingState(reason: "storage_unavailable")
+                let finalUploadState = source == "auto" ? "paused_auto_upload" : "idle"
+                let finalSessionState: SessionService.SyncEngineState = source == "auto" ? .interruptedAutoUpload : .idle
+                if source == "auto" {
+                    persistAutoUploadInterruptedState(reason: "storage_unavailable")
+                }
+                clearRuntimeSyncRoundProgress(uploadState: finalUploadState)
+                let payload = runtimeSyncOverviewPayload(uploadState: finalUploadState)
+                logSyncOverviewEmission("pipeline_storage_unavailable", payload: payload)
+                NativeSyncEngineModule.shared?.emitSyncStateChanged(payload)
+                stopSyncLifecycle(finalState: finalSessionState)
+                recordRecentError(code: "STORAGE_UNAVAILABLE", message: message)
+                NativeSyncEngineModule.shared?.emitError([
+                    "code": "STORAGE_UNAVAILABLE",
+                    "message": message,
+                ])
             default:
                 slog("[SyncEngine] sync pipeline failed: \(error)")
                 syncDiagnosticsLog("SyncEngine", "sync pipeline failed: \(error)")
@@ -2227,7 +2264,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
                 // Wait loop: send HTTP presence heartbeat every 30s while idle
                 while !photoLibraryChanged {
-                    sendPresenceHeartbeat(clientId: clientId)
+                    verifyPresenceWithRecovery(clientId: clientId)
                     await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
                         if photoLibraryChanged {
                             cont.resume()
@@ -2375,6 +2412,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         var activeSessionId: String?
         var uploadRoundCompleted = false
         var uploadRoundPausedForLowDisk = false
+        var uploadRoundStorageUnavailable = false
         var uploadRoundInterruptedByUser = false
 
         defer {
@@ -2397,10 +2435,17 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                         if uploadStore?.getBinding() != nil {
                             updateBindingConnectionState(.connected, reason: "upload_round_paused_low_disk")
                         }
+                    } else if uploadRoundStorageUnavailable {
+                        maintainConnectedBindingState(reason: "upload_round_storage_unavailable")
                     } else {
                         clearResolvedSidecarHost()
                         if uploadStore?.getBinding() != nil {
-                            updateBindingConnectionState(.offline, reason: "upload_round_incomplete")
+                            let clientId = bindingService.getOrCreateClientId()
+                            verifyPresenceWithRecovery(
+                                clientId: clientId,
+                                successReason: "upload_round_incomplete_presence_restored",
+                                failureReason: "upload_round_incomplete_presence_failed"
+                            )
                         }
                     }
                 }
@@ -2666,6 +2711,23 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     }
                     throw syncError
                 }
+                if let syncError = error as? SyncEngineError,
+                   case .storageUnavailable(let message, let sourceLabel) = syncError
+                {
+                    uploadRoundStorageUnavailable = true
+                    slog("[SyncEngine] storage unavailable for %@ source=%@: %@", asset.fileKey, sourceLabel, message)
+                    syncDiagnosticsLog("SyncEngine", "storage unavailable for \(asset.fileKey) source=\(sourceLabel): \(message)")
+                    recordRecentError(code: "STORAGE_UNAVAILABLE", message: message)
+                    try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "queued")
+                    emitQueueToJS()
+                    prefetchTask?.cancel()
+                    await prefetchTask?.value
+                    if let leakedExport = nextExport {
+                        exportService.cleanup(tempURL: leakedExport.tempURL)
+                        nextExport = nil
+                    }
+                    throw syncError
+                }
                 if isRetryableSyncError(error) {
                     slog("[SyncEngine] retryable upload failure for %@: %@", asset.fileKey, "\(error)")
                     syncDiagnosticsLog("SyncEngine", "retryable upload failure for \(asset.fileKey): \(error)")
@@ -2799,6 +2861,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     emitQueueToJS()
                     throw SyncEngineError.lowDiskPaused(reason)
                 }
+                if reason == "STORAGE_UNAVAILABLE" {
+                    try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "queued")
+                    clearRuntimeCurrentFile()
+                    emitQueueToJS()
+                    throw SyncEngineError.storageUnavailable(reason, source: asset.source)
+                }
                 try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "skipped")
                 clearRuntimeCurrentFile()
                 emitQueueToJS()
@@ -2919,6 +2987,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 if tuning.perfLoggingEnabled {
                     let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - fileTransferStart) * 1000)
                     perfLog("file=\(asset.fileKey) action=FAILED size=\(exported.fileSize) endToEndMs=\(elapsedMs)")
+                }
+                let reason = endRes["reason"] as? String ?? ""
+                if reason == "STORAGE_UNAVAILABLE" {
+                    try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "queued")
+                    clearRuntimeCurrentFile()
+                    emitQueueToJS()
+                    throw SyncEngineError.storageUnavailable(reason, source: asset.source)
                 }
                 slog("[SyncUpload] [%d/%d] FILE_END not ok for %@", index + 1, total, exported.originalFilename)
                 clearRuntimeCurrentFile()
@@ -3327,6 +3402,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 if errCode == "LOW_DISK_PAUSED" {
                     throw SyncEngineError.lowDiskPaused(errMsg)
                 }
+                if errCode == "STORAGE_UNAVAILABLE" {
+                    throw SyncEngineError.storageUnavailable(errMsg, source: source)
+                }
                 throw SyncEngineError.networkError("FILE_DATA error: \(errMsg)")
             }
             // For other unexpected types, just continue
@@ -3454,7 +3532,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 slog("[SyncEngine] bound device %@ disappeared from discovery, verifying via heartbeat", binding.deviceId)
                 syncDiagnosticsLog("SyncEngine", "bound device \(binding.deviceId) disappeared from discovery, verifying via heartbeat")
                 let clientId = bindingService.getOrCreateClientId()
-                sendPresenceHeartbeat(clientId: clientId)
+                verifyPresenceWithRecovery(clientId: clientId)
             } else if boundDeviceVisible && (bindingConnectionState == .offline || bindingConnectionState == .bound) {
                 slog("[SyncEngine] bound device %@ reappeared in discovery, probing connection", binding.deviceId)
                 syncDiagnosticsLog("SyncEngine", "bound device \(binding.deviceId) reappeared in discovery, probing connection")
@@ -4318,22 +4396,25 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     // MARK: - Auto Upload Interrupt / Enable
 
-    /// Interrupt auto upload: skips auto items in queue, only processes manual items.
-    /// Once interrupted, user must explicitly re-enable.
-    func interruptAutoUpload() {
-        guard !isAutoUploadInterrupted else { return }
+    private func persistAutoUploadInterruptedState(reason: String) {
         isAutoUploadInterrupted = true
 
-        // Persist interrupted state so it survives app restart
         if var config = autoUploadConfigStore?.getConfig() {
             config.state = "interrupted"
             config.updatedAt = ISO8601DateFormatter().string(from: Date())
             do {
                 try autoUploadConfigStore?.saveConfig(config)
             } catch {
-                slog("[SyncEngine] WARN: failed to persist interrupted state: %@", "\(error)")
+                slog("[SyncEngine] WARN: failed to persist interrupted state (%@): %@", reason, "\(error)")
             }
         }
+    }
+
+    /// Interrupt auto upload: skips auto items in queue, only processes manual items.
+    /// Once interrupted, user must explicitly re-enable.
+    func interruptAutoUpload() {
+        guard !isAutoUploadInterrupted else { return }
+        persistAutoUploadInterruptedState(reason: "user_interrupt")
 
         // Clear pending auto items so they don't block manual uploads
         // (dedup check) and re-enabling auto upload starts a fresh scan.

@@ -96,6 +96,7 @@ export type SyncActivityMainCardState =
   | 'running'
   | 'standby'
   | 'not_started'
+  | 'auto_interrupted'
   | 'offline'
   | 'auto_completed'
   | 'manual_completed';
@@ -166,6 +167,10 @@ export function getSyncActivityMainCardState(
     return completedTaskSource === 'manual'
       ? 'manual_completed'
       : 'auto_completed';
+  }
+
+  if (snapshot?.autoUploadState === 'interrupted') {
+    return 'auto_interrupted';
   }
 
   if (isAutoUploadActive) {

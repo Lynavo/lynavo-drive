@@ -383,10 +383,10 @@ describe('buildOverview', () => {
     expect(next.completedCount).toBe(0);
     expect(next.totalCount).toBe(0);
     expect(next.currentTaskSource).toBe('auto');
-    expect(getSyncActivityMainCardState(next, false)).toBe('not_started');
+    expect(getSyncActivityMainCardState(next, false)).toBe('auto_interrupted');
   });
 
-  it('keeps the not-started card after the interrupted auto pipeline clears source', () => {
+  it('keeps the interrupted card after the interrupted auto pipeline clears source', () => {
     const prev = {
       progressPercent: 0,
       currentSpeedMbps: 12.4,
@@ -424,7 +424,7 @@ describe('buildOverview', () => {
     expect(next.completedCount).toBe(0);
     expect(next.totalCount).toBe(0);
     expect(next.currentTaskSource).toBeUndefined();
-    expect(getSyncActivityMainCardState(next, false)).toBe('not_started');
+    expect(getSyncActivityMainCardState(next, false)).toBe('auto_interrupted');
   });
 });
 
@@ -605,6 +605,8 @@ describe('resolveSyncErrorAlertMessage', () => {
       'errors.unknown': '未知錯誤',
       'syncActivity.dialogs.syncError.lowDiskPaused':
         '接收磁碟剩餘空間小於 500MB，已暫停新的接收任務',
+      'syncActivity.dialogs.syncError.storageUnavailable':
+        '電腦端接收目錄不可用，請在電腦端重新選擇或恢復資料夾',
     };
     return values[key] ?? key;
   }) as TFunction;
@@ -628,5 +630,17 @@ describe('resolveSyncErrorAlertMessage', () => {
         t,
       ),
     ).toBe('network failed');
+  });
+
+  it('uses localized copy for unavailable desktop storage', () => {
+    expect(
+      resolveSyncErrorAlertMessage(
+        {
+          code: 'STORAGE_UNAVAILABLE',
+          message: 'desktop receive directory is unavailable',
+        },
+        t,
+      ),
+    ).toBe('電腦端接收目錄不可用，請在電腦端重新選擇或恢復資料夾');
   });
 });

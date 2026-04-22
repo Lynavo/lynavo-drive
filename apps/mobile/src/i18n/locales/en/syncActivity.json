@@ -40,6 +40,12 @@
     "goToAlbum": "Go to Album",
     "enableAuto": "Enable Auto Upload"
   },
+  "interrupted": {
+    "title": "Auto Upload Paused",
+    "subtitle": "This auto upload was interrupted. Check the receive folder on your computer, then turn it back on.",
+    "goToAlbum": "Go to Album",
+    "resumeAuto": "Turn Back On"
+  },
   "offline": {
     "title": "Device Is Offline",
     "subtitle": "Make sure your computer is on and on the same network. Once it's back, uploads and shared files will resume.",
@@ -93,7 +99,8 @@
   "dialogs": {
     "syncError": {
       "title": "Sync Error",
-      "lowDiskPaused": "Receiving disk space is below 500 MB. New receive tasks have been paused."
+      "lowDiskPaused": "Receiving disk space is below 500 MB. New receive tasks have been paused.",
+      "storageUnavailable": "The receive folder on your computer is unavailable. Restore it or choose another folder on the desktop app."
     },
     "cancelManual": {
       "title": "Cancel Manual Upload",

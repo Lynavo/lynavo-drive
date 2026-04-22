@@ -237,6 +237,9 @@ export function resolveSyncErrorAlertMessage(
   if (error?.code === 'LOW_DISK_PAUSED') {
     return t('syncActivity.dialogs.syncError.lowDiskPaused');
   }
+  if (error?.code === 'STORAGE_UNAVAILABLE') {
+    return t('syncActivity.dialogs.syncError.storageUnavailable');
+  }
   return error?.message || t('errors.unknown');
 }
 
@@ -1559,7 +1562,46 @@ export function SyncActivityScreen() {
             </View>
           )}
 
-          {/* ---- State 5: Auto Upload Not Started ---- */}
+          {/* ---- State 5: Auto Upload Interrupted ---- */}
+          {mainCardState === 'auto_interrupted' && (
+            <View style={styles.cardBodyCentered}>
+              <View style={styles.notStartedIconCircle}>
+                <Icon
+                  name="alert-circle-outline"
+                  size={38}
+                  color={EMPTY_INFO_ICON}
+                />
+              </View>
+              <Text style={styles.centeredTitle}>
+                {t('syncActivity.interrupted.title')}
+              </Text>
+              <Text style={styles.centeredSubtitle}>
+                {t('syncActivity.interrupted.subtitle')}
+              </Text>
+              <View style={styles.twoButtonRow}>
+                <TouchableOpacity
+                  style={[styles.rowButton, styles.rowButtonOutlined]}
+                  activeOpacity={0.7}
+                  onPress={() => navigation.navigate('AlbumWorkbench')}
+                >
+                  <Text style={styles.rowButtonOutlinedText}>
+                    {t('syncActivity.interrupted.goToAlbum')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.rowButton, styles.rowButtonPrimary]}
+                  activeOpacity={0.7}
+                  onPress={() => void handleEnableAutoUpload()}
+                >
+                  <Text style={styles.rowButtonPrimaryText}>
+                    {t('syncActivity.interrupted.resumeAuto')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* ---- State 6: Auto Upload Not Started ---- */}
           {mainCardState === 'not_started' && (
             <View style={styles.cardBodyCentered}>
               <View style={styles.notStartedIconCircle}>
@@ -1598,7 +1640,7 @@ export function SyncActivityScreen() {
             </View>
           )}
 
-          {/* ---- State 6: Device Offline ---- */}
+          {/* ---- State 7: Device Offline ---- */}
           {mainCardState === 'offline' && (
             <View style={styles.cardBodyCentered}>
               <View style={styles.offlineIconCircle}>

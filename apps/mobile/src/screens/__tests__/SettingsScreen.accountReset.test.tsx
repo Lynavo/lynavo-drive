@@ -38,6 +38,10 @@ jest.mock('@react-navigation/native', () => ({
     reset: jest.fn(),
     dispatch: mockDispatch,
   }),
+  useFocusEffect: (effect: () => void | (() => void)) => {
+    const ReactInner = require('react');
+    ReactInner.useEffect(effect, [effect]);
+  },
   CommonActions: {
     reset: jest.fn(payload => payload),
   },

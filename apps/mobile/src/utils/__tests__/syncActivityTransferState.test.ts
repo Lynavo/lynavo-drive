@@ -89,7 +89,7 @@ describe('syncActivityTransferState', () => {
     expect(getSyncActivityMainCardState(snapshot, false)).toBe('running');
   });
 
-  it('does not keep the running card after auto upload is interrupted', () => {
+  it('shows an interrupted card after auto upload is interrupted', () => {
     const snapshot = {
       uploadState: 'paused_auto_upload',
       autoUploadState: 'interrupted' as const,
@@ -104,6 +104,24 @@ describe('syncActivityTransferState', () => {
 
     expect(hasOutstandingSyncRoundWork(snapshot)).toBe(false);
     expect(isSyncActivityActivelyTransferring(snapshot)).toBe(false);
+    expect(getSyncActivityMainCardState(snapshot, false)).toBe(
+      'auto_interrupted',
+    );
+  });
+
+  it('keeps disabled auto upload on the not-started card', () => {
+    const snapshot = {
+      uploadState: 'idle',
+      autoUploadState: 'disabled' as const,
+      completedCount: 0,
+      totalCount: 0,
+      autoPending: 0,
+      manualPending: 0,
+      currentTaskSource: undefined,
+      currentFileConfirmedBytes: 0,
+      currentFileTotalBytes: 0,
+    };
+
     expect(getSyncActivityMainCardState(snapshot, false)).toBe('not_started');
   });
 
