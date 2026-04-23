@@ -4120,6 +4120,19 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 }
                 slog("[SyncEngine] recreated local binding for \(serverId)")
             }
+
+            // Both sub-branches above (device switch / recreate) just persisted
+            // a new binding. Mirror the PAIR_REQ success path's housekeeping so
+            // RN learns about the change: cache sidecarHost, mark connected,
+            // emit onBindingStateChanged so SyncActivityScreen re-renders, and
+            // fire an immediate presence heartbeat so the desktop sees us.
+            sidecarHost = confirmedHost
+            updateBindingConnectionState(.connected, reason: "auth_not_required_pairing_confirmed")
+            if let updatedBinding = uploadStore?.getBinding() {
+                NativeSyncEngineModule.shared?.emitBindingStateChanged(bindingStatePayload(binding: updatedBinding))
+            }
+            sendPresenceHeartbeat(clientId: clientId)
+
             // Sync is no longer triggered automatically after pairing.
             // The user will initiate sync from the album workbench or sync screen.
             return
