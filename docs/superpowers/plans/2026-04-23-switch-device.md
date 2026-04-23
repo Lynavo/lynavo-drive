@@ -8,6 +8,11 @@
 
 **Tech Stack:** React Native (iOS), Swift (native layer), React Navigation v6, i18next, jest + @testing-library/react-native
 
+## Spec Deviations
+
+- **Spec says toast for "tap current device", plan implements Alert.alert.** React Native does not ship a cross-platform toast primitive on iOS. Using `Alert.alert(title)` keeps the implementation a single line, matches the existing project pattern (no third-party toast lib in use), and surfaces the message reliably. If a non-modal toast becomes a hard requirement later, swap the call site without touching the surrounding logic.
+- **`settings.dialogs.switchDevice.{title,body,confirm}` is removed** (Task 3, Step 8). The previous flow showed a "disconnect first?" confirmation; the new flow only confirms when an upload is in progress and uses the new `switchDeviceWhileUploading` keys instead.
+
 ---
 
 ## File Map
@@ -141,7 +146,7 @@ Expected: FAIL — `getKnownDeviceIds is not a function`
 
 - [ ] **Step 3: Add export to SyncEngineModule.ts**
 
-In `apps/mobile/src/services/SyncEngineModule.ts`, add after the `getOwnerUserId` function (the last export in the file):
+In `apps/mobile/src/services/SyncEngineModule.ts`, append after `setOwnerUserId` (the actual last export, lines 218-220):
 
 ```ts
 export async function getKnownDeviceIds(): Promise<string[]> {
@@ -278,7 +283,18 @@ In `apps/mobile/src/i18n/locales/en/deviceDiscovery.json`, add a comma after `"d
 }
 ```
 
-- [ ] **Step 8: Run i18n key consistency test**
+- [ ] **Step 8: Remove dead `dialogs.switchDevice` keys (all three locales)**
+
+The previous flow used `settings.dialogs.switchDevice.{title,body,confirm}` to confirm "disconnect and switch". The new flow no longer shows this dialog (the confirm step now lives only when an upload is active, which uses the new `switchDeviceWhileUploading` keys). The old keys become dead code.
+
+Delete the entire `"switchDevice"` block from inside `"dialogs"` in:
+- `apps/mobile/src/i18n/locales/zh-Hans/settings.json`
+- `apps/mobile/src/i18n/locales/zh-Hant/settings.json`
+- `apps/mobile/src/i18n/locales/en/settings.json`
+
+Make sure to keep `"dialogs"` JSON valid (no trailing commas, sibling keys still well-formed). The resources consistency test will catch any divergence between the three files.
+
+- [ ] **Step 9: Run i18n key consistency test**
 
 ```bash
 cd apps/mobile && npx jest src/i18n/__tests__/resources.test.ts --no-coverage
@@ -443,6 +459,20 @@ import React from 'react';
 import { Alert, NativeModules, NativeEventEmitter } from 'react-native';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
+// IMPORTANT: must be hoisted above the i18n import below — i18n.init reads
+// RNLocalize.getLocales() synchronously to pick the initial language.
+jest.mock('react-native-localize', () => ({
+  getLocales: () => [
+    {
+      languageCode: 'zh',
+      scriptCode: 'Hant',
+      countryCode: 'TW',
+      languageTag: 'zh-Hant-TW',
+      isRTL: false,
+    },
+  ],
+}));
+
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
 const mockDispatch = jest.fn();
@@ -461,7 +491,7 @@ jest.mock('@react-navigation/native', () => ({
     params: { mode: 'switch' },
   }),
   CommonActions: {
-    reset: jest.fn(payload => ({ type: 'RESET', ...payload })),
+    reset: jest.fn(payload => ({ type: 'RESET', payload })),
   },
 }));
 
@@ -483,6 +513,9 @@ jest.mock('../../utils/shareDiagnosticsArchive', () => ({
   shareDiagnosticsArchive: jest.fn().mockResolvedValue(undefined),
 }));
 
+import i18n from '../../i18n';
+import { DeviceDiscoveryScreen } from '../DeviceDiscoveryScreen';
+
 const mockNativeSyncEngine = {
   startDiscovery: jest.fn().mockResolvedValue(undefined),
   stopDiscovery: jest.fn().mockResolvedValue(undefined),
@@ -497,17 +530,25 @@ const mockEmitter = {
   addListener: jest.fn().mockReturnValue({ remove: jest.fn() }),
 };
 
-beforeEach(() => {
-  jest.clearAllMocks();
-  NativeModules.NativeSyncEngine = mockNativeSyncEngine;
-  jest
-    .spyOn(NativeEventEmitter.prototype, 'addListener')
-    .mockImplementation(mockEmitter.addListener as any);
-});
-
-import { DeviceDiscoveryScreen } from '../DeviceDiscoveryScreen';
-
 describe('DeviceDiscoveryScreen — switch mode', () => {
+  beforeAll(async () => {
+    await i18n.changeLanguage('zh-Hant');
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Re-prime default resolved values cleared from the mock object's call state.
+    mockNativeSyncEngine.startDiscovery.mockResolvedValue(undefined);
+    mockNativeSyncEngine.stopDiscovery.mockResolvedValue(undefined);
+    mockNativeSyncEngine.getKnownDeviceIds.mockResolvedValue([]);
+    mockNativeSyncEngine.getBindingState.mockResolvedValue(null);
+    mockNativeSyncEngine.pairDevice.mockResolvedValue(undefined);
+    NativeModules.NativeSyncEngine = mockNativeSyncEngine;
+    jest
+      .spyOn(NativeEventEmitter.prototype, 'addListener')
+      .mockImplementation(mockEmitter.addListener as any);
+  });
+
   it('calls getKnownDeviceIds on mount', async () => {
     render(<DeviceDiscoveryScreen />);
     await waitFor(() => {
@@ -518,7 +559,7 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
   it('shows back button instead of manual-pair button', async () => {
     const { queryByText } = render(<DeviceDiscoveryScreen />);
     await waitFor(() => {
-      expect(queryByText('手动配对')).toBeNull();
+      expect(queryByText('手動配對')).toBeNull();
       expect(queryByText('chevron-back')).toBeTruthy();
     });
   });
@@ -530,16 +571,21 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
 
     const { getByText } = render(<DeviceDiscoveryScreen />);
 
-    // Simulate device discovery event with a known device
+    // Wait for switch-mode bootstrap to settle BEFORE injecting the device
+    // event, so handleDevicePress sees the populated knownDeviceIds set.
+    await waitFor(() => {
+      expect(mockNativeSyncEngine.getKnownDeviceIds).toHaveBeenCalled();
+      expect(mockNativeSyncEngine.getBindingState).toHaveBeenCalled();
+    });
+
     const onDiscoveredDevicesChangedCallback = mockEmitter.addListener.mock.calls.find(
       ([event]: [string]) => event === 'onDiscoveredDevicesChanged',
     )?.[1];
+    expect(onDiscoveredDevicesChangedCallback).toBeDefined();
 
-    if (onDiscoveredDevicesChangedCallback) {
-      onDiscoveredDevicesChangedCallback({
-        devices: [{ deviceId: 'server-known', name: 'Studio Mac', ip: '192.168.1.8', port: 39393, type: 'mac' }],
-      });
-    }
+    onDiscoveredDevicesChangedCallback({
+      devices: [{ deviceId: 'server-known', name: 'Studio Mac', ip: '192.168.1.8', port: 39393, type: 'mac' }],
+    });
 
     await waitFor(() => {
       expect(getByText('Studio Mac')).toBeTruthy();
@@ -554,7 +600,15 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
         port: 39393,
         connectionCode: '',
       });
-      expect(mockDispatch).toHaveBeenCalled();
+      expect(mockDispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'RESET',
+          payload: expect.objectContaining({
+            index: 0,
+            routes: [{ name: 'SyncActivity' }],
+          }),
+        }),
+      );
     });
   });
 
@@ -565,15 +619,19 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
 
     const { getByText } = render(<DeviceDiscoveryScreen />);
 
+    await waitFor(() => {
+      expect(mockNativeSyncEngine.getKnownDeviceIds).toHaveBeenCalled();
+      expect(mockNativeSyncEngine.getBindingState).toHaveBeenCalled();
+    });
+
     const onDiscoveredDevicesChangedCallback = mockEmitter.addListener.mock.calls.find(
       ([event]: [string]) => event === 'onDiscoveredDevicesChanged',
     )?.[1];
+    expect(onDiscoveredDevicesChangedCallback).toBeDefined();
 
-    if (onDiscoveredDevicesChangedCallback) {
-      onDiscoveredDevicesChangedCallback({
-        devices: [{ deviceId: 'server-known', name: 'Studio Mac', ip: '192.168.1.8', port: 39393, type: 'mac' }],
-      });
-    }
+    onDiscoveredDevicesChangedCallback({
+      devices: [{ deviceId: 'server-known', name: 'Studio Mac', ip: '192.168.1.8', port: 39393, type: 'mac' }],
+    });
 
     await waitFor(() => getByText('Studio Mac'));
     fireEvent.press(getByText('Studio Mac'));
@@ -594,15 +652,18 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
 
     const { getByText } = render(<DeviceDiscoveryScreen />);
 
+    await waitFor(() => {
+      expect(mockNativeSyncEngine.getKnownDeviceIds).toHaveBeenCalled();
+    });
+
     const onDiscoveredDevicesChangedCallback = mockEmitter.addListener.mock.calls.find(
       ([event]: [string]) => event === 'onDiscoveredDevicesChanged',
     )?.[1];
+    expect(onDiscoveredDevicesChangedCallback).toBeDefined();
 
-    if (onDiscoveredDevicesChangedCallback) {
-      onDiscoveredDevicesChangedCallback({
-        devices: [{ deviceId: 'server-new', name: 'New PC', ip: '192.168.1.9', port: 39393, type: 'win' }],
-      });
-    }
+    onDiscoveredDevicesChangedCallback({
+      devices: [{ deviceId: 'server-new', name: 'New PC', ip: '192.168.1.9', port: 39393, type: 'win' }],
+    });
 
     await waitFor(() => getByText('New PC'));
     fireEvent.press(getByText('New PC'));
@@ -611,32 +672,39 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
       expect(mockNavigate).toHaveBeenCalledWith('CodeVerify', expect.objectContaining({
         deviceId: 'server-new',
       }));
-      expect(mockNativeSyncEngine.pairDevice).not.toHaveBeenCalled();
     });
+    expect(mockNativeSyncEngine.pairDevice).not.toHaveBeenCalled();
   });
 
   it('shows alert when tapping current device', async () => {
     mockNativeSyncEngine.getKnownDeviceIds.mockResolvedValueOnce(['server-current']);
     mockNativeSyncEngine.getBindingState.mockResolvedValueOnce({ deviceId: 'server-current' });
-    const alertSpy = jest.spyOn(Alert, 'alert');
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 
     const { getByText } = render(<DeviceDiscoveryScreen />);
+
+    await waitFor(() => {
+      expect(mockNativeSyncEngine.getKnownDeviceIds).toHaveBeenCalled();
+      expect(mockNativeSyncEngine.getBindingState).toHaveBeenCalled();
+    });
 
     const onDiscoveredDevicesChangedCallback = mockEmitter.addListener.mock.calls.find(
       ([event]: [string]) => event === 'onDiscoveredDevicesChanged',
     )?.[1];
+    expect(onDiscoveredDevicesChangedCallback).toBeDefined();
 
-    if (onDiscoveredDevicesChangedCallback) {
-      onDiscoveredDevicesChangedCallback({
-        devices: [{ deviceId: 'server-current', name: 'My Mac', ip: '192.168.1.5', port: 39393, type: 'mac' }],
-      });
-    }
+    onDiscoveredDevicesChangedCallback({
+      devices: [{ deviceId: 'server-current', name: 'My Mac', ip: '192.168.1.5', port: 39393, type: 'mac' }],
+    });
 
     await waitFor(() => getByText('My Mac'));
     fireEvent.press(getByText('My Mac'));
 
     expect(mockNativeSyncEngine.pairDevice).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
+    // Alert.alert(title) — title contains the toast text "已是當前連接設備".
+    // RN Alert is used here as a cross-platform stand-in for a transient toast;
+    // see plan note in Task 5 / Spec → "toast vs Alert" decision.
     expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('當前'));
   });
 });
@@ -741,7 +809,11 @@ const handleDevicePress = useCallback(
             CommonActions.reset({ index: 0, routes: [{ name: 'SyncActivity' }] }),
           );
         }
-      } catch {
+      } catch (err) {
+        console.warn(
+          '[DiscoveryScreen] pairDevice direct connect failed, fallback to CodeVerify',
+          err,
+        );
         navigation.navigate('CodeVerify', {
           deviceId: device.deviceId,
           host: device.ip,
