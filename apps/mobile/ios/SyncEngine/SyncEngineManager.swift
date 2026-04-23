@@ -5445,9 +5445,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     func getKnownDeviceIds() -> [String] {
         let keys = bindingService.listStoredKeychainKeys()
-        let prefixes = ["syncflow_pairing_token_", "pairing_token_"]
         return keys.compactMap { key -> String? in
-            for prefix in prefixes {
+            for prefix in Self.pairingTokenKeyPrefixes {
                 if key.hasPrefix(prefix) { return String(key.dropFirst(prefix.count)) }
             }
             return nil
