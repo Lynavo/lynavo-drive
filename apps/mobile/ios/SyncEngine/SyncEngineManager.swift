@@ -4080,7 +4080,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                         shareName: helloRes["serverCapabilities"].flatMap { ($0 as? [String: Any])?["shareName"] as? String },
                         lastBoundAt: ISO8601DateFormatter().string(from: Date())
                     )
-                    try? uploadStore?.saveBinding(newBinding)
+                    try uploadStore?.saveBinding(newBinding)
                     if let bonjourDevice = discoveredDevices[deviceId] {
                         discoveredDevices[serverId] = bonjourDevice
                     }
@@ -4093,7 +4093,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 }
                 if existingBinding.deviceId == serverId && existingBinding.host != confirmedHost {
                     existingBinding.host = confirmedHost
-                    try? uploadStore?.saveBinding(existingBinding)
+                    try uploadStore?.saveBinding(existingBinding)
                     syncDiagnosticsLog("SyncEngine", "updated existing binding host after pairing confirmation host=\(confirmedHost)")
                 }
             } else {
@@ -4112,7 +4112,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     shareName: helloRes["serverCapabilities"].flatMap { ($0 as? [String: Any])?["shareName"] as? String },
                     lastBoundAt: ISO8601DateFormatter().string(from: Date())
                 )
-                try? uploadStore?.saveBinding(binding)
+                try uploadStore?.saveBinding(binding)
                 resetAutoUploadStateForFreshPairing(reason: "recreate_local_binding_auth_not_required")
                 // Re-index Bonjour entry under the server UUID (only if originally found via Bonjour).
                 if let bonjourDevice = discoveredDevices[deviceId] {
