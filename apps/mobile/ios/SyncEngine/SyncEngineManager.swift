@@ -4027,9 +4027,16 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
 
         // 2. HELLO_REQ → HELLO_RES  (spec Section 7.8)
+        // Include any stored pairing token for this server so the server can
+        // recognize the client as already bound (authRequired=false) and we
+        // skip the connection-code prompt. Powers the "switch device" direct
+        // reconnect path; absent/rejected token falls through to PAIR_REQ.
+        let storedToken = bindingService.getPairingToken(
+            forKey: pairingTokenKeychainKey(for: deviceId)
+        ) ?? bindingService.getPairingToken(forKey: BindingService.legacyPairingTokenKey)
         let (helloType, helloRes) = try await session.sendAndReceive(
             type: .helloReq,
-            payload: await buildClientHelloPayload(clientId: clientId)
+            payload: await buildClientHelloPayload(clientId: clientId, pairingToken: storedToken)
         )
 
         guard helloType == .helloRes else {
