@@ -21,7 +21,7 @@ describe('SubscriptionStatusIcon', () => {
     expect(getSubscriptionStatusIconTone('unknown')).toBeNull();
   });
 
-  test('renders the crown icon without relying on native image assets', () => {
+  test('renders the crown icon from image assets', () => {
     const { toJSON } = render(<SubscriptionStatusIcon tone="trial" />);
 
     expect(toJSON()).toBeTruthy();
