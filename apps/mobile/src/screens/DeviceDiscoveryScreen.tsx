@@ -168,8 +168,14 @@ export function DeviceDiscoveryScreen() {
     let cancelled = false;
     const { NativeSyncEngine: NSE } = NativeModules;
     Promise.all([
-      (NSE?.getKnownDeviceIds?.() ?? Promise.resolve([])).catch(() => [] as string[]),
-      (NSE?.getBindingState?.() ?? Promise.resolve(null)).catch(() => null),
+      (NSE?.getKnownDeviceIds?.() ?? Promise.resolve([])).catch((err: unknown) => {
+        console.warn('[DiscoveryScreen] switch bootstrap: getKnownDeviceIds failed', err);
+        return [] as string[];
+      }),
+      (NSE?.getBindingState?.() ?? Promise.resolve(null)).catch((err: unknown) => {
+        console.warn('[DiscoveryScreen] switch bootstrap: getBindingState failed', err);
+        return null;
+      }),
     ]).then(([ids, binding]) => {
       if (cancelled) return;
       setKnownDeviceIds(new Set(ids as string[]));
