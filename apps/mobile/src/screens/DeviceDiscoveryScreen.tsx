@@ -18,7 +18,6 @@ import {
   Modal,
   Pressable,
   KeyboardAvoidingView,
-  Linking,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
@@ -139,8 +138,6 @@ type NavigationProp = StackNavigationProp<
   'DeviceDiscovery'
 >;
 
-const PRIVACY_POLICY_URL = 'https://www.vividrop.cn/privacy/';
-const TERMS_OF_SERVICE_URL = 'https://www.vividrop.cn/terms';
 
 export function DeviceDiscoveryScreen() {
   const navigation = useNavigation<NavigationProp>();
@@ -415,14 +412,6 @@ export function DeviceDiscoveryScreen() {
     );
   }, []);
 
-  const openLegalLink = useCallback(async (url: string, label: string) => {
-    try {
-      await Linking.openURL(url);
-    } catch (error) {
-      console.warn(`[DiscoveryScreen] failed to open ${label}:`, error);
-      Alert.alert(t('deviceDiscovery.dialogs.openLinkFailed.title'), t('deviceDiscovery.dialogs.openLinkFailed.body', { label }));
-    }
-  }, []);
 
   const manualDockBottom =
     keyboardHeight > 0 ? Math.max(12, keyboardHeight - insets.bottom) : 0;
@@ -525,27 +514,6 @@ export function DeviceDiscoveryScreen() {
                   <Text style={styles.rescanText}>{t('deviceDiscovery.actions.rescan')}</Text>
                 </View>
               </TouchableOpacity>
-              <View style={styles.legalLinksRow}>
-                <TouchableOpacity
-                  style={styles.legalLinkButton}
-                  activeOpacity={0.7}
-                  onPress={() =>
-                    void openLegalLink(PRIVACY_POLICY_URL, t('common.privacyPolicy'))
-                  }
-                >
-                  <Text style={styles.legalLinkText}>{t('common.privacyPolicy')}</Text>
-                </TouchableOpacity>
-                <Text style={styles.legalLinkDivider}>{'/'}</Text>
-                <TouchableOpacity
-                  style={styles.legalLinkButton}
-                  activeOpacity={0.7}
-                  onPress={() =>
-                    void openLegalLink(TERMS_OF_SERVICE_URL, t('common.termsOfService'))
-                  }
-                >
-                  <Text style={styles.legalLinkText}>{t('common.termsOfService')}</Text>
-                </TouchableOpacity>
-              </View>
             </View>
           )}
         </View>
@@ -859,25 +827,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#5a9abf',
-  },
-  legalLinksRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  legalLinkButton: {
-    paddingHorizontal: 4,
-    paddingVertical: 4,
-  },
-  legalLinkText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#6a96b8',
-  },
-  legalLinkDivider: {
-    fontSize: 12,
-    color: '#8aabbd',
   },
 
   // Popover Styles
