@@ -1,5 +1,5 @@
 import { apiDelete, apiGet, apiPost, apiPostNoAuth } from './api';
-import type { UserProfile } from '../stores/auth-store';
+import type { SignedOutTransition, UserProfile } from '../stores/auth-store';
 
 // ---------------------------------------------------------------------------
 // Module-level reference to auth store actions.
@@ -8,7 +8,7 @@ import type { UserProfile } from '../stores/auth-store';
 // ---------------------------------------------------------------------------
 
 let _storeSetTokens: ((access: string, refresh: string) => void) | null = null;
-let _storeClearAuth: (() => void) | null = null;
+let _storeClearAuth: ((transition?: SignedOutTransition) => void) | null = null;
 
 /**
  * Called by AuthProvider to wire up store actions that the API layer can invoke
@@ -16,7 +16,7 @@ let _storeClearAuth: (() => void) | null = null;
  */
 export function registerAuthStoreActions(
   setTokens: (access: string, refresh: string) => void,
-  clearAuth: () => void,
+  clearAuth: (transition?: SignedOutTransition) => void,
 ) {
   _storeSetTokens = setTokens;
   _storeClearAuth = clearAuth;
@@ -28,8 +28,8 @@ export function _setTokensFromApi(accessToken: string, refreshToken: string) {
 }
 
 /** @internal — used by api.ts when refresh fails */
-export function _clearAuthFromApi() {
-  _storeClearAuth?.();
+export function _clearAuthFromApi(transition?: SignedOutTransition) {
+  _storeClearAuth?.(transition);
 }
 
 // ---------------------------------------------------------------------------
@@ -50,7 +50,12 @@ interface SmsLoginResponse {
 export async function smsLogin(
   phone: string,
   code: string,
-): Promise<{ accessToken: string; refreshToken: string; isNewUser: boolean; merged: boolean }> {
+): Promise<{
+  accessToken: string;
+  refreshToken: string;
+  isNewUser: boolean;
+  merged: boolean;
+}> {
   const data = await apiPostNoAuth<SmsLoginResponse>('/auth/sms/login', {
     phone,
     code,
@@ -143,8 +148,16 @@ export async function sendEmailCode(email: string): Promise<void> {
 export async function emailLogin(
   email: string,
   code: string,
-): Promise<{ accessToken: string; refreshToken: string; isNewUser: boolean; merged: boolean }> {
-  const data = await apiPostNoAuth<AuthLoginResponse>('/auth/email/login', { email, code });
+): Promise<{
+  accessToken: string;
+  refreshToken: string;
+  isNewUser: boolean;
+  merged: boolean;
+}> {
+  const data = await apiPostNoAuth<AuthLoginResponse>('/auth/email/login', {
+    email,
+    code,
+  });
   return {
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
@@ -157,7 +170,12 @@ export async function appleLogin(args: {
   identityToken: string;
   authorizationCode?: string;
   fullName?: string;
-}): Promise<{ accessToken: string; refreshToken: string; isNewUser: boolean; merged: boolean }> {
+}): Promise<{
+  accessToken: string;
+  refreshToken: string;
+  isNewUser: boolean;
+  merged: boolean;
+}> {
   const data = await apiPostNoAuth<AuthLoginResponse>('/auth/apple/login', {
     identity_token: args.identityToken,
     authorization_code: args.authorizationCode,
@@ -171,9 +189,12 @@ export async function appleLogin(args: {
   };
 }
 
-export async function googleLogin(
-  identityToken: string,
-): Promise<{ accessToken: string; refreshToken: string; isNewUser: boolean; merged: boolean }> {
+export async function googleLogin(identityToken: string): Promise<{
+  accessToken: string;
+  refreshToken: string;
+  isNewUser: boolean;
+  merged: boolean;
+}> {
   const data = await apiPostNoAuth<AuthLoginResponse>('/auth/google/login', {
     identity_token: identityToken,
   });
@@ -186,5 +207,7 @@ export async function googleLogin(
 }
 
 export async function deleteAccount(): Promise<void> {
-  await apiDelete<Record<string, never>>('/user/account', { confirm: 'DELETE' });
+  await apiDelete<Record<string, never>>('/user/account', {
+    confirm: 'DELETE',
+  });
 }

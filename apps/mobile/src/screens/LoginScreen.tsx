@@ -17,6 +17,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { Icon } from '../components/Icon';
 import { AUTH_COLORS, AuthScreenShell } from '../components/auth/AuthScreenShell';
+import { useAuth } from '../stores/auth-store';
 import { isValidChinaPhone } from '../utils/phone-validation';
 import { sendSmsCode } from '../services/auth-service';
 import { ApiError, ERROR_CODE } from '../services/api';
@@ -35,6 +36,7 @@ type LoginNavProp = StackNavigationProp<RootStackParamList, 'Login'>;
 export function LoginScreen() {
   const navigation = useNavigation<LoginNavProp>();
   const { t } = useTranslation();
+  const auth = useAuth();
 
   const [phone, setPhone] = useState('');
   const [agreed, setAgreed] = useState(false);
@@ -125,6 +127,18 @@ export function LoginScreen() {
     <AuthScreenShell subtitle={t('auth.login.subtitle')}>
       <View style={styles.pageContent}>
         <View style={styles.card}>
+          {auth.signedOutTransition === 'session_replaced' ? (
+            <View style={styles.noticeBanner}>
+              <Icon
+                name="alert-circle"
+                size={18}
+                color={AUTH_COLORS.primary}
+              />
+              <Text style={styles.noticeText}>
+                {t('auth.login.sessionReplaced')}
+              </Text>
+            </View>
+          ) : null}
           <Text style={styles.cardTitle}>{t('auth.login.firstLoginHint')}</Text>
 
           <View style={styles.fieldWrap}>
@@ -243,6 +257,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.14,
     shadowRadius: 30,
     elevation: 10,
+  },
+  noticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: 'rgba(78, 142, 247, 0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(78, 142, 247, 0.18)',
+  },
+  noticeText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    color: AUTH_COLORS.text,
   },
   cardTitle: {
     fontSize: 16,

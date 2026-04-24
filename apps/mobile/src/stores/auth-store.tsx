@@ -63,7 +63,11 @@ export interface SubscriptionInfo {
   autoRenewing?: boolean | null;
 }
 
-export type SignedOutTransition = 'account_deleted' | 'logout' | null;
+export type SignedOutTransition =
+  | 'account_deleted'
+  | 'logout'
+  | 'session_replaced'
+  | null;
 
 export interface AuthState {
   isLoggedIn: boolean;
@@ -290,7 +294,7 @@ interface AuthActions {
   setUser: (profile: UserProfile) => void;
   setSubscription: (info: SubscriptionInfo) => void;
   setSignedOutTransition: (transition: SignedOutTransition) => void;
-  clearAuth: () => void;
+  clearAuth: (transition?: SignedOutTransition) => void;
   loadProfile: () => Promise<void>;
   /** Fetches the latest subscription from the server and commits it to the
    *  store. Returns the freshly-fetched value so callers that need to react
@@ -298,9 +302,9 @@ interface AuthActions {
    *  wait for React to re-render with the new context value. Rejects if the
    *  fetch fails — callers should wrap in try/catch if they can proceed
    *  without the fresh snapshot. */
-  loadSubscription: (
-    options?: { showGlobalLoading?: boolean },
-  ) => Promise<SubscriptionInfo>;
+  loadSubscription: (options?: {
+    showGlobalLoading?: boolean;
+  }) => Promise<SubscriptionInfo>;
   /** Manually retry the post-login profile auto-load. Surface this from the
    *  RootNavigator's profile-error screen so a transient network failure
    *  doesn't strand the user on a permanent spinner. */
@@ -362,8 +366,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
-  const clearAuth = useCallback(() => {
+  const clearAuth = useCallback((transition?: SignedOutTransition) => {
     bumpAuthSessionGeneration();
+    if (transition !== undefined) {
+      dispatch({ type: 'SET_SIGNED_OUT_TRANSITION', transition });
+    }
     dispatch({ type: 'CLEAR' });
     syncTokensToModule(null, null);
     persistTokens(null, null);
@@ -383,8 +390,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           syncTokensToModule(access, refresh);
           persistTokens(access, refresh);
         },
-        () => {
+        transition => {
           bumpAuthSessionGeneration();
+          if (transition !== undefined) {
+            dispatch({
+              type: 'SET_SIGNED_OUT_TRANSITION',
+              transition,
+            });
+          }
           dispatch({ type: 'CLEAR' });
           syncTokensToModule(null, null);
           persistTokens(null, null);
@@ -405,24 +418,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const loadSubscription = useCallback(async (
-    options?: { showGlobalLoading?: boolean },
-  ): Promise<SubscriptionInfo> => {
-    const { getSubscriptionStatus } = await loadSubscriptionService();
-    const showGlobalLoading = options?.showGlobalLoading === true;
-    if (showGlobalLoading) {
-      dispatch({ type: 'SET_LOADING', isLoading: true });
-    }
-    try {
-      const info = await getSubscriptionStatus();
-      dispatch({ type: 'SET_SUBSCRIPTION', subscription: info });
-      return info;
-    } finally {
+  const loadSubscription = useCallback(
+    async (options?: {
+      showGlobalLoading?: boolean;
+    }): Promise<SubscriptionInfo> => {
+      const { getSubscriptionStatus } = await loadSubscriptionService();
+      const showGlobalLoading = options?.showGlobalLoading === true;
       if (showGlobalLoading) {
-        dispatch({ type: 'SET_LOADING', isLoading: false });
+        dispatch({ type: 'SET_LOADING', isLoading: true });
       }
-    }
-  }, []);
+      try {
+        const info = await getSubscriptionStatus();
+        dispatch({ type: 'SET_SUBSCRIPTION', subscription: info });
+        return info;
+      } finally {
+        if (showGlobalLoading) {
+          dispatch({ type: 'SET_LOADING', isLoading: false });
+        }
+      }
+    },
+    [],
+  );
 
   useIapLifecycle({ isLoggedIn: state.isLoggedIn, loadSubscription });
 

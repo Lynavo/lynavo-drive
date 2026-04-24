@@ -20,6 +20,7 @@ export const ERROR_CODE = {
   CODE_EXPIRED: 1005,
   TOKEN_INVALID: 1006,
   REFRESH_TOKEN_INVALID: 1007,
+  SESSION_REPLACED: 1009,
   TOO_MANY_CODE_ATTEMPTS: 1008,
   EMAIL_FORMAT_INVALID: 1101,
   APPLE_TOKEN_INVALID: 1102,
@@ -193,6 +194,11 @@ async function request<T>(
     return json.data;
   }
 
+  if (json.code === ERROR_CODE.SESSION_REPLACED && !skipAuth) {
+    await clearAuthFromModule('session_replaced');
+    throw new ApiError(json.code, json.message);
+  }
+
   // Token expired — attempt silent refresh ONCE, single-flight across callers.
   // _retried prevents an infinite loop if the refresh succeeds but the
   // immediate retry still gets TOKEN_INVALID (e.g. clock skew on the server).
@@ -270,16 +276,23 @@ async function doRefreshToken(): Promise<boolean> {
     return true;
   }
 
+  if (json.code === ERROR_CODE.SESSION_REPLACED) {
+    await clearAuthFromModule('session_replaced');
+    return false;
+  }
+
   // Server returned a structured error (e.g. REFRESH_TOKEN_INVALID) — the
   // refresh token itself is dead; clear local auth so the user re-authenticates.
   await clearAuthFromModule();
   return false;
 }
 
-async function clearAuthFromModule() {
+async function clearAuthFromModule(
+  transition?: 'session_replaced',
+) {
   // Lazy import to break circular dependency
   const { _clearAuthFromApi } = await import('./auth-service');
-  _clearAuthFromApi();
+  _clearAuthFromApi(transition);
 }
 
 // ---------------------------------------------------------------------------

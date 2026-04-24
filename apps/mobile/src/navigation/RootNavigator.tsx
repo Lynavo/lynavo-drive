@@ -127,8 +127,15 @@ export function RootNavigator() {
     }
     return (
       <UnauthStack
-        animateIn={auth.signedOutTransition === 'logout'}
-        onTransitionComplete={() => auth.setSignedOutTransition(null)}
+        animateIn={
+          auth.signedOutTransition === 'logout' ||
+          auth.signedOutTransition === 'session_replaced'
+        }
+        onTransitionComplete={() => {
+          if (auth.signedOutTransition === 'logout') {
+            auth.setSignedOutTransition(null);
+          }
+        }}
       />
     );
   }
