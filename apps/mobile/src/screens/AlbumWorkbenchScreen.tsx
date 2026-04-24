@@ -21,7 +21,9 @@ import {
   NativeEventEmitter,
   Modal,
   Platform,
+  PanResponder,
   type AppStateStatus,
+  type GestureResponderEvent,
   type ImageSourcePropType,
   type ListRenderItemInfo,
 } from 'react-native';
@@ -78,6 +80,9 @@ const GRID_ITEM_SIZE =
   (SCREEN_WIDTH - CONTENT_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) /
   GRID_COLUMNS;
 const PAGE_SIZE = 60;
+const GRID_DRAG_SELECT_LONG_PRESS_MS = 300;
+const GRID_DRAG_SELECT_MOVE_TOLERANCE = 8;
+const GRID_SELECTION_CONTROL_HIT_SIZE = 44;
 
 const BLUE = '#3b9fd8';
 const DARK = '#1a3a5c';
@@ -103,6 +108,17 @@ function formatCustomTime(iso: string, t: TFunction): string {
 type MediaFilter = 'all' | 'photos' | 'videos';
 type TransferFilter = 'all' | 'untransferred' | 'transferred';
 type ViewMode = 'grid' | 'list';
+type GridItemRef = React.ComponentRef<typeof View>;
+type GridDragSelectionMode = 'select' | 'deselect';
+
+interface MeasuredGridItem {
+  assetLocalId: string;
+  isTransferred: boolean;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 type UnifiedFilter =
   | 'all'
@@ -191,6 +207,37 @@ export function AlbumWorkbenchScreen() {
 
   // Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const selectedIdsRef = useRef(selectedIds);
+  selectedIdsRef.current = selectedIds;
+  const [isGridDragScrollLocked, setGridDragScrollLocked] = useState(false);
+  const gridItemRefs = useRef(new Map<string, GridItemRef>());
+  const dragSelectionRef = useRef<{
+    active: boolean;
+    startAssetLocalId: string | null;
+    startPageX: number;
+    startPageY: number;
+    startedOnSelectionControl: boolean;
+    selectionMode: GridDragSelectionMode;
+    hasMoved: boolean;
+    lastSelectedId: string | null;
+    measuredItems: MeasuredGridItem[];
+    longPressTimer: ReturnType<typeof setTimeout> | null;
+  }>({
+    active: false,
+    startAssetLocalId: null,
+    startPageX: 0,
+    startPageY: 0,
+    startedOnSelectionControl: false,
+    selectionMode: 'select',
+    hasMoved: false,
+    lastSelectedId: null,
+    measuredItems: [],
+    longPressTimer: null,
+  });
+  const suppressNextGridPressRef = useRef(false);
+  const suppressNextGridPressTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
 
   // Preview modal
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -220,6 +267,7 @@ export function AlbumWorkbenchScreen() {
 
   // Photo library authorization status — tracks limited access state
   const [photoAuthStatus, setPhotoAuthStatus] = useState<string>('unknown');
+  const isAutoUploadActive = autoUploadConfig?.state === 'active';
 
   // Radar pulse animation for auto-upload active icon
   const radarAnims = useRef(
@@ -251,6 +299,17 @@ export function AlbumWorkbenchScreen() {
     animations.forEach(a => a.start());
     return () => animations.forEach(a => a.stop());
   }, [autoUploadConfig?.state, radarAnims]);
+
+  useEffect(() => {
+    return () => {
+      if (dragSelectionRef.current.longPressTimer) {
+        clearTimeout(dragSelectionRef.current.longPressTimer);
+      }
+      if (suppressNextGridPressTimerRef.current) {
+        clearTimeout(suppressNextGridPressTimerRef.current);
+      }
+    };
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Data loading
@@ -497,17 +556,52 @@ export function AlbumWorkbenchScreen() {
   // Selection handlers
   // ---------------------------------------------------------------------------
 
-  const handleToggleSelect = useCallback((assetLocalId: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(assetLocalId)) {
-        next.delete(assetLocalId);
-      } else {
+  const assetById = useMemo(
+    () => new Map(assets.map(asset => [asset.assetLocalId, asset])),
+    [assets],
+  );
+
+  const addSelectedId = useCallback(
+    (assetLocalId: string) => {
+      const asset = assetById.get(assetLocalId);
+      if (!asset || asset.isTransferred || isAutoUploadActive) return;
+
+      setSelectedIds(prev => {
+        if (prev.has(assetLocalId)) return prev;
+        const next = new Set(prev);
         next.add(assetLocalId);
-      }
+        return next;
+      });
+    },
+    [assetById, isAutoUploadActive],
+  );
+
+  const removeSelectedId = useCallback((assetLocalId: string) => {
+    setSelectedIds(prev => {
+      if (!prev.has(assetLocalId)) return prev;
+      const next = new Set(prev);
+      next.delete(assetLocalId);
       return next;
     });
   }, []);
+
+  const handleToggleSelect = useCallback(
+    (assetLocalId: string) => {
+      const asset = assetById.get(assetLocalId);
+      if (!asset || asset.isTransferred || isAutoUploadActive) return;
+
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        if (next.has(assetLocalId)) {
+          next.delete(assetLocalId);
+        } else {
+          next.add(assetLocalId);
+        }
+        return next;
+      });
+    },
+    [assetById, isAutoUploadActive],
+  );
 
   const handleOpenPreview = useCallback(
     (assetLocalId: string) => {
@@ -517,6 +611,286 @@ export function AlbumWorkbenchScreen() {
       setPreviewVisible(true);
     },
     [assets],
+  );
+
+  const handleGridItemPress = useCallback(
+    (assetLocalId: string) => {
+      if (suppressNextGridPressRef.current) {
+        suppressNextGridPressRef.current = false;
+        return;
+      }
+      handleOpenPreview(assetLocalId);
+    },
+    [handleOpenPreview],
+  );
+
+  const measureVisibleGridItems = useCallback(
+    (onMeasured: (items: MeasuredGridItem[]) => void) => {
+      const entries = Array.from(gridItemRefs.current.entries());
+      if (entries.length === 0) {
+        onMeasured([]);
+        return;
+      }
+
+      const measuredItems: MeasuredGridItem[] = [];
+      let pending = entries.length;
+      const finishOne = () => {
+        pending -= 1;
+        if (pending === 0) {
+          onMeasured(measuredItems);
+        }
+      };
+
+      entries.forEach(([assetLocalId, node]) => {
+        const asset = assetById.get(assetLocalId);
+        if (!asset || !node) {
+          finishOne();
+          return;
+        }
+
+        node.measureInWindow((x, y, width, height) => {
+          if (width > 0 && height > 0) {
+            measuredItems.push({
+              assetLocalId,
+              isTransferred: asset.isTransferred,
+              x,
+              y,
+              width,
+              height,
+            });
+          }
+          finishOne();
+        });
+      });
+    },
+    [assetById],
+  );
+
+  const isGridSelectionControlPoint = useCallback(
+    (event: GestureResponderEvent) => {
+      const { locationX, locationY } = event.nativeEvent;
+      return (
+        locationX >= GRID_ITEM_SIZE - GRID_SELECTION_CONTROL_HIT_SIZE &&
+        locationY <= GRID_SELECTION_CONTROL_HIT_SIZE
+      );
+    },
+    [],
+  );
+
+  const applyGridDragSelectionChange = useCallback(
+    (assetLocalId: string, selectionMode: GridDragSelectionMode) => {
+      if (selectionMode === 'deselect') {
+        removeSelectedId(assetLocalId);
+        return;
+      }
+      addSelectedId(assetLocalId);
+    },
+    [addSelectedId, removeSelectedId],
+  );
+
+  const updateGridDragSelectionAtPoint = useCallback(
+    (
+      pageX: number,
+      pageY: number,
+      measuredItems = dragSelectionRef.current.measuredItems,
+      selectionMode = dragSelectionRef.current.selectionMode,
+    ) => {
+      const hit = measuredItems.find(
+        item =>
+          pageX >= item.x &&
+          pageX <= item.x + item.width &&
+          pageY >= item.y &&
+          pageY <= item.y + item.height,
+      );
+      if (!hit || hit.isTransferred) return;
+      if (dragSelectionRef.current.lastSelectedId === hit.assetLocalId) return;
+
+      dragSelectionRef.current.lastSelectedId = hit.assetLocalId;
+      applyGridDragSelectionChange(hit.assetLocalId, selectionMode);
+    },
+    [applyGridDragSelectionChange],
+  );
+
+  const activateGridDragSelection = useCallback(
+    (pageX: number, pageY: number, fallbackAssetLocalId: string | null) => {
+      const state = dragSelectionRef.current;
+      const selectionMode = state.selectionMode;
+      if (state.active) {
+        updateGridDragSelectionAtPoint(
+          pageX,
+          pageY,
+          state.measuredItems,
+          selectionMode,
+        );
+        return;
+      }
+      setGridDragScrollLocked(true);
+
+      if (state.longPressTimer) {
+        clearTimeout(state.longPressTimer);
+        state.longPressTimer = null;
+      }
+
+      state.active = true;
+      state.lastSelectedId = null;
+      if (fallbackAssetLocalId) {
+        applyGridDragSelectionChange(fallbackAssetLocalId, selectionMode);
+        state.lastSelectedId = fallbackAssetLocalId;
+      }
+      measureVisibleGridItems(measuredItems => {
+        const currentState = dragSelectionRef.current;
+        if (
+          !currentState.active ||
+          currentState.selectionMode !== selectionMode
+        ) {
+          return;
+        }
+        currentState.measuredItems = measuredItems;
+        updateGridDragSelectionAtPoint(
+          pageX,
+          pageY,
+          measuredItems,
+          selectionMode,
+        );
+      });
+    },
+    [
+      applyGridDragSelectionChange,
+      measureVisibleGridItems,
+      updateGridDragSelectionAtPoint,
+    ],
+  );
+
+  const resetGridDragSelection = useCallback(() => {
+    const state = dragSelectionRef.current;
+    const wasActive = state.active;
+    if (state.longPressTimer) {
+      clearTimeout(state.longPressTimer);
+    }
+
+    dragSelectionRef.current = {
+      active: false,
+      startAssetLocalId: null,
+      startPageX: 0,
+      startPageY: 0,
+      startedOnSelectionControl: false,
+      selectionMode: 'select',
+      hasMoved: false,
+      lastSelectedId: null,
+      measuredItems: [],
+      longPressTimer: null,
+    };
+    setGridDragScrollLocked(false);
+
+    if (wasActive) {
+      suppressNextGridPressRef.current = true;
+      if (suppressNextGridPressTimerRef.current) {
+        clearTimeout(suppressNextGridPressTimerRef.current);
+      }
+      suppressNextGridPressTimerRef.current = setTimeout(() => {
+        suppressNextGridPressRef.current = false;
+        suppressNextGridPressTimerRef.current = null;
+      }, 250);
+    }
+
+    return wasActive;
+  }, []);
+
+  const finishGridDragSelection = useCallback(
+    (assetLocalId: string) => {
+      const state = dragSelectionRef.current;
+      const shouldOpenPreview = !state.active && !state.hasMoved;
+      const shouldToggleSelection =
+        !state.active && !state.hasMoved && state.startedOnSelectionControl;
+      const wasActive = resetGridDragSelection();
+      if (!wasActive && shouldToggleSelection) {
+        handleToggleSelect(assetLocalId);
+        return;
+      }
+      if (!wasActive && shouldOpenPreview) {
+        handleOpenPreview(assetLocalId);
+      }
+    },
+    [handleOpenPreview, handleToggleSelect, resetGridDragSelection],
+  );
+
+  const beginGridDragSelection = useCallback(
+    (assetLocalId: string, event: GestureResponderEvent) => {
+      const asset = assetById.get(assetLocalId);
+      if (!asset || asset.isTransferred || isAutoUploadActive) return;
+
+      const { pageX, pageY } = event.nativeEvent;
+      const startedOnSelectionControl = isGridSelectionControlPoint(event);
+      const selectionMode: GridDragSelectionMode = selectedIdsRef.current.has(
+        assetLocalId,
+      )
+        ? 'deselect'
+        : 'select';
+      if (dragSelectionRef.current.longPressTimer) {
+        clearTimeout(dragSelectionRef.current.longPressTimer);
+      }
+      setGridDragScrollLocked(true);
+
+      dragSelectionRef.current = {
+        active: false,
+        startAssetLocalId: assetLocalId,
+        startPageX: pageX,
+        startPageY: pageY,
+        startedOnSelectionControl,
+        selectionMode,
+        hasMoved: false,
+        lastSelectedId: null,
+        measuredItems: [],
+        longPressTimer: setTimeout(() => {
+          activateGridDragSelection(pageX, pageY, assetLocalId);
+        }, GRID_DRAG_SELECT_LONG_PRESS_MS),
+      };
+    },
+    [
+      activateGridDragSelection,
+      assetById,
+      isAutoUploadActive,
+      isGridSelectionControlPoint,
+    ],
+  );
+
+  const handleGridDragMove = useCallback(
+    (event: GestureResponderEvent) => {
+      const state = dragSelectionRef.current;
+      const { pageX, pageY } = event.nativeEvent;
+      const dx = Math.abs(pageX - state.startPageX);
+      const dy = Math.abs(pageY - state.startPageY);
+      if (
+        dx > GRID_DRAG_SELECT_MOVE_TOLERANCE ||
+        dy > GRID_DRAG_SELECT_MOVE_TOLERANCE
+      ) {
+        state.hasMoved = true;
+      }
+      if (
+        !state.active &&
+        state.hasMoved &&
+        (state.startedOnSelectionControl || selectedIds.size > 0)
+      ) {
+        activateGridDragSelection(pageX, pageY, state.startAssetLocalId);
+        return;
+      }
+
+      if (!state.active) return;
+      updateGridDragSelectionAtPoint(pageX, pageY);
+    },
+    [
+      activateGridDragSelection,
+      updateGridDragSelectionAtPoint,
+      selectedIds.size,
+    ],
+  );
+
+  const shouldCaptureGridSelectionGesture = useCallback(
+    (asset: AlbumAssetDTO, event: GestureResponderEvent) => {
+      if (isAutoUploadActive || asset.isTransferred) return false;
+      return selectedIds.size > 0 || isGridSelectionControlPoint(event);
+    },
+    [isAutoUploadActive, isGridSelectionControlPoint, selectedIds.size],
   );
 
   const selectableIds = useMemo(
@@ -907,50 +1281,96 @@ export function AlbumWorkbenchScreen() {
   const renderGridItem = useCallback(
     ({ item }: ListRenderItemInfo<AlbumAssetDTO>) => {
       const isSelected = selectedIds.has(item.assetLocalId);
+      const panResponder = PanResponder.create({
+        onStartShouldSetPanResponderCapture: event =>
+          shouldCaptureGridSelectionGesture(item, event),
+        onStartShouldSetPanResponder: event =>
+          shouldCaptureGridSelectionGesture(item, event),
+        onMoveShouldSetPanResponderCapture: event =>
+          shouldCaptureGridSelectionGesture(item, event),
+        onMoveShouldSetPanResponder: event =>
+          shouldCaptureGridSelectionGesture(item, event),
+        onPanResponderGrant: event => {
+          beginGridDragSelection(item.assetLocalId, event);
+        },
+        onPanResponderMove: handleGridDragMove,
+        onPanResponderRelease: () => finishGridDragSelection(item.assetLocalId),
+        onPanResponderTerminate: resetGridDragSelection,
+        onPanResponderTerminationRequest: () =>
+          !dragSelectionRef.current.active &&
+          !dragSelectionRef.current.startedOnSelectionControl &&
+          !isGridDragScrollLocked &&
+          selectedIds.size === 0,
+        onShouldBlockNativeResponder: () => false,
+      });
+
       return (
-        <TouchableOpacity
+        <View
+          ref={node => {
+            if (node) {
+              gridItemRefs.current.set(item.assetLocalId, node);
+            } else {
+              gridItemRefs.current.delete(item.assetLocalId);
+            }
+          }}
+          collapsable={false}
+          testID={`album-grid-item-${item.assetLocalId}`}
           style={styles.gridItem}
-          activeOpacity={0.7}
-          onPress={() => handleOpenPreview(item.assetLocalId)}
+          {...panResponder.panHandlers}
         >
-          <Image
-            source={{ uri: item.thumbnailUri }}
-            style={styles.gridThumbnail}
-            resizeMode="cover"
-          />
-          {item.isTransferred && (
-            <View style={styles.transferredOverlay}>
-              <Icon name="checkmark-circle" size={24} color="#fff" />
-            </View>
-          )}
-          {item.isQueued && !item.isTransferred && (
-            <View style={styles.queuedBadge}>
-              <Text style={styles.queuedBadgeText}>
-                {t('albumWorkbench.badges.queued')}
-              </Text>
-            </View>
-          )}
-          {item.mediaType === 'video' && (
-            <View style={styles.videoIndicator}>
-              <Icon name="play-circle-outline" size={16} color="#fff" />
-            </View>
-          )}
-          {!item.isTransferred && (
-            <TouchableOpacity
-              style={[
-                styles.selectionCircle,
-                isSelected && styles.selectionCircleActive,
-              ]}
-              hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
-              onPress={() => handleToggleSelect(item.assetLocalId)}
-            >
-              {isSelected && <Icon name="checkmark" size={14} color="#fff" />}
-            </TouchableOpacity>
-          )}
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.gridItemPressable}
+            activeOpacity={0.7}
+            onPress={() => handleGridItemPress(item.assetLocalId)}
+          >
+            <Image
+              source={{ uri: item.thumbnailUri }}
+              style={styles.gridThumbnail}
+              resizeMode="cover"
+            />
+            {item.isTransferred && (
+              <View style={styles.transferredOverlay}>
+                <Icon name="checkmark-circle" size={24} color="#fff" />
+              </View>
+            )}
+            {item.isQueued && !item.isTransferred && (
+              <View style={styles.queuedBadge}>
+                <Text style={styles.queuedBadgeText}>
+                  {t('albumWorkbench.badges.queued')}
+                </Text>
+              </View>
+            )}
+            {item.mediaType === 'video' && (
+              <View style={styles.videoIndicator}>
+                <Icon name="play-circle-outline" size={16} color="#fff" />
+              </View>
+            )}
+            {!item.isTransferred && (
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.selectionCircle,
+                  isSelected && styles.selectionCircleActive,
+                ]}
+              >
+                {isSelected && <Icon name="checkmark" size={14} color="#fff" />}
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       );
     },
-    [selectedIds, handleToggleSelect, handleOpenPreview, t],
+    [
+      beginGridDragSelection,
+      finishGridDragSelection,
+      handleGridDragMove,
+      handleGridItemPress,
+      isGridDragScrollLocked,
+      resetGridDragSelection,
+      selectedIds,
+      shouldCaptureGridSelectionGesture,
+      t,
+    ],
   );
 
   const renderListItem = useCallback(
@@ -1022,7 +1442,6 @@ export function AlbumWorkbenchScreen() {
   // Render
   // ---------------------------------------------------------------------------
 
-  const isAutoUploadActive = autoUploadConfig?.state === 'active';
   const autoUploadTransferredThisRound =
     isAutoUploadActive && stats
       ? Math.max(
@@ -1484,6 +1903,7 @@ export function AlbumWorkbenchScreen() {
           extraData={selectedIds}
           numColumns={GRID_COLUMNS}
           contentContainerStyle={styles.gridContent}
+          scrollEnabled={!isGridDragScrollLocked}
           columnWrapperStyle={
             !isAutoUploadActive && assets.length > 0
               ? styles.gridRow
@@ -2093,6 +2513,10 @@ const styles = StyleSheet.create({
     height: GRID_ITEM_SIZE,
     borderRadius: 4,
     overflow: 'hidden',
+  },
+  gridItemPressable: {
+    width: '100%',
+    height: '100%',
   },
   gridThumbnail: {
     width: '100%',
