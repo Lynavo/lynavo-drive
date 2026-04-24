@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
-import { Animated, NativeModules, Text } from 'react-native';
+import { Animated, NativeModules, Text, View } from 'react-native';
 
 jest.mock('react-native-localize', () => ({
   getLocales: () => [
@@ -20,6 +20,19 @@ jest.mock('react-i18next', () => jest.requireActual('react-i18next'));
 
 import i18n from '../../i18n';
 import { AlbumWorkbenchScreen } from '../AlbumWorkbenchScreen';
+
+function flattenTextChildren(value: unknown): Array<string | number> {
+  if (typeof value === 'string' || typeof value === 'number') {
+    return [value];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap(flattenTextChildren);
+  }
+  if (React.isValidElement<{ children?: unknown }>(value)) {
+    return flattenTextChildren(value.props.children);
+  }
+  return [];
+}
 
 const mockedBrowseAlbum = jest.fn();
 const mockedGetAlbumStats = jest.fn();
@@ -46,7 +59,8 @@ jest.mock('../../services/SyncEngineModule', () => ({
   submitManualUpload: jest.fn(),
   cancelAllManualUploads: jest.fn(),
   getAutoUploadConfig: () => mockedGetAutoUploadConfig(),
-  saveAutoUploadConfig: (...args: unknown[]) => mockedSaveAutoUploadConfig(...args),
+  saveAutoUploadConfig: (...args: unknown[]) =>
+    mockedSaveAutoUploadConfig(...args),
   interruptAutoUpload: jest.fn(),
   disableAutoUpload: jest.fn(),
   enableAutoUpload: jest.fn(),
@@ -143,14 +157,18 @@ describe('AlbumWorkbenchScreen', () => {
       transferredTab!.props.onPress();
     });
 
-    expect(mockedBrowseAlbum).toHaveBeenLastCalledWith('all', 'transferred', 0, 60, undefined);
+    expect(mockedBrowseAlbum).toHaveBeenLastCalledWith(
+      'all',
+      'transferred',
+      0,
+      60,
+      undefined,
+    );
 
-    const textValues = tree!.root
-      .findAllByType(Text)
-      .flatMap(node => {
-        const value = node.props.children;
-        return typeof value === 'string' ? [value] : [];
-      });
+    const textValues = tree!.root.findAllByType(Text).flatMap(node => {
+      const value = node.props.children;
+      return typeof value === 'string' ? [value] : [];
+    });
 
     expect(textValues).toContain('暂无已传素材');
     expect(textValues).toContain('全部');
@@ -176,10 +194,12 @@ describe('AlbumWorkbenchScreen', () => {
     });
 
     const findTab = (label: string) =>
-      tree!.root.findAll(node => typeof node.props.onPress === 'function').find(node => {
-        const textNodes = node.findAllByType(Text);
-        return textNodes.some(textNode => textNode.props.children === label);
-      });
+      tree!.root
+        .findAll(node => typeof node.props.onPress === 'function')
+        .find(node => {
+          const textNodes = node.findAllByType(Text);
+          return textNodes.some(textNode => textNode.props.children === label);
+        });
 
     const transferredTab = findTab('已传');
     expect(transferredTab).toBeDefined();
@@ -296,12 +316,10 @@ describe('AlbumWorkbenchScreen', () => {
       tree = ReactTestRenderer.create(<AlbumWorkbenchScreen />);
     });
 
-    const textValues = tree!.root
-      .findAllByType(Text)
-      .flatMap(node => {
-        const value = node.props.children;
-        return typeof value === 'string' ? [value] : [];
-      });
+    const textValues = tree!.root.findAllByType(Text).flatMap(node => {
+      const value = node.props.children;
+      return typeof value === 'string' ? [value] : [];
+    });
 
     // Should show the limited-access guidance, NOT the generic empty state
     expect(textValues).toContain('尚未选择照片');
@@ -359,12 +377,10 @@ describe('AlbumWorkbenchScreen', () => {
       tree = ReactTestRenderer.create(<AlbumWorkbenchScreen />);
     });
 
-    const textValues = tree!.root
-      .findAllByType(Text)
-      .flatMap(node => {
-        const value = node.props.children;
-        return typeof value === 'string' ? [value] : [];
-      });
+    const textValues = tree!.root.findAllByType(Text).flatMap(node => {
+      const value = node.props.children;
+      return typeof value === 'string' ? [value] : [];
+    });
 
     // Should show the generic empty state, not the limited CTA
     expect(textValues).not.toContain('尚未选择照片');
@@ -393,12 +409,10 @@ describe('AlbumWorkbenchScreen', () => {
       tree = ReactTestRenderer.create(<AlbumWorkbenchScreen />);
     });
 
-    const textValues = tree!.root
-      .findAllByType(Text)
-      .flatMap(node => {
-        const value = node.props.children;
-        return typeof value === 'string' ? [value] : [];
-      });
+    const textValues = tree!.root.findAllByType(Text).flatMap(node => {
+      const value = node.props.children;
+      return typeof value === 'string' ? [value] : [];
+    });
 
     expect(textValues).toContain('尚未选择照片');
     expect(textValues).toContain('选择照片');
@@ -417,8 +431,17 @@ describe('AlbumWorkbenchScreen', () => {
         isQueued: false,
       },
     ]);
-    mockedGetAlbumStats.mockResolvedValue({ totalCount: 1, transferredCount: 0, queuedCount: 0, pendingCount: 1 });
-    mockedGetAutoUploadConfig.mockResolvedValue({ enabled: false, timeRangeMode: 'all', state: 'idle' });
+    mockedGetAlbumStats.mockResolvedValue({
+      totalCount: 1,
+      transferredCount: 0,
+      queuedCount: 0,
+      pendingCount: 1,
+    });
+    mockedGetAutoUploadConfig.mockResolvedValue({
+      enabled: false,
+      timeRangeMode: 'all',
+      state: 'idle',
+    });
     mockedGetPhotoAuthorizationStatus.mockResolvedValue('authorized');
 
     let tree: ReactTestRenderer.ReactTestRenderer;
@@ -449,7 +472,9 @@ describe('AlbumWorkbenchScreen', () => {
       const s = v.props.style;
       if (!s) return false;
       const arr = Array.isArray(s) ? s : [s];
-      return arr.some((x: { backgroundColor?: string }) => x && x.backgroundColor === '#000');
+      return arr.some(
+        (x: { backgroundColor?: string }) => x && x.backgroundColor === '#000',
+      );
     });
     expect(modalRoot).toBeDefined();
   });
@@ -467,8 +492,17 @@ describe('AlbumWorkbenchScreen', () => {
         isQueued: false,
       },
     ]);
-    mockedGetAlbumStats.mockResolvedValue({ totalCount: 1, transferredCount: 0, queuedCount: 0, pendingCount: 1 });
-    mockedGetAutoUploadConfig.mockResolvedValue({ enabled: false, timeRangeMode: 'all', state: 'idle' });
+    mockedGetAlbumStats.mockResolvedValue({
+      totalCount: 1,
+      transferredCount: 0,
+      queuedCount: 0,
+      pendingCount: 1,
+    });
+    mockedGetAutoUploadConfig.mockResolvedValue({
+      enabled: false,
+      timeRangeMode: 'all',
+      state: 'idle',
+    });
     mockedGetPhotoAuthorizationStatus.mockResolvedValue('authorized');
 
     let tree: ReactTestRenderer.ReactTestRenderer;
@@ -535,5 +569,48 @@ describe('AlbumWorkbenchScreen', () => {
       await fromNowChip!.props.onPress();
     });
     expect(mockedSaveAutoUploadConfig).not.toHaveBeenCalled();
+  });
+
+  it('shows auto upload transferred count as this-round increment instead of cumulative total', async () => {
+    mockedBrowseAlbum.mockResolvedValue([]);
+    mockedGetAlbumStats.mockResolvedValue({
+      totalCount: 28,
+      transferredCount: 8,
+      queuedCount: 0,
+      pendingCount: 20,
+    });
+    mockedGetAutoUploadConfig.mockResolvedValue({
+      enabled: true,
+      state: 'active',
+      timeRangeMode: 'all',
+      customTimeFrom: null,
+    });
+
+    let tree: ReactTestRenderer.ReactTestRenderer | undefined;
+    await ReactTestRenderer.act(async () => {
+      tree = ReactTestRenderer.create(<AlbumWorkbenchScreen />);
+    });
+    await ReactTestRenderer.act(async () => {
+      await Promise.resolve();
+    });
+
+    const allTextValues = tree!.root
+      .findAllByType(Text)
+      .flatMap(node => flattenTextChildren(node.props.children));
+    const transferredSummaryItem = tree!.root.findAllByType(View).find(node => {
+      const itemTextValues = node
+        .findAllByType(Text)
+        .flatMap(text => flattenTextChildren(text.props.children));
+      return itemTextValues.includes('本次已传');
+    });
+
+    expect(allTextValues).toContain('本次已传');
+    expect(transferredSummaryItem).toBeDefined();
+    expect(
+      transferredSummaryItem!
+        .findAllByType(Text)
+        .flatMap(node => flattenTextChildren(node.props.children)),
+    ).toContain(0);
+    expect(allTextValues).not.toContain(8);
   });
 });

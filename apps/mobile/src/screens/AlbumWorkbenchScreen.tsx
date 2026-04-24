@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from 'react';
 import {
   View,
   Text,
@@ -69,7 +75,8 @@ const GRID_COLUMNS = 3;
 const GRID_GAP = 2;
 const CONTENT_PADDING = 16;
 const GRID_ITEM_SIZE =
-  (SCREEN_WIDTH - CONTENT_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
+  (SCREEN_WIDTH - CONTENT_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) /
+  GRID_COLUMNS;
 const PAGE_SIZE = 60;
 
 const BLUE = '#3b9fd8';
@@ -97,7 +104,12 @@ type MediaFilter = 'all' | 'photos' | 'videos';
 type TransferFilter = 'all' | 'untransferred' | 'transferred';
 type ViewMode = 'grid' | 'list';
 
-type UnifiedFilter = 'all' | 'photos' | 'videos' | 'untransferred' | 'transferred';
+type UnifiedFilter =
+  | 'all'
+  | 'photos'
+  | 'videos'
+  | 'untransferred'
+  | 'transferred';
 const UNIFIED_FILTER_TABS = [
   { key: 'all', labelKey: 'albumWorkbench.tabs.all' },
   { key: 'photos', labelKey: 'albumWorkbench.tabs.photos' },
@@ -167,12 +179,15 @@ export function AlbumWorkbenchScreen() {
   // Data
   const [assets, setAssets] = useState<AlbumAssetDTO[]>([]);
   const [stats, setStats] = useState<AlbumStats | null>(null);
+  const [autoUploadTransferredBaseline, setAutoUploadTransferredBaselineState] =
+    useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const offsetRef = useRef(0);
   const hasLoadedInitialAssetsRef = useRef(false);
   const assetListRequestRef = useRef(0);
+  const autoUploadTransferredBaselineRef = useRef<number | null>(null);
 
   // Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -241,6 +256,14 @@ export function AlbumWorkbenchScreen() {
   // Data loading
   // ---------------------------------------------------------------------------
 
+  const setAutoUploadTransferredBaseline = useCallback(
+    (baseline: number | null) => {
+      autoUploadTransferredBaselineRef.current = baseline;
+      setAutoUploadTransferredBaselineState(baseline);
+    },
+    [],
+  );
+
   const loadAssets = useCallback(
     async (
       nextMediaFilter: MediaFilter,
@@ -303,6 +326,18 @@ export function AlbumWorkbenchScreen() {
     }
   }, []);
 
+  const primeAutoUploadRoundBaseline = useCallback(async () => {
+    let baseline = stats?.transferredCount ?? 0;
+    try {
+      const latestStats = await getAlbumStats();
+      setStats(latestStats);
+      baseline = latestStats.transferredCount;
+    } catch (e) {
+      console.warn('[AlbumWorkbench] primeAutoUploadRoundBaseline error:', e);
+    }
+    setAutoUploadTransferredBaseline(baseline);
+  }, [setAutoUploadTransferredBaseline, stats?.transferredCount]);
+
   const loadConfig = useCallback(async () => {
     try {
       const config = await getAutoUploadConfig();
@@ -323,8 +358,7 @@ export function AlbumWorkbenchScreen() {
     // Seed initial connection and photo auth state
     void (async () => {
       try {
-        const binding =
-          await NativeModules.NativeSyncEngine?.getBindingState();
+        const binding = await NativeModules.NativeSyncEngine?.getBindingState();
         const conn = (binding?.connectionState as string) || '';
         setDeviceConnected(prev => deriveDeviceConnected(conn, prev));
       } catch {
@@ -346,6 +380,28 @@ export function AlbumWorkbenchScreen() {
     loadAssets,
     loadStats,
     loadConfig,
+  ]);
+
+  const statsTransferredCount = stats?.transferredCount;
+
+  useEffect(() => {
+    if (autoUploadConfig?.state !== 'active') {
+      if (autoUploadTransferredBaselineRef.current !== null) {
+        setAutoUploadTransferredBaseline(null);
+      }
+      return;
+    }
+
+    if (
+      typeof statsTransferredCount === 'number' &&
+      autoUploadTransferredBaselineRef.current === null
+    ) {
+      setAutoUploadTransferredBaseline(statsTransferredCount);
+    }
+  }, [
+    autoUploadConfig?.state,
+    setAutoUploadTransferredBaseline,
+    statsTransferredCount,
   ]);
 
   // Refresh all currently visible assets (re-fetch from 0 to current offset)
@@ -404,7 +460,14 @@ export function AlbumWorkbenchScreen() {
       bindingSub.remove();
       photoLibSub.remove();
     };
-  }, [mediaFilter, transferFilter, collectionId, loadAssets, refreshVisibleAssets, loadStats]);
+  }, [
+    mediaFilter,
+    transferFilter,
+    collectionId,
+    loadAssets,
+    refreshVisibleAssets,
+    loadStats,
+  ]);
 
   // Re-fetch when returning from background / permission dialog.
   // On first install, PHAsset.fetchAssets() triggers the iOS permission
@@ -412,24 +475,21 @@ export function AlbumWorkbenchScreen() {
   // and the app goes back to active, we need to reload.
   const appStateRef = useRef(AppState.currentState);
   useEffect(() => {
-    const sub = AppState.addEventListener(
-      'change',
-      (next: AppStateStatus) => {
-        if (
-          appStateRef.current.match(/inactive|background/) &&
-          next === 'active'
-        ) {
-          void loadAssets(mediaFilter, transferFilter, true, collectionId);
-          void loadStats();
-          // Re-check auth status — may have changed from notDetermined to
-          // limited/authorized while the permission dialog was showing.
-          void getPhotoAuthorizationStatus()
-            .then(setPhotoAuthStatus)
-            .catch(() => {});
-        }
-        appStateRef.current = next;
-      },
-    );
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (
+        appStateRef.current.match(/inactive|background/) &&
+        next === 'active'
+      ) {
+        void loadAssets(mediaFilter, transferFilter, true, collectionId);
+        void loadStats();
+        // Re-check auth status — may have changed from notDetermined to
+        // limited/authorized while the permission dialog was showing.
+        void getPhotoAuthorizationStatus()
+          .then(setPhotoAuthStatus)
+          .catch(() => {});
+      }
+      appStateRef.current = next;
+    });
     return () => sub.remove();
   }, [loadAssets, mediaFilter, transferFilter, collectionId, loadStats]);
 
@@ -464,8 +524,7 @@ export function AlbumWorkbenchScreen() {
     [assets],
   );
   const allSelectableSelected =
-    selectableIds.length > 0 &&
-    selectableIds.every(id => selectedIds.has(id));
+    selectableIds.length > 0 && selectableIds.every(id => selectedIds.has(id));
 
   const handleToggleSelectAll = useCallback(() => {
     if (allSelectableSelected) {
@@ -622,7 +681,10 @@ export function AlbumWorkbenchScreen() {
                   await disableAutoUpload();
                   await loadConfig();
                 } catch (e) {
-                  console.warn('[AlbumWorkbench] disableAutoUpload error:', e);
+                  console.warn(
+                    '[AlbumWorkbench] disableAutoUpload error:',
+                    e,
+                  );
                   Alert.alert(
                     t('albumWorkbench.dialogs.closeAutoFailed.title'),
                     t('albumWorkbench.dialogs.closeAutoFailed.body'),
@@ -685,10 +747,14 @@ export function AlbumWorkbenchScreen() {
                   onPress: async () => {
                     try {
                       await cancelAllManualUploads();
+                      await primeAutoUploadRoundBaseline();
                       await enableAutoUpload();
                       await loadConfig();
                     } catch (e) {
-                      console.warn('[AlbumWorkbench] enableAutoUpload error:', e);
+                      console.warn(
+                        '[AlbumWorkbench] enableAutoUpload error:',
+                        e,
+                      );
                       Alert.alert(
                         t('albumWorkbench.dialogs.enableAutoFailed.title'),
                         t('albumWorkbench.dialogs.enableAutoFailed.body'),
@@ -704,6 +770,7 @@ export function AlbumWorkbenchScreen() {
           // If we can't check, proceed — sync overview unavailable
         }
 
+        await primeAutoUploadRoundBaseline();
         await enableAutoUpload();
       }
       await loadConfig();
@@ -714,7 +781,7 @@ export function AlbumWorkbenchScreen() {
         t('albumWorkbench.dialogs.toggleAutoFailed.body'),
       );
     }
-  }, [autoUploadConfig, loadConfig, t]);
+  }, [autoUploadConfig, loadConfig, primeAutoUploadRoundBaseline, t]);
 
   const handleConfigChange = useCallback(
     async (
@@ -956,6 +1023,14 @@ export function AlbumWorkbenchScreen() {
   // ---------------------------------------------------------------------------
 
   const isAutoUploadActive = autoUploadConfig?.state === 'active';
+  const autoUploadTransferredThisRound =
+    isAutoUploadActive && stats
+      ? Math.max(
+          0,
+          stats.transferredCount -
+            (autoUploadTransferredBaseline ?? stats.transferredCount),
+        )
+      : 0;
 
   // Derive custom time display string for summary card
   const timeRangeDisplayLabel = (() => {
@@ -1030,7 +1105,9 @@ export function AlbumWorkbenchScreen() {
               <TouchableOpacity
                 style={[
                   styles.configRow,
-                  !isAutoUploadActive && !deviceConnected && styles.configRowDisabled,
+                  !isAutoUploadActive &&
+                    !deviceConnected &&
+                    styles.configRowDisabled,
                 ]}
                 activeOpacity={0.7}
                 onPress={handleToggleAutoUpload}
@@ -1039,7 +1116,9 @@ export function AlbumWorkbenchScreen() {
                 <Text
                   style={[
                     styles.configLabel,
-                    !isAutoUploadActive && !deviceConnected && styles.configLabelDisabled,
+                    !isAutoUploadActive &&
+                      !deviceConnected &&
+                      styles.configLabelDisabled,
                   ]}
                 >
                   {t('albumWorkbench.config.toggleLabel')}
@@ -1048,7 +1127,9 @@ export function AlbumWorkbenchScreen() {
                   style={[
                     styles.toggleTrack,
                     isAutoUploadActive && styles.toggleTrackOn,
-                    !isAutoUploadActive && !deviceConnected && styles.toggleTrackDisabled,
+                    !isAutoUploadActive &&
+                      !deviceConnected &&
+                      styles.toggleTrackDisabled,
                   ]}
                 >
                   <View
@@ -1156,9 +1237,9 @@ export function AlbumWorkbenchScreen() {
                   ))}
                   <View style={styles.summaryDot} />
                 </View>
-              <Text style={styles.summaryTitle}>
-                {t('albumWorkbench.summary.title')}
-              </Text>
+                <Text style={styles.summaryTitle}>
+                  {t('albumWorkbench.summary.title')}
+                </Text>
               </View>
               <Text style={styles.summarySubtitle}>
                 {t('albumWorkbench.summary.subtitle')}
@@ -1170,7 +1251,7 @@ export function AlbumWorkbenchScreen() {
                   </Text>
                   <Text style={styles.summaryGridValue}>
                     <Text style={styles.summaryGridNumber}>
-                      {stats.transferredCount}
+                      {autoUploadTransferredThisRound}
                     </Text>{' '}
                     {t('albumWorkbench.summary.unitCount')}
                   </Text>
@@ -1241,9 +1322,7 @@ export function AlbumWorkbenchScreen() {
             <Text style={[styles.statValue, { color: '#f59e0b' }]}>
               {Math.max(
                 0,
-                stats.totalCount -
-                  stats.transferredCount -
-                  stats.queuedCount,
+                stats.totalCount - stats.transferredCount - stats.queuedCount,
               )}
             </Text>
             <Text style={styles.statLabel}>
@@ -1455,16 +1534,18 @@ export function AlbumWorkbenchScreen() {
         <Text
           style={[
             styles.uploadBarText,
-            selectedIds.size > 0 && !isAutoUploadActive && styles.uploadBarTextActive,
+            selectedIds.size > 0 &&
+              !isAutoUploadActive &&
+              styles.uploadBarTextActive,
           ]}
         >
           {isAutoUploadActive
             ? t('albumWorkbench.selectionHint.autoActiveLock')
             : selectedIds.size > 0
-              ? t('albumWorkbench.selectedCount', {
-                  count: selectedIds.size,
-                })
-              : t('albumWorkbench.selectionHint.none')}
+            ? t('albumWorkbench.selectedCount', {
+                count: selectedIds.size,
+              })
+            : t('albumWorkbench.selectionHint.none')}
         </Text>
         <View style={styles.uploadBarRight}>
           {!deviceConnected && !isAutoUploadActive && (
@@ -1477,12 +1558,20 @@ export function AlbumWorkbenchScreen() {
           <TouchableOpacity
             style={[
               styles.uploadButton,
-              (uploading || selectedIds.size === 0 || !deviceConnected || isAutoUploadActive) &&
+              (uploading ||
+                selectedIds.size === 0 ||
+                !deviceConnected ||
+                isAutoUploadActive) &&
                 styles.uploadButtonDisabled,
             ]}
             activeOpacity={0.7}
             onPress={() => void handleUpload()}
-            disabled={uploading || selectedIds.size === 0 || !deviceConnected || isAutoUploadActive}
+            disabled={
+              uploading ||
+              selectedIds.size === 0 ||
+              !deviceConnected ||
+              isAutoUploadActive
+            }
           >
             {uploading ? (
               <ActivityIndicator size="small" color="#fff" />

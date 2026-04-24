@@ -906,7 +906,7 @@ export function SettingsScreen() {
   const accountDisplayValue =
     isPhoneRevealed && rawPhoneIdentifier
       ? rawPhoneIdentifier
-      : (primaryIdentity?.display ?? '');
+      : primaryIdentity?.display ?? '';
 
   // Pretty-format the Apple expireAt for the "Cancelled — valid until X"
   // secondary line. Keep it lenient: bad ISO falls through to empty so
@@ -990,8 +990,8 @@ export function SettingsScreen() {
                     isConnected
                       ? styles.statusDotOnline
                       : isConnecting
-                        ? styles.statusDotConnecting
-                        : styles.statusDotOffline,
+                      ? styles.statusDotConnecting
+                      : styles.statusDotOffline,
                   ]}
                 />
                 <Text
@@ -1000,15 +1000,15 @@ export function SettingsScreen() {
                     isConnected
                       ? styles.statusTextOnline
                       : isConnecting
-                        ? styles.statusTextConnecting
-                        : styles.statusTextOffline,
+                      ? styles.statusTextConnecting
+                      : styles.statusTextOffline,
                   ]}
                 >
                   {isConnected
                     ? t('settings.connection.online')
                     : isConnecting
-                      ? t('settings.connection.connecting')
-                      : t('settings.connection.offline')}
+                    ? t('settings.connection.connecting')
+                    : t('settings.connection.offline')}
                 </Text>
               </View>
               <TouchableOpacity
@@ -1050,8 +1050,8 @@ export function SettingsScreen() {
                 isSubscriptionIntroTrial
                   ? t('settings.subscription.subscribed')
                   : isAccountTrial || isTrialExpired
-                    ? t('settings.subscription.trial')
-                    : t('subscription.title')}
+                  ? t('settings.subscription.trial')
+                  : t('subscription.title')}
               </Text>
             </View>
             {isAccountTrial || isSubscriptionIntroTrial ? (
