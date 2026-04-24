@@ -33,6 +33,10 @@ export type SubscriptionPlan = 'monthly' | 'yearly' | '';
 export interface IdentityDescriptor {
   type: string; // 'phone_cn' | 'email' | 'apple' | 'google'
   display: string; // server-side masked
+  // Raw identifier, currently only populated for 'phone_cn' on the
+  // authenticated user's own profile. Used by SettingsScreen to power
+  // a user-triggered "reveal full phone" toggle. Treat as PII.
+  identifier?: string;
 }
 
 export interface UserProfile {

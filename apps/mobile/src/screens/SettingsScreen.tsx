@@ -892,6 +892,22 @@ export function SettingsScreen() {
     ? SUBSCRIPTION_STATUS_ICON_COLORS[subscriptionIconTone]
     : DARK;
 
+  // Phone reveal toggle — when the primary identity is a CN phone number
+  // the server also returns the raw identifier so the user can choose to
+  // temporarily reveal the full digits. Defaults to masked on every mount
+  // (no persistence) so the full number is never displayed unattended.
+  const [isPhoneRevealed, setIsPhoneRevealed] = useState(false);
+  const primaryIdentity = auth.user?.primaryIdentity;
+  const rawPhoneIdentifier =
+    primaryIdentity?.type === 'phone_cn'
+      ? primaryIdentity.identifier
+      : undefined;
+  const canTogglePhoneReveal = Boolean(rawPhoneIdentifier);
+  const accountDisplayValue =
+    isPhoneRevealed && rawPhoneIdentifier
+      ? rawPhoneIdentifier
+      : (primaryIdentity?.display ?? '');
+
   // Pretty-format the Apple expireAt for the "Cancelled — valid until X"
   // secondary line. Keep it lenient: bad ISO falls through to empty so
   // the primary status line still shows.
@@ -1179,9 +1195,31 @@ export function SettingsScreen() {
                 {t('settings.rows.currentAccount')}
               </Text>
             </View>
-            <Text style={styles.infoRowValue}>
-              {auth.user?.primaryIdentity?.display ?? ''}
-            </Text>
+            <View style={styles.accountValueRow}>
+              <Text style={styles.infoRowValue} numberOfLines={1}>
+                {accountDisplayValue}
+              </Text>
+              {canTogglePhoneReveal ? (
+                <TouchableOpacity
+                  style={styles.phoneEyeButton}
+                  activeOpacity={0.7}
+                  onPress={() => setIsPhoneRevealed(v => !v)}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    isPhoneRevealed
+                      ? t('settings.phone.hide')
+                      : t('settings.phone.reveal')
+                  }
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Icon
+                    name={isPhoneRevealed ? 'eye-outline' : 'eye-off-outline'}
+                    size={16}
+                    color={MUTED_TEXT}
+                  />
+                </TouchableOpacity>
+              ) : null}
+            </View>
           </View>
           <View style={styles.listSep} />
           <View style={styles.infoRow}>
@@ -1775,6 +1813,18 @@ const styles = StyleSheet.create({
     color: MUTED_TEXT,
     flexShrink: 1,
     textAlign: 'right',
+  },
+  accountValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 1,
+  },
+  phoneEyeButton: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   languageRow: {
     paddingHorizontal: 18,

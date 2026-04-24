@@ -40,6 +40,10 @@
     "appVersion": "應用版本",
     "language": "語言"
   },
+  "phone": {
+    "reveal": "顯示完整手機號",
+    "hide": "隱藏手機號"
+  },
   "language": {
     "system": "跟隨系統",
     "traditionalChinese": "繁中",

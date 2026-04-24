@@ -99,6 +99,7 @@ export async function logout(refreshToken: string): Promise<void> {
 interface IdentityDescriptorWire {
   type: string;
   display: string;
+  identifier?: string;
 }
 
 interface UserProfileResponse {

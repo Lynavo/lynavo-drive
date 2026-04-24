@@ -40,6 +40,10 @@
     "appVersion": "App Version",
     "language": "Language"
   },
+  "phone": {
+    "reveal": "Show full phone number",
+    "hide": "Hide phone number"
+  },
   "language": {
     "system": "System",
     "traditionalChinese": "繁中",
