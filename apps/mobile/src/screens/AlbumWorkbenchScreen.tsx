@@ -585,6 +585,28 @@ export function AlbumWorkbenchScreen() {
     });
   }, []);
 
+  useEffect(() => {
+    if (selectedIds.size === 0) return;
+
+    const transferredIds = assets
+      .filter(
+        asset => asset.isTransferred && selectedIds.has(asset.assetLocalId),
+      )
+      .map(asset => asset.assetLocalId);
+    if (transferredIds.length === 0) return;
+
+    setSelectedIds(prev => {
+      let changed = false;
+      const next = new Set(prev);
+      transferredIds.forEach(id => {
+        if (next.delete(id)) {
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [assets, selectedIds]);
+
   const handleToggleSelect = useCallback(
     (assetLocalId: string) => {
       const asset = assetById.get(assetLocalId);
@@ -935,7 +957,6 @@ export function AlbumWorkbenchScreen() {
         setTransferFilter('transferred');
         break;
     }
-    setSelectedIds(new Set());
   }, []);
 
   // ---------------------------------------------------------------------------

@@ -914,6 +914,117 @@ describe('AlbumWorkbenchScreen', () => {
     }
   });
 
+  it('keeps untransferred selections visible when switching back to all', async () => {
+    const panResponderCreateSpy = mockPanResponderHandlers();
+    const selectableAsset = {
+      assetLocalId: 'a1',
+      filename: 'IMG.JPG',
+      mediaType: 'image',
+      fileSize: 1024,
+      creationDate: '2026-04-01T00:00:00Z',
+      thumbnailUri: 'file:///tmp/a1.jpg',
+      isTransferred: false,
+      isQueued: false,
+    };
+    const transferredAsset = {
+      assetLocalId: 'a2',
+      filename: 'DONE.JPG',
+      mediaType: 'image',
+      fileSize: 2048,
+      creationDate: '2026-04-02T00:00:00Z',
+      thumbnailUri: 'file:///tmp/a2.jpg',
+      isTransferred: true,
+      isQueued: false,
+    };
+
+    mockedBrowseAlbum.mockImplementation(
+      (_mediaFilter: string, transferFilter: string) => {
+        if (transferFilter === 'untransferred') return [selectableAsset];
+        if (transferFilter === 'transferred') return [transferredAsset];
+        return [selectableAsset, transferredAsset];
+      },
+    );
+    mockedGetAlbumStats.mockResolvedValue({
+      totalCount: 2,
+      transferredCount: 1,
+      queuedCount: 0,
+      pendingCount: 1,
+    });
+    mockedGetAutoUploadConfig.mockResolvedValue({
+      enabled: false,
+      timeRangeMode: 'all',
+      state: 'idle',
+    });
+    mockedGetPhotoAuthorizationStatus.mockResolvedValue('authorized');
+
+    let tree: ReactTestRenderer.ReactTestRenderer;
+    try {
+      await ReactTestRenderer.act(async () => {
+        tree = createAlbumWorkbenchScreen();
+      });
+      await ReactTestRenderer.act(async () => {
+        await Promise.resolve();
+      });
+
+      const findTab = (label: string) =>
+        tree!.root
+          .findAll(node => typeof node.props.onPress === 'function')
+          .find(node => {
+            const textNodes = node.findAllByType(Text);
+            return textNodes.some(
+              textNode => textNode.props.children === label,
+            );
+          });
+
+      await ReactTestRenderer.act(async () => {
+        findTab('未传')!.props.onPress();
+      });
+      await ReactTestRenderer.act(async () => {
+        await Promise.resolve();
+      });
+
+      const selectableGridItem = tree!.root.findByProps({
+        testID: 'album-grid-item-a1',
+      });
+      const circleTapEvent = {
+        nativeEvent: {
+          pageX: 90,
+          pageY: 110,
+          locationX: 999,
+          locationY: 10,
+        },
+      };
+
+      expect(
+        selectableGridItem.props.onStartShouldSetResponderCapture(
+          circleTapEvent,
+        ),
+      ).toBe(true);
+
+      ReactTestRenderer.act(() => {
+        selectableGridItem.props.onResponderGrant(circleTapEvent);
+        selectableGridItem.props.onResponderRelease(circleTapEvent);
+      });
+
+      await ReactTestRenderer.act(async () => {
+        findTab('全部')!.props.onPress();
+      });
+      await ReactTestRenderer.act(async () => {
+        await Promise.resolve();
+      });
+
+      const textValues = tree!.root.findAllByType(Text).flatMap(node => {
+        const value = node.props.children;
+        return typeof value === 'string' ? [value] : [];
+      });
+
+      expect(getActiveGridSelectionCircleCount(tree!)).toBe(1);
+      expect(textValues).toContain('已选 1 个素材');
+    } finally {
+      panResponderCreateSpy.mockRestore();
+    }
+  });
+
   it('locks time range chips when auto upload is active', async () => {
     mockedSaveAutoUploadConfig.mockClear();
     mockedBrowseAlbum.mockResolvedValue([]);
