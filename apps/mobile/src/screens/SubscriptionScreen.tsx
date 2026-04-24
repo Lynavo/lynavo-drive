@@ -27,6 +27,7 @@ import {
 import { isFeatureAccessAllowed, useAuth } from '../stores/auth-store';
 import { iapService } from '../services/iap-service';
 import { planToProductId } from '../constants/iap';
+import { useStoreProducts } from '../hooks/useStoreProducts';
 import { classifyIapError, IapErrorClass } from '../services/iap-errors';
 import { markSubscriptionJustActivated } from '../hooks/useExpiryReminder';
 import {
@@ -316,6 +317,9 @@ function PlanCard({
             ? planStyles.textSelected
             : planStyles.textUnselected,
         ]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
       >
         {price}
       </Text>
@@ -328,15 +332,30 @@ function PlanCard({
             ? planStyles.unitSelected
             : planStyles.unitUnselected,
         ]}
+        numberOfLines={1}
       >
         {unit}
       </Text>
       {oldPrice ? (
         <View style={planStyles.metaRow}>
-          <Text style={planStyles.oldPrice}>{oldPrice}</Text>
+          <Text
+            style={planStyles.oldPrice}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+          >
+            {oldPrice}
+          </Text>
           {savingsBadge ? (
             <View style={planStyles.savingsBadge}>
-              <Text style={planStyles.savingsBadgeText}>{savingsBadge}</Text>
+              <Text
+                style={planStyles.savingsBadgeText}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
+              >
+                {savingsBadge}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -572,7 +591,7 @@ const modalStyles = StyleSheet.create({
 
 export function SubscriptionScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, subscription, loadSubscription, setSubscription } = useAuth();
 
   // Which Apple-level plan the user is currently holding (null when on
@@ -632,6 +651,54 @@ export function SubscriptionScreen() {
   const showBackButton = navigation.canGoBack() || canExitRootPaywall;
 
   const [isRestoring, setIsRestoring] = useState(false);
+
+  // StoreKit-sourced prices. Falls back to i18n strings when IAP is gated
+  // off (CI / unit tests) or when StoreKit returns no products (sandbox not
+  // configured, network failure). Currency / formatting flows from Apple,
+  // not the codebase, so the same screen renders correct prices for any
+  // storefront the user is signed into.
+  // Use Intl.NumberFormat so the strikethrough + savings string visually
+  // matches Apple's localizedPrice (e.g. "¥118.80" rather than "CNY 118.80").
+  // Locale comes from i18next so a Hant user on a CN storefront still sees
+  // "¥118.80" while a US-storefront user sees "$1,299.00" with their grouping
+  // separators. Hermes ships Intl since RN 0.74; falls back to a simple
+  // "<currency> <amount>" string if Intl/currency throws on an obscure locale.
+  const formatPrice = useCallback(
+    (amount: number, currency: string): string => {
+      try {
+        return new Intl.NumberFormat(i18n.language, {
+          style: 'currency',
+          currency,
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+        }).format(amount);
+      } catch {
+        return `${currency} ${amount.toFixed(2)}`;
+      }
+    },
+    [i18n.language],
+  );
+  const formatSavings = useCallback(
+    (savingsDisplay: string) =>
+      t('subscription.plans.yearly.savingsTemplate', {
+        amount: savingsDisplay,
+        defaultValue: t('subscription.plans.yearly.savings'),
+      }),
+    [t],
+  );
+  const storeProducts = useStoreProducts({ formatPrice, formatSavings });
+  const monthlyPriceLabel =
+    storeProducts.monthly?.displayPrice ??
+    t('subscription.plans.monthly.priceFallback');
+  const yearlyPriceLabel =
+    storeProducts.yearly?.displayPrice ??
+    t('subscription.plans.yearly.priceFallback');
+  const yearlyOldPriceLabel =
+    storeProducts.yearlySavings?.annualizedMonthlyDisplay ??
+    t('subscription.plans.yearly.oldPrice');
+  const yearlySavingsLabel =
+    storeProducts.yearlySavings?.display ??
+    t('subscription.plans.yearly.savings');
 
   const handleRestore = useCallback(async () => {
     if (!FEATURES.IAP_ENABLED || !FEATURES.IAP_RESTORE_ENABLED) return;
@@ -896,9 +963,18 @@ export function SubscriptionScreen() {
           <FeatureList t={t} />
         </View>
 
-        <View style={styles.planRow}>
+        <View
+          style={[
+            styles.planRow,
+            // Dim during the cold-start StoreKit fetch so the price swap
+            // (priceFallback → real localizedPrice) reads as "loading then
+            // settled" instead of a jarring text replacement. Once products
+            // are resolved (or refresh after error) we restore full opacity.
+            storeProducts.loading && styles.planRowLoading,
+          ]}
+        >
           <PlanCard
-            price="¥9.9"
+            price={monthlyPriceLabel}
             unit={t('subscription.plans.monthly.unit')}
             selected={selectedPlan === 'monthly'}
             disabled={
@@ -913,10 +989,10 @@ export function SubscriptionScreen() {
             onPress={() => setSelectedPlan('monthly')}
           />
           <PlanCard
-            price="¥104"
+            price={yearlyPriceLabel}
             unit={t('subscription.plans.yearly.unit')}
-            oldPrice={t('subscription.plans.yearly.oldPrice')}
-            savingsBadge={t('subscription.plans.yearly.savings')}
+            oldPrice={yearlyOldPriceLabel}
+            savingsBadge={yearlySavingsLabel}
             selected={selectedPlan === 'yearly'}
             disabled={currentPlan === 'yearly'}
             currentBadge={
@@ -928,11 +1004,30 @@ export function SubscriptionScreen() {
           />
         </View>
 
+        {storeProducts.error && FEATURES.IAP_ENABLED ? (
+          <TouchableOpacity
+            style={styles.errorBanner}
+            activeOpacity={0.7}
+            onPress={() => {
+              void storeProducts.refresh();
+            }}
+            accessibilityLabel={t('common.retry')}
+          >
+            <Text style={styles.errorBannerText} numberOfLines={2}>
+              {t('subscription.errors.productsUnavailable')}
+            </Text>
+            <Text style={styles.errorBannerRetry}>{t('common.retry')}</Text>
+          </TouchableOpacity>
+        ) : null}
+
         <TouchableOpacity
           style={styles.subscribeButton}
           activeOpacity={0.7}
           disabled={
-            isLoading || selectedPlanIsCurrent || selectedPlanIsDowngrade
+            isLoading ||
+            selectedPlanIsCurrent ||
+            selectedPlanIsDowngrade ||
+            (storeProducts.error != null && FEATURES.IAP_ENABLED)
           }
           onPress={() => {
             void handleSubscribe();
@@ -1045,6 +1140,9 @@ const styles = StyleSheet.create({
     gap: PLAN_CARD_GAP,
     marginBottom: 20,
   },
+  planRowLoading: {
+    opacity: 0.55,
+  },
   subscribeButton: {
     backgroundColor: DARK,
     borderRadius: 14,
@@ -1082,5 +1180,28 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 20,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(229, 57, 53, 0.08)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 10,
+    gap: 12,
+  },
+  errorBannerText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: DESTRUCTIVE_RED,
+  },
+  errorBannerRetry: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: DESTRUCTIVE_RED,
+    textDecorationLine: 'underline',
   },
 });

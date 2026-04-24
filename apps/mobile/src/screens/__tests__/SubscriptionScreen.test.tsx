@@ -66,6 +66,7 @@ jest.mock('../../services/iap-service', () => ({
         eligibleForIntroOffer: true,
       },
     ]),
+    getProductSummaries: jest.fn().mockResolvedValue([]),
     onOrphanPurchaseVerified: jest.fn(() => jest.fn()),
   },
 }));

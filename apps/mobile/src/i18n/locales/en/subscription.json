@@ -17,15 +17,19 @@
     "monthly": {
       "name": "Monthly Plan",
       "unit": "/mo",
+      "priceFallback": "¥9.9",
       "subtitle": "¥9.9/month",
       "trialOffer": "7-day free trial, then ¥9.9/month"
     },
     "yearly": {
       "name": "12-Month Plan",
       "unit": "/12 months",
+      "priceFallback": "¥104",
       "oldPrice": "¥118.8",
-      "savings": "Save ¥14.8"
+      "savings": "Save ¥14.8",
+      "savingsTemplate": "Save {{amount}}"
     },
+    "priceTemplate": "{{currency}} {{amount}}",
     "fallback": "Subscription",
     "currentPlan": "Current Plan"
   },
@@ -46,7 +50,8 @@
     "deferred": "Purchase pending approval.",
     "alreadyOwned": "You already have an active subscription. If you want to switch plans, please retry or manage it in App Store settings.",
     "receiptBoundToOther": "This Apple subscription is linked to another account. Please sign in with the original account to continue.",
-    "receiptStaleNoActive": "This receipt was already used but there is no active subscription. Please purchase again."
+    "receiptStaleNoActive": "This receipt was already used but there is no active subscription. Please purchase again.",
+    "productsUnavailable": "Plans are temporarily unavailable. Please check your connection and retry."
   },
   "status": {
     "trialing": "Trial — {{days}} days left",

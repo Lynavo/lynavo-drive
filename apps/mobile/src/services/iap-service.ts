@@ -62,6 +62,22 @@ export interface EligibilityResult {
   eligibleForIntroOffer: boolean;
 }
 
+export type SubscriptionPeriodUnit = 'DAY' | 'WEEK' | 'MONTH' | 'YEAR';
+
+/** Storefront-localized snapshot of one IAP product, sourced from StoreKit
+ *  via react-native-iap. `displayPrice` is Apple-formatted for the user's
+ *  current storefront — never persist it across launches, the storefront
+ *  can change. Use `priceAmount` + `currency` for math (discount %, etc.). */
+export interface IapProductSummary {
+  productId: IapProductId;
+  displayPrice: string;
+  priceAmount: number;
+  currency: string;
+  periodUnit?: SubscriptionPeriodUnit;
+  periodCount?: number;
+  eligibleForIntroOffer: boolean;
+}
+
 export interface IapService {
   initialize(): Promise<void>;
   teardown(): Promise<void>;
@@ -69,6 +85,10 @@ export interface IapService {
   restore(): Promise<PurchaseReceipt[]>;
   finishTransaction(transactionId: string): Promise<void>;
   checkEligibility(): Promise<EligibilityResult[]>;
+  /** Fetches the storefront-localized product catalog. Returns `[]` on any
+   *  failure (network, StoreKit unavailable, sandbox not configured) — UI
+   *  must render loading/error/empty rather than depend on hardcoded prices. */
+  getProductSummaries(): Promise<IapProductSummary[]>;
   refreshReceipt(): Promise<string | null>;
   onOrphanPurchaseVerified(cb: () => void): () => void;
 }
@@ -77,10 +97,7 @@ class IapServiceImpl implements IapService {
   private initialized = false;
   private purchaseSub: EmitterSubscription | null = null;
   private errorSub: EmitterSubscription | null = null;
-  private pendingPurchase = new Map<
-    IapProductId,
-    PendingPurchase
-  >();
+  private pendingPurchase = new Map<IapProductId, PendingPurchase>();
   private orphanListeners = new Set<() => void>();
 
   async initialize(): Promise<void> {
@@ -222,6 +239,58 @@ class IapServiceImpl implements IapService {
     } catch {
       // Eligibility query failure must not block UI — fall back to "not eligible"
       // so the non-trial copy is shown (never over-promise a free trial).
+      return [];
+    }
+  }
+
+  async getProductSummaries(): Promise<IapProductSummary[]> {
+    try {
+      const products = await getSubscriptions({ skus: [...ALL_PRODUCT_IDS] });
+      const summaries: IapProductSummary[] = [];
+      for (const productId of ALL_PRODUCT_IDS) {
+        const match = products.find(p => p.productId === productId);
+        if (!match) continue;
+        // The react-native-iap `Subscription` union spans iOS / Android /
+        // Amazon, but only the iOS variant exposes localizedPrice / currency.
+        // This app ships iOS only, so cast through a structural shape that
+        // covers the fields we need without depending on the platform-tagged
+        // discriminator (which isn't always present in older SK1 builds).
+        const ios = match as Partial<{
+          price: string;
+          localizedPrice: string;
+          currency: string;
+          subscriptionPeriodUnitIOS: SubscriptionPeriodUnit;
+          subscriptionPeriodNumberIOS: string;
+          introductoryPricePaymentModeIOS: string;
+        }>;
+        const priceRaw = ios.price ?? '';
+        const priceAmount = Number.parseFloat(priceRaw);
+        if (!Number.isFinite(priceAmount)) continue;
+        const displayPrice = ios.localizedPrice ?? priceRaw;
+        const currency = ios.currency ?? '';
+        const periodUnit = ios.subscriptionPeriodUnitIOS;
+        const periodCountRaw = ios.subscriptionPeriodNumberIOS;
+        const periodCount = periodCountRaw
+          ? Number.parseInt(periodCountRaw, 10)
+          : undefined;
+        const eligibleForIntroOffer =
+          ios.introductoryPricePaymentModeIOS === 'FREETRIAL';
+        summaries.push({
+          productId,
+          displayPrice,
+          priceAmount,
+          currency,
+          periodUnit,
+          periodCount:
+            periodCount && Number.isFinite(periodCount)
+              ? periodCount
+              : undefined,
+          eligibleForIntroOffer,
+        });
+      }
+      return summaries;
+    } catch (err) {
+      console.warn('[iap-service] getProductSummaries failed', err);
       return [];
     }
   }

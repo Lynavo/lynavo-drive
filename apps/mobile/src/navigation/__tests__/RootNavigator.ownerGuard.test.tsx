@@ -22,7 +22,8 @@ import { NativeModules } from 'react-native';
 // react-native-gesture-handler — must be mocked before @react-navigation/stack
 // ---------------------------------------------------------------------------
 jest.mock('react-native-gesture-handler', () => ({
-  GestureHandlerRootView: ({ children }: { children: React.ReactNode }) => children,
+  GestureHandlerRootView: ({ children }: { children: React.ReactNode }) =>
+    children,
   PanGestureHandler: ({ children }: { children: React.ReactNode }) => children,
   GestureDetector: ({ children }: { children: React.ReactNode }) => children,
   State: {},
@@ -56,7 +57,11 @@ jest.mock('react-native-safe-area-context', () => {
   return {
     SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
     SafeAreaProvider: ({ children }: { children: React.ReactNode }) =>
-      R.createElement(SafeAreaInsetsContext.Provider, { value: insets }, children),
+      R.createElement(
+        SafeAreaInsetsContext.Provider,
+        { value: insets },
+        children,
+      ),
     useSafeAreaInsets: () => insets,
     SafeAreaInsetsContext,
     initialWindowMetrics: {
@@ -87,7 +92,9 @@ jest.mock('react-native-keychain', () => ({
   getGenericPassword: jest.fn().mockResolvedValue(false),
   setGenericPassword: jest.fn().mockResolvedValue(true),
   resetGenericPassword: jest.fn().mockResolvedValue(true),
-  ACCESSIBLE: { AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 'AfterFirstUnlockThisDeviceOnly' },
+  ACCESSIBLE: {
+    AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 'AfterFirstUnlockThisDeviceOnly',
+  },
 }));
 
 jest.mock('../../services/iap-service', () => ({
@@ -97,6 +104,7 @@ jest.mock('../../services/iap-service', () => ({
     onOrphanPurchaseVerified: jest.fn(() => jest.fn()),
     checkEligibility: jest.fn().mockResolvedValue([]),
     restore: jest.fn().mockResolvedValue([]),
+    getProductSummaries: jest.fn().mockResolvedValue([]),
   },
 }));
 
@@ -108,7 +116,12 @@ jest.mock('../../services/SyncEngineModule', () => ({
   browseAlbum: jest.fn().mockResolvedValue([]),
   getAlbumStats: jest
     .fn()
-    .mockResolvedValue({ totalCount: 0, transferredCount: 0, queuedCount: 0, pendingCount: 0 }),
+    .mockResolvedValue({
+      totalCount: 0,
+      transferredCount: 0,
+      queuedCount: 0,
+      pendingCount: 0,
+    }),
   submitManualUpload: jest.fn(),
   getAutoUploadConfig: jest.fn().mockResolvedValue({
     enabled: false,
@@ -143,7 +156,11 @@ jest.mock('../../screens/DeviceDiscoveryScreen', () => {
   const { Text } = require('react-native');
   return {
     DeviceDiscoveryScreen: () =>
-      R.createElement(Text, { testID: 'stub-device-discovery' }, 'DEVICE_DISCOVERY_SENTINEL'),
+      R.createElement(
+        Text,
+        { testID: 'stub-device-discovery' },
+        'DEVICE_DISCOVERY_SENTINEL',
+      ),
   };
 });
 jest.mock('../../screens/SyncActivityScreen', () => {
@@ -151,12 +168,20 @@ jest.mock('../../screens/SyncActivityScreen', () => {
   const { Text } = require('react-native');
   return {
     SyncActivityScreen: () =>
-      R.createElement(Text, { testID: 'stub-sync-activity' }, 'SYNC_ACTIVITY_SENTINEL'),
+      R.createElement(
+        Text,
+        { testID: 'stub-sync-activity' },
+        'SYNC_ACTIVITY_SENTINEL',
+      ),
   };
 });
 jest.mock('../../screens/LoginScreen', () => ({ LoginScreen: () => null }));
-jest.mock('../../screens/SmsVerifyScreen', () => ({ SmsVerifyScreen: () => null }));
-jest.mock('../../screens/CodeVerifyScreen', () => ({ CodeVerifyScreen: () => null }));
+jest.mock('../../screens/SmsVerifyScreen', () => ({
+  SmsVerifyScreen: () => null,
+}));
+jest.mock('../../screens/CodeVerifyScreen', () => ({
+  CodeVerifyScreen: () => null,
+}));
 jest.mock('../../screens/AlbumWorkbenchScreen', () => ({
   AlbumWorkbenchScreen: () => null,
 }));
@@ -164,7 +189,9 @@ jest.mock('../../screens/SharedFilesScreen', () => ({
   SharedFilesScreen: () => null,
 }));
 jest.mock('../../screens/HistoryScreen', () => ({ HistoryScreen: () => null }));
-jest.mock('../../screens/SettingsScreen', () => ({ SettingsScreen: () => null }));
+jest.mock('../../screens/SettingsScreen', () => ({
+  SettingsScreen: () => null,
+}));
 jest.mock('../../screens/HelpScreen', () => ({ HelpScreen: () => null }));
 jest.mock('../../screens/QRScannerScreen', () => ({
   QRScannerScreen: () => null,

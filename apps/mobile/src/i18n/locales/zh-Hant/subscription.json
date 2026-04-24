@@ -17,15 +17,19 @@
     "monthly": {
       "name": "月度訂閱",
       "unit": "/月",
+      "priceFallback": "¥9.9",
       "subtitle": "¥9.9/月",
       "trialOffer": "7 天免費試用，之後 ¥9.9/月"
     },
     "yearly": {
       "name": "12 個月方案",
       "unit": "/12個月",
+      "priceFallback": "¥104",
       "oldPrice": "¥118.8",
-      "savings": "立省 ¥14.8"
+      "savings": "立省 ¥14.8",
+      "savingsTemplate": "立省 {{amount}}"
     },
+    "priceTemplate": "{{currency}} {{amount}}",
     "fallback": "訂閱",
     "currentPlan": "目前方案"
   },
@@ -46,7 +50,8 @@
     "deferred": "付款等待核准中",
     "alreadyOwned": "你已有有效訂閱。如要切換方案，請重試或在 App Store 訂閱設定中管理。",
     "receiptBoundToOther": "此 Apple 訂閱已綁定其他帳號。請改用原帳號登入後再試。",
-    "receiptStaleNoActive": "此收據已使用但無有效訂閱，請重新購買"
+    "receiptStaleNoActive": "此收據已使用但無有效訂閱，請重新購買",
+    "productsUnavailable": "暫時無法取得方案資訊，請檢查網路後重試"
   },
   "status": {
     "trialing": "試用中，還剩 {{days}} 天",
