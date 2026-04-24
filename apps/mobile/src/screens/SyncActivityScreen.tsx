@@ -72,6 +72,8 @@ interface SyncOverview {
   totalCount: number;
   completedBytes: number;
   totalBytes: number;
+  roundBaselineCompletedCount?: number;
+  roundBaselineCompletedBytes?: number;
   currentFile?: string;
   currentFilename?: string;
   currentFileConfirmedBytes: number;
@@ -109,6 +111,11 @@ interface TodayStats {
   fileCount: number;
   totalBytes: number;
   latestUpdatedAt?: string;
+}
+
+interface AutoRoundDisplayBaseline {
+  completedCount: number;
+  completedBytes: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -168,6 +175,8 @@ const EMPTY_OVERVIEW: SyncOverview = {
   totalCount: 0,
   completedBytes: 0,
   totalBytes: 0,
+  roundBaselineCompletedCount: 0,
+  roundBaselineCompletedBytes: 0,
   currentFileConfirmedBytes: 0,
   currentFileTotalBytes: 0,
   currentTaskSource: null,
@@ -431,6 +440,102 @@ export function getSyncActivityDisplayProgressPercent(
   return getSyncActivityProgressPercent(overview);
 }
 
+export function getSyncActivityAutoRoundDisplayMetrics(input: {
+  overview: Pick<
+    SyncOverview,
+    | 'autoUploadState'
+    | 'uploadState'
+    | 'completedCount'
+    | 'totalCount'
+    | 'completedBytes'
+    | 'currentTaskSource'
+    | 'lastCompletedTaskSource'
+    | 'autoPending'
+    | 'roundBaselineCompletedCount'
+    | 'roundBaselineCompletedBytes'
+  >;
+  isManualUploading: boolean;
+  rawMainCardState: SyncActivityMainCardState;
+  baseline?: AutoRoundDisplayBaseline | null;
+}): {
+  shouldTrack: boolean;
+  baseline: AutoRoundDisplayBaseline | null;
+  completedCount: number;
+  totalCount: number;
+  completedBytes: number;
+} {
+  const { overview, isManualUploading, rawMainCardState, baseline } = input;
+  const shouldTrack =
+    overview.autoUploadState === 'active' &&
+    !isManualUploading &&
+    (baseline !== null ||
+      rawMainCardState === 'standby' ||
+      rawMainCardState === 'auto_completed' ||
+      overview.currentTaskSource === 'auto' ||
+      (overview.autoPending ?? 0) > 0);
+
+  if (!shouldTrack) {
+    return {
+      shouldTrack: false,
+      baseline: null,
+      completedCount: overview.completedCount,
+      totalCount: overview.totalCount,
+      completedBytes: overview.completedBytes,
+    };
+  }
+
+  const nativeBaseline =
+    typeof overview.roundBaselineCompletedCount === 'number' &&
+    typeof overview.roundBaselineCompletedBytes === 'number'
+      ? {
+          completedCount: overview.roundBaselineCompletedCount,
+          completedBytes: overview.roundBaselineCompletedBytes,
+        }
+      : null;
+  const resolvedKnownBaseline = nativeBaseline ?? baseline ?? null;
+
+  const canSeedBaseline =
+    baseline !== null ||
+    (overview.currentTaskSource !== 'auto' &&
+      rawMainCardState !== 'auto_completed' &&
+      rawMainCardState !== 'standby');
+
+  if (!resolvedKnownBaseline && !canSeedBaseline) {
+    return {
+      shouldTrack: true,
+      baseline: null,
+      completedCount: overview.completedCount,
+      totalCount: overview.totalCount,
+      completedBytes: overview.completedBytes,
+    };
+  }
+
+  const resolvedBaseline = resolvedKnownBaseline ?? {
+    completedCount: overview.completedCount,
+    completedBytes: overview.completedBytes,
+  };
+  const completedCount = Math.max(
+    0,
+    overview.completedCount - resolvedBaseline.completedCount,
+  );
+  const totalCount = Math.max(
+    completedCount,
+    overview.totalCount - resolvedBaseline.completedCount,
+  );
+  const completedBytes = Math.max(
+    0,
+    overview.completedBytes - resolvedBaseline.completedBytes,
+  );
+
+  return {
+    shouldTrack: true,
+    baseline: resolvedBaseline,
+    completedCount,
+    totalCount,
+    completedBytes,
+  };
+}
+
 function CompletionStatCard({
   label,
   value,
@@ -466,6 +571,8 @@ export function SyncActivityScreen() {
   const [cancellingBatch, setCancellingBatch] = useState(false);
   const [autoCompletionVisualHoldUntilMs, setAutoCompletionVisualHoldUntilMs] =
     useState<number | null>(null);
+  const [autoRoundDisplayBaseline, setAutoRoundDisplayBaseline] =
+    useState<AutoRoundDisplayBaseline | null>(null);
 
   // Offline debounce: stabilize isOffline to avoid rapid UI flicker
   const [stableOffline, setStableOffline] = useState(false);
@@ -1084,6 +1191,15 @@ export function SyncActivityScreen() {
     overview.totalCount,
     overview.completedCount,
   );
+  const autoRoundDisplayMetrics = getSyncActivityAutoRoundDisplayMetrics({
+    overview,
+    isManualUploading,
+    rawMainCardState,
+    baseline: autoRoundDisplayBaseline,
+  });
+  const displayCompletedCount = autoRoundDisplayMetrics.completedCount;
+  const displayTotalCount = autoRoundDisplayMetrics.totalCount;
+  const displayCompletedBytes = autoRoundDisplayMetrics.completedBytes;
   const latestSyncLabel = todayStats.latestUpdatedAt
     ? formatDateTimeLabel(todayStats.latestUpdatedAt, t)
     : undefined;
@@ -1093,6 +1209,26 @@ export function SyncActivityScreen() {
     isLoggedIn: auth.isLoggedIn,
     featureAccessAllowed,
   });
+
+  useEffect(() => {
+    if (autoRoundDisplayMetrics.shouldTrack) {
+      const nextBaseline = autoRoundDisplayMetrics.baseline;
+      if (
+        nextBaseline &&
+        (autoRoundDisplayBaseline?.completedCount !==
+          nextBaseline.completedCount ||
+          autoRoundDisplayBaseline?.completedBytes !==
+            nextBaseline.completedBytes)
+      ) {
+        setAutoRoundDisplayBaseline(nextBaseline);
+      }
+      return;
+    }
+
+    if (autoRoundDisplayBaseline !== null) {
+      setAutoRoundDisplayBaseline(null);
+    }
+  }, [autoRoundDisplayBaseline, autoRoundDisplayMetrics]);
 
   useEffect(() => {
     // Cache the last known uploading visual regardless of task source.
@@ -1370,7 +1506,7 @@ export function SyncActivityScreen() {
                         {t('syncActivity.stats.progress')}
                       </Text>
                       <Text style={styles.statValue}>
-                        {`${overview.completedCount} / ${overview.totalCount}`}
+                        {`${displayCompletedCount} / ${displayTotalCount}`}
                       </Text>
                     </View>
                     <View style={styles.statDivider} />
@@ -1379,7 +1515,7 @@ export function SyncActivityScreen() {
                         {t('syncActivity.stats.transferred')}
                       </Text>
                       <Text style={styles.statValue}>
-                        {formatBytes(overview.completedBytes)}
+                        {formatBytes(displayCompletedBytes)}
                       </Text>
                     </View>
                   </View>
@@ -1406,7 +1542,7 @@ export function SyncActivityScreen() {
                   <Text style={styles.idleSubtitle}>
                     {t('syncActivity.phases.preparingSubtitle')}
                   </Text>
-                  {overview.completedCount > 0 && (
+                  {displayCompletedCount > 0 && (
                     <View style={styles.statsRow}>
                       <View style={styles.statItem}>
                         <Text style={styles.statLabel}>
@@ -1414,7 +1550,7 @@ export function SyncActivityScreen() {
                         </Text>
                         <Text style={styles.statValue}>
                           {t('syncActivity.stats.transferredCount', {
-                            count: overview.completedCount,
+                            count: displayCompletedCount,
                           })}
                         </Text>
                       </View>
@@ -1424,7 +1560,7 @@ export function SyncActivityScreen() {
                           {t('syncActivity.stats.dataAmount')}
                         </Text>
                         <Text style={styles.statValue}>
-                          {formatBytes(overview.completedBytes)}
+                          {formatBytes(displayCompletedBytes)}
                         </Text>
                       </View>
                     </View>
@@ -1439,7 +1575,7 @@ export function SyncActivityScreen() {
                   <Text style={styles.idleSubtitle}>
                     {t('syncActivity.running.autoRunningSubtitle')}
                   </Text>
-                  {overview.completedCount > 0 && (
+                  {displayCompletedCount > 0 && (
                     <View style={styles.statsRow}>
                       <View style={styles.statItem}>
                         <Text style={styles.statLabel}>
@@ -1447,7 +1583,7 @@ export function SyncActivityScreen() {
                         </Text>
                         <Text style={styles.statValue}>
                           {t('syncActivity.stats.transferredCount', {
-                            count: overview.completedCount,
+                            count: displayCompletedCount,
                           })}
                         </Text>
                       </View>
@@ -1457,7 +1593,7 @@ export function SyncActivityScreen() {
                           {t('syncActivity.stats.dataAmount')}
                         </Text>
                         <Text style={styles.statValue}>
-                          {formatBytes(overview.completedBytes)}
+                          {formatBytes(displayCompletedBytes)}
                         </Text>
                       </View>
                     </View>
@@ -1532,7 +1668,7 @@ export function SyncActivityScreen() {
 
               <Text style={styles.completionSubtitle}>
                 {t('syncActivity.completed.auto.subtitle', {
-                  count: overview.completedCount,
+                  count: displayCompletedCount,
                 })}
               </Text>
 
@@ -1544,12 +1680,12 @@ export function SyncActivityScreen() {
                 <CompletionStatCard
                   label={t('syncActivity.completed.auto.fileCountLabel')}
                   value={t('syncActivity.completed.auto.fileCountValue', {
-                    count: overview.completedCount,
+                    count: displayCompletedCount,
                   })}
                 />
                 <CompletionStatCard
                   label={t('syncActivity.stats.transferred')}
-                  value={formatBytes(overview.completedBytes)}
+                  value={formatBytes(displayCompletedBytes)}
                 />
               </View>
 
@@ -1698,7 +1834,7 @@ export function SyncActivityScreen() {
                 {t('syncActivity.standby.subtitle')}
               </Text>
 
-              {overview.completedCount > 0 && (
+              {displayCompletedCount > 0 && (
                 <View style={styles.statsRow}>
                   <View style={styles.statItem}>
                     <Text style={styles.statLabel}>
@@ -1706,7 +1842,7 @@ export function SyncActivityScreen() {
                     </Text>
                     <Text style={styles.statValue}>
                       {t('syncActivity.stats.transferredCount', {
-                        count: overview.completedCount,
+                        count: displayCompletedCount,
                       })}
                     </Text>
                   </View>
@@ -1716,7 +1852,7 @@ export function SyncActivityScreen() {
                       {t('syncActivity.stats.dataAmount')}
                     </Text>
                     <Text style={styles.statValue}>
-                      {formatBytes(overview.completedBytes)}
+                      {formatBytes(displayCompletedBytes)}
                     </Text>
                   </View>
                 </View>
@@ -2125,6 +2261,12 @@ export function buildOverview(
     totalCount: effectiveTotalCount,
     completedBytes: effectiveCompletedBytes,
     totalBytes: effectiveTotalBytes,
+    roundBaselineCompletedCount:
+      (payload.roundBaselineCompletedCount as number | undefined) ??
+      prev.roundBaselineCompletedCount,
+    roundBaselineCompletedBytes:
+      (payload.roundBaselineCompletedBytes as number | undefined) ??
+      prev.roundBaselineCompletedBytes,
     currentFile: shouldClearActiveFile
       ? undefined
       : 'currentFile' in payload

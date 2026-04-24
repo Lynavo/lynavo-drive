@@ -1,5 +1,6 @@
 import {
   buildOverview,
+  getSyncActivityAutoRoundDisplayMetrics,
   getTrialUpgradeEntryDays,
   getSyncActivityDisplayProgressPercent,
   isPreparationPhase,
@@ -1119,6 +1120,210 @@ describe('getSyncActivityDisplayProgressPercent', () => {
         true,
       ),
     ).toBe(100);
+  });
+});
+
+describe('getSyncActivityAutoRoundDisplayMetrics', () => {
+  it('uses the current auto round as the progress denominator instead of cumulative completed history', () => {
+    expect(
+      getSyncActivityAutoRoundDisplayMetrics({
+        overview: {
+          uploadState: 'scanning',
+          completedCount: 4,
+          totalCount: 6046,
+          completedBytes: 1024,
+          currentTaskSource: undefined,
+          lastCompletedTaskSource: 'manual',
+          autoUploadState: 'active',
+          autoPending: 6042,
+        },
+        isManualUploading: false,
+        rawMainCardState: 'running',
+        baseline: null,
+      }),
+    ).toEqual({
+      shouldTrack: true,
+      baseline: {
+        completedCount: 4,
+        completedBytes: 1024,
+      },
+      completedCount: 0,
+      totalCount: 6042,
+      completedBytes: 0,
+    });
+  });
+
+  it('keeps counting against the same baseline while the auto round advances', () => {
+    expect(
+      getSyncActivityAutoRoundDisplayMetrics({
+        overview: {
+          uploadState: 'uploading',
+          completedCount: 7,
+          totalCount: 6046,
+          completedBytes: 4096,
+          currentTaskSource: 'auto',
+          lastCompletedTaskSource: 'manual',
+          autoUploadState: 'active',
+          autoPending: 6039,
+        },
+        isManualUploading: false,
+        rawMainCardState: 'running',
+        baseline: {
+          completedCount: 4,
+          completedBytes: 1024,
+        },
+      }),
+    ).toEqual({
+      shouldTrack: true,
+      baseline: {
+        completedCount: 4,
+        completedBytes: 1024,
+      },
+      completedCount: 3,
+      totalCount: 6042,
+      completedBytes: 3072,
+    });
+  });
+
+  it('falls back to the raw overview values when entering mid-round without a baseline', () => {
+    expect(
+      getSyncActivityAutoRoundDisplayMetrics({
+        overview: {
+          uploadState: 'uploading',
+          completedCount: 7,
+          totalCount: 6046,
+          completedBytes: 4096,
+          currentTaskSource: 'auto',
+          lastCompletedTaskSource: 'manual',
+          autoUploadState: 'active',
+          autoPending: 6039,
+        },
+        isManualUploading: false,
+        rawMainCardState: 'running',
+        baseline: null,
+      }),
+    ).toEqual({
+      shouldTrack: true,
+      baseline: null,
+      completedCount: 7,
+      totalCount: 6046,
+      completedBytes: 4096,
+    });
+  });
+
+  it('prefers the native-provided round baseline when entering mid-round', () => {
+    expect(
+      getSyncActivityAutoRoundDisplayMetrics({
+        overview: {
+          uploadState: 'uploading',
+          completedCount: 7,
+          totalCount: 6046,
+          completedBytes: 4096,
+          currentTaskSource: 'auto',
+          lastCompletedTaskSource: 'manual',
+          autoUploadState: 'active',
+          autoPending: 6039,
+          roundBaselineCompletedCount: 4,
+          roundBaselineCompletedBytes: 1024,
+        },
+        isManualUploading: false,
+        rawMainCardState: 'running',
+        baseline: null,
+      }),
+    ).toEqual({
+      shouldTrack: true,
+      baseline: {
+        completedCount: 4,
+        completedBytes: 1024,
+      },
+      completedCount: 3,
+      totalCount: 6042,
+      completedBytes: 3072,
+    });
+  });
+
+  it('keeps the same auto-round baseline through completed and standby cards', () => {
+    const baseline = {
+      completedCount: 4,
+      completedBytes: 1024,
+    };
+
+    expect(
+      getSyncActivityAutoRoundDisplayMetrics({
+        overview: {
+          uploadState: 'completed',
+          completedCount: 10,
+          totalCount: 10,
+          completedBytes: 8192,
+          currentTaskSource: undefined,
+          lastCompletedTaskSource: 'auto',
+          autoUploadState: 'active',
+          autoPending: 0,
+        },
+        isManualUploading: false,
+        rawMainCardState: 'auto_completed',
+        baseline,
+      }),
+    ).toEqual({
+      shouldTrack: true,
+      baseline,
+      completedCount: 6,
+      totalCount: 6,
+      completedBytes: 7168,
+    });
+
+    expect(
+      getSyncActivityAutoRoundDisplayMetrics({
+        overview: {
+          uploadState: 'idle',
+          completedCount: 10,
+          totalCount: 10,
+          completedBytes: 8192,
+          currentTaskSource: undefined,
+          lastCompletedTaskSource: 'auto',
+          autoUploadState: 'active',
+          autoPending: 0,
+        },
+        isManualUploading: false,
+        rawMainCardState: 'standby',
+        baseline,
+      }),
+    ).toEqual({
+      shouldTrack: true,
+      baseline,
+      completedCount: 6,
+      totalCount: 6,
+      completedBytes: 7168,
+    });
+  });
+
+  it('does not apply auto-round baseline logic to manual uploads', () => {
+    expect(
+      getSyncActivityAutoRoundDisplayMetrics({
+        overview: {
+          uploadState: 'uploading',
+          completedCount: 3,
+          totalCount: 5,
+          completedBytes: 2048,
+          currentTaskSource: 'manual',
+          lastCompletedTaskSource: null,
+          autoUploadState: 'active',
+          autoPending: 2,
+        },
+        isManualUploading: true,
+        rawMainCardState: 'running',
+        baseline: {
+          completedCount: 1,
+          completedBytes: 512,
+        },
+      }),
+    ).toEqual({
+      shouldTrack: false,
+      baseline: null,
+      completedCount: 3,
+      totalCount: 5,
+      completedBytes: 2048,
+    });
   });
 });
 

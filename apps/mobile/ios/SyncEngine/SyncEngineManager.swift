@@ -293,6 +293,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private var runtimeQueueCompletedCount = 0
     private var runtimeQueueTotalBytes: Int64 = 0
     private var runtimeQueueCompletedBytes: Int64 = 0
+    private var runtimeRoundBaselineCompletedCount = 0
+    private var runtimeRoundBaselineCompletedBytes: Int64 = 0
     private var runtimeCurrentFileKey: String?
     private var runtimeCurrentFilename: String?
     private var runtimeCurrentFileConfirmedBytes: Int64 = 0
@@ -488,6 +490,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         runtimeQueueCompletedCount = 0
         runtimeQueueTotalBytes = 0
         runtimeQueueCompletedBytes = 0
+        runtimeRoundBaselineCompletedCount = 0
+        runtimeRoundBaselineCompletedBytes = 0
         clearRuntimeCurrentFile()
         runtimeCurrentSpeedMbps = 0
         runtimeLastSpeedCheckTime = 0
@@ -520,6 +524,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         runtimeQueueCompletedCount = completedCount
         runtimeQueueTotalBytes = totalBytes
         runtimeQueueCompletedBytes = completedBytes
+        runtimeRoundBaselineCompletedCount = completedCount
+        runtimeRoundBaselineCompletedBytes = completedBytes
         runtimeRoundSource = source
         runtimeLastSpeedCheckTime = CFAbsoluteTimeGetCurrent()
         runtimeLastBytesTransferred = completedBytes
@@ -622,6 +628,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             "currentDeviceName": currentBinding?.deviceAlias ?? currentBinding?.deviceName ?? NSNull(),
             "completedCount": effectiveCompletedCount,
             "completedBytes": effectiveCompletedBytes,
+            "roundBaselineCompletedCount": runtimeRoundBaselineCompletedCount,
+            "roundBaselineCompletedBytes": runtimeRoundBaselineCompletedBytes,
             "currentFile": runtimeCurrentFileKey ?? NSNull(),
             "currentFilename": runtimeCurrentFilename ?? NSNull(),
             "currentFileConfirmedBytes": runtimeCurrentFileConfirmedBytes,
@@ -4310,6 +4318,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     runtimeQueueCompletedCount = 0
                     runtimeQueueTotalBytes = 0
                     runtimeQueueCompletedBytes = 0
+                    runtimeRoundBaselineCompletedCount = 0
+                    runtimeRoundBaselineCompletedBytes = 0
                     runtimeCurrentFileKey = nil
                     runtimeCurrentFilename = nil
                     runtimeCurrentFileConfirmedBytes = 0
@@ -4437,7 +4447,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         //    If the user is switching to a DIFFERENT desktop device, reset the upload
         //    queue so the new device starts from scratch and receives all photos.
         //    daily_ledgers are kept so historical stats for the previous device are preserved.
+        let didSwitchDevice: Bool
         if let existingBinding = uploadStore?.getBinding(), existingBinding.deviceId != serverId {
+            didSwitchDevice = true
             interruptActiveSyncForBindingChange(
                 reason: "pair_device_switch_confirmed \(existingBinding.deviceId) -> \(serverId)"
             )
@@ -4448,7 +4460,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             try? uploadStore?.resetUploadQueue()
             resetAutoUploadStateForFreshPairing(reason: "device_switch_pair_required")
             didAttemptRemoteHistoryReconciliation = false
+            clearRuntimeSyncRoundProgress(uploadState: "idle")
         } else {
+            didSwitchDevice = false
             resetAutoUploadStateForFreshPairing(reason: "successful_pairing")
         }
 
@@ -4482,6 +4496,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         sidecarHost = confirmedHost
         updateBindingConnectionState(.connected, reason: "pairing_confirmed_reachable")
         NativeSyncEngineModule.shared?.emitBindingStateChanged(bindingStatePayload(binding: binding))
+        if didSwitchDevice {
+            NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                runtimeSyncOverviewPayload(uploadState: "idle")
+            )
+        }
 
         // 7. Send a presence heartbeat so the desktop UI shows device as online
         //    immediately after pairing, without waiting for a full sync cycle.
