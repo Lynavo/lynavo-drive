@@ -679,17 +679,18 @@ export function SubscriptionScreen() {
 
   const [isRestoring, setIsRestoring] = useState(false);
 
-  // StoreKit-sourced prices. Falls back to i18n strings when IAP is gated
-  // off (CI / unit tests) or when StoreKit returns no products (sandbox not
-  // configured, network failure). Currency / formatting flows from Apple,
-  // not the codebase, so the same screen renders correct prices for any
-  // storefront the user is signed into.
-  // Use Intl.NumberFormat so the strikethrough + savings string visually
-  // matches Apple's localizedPrice (e.g. "¥118.80" rather than "CNY 118.80").
-  // Locale comes from i18next so a Hant user on a CN storefront still sees
-  // "¥118.80" while a US-storefront user sees "$1,299.00" with their grouping
-  // separators. Hermes ships Intl since RN 0.74; falls back to a simple
-  // "<currency> <amount>" string if Intl/currency throws on an obscure locale.
+  // Prices flow exclusively from StoreKit. There are NO numeric fallbacks
+  // baked into i18n — fake-number fallbacks are worse than no number, since
+  // they let users tap "Subscribe" against a stale price that StoreKit will
+  // then reject. When StoreKit hasn't resolved (loading) or fails (sandbox
+  // not configured, network down) the UI shows a neutral "—" placeholder
+  // and the error banner / disabled CTA take over the messaging.
+  //
+  // Intl.NumberFormat keeps the derived strings (annualized strikethrough,
+  // savings amount) visually consistent with Apple's localizedPrice for
+  // the user's storefront. Hermes ships Intl since RN 0.74; on the rare
+  // locale/currency combination that throws we degrade to "<currency>
+  // <amount>" rather than crash.
   const formatPrice = useCallback(
     (amount: number, currency: string): string => {
       try {
@@ -709,23 +710,21 @@ export function SubscriptionScreen() {
     (savingsDisplay: string) =>
       t('subscription.plans.yearly.savingsTemplate', {
         amount: savingsDisplay,
-        defaultValue: t('subscription.plans.yearly.savings'),
       }),
     [t],
   );
   const storeProducts = useStoreProducts({ formatPrice, formatSavings });
+  const PRICE_PLACEHOLDER = '—';
   const monthlyPriceLabel =
-    storeProducts.monthly?.displayPrice ??
-    t('subscription.plans.monthly.priceFallback');
+    storeProducts.monthly?.displayPrice ?? PRICE_PLACEHOLDER;
   const yearlyPriceLabel =
-    storeProducts.yearly?.displayPrice ??
-    t('subscription.plans.yearly.priceFallback');
+    storeProducts.yearly?.displayPrice ?? PRICE_PLACEHOLDER;
+  // oldPrice / savingsBadge are intentionally undefined when StoreKit
+  // hasn't surfaced real savings data — PlanCard hides the meta row +
+  // renders the spacer so card height stays stable.
   const yearlyOldPriceLabel =
-    storeProducts.yearlySavings?.annualizedMonthlyDisplay ??
-    t('subscription.plans.yearly.oldPrice');
-  const yearlySavingsLabel =
-    storeProducts.yearlySavings?.display ??
-    t('subscription.plans.yearly.savings');
+    storeProducts.yearlySavings?.annualizedMonthlyDisplay;
+  const yearlySavingsLabel = storeProducts.yearlySavings?.display;
   // Period suffix follows StoreKit's reported (periodUnit, periodCount) so
   // a US-locale user paying $0.99 sees "/month" instead of the hardcoded
   // "/月". The legacy keys remain as the fallback for the sandbox-down /

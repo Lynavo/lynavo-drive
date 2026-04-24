@@ -16,17 +16,11 @@
   "plans": {
     "monthly": {
       "name": "Monthly Plan",
-      "unit": "/mo",
-      "priceFallback": "¥9.9",
-      "subtitle": "¥9.9/month",
-      "trialOffer": "7-day free trial, then ¥9.9/month"
+      "unit": "/mo"
     },
     "yearly": {
       "name": "12-Month Plan",
       "unit": "/12 months",
-      "priceFallback": "¥104",
-      "oldPrice": "¥118.8",
-      "savings": "Save ¥14.8",
       "savingsTemplate": "Save {{amount}}"
     },
     "priceTemplate": "{{currency}} {{amount}}",

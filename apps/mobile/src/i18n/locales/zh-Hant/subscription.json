@@ -16,17 +16,11 @@
   "plans": {
     "monthly": {
       "name": "月度訂閱",
-      "unit": "/月",
-      "priceFallback": "¥9.9",
-      "subtitle": "¥9.9/月",
-      "trialOffer": "7 天免費試用，之後 ¥9.9/月"
+      "unit": "/月"
     },
     "yearly": {
       "name": "12 個月方案",
       "unit": "/12個月",
-      "priceFallback": "¥104",
-      "oldPrice": "¥118.8",
-      "savings": "立省 ¥14.8",
       "savingsTemplate": "立省 {{amount}}"
     },
     "priceTemplate": "{{currency}} {{amount}}",

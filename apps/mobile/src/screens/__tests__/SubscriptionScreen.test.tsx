@@ -66,7 +66,30 @@ jest.mock('../../services/iap-service', () => ({
         eligibleForIntroOffer: true,
       },
     ]),
-    getProductSummaries: jest.fn().mockResolvedValue([]),
+    // Mirror what StoreKit returns for the CN storefront. The screen no
+    // longer carries any hardcoded numeric fallback in i18n, so tests must
+    // assert against StoreKit-provided strings; an empty mock would render
+    // "—" placeholders and break selectors that look up by price text.
+    getProductSummaries: jest.fn().mockResolvedValue([
+      {
+        productId: 'com.vividrop.mobile.china.monthly.999',
+        displayPrice: '¥9.90',
+        priceAmount: 9.9,
+        currency: 'CNY',
+        periodUnit: 'MONTH',
+        periodCount: 1,
+        eligibleForIntroOffer: true,
+      },
+      {
+        productId: 'com.vividrop.mobile.china.yearly.10400',
+        displayPrice: '¥104.00',
+        priceAmount: 104,
+        currency: 'CNY',
+        periodUnit: 'YEAR',
+        periodCount: 1,
+        eligibleForIntroOffer: false,
+      },
+    ]),
     onOrphanPurchaseVerified: jest.fn(() => jest.fn()),
   },
 }));
@@ -192,11 +215,15 @@ describe('SubscriptionScreen', () => {
     expect(mockLoadSubscription).not.toHaveBeenCalled();
   });
 
-  test('monthly card matches design without trial copy', () => {
-    const { getByText, queryByText } = renderScreen();
-    expect(getByText('¥9.9')).toBeTruthy();
-    expect(getByText('/月')).toBeTruthy();
-    expect(queryByText('7 天免费试用，之后 ¥9.9/月')).toBeNull();
+  test('monthly card renders StoreKit price + unit, no trial copy', async () => {
+    const { findByText, queryByText } = renderScreen();
+    // Wait for useStoreProducts to resolve before asserting on the price —
+    // first paint shows the "—" placeholder while StoreKit fetches.
+    expect(await findByText('¥9.90')).toBeTruthy();
+    expect(queryByText('/月')).toBeTruthy();
+    // Trial-offer copy was an i18n design holdover; this guards against
+    // anyone re-introducing a hardcoded "after ¥X.XX/月" string.
+    expect(queryByText(/7 天免费试用|7-day free trial/)).toBeNull();
   });
 
   test('subscribe tap invokes iapService.purchase then verify', async () => {
@@ -228,8 +255,10 @@ describe('SubscriptionScreen', () => {
         trialEnd: null,
       });
 
-    const { getByText } = renderScreen();
-    fireEvent.press(getByText('¥9.9'));
+    const { getByText, findByText } = renderScreen();
+    // Wait for StoreKit-driven monthly price to render before tapping —
+    // before that the card shows "—" and getByText('¥9.90') would miss.
+    fireEvent.press(await findByText('¥9.90'));
     fireEvent.press(getByText(/立即订阅|立即訂閱|Subscribe Now/));
 
     await waitFor(() => {
