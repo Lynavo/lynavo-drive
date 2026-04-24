@@ -30,6 +30,16 @@
       "savingsTemplate": "立省 {{amount}}"
     },
     "priceTemplate": "{{currency}} {{amount}}",
+    "unit": {
+      "day_one": "/天",
+      "day_other": "/{{count}}天",
+      "week_one": "/周",
+      "week_other": "/{{count}}周",
+      "month_one": "/月",
+      "month_other": "/{{count}}个月",
+      "year_one": "/年",
+      "year_other": "/{{count}}年"
+    },
     "fallback": "订阅",
     "currentPlan": "当前方案"
   },

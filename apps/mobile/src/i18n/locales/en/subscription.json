@@ -30,6 +30,16 @@
       "savingsTemplate": "Save {{amount}}"
     },
     "priceTemplate": "{{currency}} {{amount}}",
+    "unit": {
+      "day_one": "/day",
+      "day_other": "/{{count}} days",
+      "week_one": "/week",
+      "week_other": "/{{count}} weeks",
+      "month_one": "/month",
+      "month_other": "/{{count}} months",
+      "year_one": "/year",
+      "year_other": "/{{count}} years"
+    },
     "fallback": "Subscription",
     "currentPlan": "Current Plan"
   },

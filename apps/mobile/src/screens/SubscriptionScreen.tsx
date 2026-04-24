@@ -108,6 +108,33 @@ async function resolvePostSubscriptionRoute(): Promise<PostSubscriptionRoute> {
   return 'DeviceDiscovery';
 }
 
+/** Translates StoreKit-reported (periodUnit, periodCount) into a localized
+ *  unit suffix like "/月" / "/year" / "/3 months". Falls back to the
+ *  caller-provided string when StoreKit didn't expose period metadata
+ *  (Android, sandbox not configured, IAP feature flag off). */
+function periodLabel(
+  product: { periodUnit?: string; periodCount?: number } | null,
+  fallbackLabel: string,
+  t: TFunction,
+): string {
+  const unit = product?.periodUnit;
+  const count = product?.periodCount;
+  if (!unit || !count || count < 1) return fallbackLabel;
+  const lower = unit.toLowerCase();
+  if (
+    lower !== 'day' &&
+    lower !== 'week' &&
+    lower !== 'month' &&
+    lower !== 'year'
+  ) {
+    return fallbackLabel;
+  }
+  return t(`subscription.plans.unit.${lower}` as never, {
+    count,
+    defaultValue: fallbackLabel,
+  });
+}
+
 function getPlanDisplayName(plan: string, t: TFunction): string {
   switch (plan) {
     case 'monthly':
@@ -699,6 +726,20 @@ export function SubscriptionScreen() {
   const yearlySavingsLabel =
     storeProducts.yearlySavings?.display ??
     t('subscription.plans.yearly.savings');
+  // Period suffix follows StoreKit's reported (periodUnit, periodCount) so
+  // a US-locale user paying $0.99 sees "/month" instead of the hardcoded
+  // "/月". The legacy keys remain as the fallback for the sandbox-down /
+  // IAP-disabled paths so dev builds keep their familiar Chinese copy.
+  const monthlyUnitLabel = periodLabel(
+    storeProducts.monthly,
+    t('subscription.plans.monthly.unit'),
+    t,
+  );
+  const yearlyUnitLabel = periodLabel(
+    storeProducts.yearly,
+    t('subscription.plans.yearly.unit'),
+    t,
+  );
 
   const handleRestore = useCallback(async () => {
     if (!FEATURES.IAP_ENABLED || !FEATURES.IAP_RESTORE_ENABLED) return;
@@ -975,7 +1016,7 @@ export function SubscriptionScreen() {
         >
           <PlanCard
             price={monthlyPriceLabel}
-            unit={t('subscription.plans.monthly.unit')}
+            unit={monthlyUnitLabel}
             selected={selectedPlan === 'monthly'}
             disabled={
               currentPlan === 'monthly' ||
@@ -990,7 +1031,7 @@ export function SubscriptionScreen() {
           />
           <PlanCard
             price={yearlyPriceLabel}
-            unit={t('subscription.plans.yearly.unit')}
+            unit={yearlyUnitLabel}
             oldPrice={yearlyOldPriceLabel}
             savingsBadge={yearlySavingsLabel}
             selected={selectedPlan === 'yearly'}
