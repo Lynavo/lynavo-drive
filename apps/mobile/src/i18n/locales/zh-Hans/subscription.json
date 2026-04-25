@@ -14,16 +14,8 @@
     "unlimited": "无限量上传素材"
   },
   "plans": {
-    "monthly": {
-      "name": "月度订阅",
-      "unit": "/月"
-    },
-    "yearly": {
-      "name": "12 个月方案",
-      "unit": "/12个月",
-      "savingsTemplate": "立省 {{amount}}"
-    },
     "priceTemplate": "{{currency}} {{amount}}",
+    "savingsTemplate": "立省 {{amount}}",
     "unit": {
       "day_one": "/天",
       "day_other": "/{{count}}天",
@@ -35,7 +27,8 @@
       "year_other": "/{{count}}年"
     },
     "fallback": "订阅",
-    "currentPlan": "当前方案"
+    "currentPlan": "当前方案",
+    "offlineMode": "离线模式 — 部分信息可能过时"
   },
   "restore": {
     "action": "恢复已购买订阅",

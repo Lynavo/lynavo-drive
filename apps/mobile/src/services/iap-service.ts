@@ -87,8 +87,16 @@ export interface IapService {
   checkEligibility(): Promise<EligibilityResult[]>;
   /** Fetches the storefront-localized product catalog. Returns `[]` on any
    *  failure (network, StoreKit unavailable, sandbox not configured) — UI
-   *  must render loading/error/empty rather than depend on hardcoded prices. */
-  getProductSummaries(): Promise<IapProductSummary[]>;
+   *  must render loading/error/empty rather than depend on hardcoded prices.
+   *
+   *  When `skus` is omitted the bootstrap `ALL_PRODUCT_IDS` list is used (kept
+   *  for backward compatibility with the legacy `useStoreProducts` hook). The
+   *  server-driven catalog flow passes the SKU list resolved from
+   *  `/subscription/plans` so paywall content reflects ASC + the server's
+   *  business decisions, not a frozen client constant. */
+  getProductSummaries(
+    skus?: readonly IapProductId[],
+  ): Promise<IapProductSummary[]>;
   refreshReceipt(): Promise<string | null>;
   onOrphanPurchaseVerified(cb: () => void): () => void;
 }
@@ -243,11 +251,17 @@ class IapServiceImpl implements IapService {
     }
   }
 
-  async getProductSummaries(): Promise<IapProductSummary[]> {
+  async getProductSummaries(
+    skus?: readonly IapProductId[],
+  ): Promise<IapProductSummary[]> {
+    // Default to the bootstrap list so existing callers (and offline first
+    // launch before the server catalog hydrates) still get *something*.
+    const requestedSkus: readonly IapProductId[] = skus ?? ALL_PRODUCT_IDS;
+    if (requestedSkus.length === 0) return [];
     try {
-      const products = await getSubscriptions({ skus: [...ALL_PRODUCT_IDS] });
+      const products = await getSubscriptions({ skus: [...requestedSkus] });
       const summaries: IapProductSummary[] = [];
-      for (const productId of ALL_PRODUCT_IDS) {
+      for (const productId of requestedSkus) {
         const match = products.find(p => p.productId === productId);
         if (!match) continue;
         // The react-native-iap `Subscription` union spans iOS / Android /

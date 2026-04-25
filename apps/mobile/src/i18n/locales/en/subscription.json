@@ -14,16 +14,8 @@
     "unlimited": "Unlimited media uploads"
   },
   "plans": {
-    "monthly": {
-      "name": "Monthly Plan",
-      "unit": "/mo"
-    },
-    "yearly": {
-      "name": "12-Month Plan",
-      "unit": "/12 months",
-      "savingsTemplate": "Save {{amount}}"
-    },
     "priceTemplate": "{{currency}} {{amount}}",
+    "savingsTemplate": "Save {{amount}}",
     "unit": {
       "day_one": "/day",
       "day_other": "/{{count}} days",
@@ -35,7 +27,8 @@
       "year_other": "/{{count}} years"
     },
     "fallback": "Subscription",
-    "currentPlan": "Current Plan"
+    "currentPlan": "Current Plan",
+    "offlineMode": "Offline mode — some details may be out of date"
   },
   "restore": {
     "action": "Restore Purchases",

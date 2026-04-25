@@ -1,0 +1,215 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { SubscriptionPlanDto } from '@syncflow/contracts';
+import { iapService, type IapProductSummary } from '../services/iap-service';
+import {
+  subscriptionPlansService,
+  type SubscriptionPlansSource,
+} from '../services/subscription-plans-service';
+import type { IapProductId } from '../constants/iap';
+import { ALL_PRODUCT_IDS } from '../constants/iap';
+import { FEATURES } from '../constants/features';
+
+// ---------------------------------------------------------------------------
+// Public types
+// ---------------------------------------------------------------------------
+
+export interface YearlySavings {
+  display: string;
+  percent: number;
+  annualizedMonthlyDisplay: string;
+}
+
+export interface PlanWithProduct {
+  plan: SubscriptionPlanDto;
+  /** `null` when StoreKit did not return a SKU matching `plan.product_id`.
+   *  Reasons: ASC mis-config, sandbox not signed in, region restriction.
+   *  Decision: keep the entry so the screen can render an "unavailable"
+   *  placeholder rather than silently dropping a server-driven plan. The
+   *  screen layer (#19) decides whether to filter or display the placeholder. */
+  product: IapProductSummary | null;
+  /** Yearly savings vs the cheapest monthly-period anchor in the same
+   *  currency. `null` for monthly plans, plans without a product, or when no
+   *  monthly anchor exists in the catalog. */
+  savings: YearlySavings | null;
+}
+
+export interface UseSubscriptionPlansResult {
+  loading: boolean;
+  error: string | null;
+  plans: PlanWithProduct[];
+  source: SubscriptionPlansSource;
+  refresh: () => Promise<void>;
+}
+
+export interface UseSubscriptionPlansArgs {
+  formatPrice: (amount: number, currency: string) => string;
+  formatSavings: (savingsDisplay: string) => string;
+  enabled?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const ALLOWED_SKUS: ReadonlySet<string> = new Set(ALL_PRODUCT_IDS);
+
+function isKnownIapProductId(productId: string): productId is IapProductId {
+  return ALLOWED_SKUS.has(productId);
+}
+
+/**
+ * Pick the monthly anchor for savings math: lowest-priced product whose
+ * StoreKit period is exactly 1 month. Walking by period unit (not by SKU
+ * naming) means a future "weekly" or "quarterly" plan does not silently
+ * become the anchor and skew the percentages.
+ */
+function findMonthlyAnchor(
+  rows: ReadonlyArray<{ product: IapProductSummary | null }>,
+): IapProductSummary | null {
+  let anchor: IapProductSummary | null = null;
+  for (const row of rows) {
+    const p = row.product;
+    if (!p) continue;
+    if (p.periodUnit !== 'MONTH') continue;
+    if ((p.periodCount ?? 1) !== 1) continue;
+    if (p.priceAmount <= 0) continue;
+    if (!anchor || p.priceAmount < anchor.priceAmount) {
+      anchor = p;
+    }
+  }
+  return anchor;
+}
+
+function computeYearlySavings(
+  monthly: IapProductSummary,
+  yearly: IapProductSummary,
+  formatPrice: (amount: number, currency: string) => string,
+  formatSavings: (savingsDisplay: string) => string,
+): YearlySavings | null {
+  if (monthly.currency !== yearly.currency) return null;
+  if (monthly.priceAmount <= 0 || yearly.priceAmount <= 0) return null;
+  const annualized = monthly.priceAmount * 12;
+  if (yearly.priceAmount >= annualized) return null;
+  const savedAmount = annualized - yearly.priceAmount;
+  const percent = Math.round((savedAmount / annualized) * 100);
+  return {
+    display: formatSavings(formatPrice(savedAmount, monthly.currency)),
+    percent,
+    annualizedMonthlyDisplay: formatPrice(annualized, monthly.currency),
+  };
+}
+
+function isYearlyPeriod(product: IapProductSummary): boolean {
+  return product.periodUnit === 'YEAR' && (product.periodCount ?? 1) === 1;
+}
+
+function computePlanSavings(
+  product: IapProductSummary | null,
+  monthlyAnchor: IapProductSummary | null,
+  formatPrice: (amount: number, currency: string) => string,
+  formatSavings: (savingsDisplay: string) => string,
+): YearlySavings | null {
+  if (!product || !monthlyAnchor) return null;
+  // Do not "save vs self".
+  if (product.productId === monthlyAnchor.productId) return null;
+  // Only yearly tiers carry meaningful savings copy in the current PRD.
+  if (!isYearlyPeriod(product)) return null;
+  return computeYearlySavings(
+    monthlyAnchor,
+    product,
+    formatPrice,
+    formatSavings,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
+
+export function useSubscriptionPlans({
+  formatPrice,
+  formatSavings,
+  enabled = FEATURES.IAP_ENABLED,
+}: UseSubscriptionPlansArgs): UseSubscriptionPlansResult {
+  const [plans, setPlans] = useState<SubscriptionPlanDto[]>([]);
+  const [products, setProducts] = useState<IapProductSummary[]>([]);
+  const [source, setSource] = useState<SubscriptionPlansSource>('bootstrap');
+  const [loading, setLoading] = useState<boolean>(enabled);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async (): Promise<void> => {
+    if (!enabled) {
+      setPlans([]);
+      setProducts([]);
+      setSource('bootstrap');
+      setLoading(false);
+      setError(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      // Step 1 — server catalog (with cache + bootstrap fallback inside).
+      const catalog = await subscriptionPlansService.fetchPlans('ios');
+      const validPlans = catalog.plans.filter(p => p.active);
+      setPlans(validPlans);
+      setSource(catalog.source);
+
+      // Step 2 — Apple StoreKit prices/period for the SKUs the server told
+      // us to render. Filter out unknown SKUs defensively so a server typo
+      // cannot crash StoreKit lookup.
+      const skus = validPlans
+        .map(p => p.product_id)
+        .filter(isKnownIapProductId);
+      const fetchedProducts =
+        skus.length > 0 ? await iapService.getProductSummaries(skus) : [];
+      setProducts(fetchedProducts);
+
+      // Mirror useStoreProducts: surface STOREKIT_EMPTY when the catalog
+      // promised SKUs but Apple returned nothing. Bootstrap source can also
+      // legitimately produce zero products in dev — still useful signal.
+      if (validPlans.length > 0 && fetchedProducts.length === 0) {
+        setError('STOREKIT_EMPTY');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [enabled]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const merged = useMemo<PlanWithProduct[]>(() => {
+    if (plans.length === 0) return [];
+    const productById = new Map<string, IapProductSummary>(
+      products.map(p => [p.productId, p]),
+    );
+    const intermediate = plans.map(plan => ({
+      plan,
+      product: productById.get(plan.product_id) ?? null,
+    }));
+    const monthlyAnchor = findMonthlyAnchor(intermediate);
+    return intermediate.map(({ plan, product }) => ({
+      plan,
+      product,
+      savings: computePlanSavings(
+        product,
+        monthlyAnchor,
+        formatPrice,
+        formatSavings,
+      ),
+    }));
+  }, [plans, products, formatPrice, formatSavings]);
+
+  return {
+    loading,
+    error,
+    plans: merged,
+    source,
+    refresh,
+  };
+}

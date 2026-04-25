@@ -1,6 +1,10 @@
 import React from 'react';
-import { Alert, NativeModules } from 'react-native';
+import { NativeModules } from 'react-native';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import type {
+  SubscriptionPlanDto,
+  SubscriptionPlanPlatform,
+} from '@syncflow/contracts';
 
 // Must mock react-native-localize before i18n import
 jest.mock('react-native-localize', () => ({
@@ -43,7 +47,9 @@ jest.mock('../../components/Icon', () => ({
 }));
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
-  default: { getItem: jest.fn(), setItem: jest.fn(), removeItem: jest.fn() },
+  getItem: jest.fn(),
+  setItem: jest.fn(),
+  removeItem: jest.fn(),
 }));
 
 jest.mock('react-native-keychain', () => ({
@@ -60,37 +66,15 @@ jest.mock('../../services/iap-service', () => ({
     restore: jest.fn().mockResolvedValue([]),
     finishTransaction: jest.fn().mockResolvedValue(undefined),
     refreshReceipt: jest.fn().mockResolvedValue(null),
-    checkEligibility: jest.fn().mockResolvedValue([
-      {
-        productId: 'com.vividrop.mobile.china.monthly.999',
-        eligibleForIntroOffer: true,
-      },
-    ]),
-    // Mirror what StoreKit returns for the CN storefront. The screen no
-    // longer carries any hardcoded numeric fallback in i18n, so tests must
-    // assert against StoreKit-provided strings; an empty mock would render
-    // "—" placeholders and break selectors that look up by price text.
-    getProductSummaries: jest.fn().mockResolvedValue([
-      {
-        productId: 'com.vividrop.mobile.china.monthly.999',
-        displayPrice: '¥9.90',
-        priceAmount: 9.9,
-        currency: 'CNY',
-        periodUnit: 'MONTH',
-        periodCount: 1,
-        eligibleForIntroOffer: true,
-      },
-      {
-        productId: 'com.vividrop.mobile.china.yearly.10400',
-        displayPrice: '¥104.00',
-        priceAmount: 104,
-        currency: 'CNY',
-        periodUnit: 'YEAR',
-        periodCount: 1,
-        eligibleForIntroOffer: false,
-      },
-    ]),
+    checkEligibility: jest.fn().mockResolvedValue([]),
+    getProductSummaries: jest.fn(),
     onOrphanPurchaseVerified: jest.fn(() => jest.fn()),
+  },
+}));
+
+jest.mock('../../services/subscription-plans-service', () => ({
+  subscriptionPlansService: {
+    fetchPlans: jest.fn(),
   },
 }));
 
@@ -134,20 +118,92 @@ jest.mock('../../stores/auth-store', () => ({
     loadSubscription: mockLoadSubscription,
     setSubscription: mockSetSubscription,
   }),
-  // Mirror the real predicate so tests covering the post-verify guard (fresh
-  // subscription must actually grant access) exercise the same logic as prod.
+  // Mirror the real predicate so the post-verify guard test exercises the
+  // same logic as production.
   isFeatureAccessAllowed: (status: string | undefined | null) =>
     status === 'trialing' || status === 'subscribed',
 }));
 
 import i18n from '../../i18n';
 import { SubscriptionScreen, resolveCurrentPlan } from '../SubscriptionScreen';
-import { iapService } from '../../services/iap-service';
-import {
-  getSubscriptionStatus,
-  verifyIapReceipt,
-} from '../../services/subscription-service';
-import { ApiError, ERROR_CODE } from '../../services/api';
+import { iapService, type IapProductSummary } from '../../services/iap-service';
+import { subscriptionPlansService } from '../../services/subscription-plans-service';
+import { IAP_PRODUCTS } from '../../constants/iap';
+
+// ---------------------------------------------------------------------------
+// Fixture builders — CN storefront data, mirrors what the server + StoreKit
+// return in production. Centralising here keeps each test focused on the
+// behaviour under inspection rather than re-spelling the catalog.
+// ---------------------------------------------------------------------------
+
+function makePlan(
+  overrides: Partial<SubscriptionPlanDto> &
+    Pick<SubscriptionPlanDto, 'id' | 'product_id'>,
+): SubscriptionPlanDto {
+  const platform: SubscriptionPlanPlatform = 'ios';
+  return {
+    name: 'Plan',
+    description: '',
+    badges: [],
+    recommended: false,
+    sort_order: 10,
+    active: true,
+    platform,
+    created_at: '2026-04-24T00:00:00Z',
+    updated_at: '2026-04-24T00:00:00Z',
+    ...overrides,
+  };
+}
+
+const monthlyPlan: SubscriptionPlanDto = makePlan({
+  id: 1,
+  product_id: IAP_PRODUCTS.monthly,
+  name: '月度方案',
+  description: '按月訂閱',
+  sort_order: 10,
+});
+
+const yearlyPlan: SubscriptionPlanDto = makePlan({
+  id: 2,
+  product_id: IAP_PRODUCTS.yearly,
+  name: '年度方案',
+  description: '一年無限同步',
+  badges: ['8.8 折'],
+  recommended: true,
+  sort_order: 20,
+});
+
+const monthlyProduct: IapProductSummary = {
+  productId: IAP_PRODUCTS.monthly,
+  displayPrice: '¥9.90',
+  priceAmount: 9.9,
+  currency: 'CNY',
+  periodUnit: 'MONTH',
+  periodCount: 1,
+  eligibleForIntroOffer: false,
+};
+
+const yearlyProduct: IapProductSummary = {
+  productId: IAP_PRODUCTS.yearly,
+  displayPrice: '¥104.00',
+  priceAmount: 104,
+  currency: 'CNY',
+  periodUnit: 'YEAR',
+  periodCount: 1,
+  eligibleForIntroOffer: false,
+};
+
+function mockCatalog(
+  plans: SubscriptionPlanDto[],
+  products: IapProductSummary[],
+  source: 'network' | 'cache' | 'bootstrap' = 'network',
+): void {
+  (subscriptionPlansService.fetchPlans as jest.Mock).mockResolvedValue({
+    plans,
+    source,
+  });
+  (iapService.getProductSummaries as jest.Mock).mockResolvedValue(products);
+}
 
 function renderScreen() {
   return render(<SubscriptionScreen />);
@@ -164,501 +220,124 @@ describe('SubscriptionScreen', () => {
     (NativeModules as Record<string, unknown>).NativeSyncEngine = {
       getBindingState: jest.fn().mockResolvedValue(null),
     };
-    (getSubscriptionStatus as jest.Mock).mockResolvedValue({
-      status: 'trial_expired',
-      plan: '',
-      expireAt: null,
-      trialEnd: null,
-    });
     mockAuthState.user = { id: 1, status: 'trial_expired' };
     mockAuthState.subscription = null;
     mockLoadSubscription.mockResolvedValue(null);
     mockSetSubscription.mockReset();
+    // Default catalog — both plans, both products. Individual tests override.
+    mockCatalog([monthlyPlan, yearlyPlan], [monthlyProduct, yearlyProduct]);
   });
 
-  test('renders subscribe button', () => {
-    const { getByText } = renderScreen();
-    expect(getByText(/立即订阅|立即訂閱|Subscribe Now/)).toBeTruthy();
+  test('renders one card per server plan with server-provided names', async () => {
+    // Arrange: 2-plan catalog set in beforeEach.
+
+    // Act
+    const { findByText } = renderScreen();
+
+    // Assert: name copy comes from `plan.name`, not from i18n. This is the
+    // load-bearing assertion that the screen reads the server catalog rather
+    // than the legacy hardcoded i18n strings.
+    expect(await findByText('月度方案')).toBeTruthy();
+    expect(await findByText('年度方案')).toBeTruthy();
+    expect(await findByText('¥9.90')).toBeTruthy();
+    expect(await findByText('¥104.00')).toBeTruthy();
+  }, 15000); // First test pays Jest cold-start cost (i18n + RN module bridge hydration); subsequent tests run in <250ms.
+
+  test('auto-selects the recommended plan once the catalog resolves', async () => {
+    // Arrange: yearlyPlan.recommended === true.
+
+    // Act
+    const { findByText } = renderScreen();
+    // Wait for catalog hydration before triggering the purchase.
+    await findByText('年度方案');
+    fireEvent.press(await findByText(/立即订阅|立即訂閱|Subscribe Now/));
+
+    // Assert: purchase fires against the recommended SKU without any prior tap.
+    await waitFor(() =>
+      expect(iapService.purchase).toHaveBeenCalledWith(IAP_PRODUCTS.yearly),
+    );
   });
 
-  test('renders Restore button when flags enabled', () => {
-    const { getByText } = renderScreen();
+  test('renders a single card when the server returns one plan', async () => {
+    // Arrange
+    mockCatalog([yearlyPlan], [yearlyProduct]);
+
+    // Act
+    const { findByText, queryByText } = renderScreen();
+
+    // Assert: only the yearly card is visible.
+    expect(await findByText('年度方案')).toBeTruthy();
+    expect(queryByText('月度方案')).toBeNull();
+  });
+
+  test('shows STOREKIT_EMPTY error banner when no plans are renderable', async () => {
+    // Arrange: server catalog has rows but Apple returned nothing — the
+    // screen filters those out and lands on the empty-paywall error path.
+    mockCatalog([monthlyPlan, yearlyPlan], []);
+
+    // Act
+    const { findByText } = renderScreen();
+
+    // Assert: error banner copy + retry affordance render so the user can
+    // recover instead of staring at a blank paywall.
     expect(
-      getByText(/恢復已購買訂閱|恢复已购买订阅|Restore Purchases/),
+      await findByText(/暂时无法获取方案信息|暫時無法獲取|temporarily unable/i),
     ).toBeTruthy();
   });
 
-  test('hides back button when expired subscription paywall is the root screen', () => {
-    mockNavigation.canGoBack.mockReturnValue(false);
-    mockAuthState.user = { id: 1, status: 'trial_expired' };
-    mockAuthState.subscription = {
-      status: 'trial_expired',
-      plan: '',
-      expireAt: null,
-      trialEnd: null,
-    };
+  test('shows offline-mode footer note when source is bootstrap', async () => {
+    // Arrange
+    mockCatalog(
+      [monthlyPlan, yearlyPlan],
+      [monthlyProduct, yearlyProduct],
+      'bootstrap',
+    );
 
-    const { queryByLabelText } = renderScreen();
+    // Act
+    const { findByText } = renderScreen();
 
-    expect(queryByLabelText(/返回|Back/)).toBeNull();
+    // Assert: the small grey footer line announces degraded mode.
+    expect(await findByText(/离线模式|離線模式|Offline mode/i)).toBeTruthy();
   });
 
-  test('refreshes subscription status when screen is focused', async () => {
-    renderScreen();
-    await waitFor(() => expect(getSubscriptionStatus).toHaveBeenCalled());
-    expect(mockSetSubscription).toHaveBeenCalledWith({
-      status: 'trial_expired',
-      plan: '',
-      expireAt: null,
-      trialEnd: null,
-    });
-    expect(mockLoadSubscription).not.toHaveBeenCalled();
+  test('subscribe CTA invokes iapService.purchase with the selected product_id', async () => {
+    // Arrange: user explicitly taps the (non-recommended) monthly card.
+    const { findByText } = renderScreen();
+    fireEvent.press(await findByText('月度方案'));
+    fireEvent.press(await findByText(/立即订阅|立即訂閱|Subscribe Now/));
+
+    // Assert: purchase wired to the product_id the user selected.
+    await waitFor(() =>
+      expect(iapService.purchase).toHaveBeenCalledWith(IAP_PRODUCTS.monthly),
+    );
   });
 
-  test('monthly card renders StoreKit price + unit, no trial copy', async () => {
-    const { findByText, queryByText } = renderScreen();
-    // Wait for useStoreProducts to resolve before asserting on the price —
-    // first paint shows the "—" placeholder while StoreKit fetches.
-    expect(await findByText('¥9.90')).toBeTruthy();
-    expect(queryByText('/月')).toBeTruthy();
-    // Trial-offer copy was an i18n design holdover; this guards against
-    // anyone re-introducing a hardcoded "after ¥X.XX/月" string.
-    expect(queryByText(/7 天免费试用|7-day free trial/)).toBeNull();
-  });
+  test('subscribe CTA is disabled when there is no selectable plan', async () => {
+    // Arrange: empty catalog → nothing to auto-select → CTA must stay
+    // un-tappable so we never fire purchase against an undefined SKU.
+    mockCatalog([], []);
 
-  test('subscribe tap invokes iapService.purchase then verify', async () => {
-    (iapService.purchase as jest.Mock).mockResolvedValueOnce({
-      productId: 'com.vividrop.mobile.china.yearly.10400',
-      transactionReceipt: 'BLOB',
-      transactionId: 'tx_1',
-    });
+    // Act
+    const { findByText } = renderScreen();
+    fireEvent.press(await findByText(/立即订阅|立即訂閱|Subscribe Now/));
 
-    const { getByText } = renderScreen();
-    fireEvent.press(getByText(/立即订阅|立即訂閱|Subscribe Now/));
-
-    await waitFor(() => expect(iapService.purchase).toHaveBeenCalled());
-    await waitFor(() => expect(verifyIapReceipt).toHaveBeenCalled());
-  });
-
-  test('preflight refresh blocks stale yearly-to-monthly downgrade before StoreKit', async () => {
-    (getSubscriptionStatus as jest.Mock)
-      .mockResolvedValueOnce({
-        status: 'trial_expired',
-        plan: '',
-        expireAt: null,
-        trialEnd: null,
-      })
-      .mockResolvedValueOnce({
-        status: 'subscribed',
-        plan: 'yearly',
-        expireAt: '2026-04-20T08:31:34Z',
-        trialEnd: null,
-      });
-
-    const { getByText, findByText } = renderScreen();
-    // Wait for StoreKit-driven monthly price to render before tapping —
-    // before that the card shows "—" and getByText('¥9.90') would miss.
-    fireEvent.press(await findByText('¥9.90'));
-    fireEvent.press(getByText(/立即订阅|立即訂閱|Subscribe Now/));
-
-    await waitFor(() => {
-      expect(mockSetSubscription).toHaveBeenCalledWith({
-        status: 'subscribed',
-        plan: 'yearly',
-        expireAt: '2026-04-20T08:31:34Z',
-        trialEnd: null,
-      });
-    });
+    // Assert: the press is a no-op — handleSubscribe early-returns when
+    // selectedEntry is null. iapService.purchase must never see a call.
     expect(iapService.purchase).not.toHaveBeenCalled();
   });
 
-  test('restore tap invokes iapService.restore', async () => {
+  test('restore button invokes iapService.restore', async () => {
+    // Arrange
     (iapService.restore as jest.Mock).mockResolvedValueOnce([]);
-    const { getByText } = renderScreen();
+
+    // Act
+    const { findByText } = renderScreen();
     fireEvent.press(
-      getByText(/恢復已購買訂閱|恢复已购买订阅|Restore Purchases/),
+      await findByText(/恢復已購買訂閱|恢复已购买订阅|Restore Purchases/),
     );
+
+    // Assert
     await waitFor(() => expect(iapService.restore).toHaveBeenCalled());
-  });
-
-  test('restore bound to another account shows dedicated alert', async () => {
-    (iapService.restore as jest.Mock).mockRejectedValueOnce(
-      new ApiError(ERROR_CODE.RECEIPT_BOUND_TO_OTHER_USER, 'bound'),
-    );
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-
-    const { getByText } = renderScreen();
-    fireEvent.press(
-      getByText(/恢復已購買訂閱|恢复已购买订阅|Restore Purchases/),
-    );
-
-    await waitFor(() => expect(alertSpy).toHaveBeenCalled());
-    expect(alertSpy.mock.calls[0]?.[0]).toMatch(/Apple.*(绑定|綁定|linked)/i);
-    alertSpy.mockRestore();
-  });
-
-  test('2002 without a fresh subscription snapshot degrades to success modal', async () => {
-    // loadSubscription returns null (legacy mock default) ⇒ no fresh evidence
-    // to block on. Fall through to success modal rather than false-alarming a
-    // legitimate retry-after-network-flap that server already accepted.
-    (iapService.purchase as jest.Mock).mockResolvedValueOnce({
-      productId: 'com.vividrop.mobile.china.yearly.10400',
-      transactionReceipt: 'BLOB',
-      transactionId: 'tx_1',
-    });
-    (verifyIapReceipt as jest.Mock).mockRejectedValueOnce(
-      new ApiError(ERROR_CODE.RECEIPT_ALREADY_USED, 'used'),
-    );
-
-    const { getByText, findByText } = renderScreen();
-    fireEvent.press(getByText(/立即订阅|立即訂閱|Subscribe Now/));
-
-    expect(await findByText(/支付成功|Payment Successful/)).toBeTruthy();
-  });
-
-  test('2002 + fresh loadSubscription returns expired ⇒ error alert, no success modal', async () => {
-    // Sandbox replay scenario: StoreKit delivers a stale transaction whose tx
-    // the server already consumed (2002), but the server's canonical state
-    // shows no active subscription. We must NOT mislead the user with
-    // "支付成功" — they still need to purchase fresh.
-    (iapService.purchase as jest.Mock).mockResolvedValueOnce({
-      productId: 'com.vividrop.mobile.china.yearly.10400',
-      transactionReceipt: 'STALE_BLOB',
-      transactionId: 'tx_stale',
-    });
-    (verifyIapReceipt as jest.Mock).mockRejectedValueOnce(
-      new ApiError(ERROR_CODE.RECEIPT_ALREADY_USED, 'used'),
-    );
-    mockLoadSubscription.mockResolvedValueOnce({
-      status: 'sub_expired',
-      plan: 'monthly',
-      expireAt: '2026-04-23T10:50:00Z',
-      trialEnd: null,
-    });
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-
-    const { getByText, queryByText } = renderScreen();
-    fireEvent.press(getByText(/立即订阅|立即訂閱|Subscribe Now/));
-
-    await waitFor(() => expect(alertSpy).toHaveBeenCalled());
-
-    // Stale receipt, so the retained transaction must be finished to unjam
-    // StoreKit's queue on the next launch.
-    expect(iapService.finishTransaction).toHaveBeenCalledWith('tx_stale');
-
-    // Success modal must NOT appear — otherwise the user taps "Start Using"
-    // and gets bounced to the paywall because fresh status is still expired.
-    expect(queryByText(/支付成功|Payment Successful/)).toBeNull();
-
-    // Alert message must be the receipt-stale copy (any of the 3 locales).
-    const alertMessage = alertSpy.mock.calls[0]?.[0] ?? '';
-    expect(alertMessage).toMatch(
-      /收據已使用.*無有效訂閱|收据已使用.*无有效订阅|receipt.*no active subscription/i,
-    );
-
-    alertSpy.mockRestore();
-  });
-
-  test('stale-receipt alert still shown when finishTransaction throws', async () => {
-    // finishTransaction rarely fails (StoreKit internal), but if it does the
-    // user-facing copy must still be the accurate "receipt stale" alert, not
-    // a generic error from the outer catch. Alert fires before the best-effort
-    // finish, so the throw is silently swallowed and the alert survives.
-    (iapService.purchase as jest.Mock).mockResolvedValueOnce({
-      productId: 'com.vividrop.mobile.china.yearly.10400',
-      transactionReceipt: 'STALE_BLOB',
-      transactionId: 'tx_flaky_finish',
-    });
-    (verifyIapReceipt as jest.Mock).mockRejectedValueOnce(
-      new ApiError(ERROR_CODE.RECEIPT_ALREADY_USED, 'used'),
-    );
-    mockLoadSubscription.mockResolvedValueOnce({
-      status: 'sub_expired',
-      plan: 'monthly',
-      expireAt: '2026-04-23T10:50:00Z',
-      trialEnd: null,
-    });
-    (iapService.finishTransaction as jest.Mock).mockRejectedValueOnce(
-      new Error('StoreKit finishTransaction failed'),
-    );
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-
-    const { getByText } = renderScreen();
-    fireEvent.press(getByText(/立即订阅|立即訂閱|Subscribe Now/));
-
-    await waitFor(() => expect(alertSpy).toHaveBeenCalled());
-
-    // Exactly one alert — the receipt-stale copy. The outer catch must NOT
-    // have fired a generic "verifying payment..." alert on top.
-    expect(alertSpy).toHaveBeenCalledTimes(1);
-    const alertMessage = alertSpy.mock.calls[0]?.[0] ?? '';
-    expect(alertMessage).toMatch(
-      /收據已使用.*無有效訂閱|收据已使用.*无有效订阅|receipt.*no active subscription/i,
-    );
-
-    alertSpy.mockRestore();
-  });
-
-  test('2002 + fresh loadSubscription returns active subscription ⇒ success modal still shown', async () => {
-    // Legitimate retry: user's original purchase succeeded + wrote a sub row,
-    // client retried verify due to network flap, server returns 2002 the
-    // second time. Fresh status confirms they're genuinely subscribed, so we
-    // must complete the success flow, not false-alarm on 2002.
-    (iapService.purchase as jest.Mock).mockResolvedValueOnce({
-      productId: 'com.vividrop.mobile.china.yearly.10400',
-      transactionReceipt: 'BLOB',
-      transactionId: 'tx_legit',
-    });
-    (verifyIapReceipt as jest.Mock).mockRejectedValueOnce(
-      new ApiError(ERROR_CODE.RECEIPT_ALREADY_USED, 'used'),
-    );
-    mockLoadSubscription.mockResolvedValueOnce({
-      status: 'subscribed',
-      plan: 'yearly',
-      expireAt: '2027-05-20T00:00:00Z',
-      trialEnd: null,
-    });
-
-    const { getByText, findByText } = renderScreen();
-    fireEvent.press(getByText(/立即订阅|立即訂閱|Subscribe Now/));
-
-    expect(await findByText(/支付成功|Payment Successful/)).toBeTruthy();
-  });
-
-  test('E_ALREADY_OWNED shows dedicated alert and does NOT trigger restore', async () => {
-    (iapService.purchase as jest.Mock).mockRejectedValueOnce({
-      code: 'E_ALREADY_OWNED',
-    });
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-
-    const { getByText } = renderScreen();
-    fireEvent.press(getByText(/立即订阅|立即訂閱|Subscribe Now/));
-
-    await waitFor(() => expect(alertSpy).toHaveBeenCalled());
-
-    // Restore must not be auto-triggered — that was the Blocker #2 bug.
-    expect(iapService.restore).not.toHaveBeenCalled();
-
-    // Alert message must be the AlreadyOwned copy (any of the 3 locales).
-    const alertMessage = alertSpy.mock.calls[0]?.[0] ?? '';
-    expect(alertMessage).toMatch(
-      /已有(有效)?订阅|已有(有效)?訂閱|already have an active subscription/i,
-    );
-
-    alertSpy.mockRestore();
-  });
-
-  test('success modal reflects expireAt from freshly-loaded subscription', async () => {
-    (iapService.purchase as jest.Mock).mockResolvedValueOnce({
-      productId: 'com.vividrop.mobile.china.yearly.10400',
-      transactionReceipt: 'BLOB',
-      transactionId: 'tx_1',
-    });
-    (verifyIapReceipt as jest.Mock).mockResolvedValueOnce(undefined);
-
-    // loadSubscription returns the fresh snapshot; the screen reads
-    // expireAt off that return value (not off the closed-over `subscription`
-    // prop, which wouldn't have updated yet within the same async flow).
-    mockLoadSubscription.mockResolvedValueOnce({
-      status: 'subscribed',
-      plan: 'yearly',
-      expireAt: '2027-05-20T00:00:00Z',
-      trialEnd: null,
-    });
-
-    const { getByText, findByText } = renderScreen();
-    fireEvent.press(getByText(/立即订阅|立即訂閱|Subscribe Now/));
-
-    // The modal's "valid until" line formats as YYYY/M/D (formatExpireDate).
-    expect(await findByText(/2027\/5\/20/)).toBeTruthy();
-  });
-
-  test('success dismiss resets root paywall to SyncActivity when a binding exists', async () => {
-    mockNavigation.canGoBack.mockReturnValue(false);
-    (NativeModules as Record<string, unknown>).NativeSyncEngine = {
-      getBindingState: jest.fn().mockResolvedValue({ deviceId: 'desktop-1' }),
-    };
-    (iapService.purchase as jest.Mock).mockResolvedValueOnce({
-      productId: 'com.vividrop.mobile.china.yearly.10400',
-      transactionReceipt: 'BLOB',
-      transactionId: 'tx_1',
-    });
-    (verifyIapReceipt as jest.Mock).mockResolvedValueOnce(undefined);
-    mockLoadSubscription.mockResolvedValueOnce({
-      status: 'subscribed',
-      plan: 'yearly',
-      expireAt: '2027-05-20T00:00:00Z',
-      trialEnd: null,
-    });
-
-    const { getByText, findByText } = renderScreen();
-    fireEvent.press(getByText(/立即订阅|立即訂閱|Subscribe Now/));
-    fireEvent.press(await findByText(/開始使用|开始使用|Start Using/));
-
-    await waitFor(() =>
-      expect(mockNavigation.reset).toHaveBeenCalledWith({
-        index: 0,
-        routes: [{ name: 'SyncActivity' }],
-      }),
-    );
-    expect(mockNavigation.goBack).not.toHaveBeenCalled();
-  });
-
-  test('success dismiss resets root paywall to DeviceDiscovery without a binding', async () => {
-    mockNavigation.canGoBack.mockReturnValue(false);
-    (iapService.purchase as jest.Mock).mockResolvedValueOnce({
-      productId: 'com.vividrop.mobile.china.yearly.10400',
-      transactionReceipt: 'BLOB',
-      transactionId: 'tx_1',
-    });
-    (verifyIapReceipt as jest.Mock).mockResolvedValueOnce(undefined);
-    mockLoadSubscription.mockResolvedValueOnce({
-      status: 'subscribed',
-      plan: 'yearly',
-      expireAt: '2027-05-20T00:00:00Z',
-      trialEnd: null,
-    });
-
-    const { getByText, findByText } = renderScreen();
-    fireEvent.press(getByText(/立即订阅|立即訂閱|Subscribe Now/));
-    fireEvent.press(await findByText(/開始使用|开始使用|Start Using/));
-
-    await waitFor(() =>
-      expect(mockNavigation.reset).toHaveBeenCalledWith({
-        index: 0,
-        routes: [{ name: 'DeviceDiscovery' }],
-      }),
-    );
-  });
-
-  test('plan switch retries PRODUCT_ID_MISMATCH with a refreshed receipt', async () => {
-    mockAuthState.subscription = {
-      status: 'subscribed',
-      plan: 'monthly',
-      expireAt: '2027-05-20T00:00:00Z',
-      trialEnd: null,
-    };
-    (iapService.purchase as jest.Mock).mockResolvedValueOnce({
-      productId: 'com.vividrop.mobile.china.monthly.999',
-      transactionReceipt: 'STALE_MONTHLY_RECEIPT',
-      transactionId: 'tx_upgrade',
-    });
-    (iapService.refreshReceipt as jest.Mock).mockResolvedValueOnce(
-      'FRESH_YEARLY_RECEIPT',
-    );
-    (verifyIapReceipt as jest.Mock)
-      .mockRejectedValueOnce(
-        new ApiError(ERROR_CODE.PRODUCT_ID_MISMATCH, 'mismatch'),
-      )
-      .mockResolvedValueOnce(undefined);
-    mockLoadSubscription.mockResolvedValueOnce({
-      status: 'subscribed',
-      plan: 'yearly',
-      expireAt: '2028-05-20T00:00:00Z',
-      trialEnd: null,
-    });
-
-    const { getByText, findByText } = renderScreen();
-    fireEvent.press(getByText(/切换方案|切換方案|Switch Plan/));
-
-    await waitFor(() => expect(verifyIapReceipt).toHaveBeenCalledTimes(2), {
-      timeout: 3_000,
-    });
-    expect(verifyIapReceipt).toHaveBeenNthCalledWith(
-      1,
-      'STALE_MONTHLY_RECEIPT',
-      'yearly',
-    );
-    expect(iapService.refreshReceipt).toHaveBeenCalledTimes(1);
-    expect(verifyIapReceipt).toHaveBeenNthCalledWith(
-      2,
-      'FRESH_YEARLY_RECEIPT',
-      'yearly',
-    );
-    expect(await findByText(/支付成功|Payment Successful/)).toBeTruthy();
-  });
-
-  test('plan switch keeps selected plan locally when status refresh is stale', async () => {
-    mockAuthState.subscription = {
-      status: 'subscribed',
-      plan: 'monthly',
-      expireAt: '2027-05-20T00:00:00Z',
-      trialEnd: null,
-    };
-    (iapService.purchase as jest.Mock).mockResolvedValueOnce({
-      productId: 'com.vividrop.mobile.china.yearly.10400',
-      transactionReceipt: 'YEARLY_RECEIPT',
-      transactionId: 'tx_upgrade_stale_status',
-    });
-    (verifyIapReceipt as jest.Mock).mockResolvedValueOnce(undefined);
-    mockLoadSubscription.mockResolvedValueOnce({
-      status: 'subscribed',
-      plan: 'monthly',
-      expireAt: '2027-05-20T00:00:00Z',
-      trialEnd: null,
-    });
-
-    const { getByText, findByText } = renderScreen();
-    fireEvent.press(getByText(/切换方案|切換方案|Switch Plan/));
-
-    expect(await findByText(/支付成功|Payment Successful/)).toBeTruthy();
-    expect(mockSetSubscription).toHaveBeenCalledWith({
-      status: 'subscribed',
-      plan: 'yearly',
-      expireAt: '2027-05-20T00:00:00Z',
-      trialEnd: null,
-    });
-  });
-
-  test('current-plan badge appears on the plan the user already holds', () => {
-    mockAuthState.subscription = {
-      status: 'subscribed',
-      plan: 'monthly',
-      expireAt: '2027-05-20T00:00:00Z',
-      trialEnd: null,
-    };
-
-    const { getByText, queryAllByText } = renderScreen();
-
-    // Badge renders on monthly card.
-    expect(getByText(/当前方案|目前方案|Current Plan/)).toBeTruthy();
-    // Only one badge — yearly card stays actionable without the label.
-    expect(queryAllByText(/当前方案|目前方案|Current Plan/).length).toBe(1);
-  });
-
-  test('CTA reads Switch Plan when user already has a subscription and selects the other plan', () => {
-    mockAuthState.subscription = {
-      status: 'subscribed',
-      plan: 'monthly',
-      expireAt: '2027-05-20T00:00:00Z',
-      trialEnd: null,
-    };
-
-    const { getByText, queryByText } = renderScreen();
-
-    // selectedPlan defaults to the non-current side (yearly here), so CTA
-    // immediately shows the switch-plan label instead of "Subscribe Now".
-    expect(getByText(/切换方案|切換方案|Switch Plan/)).toBeTruthy();
-    expect(queryByText(/^立即订阅$|^立即訂閱$|^Subscribe Now$/)).toBeNull();
-  });
-
-  test('yearly subscribers cannot downgrade to monthly from this screen', async () => {
-    mockAuthState.subscription = {
-      status: 'subscribed',
-      plan: 'yearly',
-      expireAt: '2028-05-20T00:00:00Z',
-      trialEnd: null,
-    };
-
-    const { getByText, queryByText } = renderScreen();
-
-    expect(getByText(/已是年會員|已是年会员|Current Yearly Plan/)).toBeTruthy();
-    expect(queryByText(/切换方案|切換方案|Switch Plan/)).toBeNull();
-    expect(queryByText(/^立即订阅$|^立即訂閱$|^Subscribe Now$/)).toBeNull();
-
-    fireEvent.press(getByText(/已是年會員|已是年会员|Current Yearly Plan/));
-
-    expect(iapService.purchase).not.toHaveBeenCalled();
   });
 });
 

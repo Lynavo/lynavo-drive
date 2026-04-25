@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { Icon } from '../components/Icon';
+import { SubscriptionPlanCard } from '../components/SubscriptionPlanCard';
 import {
   SUBSCRIPTION_STATUS_ICON_BACKGROUNDS,
   SUBSCRIPTION_STATUS_ICON_COLORS,
@@ -26,8 +27,15 @@ import {
 } from '../components/SubscriptionStatusIcon';
 import { isFeatureAccessAllowed, useAuth } from '../stores/auth-store';
 import { iapService } from '../services/iap-service';
-import { planToProductId } from '../constants/iap';
-import { useStoreProducts } from '../hooks/useStoreProducts';
+import {
+  ALL_PRODUCT_IDS,
+  productIdToPlan,
+  type IapProductId,
+} from '../constants/iap';
+import {
+  useSubscriptionPlans,
+  type PlanWithProduct,
+} from '../hooks/useSubscriptionPlans';
 import { classifyIapError, IapErrorClass } from '../services/iap-errors';
 import { markSubscriptionJustActivated } from '../hooks/useExpiryReminder';
 import {
@@ -47,16 +55,20 @@ const CARD_BORDER = 'rgba(187, 214, 233, 0.72)';
 const MUTED_TEXT = '#7893ab';
 const SUCCESS_GREEN = '#22c55e';
 const DESTRUCTIVE_RED = '#e53935';
-const PLAN_DISABLED_BG = '#edf5fb';
-const PLAN_DISABLED_TEXT = '#afb6bf';
-const PLAN_SELECTED_BORDER = '#3a3a3d';
 const CHECK_BG = 'rgba(83, 200, 120, 0.12)';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PLAN_CARD_GAP = 12;
 const PLAN_CARD_HORIZONTAL_PADDING = 16;
-const PLAN_CARD_WIDTH =
-  (SCREEN_WIDTH - PLAN_CARD_HORIZONTAL_PADDING * 2 - PLAN_CARD_GAP) / 2;
 
+/** Card width grows/shrinks with plan count so 2 or 3 cards always tile
+ *  edge-to-edge under the section padding. The base styles default to the
+ *  2-card width; PlanCard accepts a width override for 3-card layouts. */
+function planCardWidth(cardsPerRow: number): number {
+  const totalGap = PLAN_CARD_GAP * (cardsPerRow - 1);
+  return (
+    (SCREEN_WIDTH - PLAN_CARD_HORIZONTAL_PADDING * 2 - totalGap) / cardsPerRow
+  );
+}
 type NavigationProp = StackNavigationProp<RootStackParamList, 'Subscription'>;
 type PostSubscriptionRoute = Extract<
   keyof RootStackParamList,
@@ -77,7 +89,11 @@ export function resolveCurrentPlan(
 }
 type PlanKey = 'monthly' | 'yearly';
 
-const DEFAULT_SELECTED_PLAN: PlanKey = 'yearly';
+const KNOWN_IAP_SKUS: ReadonlySet<string> = new Set(ALL_PRODUCT_IDS);
+
+function isKnownIapProductId(productId: string): productId is IapProductId {
+  return KNOWN_IAP_SKUS.has(productId);
+}
 
 function isDowngradePlan(
   currentPlan: PlanKey | null,
@@ -135,15 +151,19 @@ function periodLabel(
   });
 }
 
-function getPlanDisplayName(plan: string, t: TFunction): string {
-  switch (plan) {
-    case 'monthly':
-      return t('subscription.plans.monthly.name');
-    case 'yearly':
-      return t('subscription.plans.yearly.name');
-    default:
-      return plan || t('subscription.plans.fallback');
-  }
+/** Best-effort label for the post-purchase success modal. The modal only
+ *  needs a human-readable plan name, so we look it up from the freshly
+ *  loaded server catalog by product_id. When the catalog isn't available
+ *  (offline + bootstrap fallback) we fall back to the legacy generic
+ *  "subscription" copy so the modal still renders rather than crashing. */
+function getPlanDisplayName(
+  productId: string,
+  plans: PlanWithProduct[],
+  t: TFunction,
+): string {
+  const found = plans.find(entry => entry.plan.product_id === productId);
+  if (found) return found.plan.name;
+  return t('subscription.plans.fallback');
 }
 
 const FEATURE_KEYS = [
@@ -294,211 +314,17 @@ const featureStyles = StyleSheet.create({
   },
 });
 
-function PlanCard({
-  price,
-  unit,
-  oldPrice,
-  savingsBadge,
-  selected,
-  disabled,
-  currentBadge,
-  onPress,
-}: {
-  price: string;
-  unit: string;
-  oldPrice?: string;
-  savingsBadge?: string;
-  selected: boolean;
-  disabled?: boolean;
-  /** When set, renders a small "目前方案" / "Current Plan" label in the
-   *  top-right corner. Callers should also pass `disabled` to block the
-   *  pointless self-select tap. */
-  currentBadge?: string;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity
-      style={[
-        planStyles.card,
-        disabled
-          ? planStyles.cardDisabled
-          : selected
-          ? planStyles.cardSelected
-          : planStyles.cardUnselected,
-      ]}
-      activeOpacity={0.82}
-      onPress={onPress}
-      disabled={disabled}
-    >
-      {currentBadge ? (
-        <View style={planStyles.currentBadge}>
-          <Text style={planStyles.currentBadgeText}>{currentBadge}</Text>
-        </View>
-      ) : null}
-      <Text
-        style={[
-          planStyles.price,
-          disabled
-            ? planStyles.textDisabled
-            : selected
-            ? planStyles.textSelected
-            : planStyles.textUnselected,
-        ]}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.7}
-      >
-        {price}
-      </Text>
-      <Text
-        style={[
-          planStyles.unit,
-          disabled
-            ? planStyles.unitDisabled
-            : selected
-            ? planStyles.unitSelected
-            : planStyles.unitUnselected,
-        ]}
-        numberOfLines={1}
-      >
-        {unit}
-      </Text>
-      {oldPrice ? (
-        <View style={planStyles.metaRow}>
-          <Text
-            style={planStyles.oldPrice}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.7}
-          >
-            {oldPrice}
-          </Text>
-          {savingsBadge ? (
-            <View style={planStyles.savingsBadge}>
-              <Text
-                style={planStyles.savingsBadgeText}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.7}
-              >
-                {savingsBadge}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      ) : (
-        <View style={planStyles.metaSpacer} />
-      )}
-    </TouchableOpacity>
-  );
-}
-
-const planStyles = StyleSheet.create({
-  card: {
-    width: PLAN_CARD_WIDTH,
-    minHeight: 142,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    paddingVertical: 18,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardSelected: {
-    backgroundColor: CARD_BG,
-    borderColor: PLAN_SELECTED_BORDER,
-    shadowColor: '#1f2937',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  cardUnselected: {
-    backgroundColor: CARD_BG,
-    borderColor: CARD_BORDER,
-  },
-  cardDisabled: {
-    backgroundColor: PLAN_DISABLED_BG,
-    borderColor: 'rgba(196, 214, 228, 0.72)',
-  },
-  price: {
-    fontSize: 24,
-    fontWeight: '800',
-  },
-  textSelected: {
-    color: DARK,
-  },
-  textUnselected: {
-    color: DARK,
-  },
-  textDisabled: {
-    color: PLAN_DISABLED_TEXT,
-  },
-  unit: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  unitSelected: {
-    color: '#6f747c',
-  },
-  unitUnselected: {
-    color: MUTED_TEXT,
-  },
-  unitDisabled: {
-    color: '#c2c8cf',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 10,
-  },
-  metaSpacer: {
-    height: 23,
-    marginTop: 10,
-  },
-  oldPrice: {
-    fontSize: 11,
-    color: '#b9b0b0',
-    textDecorationLine: 'line-through',
-  },
-  savingsBadge: {
-    backgroundColor: DESTRUCTIVE_RED,
-    borderRadius: 8,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-  },
-  savingsBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  currentBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(83, 200, 120, 0.16)',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  currentBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#2e7d4f',
-  },
-});
-
 function PaymentSuccessModal({
   visible,
-  plan,
+  planLabel,
   expireAt,
   onDismiss,
   t,
 }: {
   visible: boolean;
-  plan: string;
+  /** Pre-resolved display name (server-provided plan.name or fallback). The
+   *  modal stays dumb so SubscriptionScreen owns catalog lookup. */
+  planLabel: string;
   expireAt: string | null;
   onDismiss: () => void;
   t: TFunction;
@@ -526,9 +352,7 @@ function PaymentSuccessModal({
 
           <View style={modalStyles.planRow}>
             <Icon name="calendar-outline" size={18} color="#3b9fd8" />
-            <Text style={modalStyles.planText}>
-              {getPlanDisplayName(plan, t)}
-            </Text>
+            <Text style={modalStyles.planText}>{planLabel}</Text>
             {expiry ? (
               <Text style={modalStyles.expiryText}>
                 {t('subscription.modal.validUntil', { date: expiry })}
@@ -626,18 +450,23 @@ export function SubscriptionScreen() {
   // 方案" badge, card disable, and CTA copy.
   const currentPlan = resolveCurrentPlan(subscription);
 
-  // Default to the yearly SKU. Monthly holders can upgrade; yearly holders
-  // stay on their current plan because this screen intentionally blocks
-  // yearly -> monthly downgrade.
-  const [selectedPlan, setSelectedPlan] = useState<PlanKey>(
-    DEFAULT_SELECTED_PLAN,
+  // selectedProductId tracks the Apple SKU the user has tapped on. Defaults
+  // to null so the auto-select-first effect below picks the recommended /
+  // first plan once the catalog resolves. Keying by product_id (instead of
+  // the legacy 'monthly' | 'yearly' enum) lets us render N plans driven by
+  // the server catalog while still mapping back to backend tier semantics
+  // via productIdToPlan() for downgrade checks and verify-receipt calls.
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(
+    null,
   );
-  const selectedPlanIsCurrent =
-    currentPlan != null && selectedPlan === currentPlan;
-  const selectedPlanIsDowngrade = isDowngradePlan(currentPlan, selectedPlan);
   const [isLoading, setIsLoading] = useState(false);
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
-  const [confirmedPlan, setConfirmedPlan] = useState<PlanKey>('yearly');
+  /** Apple SKU consumed by the most recent successful purchase. Surfaces in
+   *  the success modal as a localized plan name (looked up against the
+   *  current catalog). */
+  const [confirmedProductId, setConfirmedProductId] = useState<string | null>(
+    null,
+  );
   const [confirmedExpireAt, setConfirmedExpireAt] = useState<string | null>(
     null,
   );
@@ -657,16 +486,6 @@ export function SubscriptionScreen() {
       };
     }, [setSubscription]),
   );
-
-  useEffect(() => {
-    if (
-      currentPlan != null &&
-      (selectedPlan === currentPlan ||
-        isDowngradePlan(currentPlan, selectedPlan))
-    ) {
-      setSelectedPlan(DEFAULT_SELECTED_PLAN);
-    }
-  }, [currentPlan, selectedPlan]);
 
   const subscriptionDisplay = resolveSubscriptionDisplayState({
     subscription,
@@ -708,37 +527,101 @@ export function SubscriptionScreen() {
   );
   const formatSavings = useCallback(
     (savingsDisplay: string) =>
-      t('subscription.plans.yearly.savingsTemplate', {
+      t('subscription.plans.savingsTemplate', {
         amount: savingsDisplay,
       }),
     [t],
   );
-  const storeProducts = useStoreProducts({ formatPrice, formatSavings });
-  const PRICE_PLACEHOLDER = '—';
-  const monthlyPriceLabel =
-    storeProducts.monthly?.displayPrice ?? PRICE_PLACEHOLDER;
-  const yearlyPriceLabel =
-    storeProducts.yearly?.displayPrice ?? PRICE_PLACEHOLDER;
-  // oldPrice / savingsBadge are intentionally undefined when StoreKit
-  // hasn't surfaced real savings data — PlanCard hides the meta row +
-  // renders the spacer so card height stays stable.
-  const yearlyOldPriceLabel =
-    storeProducts.yearlySavings?.annualizedMonthlyDisplay;
-  const yearlySavingsLabel = storeProducts.yearlySavings?.display;
-  // Period suffix follows StoreKit's reported (periodUnit, periodCount) so
-  // a US-locale user paying $0.99 sees "/month" instead of the hardcoded
-  // "/月". The legacy keys remain as the fallback for the sandbox-down /
-  // IAP-disabled paths so dev builds keep their familiar Chinese copy.
-  const monthlyUnitLabel = periodLabel(
-    storeProducts.monthly,
-    t('subscription.plans.monthly.unit'),
-    t,
+  const {
+    loading: plansLoading,
+    error: plansError,
+    plans: rawPlans,
+    source: plansSource,
+    refresh: refreshPlans,
+  } = useSubscriptionPlans({ formatPrice, formatSavings });
+
+  // Layout cap: paywall design assumes 1-3 cards in a single row. Server can
+  // technically return more (extra promo SKUs, A/B variants), but rendering
+  // 4+ cards in the same row breaks tile widths. Drop the overflow here and
+  // surface a console.warn so QA notices the mis-config rather than shipping
+  // a broken layout.
+  const PLAN_LAYOUT_CAP = 3;
+  const plans = useMemo<PlanWithProduct[]>(() => {
+    // Filter out catalog rows whose Apple SKU didn't resolve via StoreKit —
+    // ASC mis-config most commonly. We log the dropped product_id so QA
+    // notices instead of silently rendering a placeholder card with "—".
+    const filtered = rawPlans.filter(entry => {
+      if (entry.product != null) return true;
+      console.warn(
+        '[SubscriptionScreen] dropping plan with no StoreKit product:',
+        entry.plan.product_id,
+      );
+      return false;
+    });
+    if (filtered.length > PLAN_LAYOUT_CAP) {
+      console.warn(
+        '[SubscriptionScreen] catalog returned',
+        filtered.length,
+        'plans; capping render to first',
+        PLAN_LAYOUT_CAP,
+      );
+      return filtered.slice(0, PLAN_LAYOUT_CAP);
+    }
+    return filtered;
+  }, [rawPlans]);
+
+  // Auto-select the first valid plan once the catalog resolves. Prefer the
+  // recommended row when present (server intent), otherwise the first
+  // post-sort entry. Re-runs only when the available SKU set changes so a
+  // user-initiated tap is preserved across re-renders.
+  useEffect(() => {
+    if (plans.length === 0) {
+      if (selectedProductId != null) setSelectedProductId(null);
+      return;
+    }
+    const stillAvailable = plans.some(
+      entry => entry.plan.product_id === selectedProductId,
+    );
+    if (stillAvailable) return;
+    const recommended = plans.find(entry => entry.plan.recommended);
+    setSelectedProductId((recommended ?? plans[0]).plan.product_id);
+  }, [plans, selectedProductId]);
+
+  // Reconcile selection if the user already holds the SKU they're pointing
+  // at, OR if the SKU maps to a downgrade — flip to the first non-current,
+  // non-downgrade plan. Keeps the CTA in a meaningful state without forcing
+  // a "blank" UI before the user has explicitly tapped.
+  const selectedEntry = useMemo<PlanWithProduct | null>(
+    () =>
+      plans.find(entry => entry.plan.product_id === selectedProductId) ?? null,
+    [plans, selectedProductId],
   );
-  const yearlyUnitLabel = periodLabel(
-    storeProducts.yearly,
-    t('subscription.plans.yearly.unit'),
-    t,
-  );
+  const selectedPlanTier = useMemo<PlanKey | null>(() => {
+    if (!selectedEntry) return null;
+    return productIdToPlan(selectedEntry.plan.product_id);
+  }, [selectedEntry]);
+  const selectedPlanIsCurrent =
+    currentPlan != null &&
+    selectedPlanTier != null &&
+    selectedPlanTier === currentPlan;
+  const selectedPlanIsDowngrade =
+    selectedPlanTier != null && isDowngradePlan(currentPlan, selectedPlanTier);
+
+  useEffect(() => {
+    if (plans.length === 0) return;
+    if (!selectedPlanIsCurrent && !selectedPlanIsDowngrade) return;
+    // Find an alternative — preferring recommended, otherwise first non-self.
+    const alternative = plans.find(entry => {
+      const tier = productIdToPlan(entry.plan.product_id);
+      if (tier == null) return false;
+      if (currentPlan != null && tier === currentPlan) return false;
+      if (isDowngradePlan(currentPlan, tier)) return false;
+      return true;
+    });
+    if (alternative) {
+      setSelectedProductId(alternative.plan.product_id);
+    }
+  }, [plans, currentPlan, selectedPlanIsCurrent, selectedPlanIsDowngrade]);
 
   const handleRestore = useCallback(async () => {
     if (!FEATURES.IAP_ENABLED || !FEATURES.IAP_RESTORE_ENABLED) return;
@@ -760,9 +643,18 @@ export function SubscriptionScreen() {
   }, [t, loadSubscription]);
 
   const handleSubscribe = useCallback(async () => {
+    if (!selectedEntry || selectedPlanTier == null) {
+      // Catalog hasn't resolved yet, or selection couldn't map back to a
+      // backend tier (would only happen if the server registered a SKU
+      // outside the bootstrap product list). Bail rather than guessing.
+      return;
+    }
+    const targetProductId = selectedEntry.plan.product_id;
+    const targetTier = selectedPlanTier;
+
     if (
-      (currentPlan != null && selectedPlan === currentPlan) ||
-      isDowngradePlan(currentPlan, selectedPlan)
+      (currentPlan != null && targetTier === currentPlan) ||
+      isDowngradePlan(currentPlan, targetTier)
     ) {
       return;
     }
@@ -783,8 +675,8 @@ export function SubscriptionScreen() {
         setSubscription(fresh);
         const freshPlan = resolveCurrentPlan(fresh);
         if (
-          (freshPlan != null && selectedPlan === freshPlan) ||
-          isDowngradePlan(freshPlan, selectedPlan)
+          (freshPlan != null && targetTier === freshPlan) ||
+          isDowngradePlan(freshPlan, targetTier)
         ) {
           return;
         }
@@ -792,10 +684,20 @@ export function SubscriptionScreen() {
         console.warn('[subscription] preflight refresh failed', err);
       }
 
-      const productId = planToProductId(selectedPlan);
-      const receipt = await iapService.purchase(productId);
+      if (!isKnownIapProductId(targetProductId)) {
+        // Defensive: server returned a SKU we don't know how to verify.
+        // Hook already filters unknown SKUs from StoreKit lookup, but
+        // re-narrow here so iapService.purchase gets a typed productId.
+        console.warn(
+          '[subscription] cannot purchase unknown product_id',
+          targetProductId,
+        );
+        Alert.alert(t('subscription.errors.productMismatch'));
+        return;
+      }
+      const receipt = await iapService.purchase(targetProductId);
       let receiptData = receipt.transactionReceipt;
-      const isPlanSwitch = currentPlan != null && currentPlan !== selectedPlan;
+      const isPlanSwitch = currentPlan != null && currentPlan !== targetTier;
 
       // Retry verify twice (1s → 4s) before surfacing error — Apple already
       // charged, so we must try hard before handing retry to the user.
@@ -812,7 +714,7 @@ export function SubscriptionScreen() {
       for (const delay of delays) {
         if (delay > 0) await new Promise<void>(r => setTimeout(r, delay));
         try {
-          await verifyIapReceipt(receiptData, selectedPlan);
+          await verifyIapReceipt(receiptData, targetTier);
           verified = true;
           break;
         } catch (err) {
@@ -866,10 +768,10 @@ export function SubscriptionScreen() {
         if (
           fresh &&
           isPlanSwitch &&
-          fresh.plan !== selectedPlan &&
+          fresh.plan !== targetTier &&
           (fresh.status === 'subscribed' || fresh.status === 'trialing')
         ) {
-          fresh = { ...fresh, plan: selectedPlan };
+          fresh = { ...fresh, plan: targetTier };
           setSubscription(fresh);
         }
       } catch {
@@ -901,7 +803,7 @@ export function SubscriptionScreen() {
 
       await iapService.finishTransaction(receipt.transactionId);
       markSubscriptionJustActivated();
-      setConfirmedPlan(selectedPlan);
+      setConfirmedProductId(targetProductId);
       setConfirmedExpireAt(fresh?.expireAt ?? null);
       setShowPaymentSuccess(true);
     } catch (err) {
@@ -929,7 +831,15 @@ export function SubscriptionScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [t, selectedPlan, currentPlan, loadSubscription, setSubscription]);
+  }, [
+    t,
+    selectedEntry,
+    selectedPlanTier,
+    currentPlan,
+    loadSubscription,
+    setSubscription,
+    handleRestore,
+  ]);
 
   const resetToPostSubscriptionRoute = useCallback(async () => {
     const route = await resolvePostSubscriptionRoute();
@@ -964,7 +874,7 @@ export function SubscriptionScreen() {
   const subscribeButtonLabel =
     currentPlan === 'yearly'
       ? t('subscription.actions.currentYearly')
-      : currentPlan && selectedPlan !== currentPlan
+      : currentPlan && selectedPlanTier && selectedPlanTier !== currentPlan
       ? t('subscription.actions.switchPlan')
       : t('subscription.actions.subscribe');
 
@@ -1010,46 +920,50 @@ export function SubscriptionScreen() {
             // (priceFallback → real localizedPrice) reads as "loading then
             // settled" instead of a jarring text replacement. Once products
             // are resolved (or refresh after error) we restore full opacity.
-            storeProducts.loading && styles.planRowLoading,
+            plansLoading && styles.planRowLoading,
           ]}
         >
-          <PlanCard
-            price={monthlyPriceLabel}
-            unit={monthlyUnitLabel}
-            selected={selectedPlan === 'monthly'}
-            disabled={
-              currentPlan === 'monthly' ||
-              isDowngradePlan(currentPlan, 'monthly')
-            }
-            currentBadge={
-              currentPlan === 'monthly'
-                ? t('subscription.plans.currentPlan')
-                : undefined
-            }
-            onPress={() => setSelectedPlan('monthly')}
-          />
-          <PlanCard
-            price={yearlyPriceLabel}
-            unit={yearlyUnitLabel}
-            oldPrice={yearlyOldPriceLabel}
-            savingsBadge={yearlySavingsLabel}
-            selected={selectedPlan === 'yearly'}
-            disabled={currentPlan === 'yearly'}
-            currentBadge={
-              currentPlan === 'yearly'
-                ? t('subscription.plans.currentPlan')
-                : undefined
-            }
-            onPress={() => setSelectedPlan('yearly')}
-          />
+          {plans.map(entry => {
+            const product = entry.product;
+            // entry.product is non-null here — `plans` filtered out null
+            // products above. Cast keeps TS happy without an extra guard.
+            const tier = productIdToPlan(entry.plan.product_id);
+            const cardIsCurrent = tier != null && currentPlan === tier;
+            const cardIsDowngrade =
+              tier != null && isDowngradePlan(currentPlan, tier);
+            const unitLabel = product ? periodLabel(product, '', t) : '';
+            return (
+              <SubscriptionPlanCard
+                key={entry.plan.product_id}
+                title={entry.plan.name}
+                description={entry.plan.description}
+                badges={entry.plan.badges}
+                width={planCardWidth(plans.length)}
+                price={product?.displayPrice ?? '—'}
+                unit={unitLabel}
+                oldPrice={entry.savings?.annualizedMonthlyDisplay}
+                savingsBadge={entry.savings?.display}
+                selected={selectedProductId === entry.plan.product_id}
+                disabled={cardIsCurrent || cardIsDowngrade}
+                recommended={entry.plan.recommended}
+                currentBadge={
+                  cardIsCurrent
+                    ? t('subscription.plans.currentPlan')
+                    : undefined
+                }
+                onPress={() => setSelectedProductId(entry.plan.product_id)}
+              />
+            );
+          })}
         </View>
 
-        {storeProducts.error && FEATURES.IAP_ENABLED ? (
+        {(plansError || (FEATURES.IAP_ENABLED && plans.length === 0)) &&
+        FEATURES.IAP_ENABLED ? (
           <TouchableOpacity
             style={styles.errorBanner}
             activeOpacity={0.7}
             onPress={() => {
-              void storeProducts.refresh();
+              void refreshPlans();
             }}
             accessibilityLabel={t('common.retry')}
           >
@@ -1065,9 +979,10 @@ export function SubscriptionScreen() {
           activeOpacity={0.7}
           disabled={
             isLoading ||
+            selectedEntry == null ||
             selectedPlanIsCurrent ||
             selectedPlanIsDowngrade ||
-            (storeProducts.error != null && FEATURES.IAP_ENABLED)
+            (plansError != null && FEATURES.IAP_ENABLED)
           }
           onPress={() => {
             void handleSubscribe();
@@ -1098,12 +1013,21 @@ export function SubscriptionScreen() {
         ) : null}
 
         <Text style={styles.footerText}>{t('subscription.footer')}</Text>
+        {plansSource === 'bootstrap' ? (
+          <Text style={styles.offlineNote}>
+            {t('subscription.plans.offlineMode')}
+          </Text>
+        ) : null}
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
       <PaymentSuccessModal
         visible={showPaymentSuccess}
-        plan={confirmedPlan}
+        planLabel={
+          confirmedProductId
+            ? getPlanDisplayName(confirmedProductId, plans, t)
+            : t('subscription.plans.fallback')
+        }
         expireAt={confirmedExpireAt}
         onDismiss={handlePaymentSuccessDismiss}
         t={t}
@@ -1207,6 +1131,12 @@ const styles = StyleSheet.create({
     color: '#b2bccc',
     textAlign: 'center',
     lineHeight: 18,
+  },
+  offlineNote: {
+    fontSize: 11,
+    color: '#9aa6b3',
+    textAlign: 'center',
+    marginTop: 8,
   },
   restoreButton: {
     alignSelf: 'center',

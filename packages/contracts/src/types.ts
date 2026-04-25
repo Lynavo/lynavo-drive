@@ -247,3 +247,47 @@ export interface SharedDirectoryDTO {
   files: SharedFileDTO[];
   totalCount: number;
 }
+
+/**
+ * Platforms the paywall catalog supports. Kept as a string literal union
+ * (not enum) so server-side additions do not break older clients — an
+ * unknown platform string is treated as "filtered out" rather than a hard
+ * parse error.
+ */
+export type SubscriptionPlanPlatform = 'ios' | 'android';
+
+/**
+ * Server-controlled paywall entry. Returned by GET /api/v1/subscription/plans.
+ *
+ * The server owns the *business* layer: which SKUs to show, in what
+ * order, with what marketing copy. Price / currency / period come from
+ * Apple StoreKit at render time — not from this DTO. The mobile client
+ * merges server rows with StoreKit product info to build the final paywall.
+ *
+ * Date fields are ISO 8601 strings (Go time.Time default format, RFC 3339).
+ */
+export interface SubscriptionPlanDto {
+  id: number;
+  /** Apple IAP product identifier, e.g. "com.vividrop.mobile.china.monthly.999". */
+  product_id: string;
+  platform: SubscriptionPlanPlatform;
+  /** Display name for the card header (Chinese by default). */
+  name: string;
+  /** One-line subtitle shown under the name. */
+  description: string;
+  /** Short marketing labels (e.g. "8.8 折", "限時"). Always an array — never null. */
+  badges: string[];
+  /** Highlighted card in the paywall. At most one plan per platform should be flagged. */
+  recommended: boolean;
+  /** Ascending order; lower values render first. */
+  sort_order: number;
+  /** Soft-delete flag. Server filters inactive rows before responding, so clients will not normally observe `false`. */
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Envelope returned by GET /api/v1/subscription/plans. */
+export interface SubscriptionPlansResponse {
+  plans: SubscriptionPlanDto[];
+}
