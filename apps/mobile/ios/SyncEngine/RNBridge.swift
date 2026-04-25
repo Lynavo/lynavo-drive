@@ -32,32 +32,43 @@ class NativeSyncEngineModule: RCTEventEmitter {
 
     // MARK: - Event Emitters
 
+    private func sendEventOnMain(withName name: String, body: Any?) {
+        if Thread.isMainThread {
+            sendEvent(withName: name, body: body)
+            return
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            self?.sendEvent(withName: name, body: body)
+        }
+    }
+
     func emitDiscoveredDevices(_ devices: [[String: Any]]) {
-        sendEvent(withName: "onDiscoveredDevicesChanged", body: devices)
+        sendEventOnMain(withName: "onDiscoveredDevicesChanged", body: devices)
     }
 
     func emitSyncStateChanged(_ state: [String: Any]) {
-        sendEvent(withName: "onSyncStateChanged", body: state)
+        sendEventOnMain(withName: "onSyncStateChanged", body: state)
     }
 
     func emitQueueUpdated(_ queue: [[String: Any]]) {
-        sendEvent(withName: "onQueueUpdated", body: queue)
+        sendEventOnMain(withName: "onQueueUpdated", body: queue)
     }
 
     func emitHistoryUpdated() {
-        sendEvent(withName: "onHistoryUpdated", body: nil)
+        sendEventOnMain(withName: "onHistoryUpdated", body: nil)
     }
 
     func emitBindingStateChanged(_ binding: [String: Any]?) {
-        sendEvent(withName: "onBindingStateChanged", body: binding)
+        sendEventOnMain(withName: "onBindingStateChanged", body: binding)
     }
 
     func emitError(_ error: [String: Any]) {
-        sendEvent(withName: "onError", body: error)
+        sendEventOnMain(withName: "onError", body: error)
     }
 
     func emitPhotoLibraryChanged() {
-        sendEvent(withName: "onPhotoLibraryChanged", body: nil)
+        sendEventOnMain(withName: "onPhotoLibraryChanged", body: nil)
     }
 
     // MARK: - Bridge Methods
