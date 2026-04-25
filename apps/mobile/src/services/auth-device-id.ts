@@ -1,11 +1,15 @@
+import * as Keychain from 'react-native-keychain';
+
 let cachedAuthDeviceId: string | null = null;
 let inflightAuthDeviceId: Promise<string> | null = null;
 
 function generateDeviceId(): string {
   const bytes = new Uint8Array(16);
-  const cryptoObj = (globalThis as {
-    crypto?: { getRandomValues?: (array: Uint8Array) => Uint8Array };
-  }).crypto;
+  const cryptoObj = (
+    globalThis as {
+      crypto?: { getRandomValues?: (array: Uint8Array) => Uint8Array };
+    }
+  ).crypto;
 
   if (cryptoObj?.getRandomValues) {
     cryptoObj.getRandomValues(bytes);
@@ -18,7 +22,9 @@ function generateDeviceId(): string {
   bytes[6] = (bytes[6] & 0x0f) | 0x40;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
 
-  const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+  const hex = Array.from(bytes, byte =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('');
   return [
     hex.slice(0, 8),
     hex.slice(8, 12),
@@ -46,7 +52,6 @@ export async function getOrCreateAuthDeviceId(): Promise<string> {
 }
 
 async function loadOrCreateAuthDeviceId(): Promise<string> {
-  const Keychain = await import('react-native-keychain');
   const service = 'cn.vividrop.auth-device-id';
   const account = 'auth-device-id';
 
