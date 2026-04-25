@@ -2,6 +2,7 @@ import React from 'react';
 import { Alert } from 'react-native';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { ReactTestInstance } from 'react-test-renderer';
 import type { SubscriptionInfo, UserProfile } from '../../stores/auth-store';
 
 jest.mock('react-native-localize', () => ({
@@ -196,7 +197,7 @@ describe('SettingsScreen', () => {
     NativeModules.NativeSyncEngine = mockNativeSyncEngine;
     jest
       .spyOn(NativeEventEmitter.prototype, 'addListener')
-      .mockImplementation(() => ({ remove: jest.fn() } as never));
+      .mockImplementation(() => ({ remove: jest.fn() }) as never);
   });
 
   test('subscription card prefers subscription status over stale user status', async () => {
@@ -327,8 +328,7 @@ describe('SettingsScreen', () => {
       // Find the pencil edit button by its icon name and press it.
       const TextRN = require('react-native').Text;
       const pencilNode = UNSAFE_getAllByType(TextRN).find(
-        (n: { props: { children: unknown } }) =>
-          n.props.children === 'pencil-outline',
+        (n: ReactTestInstance) => n.props.children === 'pencil-outline',
       );
       expect(pencilNode).toBeTruthy();
       fireEvent.press(pencilNode!);
@@ -336,8 +336,7 @@ describe('SettingsScreen', () => {
       // After entering edit mode, the checkmark icon (confirm button) appears.
       await waitFor(() => {
         const checkmark = UNSAFE_getAllByType(TextRN).find(
-          (n: { props: { children: unknown } }) =>
-            n.props.children === 'checkmark',
+          (n: ReactTestInstance) => n.props.children === 'checkmark',
         );
         expect(checkmark).toBeTruthy();
       });
@@ -361,16 +360,14 @@ describe('SettingsScreen', () => {
 
       const TextRN = require('react-native').Text;
       const pencilNode = UNSAFE_getAllByType(TextRN).find(
-        (n: { props: { children: unknown } }) =>
-          n.props.children === 'pencil-outline',
+        (n: ReactTestInstance) => n.props.children === 'pencil-outline',
       );
       expect(pencilNode).toBeTruthy();
       fireEvent.press(pencilNode!);
 
       // No checkmark (confirm) → edit mode never opened.
       const checkmark = UNSAFE_getAllByType(TextRN).find(
-        (n: { props: { children: unknown } }) =>
-          n.props.children === 'checkmark',
+        (n: ReactTestInstance) => n.props.children === 'checkmark',
       );
       expect(checkmark).toBeFalsy();
 

@@ -66,7 +66,9 @@ const yearlyPlan: SubscriptionPlanDto = {
 describe('subscriptionPlansService.fetchPlans', () => {
   let warnSpy: jest.SpyInstance;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    await subscriptionPlansService._clearCache();
     jest.clearAllMocks();
     warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
@@ -104,6 +106,62 @@ describe('subscriptionPlansService.fetchPlans', () => {
     };
     expect(envelope.platform).toBe('ios');
     expect(envelope.plans).toEqual([monthlyPlan, yearlyPlan]);
+  });
+
+  test('coalesces concurrent requests for the same platform', async () => {
+    let resolveNetwork!: (value: SubscriptionPlansResponse) => void;
+    (apiGet as jest.Mock).mockReturnValueOnce(
+      new Promise<SubscriptionPlansResponse>(resolve => {
+        resolveNetwork = resolve;
+      }),
+    );
+
+    const first = subscriptionPlansService.fetchPlans('ios');
+    const second = subscriptionPlansService.fetchPlans('ios');
+
+    expect(apiGet).toHaveBeenCalledTimes(1);
+    resolveNetwork({ plans: [monthlyPlan] });
+
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+    expect(firstResult).toEqual(secondResult);
+    expect(firstResult.source).toBe('network');
+    expect(firstResult.plans).toEqual([monthlyPlan]);
+  });
+
+  test('serves repeated requests from short-lived memory cache', async () => {
+    (apiGet as jest.Mock).mockResolvedValueOnce({ plans: [monthlyPlan] });
+
+    const first = await subscriptionPlansService.fetchPlans('ios');
+    const second = await subscriptionPlansService.fetchPlans('ios');
+
+    expect(apiGet).toHaveBeenCalledTimes(1);
+    expect(second).toEqual(first);
+  });
+
+  test('bootstrap fallback memory cache expires quickly', async () => {
+    const nowSpy = jest.spyOn(Date, 'now');
+    nowSpy.mockReturnValue(1_000);
+    (apiGet as jest.Mock).mockRejectedValueOnce(new Error('offline'));
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(null);
+
+    const first = await subscriptionPlansService.fetchPlans('ios');
+    expect(first.source).toBe('bootstrap');
+    expect(apiGet).toHaveBeenCalledTimes(1);
+
+    nowSpy.mockReturnValue(5_000);
+    const second = await subscriptionPlansService.fetchPlans('ios');
+    expect(second.source).toBe('bootstrap');
+    expect(apiGet).toHaveBeenCalledTimes(1);
+
+    nowSpy.mockReturnValue(7_000);
+    (apiGet as jest.Mock).mockResolvedValueOnce({ plans: [monthlyPlan] });
+    const third = await subscriptionPlansService.fetchPlans('ios');
+
+    expect(third.source).toBe('network');
+    expect(third.plans).toEqual([monthlyPlan]);
+    expect(apiGet).toHaveBeenCalledTimes(2);
+
+    nowSpy.mockRestore();
   });
 
   test('falls back to cache when network fails and cache is valid', async () => {

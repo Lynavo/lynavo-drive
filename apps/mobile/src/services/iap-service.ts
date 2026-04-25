@@ -26,6 +26,7 @@ import { looksLikeUserDismiss } from './iap-errors';
 const MAX_RESTORE_RECEIPTS = 10;
 const PURCHASE_TIMEOUT_MS = 60_000;
 const NON_FATAL_ERROR_GRACE_MS = PURCHASE_TIMEOUT_MS;
+const ORPHAN_PURCHASE_RETRY_BACKOFF_MS = 60_000;
 type RestorablePlan = NonNullable<ReturnType<typeof productIdToPlan>>;
 type PendingPurchase = {
   resolve: (r: PurchaseReceipt) => void;
@@ -104,31 +105,92 @@ export interface IapService {
 
 class IapServiceImpl implements IapService {
   private initialized = false;
+  private initializePromise: Promise<void> | null = null;
+  private teardownPromise: Promise<void> | null = null;
+  private teardownRequested = false;
   private purchaseSub: EmitterSubscription | null = null;
   private errorSub: EmitterSubscription | null = null;
   private pendingPurchase = new Map<IapProductId, PendingPurchase>();
   private orphanListeners = new Set<() => void>();
+  private orphanVerificationInFlight = new Set<string>();
+  private orphanRetryAfter = new Map<string, number>();
 
   async initialize(): Promise<void> {
-    if (this.initialized) return;
-    await initConnection();
-    this.purchaseSub = purchaseUpdatedListener(p => {
-      void this.handlePurchaseEvent(p);
-    });
-    this.errorSub = purchaseErrorListener(err => {
-      this.handleErrorEvent(err);
-    });
-    this.initialized = true;
+    while (true) {
+      if (this.teardownPromise) {
+        await this.teardownPromise;
+        continue;
+      }
+
+      if (this.initialized) return;
+
+      if (this.initializePromise) {
+        const pendingInitialize = this.initializePromise;
+        if (!this.teardownRequested) return pendingInitialize;
+        await pendingInitialize;
+        continue;
+      }
+
+      this.teardownRequested = false;
+      this.initializePromise = this.initializeConnection();
+      return this.initializePromise;
+    }
   }
 
   async teardown(): Promise<void> {
+    if (this.initializePromise && !this.initialized) {
+      this.teardownRequested = true;
+      await this.initializePromise;
+      return;
+    }
+    if (this.teardownPromise) return this.teardownPromise;
     if (!this.initialized) return;
+    this.teardownRequested = true;
+    this.teardownPromise = this.teardownConnection();
+    return this.teardownPromise;
+  }
+
+  private async teardownConnection(): Promise<void> {
     this.purchaseSub?.remove();
     this.errorSub?.remove();
     this.purchaseSub = null;
     this.errorSub = null;
-    await endConnection();
-    this.initialized = false;
+    try {
+      await endConnection();
+    } finally {
+      this.initialized = false;
+      this.teardownPromise = null;
+    }
+  }
+
+  private async initializeConnection(): Promise<void> {
+    try {
+      await initConnection();
+      if (this.teardownRequested) {
+        await endConnection().catch(() => {});
+        return;
+      }
+
+      const purchaseSub = purchaseUpdatedListener(p => {
+        void this.handlePurchaseEvent(p);
+      });
+      const errorSub = purchaseErrorListener(err => {
+        this.handleErrorEvent(err);
+      });
+
+      if (this.teardownRequested) {
+        purchaseSub.remove();
+        errorSub.remove();
+        await endConnection().catch(() => {});
+        return;
+      }
+
+      this.purchaseSub = purchaseSub;
+      this.errorSub = errorSub;
+      this.initialized = true;
+    } finally {
+      this.initializePromise = null;
+    }
   }
 
   async purchase(productId: IapProductId): Promise<PurchaseReceipt> {
@@ -544,25 +606,52 @@ class IapServiceImpl implements IapService {
       await this.finishTransaction(txId).catch(() => {});
       return;
     }
+    const orphanKey = this.orphanPurchaseKey(p);
+    if (this.orphanVerificationInFlight.has(orphanKey)) {
+      return;
+    }
+    const retryAfter = this.orphanRetryAfter.get(orphanKey);
+    if (retryAfter != null && Date.now() < retryAfter) {
+      return;
+    }
+
+    this.orphanVerificationInFlight.add(orphanKey);
     try {
       await verifyIapReceipt(p.transactionReceipt, plan);
       await this.finishTransaction(txId).catch(() => {});
+      this.orphanRetryAfter.delete(orphanKey);
       this.orphanListeners.forEach(cb => cb());
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === ERROR_CODE.RECEIPT_ALREADY_USED) {
           await this.finishTransaction(txId).catch(() => {});
+          this.orphanRetryAfter.delete(orphanKey);
           this.orphanListeners.forEach(cb => cb());
           return;
         }
         if (err.code === ERROR_CODE.PRODUCT_ID_MISMATCH) {
           await this.finishTransaction(txId).catch(() => {});
+          this.orphanRetryAfter.delete(orphanKey);
           return;
         }
       }
       // Network / 5xx / 2001 — leave the transaction unfinished so Apple
-      // redelivers it on next startup.
+      // redelivers it later, but throttle same-transaction repeats so login
+      // cannot get flooded by StoreKit redelivery loops.
+      this.orphanRetryAfter.set(
+        orphanKey,
+        Date.now() + ORPHAN_PURCHASE_RETRY_BACKOFF_MS,
+      );
+    } finally {
+      this.orphanVerificationInFlight.delete(orphanKey);
     }
+  }
+
+  private orphanPurchaseKey(p: Purchase): string {
+    if (p.transactionId) return `tx:${p.transactionId}`;
+    const receipt =
+      typeof p.transactionReceipt === 'string' ? p.transactionReceipt : '';
+    return `receipt:${p.productId}:${receipt.slice(0, 64)}`;
   }
 }
 

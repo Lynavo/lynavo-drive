@@ -13,6 +13,8 @@ import { ALL_PRODUCT_IDS, IAP_PRODUCTS } from '../constants/iap';
 
 const CACHE_KEY = '@vividrop/subscription-plans-cache:v1';
 const PLANS_PATH = '/subscription/plans';
+const MEMORY_CACHE_TTL_MS = 60_000;
+const BOOTSTRAP_MEMORY_CACHE_TTL_MS = 5_000;
 
 export type SubscriptionPlansSource = 'network' | 'cache' | 'bootstrap';
 
@@ -28,6 +30,15 @@ export interface SubscriptionPlansService {
   /** Test-only: clears the AsyncStorage cache. */
   _clearCache(): Promise<void>;
 }
+
+const memoryCache = new Map<
+  SubscriptionPlanPlatform,
+  { result: SubscriptionPlansResult; expiresAt: number }
+>();
+const inFlightFetches = new Map<
+  SubscriptionPlanPlatform,
+  Promise<SubscriptionPlansResult>
+>();
 
 // ---------------------------------------------------------------------------
 // Cache envelope
@@ -184,6 +195,37 @@ class SubscriptionPlansServiceImpl implements SubscriptionPlansService {
   async fetchPlans(
     platform: SubscriptionPlanPlatform = 'ios',
   ): Promise<SubscriptionPlansResult> {
+    const now = Date.now();
+    const cachedResult = memoryCache.get(platform);
+    if (cachedResult && cachedResult.expiresAt > now) {
+      return cachedResult.result;
+    }
+
+    const inFlight = inFlightFetches.get(platform);
+    if (inFlight) return inFlight;
+
+    const task = this.fetchPlansUncached(platform).finally(() => {
+      inFlightFetches.delete(platform);
+    });
+    inFlightFetches.set(platform, task);
+    return task;
+  }
+
+  private remember(
+    platform: SubscriptionPlanPlatform,
+    result: SubscriptionPlansResult,
+    ttlMs: number = MEMORY_CACHE_TTL_MS,
+  ): SubscriptionPlansResult {
+    memoryCache.set(platform, {
+      result,
+      expiresAt: Date.now() + ttlMs,
+    });
+    return result;
+  }
+
+  private async fetchPlansUncached(
+    platform: SubscriptionPlanPlatform,
+  ): Promise<SubscriptionPlansResult> {
     // 1. Try the network. apiGet handles auth, refresh, timeout, retry.
     try {
       const response = await apiGet<SubscriptionPlansResponse>(
@@ -194,7 +236,7 @@ class SubscriptionPlansServiceImpl implements SubscriptionPlansService {
       // ordering bug on the backend cannot shuffle the paywall.
       const sorted = [...plans].sort((a, b) => a.sort_order - b.sort_order);
       void writeCache(platform, sorted);
-      return { plans: sorted, source: 'network' };
+      return this.remember(platform, { plans: sorted, source: 'network' });
     } catch (err) {
       if (err instanceof ApiError) {
         console.warn(
@@ -208,17 +250,26 @@ class SubscriptionPlansServiceImpl implements SubscriptionPlansService {
     // 2. Fall back to the AsyncStorage cache.
     const cached = await readCache(platform);
     if (cached && cached.length > 0) {
-      return { plans: cached, source: 'cache' };
+      return this.remember(platform, { plans: cached, source: 'cache' });
     }
 
     // 3. Final fallback — protect the paywall so users can still subscribe.
     console.warn(
       '[plans-service] bootstrap fallback active — server unreachable and no cache',
     );
-    return { plans: buildBootstrapPlans(platform), source: 'bootstrap' };
+    return this.remember(
+      platform,
+      {
+        plans: buildBootstrapPlans(platform),
+        source: 'bootstrap',
+      },
+      BOOTSTRAP_MEMORY_CACHE_TTL_MS,
+    );
   }
 
   async _clearCache(): Promise<void> {
+    memoryCache.clear();
+    inFlightFetches.clear();
     try {
       await AsyncStorage.removeItem(CACHE_KEY);
     } catch {

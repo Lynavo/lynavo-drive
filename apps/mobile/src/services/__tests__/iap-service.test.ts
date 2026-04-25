@@ -38,6 +38,16 @@ jest.mock('../subscription-service', () => ({
 
 import { iapService } from '../iap-service';
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 describe('iapService — lifecycle', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -63,6 +73,70 @@ describe('iapService — lifecycle', () => {
     expect(purchaseUpdatedListener).toHaveBeenCalledTimes(1);
   });
 
+  test('initialize() coalesces concurrent calls while initConnection is pending', async () => {
+    const init = deferred<boolean>();
+    (initConnection as jest.Mock).mockReturnValueOnce(init.promise);
+
+    const first = iapService.initialize();
+    const second = iapService.initialize();
+
+    expect(initConnection).toHaveBeenCalledTimes(1);
+    init.resolve(true);
+    await Promise.all([first, second]);
+
+    expect(purchaseUpdatedListener).toHaveBeenCalledTimes(1);
+    expect(purchaseErrorListener).toHaveBeenCalledTimes(1);
+  });
+
+  test('teardown() during pending initialize closes the native connection without mounting listeners', async () => {
+    const init = deferred<boolean>();
+    (initConnection as jest.Mock).mockReturnValueOnce(init.promise);
+
+    const initializing = iapService.initialize();
+    const tearingDown = iapService.teardown();
+
+    init.resolve(true);
+    await Promise.all([initializing, tearingDown]);
+
+    expect(purchaseUpdatedListener).not.toHaveBeenCalled();
+    expect(purchaseErrorListener).not.toHaveBeenCalled();
+    expect(endConnection).toHaveBeenCalledTimes(1);
+  });
+
+  test('initialize() after teardown during pending initialize starts a fresh listener', async () => {
+    const init = deferred<boolean>();
+    (initConnection as jest.Mock).mockReturnValueOnce(init.promise);
+
+    const firstInitialize = iapService.initialize();
+    const tearingDown = iapService.teardown();
+    const secondInitialize = iapService.initialize();
+
+    init.resolve(true);
+    await Promise.all([firstInitialize, tearingDown, secondInitialize]);
+
+    expect(initConnection).toHaveBeenCalledTimes(2);
+    expect(endConnection).toHaveBeenCalledTimes(1);
+    expect(purchaseUpdatedListener).toHaveBeenCalledTimes(1);
+    expect(purchaseErrorListener).toHaveBeenCalledTimes(1);
+  });
+
+  test('initialize() during active teardown waits and reconnects', async () => {
+    const end = deferred<void>();
+    (endConnection as jest.Mock).mockReturnValueOnce(end.promise);
+
+    await iapService.initialize();
+    const tearingDown = iapService.teardown();
+    const secondInitialize = iapService.initialize();
+
+    end.resolve();
+    await Promise.all([tearingDown, secondInitialize]);
+
+    expect(initConnection).toHaveBeenCalledTimes(2);
+    expect(endConnection).toHaveBeenCalledTimes(1);
+    expect(purchaseUpdatedListener).toHaveBeenCalledTimes(2);
+    expect(purchaseErrorListener).toHaveBeenCalledTimes(2);
+  });
+
   test('teardown() removes listeners and ends connection', async () => {
     const removeMock = jest.fn();
     (purchaseUpdatedListener as jest.Mock).mockReturnValue({
@@ -86,7 +160,7 @@ describe('iapService — lifecycle', () => {
 });
 
 import { getReceiptIOS, requestSubscription } from 'react-native-iap';
-import { IAP_PRODUCTS } from '../../constants/iap';
+import { ALL_PRODUCT_IDS, IAP_PRODUCTS } from '../../constants/iap';
 
 describe('iapService — purchase', () => {
   let updatedCb: ((p: any) => void) | null = null;
@@ -434,6 +508,25 @@ describe('iapService — orphan recovery', () => {
     expect(finishTxMock).not.toHaveBeenCalled();
   });
 
+  test('orphan with retryable failure is throttled for the same transaction', async () => {
+    (verifyIapReceipt as jest.Mock).mockRejectedValue(
+      new ApiError(ERROR_CODE.NETWORK_ERROR, 'net'),
+    );
+    const purchase = {
+      productId: IAP_PRODUCTS.monthly,
+      transactionReceipt: 'BLOB',
+      transactionId: 'tx_orphan_retry_throttle',
+    };
+
+    updatedCb?.(purchase);
+    await new Promise<void>(r => setImmediate(r));
+    updatedCb?.(purchase);
+    await new Promise<void>(r => setImmediate(r));
+
+    expect(verifyIapReceipt).toHaveBeenCalledTimes(1);
+    expect(finishTxMock).not.toHaveBeenCalled();
+  });
+
   test('onOrphanPurchaseVerified returns unsubscribe', async () => {
     (verifyIapReceipt as jest.Mock).mockResolvedValueOnce(undefined);
     const listener = jest.fn();
@@ -516,7 +609,7 @@ describe('iapService — checkEligibility', () => {
     await iapService.checkEligibility();
 
     expect(getSubscriptions).toHaveBeenCalledWith({
-      skus: [IAP_PRODUCTS.monthly, IAP_PRODUCTS.yearly],
+      skus: [...ALL_PRODUCT_IDS],
     });
   });
 });
