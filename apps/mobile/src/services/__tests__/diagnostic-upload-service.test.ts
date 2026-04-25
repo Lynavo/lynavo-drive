@@ -27,6 +27,17 @@ interface MockXHR {
 }
 
 let lastXHR: MockXHR;
+const zipBlob = new Blob(['fake-zip'], {
+  type: 'application/zip',
+  lastModified: Date.now(),
+});
+
+async function flushUploadSetup() {
+  for (let i = 0; i < 10; i += 1) {
+    await Promise.resolve();
+    if (lastXHR.send.mock.calls.length > 0) return;
+  }
+}
 
 beforeEach(() => {
   lastXHR = {
@@ -40,13 +51,20 @@ beforeEach(() => {
   };
   // @ts-expect-error overriding global for test environment
   global.XMLHttpRequest = jest.fn(() => lastXHR);
+  globalThis.fetch = jest.fn().mockResolvedValue({
+    blob: jest.fn().mockResolvedValue(zipBlob),
+  });
 });
 
 describe('diagnosticUploadService.upload', () => {
   test('happy path: 200 → resolves with refId + uploadedAt', async () => {
-    const blob = new Blob(['fake-zip']);
     const ctrl = new AbortController();
-    const promise = diagnosticUploadService.upload(blob, 'client-1', ctrl.signal);
+    const promise = diagnosticUploadService.upload(
+      'file:///tmp/diagnostics-test.zip',
+      'client-1',
+      ctrl.signal,
+    );
+    await flushUploadSetup();
 
     lastXHR.status = 200;
     lastXHR.responseText = JSON.stringify({
@@ -66,14 +84,29 @@ describe('diagnosticUploadService.upload', () => {
       'Authorization',
       'Bearer test-token',
     );
+    expect(lastXHR.setRequestHeader).toHaveBeenCalledWith(
+      'Content-Type',
+      expect.stringMatching(/^multipart\/form-data; boundary=syncflow-/),
+    );
+    const sentBody = lastXHR.send.mock.calls[0][0] as unknown as {
+      text(): Promise<string>;
+    };
+    const multipartText = await sentBody.text();
+    expect(multipartText).toContain('name="client_id"\r\n\r\nclient-1');
+    expect(multipartText).toContain(
+      'name="bundle"; filename="diagnostics-',
+    );
+    expect(multipartText).toContain('Content-Type: application/zip');
+    expect(multipartText).toContain('fake-zip');
   });
 
   test('413 → rejects with BUNDLE_TOO_LARGE', async () => {
     const promise = diagnosticUploadService.upload(
-      new Blob(['x']),
+      'file:///tmp/x.zip',
       'c',
       new AbortController().signal,
     );
+    await flushUploadSetup();
     lastXHR.status = 413;
     lastXHR.onload!();
     await expect(promise).rejects.toMatchObject({
@@ -83,10 +116,11 @@ describe('diagnosticUploadService.upload', () => {
 
   test('500 → rejects with SERVER_ERROR carrying status', async () => {
     const promise = diagnosticUploadService.upload(
-      new Blob(['x']),
+      'file:///tmp/x.zip',
       'c',
       new AbortController().signal,
     );
+    await flushUploadSetup();
     lastXHR.status = 500;
     lastXHR.responseText = 'internal error';
     lastXHR.onload!();
@@ -97,10 +131,11 @@ describe('diagnosticUploadService.upload', () => {
 
   test('network failure → rejects with NETWORK_ERROR', async () => {
     const promise = diagnosticUploadService.upload(
-      new Blob(['x']),
+      'file:///tmp/x.zip',
       'c',
       new AbortController().signal,
     );
+    await flushUploadSetup();
     lastXHR.onerror!();
     await expect(promise).rejects.toMatchObject({
       detail: { kind: 'NETWORK_ERROR' },
@@ -110,10 +145,11 @@ describe('diagnosticUploadService.upload', () => {
   test('abort signal → rejects with ABORTED + xhr.abort called', async () => {
     const ctrl = new AbortController();
     const promise = diagnosticUploadService.upload(
-      new Blob(['x']),
+      'file:///tmp/x.zip',
       'c',
       ctrl.signal,
     );
+    await flushUploadSetup();
     ctrl.abort();
     await expect(promise).rejects.toMatchObject({
       detail: { kind: 'ABORTED' },
@@ -124,11 +160,12 @@ describe('diagnosticUploadService.upload', () => {
   test('progress callback fires when upload.onprogress emitted', async () => {
     const onProgress = jest.fn();
     const promise = diagnosticUploadService.upload(
-      new Blob(['x']),
+      'file:///tmp/x.zip',
       'c',
       new AbortController().signal,
       onProgress,
     );
+    await flushUploadSetup();
 
     lastXHR.upload.onprogress!({
       lengthComputable: true,
@@ -144,6 +181,16 @@ describe('diagnosticUploadService.upload', () => {
     });
     lastXHR.onload!();
     await promise;
+  });
+
+  test('empty file uri rejects before touching XHR', async () => {
+    await expect(
+      diagnosticUploadService.upload('  ', 'c', new AbortController().signal),
+    ).rejects.toMatchObject({
+      detail: { kind: 'NETWORK_ERROR' },
+    });
+    expect(globalThis.XMLHttpRequest).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   test('DiagnosticUploadError has correct name and message for SERVER_ERROR', () => {

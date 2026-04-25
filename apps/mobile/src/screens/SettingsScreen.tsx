@@ -562,12 +562,11 @@ export function SettingsScreen() {
                 const archiveUrl = archivePath.startsWith('file://')
                   ? archivePath
                   : `file://${archivePath}`;
-                const zipBlob = await fetch(archiveUrl).then(r => r.blob());
 
-                const clientId = String(auth.user?.id ?? 'unknown');
+                const clientId = String(await NativeSyncEngine.getClientId());
 
                 const result = await diagnosticUploadService.upload(
-                  zipBlob,
+                  archiveUrl,
                   clientId,
                   abortController.signal,
                   (loaded, total) => {

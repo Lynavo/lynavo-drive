@@ -118,12 +118,6 @@ jest.mock('../../services/diagnostic-upload-service', () => {
   };
 });
 
-// Mock fetch — used to convert file:// path → Blob
-const mockFetchBlob = {} as Blob; // opaque placeholder; upload service receives it as-is
-(globalThis as Record<string, unknown>).fetch = jest.fn().mockResolvedValue({
-  blob: () => Promise.resolve(mockFetchBlob),
-});
-
 // ---------------------------------------------------------------------------
 // Auth mock
 // ---------------------------------------------------------------------------
@@ -188,6 +182,7 @@ const EXPORT_PATH = '/tmp/diagnostics-test.zip';
 
 const mockNativeSyncEngine = {
   getBindingState: jest.fn().mockResolvedValue(null),
+  getClientId: jest.fn().mockResolvedValue('mobile-client-uuid'),
   getClientDisplayName: jest.fn().mockResolvedValue('My iPhone'),
   getAppInfo: jest.fn().mockResolvedValue({ version: '1.0.0', build: '1' }),
   getHistoryDays: jest.fn().mockResolvedValue({ items: [] }),
@@ -276,7 +271,7 @@ describe('SettingsScreen — diagnostic upload flow', () => {
     expect(mockUpload).not.toHaveBeenCalled();
   });
 
-  test('success: upload service called with blob + user-id, success toast shown with refId, clipboard written', async () => {
+  test('success: upload service called with file URI + mobile client id, success toast shown with refId, clipboard written', async () => {
     mockUpload.mockResolvedValueOnce({
       refId: 'ABC12XYZ',
       uploadedAt: '2026-04-25T10:00:00.000Z',
@@ -296,8 +291,8 @@ describe('SettingsScreen — diagnostic upload flow', () => {
 
     await waitFor(() => {
       expect(mockUpload).toHaveBeenCalledWith(
-        mockFetchBlob,
-        '42',
+        'file:///tmp/diagnostics-test.zip',
+        'mobile-client-uuid',
         expect.any(AbortSignal),
         expect.any(Function),
       );

@@ -213,6 +213,11 @@ export async function getOwnerUserId(): Promise<string | null> {
   return result;
 }
 
+export async function getClientId(): Promise<string> {
+  const result = await NativeSyncEngine.getClientId();
+  return String(result);
+}
+
 /** Record the auth user-id now bound to the sync identity on this device.
  *  Written after a successful login + owner-check, so a later login by a
  *  different user can be detected via owner mismatch and force a wipe.

@@ -4,6 +4,137 @@ import PhotosUI
 import React
 import UIKit
 
+private struct DiagnosticsUploadNativeError: LocalizedError {
+    let code: String
+    let message: String
+
+    var errorDescription: String? { message }
+}
+
+private func diagnosticsArchiveURL(from rawPath: String) -> URL? {
+    let trimmed = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+
+    if trimmed.hasPrefix("file://") {
+        return URL(string: trimmed)
+    }
+
+    return URL(fileURLWithPath: trimmed)
+}
+
+private func diagnosticsUploadLog(_ message: String) {
+    syncDiagnosticsLog("DiagnosticsUpload", message)
+    slog("[DiagnosticsUpload] %@", message)
+}
+
+private func appendDiagnosticsMultipartString(_ value: String, to data: inout Data) {
+    data.append(Data(value.utf8))
+}
+
+private func diagnosticsMultipartBody(
+    archiveURL: URL,
+    clientId: String,
+    boundary: String
+) throws -> Data {
+    var body = Data()
+    let filename = "diagnostics-\(Int(Date().timeIntervalSince1970 * 1000)).zip"
+
+    appendDiagnosticsMultipartString("--\(boundary)\r\n", to: &body)
+    appendDiagnosticsMultipartString("Content-Disposition: form-data; name=\"client_id\"\r\n\r\n", to: &body)
+    appendDiagnosticsMultipartString(clientId, to: &body)
+    appendDiagnosticsMultipartString("\r\n", to: &body)
+
+    appendDiagnosticsMultipartString("--\(boundary)\r\n", to: &body)
+    appendDiagnosticsMultipartString(
+        "Content-Disposition: form-data; name=\"bundle\"; filename=\"\(filename)\"\r\n",
+        to: &body
+    )
+    appendDiagnosticsMultipartString("Content-Type: application/zip\r\n\r\n", to: &body)
+    body.append(try Data(contentsOf: archiveURL))
+    appendDiagnosticsMultipartString("\r\n", to: &body)
+    appendDiagnosticsMultipartString("--\(boundary)--\r\n", to: &body)
+
+    return body
+}
+
+private func diagnosticsHeaders(from rawHeaders: Any?) -> [String: String] {
+    guard let rawHeaders = rawHeaders as? NSDictionary else { return [:] }
+
+    var headers: [String: String] = [:]
+    for (key, value) in rawHeaders {
+        guard let headerName = key as? String else { continue }
+        if let headerValue = value as? String {
+            headers[headerName] = headerValue
+        }
+    }
+    return headers
+}
+
+private func performDiagnosticsArchiveUpload(
+    archiveURL: URL,
+    uploadURL: URL,
+    clientId: String,
+    headers: [String: String]
+) async throws -> [String: Any] {
+    let boundary = "syncflow-\(UUID().uuidString)"
+    var request = URLRequest(url: uploadURL)
+    request.httpMethod = "POST"
+    for (key, value) in headers {
+        if key.caseInsensitiveCompare("Content-Type") == .orderedSame {
+            continue
+        }
+        request.setValue(value, forHTTPHeaderField: key)
+    }
+    let contentType = "multipart/form-data; boundary=\(boundary)"
+    request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+    request.httpBody = try diagnosticsMultipartBody(
+        archiveURL: archiveURL,
+        clientId: clientId,
+        boundary: boundary
+    )
+    let uploadBytes = request.httpBody?.count ?? 0
+    diagnosticsUploadLog(
+        "started url=\(uploadURL.absoluteString) archive=\(archiveURL.lastPathComponent) bytes=\(uploadBytes) client_id=\(clientId) contentType=\(contentType)"
+    )
+
+    let data: Data
+    let response: URLResponse
+    do {
+        (data, response) = try await URLSession.shared.data(for: request)
+    } catch {
+        diagnosticsUploadLog("failed network error=\(error)")
+        throw error
+    }
+    guard let httpResponse = response as? HTTPURLResponse else {
+        diagnosticsUploadLog("failed invalid response")
+        throw DiagnosticsUploadNativeError(code: "NETWORK_ERROR", message: "Invalid diagnostics upload response")
+    }
+    let body = String(data: data, encoding: .utf8) ?? ""
+    let clippedBody = body.count > 500 ? String(body.prefix(500)) : body
+    diagnosticsUploadLog(
+        "completed status=\(httpResponse.statusCode) responseBytes=\(data.count) body=\(clippedBody)"
+    )
+
+    if httpResponse.statusCode == 413 {
+        throw DiagnosticsUploadNativeError(code: "BUNDLE_TOO_LARGE", message: "Diagnostics bundle too large")
+    }
+
+    guard httpResponse.statusCode == 200 else {
+        throw DiagnosticsUploadNativeError(
+            code: "SERVER_ERROR",
+            message: body.isEmpty ? "Diagnostics upload failed with HTTP \(httpResponse.statusCode)" : body
+        )
+    }
+
+    guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let refId = json["ref_id"] as? String,
+          let uploadedAt = json["uploaded_at"] as? String else {
+        throw DiagnosticsUploadNativeError(code: "SERVER_ERROR", message: "Invalid diagnostics upload response JSON")
+    }
+
+    return ["ref_id": refId, "uploaded_at": uploadedAt]
+}
+
 @objc(NativeSyncEngine)
 class NativeSyncEngineModule: RCTEventEmitter {
 
@@ -189,9 +320,17 @@ class NativeSyncEngineModule: RCTEventEmitter {
     }
 
     @objc
-    func getHistoryDays(_ cursor: NSString?, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    func getHistoryDays(_ cursor: Any?, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         Task {
-            let result = await SyncEngineManager.shared.getHistoryDays(cursor: cursor as String?)
+            let cursorString: String?
+            if let value = cursor as? String {
+                cursorString = value
+            } else if let value = cursor as? NSString {
+                cursorString = value as String
+            } else {
+                cursorString = nil
+            }
+            let result = await SyncEngineManager.shared.getHistoryDays(cursor: cursorString)
             resolve(result)
         }
     }
@@ -217,8 +356,44 @@ class NativeSyncEngineModule: RCTEventEmitter {
     }
 
     @objc
+    func uploadDiagnosticsArchive(_ params: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        guard let urlString = params["url"] as? String,
+              let uploadURL = URL(string: urlString),
+              let archivePath = params["archivePath"] as? String,
+              let archiveURL = diagnosticsArchiveURL(from: archivePath),
+              let clientId = params["client_id"] as? String,
+              !clientId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            reject("INVALID_PARAMS", "Missing diagnostics upload parameters", nil)
+            return
+        }
+
+        let headers = diagnosticsHeaders(from: params["headers"])
+
+        Task {
+            do {
+                let result = try await performDiagnosticsArchiveUpload(
+                    archiveURL: archiveURL,
+                    uploadURL: uploadURL,
+                    clientId: clientId,
+                    headers: headers
+                )
+                resolve(result)
+            } catch let error as DiagnosticsUploadNativeError {
+                reject(error.code, error.message, error)
+            } catch {
+                reject("NETWORK_ERROR", error.localizedDescription, error)
+            }
+        }
+    }
+
+    @objc
     func getClientDisplayName(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         resolve(SyncEngineManager.shared.getClientDisplayName())
+    }
+
+    @objc
+    func getClientId(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        resolve(SyncEngineManager.shared.getClientId())
     }
 
     @objc

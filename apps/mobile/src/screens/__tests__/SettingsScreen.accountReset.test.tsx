@@ -106,6 +106,7 @@ jest.mock('../../utils/clearUserScopedStorage', () => ({
 }));
 
 jest.mock('../../services/SyncEngineModule', () => ({
+  getClientId: jest.fn().mockResolvedValue('mobile-client-uuid'),
   wipeSyncIdentity: (...args: unknown[]) => mockWipeSyncIdentity(...args),
 }));
 

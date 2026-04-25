@@ -4644,6 +4644,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             return [
                 "name": device.name,
                 "model": device.model,
+                "osVersion": "\(device.systemName) \(device.systemVersion)",
                 "systemName": device.systemName,
                 "systemVersion": device.systemVersion,
                 "userInterfaceIdiom": device.userInterfaceIdiom.rawValue,
@@ -5119,6 +5120,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let generated = defaultClientDisplayName()
         defaults.removeObject(forKey: Self.legacyClientNameKey)
         return generated
+    }
+
+    func getClientId() -> String {
+        bindingService.getOrCreateClientId()
     }
 
     func setClientDisplayName(_ name: String) {
