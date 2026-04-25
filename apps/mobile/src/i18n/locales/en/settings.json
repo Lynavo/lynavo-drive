@@ -27,7 +27,8 @@
   },
   "myDevice": {
     "label": "My Device Name",
-    "hint": "This name will be shown on your Mac."
+    "hint": "This name will be shown on your PC.",
+    "lockedHint": "A transfer is in progress, device name can't be changed right now."
   },
   "photoPermission": {
     "title": "Photo Access Is Off",

@@ -27,7 +27,8 @@
   },
   "myDevice": {
     "label": "我的设备名称",
-    "hint": "此名称将在 Mac 端显示"
+    "hint": "此名称将在 PC 端显示",
+    "lockedHint": "传输进行中，暂不可修改设备名称"
   },
   "photoPermission": {
     "title": "照片权限未开启",

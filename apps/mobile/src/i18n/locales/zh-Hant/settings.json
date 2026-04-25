@@ -27,7 +27,8 @@
   },
   "myDevice": {
     "label": "我的設備名稱",
-    "hint": "此名稱將在 Mac 端顯示"
+    "hint": "此名稱將在 PC 端顯示",
+    "lockedHint": "傳輸進行中，暫不可修改設備名稱"
   },
   "photoPermission": {
     "title": "照片權限未開啟",
