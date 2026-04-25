@@ -196,7 +196,7 @@ export function HistoryScreen() {
         const { NativeSyncEngine } = NativeModules;
         if (!NativeSyncEngine) return;
 
-        const result = await NativeSyncEngine.getHistoryDays(null);
+        const result = await NativeSyncEngine.getHistoryDays('');
         if (result && result.items) {
           const grouped = groupByDate(result.items, t);
           setSections(grouped);
@@ -206,7 +206,7 @@ export function HistoryScreen() {
         const emitter = new NativeEventEmitter(NativeSyncEngine);
         historySub = emitter.addListener('onHistoryUpdated', async () => {
           try {
-            const updated = await NativeSyncEngine.getHistoryDays(null);
+            const updated = await NativeSyncEngine.getHistoryDays('');
             if (updated && updated.items) {
               setSections(groupByDate(updated.items, t));
             }

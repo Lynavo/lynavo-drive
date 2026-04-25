@@ -196,7 +196,7 @@ describe('SettingsScreen', () => {
     NativeModules.NativeSyncEngine = mockNativeSyncEngine;
     jest
       .spyOn(NativeEventEmitter.prototype, 'addListener')
-      .mockImplementation(() => ({ remove: jest.fn() }) as never);
+      .mockImplementation(() => ({ remove: jest.fn() } as never));
   });
 
   test('subscription card prefers subscription status over stale user status', async () => {
@@ -397,7 +397,9 @@ describe('SettingsScreen', () => {
         expect(getByText('切換')).toBeTruthy();
       });
       fireEvent.press(getByText('切換'));
-      expect(mockNavigate).toHaveBeenCalledWith('DeviceDiscovery', { mode: 'switch' });
+      expect(mockNavigate).toHaveBeenCalledWith('DeviceDiscovery', {
+        mode: 'switch',
+      });
     });
 
     it('shows upload confirmation dialog when upload is active', async () => {

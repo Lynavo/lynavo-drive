@@ -2590,6 +2590,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                         runtimeQueueCompletedCount >= runtimeQueueTotalCount &&
                         runtimeRoundSource != nil
                     if completedRuntimeRound {
+                        let completedRoundSource = runtimeRoundSource
                         let payload = ([
                             "uploadState": "completed",
                             "progressPercent": 100,
@@ -2598,6 +2599,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                         ) { _, new in new }
                         logSyncOverviewEmission("empty_queue_completed", payload: payload)
                         NativeSyncEngineModule.shared?.emitSyncStateChanged(payload)
+                        if completedRoundSource == "auto" {
+                            clearRuntimeSyncRoundProgress(uploadState: "idle")
+                        }
 
                         slog("[SyncPipeline] idle — upload round completed, waiting for new photos...")
                         syncDiagnosticsLog("SyncPipeline", "idle — upload round completed")
@@ -4582,7 +4586,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         guard let historyStore else {
             return ["items": [], "nextCursor": NSNull()]
         }
-        let result = historyStore.getDailyLedgers(cursor: cursor)
+        let normalizedCursor = cursor?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let result = historyStore.getDailyLedgers(
+            cursor: normalizedCursor?.isEmpty == true ? nil : normalizedCursor
+        )
         let items: [[String: Any]] = result.items.map { ledger in
             [
                 "ledgerDate": ledger.ledgerDate,

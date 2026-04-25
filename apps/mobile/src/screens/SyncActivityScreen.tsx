@@ -576,7 +576,7 @@ export function SyncActivityScreen() {
       try {
         const mod = engine ?? NativeModules.NativeSyncEngine;
         if (!mod) return;
-        const history = await mod.getHistoryDays(null);
+        const history = await mod.getHistoryDays('');
         if (history?.items) {
           const today = formatLocalDateKey(new Date());
           let totalFiles = 0;

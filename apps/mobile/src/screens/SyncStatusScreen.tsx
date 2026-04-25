@@ -575,7 +575,7 @@ export function SyncStatusScreen() {
     try {
       const mod = engine || NativeModules.NativeSyncEngine;
       if (!mod) return null;
-      const history = await mod.getHistoryDays(null);
+      const history = await mod.getHistoryDays('');
       if (history?.items) {
         const today = formatLocalDateKey(new Date());
         let totalFiles = 0;
@@ -600,7 +600,7 @@ export function SyncStatusScreen() {
     try {
       const mod = engine || NativeModules.NativeSyncEngine;
       if (!mod) return;
-      const history = await mod.getHistoryDays(null);
+      const history = await mod.getHistoryDays('');
       const items = history?.items as
         | Array<Record<string, unknown>>
         | undefined;
@@ -718,7 +718,7 @@ export function SyncStatusScreen() {
         }, STARTUP_CONNECTION_GRACE_MS);
 
         // Load initial state FIRST (before triggering sync, to avoid flash)
-        const loadedTodayStats = await loadTodayStats(NativeSyncEngine);
+        await loadTodayStats(NativeSyncEngine);
         await loadLatestSync(NativeSyncEngine);
 
         const syncData = await NativeSyncEngine.getSyncOverview();
@@ -743,11 +743,7 @@ export function SyncStatusScreen() {
           initialOverview.autoUploadState === 'disabled';
         const initialDone =
           !initialAutoOff &&
-          (initialOverview.uploadState === 'completed' ||
-            (initialOverview.uploadState === 'idle' &&
-              initialQueue.length === 0 &&
-              (initialOverview.progressPercent >= 100 ||
-                (loadedTodayStats?.fileCount ?? 0) > 0)));
+          initialOverview.uploadState === 'completed';
         if (initialDone) {
           setHoldCompletionCardUntilMs(Date.now() + COMPLETION_CARD_HOLD_MS);
         }
@@ -930,10 +926,7 @@ export function SyncStatusScreen() {
     overview.autoUploadState === 'disabled';
   const isDone =
     !isAutoUploadOff &&
-    (overview.uploadState === 'completed' ||
-      (overview.uploadState === 'idle' &&
-        queue.length === 0 &&
-        todayStats.fileCount > 0));
+    overview.uploadState === 'completed';
   const holdCompletionCard =
     holdCompletionCardUntilMs !== null &&
     Date.now() < holdCompletionCardUntilMs &&
