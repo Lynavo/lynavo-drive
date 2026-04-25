@@ -36,7 +36,17 @@ export interface PlanWithProduct {
 }
 
 export interface UseSubscriptionPlansResult {
+  /** True while the server `subscription_plans` catalog is being fetched.
+   *  Decoupled from StoreKit lookup so the paywall can render server-driven
+   *  plan names/descriptions even before Apple returns localized prices. */
   loading: boolean;
+  /** True while StoreKit `getProductSummaries` is in flight. Independent
+   *  from `loading` because the IAP service is initialized lazily (post
+   *  cold-start, see `useIapLifecycle`) and may resolve later than the
+   *  server catalog. The paywall uses this to keep the Subscribe button
+   *  blocked until Apple-side prices are confirmed, even if `loading` has
+   *  already flipped false. */
+  productsLoading: boolean;
   error: string | null;
   plans: PlanWithProduct[];
   source: SubscriptionPlansSource;
@@ -156,6 +166,7 @@ export function useSubscriptionPlans({
   );
   const [source, setSource] = useState<SubscriptionPlansSource>('bootstrap');
   const [loading, setLoading] = useState<boolean>(enabled);
+  const [productsLoading, setProductsLoading] = useState<boolean>(enabled);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -164,21 +175,35 @@ export function useSubscriptionPlans({
       setProducts([]);
       setSource('bootstrap');
       setLoading(false);
+      setProductsLoading(false);
       setError(null);
       return;
     }
     setLoading(true);
+    setProductsLoading(true);
     setError(null);
+    // Step 1 — server catalog (with cache + bootstrap fallback inside).
+    // Decoupled from StoreKit so a slow / failed catalog fetch doesn't
+    // hold the Subscribe gate hostage when StoreKit responds first, and
+    // vice versa.
+    let validPlans: SubscriptionPlanDto[] = [];
     try {
-      // Step 1 — server catalog (with cache + bootstrap fallback inside).
       const catalog = await subscriptionPlansService.fetchPlans('ios');
-      const validPlans = catalog.plans.filter(p => p.active);
+      validPlans = catalog.plans.filter(p => p.active);
       setPlans(validPlans);
       setSource(catalog.source);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
 
-      // Step 2 — Apple StoreKit prices/period for the SKUs the server told
-      // us to render. Filter out unknown SKUs defensively so a server typo
-      // cannot crash StoreKit lookup.
+    // Step 2 — Apple StoreKit prices/period for the SKUs the server told
+    // us to render. Runs in its own try/finally so a StoreKit failure
+    // doesn't roll back the catalog already shown to the user. Filter
+    // out unknown SKUs defensively so a server typo cannot crash StoreKit
+    // lookup.
+    try {
       const skus = validPlans
         .map(p => p.product_id)
         .filter(isKnownIapProductId);
@@ -186,9 +211,9 @@ export function useSubscriptionPlans({
         skus.length > 0 ? await iapService.getProductSummaries(skus) : [];
       setProducts(fetchedProducts);
 
-      // Mirror useStoreProducts: surface STOREKIT_EMPTY when the catalog
-      // promised SKUs but Apple returned nothing. Bootstrap source can also
-      // legitimately produce zero products in dev — still useful signal.
+      // Surface STOREKIT_EMPTY when the catalog promised SKUs but Apple
+      // returned nothing. Bootstrap source can also legitimately produce
+      // zero products in dev — still useful signal.
       if (validPlans.length > 0 && fetchedProducts.length === 0) {
         setError('STOREKIT_EMPTY');
       }
@@ -196,7 +221,7 @@ export function useSubscriptionPlans({
       setError(err instanceof Error ? err.message : String(err));
       setProducts([]);
     } finally {
-      setLoading(false);
+      setProductsLoading(false);
     }
   }, [enabled]);
 
@@ -228,6 +253,7 @@ export function useSubscriptionPlans({
 
   return {
     loading,
+    productsLoading,
     error,
     plans: merged,
     source,

@@ -3,6 +3,20 @@ import { useIapLifecycle } from '../useIapLifecycle';
 import { iapService } from '../../services/iap-service';
 import { FEATURES } from '../../constants/features';
 
+// useIapLifecycle now defers iapService.initialize() via
+// InteractionManager.runAfterInteractions to keep the cold-start path
+// off of react-native-iap's flush burst. Tests still want to assert on
+// initialize being called synchronously, so mock the scheduler to
+// invoke its callback immediately and return a no-op cancel handle.
+jest.mock('react-native', () => ({
+  InteractionManager: {
+    runAfterInteractions: (cb: () => void) => {
+      cb();
+      return { cancel: jest.fn() };
+    },
+  },
+}));
+
 jest.mock('../../services/iap-service', () => ({
   iapService: {
     initialize: jest.fn().mockResolvedValue(undefined),

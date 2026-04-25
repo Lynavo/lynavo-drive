@@ -101,6 +101,15 @@ export interface IapService {
   ): Promise<IapProductSummary[]>;
   refreshReceipt(): Promise<string | null>;
   onOrphanPurchaseVerified(cb: () => void): () => void;
+  /** DEV-ONLY escape hatch: finish every transaction currently in
+   *  `SKPaymentQueue` without server-side verification. Used by an
+   *  in-app debug button to clear stale sandbox transactions that
+   *  cause the cold-start flush storm. Returns the count of finished
+   *  transactions. Throws on production builds — callers must gate
+   *  with `__DEV__`. NEVER expose in production: silently finishing
+   *  unverified purchases means a real user's renewal could be
+   *  acknowledged to Apple but never recorded server-side. */
+  _devFlushAllPending(): Promise<number>;
 }
 
 class IapServiceImpl implements IapService {
@@ -194,10 +203,15 @@ class IapServiceImpl implements IapService {
   }
 
   async purchase(productId: IapProductId): Promise<PurchaseReceipt> {
+    // Lazy init: under the deferred-init lifecycle model
+    // (`useIapLifecycle` parks initialize() on InteractionManager) the
+    // user can tap Subscribe before the idle handle fires. Throwing
+    // here would surface a confusing "must be called before purchase"
+    // error in production. Await initialize() instead — it dedupes
+    // concurrent calls internally so this is cheap when a previous
+    // initialize is already in flight.
     if (!this.initialized) {
-      throw new Error(
-        'iapService.initialize() must be called before purchase()',
-      );
+      await this.initialize();
     }
     if (this.pendingPurchase.has(productId)) {
       throw new Error(`purchase already in flight for ${productId}`);
@@ -229,10 +243,10 @@ class IapServiceImpl implements IapService {
   }
 
   async restore(): Promise<PurchaseReceipt[]> {
+    // Lazy init for the same reason as `purchase`: a user can tap the
+    // Restore link in SubscriptionScreen before the deferred init fires.
     if (!this.initialized) {
-      throw new Error(
-        'iapService.initialize() must be called before restore()',
-      );
+      await this.initialize();
     }
     const refreshedReceipt = await this.refreshReceiptForUserPurchase();
     let purchases: Purchase[];
@@ -652,6 +666,31 @@ class IapServiceImpl implements IapService {
     const receipt =
       typeof p.transactionReceipt === 'string' ? p.transactionReceipt : '';
     return `receipt:${p.productId}:${receipt.slice(0, 64)}`;
+  }
+
+  async _devFlushAllPending(): Promise<number> {
+    if (!__DEV__) {
+      throw new Error('_devFlushAllPending is only allowed in DEV builds');
+    }
+    if (!this.initialized) {
+      await this.initialize();
+    }
+    // `automaticallyFinishRestoredTransactions: true` tells react-native-iap
+    // to call finishTransaction on every entry as it walks the queue, which
+    // is exactly the cleanup we want for stale sandbox transactions. We
+    // pass `onlyIncludeActiveItems: false` so expired / cancelled tx are
+    // also drained — those are the ones most likely stuck in queue.
+    let finished = 0;
+    try {
+      const purchases = await getAvailablePurchases({
+        automaticallyFinishRestoredTransactions: true,
+        onlyIncludeActiveItems: false,
+      });
+      finished = purchases.length;
+    } catch (err) {
+      console.warn('[iap-service] _devFlushAllPending threw', err);
+    }
+    return finished;
   }
 }
 

@@ -553,6 +553,7 @@ export function SubscriptionScreen() {
   );
   const {
     loading: plansLoading,
+    productsLoading,
     error: plansError,
     plans: rawPlans,
     source: plansSource,
@@ -570,15 +571,15 @@ export function SubscriptionScreen() {
     // ASC mis-config most commonly. We log the dropped product_id so QA
     // notices instead of silently rendering a placeholder card with "—".
     //
-    // Exception: while the hook is still loading, `product` is legitimately
-    // null for the bootstrap-seeded entries because StoreKit hasn't
-    // responded yet. Keeping them rendered (with "—" price) is the entire
-    // point of the seed — it prevents the blank-row flash on cold open.
-    // Once `plansLoading` flips to false, genuinely-misconfigured SKUs are
-    // dropped as before.
+    // Exception: while either catalog or StoreKit lookup is still in
+    // flight, `product` is legitimately null for bootstrap-seeded entries.
+    // Keeping them rendered (with "—" price as last-resort fallback) is
+    // the entire point of the seed — it prevents the blank-row flash on
+    // cold open. Once both flips to false, genuinely-misconfigured SKUs
+    // are dropped as before.
     const filtered = rawPlans.filter(entry => {
       if (entry.product != null) return true;
-      if (plansLoading) return true;
+      if (plansLoading || productsLoading) return true;
       console.warn(
         '[SubscriptionScreen] dropping plan with no StoreKit product:',
         entry.plan.product_id,
@@ -595,7 +596,7 @@ export function SubscriptionScreen() {
       return filtered.slice(0, PLAN_LAYOUT_CAP);
     }
     return filtered;
-  }, [rawPlans, plansLoading]);
+  }, [rawPlans, plansLoading, productsLoading]);
 
   // Auto-select the first valid plan once the catalog resolves. Prefer the
   // recommended row when present (server intent), otherwise the first
@@ -1094,15 +1095,16 @@ export function SubscriptionScreen() {
           disabled={
             isLoading ||
             selectedEntry == null ||
-            // While `plansLoading` is true the hook is showing seeded
-            // bootstrap prices that StoreKit has NOT yet confirmed. Letting
-            // the user tap Subscribe against an unverified amount risks an
-            // Apple-side rejection (real localizedPrice differs from seed).
-            // Once loading flips false we trust whatever StoreKit returned.
-            plansLoading ||
-            // Post-loading safety net: if loading completed but the selected
-            // plan still has no product (genuine ASC mis-config / sandbox
-            // not signed in), we cannot price the purchase — block it.
+            // Block while StoreKit lookup is in flight. The hook may have
+            // already populated the catalog (plansLoading=false) but the
+            // displayed price is still the bootstrap seed until products
+            // resolve — letting the user tap Subscribe against an
+            // unverified amount risks an Apple-side rejection.
+            productsLoading ||
+            // Post-loading safety net: if both catalog and StoreKit
+            // resolved but the selected plan still has no product (genuine
+            // ASC mis-config / sandbox not signed in), we cannot price the
+            // purchase — block it.
             selectedEntry?.product == null ||
             selectedPlanIsCurrent ||
             selectedPlanIsDowngrade ||
