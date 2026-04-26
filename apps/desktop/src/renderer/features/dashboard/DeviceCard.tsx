@@ -53,7 +53,7 @@ export function DeviceCard({ device, onClick }: DeviceCardProps) {
               <Smartphone className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold">{device.clientName}</h3>
+              <h3 className="text-sm font-semibold">{device.displayName}</h3>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {device.ip}
               </p>

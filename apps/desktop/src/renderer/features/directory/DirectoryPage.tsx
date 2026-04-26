@@ -6,7 +6,6 @@ import { ErrorState } from '@renderer/components/shared/ErrorState';
 import { useDirectoryStore, type DirectoryTab } from '@renderer/stores/directory-store';
 import { useSettingsStore } from '@renderer/stores/settings-store';
 import { DirectoryPathCard } from './DirectoryPathCard';
-import { PreviewModal } from './PreviewModal';
 import { ReceivedFileList } from './ReceivedFileList';
 import { SharedFileList } from './SharedFileList';
 
@@ -19,6 +18,8 @@ const tabDescriptions: Record<DirectoryTab, string> = {
   received: '接收移动端上传的素材文件，仅供 PC 本地保管使用',
   shared: '共享目录中的文件，可供局域网内其他设备访问',
 };
+
+const DIRECTORY_AUTO_REFRESH_MS = 3000;
 
 function TabButton({
   active,
@@ -54,7 +55,8 @@ export function DirectoryPage() {
   const receivedFiles = useDirectoryStore((s) => s.receivedFiles);
   const sharedFiles = useDirectoryStore((s) => s.sharedFiles);
   const fetchAll = useDirectoryStore((s) => s.fetchAll);
-  const error = useDirectoryStore((s) => s.error);
+  const receivedError = useDirectoryStore((s) => s.receivedError);
+  const sharedError = useDirectoryStore((s) => s.sharedError);
   const loading = useDirectoryStore((s) => s.loading);
   const fetchSettings = useSettingsStore((s) => s.fetchSettings);
 
@@ -62,6 +64,45 @@ export function DirectoryPage() {
     void fetchSettings();
     void fetchAll();
   }, [fetchSettings, fetchAll]);
+
+  useEffect(() => {
+    const refreshDirectory = () => {
+      void useDirectoryStore.getState().fetchAll();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshDirectory();
+      }
+    };
+
+    window.addEventListener('focus', refreshDirectory);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', refreshDirectory);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (document.visibilityState !== 'visible') {
+      return;
+    }
+
+    const refreshActiveTab = () => {
+      const { activeTab: currentTab, fetchReceivedFiles, fetchSharedFiles } =
+        useDirectoryStore.getState();
+      if (currentTab === 'received') {
+        void fetchReceivedFiles();
+      } else {
+        void fetchSharedFiles();
+      }
+    };
+
+    const intervalId = window.setInterval(refreshActiveTab, DIRECTORY_AUTO_REFRESH_MS);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [activeTab]);
 
   const handleTabChange = (tab: DirectoryTab) => {
     setTab(tab);
@@ -71,8 +112,6 @@ export function DirectoryPage() {
       void useDirectoryStore.getState().fetchSharedFiles();
     }
   };
-
-  const previewFile = useDirectoryStore((s) => s.previewFile);
 
   return (
     <div className="flex flex-1 flex-col overflow-auto">
@@ -118,27 +157,31 @@ export function DirectoryPage() {
           </div>
 
           {/* Tab content */}
-          {error && !loading ? (
-            <ErrorState
-              message={error}
-              onRetry={() => {
-                if (activeTab === 'received') {
-                  void useDirectoryStore.getState().fetchReceivedFiles();
-                } else {
-                  void useDirectoryStore.getState().fetchSharedFiles();
-                }
-              }}
-            />
-          ) : (
-            <>
-              {activeTab === 'received' && <ReceivedFileList />}
-              {activeTab === 'shared' && <SharedFileList />}
-            </>
-          )}
+          {(() => {
+            const tabError = activeTab === 'received' ? receivedError : sharedError;
+            if (tabError && !loading) {
+              return (
+                <ErrorState
+                  message={tabError}
+                  onRetry={() => {
+                    if (activeTab === 'received') {
+                      void useDirectoryStore.getState().fetchReceivedFiles();
+                    } else {
+                      void useDirectoryStore.getState().fetchSharedFiles();
+                    }
+                  }}
+                />
+              );
+            }
+            return (
+              <>
+                {activeTab === 'received' && <ReceivedFileList />}
+                {activeTab === 'shared' && <SharedFileList />}
+              </>
+            );
+          })()}
         </GlassCard>
       </div>
-
-      {previewFile && <PreviewModal />}
     </div>
   );
 }

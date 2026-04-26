@@ -15,6 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/colors';
 import { formatBytes, formatDuration } from '../utils/format';
@@ -53,12 +55,15 @@ function isYesterday(dateStr: string): boolean {
   return dateStr === formatLocalYesterdayDateKey(new Date());
 }
 
-function formatDateLabel(dateStr: string): string {
-  if (isToday(dateStr)) return '今天';
-  if (isYesterday(dateStr)) return '昨天';
+function formatDateLabel(dateStr: string, t: TFunction): string {
+  if (isToday(dateStr)) return t('history.dates.today');
+  if (isYesterday(dateStr)) return t('history.dates.yesterday');
   const parts = dateStr.split('-');
   if (parts.length === 3) {
-    return `${parseInt(parts[1], 10)}月${parseInt(parts[2], 10)}日`;
+    return t('history.dates.monthDay', {
+      month: parseInt(parts[1], 10),
+      day: parseInt(parts[2], 10),
+    });
   }
   return dateStr;
 }
@@ -127,9 +132,10 @@ interface DeviceCardProps {
   fileCount: number;
   totalSize: string;
   duration: string;
+  t: TFunction;
 }
 
-function DeviceCard({ deviceName, deviceIp, fileCount, totalSize, duration }: DeviceCardProps) {
+function DeviceCard({ deviceName, deviceIp, fileCount, totalSize, duration, t }: DeviceCardProps) {
   return (
     <View style={styles.card}>
       {/* Row 1: device icon + name + IP */}
@@ -151,15 +157,15 @@ function DeviceCard({ deviceName, deviceIp, fileCount, totalSize, duration }: De
       {/* Row 2: stats */}
       <View style={styles.cardStats}>
         <View style={styles.cardStatsLeft}>
-          <Text style={styles.statsLabel}>{'共同步媒体文件'}</Text>
+          <Text style={styles.statsLabel}>{t('history.cards.statsLabel')}</Text>
           <Text style={styles.statsValue}>
             <Text style={styles.statsCount}>{fileCount}</Text>
-            <Text style={styles.statsSep}> {'个'} {'·'} </Text>
+            <Text style={styles.statsSep}> {t('history.cards.statsUnit')} {'·'} </Text>
             <Text style={styles.statsSize}>{totalSize}</Text>
           </Text>
         </View>
         <View style={styles.cardStatsRight}>
-          <Text style={styles.durationLabel}>{'耗时'}</Text>
+          <Text style={styles.durationLabel}>{t('history.cards.durationLabel')}</Text>
           <Text style={styles.durationValue}>{duration}</Text>
         </View>
       </View>
@@ -175,6 +181,7 @@ type NavigationProp = StackNavigationProp<RootStackParamList, 'History'>;
 
 export function HistoryScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const { t } = useTranslation();
   const [sections, setSections] = useState<HistorySection[]>([]);
 
   // ---------------------------------------------------------------------------
@@ -189,9 +196,9 @@ export function HistoryScreen() {
         const { NativeSyncEngine } = NativeModules;
         if (!NativeSyncEngine) return;
 
-        const result = await NativeSyncEngine.getHistoryDays(null);
+        const result = await NativeSyncEngine.getHistoryDays('');
         if (result && result.items) {
-          const grouped = groupByDate(result.items);
+          const grouped = groupByDate(result.items, t);
           setSections(grouped);
         }
 
@@ -199,9 +206,9 @@ export function HistoryScreen() {
         const emitter = new NativeEventEmitter(NativeSyncEngine);
         historySub = emitter.addListener('onHistoryUpdated', async () => {
           try {
-            const updated = await NativeSyncEngine.getHistoryDays(null);
+            const updated = await NativeSyncEngine.getHistoryDays('');
             if (updated && updated.items) {
-              setSections(groupByDate(updated.items));
+              setSections(groupByDate(updated.items, t));
             }
           } catch {
             // keep current data
@@ -229,7 +236,7 @@ export function HistoryScreen() {
       {section.isToday && (
         <>
           <PulsingDot />
-          <Text style={styles.liveLabel}>{'实时同步中'}</Text>
+          <Text style={styles.liveLabel}>{t('history.liveLabel')}</Text>
         </>
       )}
     </View>
@@ -242,6 +249,7 @@ export function HistoryScreen() {
       fileCount={item.fileCount}
       totalSize={item.totalSize}
       duration={item.duration}
+      t={t}
     />
   );
 
@@ -260,14 +268,14 @@ export function HistoryScreen() {
               if (navigation.canGoBack()) {
                 navigation.goBack();
               } else {
-                navigation.reset({ index: 0, routes: [{ name: 'MainTabs' as never }] });
+                navigation.reset({ index: 0, routes: [{ name: 'SyncActivity' as never }] });
               }
             }}
-            accessibilityLabel={'返回'}
+            accessibilityLabel={t('common.back')}
           >
             <Icon name="chevron-back" size={20} color={colors.screenTitle} />
           </TouchableOpacity>
-          <Text style={styles.title}>{'历史记录'}</Text>
+          <Text style={styles.title}>{t('history.title')}</Text>
         </View>
 
         {/* Content */}
@@ -281,7 +289,7 @@ export function HistoryScreen() {
           stickySectionHeadersEnabled={false}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>{'暂无同步记录'}</Text>
+              <Text style={styles.emptyText}>{t('history.emptyState.noRecords')}</Text>
             </View>
           }
         />
@@ -308,7 +316,7 @@ interface LedgerItem {
   activeTransmissionMs?: number;
 }
 
-function groupByDate(items: LedgerItem[]): HistorySection[] {
+function groupByDate(items: LedgerItem[], t: TFunction): HistorySection[] {
   const map = new Map<string, SessionCard[]>();
 
   for (const item of items) {
@@ -330,7 +338,7 @@ function groupByDate(items: LedgerItem[]): HistorySection[] {
   return Array.from(map.keys())
     .sort((a, b) => b.localeCompare(a))
     .map(date => ({
-      title: formatDateLabel(date),
+      title: formatDateLabel(date, t),
       isToday: isToday(date),
       data: map.get(date)!,
     }));

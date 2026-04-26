@@ -4,12 +4,14 @@
 <dict>
   <key>method</key>
   <string>app-store-connect</string>
-	<key>teamID</key>
-	<string>GKN7JQNCMC</string>
+  <key>teamID</key>
+  <string>GKN7JQNCMC</string>
   <key>destination</key>
-  <string>upload</string>
+  <string>export</string>
   <key>signingStyle</key>
   <string>automatic</string>
+  <key>signingCertificate</key>
+  <string>Apple Distribution</string>
   <key>stripSwiftSymbols</key>
   <false/>
   <key>uploadSymbols</key>

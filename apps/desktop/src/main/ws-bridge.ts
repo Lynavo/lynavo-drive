@@ -52,18 +52,22 @@ export class WsBridge {
       }
     });
 
-    ws.on('close', () => {
+    ws.on('close', (code, reason) => {
       const wasManualDisconnect = this.manualDisconnect;
       if (this.ws === ws) {
         this.ws = null;
       }
 
+      const reasonText = reason?.toString('utf8') || '';
+
       if (wasManualDisconnect) {
-        log.info('[WsBridge] disconnected');
+        log.info(`[WsBridge] disconnected code=${code} reason=${reasonText}`);
         return;
       }
 
-      log.info('[WsBridge] disconnected, reconnecting in 3s');
+      log.info(
+        `[WsBridge] disconnected, reconnecting in 3s code=${code} reason=${reasonText}`,
+      );
       this.scheduleReconnect();
     });
 
@@ -71,7 +75,7 @@ export class WsBridge {
       if (this.ws !== ws) {
         return;
       }
-      log.warn('[WsBridge] error', err.message);
+      log.warn('[WsBridge] error', err.message, '; readyState=', ws.readyState);
     });
   }
 

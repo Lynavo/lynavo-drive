@@ -84,11 +84,11 @@ class SharedFilesService {
         if fileType == "image" || fileType == "video" {
             try await saveToPhotoLibrary(fileURL: destURL, isVideo: fileType == "video")
             try? FileManager.default.removeItem(at: destURL)
-            NSLog("[SharedFilesService] saved %@ to Camera Roll", path)
+            slog("[SharedFilesService] saved %@ to Camera Roll", path)
             return DownloadResult(localPath: nil, savedToPhotos: true)
         }
 
-        NSLog("[SharedFilesService] downloaded %@ to %@", path, destURL.path)
+        slog("[SharedFilesService] downloaded %@ to %@", path, destURL.path)
         return DownloadResult(localPath: destURL.path, savedToPhotos: false)
     }
 

@@ -13,6 +13,15 @@ type resetStateResponse struct {
 }
 
 func (s *Server) handleResetState(w http.ResponseWriter, _ *http.Request) {
+	if s.isTransferActive() {
+		writeError(w, http.StatusConflict, "cannot reset state while a transfer is active")
+		return
+	}
+
+	if !s.ensureStorageDirsForRequest(w, "settings.reset_state") {
+		return
+	}
+
 	if err := s.store.ResetState(); err != nil {
 		slog.Error("reset runtime state", "err", err)
 		writeError(w, http.StatusInternalServerError, "failed to reset state")
@@ -38,7 +47,27 @@ func (s *Server) handleResetState(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
+	legacyStagingDir := filepath.Clean(s.config.LegacyStagingDir())
+	activeStagingDir := filepath.Clean(s.config.StagingDir())
+	if legacyStagingDir != activeStagingDir {
+		if err := clearDirectoryContentsIfExists(legacyStagingDir, nil); err != nil {
+			slog.Error("clear legacy staging dir for reset", "path", legacyStagingDir, "err", err)
+			writeError(w, http.StatusInternalServerError, "failed to reset state")
+			return
+		}
+	}
+
 	writeJSON(w, http.StatusOK, resetStateResponse{OK: true})
+}
+
+func clearDirectoryContentsIfExists(dir string, preserved map[string]struct{}) error {
+	cleanDir := filepath.Clean(dir)
+	if _, err := os.Stat(cleanDir); os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("stat dir %s: %w", cleanDir, err)
+	}
+	return clearDirectoryContents(cleanDir, preserved)
 }
 
 func clearDirectoryContents(dir string, preserved map[string]struct{}) error {

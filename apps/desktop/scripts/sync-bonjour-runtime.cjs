@@ -7,14 +7,11 @@ const resourcesDir = path.join(projectRoot, 'resources');
 const dnsSDFileName = 'dns-sd.exe';
 const dnsSDDLLName = 'dnssd.dll';
 
-if (!isWindows) {
-  process.exit(0);
-}
-
 function candidatePaths() {
   const candidates = [];
+  const pathSeparator = isWindows ? ';' : ':';
   const pathEntries = (process.env.PATH || process.env.Path || '')
-    .split(';')
+    .split(pathSeparator)
     .map((entry) => entry.trim())
     .filter(Boolean);
 
@@ -26,16 +23,22 @@ function candidatePaths() {
     candidates.push(path.join(process.env.SYNCFLOW_BONJOUR_DIR, dnsSDFileName));
   }
 
-  for (const entry of pathEntries) {
-    candidates.push(path.join(entry, dnsSDFileName));
-  }
+  // Default vendor directory — works on any host when the binaries are checked in
+  // or dropped in manually (see docs/release/release-playbook.md).
+  candidates.push(path.join(projectRoot, 'resources-vendor', 'bonjour', dnsSDFileName));
 
-  for (const root of [process.env.ProgramFiles, process.env['ProgramFiles(x86)']]) {
-    if (!root) {
-      continue;
+  if (isWindows) {
+    for (const entry of pathEntries) {
+      candidates.push(path.join(entry, dnsSDFileName));
     }
-    candidates.push(path.join(root, 'Bonjour', dnsSDFileName));
-    candidates.push(path.join(root, 'Bonjour Print Services', dnsSDFileName));
+
+    for (const root of [process.env.ProgramFiles, process.env['ProgramFiles(x86)']]) {
+      if (!root) {
+        continue;
+      }
+      candidates.push(path.join(root, 'Bonjour', dnsSDFileName));
+      candidates.push(path.join(root, 'Bonjour Print Services', dnsSDFileName));
+    }
   }
 
   return [...new Set(candidates)];
@@ -79,7 +82,11 @@ function copyIfPresent(sourcePath, destinationPath) {
 
 const sourcePath = candidatePaths().find((candidate) => fs.existsSync(candidate));
 if (!sourcePath) {
-  console.warn('[sync-bonjour-runtime] dns-sd.exe not found; continuing without bundled Bonjour runtime');
+  console.warn(
+    '[sync-bonjour-runtime] dns-sd.exe not found; continuing without bundled Bonjour runtime.\n' +
+      '  To bundle Bonjour on a non-Windows host, set SYNCFLOW_BONJOUR_DIR to a directory\n' +
+      '  containing dns-sd.exe + dnssd.dll, or drop them into apps/desktop/resources-vendor/bonjour/.',
+  );
   process.exit(0);
 }
 

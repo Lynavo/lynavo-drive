@@ -1,0 +1,13 @@
+{
+  "title": "Scan Pairing QR Code",
+  "instruction": "Place the QR code in the frame to connect automatically.",
+  "permissionDenied": {
+    "text": "Camera access is required to scan the QR code."
+  },
+  "noCameraDevice": "No camera found",
+  "android": {
+    "title": "QR Pairing Not Available on Android",
+    "body": "This Android build only includes basic bridging and manual pairing. Go back and use \"Manual pairing\" to enter the desktop IPv4 address instead.",
+    "backToManual": "Back to Manual Pairing"
+  }
+}

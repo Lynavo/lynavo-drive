@@ -3,13 +3,84 @@ import Security
 
 class BindingService {
     private static let keychainServiceName = "com.vividrop.mobile.china"
+    private static let legacyKeychainServiceName = "com.syncflow.mobile"
     private static let clientIdKey = "syncflow_client_id"
     private static let pairingTokenKey = "syncflow_pairing_token"
     private static let clientDisplayNameKey = "syncflow_client_display_name"
+    private static let keychainMigrationDoneKey = "keychain_migration_done_v1"
 
     /// The single-key name used before per-device token storage was introduced.
     /// Exposed so callers can detect and fall back to legacy tokens.
     static let legacyPairingTokenKey = pairingTokenKey
+
+    // MARK: - Keychain Migration (com.syncflow.mobile → com.vividrop.mobile.china)
+
+    /// Migrate keychain entries from the old bundle service name to the new one.
+    /// Called once on first access; idempotent via a UserDefaults flag.
+    func migrateKeychainIfNeeded() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: Self.keychainMigrationDoneKey) else { return }
+
+        let keysToMigrate = [Self.clientIdKey, Self.pairingTokenKey, Self.clientDisplayNameKey]
+        var migratedCount = 0
+
+        for key in keysToMigrate {
+            if let value = readKeychainFromService(Self.legacyKeychainServiceName, key: key),
+               readKeychain(key: key) == nil {
+                writeKeychain(key: key, value: value)
+                migratedCount += 1
+                slog("[BindingService] migrated keychain key '%@' from legacy service", key)
+            }
+        }
+
+        // Also migrate any per-device pairing tokens (keys starting with "pairing_token_")
+        // These are discovered by querying all items under the legacy service.
+        let allLegacyKeys = listKeychainKeys(service: Self.legacyKeychainServiceName)
+        for legacyKey in allLegacyKeys where legacyKey.hasPrefix("pairing_token_") && !keysToMigrate.contains(legacyKey) {
+            if let value = readKeychainFromService(Self.legacyKeychainServiceName, key: legacyKey),
+               readKeychain(key: legacyKey) == nil {
+                writeKeychain(key: legacyKey, value: value)
+                migratedCount += 1
+                slog("[BindingService] migrated per-device token '%@' from legacy service", legacyKey)
+            }
+        }
+
+        defaults.set(true, forKey: Self.keychainMigrationDoneKey)
+        if migratedCount > 0 {
+            slog("[BindingService] keychain migration complete: %d entries migrated", migratedCount)
+        } else {
+            slog("[BindingService] keychain migration: no legacy entries found")
+        }
+    }
+
+    /// Read a value from a specific keychain service (for migration).
+    private func readKeychainFromService(_ service: String, key: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    /// List all keychain account keys under a given service.
+    private func listKeychainKeys(service: String) -> [String] {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll,
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let items = result as? [[String: Any]] else { return [] }
+        return items.compactMap { $0[kSecAttrAccount as String] as? String }
+    }
 
     // MARK: - Client ID (generated once, persisted in Keychain)
 
@@ -20,6 +91,21 @@ class BindingService {
         let newId = UUID().uuidString.lowercased()
         writeKeychain(key: Self.clientIdKey, value: newId)
         return newId
+    }
+
+    /// Delete the persisted clientId. The next call to `getOrCreateClientId()`
+    /// will generate a fresh UUID, which is the desired behaviour when wiping
+    /// the sync identity (logout / account switch / reinstall sentinel).
+    func clearClientId() {
+        deleteKeychain(key: Self.clientIdKey)
+    }
+
+    /// Enumerate every keychain account stored under the current
+    /// (`com.vividrop.mobile.china`) service. Exposed so the wipe orchestrator
+    /// can discover per-device pairing tokens whose names are not known at
+    /// compile time (`syncflow_pairing_token_<serverId>`).
+    func listStoredKeychainKeys() -> [String] {
+        return listKeychainKeys(service: Self.keychainServiceName)
     }
 
     // MARK: - Pairing Token
@@ -84,7 +170,7 @@ class BindingService {
         addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
         let status = SecItemAdd(addQuery as CFDictionary, nil)
         if status != errSecSuccess {
-            NSLog("[BindingService] Keychain write failed for %@: OSStatus=%d", key, status)
+            slog("[BindingService] Keychain write failed for %@: OSStatus=%d", key, status)
         }
     }
 
@@ -102,11 +188,11 @@ class BindingService {
             return nil
         }
         if status != errSecSuccess {
-            NSLog("[BindingService] Keychain read failed for %@: OSStatus=%d", key, status)
+            slog("[BindingService] Keychain read failed for %@: OSStatus=%d", key, status)
             return nil
         }
         guard let data = result as? Data else {
-            NSLog("[BindingService] Keychain read for %@: status OK but data cast failed", key)
+            slog("[BindingService] Keychain read for %@: status OK but data cast failed", key)
             return nil
         }
         return String(data: data, encoding: .utf8)

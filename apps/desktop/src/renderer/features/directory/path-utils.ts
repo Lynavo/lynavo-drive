@@ -19,12 +19,3 @@ export function resolveAbsolutePath(basePath: string, targetPath: string): strin
   return `${normalizedBase}${separator}${normalizedTarget}`;
 }
 
-export function toMediaUrl(absolutePath: string): string {
-  const encoded = absolutePath
-    .replace(/\\/g, '/')
-    .split('/')
-    .map((segment) => encodeURIComponent(segment))
-    .join('/');
-
-  return `media://${encoded}`;
-}

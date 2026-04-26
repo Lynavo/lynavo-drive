@@ -1,0 +1,162 @@
+{
+  "title": "Album",
+  "loading": "Loading album...",
+  "tabs": {
+    "all": "All",
+    "photos": "Photos",
+    "videos": "Videos",
+    "untransferred": "Pending",
+    "transferred": "Uploaded"
+  },
+  "timeFilters": {
+    "all": "All",
+    "fromNow": "From Now",
+    "custom": "Custom Time"
+  },
+  "emptyStates": {
+    "transferredEmpty": {
+      "title": "No Uploaded Items Yet",
+      "subtitle": "Completed uploads will appear here."
+    },
+    "untransferredEmpty": {
+      "title": "No Pending Items",
+      "subtitle": "Nothing matches the current filter."
+    },
+    "photosEmpty": {
+      "title": "No Photos",
+      "subtitle": "No photos match the current filter."
+    },
+    "videosEmpty": {
+      "title": "No Videos",
+      "subtitle": "No videos match the current filter."
+    },
+    "genericEmpty": {
+      "title": "No Items",
+      "subtitle": "Make sure photo library access is granted."
+    },
+    "limitedAccess": {
+      "title": "No Photos Selected",
+      "subtitle": "Limited access mode — pick the photos you want to share.",
+      "selectPhotos": "Select Photos"
+    }
+  },
+  "dates": {
+    "full": "{{month}}/{{day}}/{{year}} {{hour}}:{{minute}}"
+  },
+  "selectedCount": "{{count}} items selected",
+  "selectedCount_one": "{{count}} item selected",
+  "selectedCount_other": "{{count}} items selected",
+  "selectionHint": {
+    "none": "No items selected",
+    "autoActiveLock": "Auto upload is on — manual upload unavailable"
+  },
+  "deviceDisconnected": "Device offline",
+  "mediaTypes": {
+    "video": "Video",
+    "photo": "Photo"
+  },
+  "badges": {
+    "queued": "Queued",
+    "transferred": "Uploaded"
+  },
+  "actions": {
+    "startUpload": "Start Upload",
+    "pickTime": "Tap to Set a Time"
+  },
+  "config": {
+    "sectionTitle": "Auto Upload",
+    "toggleLabel": "Auto upload",
+    "stateOn": "On",
+    "stateOff": "Off",
+    "timeRangeLabel": "Time range"
+  },
+  "summary": {
+    "title": "Auto Upload Is On",
+    "subtitle": "New photos will transfer to your PC automatically.",
+    "transferredThisRound": "Uploaded",
+    "pending": "Pending",
+    "totalAssets": "Total",
+    "timeRange": "Time range",
+    "unitCount": ""
+  },
+  "stats": {
+    "total": "Total",
+    "selected": "Selected",
+    "transferred": "Uploaded",
+    "new": "New"
+  },
+  "datePicker": {
+    "title": "Pick a Time",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
+  },
+  "collectionSheet": {
+    "title": "Choose Album",
+    "allPhotos": "All Photos"
+  },
+  "selectAll": "Select all",
+  "deselectAll": "Deselect all",
+  "preview": {
+    "cloudUnavailable": "iCloud video not downloaded, cannot preview",
+    "notFound": "Asset not found"
+  },
+  "dialogs": {
+    "cannotUpload": {
+      "title": "Cannot Upload",
+      "autoActive": "Turn off auto upload first.",
+      "notConnected": "Please connect to a device first."
+    },
+    "submitted": {
+      "title": "Submitted",
+      "queuedOnly": "Queued {{count}} files",
+      "queuedOnly_one": "Queued {{count}} file",
+      "queuedOnly_other": "Queued {{count}} files",
+      "queuedWithSkipped": "Queued {{queued}} files; {{skipped}} duplicate(s) skipped"
+    },
+    "allDuplicate": {
+      "title": "All Duplicates",
+      "body": "All {{count}} selected items are already in the upload queue.",
+      "body_one": "The selected item is already in the upload queue.",
+      "body_other": "All {{count}} selected items are already in the upload queue."
+    },
+    "submitFailed": {
+      "title": "Submission Failed",
+      "body": "Could not submit the upload. Please try again later."
+    },
+    "closeAuto": {
+      "title": "Turn Off Auto Upload",
+      "body": "Turn off auto upload? New photos will stop transferring to your PC automatically.",
+      "keepUploading": "Keep Uploading",
+      "confirm": "Confirm Turn Off"
+    },
+    "closeAutoFailed": {
+      "title": "Action Failed",
+      "body": "Could not turn off auto upload. Please try again."
+    },
+    "cannotEnable": {
+      "title": "Cannot Enable",
+      "notConnected": "Please connect to a device first."
+    },
+    "configIncomplete": {
+      "title": "Configuration Incomplete",
+      "body": "Please set a custom start time first."
+    },
+    "switchUploadMode": {
+      "title": "Switch Upload Mode",
+      "body": "An upload is in progress. Enabling auto upload will interrupt the manual upload. Continue?",
+      "confirm": "Confirm Switch"
+    },
+    "enableAutoFailed": {
+      "title": "Action Failed",
+      "body": "Could not enable auto upload. Please try again."
+    },
+    "toggleAutoFailed": {
+      "title": "Action Failed",
+      "body": "Could not change auto upload state. Please try again."
+    },
+    "saveConfigFailed": {
+      "title": "Save Failed",
+      "body": "Could not save auto upload configuration. Please try again."
+    }
+  }
+}

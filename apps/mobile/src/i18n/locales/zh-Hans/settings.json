@@ -1,0 +1,136 @@
+{
+  "title": "设置",
+  "versionLabel": "v{{version}} ({{build}})",
+  "sections": {
+    "connectedDevice": "已连接设备",
+    "supportHelp": "支持与帮助"
+  },
+  "android": {
+    "title": "Android 端能力说明",
+    "body": "当前版本已提供 Android 壳层、局域网自动发现、基础配对与诊断导出入口；扫码配对、真实上传队列、后台重连和增量同步仍未移植到 Android 原生引擎。"
+  },
+  "connection": {
+    "online": "在线",
+    "connecting": "连接中",
+    "offline": "离线",
+    "notConnected": "未连接"
+  },
+  "subscription": {
+    "subscribed": "订阅服务",
+    "trial": "试用服务",
+    "trialDays": "{{days}} 天",
+    "freeTrial": "免费试用",
+    "introTrial": "月订阅免费期",
+    "expired": "已到期",
+    "active": "有效",
+    "subscribeCta": "立即订阅"
+  },
+  "myDevice": {
+    "label": "我的设备名称",
+    "hint": "此名称将在 PC 端显示",
+    "lockedHint": "传输进行中，暂不可修改设备名称"
+  },
+  "photoPermission": {
+    "title": "照片权限未开启",
+    "body": "需要允许访问照片后才能继续自动同步。",
+    "openSettings": "打开系统设置"
+  },
+  "rows": {
+    "currentAccount": "当前账号",
+    "latestSync": "最近同步",
+    "appVersion": "应用版本",
+    "language": "语言"
+  },
+  "phone": {
+    "reveal": "显示完整手机号",
+    "hide": "隐藏手机号"
+  },
+  "language": {
+    "system": "跟随系统",
+    "traditionalChinese": "繁中",
+    "simplifiedChinese": "简中",
+    "english": "English"
+  },
+  "uploadDiagnostic": {
+    "button": "上传诊断包",
+    "confirm": {
+      "title": "上传诊断包",
+      "message": "将打包当前运行状态并上传到 Vivi Drop 支持团队，是否继续？",
+      "ok": "继续",
+      "cancel": "取消"
+    },
+    "progress": {
+      "title": "上传中…",
+      "cancel": "取消"
+    },
+    "success": {
+      "toast": "上传成功，编号 {{refId}}（已复制到剪贴板）"
+    },
+    "failure": {
+      "toast": "上传失败，请稍后再试"
+    },
+    "tooLarge": {
+      "toast": "诊断包过大，请联系支持"
+    },
+    "aborted": {
+      "toast": "已取消上传"
+    }
+  },
+  "actions": {
+    "exportDiagnostics": "导出诊断包",
+    "exportingDiagnostics": "正在导出诊断包…",
+    "help": "帮助",
+    "resetSyncStatus": "重置同步状态",
+    "logout": "退出登录",
+    "switch": "切换",
+    "deleteAccount": "删除帐号",
+    "deletingAccount": "删除中…"
+  },
+  "status": {
+    "noRecord": "暂无记录",
+    "reading": "读取中…",
+    "notBound": "未绑定"
+  },
+  "dates": {
+    "todayAt": "今天 {{time}}",
+    "monthDayAt": "{{month}}月{{day}}日 {{time}}",
+    "fullDate": "{{year}}/{{month}}/{{day}} {{time}}"
+  },
+  "dialogs": {
+    "switchDeviceWhileUploading": {
+      "title": "正在上传中",
+      "body": "当前有上传任务正在进行，切换设备将中断上传，是否继续？",
+      "confirm": "继续切换"
+    },
+    "resetSync": {
+      "title": "重置所有同步状态",
+      "body": "将清除所有同步记录并断开当前设备连接，需要重新输入连接码配对。手机和电脑上的照片不会被删除。",
+      "confirm": "确定重置"
+    },
+    "logout": {
+      "title": "退出登录",
+      "body": "确定要退出登录吗？",
+      "confirm": "确定退出"
+    },
+    "exportUnavailable": {
+      "title": "无法导出",
+      "body": "当前版本暂不支持导出诊断包"
+    },
+    "exportFailed": {
+      "title": "导出失败",
+      "body": "诊断包导出失败，请稍后重试"
+    },
+    "languageSaveFailed": {
+      "title": "无法切换语言",
+      "body": "语言设置保存失败，请稍后重试。"
+    },
+    "deleteAccount": {
+      "title": "删除帐号",
+      "body": "此动作将永久删除你的帐号、所有登入方式与使用纪录。此动作无法复原。",
+      "continue": "继续",
+      "confirmAgainTitle": "确定删除帐号？",
+      "confirmAgainBody": "这是最后一次确认。删除后资料无法救回。",
+      "confirmAgainButton": "确定删除"
+    }
+  }
+}

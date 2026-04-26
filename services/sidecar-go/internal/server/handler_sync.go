@@ -11,6 +11,7 @@ import (
 	"github.com/nicksyncflow/sidecar/internal/disk"
 	"github.com/nicksyncflow/sidecar/internal/events"
 	"github.com/nicksyncflow/sidecar/internal/protocol"
+	"github.com/nicksyncflow/sidecar/internal/runtimefs"
 	"github.com/nicksyncflow/sidecar/internal/store"
 	"github.com/nicksyncflow/sidecar/internal/uploadfs"
 )
@@ -92,12 +93,33 @@ func (c *connection) handleFileInit(body []byte) error {
 		"queueIndex", req.QueueIndex,
 	)
 
-	// Check disk space
-	isLow, remainingBytes, err := disk.IsLow(c.config.ReceiveDir, c.config.LowDiskThresholdBytes)
+	if _, err := runtimefs.EnsureStorageDirs(c.config); err != nil {
+		slog.Error("runtime storage unavailable during file init", "fileKey", req.FileKey, "err", err)
+		c.hub.Broadcast(events.Event{Type: "dashboard.updated", Payload: nil})
+		return c.sendJSON(protocol.TypeFileInitRes, protocol.FileInitRes{
+			Action: "REJECT",
+			Reason: "STORAGE_UNAVAILABLE",
+		})
+	}
+
+	// Check disk space. Reserve the configured safety threshold *after* the
+	// incoming file completes, so a single large file can't be accepted when
+	// finishing it would leave the disk below the safety floor (and likely
+	// race into ENOSPC mid-write).
+	effectiveThreshold := c.config.LowDiskThresholdBytes
+	if req.FileSize > 0 {
+		effectiveThreshold += req.FileSize
+	}
+	isLow, remainingBytes, err := disk.IsLow(c.config.ReceiveDir, effectiveThreshold)
 	if err != nil {
 		slog.Warn("disk check failed, continuing", "err", err)
 	} else if isLow {
-		slog.Warn("low disk space, rejecting file", "fileKey", req.FileKey)
+		slog.Warn("low disk space, rejecting file",
+			"fileKey", req.FileKey,
+			"fileSize", req.FileSize,
+			"remainingBytes", remainingBytes,
+			"effectiveThreshold", effectiveThreshold,
+		)
 		c.hub.Broadcast(events.Event{
 			Type: "disk.low",
 			Payload: map[string]any{

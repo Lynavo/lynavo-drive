@@ -1,0 +1,47 @@
+{
+  "phases": {
+    "uploading": "正在同步",
+    "preparing": "准备同步",
+    "cloudDownloading": "准备素材中",
+    "reconnecting": "等待重连",
+    "pausedNoPermission": "等待权限",
+    "default": "同步摘要"
+  },
+  "completion": {
+    "title": "所有文件已同步",
+    "filesUnit": "个文件",
+    "subtitle": "本次同步已全部完成",
+    "latestSync": "最近一次成功同步：{{label}}"
+  },
+  "summary": {
+    "filesCompleted": "{{completed}} / {{total}} 个文件已完成",
+    "transferred": "已传输",
+    "speed": "当前速度",
+    "currentFile": "当前文件：{{name}}"
+  },
+  "queue": {
+    "itemStatus": {
+      "transferring": "传输中 {{percent}}%",
+      "cloudDownloading": "下载 iCloud 原件中",
+      "preparing": "准备中",
+      "uploading": "传输中"
+    }
+  },
+  "banners": {
+    "permissionRequired": "需要授予照片访问权限。",
+    "permissionDetail": "打开系统设置后允许访问照片，恢复后会自动继续同步。",
+    "windowsInterrupted": "\"{{device}}\"中断了传输连接。",
+    "networkPaused": "传输已暂停，等待网络恢复。",
+    "networkReconnecting": "网络波动，正在重连\"{{device}}\"。",
+    "notConnected": "未连接到\"{{device}}\"，请确认电脑端 Vivi Drop 正在运行。",
+    "connecting": "正在连接到\"{{device}}\"。",
+    "progressWindowsRetry": "已保留当前进度 {{transferred}} / {{total}}，将在 {{seconds}} 秒后发起第 {{attempt}} 次重试。请检查这台 Windows 电脑上的防火墙、安全软件或 VPN。",
+    "progressWindowsNoRetry": "已保留当前进度 {{transferred}} / {{total}}，请检查这台 Windows 电脑上的防火墙、安全软件或 VPN，处理后会自动继续。",
+    "networkWithRetry": "已保留当前进度 {{transferred}} / {{total}}，网络恢复后将在 {{seconds}} 秒后发起第 {{attempt}} 次重试。",
+    "networkAutoResume": "已保留当前进度 {{transferred}} / {{total}}，网络恢复后会自动继续。",
+    "progressWithRetry": "已保留当前进度 {{transferred}} / {{total}}，将在 {{seconds}} 秒后发起第 {{attempt}} 次重试。",
+    "retryingReconnect": "已保留当前进度 {{transferred}} / {{total}}，正在重新建立连接。",
+    "connectionErrorResume": "恢复网络或重新打开电脑端 Vivi Drop 后会自动继续。",
+    "connectingAutoResume": "连接建立后会自动继续当前同步任务。"
+  }
+}

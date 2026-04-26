@@ -120,8 +120,17 @@ async function collectExecutableFiles(dir, files = []) {
   return files;
 }
 
-function pathDepth(target) {
-  return target.split(path.sep).length;
+function sortPathsDeepestFirst(paths) {
+  return [...paths].sort((left, right) => {
+    const leftDepth = left.split(path.sep).length;
+    const rightDepth = right.split(path.sep).length;
+
+    if (leftDepth !== rightDepth) {
+      return rightDepth - leftDepth;
+    }
+
+    return left.localeCompare(right);
+  });
 }
 
 async function signTarget(opts, target, extraArgs = []) {
@@ -171,13 +180,11 @@ module.exports = async function sign(opts) {
 
   const frameworks = await listImmediateChildren(frameworksDir, '.framework');
 
-  const nestedExecutables = [
+  const nestedExecutables = sortPathsDeepestFirst([
     ...(await collectExecutableFiles(frameworksDir)),
     ...(await collectExecutableFiles(loginItemsDir)),
     ...(await collectExecutableFiles(helpersDir)),
-  ].sort((left, right) => {
-    return pathDepth(right) - pathDepth(left) || right.length - left.length || left.localeCompare(right);
-  });
+  ]);
 
   const binaries = Array.isArray(opts.binaries) ? opts.binaries : [];
   for (const binary of binaries) {

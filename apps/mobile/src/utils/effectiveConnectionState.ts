@@ -5,7 +5,7 @@ export type MobileConnectionState =
   | 'offline'
   | 'discovering';
 
-type SyncConnectionEvidence = {
+export type SyncConnectionEvidence = {
   progressPercent?: number | null;
   queueHasUploadingItem?: boolean;
   queueHasActiveItem?: boolean;
@@ -14,6 +14,32 @@ type SyncConnectionEvidence = {
   currentFileKey?: string | null;
 };
 
+export type SyncConnectionSnapshot = {
+  progressPercent?: number | null;
+  queueHasUploadingItem?: boolean;
+  queueHasActiveItem?: boolean;
+  transferredBytes?: number | null;
+  currentFile?: string | null;
+  currentFileConfirmedBytes?: number | null;
+  uploadState?: string | null;
+};
+
+export type ConnectionBadgeState = 'online' | 'connecting' | 'offline';
+
+export function buildSyncConnectionEvidence(
+  snapshot: SyncConnectionSnapshot,
+): SyncConnectionEvidence {
+  return {
+    progressPercent: snapshot.progressPercent,
+    queueHasUploadingItem: snapshot.queueHasUploadingItem,
+    queueHasActiveItem: snapshot.queueHasActiveItem,
+    transferredBytes:
+      snapshot.currentFileConfirmedBytes ?? snapshot.transferredBytes,
+    uploadState: snapshot.uploadState,
+    currentFileKey: snapshot.currentFile,
+  };
+}
+
 export function syncActivityImpliesConnected(
   evidence: SyncConnectionEvidence,
 ): boolean {
@@ -21,13 +47,15 @@ export function syncActivityImpliesConnected(
     evidence.uploadState === 'uploading' ||
     evidence.uploadState === 'completed' ||
     evidence.uploadState === 'preparing' ||
-    evidence.uploadState === 'cloud_downloading' ||
-    evidence.uploadState === 'reconnecting'
+    evidence.uploadState === 'cloud_downloading'
   ) {
     return true;
   }
 
-  if ((evidence.progressPercent ?? 0) > 0 || (evidence.transferredBytes ?? 0) > 0) {
+  if (
+    (evidence.progressPercent ?? 0) > 0 ||
+    (evidence.transferredBytes ?? 0) > 0
+  ) {
     return true;
   }
 
@@ -35,14 +63,31 @@ export function syncActivityImpliesConnected(
     return true;
   }
 
-  return evidence.queueHasUploadingItem === true || evidence.queueHasActiveItem === true;
+  return (
+    evidence.queueHasUploadingItem === true ||
+    evidence.queueHasActiveItem === true
+  );
 }
 
 export function getEffectiveConnectionState(
   connectionState: MobileConnectionState | null | undefined,
   evidence: SyncConnectionEvidence,
 ): MobileConnectionState | null | undefined {
-  if (connectionState === 'connected') {
+  // When the native layer explicitly says offline, only override if the queue
+  // proves a transfer is truly in-flight right now — stale progress values
+  // (e.g. 100% from a previous completed upload) must not keep the badge green.
+  if (connectionState === 'offline') {
+    return 'offline';
+  }
+
+  if (
+    evidence.uploadState === 'reconnecting' ||
+    evidence.uploadState === 'backoff_waiting'
+  ) {
+    return 'connecting';
+  }
+
+  if (connectionState === 'connected' || connectionState === 'bound') {
     return 'connected';
   }
 
@@ -51,4 +96,28 @@ export function getEffectiveConnectionState(
   }
 
   return connectionState;
+}
+
+export function getConnectionBadgeState(
+  connectionState: MobileConnectionState | null | undefined,
+  evidence: SyncConnectionEvidence,
+): ConnectionBadgeState {
+  const effectiveConnectionState = getEffectiveConnectionState(
+    connectionState,
+    evidence,
+  );
+
+  if (effectiveConnectionState === 'connected') {
+    return 'online';
+  }
+
+  if (
+    effectiveConnectionState === 'bound' ||
+    effectiveConnectionState === 'connecting' ||
+    effectiveConnectionState === 'discovering'
+  ) {
+    return 'connecting';
+  }
+
+  return 'offline';
 }

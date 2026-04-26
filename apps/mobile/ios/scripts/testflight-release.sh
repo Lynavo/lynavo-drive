@@ -14,6 +14,11 @@ EXPORT_OPTIONS="${IOS_DIR}/ExportOptions-TestFlight.plist"
 ARCHIVES_DIR="${IOS_DIR}/build/archives"
 EXPORT_DIR="/tmp/syncflow-export"
 
+# App Store Connect API key for Shenzhen Kaiyun (GKN7JQNCMC) — altool upload path.
+APPLE_API_KEY_ID="${APPLE_API_KEY_ID:-HY8CAHGPW9}"
+APPLE_API_ISSUER="${APPLE_API_ISSUER:-54cad458-4184-4fc6-a1c7-cb4b0c6ded0e}"
+APPLE_API_KEY="${APPLE_API_KEY:-${REPO_ROOT}/AuthKey_${APPLE_API_KEY_ID}.p8}"
+
 PROJECT_FILE="${IOS_DIR}/SyncFlowMobile.xcodeproj/project.pbxproj"
 MARKETING_VERSION="$(sed -n 's/.*MARKETING_VERSION = \([^;]*\);/\1/p' "${PROJECT_FILE}" | head -n 1 | tr -d '[:space:]')"
 BUILD_NUMBER="$(sed -n 's/.*CURRENT_PROJECT_VERSION = \([^;]*\);/\1/p' "${PROJECT_FILE}" | head -n 1 | tr -d '[:space:]')"
@@ -108,7 +113,7 @@ archive_build() {
     archive
 }
 
-upload_archive() {
+export_ipa() {
   if [[ ! -d "${ARCHIVE_PATH}" ]]; then
     echo "Archive not found: ${ARCHIVE_PATH}" >&2
     exit 1
@@ -117,7 +122,7 @@ upload_archive() {
   rm -rf "${EXPORT_DIR}"
   mkdir -p "${EXPORT_DIR}"
 
-  echo "Uploading archive to TestFlight"
+  echo "Exporting IPA from archive"
   echo "Archive path: ${ARCHIVE_PATH}"
   echo "Export options: ${EXPORT_OPTIONS}"
 
@@ -129,6 +134,47 @@ upload_archive() {
     -allowProvisioningUpdates
 }
 
+ensure_altool_key() {
+  local dir="${HOME}/.appstoreconnect/private_keys"
+  local target="${dir}/AuthKey_${APPLE_API_KEY_ID}.p8"
+  if [[ -f "${target}" ]]; then
+    return 0
+  fi
+  if [[ ! -f "${APPLE_API_KEY}" ]]; then
+    echo "Missing API key file: ${APPLE_API_KEY}" >&2
+    exit 1
+  fi
+  mkdir -p "${dir}"
+  cp "${APPLE_API_KEY}" "${target}"
+  chmod 600 "${target}"
+  echo "Staged API key at ${target}"
+}
+
+upload_ipa() {
+  local ipa
+  ipa="$(find "${EXPORT_DIR}" -maxdepth 2 -name '*.ipa' -type f | head -n 1)"
+  if [[ -z "${ipa}" ]]; then
+    echo "IPA not found in ${EXPORT_DIR}" >&2
+    exit 1
+  fi
+
+  ensure_altool_key
+
+  echo "Uploading to TestFlight via altool"
+  echo "IPA: ${ipa}"
+
+  # Once altool starts transferring, a partial upload may already reach ASC.
+  # Suppress automatic rollback from here on — on failure the operator must
+  # verify in App Store Connect whether the build was accepted before retrying.
+  NEED_ROLLBACK=false
+
+  xcrun altool --upload-app \
+    -f "${ipa}" \
+    -t ios \
+    --apiKey "${APPLE_API_KEY_ID}" \
+    --apiIssuer "${APPLE_API_ISSUER}"
+}
+
 ensure_prereqs
 
 case "${MODE}" in
@@ -136,10 +182,12 @@ case "${MODE}" in
     archive_build
     ;;
   upload)
-    upload_archive
+    export_ipa
+    upload_ipa
     ;;
   archive-upload)
     archive_build
-    upload_archive
+    export_ipa
+    upload_ipa
     ;;
 esac

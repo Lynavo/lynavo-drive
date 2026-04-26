@@ -77,6 +77,41 @@ func TestSetConnectionCode(t *testing.T) {
 	}
 }
 
+func TestSetConnectionCodeAndRevokePairedDevices(t *testing.T) {
+	s := newTestStore(t)
+	for _, id := range []string{"client-a", "client-b"} {
+		if err := s.UpsertPairedDevice(sampleDevice(id)); err != nil {
+			t.Fatalf("UpsertPairedDevice %q: %v", id, err)
+		}
+	}
+
+	revokedCount, err := s.SetConnectionCodeAndRevokePairedDevices("654321")
+	if err != nil {
+		t.Fatalf("SetConnectionCodeAndRevokePairedDevices: %v", err)
+	}
+	if revokedCount != 2 {
+		t.Fatalf("expected 2 revoked devices, got %d", revokedCount)
+	}
+
+	code, err := s.GetConnectionCode()
+	if err != nil {
+		t.Fatalf("GetConnectionCode: %v", err)
+	}
+	if code != "654321" {
+		t.Fatalf("expected code 654321, got %q", code)
+	}
+
+	for _, id := range []string{"client-a", "client-b"} {
+		got, err := s.GetPairedDevice(id)
+		if err != nil {
+			t.Fatalf("GetPairedDevice %q: %v", id, err)
+		}
+		if got.RevokedAt == nil {
+			t.Fatalf("expected %q to be revoked", id)
+		}
+	}
+}
+
 func TestGetDeviceID_AfterMigration(t *testing.T) {
 	s := newTestStore(t)
 

@@ -8,6 +8,22 @@ import type {
 
 const BASE = `http://127.0.0.1:${SIDECAR_HTTP_PORT}`;
 
+export interface SidecarHealth {
+  ok: boolean;
+  service: string;
+  capabilities?: {
+    revokesPairingsOnCodeRotation?: boolean;
+  };
+}
+
+export function supportsPairingRevocationOnCodeRotation(health: SidecarHealth | null | undefined): boolean {
+  return (
+    health?.ok === true &&
+    health.service === 'syncflow-sidecar' &&
+    health.capabilities?.revokesPairingsOnCodeRotation === true
+  );
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   return new Promise((resolve, reject) => {
     const url = new URL(path, BASE);
@@ -38,7 +54,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const sidecarClient = {
-  getHealth: () => request<{ ok: boolean; service: string }>('GET', '/health'),
+  getHealth: () => request<SidecarHealth>('GET', '/health'),
   getDashboardSummary: () =>
     request<import('@syncflow/contracts').DashboardSummaryDTO>('GET', '/dashboard/summary'),
   getDashboardDevices: () =>

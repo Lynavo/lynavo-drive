@@ -1,0 +1,36 @@
+{
+  "defaultFolderName": "Shared Files",
+  "loading": "Loading...",
+  "files": {
+    "folder": "Folder"
+  },
+  "emptyState": {
+    "title": "Shared Directory Is Empty",
+    "message": "Files will appear here once syncing is complete."
+  },
+  "deviceUnavailable": {
+    "title": "Device Unavailable",
+    "message": "Please connect to a device first.",
+    "recheck": "Check Again"
+  },
+  "directoryInaccessible": {
+    "title": "Shared Directory Inaccessible",
+    "message": "Please check the desktop app settings."
+  },
+  "networkError": {
+    "title": "Failed to Load",
+    "message": "Please try again later."
+  },
+  "preview": {
+    "playVideo": "Tap to play video"
+  },
+  "dialogs": {
+    "downloadSavedToPhotos": "{{name}} saved to Photos",
+    "downloadSaved": "{{name}} saved",
+    "downloadComplete": "Download complete",
+    "downloadFailed": "Download Failed",
+    "downloadFailedMessage": "Could not download the file. Please try again later.",
+    "previewFailed": "Preview Failed",
+    "previewFailedMessage": "Could not load file preview."
+  }
+}

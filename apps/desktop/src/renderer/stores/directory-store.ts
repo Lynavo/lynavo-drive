@@ -24,12 +24,9 @@ function isSidecarHealthy(): boolean {
   return useSidecarRuntimeStore.getState().runtime.status === 'healthy';
 }
 
-/** File preview descriptor */
-export interface PreviewFile {
-  name: string;
-  /** media:// URL usable in <img>/<video> src */
-  url: string;
-  mediaType: 'image' | 'video';
+function isStorageUnavailableError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err ?? '');
+  return message.includes('storage path unavailable');
 }
 
 export interface DirectoryState {
@@ -38,23 +35,14 @@ export interface DirectoryState {
   sharedFiles: SharedFileEntry[];
   receivedTotalBytes: number;
   loading: boolean;
-  error: string | null;
+  receivedError: string | null;
+  sharedError: string | null;
   sortField: DirectorySortField;
   sortDirection: SortDirection;
-  /** Currently visible preview file (derived from previewList + previewIndex) */
-  previewFile: PreviewFile | null;
-  /** All previewable files in the current list context */
-  previewList: PreviewFile[];
-  /** Index into previewList */
-  previewIndex: number;
 
   setTab(tab: DirectoryTab): void;
   setSortField(field: DirectorySortField): void;
   toggleSort(field: DirectorySortField): void;
-  openPreview(file: PreviewFile, list: PreviewFile[]): void;
-  closePreview(): void;
-  prevPreview(): void;
-  nextPreview(): void;
   fetchReceivedFiles(): Promise<void>;
   fetchSharedFiles(): Promise<void>;
   fetchAll(): Promise<void>;
@@ -66,32 +54,12 @@ export const useDirectoryStore = create<DirectoryState>((set, get) => ({
   sharedFiles: [],
   receivedTotalBytes: 0,
   loading: false,
-  error: null,
+  receivedError: null,
+  sharedError: null,
   sortField: 'completedAt',
   sortDirection: 'desc',
-  previewFile: null,
-  previewList: [],
-  previewIndex: 0,
 
   setTab: (tab) => set({ activeTab: tab }),
-
-  openPreview: (file, list) => {
-    const index = list.findIndex((f) => f.url === file.url);
-    set({ previewFile: file, previewList: list, previewIndex: index >= 0 ? index : 0 });
-  },
-  closePreview: () => set({ previewFile: null, previewList: [], previewIndex: 0 }),
-  prevPreview: () => {
-    const { previewList, previewIndex } = get();
-    if (previewList.length === 0) return;
-    const newIndex = previewIndex > 0 ? previewIndex - 1 : previewList.length - 1;
-    set({ previewIndex: newIndex, previewFile: previewList[newIndex] });
-  },
-  nextPreview: () => {
-    const { previewList, previewIndex } = get();
-    if (previewList.length === 0) return;
-    const newIndex = previewIndex < previewList.length - 1 ? previewIndex + 1 : 0;
-    set({ previewIndex: newIndex, previewFile: previewList[newIndex] });
-  },
 
   setSortField: (field) => set({ sortField: field }),
 
@@ -108,7 +76,11 @@ export const useDirectoryStore = create<DirectoryState>((set, get) => ({
     const api = window.electronAPI;
     if (!api || !isSidecarHealthy()) return;
 
-    set({ loading: true, error: null });
+    // Only show loading indicator on initial load (no files yet)
+    const isInitialLoad = get().receivedFiles.length === 0;
+    if (isInitialLoad) {
+      set({ loading: true, receivedError: null });
+    }
 
     try {
       const devices: DashboardDeviceDTO[] = await api.sidecar.getDashboardDevices();
@@ -142,7 +114,7 @@ export const useDirectoryStore = create<DirectoryState>((set, get) => ({
               for (const file of result.items) {
                 allFiles.push({
                   ...file,
-                  deviceName: device.clientName,
+                  deviceName: device.displayName,
                   deviceId: device.deviceId,
                 });
               }
@@ -153,14 +125,28 @@ export const useDirectoryStore = create<DirectoryState>((set, get) => ({
         }),
       );
 
-      set({
-        receivedFiles: allFiles,
-        receivedTotalBytes: totalBytes,
-        loading: false,
-      });
+      // Build fingerprint from fileKeys to detect actual changes
+      const newFingerprint = allFiles.map((f) => f.fileKey).join('\n');
+      const oldFingerprint = get().receivedFiles.map((f) => f.fileKey).join('\n');
+
+      if (newFingerprint !== oldFingerprint || totalBytes !== get().receivedTotalBytes) {
+        set({
+          receivedFiles: allFiles,
+          receivedTotalBytes: totalBytes,
+          loading: false,
+          receivedError: null,
+        });
+      } else if (isInitialLoad) {
+        set({ loading: false, receivedError: null });
+      }
     } catch (err) {
       console.error('Failed to fetch received files:', err);
-      set({ loading: false, error: '加载接收文件列表失败' });
+      set({
+        loading: false,
+        receivedError: isStorageUnavailableError(err)
+          ? '接收目录不可用，请重新选择或恢复文件夹'
+          : '加载接收文件列表失败',
+      });
     }
   },
 
@@ -168,7 +154,6 @@ export const useDirectoryStore = create<DirectoryState>((set, get) => ({
     const api = window.electronAPI;
     if (!api || !isSidecarHealthy()) return;
 
-    set({ error: null });
     try {
       const result = await api.sidecar.getSharedList();
       const entries: SharedFileEntry[] = result.files
@@ -180,10 +165,24 @@ export const useDirectoryStore = create<DirectoryState>((set, get) => ({
           size: f.size,
           modifiedAt: f.modifiedAt,
         }));
-      set({ sharedFiles: entries });
+
+      // Only update state if the file list actually changed
+      const newFingerprint = entries.map((f) => f.path).join('\n');
+      const oldFingerprint = get().sharedFiles.map((f) => f.path).join('\n');
+
+      if (newFingerprint !== oldFingerprint) {
+        set({ sharedFiles: entries, sharedError: null });
+      } else if (get().sharedError) {
+        set({ sharedError: null });
+      }
     } catch (err) {
       console.error('Failed to fetch shared files:', err);
-      set({ sharedFiles: [], error: '加载共享文件列表失败' });
+      set({
+        sharedFiles: [],
+        sharedError: isStorageUnavailableError(err)
+          ? '共享目录不可用，请重新选择或恢复文件夹'
+          : '加载共享文件列表失败',
+      });
     }
   },
 

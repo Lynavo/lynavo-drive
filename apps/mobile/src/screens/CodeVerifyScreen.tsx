@@ -3,10 +3,12 @@ import {
   View,
   Text,
   TextInput,
+  TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   Vibration,
   NativeModules,
+  Dimensions,
   type NativeSyntheticEvent,
   type TextInputKeyPressEventData,
 } from 'react-native';
@@ -16,6 +18,10 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/colors';
+import { useTranslation } from 'react-i18next';
+import { Icon } from '../components/Icon';
+
+const DARK = '#1a3a5c';
 
 // ---------------------------------------------------------------------------
 // Navigation types
@@ -34,6 +40,8 @@ const VERIFY_DELAY_MS = 1200;
 export function CodeVerifyScreen() {
   const navigation = useNavigation<CodeVerifyNavProp>();
   const route = useRoute<CodeVerifyRouteProp>();
+  const { t } = useTranslation();
+  const windowWidth = Dimensions.get('window').width;
   const { deviceId, host, port, deviceName, prefilledCode } = route.params;
 
   const [code, setCode] = useState<string[]>(
@@ -46,6 +54,15 @@ export function CodeVerifyScreen() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const inputRefs = useRef<(TextInput | null)[]>([]);
+  const codeBoxSize = Math.min(
+    52,
+    Math.floor(
+      (windowWidth - 24 * 2 - 4 * 2 - 8 * (CODE_LENGTH - 1)) / CODE_LENGTH,
+    ),
+  );
+  const resolvedCodeBoxSize = Math.max(36, codeBoxSize);
+  const codeBoxFontSize = Math.max(18, Math.floor(resolvedCodeBoxSize * 0.4));
+  const codeBoxRadius = Math.max(14, Math.floor(resolvedCodeBoxSize * 0.3));
 
 
 
@@ -68,7 +85,7 @@ export function CodeVerifyScreen() {
           navigation.dispatch(
             CommonActions.reset({
               index: 0,
-              routes: [{ name: 'MainTabs', state: { routes: [{ name: 'AlbumWorkbench' }] } }],
+              routes: [{ name: 'SyncActivity' }],
             }),
           );
           return;
@@ -81,9 +98,9 @@ export function CodeVerifyScreen() {
         // Include actual error message so the user knows if it's a network timeout vs incorrect code
         const msg = e?.message || '';
         if (msg.includes('Pairing rejected')) {
-           setErrorMsg('连接码错误，请重新输入');
+           setErrorMsg(t('errors.pairingWrongCode'));
         } else {
-           setErrorMsg(`连接失败：${msg}`);
+           setErrorMsg(t('errors.pairingConnectFailed', { msg }));
         }
         setCode(Array(CODE_LENGTH).fill(''));
         Vibration.vibrate(300);
@@ -97,7 +114,7 @@ export function CodeVerifyScreen() {
         navigation.dispatch(
             CommonActions.reset({
               index: 0,
-              routes: [{ name: 'MainTabs', state: { routes: [{ name: 'AlbumWorkbench' }] } }],
+              routes: [{ name: 'SyncActivity' }],
             }),
           );
       }, VERIFY_DELAY_MS);
@@ -168,12 +185,34 @@ export function CodeVerifyScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          activeOpacity={0.6}
+          hitSlop={{ top: 15, bottom: 15, left: 15, right: 30 }}
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: 'DeviceDiscovery' }],
+                }),
+              );
+            }
+          }}
+          accessibilityLabel={t('common.back')}
+        >
+          <Icon name="chevron-back" size={20} color={DARK} />
+        </TouchableOpacity>
+      </View>
       <View style={styles.container}>
         {/* Device name context */}
-        <Text style={styles.deviceLabel}>{'正在连接'}: {deviceName} ({host})</Text>
+        <Text style={styles.deviceLabel}>{t('codeVerify.deviceLabel', { deviceName, host })}</Text>
 
         {/* Prompt */}
-        <Text style={styles.prompt}>{'请输入电脑端显示的 6 位连接码'}</Text>
+        <Text style={styles.prompt}>{t('codeVerify.prompt')}</Text>
 
         {/* Code input boxes */}
         <View style={styles.codeRow}>
@@ -185,6 +224,12 @@ export function CodeVerifyScreen() {
               }}
               style={[
                 styles.codeBox,
+                {
+                  width: resolvedCodeBoxSize,
+                  height: resolvedCodeBoxSize,
+                  borderRadius: codeBoxRadius,
+                  fontSize: codeBoxFontSize,
+                },
                 digit ? styles.codeBoxFilled : styles.codeBoxEmpty,
                 error && styles.codeBoxError,
                 verifying && styles.codeBoxDisabled,
@@ -206,21 +251,21 @@ export function CodeVerifyScreen() {
         {verifying && (
           <View style={styles.statusRow}>
             <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={styles.statusText}>{'正在验证连接码...'}</Text>
+            <Text style={styles.statusText}>{t('codeVerify.verifying')}</Text>
           </View>
         )}
 
         {/* Status: error */}
         {error && (
           <Text style={styles.errorText} numberOfLines={2}>
-            {errorMsg || '连接码错误，请重新输入'}
+            {errorMsg || t('errors.pairingWrongCode')}
           </Text>
         )}
 
         {/* Help text */}
         <View style={styles.helpCard}>
           <Text style={styles.helpText}>
-            {'请确保手机与电脑处于同一局域网下，在电脑端打开应用即可看到连接码'}
+            {t('codeVerify.helpText')}
           </Text>
         </View>
       </View>
@@ -237,11 +282,26 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#c4e4f5',
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 12,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   container: {
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingTop: 60,
+    paddingTop: 24,
   },
 
   // Device label
@@ -270,12 +330,8 @@ const styles = StyleSheet.create({
   },
 
   codeBox: {
-    width: 44,
-    height: 56,
-    borderRadius: 16,
     borderWidth: 2,
     textAlign: 'center',
-    fontSize: 20,
     fontWeight: 'bold',
     color: colors.foreground,
     // Shadow

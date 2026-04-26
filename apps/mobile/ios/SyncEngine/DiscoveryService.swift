@@ -66,10 +66,29 @@ class DiscoveryService {
     private var probeGeneration: UInt64 = 0
     weak var delegate: DiscoveryServiceDelegate?
     var browserState: String = "not_started"
+    var isBrowsing: Bool {
+        browser != nil
+    }
 
     func startBrowsing() {
-        NSLog("[DiscoveryService] startBrowsing called")
+        slog("[DiscoveryService] startBrowsing called")
         syncDiagnosticsLog("DiscoveryService", "startBrowsing called")
+        guard browser == nil else {
+            syncDiagnosticsLog(
+                "DiscoveryService",
+                "startBrowsing no-op: browser already active state=\(browserState)"
+            )
+            return
+        }
+        browser?.cancel()
+        browser = nil
+        for connection in probeConnections.values {
+            connection.cancel()
+        }
+        probeConnections.removeAll()
+        devices.removeAll()
+        reachableDevices.removeAll()
+
         let descriptor = NWBrowser.Descriptor.bonjourWithTXTRecord(type: "_syncflow._tcp", domain: nil)
         let params = NWParameters()
         // Prefer infrastructure Wi-Fi / USB network paths for discovery so the
@@ -82,14 +101,21 @@ class DiscoveryService {
         browser = NWBrowser(for: descriptor, using: params)
 
         browser?.browseResultsChangedHandler = { [weak self] results, _ in
-            NSLog("[DiscoveryService] results changed: \(results.count) results")
+            slog("[DiscoveryService] results changed: \(results.count) results")
             syncDiagnosticsLog("DiscoveryService", "results changed: \(results.count) results")
             self?.handleResults(results)
         }
 
         browser?.stateUpdateHandler = { [weak self] state in
-            NSLog("[DiscoveryService] state: \(state)")
-            syncDiagnosticsLog("DiscoveryService", "state: \(state)")
+            slog("[DiscoveryService] state: \(state)")
+            // Include the current network path summary alongside the browser
+            // state: the two together explain most "why did discovery stop"
+            // scenarios (WiFi dropped, interface lost, DNS unavailable).
+            let pathSnapshot = NetworkPathObserver.shared.snapshot()
+            syncDiagnosticsLog(
+                "DiscoveryService",
+                "state: \(state) path=\(pathSnapshot)"
+            )
             self?.browserState = String(describing: state)
         }
 
@@ -109,7 +135,7 @@ class DiscoveryService {
         probeConnections.removeAll()
         devices.removeAll()
         reachableDevices.removeAll()
-        delegate?.discoveryDidUpdate(devices: [])
+        syncDiagnosticsLog("DiscoveryService", "stopBrowsing cleared local discovery cache without emitting empty result")
     }
 
     private func handleResults(_ results: Set<NWBrowser.Result>) {
@@ -310,7 +336,7 @@ class DiscoveryService {
                     probedHost = "\(host)"
                 }
                 let resolvedIP = preferredDiscoveryHost(advertisedIP: device.ip, probedHost: probedHost)
-                NSLog("[DiscoveryService] reachable %@ via %@", device.name, resolvedIP)
+                slog("[DiscoveryService] reachable %@ via %@", device.name, resolvedIP)
                 syncDiagnosticsLog(
                     "DiscoveryService",
                     "probe_ready id=\(device.deviceId) name=\(device.name) resolved_ip=\(resolvedIP) advertised_ip=\(device.ip) remote_endpoint=\(endpointDebugDescription(connection.currentPath?.remoteEndpoint))"
@@ -332,7 +358,7 @@ class DiscoveryService {
                 self.emitReachableDevices()
 
             case .waiting:
-                NSLog("[DiscoveryService] reachability waiting for %@: %@", device.name, "\(state)")
+                slog("[DiscoveryService] reachability waiting for %@: %@", device.name, "\(state)")
                 syncDiagnosticsLog(
                     "DiscoveryService",
                     "probe_waiting id=\(device.deviceId) name=\(device.name) state=\(state) target=\(endpointDebugDescription(endpoint))"
@@ -364,7 +390,7 @@ class DiscoveryService {
 
     private func preferredProbeEndpoint(for device: DiscoveredDevice) -> NWEndpoint? {
         if isIPv4Address(device.ip), let port = NWEndpoint.Port(rawValue: device.port) {
-            NSLog("[DiscoveryService] probing %@ via advertised IPv4 %@", device.name, device.ip)
+            slog("[DiscoveryService] probing %@ via advertised IPv4 %@", device.name, device.ip)
             return .hostPort(host: NWEndpoint.Host(device.ip), port: port)
         }
         return device.endpoint

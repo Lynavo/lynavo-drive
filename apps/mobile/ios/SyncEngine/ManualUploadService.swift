@@ -26,14 +26,14 @@ class ManualUploadService {
     // MARK: - Submit Manual Upload
 
     /// Submit manually selected assets for upload.
-    /// - Returns: ManualUploadResult with queued count, skipped count, and batch ID.
+    /// - Returns: ManualUploadResult with queued count, skipped count, and manual queue ID.
     func submitManualUpload(assets: [PHAsset]) -> ManualUploadResult {
         guard let store = uploadStore else {
-            NSLog("[ManualUploadService] uploadStore unavailable — cannot submit")
+            slog("[ManualUploadService] uploadStore unavailable — cannot submit")
             return ManualUploadResult(queuedCount: 0, skippedCount: 0, batchId: "")
         }
 
-        let batchId = UUID().uuidString.lowercased()
+        let batchId = store.getActiveManualQueueBatchId() ?? UUID().uuidString.lowercased()
         let clientId = bindingService.getOrCreateClientId()
         let now = ISO8601DateFormatter().string(from: Date())
 
@@ -102,12 +102,12 @@ class ManualUploadService {
         if !itemsToInsert.isEmpty {
             do {
                 try store.upsertUploadItems(itemsToInsert)
-                NSLog("[ManualUploadService] queued %d items (skipped %d) in batch %@",
+                slog("[ManualUploadService] queued %d items (skipped %d) in manual queue %@",
                       queuedCount, skippedCount, batchId)
                 syncDiagnosticsLog("ManualUploadService",
-                    "queued \(queuedCount) items (skipped \(skippedCount)) in batch \(batchId)")
+                    "queued \(queuedCount) items (skipped \(skippedCount)) in manual queue \(batchId)")
             } catch {
-                NSLog("[ManualUploadService] failed to insert items: %@", "\(error)")
+                slog("[ManualUploadService] failed to insert items: %@", "\(error)")
                 syncDiagnosticsLog("ManualUploadService", "failed to insert items: \(error)")
                 return ManualUploadResult(queuedCount: 0, skippedCount: skippedCount, batchId: batchId)
             }

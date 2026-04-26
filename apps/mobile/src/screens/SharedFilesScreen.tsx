@@ -15,7 +15,11 @@ import {
   type ListRenderItemInfo,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import type { SharedFileDTO } from '@syncflow/contracts';
+import { FEATURES } from '../constants/features';
+import { useAuth, isFeatureAccessAllowed } from '../stores/auth-store';
 import { Icon } from '../components/Icon';
 import {
   browseSharedFiles,
@@ -71,6 +75,9 @@ async function checkDeviceAvailable(): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 export function SharedFilesScreen() {
+  const navigation = useNavigation();
+  const { t } = useTranslation();
+  const { subscription } = useAuth();
   const [loading, setLoading] = useState(true);
   const [files, setFiles] = useState<SharedFileDTO[]>([]);
   const [currentPath, setCurrentPath] = useState('');
@@ -104,8 +111,15 @@ export function SharedFilesScreen() {
       setErrorKind(null);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      // Differentiate error types
-      if (msg.includes('403') || msg.includes('404') || msg.includes('not found')) {
+      // 404 / 403 → directory genuinely missing or access denied.
+      // 400 is intentionally excluded: sidecar returns 400 for path
+      // traversal rejects, "not a directory", and resolve failures —
+      // none of which mean "shared directory inaccessible".
+      if (
+        msg.includes('403') ||
+        msg.includes('404') ||
+        msg.includes('not found')
+      ) {
         setErrorKind('directory_inaccessible');
       } else {
         setErrorKind('network_error');
@@ -176,21 +190,39 @@ export function SharedFilesScreen() {
   // ---------------------------------------------------------------------------
 
   const handleDownload = useCallback(async (file: SharedFileDTO) => {
+    // --- PRD §7.1 — downloads require active subscription ---
+    if (!FEATURES.SUBSCRIPTION_ENFORCEMENT) {
+      // Soft-off: skip the gate until enforcement is globally enabled.
+    } else if (!isFeatureAccessAllowed(subscription?.status)) {
+      Alert.alert(
+        t('subscription.gate.downloadTitle'),
+        t('subscription.gate.downloadBody'),
+        [
+          { text: t('subscription.gate.cancel'), style: 'cancel' },
+          {
+            text: t('subscription.gate.goSubscribe'),
+            onPress: () => navigation.navigate('Subscription' as never),
+          },
+        ],
+      );
+      return;
+    }
+
     setDownloading(file.path);
     try {
       const result = await downloadSharedFile(file.path);
       if (result.savedToPhotos) {
-        Alert.alert('下载完成', `${file.name} 已保存到相册`);
+        Alert.alert(t('sharedFiles.dialogs.downloadComplete'), t('sharedFiles.dialogs.downloadSavedToPhotos', { name: file.name }));
       } else if (result.localPath) {
-        Alert.alert('下载完成', `${file.name} 已保存`);
+        Alert.alert(t('sharedFiles.dialogs.downloadComplete'), t('sharedFiles.dialogs.downloadSaved', { name: file.name }));
       }
     } catch (e) {
-      Alert.alert('下载失败', '无法下载文件，请稍后重试');
+      Alert.alert(t('sharedFiles.dialogs.downloadFailed'), t('sharedFiles.dialogs.downloadFailedMessage'));
       console.warn('[SharedFiles] download error:', e);
     } finally {
       setDownloading(null);
     }
-  }, []);
+  }, [subscription?.status, t, navigation]);
 
   // ---------------------------------------------------------------------------
   // Preview handler
@@ -202,7 +234,7 @@ export function SharedFilesScreen() {
       setPreviewFile(file);
       setPreviewUrl(url);
     } catch (e) {
-      Alert.alert('预览失败', '无法获取文件预览');
+      Alert.alert(t('sharedFiles.dialogs.previewFailed'), t('sharedFiles.dialogs.previewFailedMessage'));
       console.warn('[SharedFiles] getStreamUrl error:', e);
     }
   }, []);
@@ -252,7 +284,7 @@ export function SharedFilesScreen() {
               {item.name}
             </Text>
             <Text style={styles.fileMeta}>
-              {item.isDirectory ? '文件夹' : formatBytes(item.size)}
+              {item.isDirectory ? t('sharedFiles.files.folder') : formatBytes(item.size)}
             </Text>
           </View>
 
@@ -264,6 +296,7 @@ export function SharedFilesScreen() {
               style={styles.downloadBtn}
               activeOpacity={0.7}
               disabled={isDownloading}
+              testID="shared-file-download-button"
               onPress={() => void handleDownload(item)}
             >
               {isDownloading ? (
@@ -291,7 +324,7 @@ export function SharedFilesScreen() {
     content = (
       <View style={styles.stateContainer}>
         <ActivityIndicator size="large" color={BLUE} />
-        <Text style={styles.loadingText}>加载中...</Text>
+        <Text style={styles.loadingText}>{t('sharedFiles.loading')}</Text>
       </View>
     );
   } else if (errorKind === 'device_unavailable') {
@@ -300,15 +333,15 @@ export function SharedFilesScreen() {
         <View style={styles.stateIconCircle}>
           <Icon name="desktop-outline" size={32} color="#9ab8cc" />
         </View>
-        <Text style={styles.stateTitle}>设备不可用</Text>
-        <Text style={styles.stateMessage}>请先连接设备</Text>
+        <Text style={styles.stateTitle}>{t('sharedFiles.deviceUnavailable.title')}</Text>
+        <Text style={styles.stateMessage}>{t('sharedFiles.deviceUnavailable.message')}</Text>
         <TouchableOpacity
           style={styles.retryButton}
           activeOpacity={0.7}
           onPress={() => void loadFiles(currentPath)}
         >
           <Icon name="refresh-outline" size={16} color="#fff" />
-          <Text style={styles.retryButtonText}>重新检查</Text>
+          <Text style={styles.retryButtonText}>{t('sharedFiles.deviceUnavailable.recheck')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -318,15 +351,15 @@ export function SharedFilesScreen() {
         <View style={styles.stateIconCircle}>
           <Icon name="folder-outline" size={32} color="#9ab8cc" />
         </View>
-        <Text style={styles.stateTitle}>共享目录不可访问</Text>
-        <Text style={styles.stateMessage}>请检查电脑端设置</Text>
+        <Text style={styles.stateTitle}>{t('sharedFiles.directoryInaccessible.title')}</Text>
+        <Text style={styles.stateMessage}>{t('sharedFiles.directoryInaccessible.message')}</Text>
         <TouchableOpacity
           style={styles.retryButton}
           activeOpacity={0.7}
           onPress={() => void loadFiles(currentPath)}
         >
           <Icon name="refresh-outline" size={16} color="#fff" />
-          <Text style={styles.retryButtonText}>重试</Text>
+          <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -336,15 +369,15 @@ export function SharedFilesScreen() {
         <View style={styles.stateIconCircle}>
           <Icon name="alert-circle-outline" size={32} color="#9ab8cc" />
         </View>
-        <Text style={styles.stateTitle}>加载失败</Text>
-        <Text style={styles.stateMessage}>请稍后重试</Text>
+        <Text style={styles.stateTitle}>{t('sharedFiles.networkError.title')}</Text>
+        <Text style={styles.stateMessage}>{t('sharedFiles.networkError.message')}</Text>
         <TouchableOpacity
           style={styles.retryButton}
           activeOpacity={0.7}
           onPress={() => void loadFiles(currentPath)}
         >
           <Icon name="refresh-outline" size={16} color="#fff" />
-          <Text style={styles.retryButtonText}>重试</Text>
+          <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -354,8 +387,8 @@ export function SharedFilesScreen() {
         <View style={styles.stateIconCircle}>
           <Icon name="folder-outline" size={32} color="#9ab8cc" />
         </View>
-        <Text style={styles.stateTitle}>共享目录暂无内容</Text>
-        <Text style={styles.stateMessage}>同步完成后，文件将显示在这里</Text>
+        <Text style={styles.stateTitle}>{t('sharedFiles.emptyState.title')}</Text>
+        <Text style={styles.stateMessage}>{t('sharedFiles.emptyState.message')}</Text>
       </View>
     );
   } else {
@@ -373,23 +406,21 @@ export function SharedFilesScreen() {
 
   // Current folder name for header
   const folderName = currentPath
-    ? currentPath.split('/').filter(Boolean).pop() ?? '共享文件'
-    : '共享文件';
+    ? currentPath.split('/').filter(Boolean).pop() ?? t('sharedFiles.defaultFolderName')
+    : t('sharedFiles.defaultFolderName');
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          {currentPath !== '' && (
-            <TouchableOpacity
-              style={styles.backButton}
-              activeOpacity={0.7}
-              onPress={navigateBack}
-            >
-              <Icon name="chevron-back" size={18} color={DARK} />
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={styles.backButton}
+            activeOpacity={0.7}
+            onPress={currentPath !== '' ? navigateBack : () => navigation.goBack()}
+          >
+            <Icon name="chevron-back" size={18} color={DARK} />
+          </TouchableOpacity>
           <Text style={styles.title}>{folderName}</Text>
           <View style={{ flex: 1 }} />
           <TouchableOpacity
@@ -442,7 +473,7 @@ export function SharedFilesScreen() {
                   onPress={() => void Linking.openURL(previewUrl)}
                 >
                   <Icon name="play-circle-outline" size={64} color="#fff" />
-                  <Text style={styles.videoPlayText}>点击播放视频</Text>
+                  <Text style={styles.videoPlayText}>{t('sharedFiles.preview.playVideo')}</Text>
                 </TouchableOpacity>
               )}
             </View>

@@ -1,5 +1,7 @@
 // DEPRECATED: Replaced by SyncActivityScreen in Vivi Drop update
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   View,
   Text,
@@ -24,13 +26,15 @@ import { formatLocalDateKey } from '../utils/localDateKey';
 import { getEffectiveConnectionState } from '../utils/effectiveConnectionState';
 import { shouldTreatReconnectAsWaitingForNetworkRecovery } from '../utils/reconnectBannerState';
 import { getReconnectInterruptionReason } from '../utils/reconnectInterruptionReason';
+import { formatQueueCountDisplay } from '../utils/queueCountDisplay';
 import { SyncPerformanceHint } from './components/SyncPerformanceHint';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type SyncStatusNav = StackNavigationProp<RootStackParamList, 'SyncStatus'>;
+/** @deprecated — this screen is replaced by SyncActivityScreen */
+type SyncStatusNav = StackNavigationProp<RootStackParamList, 'SyncActivity'>;
 
 interface QueueItem {
   id: string;
@@ -73,6 +77,7 @@ interface SyncOverview {
   lastErrorMessage?: string;
   retryAttempt?: number;
   retryDelaySec?: number;
+  autoUploadState?: string;
 }
 
 interface BindingState {
@@ -314,40 +319,43 @@ function buildOverviewFromPayload(
       (payload.retryAttempt as number | undefined) ?? previous.retryAttempt,
     retryDelaySec:
       (payload.retryDelaySec as number | undefined) ?? previous.retryDelaySec,
+    autoUploadState:
+      (payload.autoUploadState as string | undefined) ??
+      previous.autoUploadState,
   };
 }
 
-function summaryTitleForUploadState(uploadState: string): string {
+function summaryTitleForUploadState(uploadState: string, t: TFunction): string {
   switch (uploadState) {
     case 'uploading':
-      return '正在同步';
+      return t('syncStatus.phases.uploading');
     case 'preparing':
-      return '准备同步';
+      return t('syncStatus.phases.preparing');
     case 'cloud_downloading':
-      return '准备素材中';
+      return t('syncStatus.phases.cloudDownloading');
     case 'reconnecting':
-      return '等待重连';
+      return t('syncStatus.phases.reconnecting');
     case 'paused_no_permission':
-      return '等待权限';
+      return t('syncStatus.phases.pausedNoPermission');
     default:
-      return '同步摘要';
+      return t('syncStatus.phases.default');
   }
 }
 
-function formatDateTimeLabel(iso?: string): string {
-  if (!iso) return '暂无记录';
+function formatDateTimeLabel(iso: string | undefined, t: TFunction): string {
+  if (!iso) return t('settings.status.noRecord');
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '暂无记录';
+  if (Number.isNaN(date.getTime())) return t('settings.status.noRecord');
 
   const now = new Date();
   const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   if (date.toDateString() === now.toDateString()) {
-    return `今天 ${time}`;
+    return t('settings.dates.todayAt', { time });
   }
   if (date.getFullYear() === now.getFullYear()) {
-    return `${date.getMonth() + 1}月${date.getDate()}日 ${time}`;
+    return t('settings.dates.monthDayAt', { month: date.getMonth() + 1, day: date.getDate(), time });
   }
-  return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()} ${time}`;
+  return t('settings.dates.fullDate', { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate(), time });
 }
 
 // ---------------------------------------------------------------------------
@@ -358,10 +366,12 @@ function CompletionCard({
   fileCount,
   totalSize,
   latestSyncLabel,
+  t,
 }: {
   fileCount: number;
   totalSize: string;
   latestSyncLabel?: string;
+  t: TFunction;
 }) {
   return (
     <View style={styles.completionContainer}>
@@ -371,16 +381,16 @@ function CompletionCard({
       <View style={styles.completionCircle}>
         <Icon name="checkmark-circle" size={64} color="#22c55e" />
       </View>
-      <Text style={styles.completionTitle}>{'所有文件已同步'}</Text>
+      <Text style={styles.completionTitle}>{t('syncStatus.completion.title')}</Text>
       <View style={styles.completionMeta}>
         <Text style={styles.completionStats}>
-          {fileCount} {'个文件'} {'·'} {totalSize}
+          {fileCount} {t('syncStatus.completion.filesUnit')} {'·'} {totalSize}
         </Text>
-        <Text style={styles.completionSubtext}>{'本次同步已全部完成'}</Text>
+        <Text style={styles.completionSubtext}>{t('syncStatus.completion.subtitle')}</Text>
         {latestSyncLabel ? (
           <Text
             style={styles.lastSyncText}
-          >{`最近一次成功同步：${latestSyncLabel}`}</Text>
+          >{t('syncStatus.completion.latestSync', { label: latestSyncLabel })}</Text>
         ) : null}
       </View>
     </View>
@@ -395,6 +405,7 @@ function SyncSummaryCard({
   totalBytes,
   currentSpeedMbps,
   activeFileName,
+  t,
 }: {
   uploadState: string;
   completedCount: number;
@@ -403,24 +414,25 @@ function SyncSummaryCard({
   totalBytes: number;
   currentSpeedMbps: number;
   activeFileName?: string;
+  t: TFunction;
 }) {
   return (
     <>
       <Text style={styles.summaryEyebrow}>
-        {summaryTitleForUploadState(uploadState)}
+        {summaryTitleForUploadState(uploadState, t)}
       </Text>
       <Text style={styles.summaryTitle}>
-        {`${completedCount} / ${totalCount} 个文件已完成`}
+        {t('syncStatus.summary.filesCompleted', { completed: completedCount, total: totalCount })}
       </Text>
       <View style={styles.summaryStats}>
         <View style={styles.summaryStatCard}>
-          <Text style={styles.summaryStatLabel}>{'已传输'}</Text>
+          <Text style={styles.summaryStatLabel}>{t('syncStatus.summary.transferred')}</Text>
           <Text style={styles.summaryStatValue}>
             {`${formatBytes(transferredBytes)} / ${formatBytes(totalBytes)}`}
           </Text>
         </View>
         <View style={styles.summaryStatCard}>
-          <Text style={styles.summaryStatLabel}>{'当前速度'}</Text>
+          <Text style={styles.summaryStatLabel}>{t('syncStatus.summary.speed')}</Text>
           <Text style={styles.summaryStatValue}>
             {formatSpeedMbps(currentSpeedMbps)}
           </Text>
@@ -428,7 +440,7 @@ function SyncSummaryCard({
       </View>
       {activeFileName ? (
         <Text style={styles.summaryCurrentFile} numberOfLines={1}>
-          {`当前文件：${activeFileName}`}
+          {t('syncStatus.summary.currentFile', { name: activeFileName })}
         </Text>
       ) : null}
     </>
@@ -442,6 +454,7 @@ function QueueItemRow({
   activeProgressPercent,
   activeConfirmedBytes,
   activeTotalBytes,
+  t,
 }: {
   item: QueueItem;
   isLast: boolean;
@@ -449,23 +462,24 @@ function QueueItemRow({
   activeProgressPercent: number;
   activeConfirmedBytes: number;
   activeTotalBytes: number;
+  t: TFunction;
 }) {
   const isActive =
     item.status === 'uploading' ||
     (item.fileKey.length > 0 && item.fileKey === activeFileKey);
   const showItemProgress = isActive && activeTotalBytes > 0;
   const itemStatusLabel = showItemProgress
-    ? `传输中 ${activeProgressPercent}%`
+    ? t('syncStatus.queue.itemStatus.transferring', { percent: activeProgressPercent })
     : item.status === 'cloud_downloading'
-      ? '下载 iCloud 原件中'
+      ? t('syncStatus.queue.itemStatus.cloudDownloading')
       : item.status === 'preparing'
-        ? '准备中'
+        ? t('syncStatus.queue.itemStatus.preparing')
         : item.status === 'uploading'
-          ? '传输中'
+          ? t('syncStatus.queue.itemStatus.uploading')
           : item.status === 'ready' ||
               item.status === 'discovered' ||
               item.status === 'queued'
-            ? '排队中'
+            ? t('albumWorkbench.badges.queued')
             : null;
 
   return (
@@ -526,6 +540,7 @@ function QueueItemRow({
 
 export function SyncStatusScreen() {
   const navigation = useNavigation<SyncStatusNav>();
+  const { t } = useTranslation();
   const isAndroid = Platform.OS === 'android';
   const [overview, setOverview] = useState<SyncOverview>(EMPTY_OVERVIEW);
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -560,7 +575,7 @@ export function SyncStatusScreen() {
     try {
       const mod = engine || NativeModules.NativeSyncEngine;
       if (!mod) return null;
-      const history = await mod.getHistoryDays(null);
+      const history = await mod.getHistoryDays('');
       if (history?.items) {
         const today = formatLocalDateKey(new Date());
         let totalFiles = 0;
@@ -585,7 +600,7 @@ export function SyncStatusScreen() {
     try {
       const mod = engine || NativeModules.NativeSyncEngine;
       if (!mod) return;
-      const history = await mod.getHistoryDays(null);
+      const history = await mod.getHistoryDays('');
       const items = history?.items as
         | Array<Record<string, unknown>>
         | undefined;
@@ -604,7 +619,7 @@ export function SyncStatusScreen() {
         ) {
           latest = {
             updatedAt,
-            deviceName: (item.deviceName as string) || '电脑',
+            deviceName: (item.deviceName as string) || t('common.deviceNames.default'),
           };
         }
       }
@@ -612,7 +627,7 @@ export function SyncStatusScreen() {
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!retryBanner) {
@@ -703,7 +718,7 @@ export function SyncStatusScreen() {
         }, STARTUP_CONNECTION_GRACE_MS);
 
         // Load initial state FIRST (before triggering sync, to avoid flash)
-        const loadedTodayStats = await loadTodayStats(NativeSyncEngine);
+        await loadTodayStats(NativeSyncEngine);
         await loadLatestSync(NativeSyncEngine);
 
         const syncData = await NativeSyncEngine.getSyncOverview();
@@ -722,12 +737,13 @@ export function SyncStatusScreen() {
           setQueue(initialQueue);
         }
 
+        const initialAutoOff =
+          initialOverview.uploadState === 'paused_auto_upload' ||
+          initialOverview.autoUploadState === 'interrupted' ||
+          initialOverview.autoUploadState === 'disabled';
         const initialDone =
-          initialOverview.uploadState === 'completed' ||
-          (initialOverview.uploadState === 'idle' &&
-            initialQueue.length === 0 &&
-            (initialOverview.progressPercent >= 100 ||
-              (loadedTodayStats?.fileCount ?? 0) > 0));
+          !initialAutoOff &&
+          initialOverview.uploadState === 'completed';
         if (initialDone) {
           setHoldCompletionCardUntilMs(Date.now() + COMPLETION_CARD_HOLD_MS);
         }
@@ -869,6 +885,7 @@ export function SyncStatusScreen() {
         activeProgressPercent={overview.progressPercent}
         activeConfirmedBytes={overview.currentFileConfirmedBytes}
         activeTotalBytes={overview.currentFileTotalBytes}
+        t={t}
       />
     ),
     [
@@ -877,6 +894,7 @@ export function SyncStatusScreen() {
       overview.currentFileTotalBytes,
       overview.progressPercent,
       queue.length,
+      t,
     ],
   );
 
@@ -895,16 +913,20 @@ export function SyncStatusScreen() {
     summaryTotalBytes,
     overview.completedBytes + overview.currentFileConfirmedBytes,
   );
+  const queueCountDisplay = formatQueueCountDisplay(queue.length);
   const activeQueueItem = queue.find(
     item => item.fileKey.length > 0 && item.fileKey === overview.currentFile,
   );
   const activeFileName = overview.currentFilename || activeQueueItem?.name;
 
+  // interrupted / disabled should NOT show the completion card
+  const isAutoUploadOff =
+    overview.uploadState === 'paused_auto_upload' ||
+    overview.autoUploadState === 'interrupted' ||
+    overview.autoUploadState === 'disabled';
   const isDone =
-    overview.uploadState === 'completed' ||
-    (overview.uploadState === 'idle' &&
-      queue.length === 0 &&
-      todayStats.fileCount > 0);
+    !isAutoUploadOff &&
+    overview.uploadState === 'completed';
   const holdCompletionCard =
     holdCompletionCardUntilMs !== null &&
     Date.now() < holdCompletionCardUntilMs &&
@@ -915,7 +937,7 @@ export function SyncStatusScreen() {
   const boundDeviceName =
     bindingState?.deviceAlias ||
     bindingState?.deviceName ||
-    (bindingState?.deviceType === 'win' ? 'Windows 电脑' : '电脑');
+    (bindingState?.deviceType === 'win' ? t('common.deviceNames.windows') : t('common.deviceNames.default'));
   const effectiveConnectionState = getEffectiveConnectionState(
     bindingState?.connectionState,
     {
@@ -967,41 +989,44 @@ export function SyncStatusScreen() {
     isConnectionError ||
     (isTransferInterrupted && reconnectInterruptionReason !== 'transient_reconnect');
   const enableConnectionBanner = true;
+  const retryAttempt = retryBanner?.attempt ?? overview.retryAttempt ?? 0;
+  const transferred = formatBytes(summaryTransferredBytes);
+  const total = formatBytes(summaryTotalBytes);
   const connectionNotice = isPermissionBlocked
-    ? '需要授予照片访问权限。'
+    ? t('syncStatus.banners.permissionRequired')
     : suppressConnectionNotice
       ? null
       : isTransferInterrupted
         ? reconnectInterruptionReason === 'windows_host_interrupted'
-          ? `“${boundDeviceName}”中断了传输连接。`
+          ? t('syncStatus.banners.windowsInterrupted', { device: boundDeviceName })
           : reconnectInterruptionReason === 'network_recovery'
-            ? '传输已暂停，等待网络恢复。'
-            : `网络波动，正在重连“${boundDeviceName}”。`
+            ? t('syncStatus.banners.networkPaused')
+            : t('syncStatus.banners.networkReconnecting', { device: boundDeviceName })
         : isConnectionError
-          ? `未连接到“${boundDeviceName}”，请确认电脑端 Vivi Drop 正在运行。`
+          ? t('syncStatus.banners.notConnected', { device: boundDeviceName })
           : isConnectingState
-            ? `正在连接到“${boundDeviceName}”。`
+            ? t('syncStatus.banners.connecting', { device: boundDeviceName })
             : null;
   const connectionDetail = isPermissionBlocked
-    ? '打开系统设置后允许访问照片，恢复后会自动继续同步。'
+    ? t('syncStatus.banners.permissionDetail')
     : suppressConnectionNotice
       ? null
       : isTransferInterrupted
         ? reconnectInterruptionReason === 'windows_host_interrupted'
           ? retryCountdownSec > 0
-            ? `已保留当前进度 ${formatBytes(summaryTransferredBytes)} / ${formatBytes(summaryTotalBytes)}，将在 ${retryCountdownSec} 秒后发起第 ${retryBanner?.attempt ?? overview.retryAttempt ?? 0} 次重试。请检查这台 Windows 电脑上的防火墙、安全软件或 VPN。`
-            : `已保留当前进度 ${formatBytes(summaryTransferredBytes)} / ${formatBytes(summaryTotalBytes)}，请检查这台 Windows 电脑上的防火墙、安全软件或 VPN，处理后会自动继续。`
+            ? t('syncStatus.banners.progressWindowsRetry', { transferred, total, seconds: retryCountdownSec, attempt: retryAttempt })
+            : t('syncStatus.banners.progressWindowsNoRetry', { transferred, total })
           : reconnectInterruptionReason === 'network_recovery'
             ? retryCountdownSec > 0
-              ? `已保留当前进度 ${formatBytes(summaryTransferredBytes)} / ${formatBytes(summaryTotalBytes)}，网络恢复后将在 ${retryCountdownSec} 秒后发起第 ${retryBanner?.attempt ?? overview.retryAttempt ?? 0} 次重试。`
-              : `已保留当前进度 ${formatBytes(summaryTransferredBytes)} / ${formatBytes(summaryTotalBytes)}，网络恢复后会自动继续。`
+              ? t('syncStatus.banners.networkWithRetry', { transferred, total, seconds: retryCountdownSec, attempt: retryAttempt })
+              : t('syncStatus.banners.networkAutoResume', { transferred, total })
             : retryCountdownSec > 0
-              ? `已保留当前进度 ${formatBytes(summaryTransferredBytes)} / ${formatBytes(summaryTotalBytes)}，将在 ${retryCountdownSec} 秒后发起第 ${retryBanner?.attempt ?? overview.retryAttempt ?? 0} 次重试。`
-              : `已保留当前进度 ${formatBytes(summaryTransferredBytes)} / ${formatBytes(summaryTotalBytes)}，正在重新建立连接。`
+              ? t('syncStatus.banners.progressWithRetry', { transferred, total, seconds: retryCountdownSec, attempt: retryAttempt })
+              : t('syncStatus.banners.retryingReconnect', { transferred, total })
         : isConnectionError
-          ? '恢复网络或重新打开电脑端 Vivi Drop 后会自动继续。'
+          ? t('syncStatus.banners.connectionErrorResume')
           : isConnectingState
-            ? '连接建立后会自动继续当前同步任务。'
+            ? t('syncStatus.banners.connectingAutoResume')
             : null;
 
   useEffect(() => {
@@ -1026,14 +1051,14 @@ export function SyncStatusScreen() {
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       {/* ---- Header ---- */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{'同步动态'}</Text>
+        <Text style={styles.headerTitle}>{t('syncActivity.title')}</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity
             onPress={handleHistory}
             style={styles.headerBtn}
             activeOpacity={0.6}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityLabel={'历史记录'}
+            accessibilityLabel={t('history.title')}
           >
             <Icon name="time-outline" size={20} color="#4a6a8a" />
           </TouchableOpacity>
@@ -1042,7 +1067,7 @@ export function SyncStatusScreen() {
             style={styles.headerBtn}
             activeOpacity={0.6}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityLabel={'设置'}
+            accessibilityLabel={t('settings.title')}
           >
             <Icon name="settings-outline" size={20} color="#4a6a8a" />
           </TouchableOpacity>
@@ -1052,12 +1077,10 @@ export function SyncStatusScreen() {
       {isAndroid ? (
         <View style={styles.androidNoticeCard}>
           <Text style={styles.androidNoticeTitle}>
-            {'Android 端基线已接入'}
+            {t('settings.android.title')}
           </Text>
           <Text style={styles.androidNoticeBody}>
-            {
-              '当前版本已支持 Android 工程启动、局域网自动发现、手动配对入口与设置页；扫码配对、后台上传与增量同步引擎仍沿用 iOS 实现，尚未在 Android 落地。'
-            }
+            {t('settings.android.body')}
           </Text>
         </View>
       ) : null}
@@ -1112,7 +1135,7 @@ export function SyncStatusScreen() {
                 style={styles.connectionBannerAction}
               >
                 <Text style={styles.connectionBannerActionText}>
-                  {'打开系统设置'}
+                  {t('settings.photoPermission.openSettings')}
                 </Text>
               </Pressable>
             ) : null}
@@ -1128,9 +1151,10 @@ export function SyncStatusScreen() {
             totalSize={formatBytes(todayStats.totalBytes)}
             latestSyncLabel={
               latestSync
-                ? `${formatDateTimeLabel(latestSync.updatedAt)} · ${latestSync.deviceName}`
+                ? `${formatDateTimeLabel(latestSync.updatedAt, t)} · ${latestSync.deviceName}`
                 : undefined
             }
+            t={t}
           />
         </View>
       ) : (
@@ -1151,15 +1175,16 @@ export function SyncStatusScreen() {
               totalBytes={summaryTotalBytes}
               currentSpeedMbps={overview.currentSpeedMbps}
               activeFileName={activeFileName}
+              t={t}
             />
           </View>
 
           {/* ---- Queue card ---- */}
           <View style={styles.queueCard}>
             <View style={styles.queueHeader}>
-              <Text style={styles.queueTitle}>{'排队中'}</Text>
+              <Text style={styles.queueTitle}>{t('albumWorkbench.badges.queued')}</Text>
               <View style={styles.queueBadge}>
-                <Text style={styles.queueBadgeText}>{queue.length}</Text>
+                <Text style={styles.queueBadgeText}>{queueCountDisplay}</Text>
               </View>
             </View>
             <FlatList<QueueItem>

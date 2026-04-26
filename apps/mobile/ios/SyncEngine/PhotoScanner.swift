@@ -25,7 +25,7 @@ class PhotoScanner: NSObject, PHPhotoLibraryChangeObserver {
         guard !observing else { return }
         observing = true
         PHPhotoLibrary.shared().register(self)
-        NSLog("[PhotoScanner] started observing photo library changes")
+        slog("[PhotoScanner] started observing photo library changes")
     }
 
     /// Stop observing
@@ -33,13 +33,13 @@ class PhotoScanner: NSObject, PHPhotoLibraryChangeObserver {
         guard observing else { return }
         observing = false
         PHPhotoLibrary.shared().unregisterChangeObserver(self)
-        NSLog("[PhotoScanner] stopped observing")
+        slog("[PhotoScanner] stopped observing")
     }
 
     // MARK: - PHPhotoLibraryChangeObserver
 
     func photoLibraryDidChange(_ changeInstance: PHChange) {
-        NSLog("[PhotoScanner] photo library changed — notifying delegate")
+        slog("[PhotoScanner] photo library changed — notifying delegate")
         DispatchQueue.main.async { [weak self] in
             self?.delegate?.photoLibraryDidChange()
         }
@@ -107,7 +107,7 @@ class PhotoScanner: NSObject, PHPhotoLibraryChangeObserver {
             ))
         }
 
-        NSLog("[PhotoScanner] delta scan: %d candidates (%d inserted, %d changed), %d new untracked",
+        slog("[PhotoScanner] delta scan: %d candidates (%d inserted, %d changed), %d new untracked",
               candidateIndexes.count, insertedIndexes.count, changedIndexes.count, results.count)
         return results
     }
@@ -115,16 +115,25 @@ class PhotoScanner: NSObject, PHPhotoLibraryChangeObserver {
     // MARK: - Full scan (initial / fallback)
 
     /// Scan all photos and videos, return items whose fileKey is not already tracked.
-    func scanForUntrackedAssets(clientId: String, trackedFileKeys: Set<String>) -> [ScannedAsset] {
+    /// - Parameter onProgress: Optional callback invoked every 200 assets with (scannedSoFar, totalInLibrary).
+    func scanForUntrackedAssets(
+        clientId: String,
+        trackedFileKeys: Set<String>,
+        onProgress: ((_ scanned: Int, _ total: Int) -> Void)? = nil
+    ) -> [ScannedAsset] {
         let fetchOptions = Self.defaultFetchOptions(configStore: autoUploadConfigStore)
         let assets = PHAsset.fetchAssets(with: fetchOptions)
 
         // Cache for future incremental scans
         lastFetchResult = assets
 
-        NSLog("[PhotoScanner] library has %d authorized assets, %d tracked keys", assets.count, trackedFileKeys.count)
+        let libraryTotal = assets.count
+        slog("[PhotoScanner] library has %d authorized assets, %d tracked keys", libraryTotal, trackedFileKeys.count)
         var results: [ScannedAsset] = []
         var skippedCount = 0
+        var processedCount = 0
+
+        onProgress?(0, libraryTotal)
 
         assets.enumerateObjects { asset, _, _ in
             let fileKey = Self.computeFileKey(
@@ -157,9 +166,17 @@ class PhotoScanner: NSObject, PHPhotoLibraryChangeObserver {
                     estimatedSize: estimatedSize
                 ))
             }
+
+            processedCount += 1
+            if processedCount % 200 == 0 {
+                onProgress?(processedCount, libraryTotal)
+            }
         }
 
-        NSLog("[PhotoScanner] scan result: %d new, %d skipped (already tracked)", results.count, skippedCount)
+        // Final progress callback so UI sees 100%
+        onProgress?(libraryTotal, libraryTotal)
+
+        slog("[PhotoScanner] scan result: %d new, %d skipped (already tracked)", results.count, skippedCount)
         return results
     }
 
@@ -189,27 +206,12 @@ class PhotoScanner: NSObject, PHPhotoLibraryChangeObserver {
 
         var predicates: [NSPredicate] = []
 
-        // Media type filter from config
-        let mediaFilter = configStore?.resolvedMediaFilter()
-        switch mediaFilter {
-        case "photos":
-            predicates.append(NSPredicate(
-                format: "mediaType == %d",
-                PHAssetMediaType.image.rawValue
-            ))
-        case "videos":
-            predicates.append(NSPredicate(
-                format: "mediaType == %d",
-                PHAssetMediaType.video.rawValue
-            ))
-        default:
-            // "all" or nil — include both images and videos
-            predicates.append(NSPredicate(
-                format: "mediaType == %d OR mediaType == %d",
-                PHAssetMediaType.image.rawValue,
-                PHAssetMediaType.video.rawValue
-            ))
-        }
+        // Auto upload uploads everything — no media type filter
+        predicates.append(NSPredicate(
+            format: "mediaType == %d OR mediaType == %d",
+            PHAssetMediaType.image.rawValue,
+            PHAssetMediaType.video.rawValue
+        ))
 
         // Time range filter from config
         if let timeThreshold = configStore?.resolvedTimeThreshold() {
@@ -245,6 +247,7 @@ struct ScannedAsset {
     let originalFilename: String
     let estimatedSize: Int64
     var source: String = "auto"  // "auto" | "manual"
+    var batchId: String? = nil
 }
 
 extension Date {

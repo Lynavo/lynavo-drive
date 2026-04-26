@@ -1,0 +1,154 @@
+{
+  "title": "Sync Activity",
+  "phases": {
+    "discoveringTitle": "Searching for your computer...",
+    "reconcilingTitle": "Syncing history...",
+    "scanningTitle": "Scanning photo library...",
+    "preparingTitle": "Establishing connection...",
+    "defaultTitle": "Preparing...",
+    "discoveringSubtitleWaited": "Waited {{seconds}}s",
+    "discoveringSubtitleSearching": "Searching on the local network",
+    "reconcilingSubtitle": "First-time setup: verifying previously uploaded files",
+    "scanningSubtitleProgress": "Scanned {{scanned}} / {{total}}",
+    "scanningSubtitleReading": "Reading photo library",
+    "preparingSubtitle": "Establishing a secure connection to your computer",
+    "reconnectingTitle": "Network hiccup — reconnecting…",
+    "reconnectingSubtitle": "Upload will resume once the connection is back",
+    "autoPreparingTitle": "Enabling auto-upload…",
+    "autoPreparingSubtitle": "Preparing to scan for new photos"
+  },
+  "badges": {
+    "manual": "Manual",
+    "auto": "Auto",
+    "manualUploading": "Manual upload in progress",
+    "autoEnabled": "Auto upload enabled"
+  },
+  "running": {
+    "manualTitle": "Manual Upload in Progress",
+    "autoTitle": "Auto Uploading",
+    "autoRunningTitle": "Auto Upload Running",
+    "autoRunningSubtitle": "New photos will transfer to your PC automatically.",
+    "queueInfo": "{{queued}} queued"
+  },
+  "standby": {
+    "title": "Waiting for New Photos",
+    "subtitle": "New photos will transfer to your PC after you take them."
+  },
+  "notStarted": {
+    "title": "Auto Upload Is Off",
+    "subtitle": "Turn on auto upload to sync after you shoot, or use manual upload.",
+    "goToAlbum": "Go to Album",
+    "enableAuto": "Enable Auto Upload"
+  },
+  "interrupted": {
+    "title": "Auto Upload Paused",
+    "subtitle": "This auto upload was interrupted. Check the receive folder on your computer, then turn it back on.",
+    "goToAlbum": "Go to Album",
+    "resumeAuto": "Turn Back On"
+  },
+  "offline": {
+    "title": "Device Is Offline",
+    "subtitle": "Make sure your computer is on and on the same network. Once it's back, uploads and shared files will resume.",
+    "switchDevice": "Switch Device",
+    "reconnect": "Reconnect"
+  },
+  "stats": {
+    "speed": "Speed",
+    "progress": "Progress",
+    "transferred": "Transferred",
+    "transferredCount": "{{count}}",
+    "dataAmount": "Data"
+  },
+  "completed": {
+    "speedIdle": "--",
+    "auto": {
+      "title": "Auto Upload Complete",
+      "subtitle": "Synced {{count}} files in this round",
+      "fileCountLabel": "Files",
+      "fileCountValue": "{{count}}",
+      "latestSync": "Latest sync: {{label}}",
+      "goToAlbum": "Go to Album"
+    },
+    "manual": {
+      "title": "Manual Upload Complete",
+      "subtitle": "Completed {{completed}} / {{total}}",
+      "progressValue": "{{completed}} / {{total}}",
+      "hint": "This upload is complete.\nAuto upload is off, so you can keep uploading manually or turn it on.",
+      "goToAlbum": "Go to Album to Upload More",
+      "enableAuto": "Enable Auto Upload"
+    }
+  },
+  "actions": {
+    "cancelling": "Cancelling...",
+    "cancelManualBatch": "Cancel Manual Upload",
+    "closeAutoUpload": "Turn Off Auto Upload"
+  },
+  "quickEntry": {
+    "title": "Quick Actions",
+    "albumTitle": "Album",
+    "albumDesc": "Browse and upload photos manually",
+    "sharedFilesTitle": "Shared Files",
+    "sharedFilesDesc": "Browse shared files on your PC"
+  },
+  "trialUpgrade": {
+    "entry": "{{days}} days left in your free trial. Upgrade to Pro to unlock everything."
+  },
+  "expired": {
+    "title": "Trial Ended",
+    "subtitle": "Subscribe to continue using photo upload, auto upload, and shared file access.",
+    "subscribeCta": "Subscribe Now",
+    "viewHelp": "View Help"
+  },
+  "dialogs": {
+    "syncError": {
+      "title": "Sync Error",
+      "lowDiskPaused": "Receiving disk space is below 500 MB. New receive tasks have been paused.",
+      "storageUnavailable": "The receive folder on your computer is unavailable. Restore it or choose another folder on the desktop app."
+    },
+    "cancelManual": {
+      "title": "Cancel Manual Upload",
+      "body": "Cancel the current manual upload queue?",
+      "rethink": "Keep Uploading",
+      "confirm": "Confirm Cancel"
+    },
+    "cancelManualFailed": {
+      "title": "Cancel Failed",
+      "body": "Could not cancel the manual upload. Please try again later."
+    },
+    "closeAuto": {
+      "title": "Turn Off Auto Upload",
+      "body": "Turning it off stops the current auto upload, and new photos will not upload automatically.",
+      "continue": "Keep Uploading",
+      "confirm": "Confirm Turn Off"
+    },
+    "closeAutoFailed": {
+      "title": "Action Failed",
+      "body": "Could not turn off auto upload. Please try again later."
+    },
+    "reconnectFailed": {
+      "title": "Reconnect Failed",
+      "body": "Please try again later."
+    },
+    "switchDevice": {
+      "title": "Switch Device",
+      "body": "This will disconnect the current device and return to the device discovery page.",
+      "confirm": "Confirm Switch"
+    },
+    "enableAutoBlocked": {
+      "title": "Cannot Enable",
+      "body": "Please connect to a device first."
+    },
+    "switchUploadMode": {
+      "title": "Switch Upload Mode",
+      "body": "An upload is in progress. Enabling auto upload will interrupt the manual upload. Continue?",
+      "confirm": "Confirm Switch"
+    },
+    "enableAutoFailed": {
+      "title": "Action Failed",
+      "body": "Could not enable auto upload. Please try again later."
+    }
+  },
+  "performance": {
+    "thermalThrottled": "Device is running hot — transfer throttled."
+  }
+}

@@ -46,7 +46,7 @@ describe('HelpPage', () => {
     render(<HelpPage />);
 
     expect(screen.getByText('帮助中心')).toBeInTheDocument();
-    expect(screen.getByText(/快速了解如何使用 FlowSync 进行跨设备文件同步/)).toBeInTheDocument();
+    expect(screen.getByText(/为您了解和使用 Vivi Drop 提供全面的指导信息/)).toBeInTheDocument();
   });
 
   it('renders all 6 quick start steps', () => {
@@ -55,12 +55,12 @@ describe('HelpPage', () => {
     expect(screen.getByText('快速开始', { exact: false })).toBeInTheDocument();
 
     const stepTitles = [
-      '选择根目录',
-      '自动生成子目录',
-      '移动端连接电脑',
+      '选择同步目录',
+      '获取连接码并连接',
+      '确认网络环境',
       '上传素材',
-      'PC 处理成品',
-      '移动端查看',
+      '电脑端查看文件',
+      '手机查看共享',
     ];
 
     for (const title of stepTitles) {
@@ -82,15 +82,15 @@ describe('HelpPage', () => {
     expect(screen.getByText('共享目录 (shared)')).toBeInTheDocument();
 
     // Key content from each card
-    expect(screen.getByText(/接收移动端上传的原片/, { exact: false })).toBeInTheDocument();
-    expect(screen.getByText(/移动端无法查看此目录/, { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(/用于接收手机上传的原片/, { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(/手机端不可见/, { exact: false })).toBeInTheDocument();
     expect(
-      screen.getByText(/移动端可查看、预览、播放和下载/, { exact: false }),
+      screen.getByText(/手机端可查看、预览、在线播放和下载/, { exact: false }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/移动端只读访问/, { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(/手机端只读访问/, { exact: false })).toBeInTheDocument();
 
     // Directory tree
-    expect(screen.getByText(/received\/.*接收移动端上传/)).toBeInTheDocument();
+    expect(screen.getByText(/received\/.*接收手机上传/)).toBeInTheDocument();
   });
 
   it('renders system permission guide for both Windows and macOS', () => {
@@ -98,14 +98,14 @@ describe('HelpPage', () => {
 
     expect(screen.getByText('系统权限指引', { exact: false })).toBeInTheDocument();
 
-    expect(screen.getByText('Windows 权限设置')).toBeInTheDocument();
-    expect(screen.getByText('macOS 权限设置')).toBeInTheDocument();
+    expect(screen.getByText('Windows')).toBeInTheDocument();
+    expect(screen.getByText('macOS')).toBeInTheDocument();
 
     // Windows steps
-    expect(screen.getByText(/文件夹共享的权限请求/, { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(/首次启动时系统可能弹出防火墙提示/, { exact: false })).toBeInTheDocument();
 
     // macOS steps
-    expect(screen.getByText(/找到该应用，勾选需要访问的文件夹权限/)).toBeInTheDocument();
+    expect(screen.getByText(/确保 Vivi Drop 有权限访问所选的同步根目录/)).toBeInTheDocument();
   });
 
   it('renders upload rules', () => {
@@ -114,11 +114,11 @@ describe('HelpPage', () => {
     expect(screen.getByText('上传规则说明', { exact: false })).toBeInTheDocument();
 
     const rules = [
-      '自动上传在每次打开上传窗口时启用',
-      '手动上传和自动上传并行支持文件上传',
-      '两者共用同一个传输队列',
-      '手动队列入列的文件优先于自动任务扫描的文件',
-      '同一时段只会上传一个文件，队列会按顺序逐一上传文件',
+      '自动上传与手动上传可并行存在，手动上传项优先于自动项',
+      '每个文件上传完成后重新取队首，确保手动素材优先传输',
+      '手动上传形成持续追加的队列，新素材去重后追加到当前手动队列',
+      '同一时刻仅允许 1 个文件处于传输中，队列按顺序逐一上传',
+      '支持暂停/恢复自动上传、取消手动批次，不支持单项删除或调序',
     ];
 
     for (const rule of rules) {
@@ -132,19 +132,22 @@ describe('HelpPage', () => {
     expect(screen.getByText('常见问题', { exact: false })).toBeInTheDocument();
 
     const questions = [
-      '为什么移动端已连接成功了，却看不到共享文件？',
-      '为什么接收目录不能修改？',
-      '为什么有些素材没有自动上传？',
-      '为什么共享目录里的内容只能查看不能修改？',
+      '手机找不到电脑怎么办？',
+      '为什么断线重连后需要手动恢复同步？',
+      '为什么上传速度不够稳定？',
+      '为什么有些素材无法上传或上传失败？',
+      '为什么电脑上显示的文件名跟手机上的不一样？',
+      '同步目录可以放在外置硬盘上吗？',
+      '电脑休眠后传输会中断吗？',
     ];
 
     for (const q of questions) {
       expect(screen.getByText(q)).toBeInTheDocument();
     }
 
-    // Verify all 4 accordion items rendered
+    // Verify all accordion items rendered
     const accordionItems = screen.getAllByTestId('accordion-item');
-    expect(accordionItems).toHaveLength(4);
+    expect(accordionItems).toHaveLength(7);
   });
 
   it('renders error handling cards', () => {
@@ -152,16 +155,16 @@ describe('HelpPage', () => {
 
     expect(screen.getByText('异常处理说明', { exact: false })).toBeInTheDocument();
 
-    const errorTitles = ['设备离线', '目录不可访问', '空间不足', '上传中断'];
+    const errorTitles = ['连接异常', '磁盘空间不足', '设备中断', '上传中断'];
 
     for (const title of errorTitles) {
       expect(screen.getByText(title)).toBeInTheDocument();
     }
 
     // Verify descriptions
-    expect(screen.getByText(/确保 PC 和移动设备在同一局域网/)).toBeInTheDocument();
-    expect(screen.getByText(/检查文件夹权限/)).toBeInTheDocument();
-    expect(screen.getByText(/清理磁盘空间/)).toBeInTheDocument();
-    expect(screen.getByText(/传输会自动在下次重新启动时恢复/)).toBeInTheDocument();
+    expect(screen.getByText(/检查电脑和手机是否在同一局域网/)).toBeInTheDocument();
+    expect(screen.getByText(/剩余空间低于 500MB/)).toBeInTheDocument();
+    expect(screen.getByText(/设备离线、电脑休眠或网络中断/)).toBeInTheDocument();
+    expect(screen.getByText(/未完成的任务可在恢复连接后自动重试/)).toBeInTheDocument();
   });
 });

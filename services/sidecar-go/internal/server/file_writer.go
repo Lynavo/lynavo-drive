@@ -1,8 +1,9 @@
 package server
 
 import (
+	"errors"
 	"fmt"
-	"log/slog"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -142,7 +143,9 @@ func (fw *FileWriter) ElapsedMs() int64 {
 // Close closes the underlying file handle.
 func (fw *FileWriter) Close() error {
 	if fw.file != nil {
-		return fw.file.Close()
+		err := fw.file.Close()
+		fw.file = nil
+		return err
 	}
 	return nil
 }
@@ -158,22 +161,23 @@ func (fw *FileWriter) Cleanup() error {
 }
 
 // Finalize moves the .part staging file to its final destination.
-// It creates the target directory structure: <receivePath>/<deviceAlias>/<date>/
+// It creates the target directory structure: <receivePath>/<dirName>/<date>/
 // and handles filename conflicts by appending a suffix.
 // Returns the relative path from receivePath.
-func (fw *FileWriter) Finalize(receivePath, deviceAlias, date, filename, fileKey string) (string, error) {
+func (fw *FileWriter) Finalize(receivePath, dirName, date, filename, fileKey string) (string, error) {
 	if fw.file != nil {
 		fw.file.Close()
 		fw.file = nil
 	}
 
-	// Sanitize alias for use as directory name
-	alias := sanitizeDirName(deviceAlias)
-	if alias == "" {
-		alias = "Unknown"
+	// Defensive sanitize: dirName should already be sanitized from EnsureReceiveDirName,
+	// but Finalize is the last gate before filesystem writes.
+	dir := sanitizeDirName(dirName)
+	if dir == "" {
+		dir = "Unknown"
 	}
 
-	dir := filepath.Join(receivePath, alias, date)
+	dir = filepath.Join(receivePath, dir, date)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("create receive dir: %w", err)
 	}
@@ -193,8 +197,8 @@ func (fw *FileWriter) Finalize(receivePath, deviceAlias, date, filename, fileKey
 		finalPath = filepath.Join(dir, fmt.Sprintf("%s_%s%s", base, suffix, ext))
 	}
 
-	if err := os.Rename(fw.partPath, finalPath); err != nil {
-		return "", fmt.Errorf("rename part to final: %w", err)
+	if err := movePartToFinal(fw.partPath, finalPath); err != nil {
+		return "", err
 	}
 
 	// Return path relative to receivePath
@@ -205,22 +209,64 @@ func (fw *FileWriter) Finalize(receivePath, deviceAlias, date, filename, fileKey
 	return rel, nil
 }
 
-// MigrateDeviceDir renames a device's receive directory when its display name changes.
-// oldDirName is the previously stored sanitized name, newAlias is the current display name.
-func MigrateDeviceDir(receivePath, oldDirName, newAlias string) {
-	newDir := sanitizeDirName(newAlias)
-	if newDir == "" || oldDirName == "" || oldDirName == newDir {
-		return
-	}
-	oldPath := filepath.Join(receivePath, oldDirName)
-	newPath := filepath.Join(receivePath, newDir)
-	if info, err := os.Stat(oldPath); err == nil && info.IsDir() {
-		if err := os.Rename(oldPath, newPath); err != nil {
-			slog.Warn("failed to migrate device dir", "old", oldPath, "new", newPath, "err", err)
-		} else {
-			slog.Info("migrated device dir", "old", oldDirName, "new", newDir)
+func movePartToFinal(partPath, finalPath string) error {
+	if err := os.Rename(partPath, finalPath); err != nil {
+		if !isCrossDeviceRenameError(err) {
+			return fmt.Errorf("rename part to final: %w", err)
+		}
+		if copyErr := copyPartToFinal(partPath, finalPath); copyErr != nil {
+			return fmt.Errorf("rename part to final: %w; copy fallback: %w", err, copyErr)
+		}
+		if removeErr := os.Remove(partPath); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+			return fmt.Errorf("remove copied part file: %w", removeErr)
 		}
 	}
+	return nil
+}
+
+func isCrossDeviceRenameError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "cross-device link") ||
+		strings.Contains(message, "different disk drive") ||
+		strings.Contains(message, "not same device")
+}
+
+func copyPartToFinal(partPath, finalPath string) error {
+	src, err := os.Open(partPath)
+	if err != nil {
+		return fmt.Errorf("open part file: %w", err)
+	}
+	defer src.Close()
+
+	dst, err := os.OpenFile(finalPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o640)
+	if err != nil {
+		return fmt.Errorf("create final file: %w", err)
+	}
+
+	copied := false
+	defer func() {
+		if !copied {
+			_ = os.Remove(finalPath)
+		}
+	}()
+
+	if _, err := io.Copy(dst, src); err != nil {
+		_ = dst.Close()
+		return fmt.Errorf("copy data: %w", err)
+	}
+	if err := dst.Sync(); err != nil {
+		_ = dst.Close()
+		return fmt.Errorf("sync final file: %w", err)
+	}
+	if err := dst.Close(); err != nil {
+		return fmt.Errorf("close final file: %w", err)
+	}
+
+	copied = true
+	return nil
 }
 
 // SanitizeDirName replaces characters unsafe for directory names.

@@ -157,3 +157,25 @@ func TestGetActiveSession_NoneActive(t *testing.T) {
 		t.Errorf("expected ErrNoRows when no active session, got %v", err)
 	}
 }
+
+func TestGetActiveSession_IgnoresCompletedAndInterrupted(t *testing.T) {
+	s := newTestStore(t)
+
+	completed := sampleSession("completed-1", "client-3")
+	completed.State = "completed"
+	if err := s.UpsertSession(completed); err != nil {
+		t.Fatalf("UpsertSession completed: %v", err)
+	}
+
+	interrupted := sampleSession("interrupted-1", "client-3")
+	interrupted.State = "interrupted"
+	interrupted.UpdatedAt = time.Now().UTC().Add(time.Second).Format(time.RFC3339)
+	if err := s.UpsertSession(interrupted); err != nil {
+		t.Fatalf("UpsertSession interrupted: %v", err)
+	}
+
+	_, err := s.GetActiveSession("client-3")
+	if !errors.Is(err, ErrNoRows) {
+		t.Errorf("expected ErrNoRows when only completed/interrupted sessions exist, got %v", err)
+	}
+}

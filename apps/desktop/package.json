@@ -16,7 +16,7 @@
     "package:mas": "bash ./scripts/package-macos-mas.sh",
     "upload:testflight": "bash ./scripts/upload-macos-testflight.sh",
     "package:all": "node ./scripts/run-workspace-pnpm.cjs build && pnpm build:sidecar && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
-    "package:win": "node ./scripts/run-workspace-pnpm.cjs build && node ./scripts/run-workspace-pnpm.cjs --filter @syncflow/desktop build:sidecar:win && node ./scripts/run-electron-builder.cjs --win nsis zip --x64",
+    "package:win": "node ./scripts/run-workspace-pnpm.cjs build && node ./scripts/run-workspace-pnpm.cjs --filter @syncflow/desktop build:sidecar:win && node ./scripts/verify-windows-resources.cjs && node ./scripts/run-electron-builder.cjs --win nsis zip --x64",
     "preview": "node ./scripts/run-electron-vite.cjs preview",
     "test": "vitest run",
     "test:watch": "vitest",

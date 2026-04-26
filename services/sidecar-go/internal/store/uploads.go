@@ -239,6 +239,12 @@ func (s *Store) CompleteUpload(fileKey, finalPath, sha256 string, transmissionMs
 // PauseUploadForLowDisk marks an in-flight upload as resumable when disk space
 // falls below the configured threshold mid-transfer.
 func (s *Store) PauseUploadForLowDisk(fileKey string, committedBytes, transmissionMs int64) error {
+	return s.PauseUploadResumable(fileKey, committedBytes, transmissionMs)
+}
+
+// PauseUploadResumable marks an in-flight upload as resumable after an
+// environmental pause such as low disk space or unavailable storage path.
+func (s *Store) PauseUploadResumable(fileKey string, committedBytes, transmissionMs int64) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	result, err := s.db.Exec(`
 		UPDATE uploads
@@ -250,11 +256,11 @@ func (s *Store) PauseUploadForLowDisk(fileKey string, committedBytes, transmissi
 		committedBytes, transmissionMs, now, fileKey,
 	)
 	if err != nil {
-		return fmt.Errorf("pause upload for low disk %q: %w", fileKey, err)
+		return fmt.Errorf("pause upload resumable %q: %w", fileKey, err)
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {
-		return fmt.Errorf("pause upload for low disk %q: %w", fileKey, ErrNoRows)
+		return fmt.Errorf("pause upload resumable %q: %w", fileKey, ErrNoRows)
 	}
 	return nil
 }
@@ -330,6 +336,7 @@ func (s *Store) GetDashboardDevices(today string) ([]DashboardDeviceResult, erro
 			SELECT client_id, state, active_file_key,
 				ROW_NUMBER() OVER (PARTITION BY client_id ORDER BY started_at DESC) AS rn
 			FROM sessions
+			WHERE state = 'transferring'
 		) latest_sess ON latest_sess.client_id = pd.client_id AND latest_sess.rn = 1
 		LEFT JOIN uploads u ON u.file_key = latest_sess.active_file_key
 		WHERE pd.revoked_at IS NULL

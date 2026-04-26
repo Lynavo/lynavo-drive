@@ -1,0 +1,13 @@
+{
+  "title": "掃描配對二維碼",
+  "instruction": "請將二維碼放入框內即可自動連接",
+  "permissionDenied": {
+    "text": "需要相機權限來掃描二維碼"
+  },
+  "noCameraDevice": "未找到相機設備",
+  "android": {
+    "title": "Android 暫未提供掃碼配對",
+    "body": "當前 Android 基線版本先開放基礎橋接與手動配對入口。請返回上一頁，使用「手動配對」輸入桌面端 IPv4 地址繼續。",
+    "backToManual": "返回手動配對"
+  }
+}

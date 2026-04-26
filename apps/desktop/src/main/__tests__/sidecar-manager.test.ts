@@ -38,6 +38,19 @@ vi.mock('../sidecar-client', () => ({
   sidecarClient: {
     getHealth: vi.fn(),
   },
+  supportsPairingRevocationOnCodeRotation: (
+    health:
+      | {
+          ok?: boolean;
+          service?: string;
+          capabilities?: { revokesPairingsOnCodeRotation?: boolean };
+        }
+      | null
+      | undefined,
+  ) =>
+    health?.ok === true &&
+    health.service === 'syncflow-sidecar' &&
+    health.capabilities?.revokesPairingsOnCodeRotation === true,
 }));
 
 function createChildProcessStub() {
@@ -77,10 +90,15 @@ describe('SidecarManager', () => {
     vi.mocked(sidecarClient.getHealth).mockResolvedValueOnce({
       ok: true,
       service: 'syncflow-sidecar',
+      capabilities: { revokesPairingsOnCodeRotation: true },
     });
     vi.mocked(sidecarClient.getHealth).mockRejectedValueOnce(new Error('ECONNREFUSED'));
     vi.mocked(sidecarClient.getHealth).mockRejectedValueOnce(new Error('ECONNREFUSED'));
-    vi.mocked(sidecarClient.getHealth).mockResolvedValue({ ok: true, service: 'syncflow-sidecar' });
+    vi.mocked(sidecarClient.getHealth).mockResolvedValue({
+      ok: true,
+      service: 'syncflow-sidecar',
+      capabilities: { revokesPairingsOnCodeRotation: true },
+    });
 
     const manager = new SidecarManager();
 
@@ -103,6 +121,26 @@ describe('SidecarManager', () => {
     const manager = new SidecarManager();
 
     await manager.start();
+
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    expect(manager.getState().status).toBe('healthy');
+  });
+
+  it('does not reuse an external sidecar without pairing-revocation capability', async () => {
+    vi.mocked(sidecarClient.getHealth)
+      .mockResolvedValueOnce({
+        ok: true,
+        service: 'syncflow-sidecar',
+      })
+      .mockResolvedValue({
+        ok: true,
+        service: 'syncflow-sidecar',
+        capabilities: { revokesPairingsOnCodeRotation: true },
+      });
+
+    const manager = new SidecarManager();
+
+    await manager.start({ reuseExisting: true });
 
     expect(spawnMock).toHaveBeenCalledTimes(1);
     expect(manager.getState().status).toBe('healthy');

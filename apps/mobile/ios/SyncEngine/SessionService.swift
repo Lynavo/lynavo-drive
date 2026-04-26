@@ -14,7 +14,7 @@ class SessionService {
         case backoffWaiting = "backoff_waiting"
         case pausedNoTarget = "paused_no_target"
         case pausedNoPermission = "paused_no_permission"
-        case pausedAutoUpload = "paused_auto_upload"
+        case interruptedAutoUpload = "paused_auto_upload"
         case stopped
     }
 
@@ -26,7 +26,7 @@ class SessionService {
     }
 
     func transitionTo(_ newState: SyncEngineState) {
-        NSLog("[SessionService] %@ -> %@", state.rawValue, newState.rawValue)
+        slog("[SessionService] %@ -> %@", state.rawValue, newState.rawValue)
         state = newState
     }
 

@@ -1,19 +1,10 @@
-import { app, BrowserWindow, net, protocol } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import { join } from 'path';
-import { pathToFileURL } from 'url';
 import { registerIpcHandlers } from './ipc-handlers';
 import { SidecarManager } from './sidecar-manager';
 import { WsBridge } from './ws-bridge';
 import type { SidecarRuntimeState } from '../shared/sidecar-runtime';
 
-// Register 'media' scheme as privileged so the renderer can load local files
-// for in-app preview. Must be called before app.whenReady().
-protocol.registerSchemesAsPrivileged([
-  {
-    scheme: 'media',
-    privileges: { stream: true, supportFetchAPI: true, bypassCSP: true },
-  },
-]);
 
 // Prevent crash on broken pipe (sidecar stdout/stderr)
 process.on('uncaughtException', (err) => {
@@ -81,14 +72,6 @@ export async function createMainWindow() {
 }
 
 app.whenReady().then(async () => {
-  // Handle media:// protocol to serve local files for in-app preview.
-  // Renderer sends: media:///Users/x/path/file.jpg  (3 slashes: scheme + empty authority + absolute path)
-  // We strip 'media://' to get '/Users/x/path/file.jpg', then use pathToFileURL for safe file:// URL.
-  protocol.handle('media', (request) => {
-    const filePath = decodeURIComponent(request.url.slice('media://'.length));
-    return net.fetch(pathToFileURL(filePath).href);
-  });
-
   registerIpcHandlers(sidecar);
   await createMainWindow();
   wsBridge = new WsBridge(() => mainWindow);
@@ -109,7 +92,13 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('before-quit', async () => {
+let isQuitting = false;
+app.on('before-quit', (event) => {
+  if (isQuitting) return;
+  event.preventDefault();
+  isQuitting = true;
   wsBridge?.disconnect();
-  await sidecar.stop();
+  sidecar
+    .stop({ killExternal: true, killBonjourBroadcasts: true })
+    .finally(() => app.quit());
 });

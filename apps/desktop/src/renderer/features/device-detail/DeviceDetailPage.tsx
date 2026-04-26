@@ -17,6 +17,8 @@ const colors = {
   folderButton: '#3b82f6',
 } as const;
 
+const DETAIL_REFRESH_INTERVAL_MS = 10_000;
+
 export function DeviceDetailPage() {
   const selectedDevice = useAppStore((s) => s.selectedDevice);
   const closeDeviceDetail = useAppStore((s) => s.closeDeviceDetail);
@@ -43,6 +45,18 @@ export function DeviceDetailPage() {
     };
   }, [selectedDevice]);
 
+  useEffect(() => {
+    if (!selectedDevice) return;
+
+    const interval = setInterval(() => {
+      useDeviceDetailStore
+        .getState()
+        .fetchDeviceFiles(selectedDevice.deviceId, { silent: true });
+    }, DETAIL_REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [selectedDevice]);
+
   const { totalPages, pageStart, pageEnd } = useMemo(() => {
     const safeTotalPages = Math.max(1, Math.ceil(totalItems / Math.max(pageSize, 1)));
     const safePage = Math.min(Math.max(page, 1), safeTotalPages);
@@ -53,9 +67,9 @@ export function DeviceDetailPage() {
 
   if (!selectedDevice) return null;
 
-  const isPhone = /iphone|ipad|galaxy|pixel|android|mobile/i.test(
-    selectedDevice.clientName,
-  );
+  const isPhone =
+    selectedDevice.platform === 'ios' ||
+    /android|mobile/i.test(selectedDevice.platform);
   const DeviceIcon = isPhone ? Smartphone : Monitor;
 
   const hasMaterializedDateDir = availableDates.includes(selectedDate);
@@ -110,7 +124,7 @@ export function DeviceDetailPage() {
 
             <div className="min-w-0 flex-1">
               <h1 className="text-xl font-bold" style={{ color: colors.titleText }}>
-                {selectedDevice.clientName}
+                {selectedDevice.displayName}
                 <span
                   className="ml-2 text-xs font-normal"
                   style={{ color: colors.subtitleText }}

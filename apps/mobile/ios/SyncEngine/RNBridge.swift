@@ -1,6 +1,139 @@
 import Foundation
+import Photos
+import PhotosUI
 import React
 import UIKit
+
+private struct DiagnosticsUploadNativeError: LocalizedError {
+    let code: String
+    let message: String
+
+    var errorDescription: String? { message }
+}
+
+private func diagnosticsArchiveURL(from rawPath: String) -> URL? {
+    let trimmed = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+
+    if trimmed.hasPrefix("file://") {
+        return URL(string: trimmed)
+    }
+
+    return URL(fileURLWithPath: trimmed)
+}
+
+private func diagnosticsUploadLog(_ message: String) {
+    syncDiagnosticsLog("DiagnosticsUpload", message)
+    slog("[DiagnosticsUpload] %@", message)
+}
+
+private func appendDiagnosticsMultipartString(_ value: String, to data: inout Data) {
+    data.append(Data(value.utf8))
+}
+
+private func diagnosticsMultipartBody(
+    archiveURL: URL,
+    clientId: String,
+    boundary: String
+) throws -> Data {
+    var body = Data()
+    let filename = "diagnostics-\(Int(Date().timeIntervalSince1970 * 1000)).zip"
+
+    appendDiagnosticsMultipartString("--\(boundary)\r\n", to: &body)
+    appendDiagnosticsMultipartString("Content-Disposition: form-data; name=\"client_id\"\r\n\r\n", to: &body)
+    appendDiagnosticsMultipartString(clientId, to: &body)
+    appendDiagnosticsMultipartString("\r\n", to: &body)
+
+    appendDiagnosticsMultipartString("--\(boundary)\r\n", to: &body)
+    appendDiagnosticsMultipartString(
+        "Content-Disposition: form-data; name=\"bundle\"; filename=\"\(filename)\"\r\n",
+        to: &body
+    )
+    appendDiagnosticsMultipartString("Content-Type: application/zip\r\n\r\n", to: &body)
+    body.append(try Data(contentsOf: archiveURL))
+    appendDiagnosticsMultipartString("\r\n", to: &body)
+    appendDiagnosticsMultipartString("--\(boundary)--\r\n", to: &body)
+
+    return body
+}
+
+private func diagnosticsHeaders(from rawHeaders: Any?) -> [String: String] {
+    guard let rawHeaders = rawHeaders as? NSDictionary else { return [:] }
+
+    var headers: [String: String] = [:]
+    for (key, value) in rawHeaders {
+        guard let headerName = key as? String else { continue }
+        if let headerValue = value as? String {
+            headers[headerName] = headerValue
+        }
+    }
+    return headers
+}
+
+private func performDiagnosticsArchiveUpload(
+    archiveURL: URL,
+    uploadURL: URL,
+    clientId: String,
+    headers: [String: String]
+) async throws -> [String: Any] {
+    let boundary = "syncflow-\(UUID().uuidString)"
+    var request = URLRequest(url: uploadURL)
+    request.httpMethod = "POST"
+    for (key, value) in headers {
+        if key.caseInsensitiveCompare("Content-Type") == .orderedSame {
+            continue
+        }
+        request.setValue(value, forHTTPHeaderField: key)
+    }
+    let contentType = "multipart/form-data; boundary=\(boundary)"
+    request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+    request.httpBody = try diagnosticsMultipartBody(
+        archiveURL: archiveURL,
+        clientId: clientId,
+        boundary: boundary
+    )
+    let uploadBytes = request.httpBody?.count ?? 0
+    diagnosticsUploadLog(
+        "started url=\(uploadURL.absoluteString) archive=\(archiveURL.lastPathComponent) bytes=\(uploadBytes) client_id=\(clientId) contentType=\(contentType)"
+    )
+
+    let data: Data
+    let response: URLResponse
+    do {
+        (data, response) = try await URLSession.shared.data(for: request)
+    } catch {
+        diagnosticsUploadLog("failed network error=\(error)")
+        throw error
+    }
+    guard let httpResponse = response as? HTTPURLResponse else {
+        diagnosticsUploadLog("failed invalid response")
+        throw DiagnosticsUploadNativeError(code: "NETWORK_ERROR", message: "Invalid diagnostics upload response")
+    }
+    let body = String(data: data, encoding: .utf8) ?? ""
+    let clippedBody = body.count > 500 ? String(body.prefix(500)) : body
+    diagnosticsUploadLog(
+        "completed status=\(httpResponse.statusCode) responseBytes=\(data.count) body=\(clippedBody)"
+    )
+
+    if httpResponse.statusCode == 413 {
+        throw DiagnosticsUploadNativeError(code: "BUNDLE_TOO_LARGE", message: "Diagnostics bundle too large")
+    }
+
+    guard httpResponse.statusCode == 200 else {
+        throw DiagnosticsUploadNativeError(
+            code: "SERVER_ERROR",
+            message: body.isEmpty ? "Diagnostics upload failed with HTTP \(httpResponse.statusCode)" : body
+        )
+    }
+
+    guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let refId = json["ref_id"] as? String,
+          let uploadedAt = json["uploaded_at"] as? String else {
+        throw DiagnosticsUploadNativeError(code: "SERVER_ERROR", message: "Invalid diagnostics upload response JSON")
+    }
+
+    return ["ref_id": refId, "uploaded_at": uploadedAt]
+}
 
 @objc(NativeSyncEngine)
 class NativeSyncEngineModule: RCTEventEmitter {
@@ -19,6 +152,7 @@ class NativeSyncEngineModule: RCTEventEmitter {
             "onQueueUpdated",
             "onHistoryUpdated",
             "onBindingStateChanged",
+            "onPhotoLibraryChanged",
             "onError",
         ]
     }
@@ -29,28 +163,43 @@ class NativeSyncEngineModule: RCTEventEmitter {
 
     // MARK: - Event Emitters
 
+    private func sendEventOnMain(withName name: String, body: Any?) {
+        if Thread.isMainThread {
+            sendEvent(withName: name, body: body)
+            return
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            self?.sendEvent(withName: name, body: body)
+        }
+    }
+
     func emitDiscoveredDevices(_ devices: [[String: Any]]) {
-        sendEvent(withName: "onDiscoveredDevicesChanged", body: devices)
+        sendEventOnMain(withName: "onDiscoveredDevicesChanged", body: devices)
     }
 
     func emitSyncStateChanged(_ state: [String: Any]) {
-        sendEvent(withName: "onSyncStateChanged", body: state)
+        sendEventOnMain(withName: "onSyncStateChanged", body: state)
     }
 
     func emitQueueUpdated(_ queue: [[String: Any]]) {
-        sendEvent(withName: "onQueueUpdated", body: queue)
+        sendEventOnMain(withName: "onQueueUpdated", body: queue)
     }
 
     func emitHistoryUpdated() {
-        sendEvent(withName: "onHistoryUpdated", body: nil)
+        sendEventOnMain(withName: "onHistoryUpdated", body: nil)
     }
 
     func emitBindingStateChanged(_ binding: [String: Any]?) {
-        sendEvent(withName: "onBindingStateChanged", body: binding)
+        sendEventOnMain(withName: "onBindingStateChanged", body: binding)
     }
 
     func emitError(_ error: [String: Any]) {
-        sendEvent(withName: "onError", body: error)
+        sendEventOnMain(withName: "onError", body: error)
+    }
+
+    func emitPhotoLibraryChanged() {
+        sendEventOnMain(withName: "onPhotoLibraryChanged", body: nil)
     }
 
     // MARK: - Bridge Methods
@@ -60,6 +209,46 @@ class NativeSyncEngineModule: RCTEventEmitter {
         Task {
             let result = await SyncEngineManager.shared.requestPhotoPermission()
             resolve(result)
+        }
+    }
+
+    @objc
+    func getPhotoAuthorizationStatus(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        switch status {
+        case .authorized:
+            resolve("authorized")
+        case .limited:
+            resolve("limited")
+        case .denied:
+            resolve("denied")
+        case .restricted:
+            resolve("restricted")
+        case .notDetermined:
+            resolve("notDetermined")
+        @unknown default:
+            resolve("unknown")
+        }
+    }
+
+    @objc
+    func presentLimitedPhotoPicker(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        DispatchQueue.main.async {
+            guard let rootVC = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .flatMap({ $0.windows })
+                .first(where: { $0.isKeyWindow })?
+                .rootViewController else {
+                reject("NO_VC", "No root view controller available", nil)
+                return
+            }
+            // Find the topmost presented controller
+            var topVC = rootVC
+            while let presented = topVC.presentedViewController {
+                topVC = presented
+            }
+            PHPhotoLibrary.shared().presentLimitedLibraryPicker(from: topVC)
+            resolve(nil)
         }
     }
 
@@ -131,9 +320,17 @@ class NativeSyncEngineModule: RCTEventEmitter {
     }
 
     @objc
-    func getHistoryDays(_ cursor: NSString?, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    func getHistoryDays(_ cursor: Any?, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         Task {
-            let result = await SyncEngineManager.shared.getHistoryDays(cursor: cursor as String?)
+            let cursorString: String?
+            if let value = cursor as? String {
+                cursorString = value
+            } else if let value = cursor as? NSString {
+                cursorString = value as String
+            } else {
+                cursorString = nil
+            }
+            let result = await SyncEngineManager.shared.getHistoryDays(cursor: cursorString)
             resolve(result)
         }
     }
@@ -159,8 +356,44 @@ class NativeSyncEngineModule: RCTEventEmitter {
     }
 
     @objc
+    func uploadDiagnosticsArchive(_ params: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        guard let urlString = params["url"] as? String,
+              let uploadURL = URL(string: urlString),
+              let archivePath = params["archivePath"] as? String,
+              let archiveURL = diagnosticsArchiveURL(from: archivePath),
+              let clientId = params["client_id"] as? String,
+              !clientId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            reject("INVALID_PARAMS", "Missing diagnostics upload parameters", nil)
+            return
+        }
+
+        let headers = diagnosticsHeaders(from: params["headers"])
+
+        Task {
+            do {
+                let result = try await performDiagnosticsArchiveUpload(
+                    archiveURL: archiveURL,
+                    uploadURL: uploadURL,
+                    clientId: clientId,
+                    headers: headers
+                )
+                resolve(result)
+            } catch let error as DiagnosticsUploadNativeError {
+                reject(error.code, error.message, error)
+            } catch {
+                reject("NETWORK_ERROR", error.localizedDescription, error)
+            }
+        }
+    }
+
+    @objc
     func getClientDisplayName(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         resolve(SyncEngineManager.shared.getClientDisplayName())
+    }
+
+    @objc
+    func getClientId(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        resolve(SyncEngineManager.shared.getClientId())
     }
 
     @objc
@@ -236,6 +469,16 @@ class NativeSyncEngineModule: RCTEventEmitter {
         }
     }
 
+    @objc
+    func getAssetPreviewSource(_ assetLocalId: NSString, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        Task {
+            let result = SyncEngineManager.shared.getAssetPreviewSource(
+                assetLocalId: assetLocalId as String
+            )
+            resolve(result)
+        }
+    }
+
     // MARK: - Vivi Drop: Manual Upload
 
     @objc
@@ -260,14 +503,32 @@ class NativeSyncEngineModule: RCTEventEmitter {
         }
     }
 
+    @objc
+    func cancelAllManualUploads(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        do {
+            try SyncEngineManager.shared.cancelAllManualUploads()
+            resolve(nil)
+        } catch {
+            reject("CANCEL_MANUAL_QUEUE_ERROR", error.localizedDescription, error)
+        }
+    }
+
     // MARK: - Vivi Drop: Auto Upload Control
 
+    // DEPRECATED: RN side uses saveAutoUploadConfig() instead. To be removed next release cycle.
     @objc
     func pauseAutoUpload(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         SyncEngineManager.shared.pauseAutoUpload()
         resolve(nil)
     }
 
+    @objc
+    func disableAutoUpload(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        SyncEngineManager.shared.disableAutoUpload()
+        resolve(nil)
+    }
+
+    // DEPRECATED: RN side uses saveAutoUploadConfig() instead. To be removed next release cycle.
     @objc
     func resumeAutoUpload(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         SyncEngineManager.shared.resumeAutoUpload()
@@ -351,5 +612,62 @@ class NativeSyncEngineModule: RCTEventEmitter {
             }
             rootVC.present(activityVC, animated: true)
         }
+    }
+
+    // MARK: - Account Identity Reset (Phase 1 / 2 / 3)
+
+    @objc
+    func wipeSyncIdentity(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        // wipeSyncIdentity mutates a large set of plain instance properties
+        // on SyncEngineManager (protocolSession, isSyncing, sidecarHost,
+        // runtimeUploadState, bindingConnectionState, etc.) that are also
+        // touched from delegate callbacks, heartbeat timers, and other
+        // `Task { @MainActor in ... }` blocks inside the manager. Running
+        // the wipe on the cooperative pool races those mutators.
+        //
+        // AppDelegate already drives this synchronously from the main
+        // thread (reinstall / self-heal paths), so align the bridge entry
+        // point to the same main-actor context. `MainActor.run` hops onto
+        // the main thread, runs the wipe to completion, and then resolves
+        // the JS promise.
+        Task { @MainActor in
+            SyncEngineManager.shared.wipeSyncIdentity()
+            resolve(nil)
+        }
+    }
+
+    @objc
+    func getOwnerUserId(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        // UserDefaults is thread-safe, so no main-actor hop is needed here.
+        if let value = SyncEngineManager.shared.getOwnerUserId() {
+            resolve(value)
+        } else {
+            resolve(NSNull())
+        }
+    }
+
+    @objc
+    func setOwnerUserId(_ userId: NSString, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        // UserDefaults is thread-safe, so no main-actor hop is needed here.
+        // Reject the JS promise if the disk flush failed — the owner marker
+        // is the Phase-2 durability anchor and a silent failure here is
+        // indistinguishable from "user A never logged in" on the next cold
+        // start, which bypasses the owner-mismatch wipe.
+        let flushed = SyncEngineManager.shared.setOwnerUserId(userId as String)
+        if flushed {
+            resolve(nil)
+        } else {
+            reject(
+                "SET_OWNER_USER_ID_FLUSH_FAILED",
+                "UserDefaults.synchronize() returned false — owner marker not durably written",
+                nil
+            )
+        }
+    }
+
+    @objc
+    func getKnownDeviceIds(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        let ids = SyncEngineManager.shared.getKnownDeviceIds()
+        resolve(ids)
     }
 }

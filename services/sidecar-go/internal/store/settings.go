@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"time"
 )
 
 // GetSetting retrieves a setting value by key.
@@ -36,6 +37,44 @@ func (s *Store) GetConnectionCode() (string, error) {
 // SetConnectionCode updates the connection code.
 func (s *Store) SetConnectionCode(code string) error {
 	return s.SetSetting("connection_code", code)
+}
+
+// SetConnectionCodeAndRevokePairedDevices rotates the connection code and
+// invalidates active pairing tokens in a single database transaction.
+func (s *Store) SetConnectionCodeAndRevokePairedDevices(code string) (int64, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("begin connection code rotation: %w", err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	if _, err := tx.Exec(
+		"INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+		"connection_code", code,
+	); err != nil {
+		return 0, fmt.Errorf("set connection code: %w", err)
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	result, err := tx.Exec(
+		"UPDATE paired_devices SET revoked_at = ? WHERE revoked_at IS NULL",
+		now,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("revoke paired devices after connection code rotation: %w", err)
+	}
+	revokedCount, _ := result.RowsAffected()
+
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("commit connection code rotation: %w", err)
+	}
+	committed = true
+	return revokedCount, nil
 }
 
 // GetDeviceID returns the auto-generated device identifier.

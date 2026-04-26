@@ -1,0 +1,154 @@
+{
+  "title": "同步动态",
+  "phases": {
+    "discoveringTitle": "正在搜索电脑…",
+    "reconcilingTitle": "正在同步历史记录…",
+    "scanningTitle": "正在扫描相册…",
+    "preparingTitle": "正在建立连接…",
+    "defaultTitle": "准备中…",
+    "discoveringSubtitleWaited": "已等待 {{seconds}} 秒",
+    "discoveringSubtitleSearching": "正在局域网中搜索",
+    "reconcilingSubtitle": "首次使用需要核对已传文件",
+    "scanningSubtitleProgress": "已扫描 {{scanned}} / {{total}} 张",
+    "scanningSubtitleReading": "正在读取相册",
+    "preparingSubtitle": "正在与电脑建立安全连接",
+    "reconnectingTitle": "网络波动，正在重连…",
+    "reconnectingSubtitle": "恢复连线后会继续本次上传",
+    "autoPreparingTitle": "正在开启自动同步…",
+    "autoPreparingSubtitle": "即将开始扫描新照片"
+  },
+  "badges": {
+    "manual": "手动",
+    "auto": "自动",
+    "manualUploading": "手动上传中",
+    "autoEnabled": "自动上传已开启"
+  },
+  "running": {
+    "manualTitle": "手动上传中",
+    "autoTitle": "正在自动上传",
+    "autoRunningTitle": "自动上传运行中",
+    "autoRunningSubtitle": "新素材将自动传输到 PC 端",
+    "queueInfo": "排队中 {{queued}}项"
+  },
+  "standby": {
+    "title": "等待新素材",
+    "subtitle": "拍完后会自动传输到 PC 端"
+  },
+  "notStarted": {
+    "title": "自动上传未开启",
+    "subtitle": "开启自动上传，拍完就同步；或者也可以选手动传输",
+    "goToAlbum": "去相册",
+    "enableAuto": "开启自动上传"
+  },
+  "interrupted": {
+    "title": "自动上传已暂停",
+    "subtitle": "本次自动上传已中断，确认电脑端接收目录后可重新开启。",
+    "goToAlbum": "去相册",
+    "resumeAuto": "重新开启"
+  },
+  "offline": {
+    "title": "当前设备已离线",
+    "subtitle": "请检查电脑是否在线并连接同一局域网，恢复后可继续上传或访问共享目录",
+    "switchDevice": "切换设备",
+    "reconnect": "重新连接"
+  },
+  "stats": {
+    "speed": "速度",
+    "progress": "进度",
+    "transferred": "已传输",
+    "transferredCount": "{{count}} 个",
+    "dataAmount": "数据量"
+  },
+  "completed": {
+    "speedIdle": "--",
+    "auto": {
+      "title": "自动上传已完成",
+      "subtitle": "本次同步 {{count}} 个文件",
+      "fileCountLabel": "文件数",
+      "fileCountValue": "{{count}} 个",
+      "latestSync": "最近同步：{{label}}",
+      "goToAlbum": "去相册"
+    },
+    "manual": {
+      "title": "手动上传已完成",
+      "subtitle": "已完成 {{completed}} / {{total}}",
+      "progressValue": "{{completed}} / {{total}}",
+      "hint": "本次上传已完成\n自动上传未开启，可继续手动上传或开启自动上传",
+      "goToAlbum": "去相册继续上传",
+      "enableAuto": "开启自动上传"
+    }
+  },
+  "actions": {
+    "cancelling": "正在取消...",
+    "cancelManualBatch": "取消本次手动上传",
+    "closeAutoUpload": "关闭自动上传"
+  },
+  "quickEntry": {
+    "title": "快捷入口",
+    "albumTitle": "相册",
+    "albumDesc": "浏览和手动上传素材",
+    "sharedFilesTitle": "共享目录",
+    "sharedFilesDesc": "浏览PC设备的共享目录"
+  },
+  "trialUpgrade": {
+    "entry": "免费试用剩余 {{days}} 天，点击升级 Pro 解锁全部功能"
+  },
+  "expired": {
+    "title": "试用已结束",
+    "subtitle": "订阅后可继续使用素材上传、自动上传与共享文件访问",
+    "subscribeCta": "立即订阅",
+    "viewHelp": "查看帮助"
+  },
+  "dialogs": {
+    "syncError": {
+      "title": "同步异常",
+      "lowDiskPaused": "接收磁盘剩余空间小于 500MB，已暂停新的接收任务",
+      "storageUnavailable": "电脑端接收目录不可用，请在电脑端重新选择或恢复文件夹"
+    },
+    "cancelManual": {
+      "title": "取消手动上传",
+      "body": "确定取消当前的手动上传队列吗？",
+      "rethink": "再想想",
+      "confirm": "确认取消"
+    },
+    "cancelManualFailed": {
+      "title": "取消失败",
+      "body": "无法取消当前手动上传，请稍后重试"
+    },
+    "closeAuto": {
+      "title": "关闭自动上传",
+      "body": "关闭后，当前自动上传任务将停止，后续新素材不会继续自动上传。",
+      "continue": "继续上传",
+      "confirm": "确认关闭"
+    },
+    "closeAutoFailed": {
+      "title": "操作失败",
+      "body": "无法关闭自动上传，请稍后重试"
+    },
+    "reconnectFailed": {
+      "title": "重连失败",
+      "body": "请稍后重试"
+    },
+    "switchDevice": {
+      "title": "切换设备",
+      "body": "将断开当前设备并返回设备扫描页",
+      "confirm": "确认切换"
+    },
+    "enableAutoBlocked": {
+      "title": "无法开启",
+      "body": "请先连接设备"
+    },
+    "switchUploadMode": {
+      "title": "切换上传模式",
+      "body": "当前正在上传，继续自动上传将中断手动上传，是否继续？",
+      "confirm": "确认切换"
+    },
+    "enableAutoFailed": {
+      "title": "操作失败",
+      "body": "无法开启自动上传，请稍后重试"
+    }
+  },
+  "performance": {
+    "thermalThrottled": "设备温度较高，已降低传输强度"
+  }
+}

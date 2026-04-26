@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/nicksyncflow/sidecar/internal/api"
 	"github.com/nicksyncflow/sidecar/internal/config"
 	"github.com/nicksyncflow/sidecar/internal/events"
@@ -46,6 +47,16 @@ func testEnv(t *testing.T) (*store.Store, *config.Config, *events.Hub) {
 	return st, cfg, hub
 }
 
+type fakeClientStates map[string]string
+
+func (f fakeClientStates) ConnectedClientStates() map[string]string {
+	states := make(map[string]string, len(f))
+	for clientID, state := range f {
+		states[clientID] = state
+	}
+	return states
+}
+
 func TestHealthEndpoint(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
@@ -74,6 +85,13 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 	if body["version"] != "0.1.0" {
 		t.Errorf("expected version=0.1.0, got %v", body["version"])
+	}
+	capabilities, ok := body["capabilities"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected capabilities object, got %T", body["capabilities"])
+	}
+	if capabilities["revokesPairingsOnCodeRotation"] != true {
+		t.Errorf("expected revokesPairingsOnCodeRotation=true, got %v", capabilities["revokesPairingsOnCodeRotation"])
 	}
 }
 
@@ -134,6 +152,234 @@ func TestDashboardDevices(t *testing.T) {
 	// Should be an empty array (not null)
 	if body == nil {
 		t.Error("expected empty array, got nil")
+	}
+}
+
+func TestDashboardStatsIgnoreDeletedFinalFiles(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	now := time.Now()
+	today := now.Format("2006-01-02")
+	nowText := now.Format(time.RFC3339)
+	dirName := "Test iPhone"
+	if err := st.UpsertPairedDevice(store.PairedDevice{
+		ClientID:         "test-device-1",
+		ClientName:       "Test iPhone",
+		Platform:         "ios",
+		PairingID:        "pair-1",
+		PairingTokenHash: "hash-1",
+		CreatedAt:        nowText,
+		LastSeenAt:       nowText,
+		ReceiveDirName:   &dirName,
+	}); err != nil {
+		t.Fatalf("UpsertPairedDevice: %v", err)
+	}
+	if err := st.UpsertDailyStats(store.DailyStats{
+		StatDate:             today,
+		ClientID:             "test-device-1",
+		ClientNameSnapshot:   "Test iPhone",
+		FileCount:            2,
+		TotalBytes:           12,
+		ActiveTransmissionMs: 50,
+		UpdatedAt:            nowText,
+	}); err != nil {
+		t.Fatalf("UpsertDailyStats: %v", err)
+	}
+
+	dateDir := filepath.Join(cfg.ReceiveDir, dirName, today)
+	if err := os.MkdirAll(dateDir, 0o755); err != nil {
+		t.Fatalf("mkdir date dir: %v", err)
+	}
+	existingPath := filepath.Join(dirName, today, "IMG_0001.JPG")
+	deletedPath := filepath.Join(dirName, today, "IMG_0002.JPG")
+	if err := os.WriteFile(filepath.Join(cfg.ReceiveDir, existingPath), []byte("actual"), 0o644); err != nil {
+		t.Fatalf("write existing file: %v", err)
+	}
+	for _, upload := range []store.Upload{
+		{
+			FileKey:          "file-existing",
+			ClientID:         "test-device-1",
+			OriginalFilename: "IMG_0001.JPG",
+			MediaType:        "image",
+			FileSize:         4,
+			Status:           "completed",
+			FinalPath:        &existingPath,
+			CommittedBytes:   4,
+			CompletedAt:      &nowText,
+			UpdatedAt:        nowText,
+		},
+		{
+			FileKey:          "file-deleted",
+			ClientID:         "test-device-1",
+			OriginalFilename: "IMG_0002.JPG",
+			MediaType:        "image",
+			FileSize:         8,
+			Status:           "completed",
+			FinalPath:        &deletedPath,
+			CommittedBytes:   8,
+			CompletedAt:      &nowText,
+			UpdatedAt:        nowText,
+		},
+	} {
+		if err := st.UpsertUpload(upload); err != nil {
+			t.Fatalf("UpsertUpload %s: %v", upload.FileKey, err)
+		}
+	}
+
+	resp, err := http.Get(srv.URL + "/dashboard/devices")
+	if err != nil {
+		t.Fatalf("GET /dashboard/devices: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var devices []struct {
+		DeviceID       string `json:"deviceId"`
+		TodayFileCount int    `json:"todayFileCount"`
+		TodayBytes     int64  `json:"todayBytes"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&devices); err != nil {
+		t.Fatalf("decode devices: %v", err)
+	}
+	if len(devices) != 1 {
+		t.Fatalf("expected one dashboard device, got %d", len(devices))
+	}
+	if devices[0].TodayFileCount != 1 {
+		t.Fatalf("expected dashboard device file count 1, got %d", devices[0].TodayFileCount)
+	}
+	if devices[0].TodayBytes != 6 {
+		t.Fatalf("expected dashboard device bytes 6, got %d", devices[0].TodayBytes)
+	}
+
+	summaryResp, err := http.Get(srv.URL + "/dashboard/summary")
+	if err != nil {
+		t.Fatalf("GET /dashboard/summary: %v", err)
+	}
+	defer summaryResp.Body.Close()
+
+	var summary struct {
+		TodayUploadCount   int   `json:"todayUploadCount"`
+		TodayOccupiedBytes int64 `json:"todayOccupiedBytes"`
+	}
+	if err := json.NewDecoder(summaryResp.Body).Decode(&summary); err != nil {
+		t.Fatalf("decode summary: %v", err)
+	}
+	if summary.TodayUploadCount != 1 {
+		t.Fatalf("expected summary file count 1, got %d", summary.TodayUploadCount)
+	}
+	if summary.TodayOccupiedBytes != 6 {
+		t.Fatalf("expected summary bytes 6, got %d", summary.TodayOccupiedBytes)
+	}
+
+	if err := os.Remove(filepath.Join(cfg.ReceiveDir, existingPath)); err != nil {
+		t.Fatalf("remove existing file: %v", err)
+	}
+
+	respAfterDelete, err := http.Get(srv.URL + "/dashboard/devices")
+	if err != nil {
+		t.Fatalf("GET /dashboard/devices after delete: %v", err)
+	}
+	defer respAfterDelete.Body.Close()
+
+	var devicesAfterDelete []struct {
+		TodayFileCount int   `json:"todayFileCount"`
+		TodayBytes     int64 `json:"todayBytes"`
+	}
+	if err := json.NewDecoder(respAfterDelete.Body).Decode(&devicesAfterDelete); err != nil {
+		t.Fatalf("decode devices after delete: %v", err)
+	}
+	if devicesAfterDelete[0].TodayFileCount != 0 {
+		t.Fatalf("expected dashboard device file count 0 after deletion, got %d", devicesAfterDelete[0].TodayFileCount)
+	}
+	if devicesAfterDelete[0].TodayBytes != 0 {
+		t.Fatalf("expected dashboard device bytes 0 after deletion, got %d", devicesAfterDelete[0].TodayBytes)
+	}
+
+	summaryAfterDeleteResp, err := http.Get(srv.URL + "/dashboard/summary")
+	if err != nil {
+		t.Fatalf("GET /dashboard/summary after delete: %v", err)
+	}
+	defer summaryAfterDeleteResp.Body.Close()
+
+	var summaryAfterDelete struct {
+		TodayUploadCount   int   `json:"todayUploadCount"`
+		TodayOccupiedBytes int64 `json:"todayOccupiedBytes"`
+	}
+	if err := json.NewDecoder(summaryAfterDeleteResp.Body).Decode(&summaryAfterDelete); err != nil {
+		t.Fatalf("decode summary after delete: %v", err)
+	}
+	if summaryAfterDelete.TodayUploadCount != 0 {
+		t.Fatalf("expected summary file count 0 after deletion, got %d", summaryAfterDelete.TodayUploadCount)
+	}
+	if summaryAfterDelete.TodayOccupiedBytes != 0 {
+		t.Fatalf("expected summary bytes 0 after deletion, got %d", summaryAfterDelete.TodayOccupiedBytes)
+	}
+}
+
+func TestPresenceHeartbeatBroadcastsConnectedIdleEvent(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := st.SetDeviceName("Desk Renamed"); err != nil {
+		t.Fatalf("SetDeviceName: %v", err)
+	}
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/events/stream"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial ws: %v", err)
+	}
+	defer conn.Close()
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/presence/client-1", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST /presence: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode presence response: %v", err)
+	}
+	if body["serverName"] != "Desk Renamed" {
+		t.Fatalf("expected serverName Desk Renamed, got %v", body["serverName"])
+	}
+
+	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, message, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("read ws message: %v", err)
+	}
+
+	var event struct {
+		Type    string         `json:"type"`
+		Payload map[string]any `json:"payload"`
+	}
+	if err := json.Unmarshal(message, &event); err != nil {
+		t.Fatalf("unmarshal event: %v", err)
+	}
+
+	if event.Type != "device.state.changed" {
+		t.Fatalf("expected device.state.changed, got %q", event.Type)
+	}
+	if event.Payload["deviceId"] != "client-1" {
+		t.Fatalf("expected deviceId client-1, got %v", event.Payload["deviceId"])
+	}
+	if event.Payload["status"] != "connected_idle" {
+		t.Fatalf("expected status connected_idle, got %v", event.Payload["status"])
 	}
 }
 
@@ -429,6 +675,59 @@ func TestDeviceExistingFileKeys(t *testing.T) {
 	}
 }
 
+func TestDeviceFilesSkipsDeletedFinalFiles(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	finalPathMissing := filepath.Join("Test iPhone", "2026-03-22", "IMG_0002.JPG")
+	if err := st.UpsertUpload(store.Upload{
+		FileKey:          "file-missing",
+		ClientID:         "test-device-1",
+		OriginalFilename: "IMG_0002.JPG",
+		MediaType:        "image",
+		FileSize:         4,
+		Status:           "completed",
+		FinalPath:        &finalPathMissing,
+		CommittedBytes:   4,
+		CompletedAt:      &now,
+		UpdatedAt:        now,
+	}); err != nil {
+		t.Fatalf("insert missing upload: %v", err)
+	}
+
+	resp, err := http.Get(srv.URL + "/devices/test-device-1/files?date=" + time.Now().Format("2006-01-02"))
+	if err != nil {
+		t.Fatalf("GET /devices/.../files: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var body struct {
+		Items      []map[string]any `json:"items"`
+		TotalItems int              `json:"totalItems"`
+		TotalBytes int64            `json:"totalBytes"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if len(body.Items) != 0 {
+		t.Fatalf("expected no device files after final file deletion, got %d", len(body.Items))
+	}
+	if body.TotalItems != 0 {
+		t.Fatalf("expected totalItems 0 after final file deletion, got %d", body.TotalItems)
+	}
+	if body.TotalBytes != 0 {
+		t.Fatalf("expected totalBytes 0 after final file deletion, got %d", body.TotalBytes)
+	}
+}
+
 func TestGetSettings(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
@@ -492,8 +791,50 @@ func TestUpdateSettings(t *testing.T) {
 	}
 }
 
+func TestSharedListRecreatesDeletedSharedDirectory(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := os.MkdirAll(cfg.SharedDir(), 0o755); err != nil {
+		t.Fatalf("mkdir shared dir: %v", err)
+	}
+	if err := os.RemoveAll(cfg.SharedDir()); err != nil {
+		t.Fatalf("remove shared dir: %v", err)
+	}
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/shared/list")
+	if err != nil {
+		t.Fatalf("GET /shared/list: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var body struct {
+		Files      []map[string]any `json:"files"`
+		TotalCount int              `json:"totalCount"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body.TotalCount != 0 {
+		t.Fatalf("expected empty shared dir, got %d", body.TotalCount)
+	}
+	if info, err := os.Stat(cfg.SharedDir()); err != nil || !info.IsDir() {
+		t.Fatalf("expected shared dir to be recreated, info=%v err=%v", info, err)
+	}
+}
+
 func TestResetState(t *testing.T) {
 	st, cfg, hub := testEnv(t)
+	cfg.ReceiveDir = filepath.Join(t.TempDir(), "external", "received")
+	if err := os.MkdirAll(cfg.ReceiveDir, 0o755); err != nil {
+		t.Fatalf("mkdir external receive dir: %v", err)
+	}
 	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
@@ -573,6 +914,14 @@ func TestResetState(t *testing.T) {
 	}
 	if err := os.WriteFile(filepath.Join(cfg.StagingDir(), "resume.part"), []byte("partial"), 0o644); err != nil {
 		t.Fatalf("write staging file: %v", err)
+	}
+	if cfg.LegacyStagingDir() != cfg.StagingDir() {
+		if err := os.MkdirAll(cfg.LegacyStagingDir(), 0o755); err != nil {
+			t.Fatalf("mkdir legacy staging path: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(cfg.LegacyStagingDir(), "legacy.part"), []byte("legacy partial"), 0o644); err != nil {
+			t.Fatalf("write legacy staging file: %v", err)
+		}
 	}
 
 	resp, err := http.Post(srv.URL+"/settings/reset-state", "application/json", strings.NewReader("{}"))
@@ -657,10 +1006,96 @@ func TestResetState(t *testing.T) {
 	if len(stagingEntries) != 0 {
 		t.Fatalf("expected staging dir to be empty, got %d entries", len(stagingEntries))
 	}
+
+	if cfg.LegacyStagingDir() != cfg.StagingDir() {
+		legacyEntries, err := os.ReadDir(cfg.LegacyStagingDir())
+		if err != nil {
+			t.Fatalf("ReadDir legacy staging: %v", err)
+		}
+		if len(legacyEntries) != 0 {
+			t.Fatalf("expected legacy staging dir to be empty, got %d entries", len(legacyEntries))
+		}
+	}
+}
+
+func TestResetStateReturnsUnavailableWhenStorageParentMissing(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	missingMount := filepath.Join(t.TempDir(), "MissingExternalDisk")
+	cfg.ReceiveDir = filepath.Join(missingMount, "ViviDrop", "received")
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Post(srv.URL+"/settings/reset-state", "application/json", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatalf("POST /settings/reset-state: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d", resp.StatusCode)
+	}
+	if _, err := os.Stat(missingMount); !os.IsNotExist(err) {
+		t.Fatalf("expected missing mount point not to be created, err=%v", err)
+	}
+}
+
+func TestResetStateRejectsActiveTransfer(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	now := time.Now().UTC().Format(time.RFC3339)
+	if err := st.UpsertPairedDevice(store.PairedDevice{
+		ClientID:         "client-active",
+		ClientName:       "Phone",
+		Platform:         "ios",
+		PairingID:        "pair-active",
+		PairingTokenHash: "hash-active",
+		CreatedAt:        now,
+		LastSeenAt:       now,
+	}); err != nil {
+		t.Fatalf("UpsertPairedDevice: %v", err)
+	}
+
+	handler := func() http.Handler {
+		_, h := api.NewServer(st, cfg, hub, fakeClientStates{"client-active": "syncing"})
+		return h
+	}()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Post(srv.URL+"/settings/reset-state", "application/json", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatalf("POST /settings/reset-state: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("expected 409, got %d", resp.StatusCode)
+	}
+
+	var count int
+	if err := st.DB().QueryRow("SELECT COUNT(*) FROM paired_devices").Scan(&count); err != nil {
+		t.Fatalf("count paired_devices: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected paired device to remain after rejected reset, got %d", count)
+	}
 }
 
 func TestRegenerateCode(t *testing.T) {
 	st, cfg, hub := testEnv(t)
+	now := time.Now().UTC().Format(time.RFC3339)
+	if err := st.UpsertPairedDevice(store.PairedDevice{
+		ClientID:         "known-client",
+		ClientName:       "Known iPhone",
+		Platform:         "ios",
+		PairingID:        "pair-known-client",
+		PairingTokenHash: "hash-known-client",
+		CreatedAt:        now,
+		LastSeenAt:       now,
+	}); err != nil {
+		t.Fatalf("UpsertPairedDevice: %v", err)
+	}
 	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
@@ -692,6 +1127,14 @@ func TestRegenerateCode(t *testing.T) {
 	// Verify the code is >= 100000
 	if code < "100000" {
 		t.Errorf("expected code >= 100000, got %s", code)
+	}
+
+	device, err := st.GetPairedDevice("known-client")
+	if err != nil {
+		t.Fatalf("GetPairedDevice after regenerate: %v", err)
+	}
+	if device.RevokedAt == nil {
+		t.Fatal("expected existing paired device to be revoked after connection code regeneration")
 	}
 }
 

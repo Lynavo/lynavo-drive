@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/nicksyncflow/sidecar/internal/config"
 	"github.com/nicksyncflow/sidecar/internal/events"
@@ -18,14 +19,37 @@ type TCPServer struct {
 	store    *store.Store
 	config   *config.Config
 	hub      *events.Hub
+	presence PresenceStateProvider
 
 	mu               sync.RWMutex
 	connectedClients map[string]string // clientID → state ("authenticated"|"syncing")
 }
 
+type PresenceStateProvider interface {
+	IsAlive(clientID string, window time.Duration) bool
+}
+
 // NewTCPServer creates a new TCPServer backed by the given store, config, and event hub.
 func NewTCPServer(s *store.Store, cfg *config.Config, hub *events.Hub) *TCPServer {
 	return &TCPServer{store: s, config: cfg, hub: hub, connectedClients: make(map[string]string)}
+}
+
+func (s *TCPServer) SetPresenceProvider(presence PresenceStateProvider) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.presence = presence
+}
+
+func (s *TCPServer) DisconnectBroadcastStatus(clientID string) string {
+	s.mu.RLock()
+	presence := s.presence
+	s.mu.RUnlock()
+
+	if clientID != "" && presence != nil && presence.IsAlive(clientID, 45*time.Second) {
+		return "connected_idle"
+	}
+
+	return "offline"
 }
 
 // SetClientState marks a client as connected with the given state.

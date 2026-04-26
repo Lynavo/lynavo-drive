@@ -14,8 +14,9 @@ const config = {
       path.resolve(__dirname, 'node_modules'),
       path.resolve(monorepoRoot, 'node_modules'),
     ],
-    // Disable package exports resolution which can conflict with pnpm symlinks
-    unstable_enablePackageExports: false,
+    // Enable package exports (Metro 0.80+ handles pnpm symlinks correctly).
+    // Required for packages like i18next v23 that define an `exports` field.
+    unstable_enablePackageExports: true,
   },
 };
 

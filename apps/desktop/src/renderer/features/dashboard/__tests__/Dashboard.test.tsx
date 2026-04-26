@@ -46,7 +46,7 @@ describe('Dashboard', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(
       screen.getByText(
-        /接收磁盘剩余空间.*500MB.*已暂停新的接收任务/,
+        /接收磁盘剩余空间小于 500MB，已暂停新的接收任务/,
       ),
     ).toBeInTheDocument();
   });

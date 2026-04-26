@@ -23,7 +23,7 @@ export function DiskWarningBanner() {
     >
       <AlertTriangle className="h-4 w-4 shrink-0" />
       <span className="flex-1 text-sm font-medium">
-        接收磁盘剩余空间 &lt; 500MB，已暂停新的接收任务
+        接收磁盘剩余空间小于 500MB，已暂停新的接收任务
       </span>
       <button
         onClick={dismissDiskWarning}

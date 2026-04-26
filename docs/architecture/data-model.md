@@ -219,21 +219,48 @@ received/
 2. `devicePath` 指設備自己的目錄
 3. desktop detail「打開資料夾」應優先打開 `<devicePath>/<selectedDate>`
 
-## 6. 設備重命名與目錄名
+## 6. 設備命名與接收目錄
 
-目前約束：
+### 6.1 設備身份
 
-1. desktop 識別設備靠 `clientId`
-2. 設備名變化不應把設備識別成新設備
-3. 磁碟目錄遷移不是 UI rename 的唯一觸發條件；需要看 sidecar 實際落盤和目錄重命名邏輯
+設備身份唯一依賴 `clientId`。不依賴 `clientName`、`deviceAlias`、`receiveDirName` 或 IP。設備名稱變化不會把設備識別成新設備。
 
-讀程式碼時不要把：
+### 6.2 展示名稱（displayName）
 
-- 設備名
-- IP
-- 目前目錄名
+展示名稱只用於 UI 呈現和診斷，不參與落盤路徑計算。
 
-誤認為是設備主鍵。
+推導規則：
+
+```text
+displayName = deviceAlias ?? clientName ?? clientId
+```
+
+- `deviceAlias`：使用者在產品內設定的別名，優先展示
+- `clientName`：mobile 每次連線上報的系統設備名
+- `clientId`：最後 fallback，僅在資料異常或初始化不完整時使用
+
+`clientName` 或 `deviceAlias` 變更時，UI 展示名稱會即時更新，但不觸發任何磁碟操作。
+
+### 6.3 接收資料夾名稱（receiveDirName）
+
+`receiveDirName` 是儲存層欄位，對應 `paired_devices.receive_dir_name`。它是穩定的 storage key，一旦為某台設備確定就不再自動變更。
+
+生成時機：
+
+- **新設備**：配對時由 `PairDeviceWithDirName` 原子地生成並寫入；同一個臨界區內完成 dir name 生成與 paired device 持久化
+- **舊設備（`receive_dir_name` 為空）**：由 `EnsureReceiveDirName` 惰性回填，優先認領既有 legacy 目錄，找不到再生成新名稱
+
+不變性約束：
+
+- `clientName` 變更時，不觸發目錄 rename
+- `deviceAlias` 變更時，不觸發目錄 rename
+- sidecar 不做啟動時全量 rename 或全量目錄重建
+
+### 6.4 displayName 與 receiveDirName 可以不同
+
+UI 顯示名稱可能與 Finder / Explorer 看到的資料夾名不同。這是設計決策而非 bug——展示層與儲存層刻意解耦，以確保外部備份、索引和腳本路徑的穩定性。
+
+排障時如需確認兩者對應關係，可在 device detail 或 diagnostics 中查看 `displayName`、`receiveDirName` 和 `devicePath`。
 
 ## 7. iCloud 素材
 

@@ -5,10 +5,10 @@ import SQLite3
 
 struct BindingRecord {
     let deviceId: String
-    let deviceName: String
+    var deviceName: String
     var deviceAlias: String?
     let deviceType: String
-    let host: String
+    var host: String
     let port: Int
     let pairingId: String
     let pairingTokenKeychainRef: String
@@ -36,9 +36,10 @@ struct UploadItemRecord {
 
 struct AutoUploadConfigRecord {
     var enabled: Bool
-    var mediaFilter: String  // 'all' | 'photos' | 'videos'
+    // media_filter column remains in SQLite but is no longer used — auto upload uploads everything
     var timeRangeMode: String  // 'from_now' | 'from_today' | 'all' | 'custom'
     var customTimeFrom: String?
+    var state: String  // 'disabled' | 'active' | 'interrupted' — persisted source of truth
     var updatedAt: String
 }
 
@@ -169,7 +170,7 @@ class UploadStore {
         let tableInfo = try queryInternal("SELECT sql FROM sqlite_master WHERE type='table' AND name='upload_items'", bind: [])
         if let createSQL = tableInfo.first?["sql"] as? String,
            createSQL.contains("UNIQUE(asset_local_id, modified_at)") {
-            NSLog("[UploadStore] migrating upload_items: removing modified_at from UNIQUE constraint")
+            slog("[UploadStore] migrating upload_items: removing modified_at from UNIQUE constraint")
             try executeInternal("""
                 CREATE TABLE upload_items_new (
                   id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -190,7 +191,7 @@ class UploadStore {
                 DROP TABLE upload_items;
                 ALTER TABLE upload_items_new RENAME TO upload_items;
             """)
-            NSLog("[UploadStore] migration complete")
+            slog("[UploadStore] migration complete")
         }
 
         // Migration: add source, batch_id, priority columns to upload_items (Vivi Drop)
@@ -200,11 +201,11 @@ class UploadStore {
         )
         let hasSourceColumn = (columnCheck.first?["cnt"] as? Int64 ?? 0) > 0
         if !hasSourceColumn {
-            NSLog("[UploadStore] migrating upload_items: adding source, batch_id, priority columns")
+            slog("[UploadStore] migrating upload_items: adding source, batch_id, priority columns")
             try executeInternal("ALTER TABLE upload_items ADD COLUMN source TEXT NOT NULL DEFAULT 'auto'")
             try executeInternal("ALTER TABLE upload_items ADD COLUMN batch_id TEXT")
             try executeInternal("ALTER TABLE upload_items ADD COLUMN priority INTEGER NOT NULL DEFAULT 0")
-            NSLog("[UploadStore] Vivi Drop columns migration complete")
+            slog("[UploadStore] Vivi Drop columns migration complete")
         }
 
         // Create auto_upload_config table (single-row config)
@@ -215,9 +216,24 @@ class UploadStore {
               media_filter      TEXT NOT NULL DEFAULT 'all',
               time_range_mode   TEXT NOT NULL DEFAULT 'from_now',
               custom_time_from  TEXT,
+              state             TEXT NOT NULL DEFAULT 'disabled',
               updated_at        TEXT NOT NULL DEFAULT ''
             );
         """)
+
+        // Migrate: add state column for existing databases that lack it
+        let stateColumnCheck = queryInternal(
+            "SELECT COUNT(*) AS cnt FROM pragma_table_info('auto_upload_config') WHERE name = 'state'",
+            bind: []
+        )
+        let hasStateColumn = (stateColumnCheck.first?["cnt"] as? Int64 ?? 0) > 0
+        if !hasStateColumn {
+            slog("[UploadStore] migrating auto_upload_config: adding state column")
+            try executeInternal("ALTER TABLE auto_upload_config ADD COLUMN state TEXT NOT NULL DEFAULT 'disabled'")
+            // Backfill: if enabled=1, state should be 'active' (not 'disabled')
+            try executeInternal("UPDATE auto_upload_config SET state = 'active' WHERE enabled = 1")
+            slog("[UploadStore] auto_upload_config state column migration complete")
+        }
     }
 
     // MARK: - Binding CRUD
@@ -352,6 +368,49 @@ class UploadStore {
         }
     }
 
+    func getManualQueueStats(batchId: String) -> (totalCount: Int, totalBytes: Int64, completedCount: Int, completedBytes: Int64)? {
+        guard !batchId.isEmpty else { return nil }
+        return queue.sync {
+            let statsSql = """
+            SELECT
+                COUNT(*) AS total_count,
+                SUM(file_size) AS total_bytes,
+                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_count,
+                SUM(CASE WHEN status = 'completed' THEN file_size ELSE 0 END) AS completed_bytes
+            FROM upload_items
+            WHERE source = 'manual'
+              AND batch_id = ?1
+              AND status IN ('queued', 'discovered', 'preparing', 'ready', 'cloud_downloading', 'uploading', 'completed')
+            """
+            let rows = queryInternal(statsSql, bind: [.text(batchId)])
+            guard let first = rows.first else {
+                return nil
+            }
+            return (
+                totalCount: Int(first["total_count"] as? Int64 ?? 0),
+                totalBytes: first["total_bytes"] as? Int64 ?? 0,
+                completedCount: Int(first["completed_count"] as? Int64 ?? 0),
+                completedBytes: first["completed_bytes"] as? Int64 ?? 0
+            )
+        }
+    }
+
+    func getActiveManualQueueBatchId() -> String? {
+        return queue.sync {
+            let sql = """
+            SELECT batch_id FROM upload_items
+            WHERE source = 'manual'
+              AND batch_id IS NOT NULL
+              AND batch_id != ''
+              AND status IN ('queued', 'discovered', 'preparing', 'ready', 'cloud_downloading', 'uploading')
+            ORDER BY priority DESC, id ASC
+            LIMIT 1
+            """
+            let rows = queryInternal(sql, bind: [])
+            return rows.first?["batch_id"] as? String
+        }
+    }
+
     func getCompletedFileKeys() -> [String] {
         return queue.sync {
             let sql = "SELECT file_key FROM upload_items WHERE status = 'completed' AND file_key IS NOT NULL"
@@ -363,6 +422,22 @@ class UploadStore {
     func getTrackedFileKeys() -> [String] {
         return queue.sync {
             let sql = "SELECT file_key FROM upload_items WHERE file_key IS NOT NULL"
+            let rows = queryInternal(sql, bind: [])
+            return rows.compactMap { $0["file_key"] as? String }
+        }
+    }
+
+    /// File keys that should suppress auto-discovery rescans.
+    /// Completed items stay suppressed permanently; pending/in-flight items stay
+    /// suppressed until they finish. Failed/skipped/cancelled items are excluded
+    /// so a later auto-upload retry can re-queue them.
+    func getAutoDiscoveryTrackedFileKeys() -> [String] {
+        return queue.sync {
+            let sql = """
+            SELECT file_key FROM upload_items
+            WHERE file_key IS NOT NULL
+              AND status IN ('queued', 'discovered', 'preparing', 'ready', 'cloud_downloading', 'uploading', 'completed')
+            """
             let rows = queryInternal(sql, bind: [])
             return rows.compactMap { $0["file_key"] as? String }
         }
@@ -507,7 +582,21 @@ class UploadStore {
         }
     }
 
-    /// Cancel all pending and in-progress items in a manual batch.
+    /// Cancel all pending auto-upload items. Called when user closes auto upload
+    /// so the queue is clean for manual uploads and re-enabling auto upload
+    /// starts a fresh scan.
+    func cancelPendingAutoItems() throws {
+        try queue.sync {
+            let now = ISO8601DateFormatter().string(from: Date())
+            let sql = """
+            UPDATE upload_items SET status = 'cancelled', updated_at = ?1
+            WHERE source = 'auto' AND status IN ('queued', 'discovered', 'preparing', 'ready', 'cloud_downloading')
+            """
+            try executeWithBindings(sql, bindings: [.text(now)])
+        }
+    }
+
+    /// Cancel all pending and in-progress items in a manual queue.
     /// Three checkpoints in the upload loop enforce this:
     ///   1. Between files (index > 0): skips cancelled items before export
     ///   2. After export, before TCP upload: skips and cleans up temp file
@@ -522,6 +611,22 @@ class UploadStore {
             try executeWithBindings(sql, bindings: [
                 .text(now),
                 .text(batchId)
+            ])
+        }
+    }
+
+    /// Cancel all pending and in-progress manual items, regardless of which
+    /// batch they came from. Manual upload is modeled in the PRD as one
+    /// continuously appended queue, not isolated per-submit batches.
+    func cancelAllManualUploads() throws {
+        try queue.sync {
+            let now = ISO8601DateFormatter().string(from: Date())
+            let sql = """
+            UPDATE upload_items SET status = 'cancelled', updated_at = ?1
+            WHERE source = 'manual' AND status IN ('queued', 'discovered', 'preparing', 'ready', 'uploading', 'cloud_downloading')
+            """
+            try executeWithBindings(sql, bindings: [
+                .text(now),
             ])
         }
     }
@@ -544,9 +649,10 @@ class UploadStore {
             guard let row = rows.first else { return nil }
             return AutoUploadConfigRecord(
                 enabled: (row["enabled"] as? Int64 ?? 0) != 0,
-                mediaFilter: row["media_filter"] as? String ?? "all",
-                timeRangeMode: row["time_range_mode"] as? String ?? "from_now",
+                // media_filter column ignored — auto upload uploads everything
+                timeRangeMode: row["time_range_mode"] as? String ?? "all",
                 customTimeFrom: row["custom_time_from"] as? String,
+                state: row["state"] as? String ?? "disabled",
                 updatedAt: row["updated_at"] as? String ?? ""
             )
         }
@@ -554,23 +660,33 @@ class UploadStore {
 
     func saveAutoUploadConfig(_ config: AutoUploadConfigRecord) throws {
         try queue.sync {
+            // media_filter column kept in schema but always written as 'all' — auto upload uploads everything
             let sql = """
-            INSERT INTO auto_upload_config (id, enabled, media_filter, time_range_mode, custom_time_from, updated_at)
-            VALUES (1, ?1, ?2, ?3, ?4, ?5)
+            INSERT INTO auto_upload_config (id, enabled, media_filter, time_range_mode, custom_time_from, state, updated_at)
+            VALUES (1, ?1, 'all', ?2, ?3, ?4, ?5)
             ON CONFLICT(id) DO UPDATE SET
               enabled = excluded.enabled,
-              media_filter = excluded.media_filter,
+              media_filter = 'all',
               time_range_mode = excluded.time_range_mode,
               custom_time_from = excluded.custom_time_from,
+              state = excluded.state,
               updated_at = excluded.updated_at
             """
             try executeWithBindings(sql, bindings: [
                 .int(config.enabled ? 1 : 0),
-                .text(config.mediaFilter),
                 .text(config.timeRangeMode),
                 .textOrNull(config.customTimeFrom),
+                .text(config.state),
                 .text(config.updatedAt)
             ])
+        }
+    }
+
+    /// Resets auto upload config to disabled state. Called when unpairing or switching devices
+    /// so that the next pairing session starts with auto upload off.
+    func resetAutoUploadConfig() throws {
+        try queue.sync {
+            try executeInternal("DELETE FROM auto_upload_config")
         }
     }
 

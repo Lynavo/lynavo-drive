@@ -1,0 +1,16 @@
+{
+  "ok": "OK",
+  "cancel": "Cancel",
+  "confirm": "Confirm",
+  "back": "Back",
+  "retry": "Retry",
+  "loading": "Loading",
+  "unknownVersion": "Unknown version",
+  "privacyPolicy": "Privacy Policy",
+  "termsOfService": "Terms of Service",
+  "deviceNames": {
+    "default": "Computer",
+    "windows": "Windows PC"
+  },
+  "diagnosticsArchiveTitle": "Vivi Drop Diagnostics"
+}

@@ -10,19 +10,9 @@ import {
 } from '@renderer/components/ui/table';
 import { FileIcon } from '@renderer/components/shared/FileIcon';
 import { formatBytes, formatSmartDate } from '@renderer/lib/format';
-import { useDirectoryStore, type SharedFileEntry, type PreviewFile } from '@renderer/stores/directory-store';
+import { useDirectoryStore, type SharedFileEntry } from '@renderer/stores/directory-store';
 import { useSettingsStore } from '@renderer/stores/settings-store';
-import { resolveAbsolutePath, toMediaUrl } from './path-utils';
-
-const imageExts = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'bmp', 'tiff']);
-const videoExts = new Set(['mp4', 'mov', 'avi', 'mkv', 'webm', 'mp4v']);
-
-function getPreviewMediaType(filename: string): 'image' | 'video' | null {
-  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
-  if (imageExts.has(ext)) return 'image';
-  if (videoExts.has(ext)) return 'video';
-  return null;
-}
+import { resolveAbsolutePath } from './path-utils';
 
 const colors = {
   headerText: '#8a9ab0',
@@ -57,7 +47,6 @@ function SortIcon({
 
 export function SharedFileList() {
   const sharedFiles = useDirectoryStore((s) => s.sharedFiles);
-  const openPreview = useDirectoryStore((s) => s.openPreview);
   const sharedPath = useSettingsStore((s) => s.settings.sharedPath);
   const [sortField, setSortField] = useState<SharedSortField>('modifiedAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -90,37 +79,10 @@ export function SharedFileList() {
     return result;
   }, [sharedFiles, sortField, sortDirection]);
 
-  const previewableList = useMemo(() => {
-    const list: PreviewFile[] = [];
-    for (const f of sortedFiles) {
-      if (!f.path) continue;
-      const mt = getPreviewMediaType(f.name);
-      if (mt) {
-        list.push({
-          name: f.name,
-          url: toMediaUrl(resolveAbsolutePath(sharedPath, f.path)),
-          mediaType: mt,
-        });
-      }
-    }
-    return list;
-  }, [sortedFiles, sharedPath]);
-
   const handleOpen = (file: SharedFileEntry) => {
     if (!file.path) return;
-
     const resolvedPath = resolveAbsolutePath(sharedPath, file.path);
-    const mediaType = getPreviewMediaType(file.name);
-    if (mediaType) {
-      const current: PreviewFile = {
-        name: file.name,
-        url: toMediaUrl(resolvedPath),
-        mediaType,
-      };
-      openPreview(current, previewableList);
-    } else {
-      void window.electronAPI?.files.openFile(resolvedPath);
-    }
+    void window.electronAPI?.files.openFile(resolvedPath);
   };
 
   return (

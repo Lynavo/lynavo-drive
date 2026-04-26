@@ -42,14 +42,24 @@ type connection struct {
 	hub        *events.Hub
 	server     *TCPServer // for tracking connected clients
 	state      connState
-	clientID   string
-	sessionID  string
-	nonce      string      // generated on HELLO_RES for HMAC auth
-	fileWriter *FileWriter // current .part file being written
-	clientIP   string
+	clientID       string
+	clientPlatform string // from HELLO_REQ, used at pairing time
+	sessionID      string
+	nonce          string      // generated on HELLO_RES for HMAC auth
+	fileWriter     *FileWriter // current .part file being written
+	clientIP       string
 	pingTimer  *time.Timer // 15s inactivity -> send PING
 	writeMu    sync.Mutex
 	ackMu      sync.Mutex
+
+	// Diagnostic-only timestamps. Used exclusively in log messages so
+	// operators can tell "connection closed because idle timeout" apart from
+	// "closed while actively transferring" — a critical signal when the
+	// client laptop just flipped WiFi networks. Not used by any business
+	// logic; removing these fields would not change protocol behaviour.
+	connectedAt    time.Time
+	lastActivityAt time.Time
+	framesReceived int64
 
 	// Active file transfer timing, measured from FILE_INIT accepted to FILE_END.
 	activeTransferFileKey string
@@ -70,13 +80,35 @@ type connection struct {
 }
 
 func newConnection(conn net.Conn, s *store.Store, cfg *config.Config, hub *events.Hub, srv *TCPServer) *connection {
+	now := time.Now()
 	return &connection{
-		conn:   conn,
-		store:  s,
-		config: cfg,
-		hub:    hub,
-		server: srv,
-		state:  stateWaitHello,
+		conn:           conn,
+		store:          s,
+		config:         cfg,
+		hub:            hub,
+		server:         srv,
+		state:          stateWaitHello,
+		connectedAt:    now,
+		lastActivityAt: now,
+	}
+}
+
+// connStateString renders the protocol state for diagnostic logs. Kept out of
+// the state machine itself so the enum remains private to the package.
+func connStateString(s connState) string {
+	switch s {
+	case stateWaitHello:
+		return "wait_hello"
+	case stateWaitAuth:
+		return "wait_auth"
+	case stateWaitPair:
+		return "wait_pair"
+	case stateAuthenticated:
+		return "authenticated"
+	case stateSyncing:
+		return "syncing"
+	default:
+		return "unknown"
 	}
 }
 
@@ -92,8 +124,42 @@ func (c *connection) handle() {
 		c.conn.Close()
 		if c.clientID != "" && c.server != nil {
 			c.server.RemoveClient(c.clientID)
+			status := c.server.DisconnectBroadcastStatus(c.clientID)
+
+			// Broadcast the derived post-disconnect state immediately so
+			// WebSocket consumers stay consistent with the dashboard API:
+			// presence-alive clients are still "connected_idle", otherwise offline.
+			c.hub.Broadcast(events.Event{
+				Type: "device.state.changed",
+				Payload: map[string]any{
+					"deviceId": c.clientID,
+					"status":   status,
+				},
+			})
+			c.hub.Broadcast(events.Event{Type: "dashboard.updated", Payload: nil})
+
+			// Clean up stale session state — if the client disconnected
+			// without sending SYNC_END_REQ, the session row is stuck in
+			// "transferring" forever. Mark it as interrupted.
+			if c.sessionID != "" {
+				if err := c.store.UpdateSessionState(c.sessionID, "interrupted"); err != nil {
+					slog.Warn("failed to mark session interrupted on disconnect",
+						"sessionID", c.sessionID, "err", err)
+				}
+			}
 		}
-		slog.Info("tcp client disconnected", "remote", c.conn.RemoteAddr(), "clientID", c.clientID)
+		now := time.Now()
+		idleMs := now.Sub(c.lastActivityAt).Milliseconds()
+		slog.Info("tcp client disconnected",
+			"remote", c.conn.RemoteAddr(),
+			"clientID", c.clientID,
+			"state", connStateString(c.state),
+			"duration_ms", now.Sub(c.connectedAt).Milliseconds(),
+			"idle_ms", idleMs,
+			"frames_rx", c.framesReceived,
+			"was_transferring", c.activeTransferFileKey != "",
+			"active_file_key", c.activeTransferFileKey,
+		)
 	}()
 
 	c.resetDeadline()
@@ -102,9 +168,21 @@ func (c *connection) handle() {
 	for {
 		hdr, body, release, err := protocol.ReadFrameBorrowed(c.conn)
 		if err != nil {
-			slog.Info("connection closed", "remote", c.conn.RemoteAddr(), "err", err)
+			idleMs := time.Since(c.lastActivityAt).Milliseconds()
+			slog.Info("connection closed",
+				"remote", c.conn.RemoteAddr(),
+				"clientID", c.clientID,
+				"err", err,
+				"state", connStateString(c.state),
+				"idle_ms", idleMs,
+				"duration_ms", time.Since(c.connectedAt).Milliseconds(),
+				"frames_rx", c.framesReceived,
+				"was_transferring", c.activeTransferFileKey != "",
+			)
 			return
 		}
+		c.lastActivityAt = time.Now()
+		c.framesReceived++
 		c.resetDeadline()
 		c.resetPingTimer()
 		if err := c.dispatch(hdr, body); err != nil {

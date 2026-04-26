@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { DirectoryPage } from '../DirectoryPage';
 import { useDirectoryStore } from '@renderer/stores/directory-store';
 import { useSettingsStore } from '@renderer/stores/settings-store';
@@ -61,6 +61,7 @@ function setupElectronAPI() {
 
 describe('DirectoryPage', () => {
   beforeEach(() => {
+    vi.useRealTimers();
     Reflect.deleteProperty(window, 'electronAPI');
     useDirectoryStore.setState(useDirectoryStore.getInitialState());
     useSettingsStore.setState({
@@ -102,10 +103,32 @@ describe('DirectoryPage', () => {
 
     expect(useDirectoryStore.getState().activeTab).toBe('shared');
   });
+
+  it('polls the active tab while the page stays visible', async () => {
+    vi.useFakeTimers();
+
+    const fetchReceivedFiles = vi.fn().mockResolvedValue(undefined);
+    const fetchSharedFiles = vi.fn().mockResolvedValue(undefined);
+    const fetchAll = vi.fn().mockResolvedValue(undefined);
+    useDirectoryStore.setState({
+      activeTab: 'received',
+      fetchReceivedFiles,
+      fetchSharedFiles,
+      fetchAll,
+    });
+
+    render(<DirectoryPage />);
+
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(fetchReceivedFiles).toHaveBeenCalledTimes(1);
+    expect(fetchSharedFiles).not.toHaveBeenCalled();
+  });
 });
 
 describe('DirectoryPathCard', () => {
   beforeEach(() => {
+    vi.useRealTimers();
     Reflect.deleteProperty(window, 'electronAPI');
     useSettingsStore.setState({
       settings: mockSettings,
@@ -160,6 +183,34 @@ describe('DirectoryPathCard', () => {
     // Shared should be /Users/alice/SyncFlow/shared
     expect(screen.getByText('/Users/alice/SyncFlow/shared')).toBeInTheDocument();
   });
+
+  it('blocks root directory changes while a transfer is active', async () => {
+    const selectFolder = vi.fn();
+    const updateSettings = vi.fn();
+    (window as Window & { electronAPI?: unknown }).electronAPI = {
+      ...(window.electronAPI ?? {}),
+      sidecar: {
+        ...(window.electronAPI?.sidecar ?? {}),
+        getTransferActive: vi.fn().mockResolvedValue({ active: true }),
+        updateSettings,
+      },
+      files: {
+        ...(window.electronAPI?.files ?? {}),
+        selectFolder,
+      },
+    } as unknown as Window['electronAPI'];
+
+    render(<DirectoryPathCard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('正在接收文件，完成后可变更')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '更改' }));
+
+    expect(selectFolder).not.toHaveBeenCalled();
+    expect(updateSettings).not.toHaveBeenCalled();
+  });
 });
 
 describe('ReceivedFileList', () => {
@@ -209,7 +260,16 @@ describe('ReceivedFileList', () => {
     expect(screen.getByText('正在加载文件列表...')).toBeInTheDocument();
   });
 
-  it('resolves relative receive paths before opening media preview', () => {
+  it('opens media files via system shell instead of in-app preview', () => {
+    const openFile = vi.fn();
+    (window as Window & { electronAPI?: unknown }).electronAPI = {
+      ...(window.electronAPI ?? {}),
+      files: {
+        ...(window.electronAPI?.files ?? {}),
+        openFile,
+      },
+    } as unknown as Window['electronAPI'];
+
     useSettingsStore.setState({
       settings: {
         ...mockSettings,
@@ -237,10 +297,9 @@ describe('ReceivedFileList', () => {
     render(<ReceivedFileList />);
     fireEvent.click(screen.getByRole('button', { name: '打开' }));
 
-    expect(useDirectoryStore.getState().previewFile).toMatchObject({
-      mediaType: 'video',
-      url: 'media:///Users/alice/SyncFlow/Received/iPhone%2015/2026-04-10/vacation%20clip.mp4',
-    });
+    expect(openFile).toHaveBeenCalledWith(
+      '/Users/alice/SyncFlow/Received/iPhone 15/2026-04-10/vacation clip.mp4',
+    );
   });
 });
 

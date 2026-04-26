@@ -78,13 +78,15 @@ class TcpTransport {
     }
 
     private func connectToEndpoint(_ endpoint: NWEndpoint) {
-        NSLog("[TcpTransport] connectToEndpoint: \(endpoint)")
+        slog("[TcpTransport] connectToEndpoint: \(endpoint)")
+        syncDiagnosticsLog("TcpTransport", "connectToEndpoint target=\(endpoint)")
 
         // Cancel any existing connection before creating a new one.
         // This prevents stale receive-loop callbacks from delivering old data
         // into the new session's continuation (the "invalid magic" race).
         if let existing = connection {
-            NSLog("[TcpTransport] cancelling previous connection before reconnecting")
+            slog("[TcpTransport] cancelling previous connection before reconnecting")
+            syncDiagnosticsLog("TcpTransport", "cancelling previous connection before reconnect")
             existing.stateUpdateHandler = nil
             existing.cancel()
             connection = nil
@@ -105,13 +107,26 @@ class TcpTransport {
         connection?.stateUpdateHandler = { [weak self] state in
             switch state {
             case .ready:
+                let remote = self?.remoteHost ?? "unknown"
+                syncDiagnosticsLog("TcpTransport", "state=ready remote=\(remote)")
                 self?.delegate?.transportDidConnect()
                 self?.startReceiving()
             case .waiting(let error):
-                NSLog("[TcpTransport] waiting: %@", "\(error)")
+                slog("[TcpTransport] waiting: %@", "\(error)")
+                syncDiagnosticsLog(
+                    "TcpTransport",
+                    "state=waiting err=\(TcpTransport.describe(error: error))"
+                )
                 self?.delegate?.transportDidDisconnect(error: error)
             case .failed(let error):
+                slog("[TcpTransport] failed: %@", "\(error)")
+                syncDiagnosticsLog(
+                    "TcpTransport",
+                    "state=failed err=\(TcpTransport.describe(error: error))"
+                )
                 self?.delegate?.transportDidDisconnect(error: error)
+            case .cancelled:
+                syncDiagnosticsLog("TcpTransport", "state=cancelled")
             default:
                 break
             }
@@ -119,7 +134,25 @@ class TcpTransport {
         connection?.start(queue: queue)
     }
 
+    /// Expand NWError into a diagnostic-friendly string that distinguishes
+    /// POSIX errnos (ECONNRESET / ETIMEDOUT / ENETDOWN), DNS failures, and
+    /// TLS errors — this is the single most useful signal when a laptop
+    /// flips WiFi mid-transfer. Purely formatting, no side effects.
+    static func describe(error: NWError) -> String {
+        switch error {
+        case .posix(let code):
+            return "posix(\(code.rawValue) \(code))"
+        case .dns(let code):
+            return "dns(\(code))"
+        case .tls(let code):
+            return "tls(\(code))"
+        @unknown default:
+            return "other(\(error))"
+        }
+    }
+
     func disconnect() {
+        syncDiagnosticsLog("TcpTransport", "disconnect requested remote=\(remoteHost ?? "nil")")
         connection?.cancel()
         connection = nil
     }
@@ -138,7 +171,7 @@ class TcpTransport {
         }
         let frame = header + body
         connection?.send(content: frame, completion: .contentProcessed({ error in
-            if let error { NSLog("[TcpTransport] send error: %@", "\(error)") }
+            if let error { slog("[TcpTransport] send error: %@", "\(error)") }
         }))
     }
 
@@ -234,7 +267,15 @@ class TcpTransport {
     private func receiveHeader() {
         connection?.receive(minimumIncompleteLength: 12, maximumLength: 12) { [weak self] data, _, _, error in
             guard let self, let data, data.count == 12 else {
-                if let error { self?.delegate?.transportDidDisconnect(error: error) }
+                if let error {
+                    syncDiagnosticsLog(
+                        "TcpTransport",
+                        "receiveHeader error=\(TcpTransport.describe(error: error))"
+                    )
+                    self?.delegate?.transportDidDisconnect(error: error)
+                } else {
+                    syncDiagnosticsLog("TcpTransport", "receiveHeader short read bytes=\(data?.count ?? 0)")
+                }
                 return
             }
 
@@ -242,7 +283,7 @@ class TcpTransport {
             guard String(data: data[0..<4], encoding: .utf8) == "LMUP" else {
                 let asciiStr = String(data: data, encoding: .ascii)?.replacingOccurrences(of: "\n", with: "\\n").replacingOccurrences(of: "\r", with: "\\r") ?? "invalid-ascii"
                 let hexStr = data.map { String(format: "%02x", $0) }.joined(separator: " ")
-                NSLog("[TcpTransport] invalid magic! Ascii=[%@], Hex=[%@]", asciiStr, hexStr)
+                slog("[TcpTransport] invalid magic! Ascii=[%@], Hex=[%@]", asciiStr, hexStr)
                 self.disconnect()
                 return
             }
@@ -251,7 +292,7 @@ class TcpTransport {
             let length = data.withUnsafeBytes { $0.load(fromByteOffset: 8, as: UInt32.self).bigEndian }
 
             guard let msgType = LMUPMessageType(rawValue: type) else {
-                NSLog("[TcpTransport] unknown type: %d", type)
+                slog("[TcpTransport] unknown type: %d", type)
                 self.receiveHeader() // skip unknown and continue
                 return
             }
@@ -269,7 +310,13 @@ class TcpTransport {
     private func receiveBody(type: LMUPMessageType, length: Int) {
         connection?.receive(minimumIncompleteLength: length, maximumLength: length) { [weak self] data, _, _, error in
             guard let self, let data else {
-                if let error { self?.delegate?.transportDidDisconnect(error: error) }
+                if let error {
+                    syncDiagnosticsLog(
+                        "TcpTransport",
+                        "receiveBody error type=\(type) length=\(length) err=\(TcpTransport.describe(error: error))"
+                    )
+                    self?.delegate?.transportDidDisconnect(error: error)
+                }
                 return
             }
             self.delegate?.transportDidReceive(type: type, body: data)

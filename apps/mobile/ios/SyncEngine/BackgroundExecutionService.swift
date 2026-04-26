@@ -16,7 +16,7 @@ class BackgroundExecutionService {
             self.handleMaintenanceTask(task as! BGProcessingTask)
         }
 
-        NSLog("[BackgroundExec] registered background tasks")
+        slog("[BackgroundExec] registered background tasks")
     }
 
     /// Submit continued processing task — call when foreground sync starts
@@ -26,10 +26,15 @@ class BackgroundExecutionService {
         request.requiresExternalPower = false
         do {
             try BGTaskScheduler.shared.submit(request)
-            NSLog("[BackgroundExec] submitted continued task")
+            slog("[BackgroundExec] submitted continued task")
         } catch {
-            NSLog("[BackgroundExec] failed to submit continued task: %@", "\(error)")
+            slog("[BackgroundExec] failed to submit continued task: %@", "\(error)")
         }
+    }
+
+    func cancelContinuedTask() {
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.continuedTaskId)
+        slog("[BackgroundExec] cancelled continued task")
     }
 
     /// Submit maintenance task — call when sync ends or continued task expires
@@ -39,16 +44,16 @@ class BackgroundExecutionService {
         request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60) // 15 min from now
         do {
             try BGTaskScheduler.shared.submit(request)
-            NSLog("[BackgroundExec] submitted maintenance task")
+            slog("[BackgroundExec] submitted maintenance task")
         } catch {
-            NSLog("[BackgroundExec] failed to submit maintenance task: %@", "\(error)")
+            slog("[BackgroundExec] failed to submit maintenance task: %@", "\(error)")
         }
     }
 
     /// Begin transition task — call when app moves to background
     func beginTransitionTask() -> UIBackgroundTaskIdentifier {
         return UIApplication.shared.beginBackgroundTask {
-            NSLog("[BackgroundExec] transition task expired")
+            slog("[BackgroundExec] transition task expired")
         }
     }
 
@@ -59,32 +64,30 @@ class BackgroundExecutionService {
     // MARK: - Task Handlers
 
     private func handleContinuedTask(_ task: BGProcessingTask) {
-        NSLog("[BackgroundExec] continued task started — resuming sync")
+        slog("[BackgroundExec] continued task started — resuming sync")
 
         task.expirationHandler = { [weak self] in
-            NSLog("[BackgroundExec] continued task expiring — saving checkpoint")
-            SyncEngineManager.shared.sessionService.transitionTo(.idle)
+            slog("[BackgroundExec] continued task expiring — saving checkpoint")
+            SyncEngineManager.shared.handleContinuedBackgroundTaskExpiration()
             self?.submitMaintenanceTask()
         }
 
-        // Resume sync in background
         Task {
-            SyncEngineManager.shared.sessionService.transitionTo(.syncingBackground)
-            SyncEngineManager.shared.startSync()
+            _ = SyncEngineManager.shared.resumeSyncFromContinuedBackgroundTask()
             task.setTaskCompleted(success: true)
         }
     }
 
     private func handleMaintenanceTask(_ task: BGProcessingTask) {
-        NSLog("[BackgroundExec] maintenance task started — incremental scan")
+        slog("[BackgroundExec] maintenance task started — incremental scan")
 
         task.expirationHandler = {
-            NSLog("[BackgroundExec] maintenance task expiring")
+            slog("[BackgroundExec] maintenance task expiring")
         }
 
         Task {
             // Run incremental scan + attempt sync if target device found
-            SyncEngineManager.shared.startSync()
+            _ = SyncEngineManager.shared.resumeSyncFromMaintenanceBackgroundTask()
             task.setTaskCompleted(success: true)
         }
     }

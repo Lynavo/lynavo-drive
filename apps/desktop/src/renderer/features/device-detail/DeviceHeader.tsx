@@ -23,9 +23,8 @@ export function DeviceHeader({
   availableDates,
   onClose,
 }: DeviceHeaderProps) {
-  const isPhone = /iphone|ipad|galaxy|pixel|android|mobile/i.test(
-    device.clientName,
-  );
+  const isPhone =
+    device.platform === 'ios' || /android|mobile/i.test(device.platform);
   const DeviceIcon = isPhone ? Smartphone : Monitor;
   const hasMaterializedDateDir = availableDates.includes(selectedDate);
   const selectedFolderPath =
@@ -68,7 +67,7 @@ export function DeviceHeader({
 
       <div className="min-w-0 flex-1">
         <h2 className="text-base font-bold" style={{ color: colors.titleText }}>
-          {device.clientName}
+          {device.displayName}
           <span
             className="ml-2 text-xs font-normal"
             style={{ color: colors.subtitleText }}

@@ -13,21 +13,10 @@ import { formatBytes, formatSmartDate } from '@renderer/lib/format';
 import {
   useDirectoryStore,
   type DirectorySortField,
-  type PreviewFile,
   type ReceivedFileEntry,
 } from '@renderer/stores/directory-store';
 import { useSettingsStore } from '@renderer/stores/settings-store';
-import { resolveAbsolutePath, toMediaUrl } from './path-utils';
-
-const imageExts = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'bmp', 'tiff']);
-const videoExts = new Set(['mp4', 'mov', 'avi', 'mkv', 'webm', 'mp4v', 'braw']);
-
-function getPreviewMediaType(filename: string): 'image' | 'video' | null {
-  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
-  if (imageExts.has(ext)) return 'image';
-  if (videoExts.has(ext)) return 'video';
-  return null;
-}
+import { resolveAbsolutePath } from './path-utils';
 
 const colors = {
   headerText: '#8a9ab0',
@@ -60,7 +49,6 @@ export function ReceivedFileList() {
   const sortDirection = useDirectoryStore((s) => s.sortDirection);
   const toggleSort = useDirectoryStore((s) => s.toggleSort);
   const loading = useDirectoryStore((s) => s.loading);
-  const openPreview = useDirectoryStore((s) => s.openPreview);
   const receivePath = useSettingsStore((s) => s.settings.receivePath);
 
   const sortedFiles = useMemo(() => {
@@ -80,38 +68,10 @@ export function ReceivedFileList() {
     return result;
   }, [receivedFiles, sortField, sortDirection]);
 
-  // Build the full list of previewable files (in current sort order) for left/right navigation
-  const previewableList = useMemo(() => {
-    const list: PreviewFile[] = [];
-    for (const f of sortedFiles) {
-      if (!f.finalPath) continue;
-      const mt = getPreviewMediaType(f.originalFilename);
-      if (mt) {
-        list.push({
-          name: f.originalFilename,
-          url: toMediaUrl(resolveAbsolutePath(receivePath, f.finalPath)),
-          mediaType: mt,
-        });
-      }
-    }
-    return list;
-  }, [sortedFiles, receivePath]);
-
   const handleOpen = (file: ReceivedFileEntry) => {
     if (!file.finalPath) return;
-
     const resolvedPath = resolveAbsolutePath(receivePath, file.finalPath);
-    const mediaType = getPreviewMediaType(file.originalFilename);
-    if (mediaType) {
-      const current: PreviewFile = {
-        name: file.originalFilename,
-        url: toMediaUrl(resolvedPath),
-        mediaType,
-      };
-      openPreview(current, previewableList);
-    } else {
-      void window.electronAPI?.files.openFile(resolvedPath);
-    }
+    void window.electronAPI?.files.openFile(resolvedPath);
   };
 
   return (

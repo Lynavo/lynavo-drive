@@ -101,6 +101,10 @@ func (s *Server) handleSharedListPath(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listSharedDir(w http.ResponseWriter, relPath string) {
+	if !s.ensureStorageDirsForRequest(w, "shared.list") {
+		return
+	}
+
 	resolved, err := s.resolveSharedPath(relPath)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -180,6 +184,10 @@ func (s *Server) listSharedDir(w http.ResponseWriter, relPath string) {
 // handleSharedThumbnail serves a thumbnail for a shared file.
 // For images, the file is served directly. For other types, a 404 is returned.
 func (s *Server) handleSharedThumbnail(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureStorageDirsForRequest(w, "shared.thumbnail") {
+		return
+	}
+
 	subPath := r.PathValue("path")
 	resolved, err := s.resolveSharedPath(subPath)
 	if err != nil {
@@ -205,6 +213,10 @@ func (s *Server) handleSharedThumbnail(w http.ResponseWriter, r *http.Request) {
 
 // handleSharedDownload serves a file for download with Content-Disposition header.
 func (s *Server) handleSharedDownload(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureStorageDirsForRequest(w, "shared.download") {
+		return
+	}
+
 	subPath := r.PathValue("path")
 	resolved, err := s.resolveSharedPath(subPath)
 	if err != nil {
@@ -232,6 +244,10 @@ func (s *Server) handleSharedDownload(w http.ResponseWriter, r *http.Request) {
 
 // handleSharedStream serves a file with support for HTTP Range requests (video streaming).
 func (s *Server) handleSharedStream(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureStorageDirsForRequest(w, "shared.stream") {
+		return
+	}
+
 	subPath := r.PathValue("path")
 	resolved, err := s.resolveSharedPath(subPath)
 	if err != nil {

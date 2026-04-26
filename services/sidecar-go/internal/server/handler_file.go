@@ -5,19 +5,49 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/nicksyncflow/sidecar/internal/disk"
 	"github.com/nicksyncflow/sidecar/internal/events"
 	"github.com/nicksyncflow/sidecar/internal/protocol"
+	"github.com/nicksyncflow/sidecar/internal/runtimefs"
 	"github.com/nicksyncflow/sidecar/internal/store"
 )
+
+// windowsErrorDiskFull mirrors the Windows system error code returned when a
+// write fails because the volume is full. Defined as a constant so the check
+// compiles on non-Windows platforms too.
+const windowsErrorDiskFull syscall.Errno = 112
+
+// isDiskFullError reports whether err represents an out-of-space condition.
+// It combines the canonical POSIX ENOSPC check, a raw Windows ERROR_DISK_FULL
+// errno probe, and a last-resort message sniff to cover cases where the
+// underlying platform layer returns an uncategorised error whose string still
+// reveals the cause (seen on Windows via os.File.WriteAt in our field logs).
+func isDiskFullError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, syscall.ENOSPC) {
+		return true
+	}
+	var errno syscall.Errno
+	if errors.As(err, &errno) && errno == windowsErrorDiskFull {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no space left") ||
+		strings.Contains(msg, "not enough space on the disk") ||
+		strings.Contains(msg, "disk is full")
+}
 
 var (
 	uploadPerfLoggingOnce    sync.Once
@@ -67,6 +97,10 @@ func (c *connection) handleFileData(hdr *protocol.FrameHeader, body []byte) erro
 		return fmt.Errorf("FILE_DATA received but no file writer active")
 	}
 
+	if err := c.activeTransferStorageError(); err != nil {
+		return c.pauseTransferForStorageUnavailable(fileKey, err)
+	}
+
 	isLow, remainingBytes, err := disk.IsLow(c.config.ReceiveDir, c.config.LowDiskThresholdBytes)
 	if err != nil {
 		slog.Warn("disk check failed during file transfer, continuing", "fileKey", fileKey, "err", err)
@@ -79,6 +113,24 @@ func (c *connection) handleFileData(hdr *protocol.FrameHeader, body []byte) erro
 	committedOffset, err := c.fileWriter.WriteAt(data, offset)
 	writeElapsed := time.Since(writeStart)
 	if err != nil {
+		if isDiskFullError(err) {
+			// The pre-check at the top of this handler (and the one at
+			// FILE_INIT) looked OK, but the OS layer still ran out of room
+			// mid-write. Route through the structured pause path so the
+			// client receives LOW_DISK_PAUSED instead of a raw write error
+			// that would be classified as a retryable network fault.
+			_, remainingBytes, checkErr := disk.IsLow(c.config.ReceiveDir, c.config.LowDiskThresholdBytes)
+			if checkErr != nil {
+				remainingBytes = 0
+			}
+			slog.Warn("write failed due to disk full, routing to low-disk pause",
+				"fileKey", fileKey,
+				"offset", offset,
+				"remainingBytes", remainingBytes,
+				"err", err,
+			)
+			return c.pauseTransferForLowDisk(fileKey, remainingBytes)
+		}
 		return fmt.Errorf("write file data: %w", err)
 	}
 
@@ -192,6 +244,66 @@ func (c *connection) pauseTransferForLowDisk(fileKey string, remainingBytes uint
 	return c.sendError("LOW_DISK_PAUSED", fmt.Sprintf("remaining disk bytes %d below threshold", remainingBytes))
 }
 
+func (c *connection) pauseTransferForStorageUnavailable(fileKey string, cause error) error {
+	c.markTransferPausedForStorageUnavailable(fileKey, cause)
+	return c.sendError("STORAGE_UNAVAILABLE", "desktop receive directory is unavailable")
+}
+
+func (c *connection) activeTransferStorageError() error {
+	result, err := runtimefs.EnsureStorageDirs(c.config)
+	if err != nil {
+		return err
+	}
+	if result.RecreatedPath(c.config.ReceiveDir) || result.RecreatedPath(c.config.StagingDir()) {
+		return errors.New("runtime upload directory was recreated")
+	}
+	if c.fileWriter != nil {
+		if _, err := os.Stat(c.fileWriter.PartPath()); err != nil {
+			return fmt.Errorf("part file unavailable: %w", err)
+		}
+	}
+	return nil
+}
+
+func (c *connection) markTransferPausedForStorageUnavailable(fileKey string, cause error) {
+	committedOffset := int64(0)
+	if c.fileWriter != nil {
+		committedOffset = c.fileWriter.CommittedOffset()
+	}
+
+	transmissionMs := c.transferElapsedMs(fileKey)
+	if transmissionMs <= 0 && c.fileWriter != nil {
+		transmissionMs = c.fileWriter.ElapsedMs()
+	}
+
+	slog.Warn("storage unavailable during file transfer, pausing upload",
+		"fileKey", fileKey,
+		"committedOffset", committedOffset,
+		"err", cause,
+	)
+
+	if fileKey != "" {
+		if err := c.flushProgress(fileKey, committedOffset); err != nil {
+			slog.Warn("failed to flush upload progress before storage pause", "fileKey", fileKey, "err", err)
+		}
+		if err := c.store.PauseUploadResumable(fileKey, committedOffset, transmissionMs); err != nil {
+			slog.Warn("failed to mark upload paused for storage unavailable", "fileKey", fileKey, "err", err)
+		}
+	}
+
+	c.clearTransferTimer(fileKey)
+	c.clearAckState(fileKey)
+
+	if c.fileWriter != nil {
+		if err := c.fileWriter.Close(); err != nil {
+			slog.Warn("failed to close file writer after storage pause", "fileKey", fileKey, "err", err)
+		}
+		c.fileWriter = nil
+	}
+
+	c.hub.Broadcast(events.Event{Type: "dashboard.updated", Payload: nil})
+}
+
 // handleFileEnd processes FILE_END_REQ. It verifies the SHA256 hash of the
 // .part file and either finalizes it to the receive directory or cleans up
 // on mismatch.
@@ -246,6 +358,16 @@ func (c *connection) handleFileEnd(body []byte) error {
 		slog.Warn("failed to close file writer before hash", "err", err)
 	}
 	closeElapsed := time.Since(closeStart)
+
+	if err := c.activeTransferStorageError(); err != nil {
+		slog.Error("runtime storage unavailable before hash", "fileKey", req.FileKey, "err", err)
+		c.markTransferPausedForStorageUnavailable(req.FileKey, err)
+		return c.sendJSON(protocol.TypeFileEndRes, protocol.FileEndRes{
+			OK:      false,
+			FileKey: req.FileKey,
+			Reason:  "STORAGE_UNAVAILABLE",
+		})
+	}
 
 	// Compute and verify SHA256 only if client provided one (empty = skipped for speed)
 	computedHash := ""
@@ -305,27 +427,21 @@ func (c *connection) handleFileEnd(body []byte) error {
 		)
 	}
 
-	// SHA256 matches — finalize
-	deviceAlias := c.clientID // fallback
-	var oldDirName string
-	if dev, err := c.store.GetPairedDevice(c.clientID); err == nil {
-		if dev.DeviceAlias != nil && *dev.DeviceAlias != "" {
-			deviceAlias = *dev.DeviceAlias
-		} else {
-			deviceAlias = dev.ClientName
-		}
-		if dev.ReceiveDirName != nil {
-			oldDirName = *dev.ReceiveDirName
-		}
+	// Get stable receive directory name (guaranteed non-empty by EnsureReceiveDirName)
+	if err := c.activeTransferStorageError(); err != nil {
+		slog.Error("runtime storage unavailable before finalize", "fileKey", req.FileKey, "err", err)
+		c.markTransferPausedForStorageUnavailable(req.FileKey, err)
+		return c.sendJSON(protocol.TypeFileEndRes, protocol.FileEndRes{
+			OK:      false,
+			FileKey: req.FileKey,
+			Reason:  "STORAGE_UNAVAILABLE",
+		})
 	}
 
-	// Migrate device directory if name changed
-	newDirName := SanitizeDirName(deviceAlias)
-	if oldDirName != "" && oldDirName != newDirName {
-		MigrateDeviceDir(c.config.ReceiveDir, oldDirName, deviceAlias)
+	dirName, err := EnsureReceiveDirName(c.store, c.config.ReceiveDir, c.clientID)
+	if err != nil {
+		return fmt.Errorf("ensure receive dir name: %w", err)
 	}
-	// Always update stored dir name
-	_ = c.store.UpdateReceiveDirName(c.clientID, newDirName)
 
 	date := time.Now().Format("2006-01-02")
 
@@ -336,13 +452,15 @@ func (c *connection) handleFileEnd(body []byte) error {
 	}
 
 	finalizeStart := time.Now()
-	relativePath, err := c.fileWriter.Finalize(c.config.ReceiveDir, deviceAlias, date, filename, req.FileKey)
+	relativePath, err := c.fileWriter.Finalize(c.config.ReceiveDir, dirName, date, filename, req.FileKey)
 	finalizeElapsed := time.Since(finalizeStart)
 	if err != nil {
 		slog.Error("failed to finalize file", "fileKey", req.FileKey, "err", err)
+		c.markTransferPausedForStorageUnavailable(req.FileKey, err)
 		return c.sendJSON(protocol.TypeFileEndRes, protocol.FileEndRes{
 			OK:      false,
 			FileKey: req.FileKey,
+			Reason:  "STORAGE_UNAVAILABLE",
 		})
 	}
 

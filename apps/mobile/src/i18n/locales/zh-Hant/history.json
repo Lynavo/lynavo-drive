@@ -1,0 +1,17 @@
+{
+  "title": "歷史記錄",
+  "emptyState": {
+    "noRecords": "暫無同步記錄"
+  },
+  "cards": {
+    "statsLabel": "共同步媒體檔案",
+    "statsUnit": "個",
+    "durationLabel": "耗時"
+  },
+  "dates": {
+    "today": "今天",
+    "yesterday": "昨天",
+    "monthDay": "{{month}}月{{day}}日"
+  },
+  "liveLabel": "即時同步中"
+}

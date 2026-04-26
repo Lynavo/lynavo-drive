@@ -4,7 +4,9 @@ import type { DashboardDeviceDTO } from '@syncflow/contracts';
 
 const mockDevice: DashboardDeviceDTO = {
   deviceId: 'd1',
+  displayName: 'iPhone 15 Pro',
   clientName: 'iPhone 15 Pro',
+  platform: 'ios',
   ip: '192.168.1.201',
   status: 'transferring',
   todayFileCount: 12,

@@ -32,6 +32,7 @@ func (c *connection) handleHello(body []byte) error {
 	}
 	c.clientID = req.ClientID
 	c.clientIP = preferredClientIP(req.ClientIP, c.conn)
+	c.clientPlatform = req.ClientPlatform
 
 	slog.Info("HELLO_REQ received",
 		"clientID", req.ClientID,
@@ -108,6 +109,11 @@ func (c *connection) handleHello(body []byte) error {
 			shouldUpsertDevice = true
 			metadataChanged = true
 		}
+		if req.ClientPlatform != "" && device.Platform != req.ClientPlatform {
+			device.Platform = req.ClientPlatform
+			shouldUpsertDevice = true
+			metadataChanged = true
+		}
 
 		if shouldUpsertDevice {
 			device.LastSeenAt = time.Now().UTC().Format(time.RFC3339)
@@ -117,6 +123,7 @@ func (c *connection) handleHello(body []byte) error {
 		} else if err := c.store.UpdateLastSeen(req.ClientID, c.clientIP); err != nil {
 			slog.Warn("failed to update last_seen", "err", err)
 		}
+
 		if metadataChanged && c.hub != nil {
 			c.hub.Broadcast(events.Event{Type: "dashboard.updated", Payload: nil})
 		}
@@ -230,7 +237,7 @@ func (c *connection) handlePair(body []byte) error {
 
 	if req.ConnectionCode != expectedCode {
 		slog.Warn("pair rejected: wrong connection code", "clientID", req.ClientID)
-		_ = c.sendJSON(protocol.TypePairRes, protocol.PairRes{OK: false})
+		_ = c.sendJSON(protocol.TypePairRes, protocol.PairRes{OK: false, Error: "连接码错误"})
 		return fmt.Errorf("invalid connection code from %s", req.ClientID)
 	}
 
@@ -259,19 +266,27 @@ func (c *connection) handlePair(body []byte) error {
 		alias = &req.DeviceAlias
 	}
 
+	platform := c.clientPlatform
+	if platform == "" {
+		platform = "ios" // fallback for clients that don't send clientPlatform
+	}
+
 	device := store.PairedDevice{
 		ClientID:         req.ClientID,
 		ClientName:       req.ClientName,
 		DeviceAlias:      alias,
 		LastIP:           &clientIP,
-		Platform:         "ios", // default for mobile clients
+		Platform:         platform,
 		PairingID:        pairingID,
 		PairingTokenHash: tokenHash,
 		CreatedAt:        now,
 		LastSeenAt:       now,
 	}
-	if err := c.store.UpsertPairedDevice(device); err != nil {
-		return fmt.Errorf("store paired device: %w", err)
+
+	// Generate dir name + store device atomically under the dir-name mutex.
+	// No intermediate state — the device record is complete from birth.
+	if _, err := PairDeviceWithDirName(c.store, c.config.ReceiveDir, device); err != nil {
+		return fmt.Errorf("pair device %q: %w", req.ClientID, err)
 	}
 	c.clientID = req.ClientID
 

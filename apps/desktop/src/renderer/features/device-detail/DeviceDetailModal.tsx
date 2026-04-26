@@ -15,6 +15,8 @@ import { DateFilter } from './DateFilter';
 import { StatsBar } from './StatsBar';
 import { FileLedgerTable } from './FileLedgerTable';
 
+const DETAIL_REFRESH_INTERVAL_MS = 10_000;
+
 export function DeviceDetailModal() {
   const isModalOpen = useAppStore((s) => s.isModalOpen);
   const selectedDevice = useAppStore((s) => s.selectedDevice);
@@ -40,6 +42,18 @@ export function DeviceDetailModal() {
     if (!isModalOpen) {
       useDeviceDetailStore.getState().reset();
     }
+  }, [isModalOpen, selectedDevice]);
+
+  useEffect(() => {
+    if (!isModalOpen || !selectedDevice) return;
+
+    const interval = setInterval(() => {
+      useDeviceDetailStore
+        .getState()
+        .fetchDeviceFiles(selectedDevice.deviceId, { silent: true });
+    }, DETAIL_REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(interval);
   }, [isModalOpen, selectedDevice]);
 
   const { totalPages, pageStart, pageEnd } = useMemo(() => {
@@ -80,7 +94,7 @@ export function DeviceDetailModal() {
         >
           {/* Visually hidden but accessible title */}
           <DialogTitle className="sr-only">
-            {selectedDevice.clientName} 设备详情
+            {selectedDevice.displayName} 设备详情
           </DialogTitle>
 
           <DeviceHeader

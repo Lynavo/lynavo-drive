@@ -153,6 +153,23 @@ private func syncFlowPreferredClientIPv4() -> String? {
     return fallback
 }
 
+private func syncFlowIPv4Octets(_ host: String) -> [Int]? {
+    let parts = host.split(separator: ".")
+    guard parts.count == 4 else { return nil }
+    let octets = parts.compactMap { Int($0) }
+    guard octets.count == 4, octets.allSatisfy({ (0...255).contains($0) }) else {
+        return nil
+    }
+    return octets
+}
+
+private func syncFlowIsPrivateLANIPv4(_ host: String) -> Bool {
+    guard let octets = syncFlowIPv4Octets(host) else { return false }
+    return octets[0] == 10 ||
+        (octets[0] == 172 && (16...31).contains(octets[1])) ||
+        (octets[0] == 192 && octets[1] == 168)
+}
+
 final class SyncDiagnosticsLogStore {
     static let shared = SyncDiagnosticsLogStore()
 
@@ -184,15 +201,15 @@ func syncDiagnosticsLog(_ category: String, _ message: @autoclosure () -> String
 
 private func syncDiagnosticsDumpToConsole(_ lines: [String]) {
     if lines.isEmpty {
-        NSLog("[Diagnostics] engine.log snapshot is empty at export time")
+        slog("[Diagnostics] engine.log snapshot is empty at export time")
         return
     }
 
-    NSLog("[Diagnostics] engine.log snapshot begin (%d lines)", lines.count)
+    slog("[Diagnostics] engine.log snapshot begin (%d lines)", lines.count)
     for line in lines {
-        NSLog("[DiagnosticsLog] %@", line)
+        slog("[DiagnosticsLog] %@", line)
     }
-    NSLog("[Diagnostics] engine.log snapshot end")
+    slog("[Diagnostics] engine.log snapshot end")
 }
 
 @objc
@@ -220,10 +237,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private var autoUploadConfigStore: AutoUploadConfigStore?
     private var manualUploadService: ManualUploadService?
     let sharedFilesService = SharedFilesService()
-    private var isAutoUploadPaused = false
+    private var isAutoUploadInterrupted = false
+    private var shouldAbortActiveAutoUpload = false
+    private var shouldAbortActiveManualUpload = false
     private var protocolSession: ProtocolSession?
+    private var activeUploadSession: ProtocolSession?
     private var discoveredDevices: [String: DiscoveredDevice] = [:]  // keyed by deviceId
     private var photoLibraryChanged = false  // set by observer, consumed by watch loop
+    private var shouldAbortActiveUploadForBindingChange = false
+    private var lastEmittedDiscoveredDevicesSignature: String?
     private var watchLoopContinuation: CheckedContinuation<Void, Never>?
     private var watchLoopContinuationToken: UUID?
     private let watchLoopContinuationLock = NSLock()
@@ -240,16 +262,29 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     )
     private var cloudAssetFlags: [String: Bool] = [:]
     private var cloudAssetDetectionInFlight: Set<String> = []
-    private var sidecarHost: String?  // resolved IP of Mac, for HTTP heartbeat
+    private var sidecarHost: String? {  // resolved IP of Mac, for HTTP heartbeat
+        didSet { sharedFilesService.sidecarHost = sidecarHost }
+    }
     private lazy var heartbeatSession: URLSession = {
         let config = URLSessionConfiguration.default
-        config.isDiscretionary = true
-        config.networkServiceType = .background
-        config.timeoutIntervalForRequest = 10
+        config.isDiscretionary = false
+        config.waitsForConnectivity = false
+        config.networkServiceType = .responsiveData
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.timeoutIntervalForRequest = 5
+        config.timeoutIntervalForResource = 5
         return URLSession(configuration: config)
     }()
     private var transitionBackgroundTaskId: UIBackgroundTaskIdentifier = .invalid
     private var bindingConnectionState: BindingConnectionState = .offline
+    private var presenceHeartbeatTimer: DispatchSourceTimer?
+    private let presenceRecoveryQueue = DispatchQueue(
+        label: "com.syncflow.presence-recovery",
+        qos: .utility
+    )
+    private let presenceRecoveryLock = NSLock()
+    private var presenceRecoveryToken = UUID()
+    private var presenceRecoveryWorkItem: DispatchWorkItem?
     private let diagnosticsIssueLock = NSLock()
     private var recentRetryDiagnostic: [String: Any]?
     private var recentErrorDiagnostic: [String: Any]?
@@ -258,6 +293,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private var runtimeQueueCompletedCount = 0
     private var runtimeQueueTotalBytes: Int64 = 0
     private var runtimeQueueCompletedBytes: Int64 = 0
+    private var runtimeRoundBaselineCompletedCount = 0
+    private var runtimeRoundBaselineCompletedBytes: Int64 = 0
     private var runtimeCurrentFileKey: String?
     private var runtimeCurrentFilename: String?
     private var runtimeCurrentFileConfirmedBytes: Int64 = 0
@@ -268,6 +305,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private var runtimeLastSpeedCheckTime: CFAbsoluteTime = 0
     private var runtimeLastBytesTransferred: Int64 = 0
     private var runtimeUploadState = "idle"
+    private var runtimeManualUploadCancelled = false
+    private var runtimeLastCompletedTaskSource: String?
+    private var runtimeRoundSource: String?
     private var lastBackgroundPhotoLibraryChangeAt: CFAbsoluteTime = 0
     private let backgroundCaptureCooldown: CFTimeInterval = 90
     private var pendingRescanAfterThermalRecovery = false
@@ -277,6 +317,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private var runtimeActiveTuningProfile = "normal"
     private var runtimeIsThermalLimited = false
     private var runtimeThermalReason: ThermalPerformanceReason?
+    private let albumBrowserQueue = DispatchQueue(
+        label: "com.syncflow.album-browser",
+        qos: .userInitiated
+    )
+    private let albumBrowserQueueKey = DispatchSpecificKey<Void>()
 
     private func preferredSidecarHost(probedHost: String?, device: DiscoveredDevice?) -> String? {
         if let probedHost, !probedHost.isEmpty, !probedHost.contains(":") {
@@ -306,6 +351,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         guard let binding = uploadStore?.getBinding() else {
             return nil
         }
+
+        return uploadTargetDeviceType(for: binding)
+    }
+
+    private func uploadTargetDeviceType(for binding: BindingRecord) -> String? {
 
         if let discovered = discoveredDevices[binding.deviceId] {
             return discovered.type
@@ -406,7 +456,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         runtimePerformanceMessage = nextReason == nil ? nil : "设备温度较高，已降低传输强度"
 
         if previousProfile != profileLabel || previousReason != nextReason || previousThermalState != nextThermalState {
-            NSLog(
+            slog(
                 "[SyncEngine] profile changed %@ -> %@ (thermal=%@, reason=%@)",
                 previousProfile,
                 profileLabel,
@@ -435,6 +485,24 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         runtimeCurrentFileTotalBytes = 0
     }
 
+    private func clearRuntimeSyncRoundProgress(uploadState: String? = nil) {
+        runtimeQueueTotalCount = 0
+        runtimeQueueCompletedCount = 0
+        runtimeQueueTotalBytes = 0
+        runtimeQueueCompletedBytes = 0
+        runtimeRoundBaselineCompletedCount = 0
+        runtimeRoundBaselineCompletedBytes = 0
+        clearRuntimeCurrentFile()
+        runtimeCurrentSpeedMbps = 0
+        runtimeLastSpeedCheckTime = 0
+        runtimeLastBytesTransferred = 0
+        runtimeLastCompletedTaskSource = nil
+        runtimeRoundSource = nil
+        if let uploadState {
+            runtimeUploadState = uploadState
+        }
+    }
+
     private func clearRuntimeReconnectError() {
         runtimeLastErrorCode = nil
         runtimeLastErrorMessage = nil
@@ -449,15 +517,20 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         totalCount: Int,
         totalBytes: Int64,
         completedCount: Int = 0,
-        completedBytes: Int64 = 0
+        completedBytes: Int64 = 0,
+        source: String? = nil
     ) {
         runtimeQueueTotalCount = totalCount
         runtimeQueueCompletedCount = completedCount
         runtimeQueueTotalBytes = totalBytes
         runtimeQueueCompletedBytes = completedBytes
+        runtimeRoundBaselineCompletedCount = completedCount
+        runtimeRoundBaselineCompletedBytes = completedBytes
+        runtimeRoundSource = source
         runtimeLastSpeedCheckTime = CFAbsoluteTimeGetCurrent()
         runtimeLastBytesTransferred = completedBytes
         runtimeCurrentSpeedMbps = 0
+        runtimeLastCompletedTaskSource = nil
         clearRuntimeCurrentFile()
         clearRuntimeReconnectError()
         applyRuntimeThermalState(
@@ -487,11 +560,54 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     private func runtimeSyncOverviewPayload(
         uploadState: String,
-        progressPercent: Int? = nil
+        progressPercent: Int? = nil,
+        includePersistedIdleStats: Bool = true
     ) -> [String: Any] {
         runtimeUploadState = uploadState
+        let preservesManualCancellation =
+            uploadState == "idle" || uploadState == "paused_auto_upload"
+        if !preservesManualCancellation {
+            runtimeManualUploadCancelled = false
+        }
+        let manualUploadCancelled =
+            runtimeManualUploadCancelled && preservesManualCancellation
         let currentBinding = uploadStore?.getBinding()
-        let transferredBytes = runtimeQueueCompletedBytes + runtimeCurrentFileConfirmedBytes
+        let pendingCounts = uploadStore?.getPendingCountsBySource() ?? (auto: 0, manual: 0)
+        let currentTaskSource: Any = uploadStore?.getCurrentUploadingSource() ?? NSNull()
+        let persistedQueueStats = uploadStore?.getQueueStats() ?? (totalCount: 0, totalBytes: 0, completedCount: 0, completedBytes: 0)
+        let hasRuntimeRoundProgress =
+            runtimeQueueTotalCount > 0 ||
+            runtimeQueueCompletedCount > 0 ||
+            runtimeQueueTotalBytes > 0 ||
+            runtimeQueueCompletedBytes > 0 ||
+            runtimeCurrentFileTotalBytes > 0
+        let shouldFallbackToPersistedQueueStats =
+            includePersistedIdleStats &&
+            !manualUploadCancelled &&
+            !hasRuntimeRoundProgress &&
+            pendingCounts.manual == 0 &&
+            pendingCounts.auto == 0 &&
+            currentBinding != nil &&
+            uploadState == "idle" &&
+            persistedQueueStats.totalCount > 0
+
+        let effectiveTotalCount =
+            shouldFallbackToPersistedQueueStats
+                ? persistedQueueStats.totalCount
+                : runtimeQueueTotalCount
+        let effectiveCompletedCount =
+            shouldFallbackToPersistedQueueStats
+                ? persistedQueueStats.completedCount
+                : runtimeQueueCompletedCount
+        let effectiveTotalBytes =
+            shouldFallbackToPersistedQueueStats
+                ? persistedQueueStats.totalBytes
+                : runtimeQueueTotalBytes
+        let effectiveCompletedBytes =
+            shouldFallbackToPersistedQueueStats
+                ? persistedQueueStats.completedBytes
+                : runtimeQueueCompletedBytes
+        let transferredBytes = effectiveCompletedBytes + runtimeCurrentFileConfirmedBytes
         let derivedProgressPercent: Int
         if let progressPercent {
             derivedProgressPercent = progressPercent
@@ -499,28 +615,21 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             derivedProgressPercent = Int(
                 (Double(runtimeCurrentFileConfirmedBytes) / Double(runtimeCurrentFileTotalBytes)) * 100
             )
+        } else if effectiveTotalCount > 0 && effectiveCompletedCount >= effectiveTotalCount {
+            derivedProgressPercent = 100
         } else {
             derivedProgressPercent = uploadState == "completed" ? 100 : 0
         }
 
-        // Compute source-split queue counts for SyncActivityScreen
-        let pendingCounts = uploadStore?.getPendingCountsBySource() ?? (auto: 0, manual: 0)
-        let currentTaskSource: Any = uploadStore?.getCurrentUploadingSource() ?? NSNull()
+        let autoUploadState = autoUploadConfigStore?.getConfig().state ?? "disabled"
 
-        let autoUploadState: String
-        if isAutoUploadPaused {
-            autoUploadState = "paused"
-        } else if autoUploadConfigStore?.getConfig().enabled == true {
-            autoUploadState = "active"
-        } else {
-            autoUploadState = "disabled"
-        }
-
-        return [
+        var payload: [String: Any] = [
             "currentDeviceId": currentBinding?.deviceId ?? NSNull(),
             "currentDeviceName": currentBinding?.deviceAlias ?? currentBinding?.deviceName ?? NSNull(),
-            "completedCount": runtimeQueueCompletedCount,
-            "completedBytes": runtimeQueueCompletedBytes,
+            "completedCount": effectiveCompletedCount,
+            "completedBytes": effectiveCompletedBytes,
+            "roundBaselineCompletedCount": runtimeRoundBaselineCompletedCount,
+            "roundBaselineCompletedBytes": runtimeRoundBaselineCompletedBytes,
             "currentFile": runtimeCurrentFileKey ?? NSNull(),
             "currentFilename": runtimeCurrentFilename ?? NSNull(),
             "currentFileConfirmedBytes": runtimeCurrentFileConfirmedBytes,
@@ -532,17 +641,67 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             "performanceHint": runtimePerformanceHint,
             "performanceMessage": runtimePerformanceMessage ?? NSNull(),
             "progressPercent": derivedProgressPercent,
-            "totalBytes": runtimeQueueTotalBytes,
-            "totalCount": runtimeQueueTotalCount,
+            "totalBytes": effectiveTotalBytes,
+            "totalCount": effectiveTotalCount,
             "thermalState": runtimeThermalState,
             "activeTuningProfile": runtimeActiveTuningProfile,
             "isThermalLimited": runtimeIsThermalLimited,
             "uploadState": runtimeUploadState,
             "currentTaskSource": currentTaskSource,
+            "lastCompletedTaskSource": runtimeLastCompletedTaskSource ?? NSNull(),
             "autoUploadState": autoUploadState,
-            "manualBatchPending": pendingCounts.manual,
+            "manualPending": pendingCounts.manual,
             "autoPending": pendingCounts.auto,
         ]
+        if manualUploadCancelled {
+            payload["manualUploadCancelled"] = true
+        }
+        return payload
+    }
+
+    private func overviewLogValue(_ value: Any?) -> String {
+        guard let value, !(value is NSNull) else { return "nil" }
+        return String(describing: value)
+    }
+
+    private func logSyncOverviewEmission(_ context: String, payload: [String: Any]) {
+        let message = String(
+            format: "emit %@ state=%@ auto=%@ source=%@ lastSource=%@ completed=%@/%@ bytes=%@/%@ pending(manual=%@ auto=%@) currentFile=%@ currentBytes=%@/%@ progress=%@",
+            context,
+            overviewLogValue(payload["uploadState"]),
+            overviewLogValue(payload["autoUploadState"]),
+            overviewLogValue(payload["currentTaskSource"]),
+            overviewLogValue(payload["lastCompletedTaskSource"]),
+            overviewLogValue(payload["completedCount"]),
+            overviewLogValue(payload["totalCount"]),
+            overviewLogValue(payload["completedBytes"]),
+            overviewLogValue(payload["totalBytes"]),
+            overviewLogValue(payload["manualPending"]),
+            overviewLogValue(payload["autoPending"]),
+            overviewLogValue(payload["currentFile"]),
+            overviewLogValue(payload["currentFileConfirmedBytes"]),
+            overviewLogValue(payload["currentFileTotalBytes"]),
+            overviewLogValue(payload["progressPercent"])
+        )
+        slog("[SyncOverview] %@", message)
+        syncDiagnosticsLog("SyncOverview", message)
+    }
+
+    private func isAutoUploadActiveForDiscovery() -> Bool {
+        let config = autoUploadConfigStore?.getConfig()
+        return config?.enabled == true &&
+            config?.state == "active" &&
+            !isAutoUploadInterrupted
+    }
+
+    private func emitScanningProgress(scanned: Int, total: Int) {
+        guard isAutoUploadActiveForDiscovery() else { return }
+        NativeSyncEngineModule.shared?.emitSyncStateChanged(
+            runtimeSyncOverviewPayload(uploadState: "scanning").merging([
+                "scannedCount": scanned,
+                "libraryTotal": total,
+            ] as [String: Any]) { _, new in new }
+        )
     }
 
     private func buildPendingUploadAssets(clientId: String, limit: Int? = 200) -> [ScannedAsset] {
@@ -550,7 +709,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
         let pendingItems = store.getPendingUploadItemsSorted(
             limit: limit,
-            excludeSource: isAutoUploadPaused ? "auto" : nil
+            excludeSource: isAutoUploadInterrupted ? "auto" : nil
         )
         guard !pendingItems.isEmpty else { return [] }
 
@@ -600,12 +759,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 creationDate: asset.creationDate,
                 originalFilename: originalFilename,
                 estimatedSize: estimatedSize,
-                source: item.source
+                source: item.source,
+                batchId: item.batchId
             ))
         }
 
         if missingAssets > 0 {
-            NSLog("[SyncPipeline] skipped %d pending items whose PHAsset could not be resolved", missingAssets)
+            slog("[SyncPipeline] skipped %d pending items whose PHAsset could not be resolved", missingAssets)
             syncDiagnosticsLog("SyncPipeline", "skipped \(missingAssets) pending items whose PHAsset could not be resolved")
         }
 
@@ -631,6 +791,20 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         )
     }
 
+    private func isManualUploadCancelled(fileKey: String, source: String) -> Bool {
+        guard source == "manual" else { return false }
+        if shouldAbortActiveManualUpload {
+            return true
+        }
+        return uploadStore?.getUploadItemByFileKey(fileKey)?.status == "cancelled"
+    }
+
+    private func throwIfManualUploadCancelled(fileKey: String, source: String) throws {
+        if isManualUploadCancelled(fileKey: fileKey, source: source) {
+            throw SyncEngineError.manualUploadCancelled
+        }
+    }
+
     private func queueItemIdentity(_ item: UploadItemRecord) -> String {
         item.fileKey ?? item.assetLocalId
     }
@@ -650,6 +824,20 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         cloudAssetFlags[key] = isCloudAsset
         cloudAssetDetectionInFlight.remove(key)
         return previous != isCloudAsset
+    }
+
+    private func manualUploadQueueAssets(from pendingAssets: [ScannedAsset]) -> [ScannedAsset] {
+        guard let first = pendingAssets.first, first.source == "manual" else { return [] }
+        guard let batchId = first.batchId, !batchId.isEmpty else {
+            return Array(pendingAssets.prefix { $0.source == "manual" })
+        }
+        return Array(pendingAssets.prefix { $0.source == "manual" && $0.batchId == batchId })
+    }
+
+    private func estimatedTotalBytes(for assets: [ScannedAsset]) -> Int64 {
+        assets.reduce(Int64(0)) { total, asset in
+            total + max(asset.estimatedSize, 0)
+        }
     }
 
     private func detectCloudBackedAsset(assetLocalId: String, mediaType: String) async -> Bool {
@@ -835,6 +1023,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     private override init() {
         super.init()
+        albumBrowserQueue.setSpecific(key: albumBrowserQueueKey, value: ())
+        // Migrate keychain from old bundle ID before any keychain access
+        bindingService.migrateKeychainIfNeeded()
         do {
             uploadStore = try UploadStore()
             historyStore = HistoryLedgerStore(store: uploadStore!)
@@ -842,8 +1033,31 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             autoUploadConfigStore = AutoUploadConfigStore(store: uploadStore!)
             manualUploadService = ManualUploadService(uploadStore: uploadStore, bindingService: bindingService)
             photoScanner.autoUploadConfigStore = autoUploadConfigStore
+            albumBrowserService?.autoUploadConfigStore = autoUploadConfigStore
+
+            // Register photo library observer early so album browser receives
+            // change events even before sync starts (e.g. limited picker flow).
+            // Only register when permission is already granted — registering with
+            // .notDetermined implicitly triggers the system permission dialog.
+            // The sync lifecycle calls startObserving() again after explicitly
+            // requesting permission, so this is just an early-start optimization.
+            let photoStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+            if photoStatus == .authorized || photoStatus == .limited {
+                photoScanner.startObserving()
+            }
+
+            // Restore interrupted state from persisted config across app restarts
+            if autoUploadConfigStore?.getConfig().state == "interrupted" {
+                isAutoUploadInterrupted = true
+                slog("[SyncEngine] restored interrupted state from persisted config")
+            }
+
+            // Cleanup is safe to run at any point during init — it only uses
+            // the static AlbumBrowserService.previewCacheDir() helper and
+            // dispatches its work onto a utility queue asynchronously.
+            cleanupPreviewCacheIfNeeded()
         } catch {
-            NSLog("[SyncEngine] Failed to init stores: \(error)")
+            slog("[SyncEngine] Failed to init stores: \(error)")
         }
         if uploadStore?.getBinding() != nil {
             bindingConnectionState = .bound
@@ -874,13 +1088,19 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let exportTempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("syncflow_export", isDirectory: true)
         try? FileManager.default.removeItem(at: exportTempDir)
-        NSLog("[SyncEngine] cleared export temp dir on init")
+        slog("[SyncEngine] cleared export temp dir on init")
+
+        // Start the passive network-path observer. Pure instrumentation:
+        // it only writes to SyncDiagnosticsLogStore so the diagnostic
+        // bundle can show WHY a connection dropped when the user walked
+        // between WiFi networks. It never triggers reconnect or discovery.
+        NetworkPathObserver.shared.start()
     }
 
     // MARK: - App State Transitions
 
     @objc private func appDidEnterBackground() {
-        NSLog("[SyncEngine] app entered background, isSyncing=\(isSyncing)")
+        slog("[SyncEngine] app entered background, isSyncing=\(isSyncing)")
         guard isSyncing else { return }
         beginBackgroundTransitionIfNeeded(reason: "didEnterBackground")
         if sessionService.state == .syncingForeground {
@@ -889,7 +1109,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     }
 
     @objc private func appWillEnterForeground() {
-        NSLog("[SyncEngine] app entering foreground")
+        slog("[SyncEngine] app entering foreground")
         endBackgroundTransitionIfNeeded(reason: "willEnterForeground")
         if sessionService.state == .syncingBackground {
             sessionService.transitionTo(.syncingForeground)
@@ -901,17 +1121,25 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             let thermal = ProcessInfo.processInfo.thermalState
             if thermal != .serious && thermal != .critical {
                 pendingRescanAfterThermalRecovery = false
-                NSLog("[SyncEngine] foreground restored — triggering deferred rescan (thermal=%@)", thermalStateLabel(thermal))
+                slog("[SyncEngine] foreground restored — triggering deferred rescan (thermal=%@)", thermalStateLabel(thermal))
                 syncDiagnosticsLog("SyncEngine", "foreground restored — triggering deferred rescan (thermal=\(thermalStateLabel(thermal)))")
                 scheduleIncrementalQueueRescan(reason: "foreground_recovery_compensation")
             }
+        }
+
+        // Validate connection immediately on foreground — the heartbeat timer
+        // may not have fired while the app was suspended, leaving a stale
+        // .connected state even though the desktop is no longer reachable.
+        if bindingConnectionState == .connected || bindingConnectionState == .bound {
+            let clientId = bindingService.getOrCreateClientId()
+            verifyPresenceWithRecovery(clientId: clientId)
         }
     }
 
     @objc private func thermalStateDidChange() {
         let state = ProcessInfo.processInfo.thermalState
         let label = thermalStateLabel(state)
-        NSLog("[SyncEngine] thermal state changed to %@", label)
+        slog("[SyncEngine] thermal state changed to %@", label)
         syncDiagnosticsLog("SyncEngine", "thermal state changed to \(label)")
         _ = resolvedUploadTuning()
         if isSyncing {
@@ -929,7 +1157,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 && !(isAppBackgrounded() && state != .nominal)
             {
                 pendingRescanAfterThermalRecovery = false
-                NSLog("[SyncEngine] thermal recovered — triggering deferred rescan")
+                slog("[SyncEngine] thermal recovered — triggering deferred rescan")
                 syncDiagnosticsLog("SyncEngine", "thermal recovered to \(label) — triggering deferred rescan")
                 scheduleIncrementalQueueRescan(reason: "thermal_recovery_compensation")
             }
@@ -969,15 +1197,318 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         NativeSyncEngineModule.shared?.emitBindingStateChanged(bindingStatePayload())
     }
 
+    private func refreshBoundServerMetadata(
+        expectedDeviceId: String,
+        serverName rawServerName: String?,
+        shareName rawShareName: String?,
+        host rawHost: String? = nil
+    ) {
+        guard var binding = uploadStore?.getBinding() else { return }
+        guard binding.deviceId == expectedDeviceId else {
+            syncDiagnosticsLog(
+                "SyncEngine",
+                "skipped binding metadata refresh for stale device=\(expectedDeviceId) current=\(binding.deviceId)"
+            )
+            return
+        }
+
+        let normalizedServerName = rawServerName?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedShareName = rawShareName?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedHost = rawHost?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        var changedFields: [String] = []
+
+        if let serverName = normalizedServerName,
+           !serverName.isEmpty,
+           binding.deviceName != serverName
+        {
+            binding.deviceName = serverName
+            changedFields.append("deviceName")
+        }
+
+        if let shareName = normalizedShareName,
+           !shareName.isEmpty,
+           binding.shareName != shareName
+        {
+            binding.shareName = shareName
+            changedFields.append("shareName")
+        }
+
+        if let host = normalizedHost,
+           !host.isEmpty,
+           binding.host != host
+        {
+            binding.host = host
+            changedFields.append("host")
+        }
+
+        guard !changedFields.isEmpty else { return }
+
+        do {
+            try uploadStore?.saveBinding(binding)
+            syncDiagnosticsLog(
+                "SyncEngine",
+                "binding metadata refreshed fields=\(changedFields.joined(separator: ",")) serverName=\(binding.deviceName)"
+            )
+            NativeSyncEngineModule.shared?.emitBindingStateChanged(
+                bindingStatePayload(binding: binding)
+            )
+        } catch {
+            syncDiagnosticsLog(
+                "SyncEngine",
+                "failed to refresh binding metadata error=\(error)"
+            )
+        }
+    }
+
     private func updateBindingConnectionState(_ newState: BindingConnectionState, reason: String) {
         guard bindingConnectionState != newState else { return }
-        NSLog("[SyncEngine] binding connection state %@ -> %@ (%@)",
+        slog("[SyncEngine] binding connection state %@ -> %@ (%@)",
               bindingConnectionState.rawValue,
               newState.rawValue,
               reason)
         syncDiagnosticsLog("SyncEngine", "binding connection state \(bindingConnectionState.rawValue) -> \(newState.rawValue) (\(reason))")
         bindingConnectionState = newState
         emitBindingStateChanged()
+
+        // Keep the standalone heartbeat timer in sync with connection state
+        if newState == .connected {
+            cancelPresenceRecoveryProbe(reason: "state_connected")
+            startPresenceHeartbeatTimer()
+        } else {
+            stopPresenceHeartbeatTimer()
+        }
+    }
+
+    private func maintainConnectedBindingState(reason: String) {
+        guard uploadStore?.getBinding() != nil else { return }
+        if bindingConnectionState != .connected {
+            updateBindingConnectionState(.connected, reason: reason)
+            return
+        }
+
+        syncDiagnosticsLog("SyncEngine", "binding connection state remains connected (\(reason))")
+        cancelPresenceRecoveryProbe(reason: reason)
+        startPresenceHeartbeatTimer()
+        emitBindingStateChanged()
+    }
+
+    // MARK: - Standalone Presence Heartbeat Timer
+
+    /// Runs independently of the sync pipeline so we detect desktop disappearance
+    /// even when no upload is in progress.
+    private func startPresenceHeartbeatTimer() {
+        stopPresenceHeartbeatTimer()
+        guard uploadStore?.getBinding() != nil else { return }
+        let clientId = bindingService.getOrCreateClientId()
+        let timer = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
+        timer.schedule(deadline: .now() + 30, repeating: 30, leeway: .seconds(5))
+        timer.setEventHandler { [weak self] in
+            guard let self = self else { return }
+            // Skip if sync pipeline is running — it has its own heartbeat loop
+            guard !self.isSyncing else { return }
+            // A single HTTP timeout on the presence port can be a transient Wi-Fi
+            // hiccup; the DiscoveryService's TCP probe on the protocol port often
+            // still sees the desktop. Don't flip the UI to offline on one miss —
+            // suppress the direct state update and hand off to the retry probe,
+            // which only marks offline after presence_recovery_exhausted.
+            self.sendPresenceHeartbeat(
+                clientId: clientId,
+                updateStateOnFailure: false
+            ) { [weak self] success in
+                guard let self = self, !success else { return }
+                self.startPresenceRecoveryProbe(clientId: clientId)
+            }
+        }
+        timer.resume()
+        presenceHeartbeatTimer = timer
+        slog("[SyncEngine] standalone presence heartbeat timer started")
+        syncDiagnosticsLog("SyncEngine", "standalone presence heartbeat timer started")
+    }
+
+    private func stopPresenceHeartbeatTimer() {
+        if let timer = presenceHeartbeatTimer {
+            timer.cancel()
+            presenceHeartbeatTimer = nil
+            slog("[SyncEngine] standalone presence heartbeat timer stopped")
+            syncDiagnosticsLog("SyncEngine", "standalone presence heartbeat timer stopped")
+        }
+    }
+
+    private func cancelPresenceRecoveryProbe(reason: String) {
+        presenceRecoveryLock.lock()
+        presenceRecoveryToken = UUID()
+        let workItem = presenceRecoveryWorkItem
+        presenceRecoveryWorkItem = nil
+        presenceRecoveryLock.unlock()
+
+        if let workItem {
+            workItem.cancel()
+            syncDiagnosticsLog("SyncEngine", "presence recovery probe cancelled (\(reason))")
+        }
+    }
+
+    private func setPresenceRecoveryWorkItem(_ workItem: DispatchWorkItem?) {
+        presenceRecoveryLock.lock()
+        presenceRecoveryWorkItem = workItem
+        presenceRecoveryLock.unlock()
+    }
+
+    private func currentPresenceRecoveryToken() -> UUID {
+        presenceRecoveryLock.lock()
+        defer { presenceRecoveryLock.unlock() }
+        return presenceRecoveryToken
+    }
+
+    private func currentPresenceHeartbeatHost() -> String? {
+        if let resolved = sidecarHost, !resolved.isEmpty {
+            return resolved
+        }
+        if let fallback = uploadStore?.getBinding()?.host, !fallback.isEmpty {
+            return fallback
+        }
+        return nil
+    }
+
+    private func startPresenceRecoveryProbe(
+        clientId: String,
+        maxAttempts: Int = 8,
+        retryInterval: TimeInterval = 1,
+        promoteOfflineToConnecting: Bool = false
+    ) {
+        cancelPresenceRecoveryProbe(reason: "start_new_probe")
+        if bindingConnectionState != .offline || promoteOfflineToConnecting {
+            updateBindingConnectionState(.connecting, reason: "presence_recovery_started")
+        } else {
+            syncDiagnosticsLog("SyncEngine", "presence recovery started while already offline; keeping offline state")
+        }
+
+        let token = UUID()
+        presenceRecoveryLock.lock()
+        presenceRecoveryToken = token
+        presenceRecoveryLock.unlock()
+
+        syncDiagnosticsLog(
+            "SyncEngine",
+            "presence recovery probe started attempts=\(maxAttempts) interval=\(retryInterval)s"
+        )
+        performPresenceRecoveryProbe(
+            clientId: clientId,
+            attempt: 1,
+            maxAttempts: maxAttempts,
+            retryInterval: retryInterval,
+            token: token
+        )
+    }
+
+    private func performPresenceRecoveryProbe(
+        clientId: String,
+        attempt: Int,
+        maxAttempts: Int,
+        retryInterval: TimeInterval,
+        token: UUID
+    ) {
+        guard token == currentPresenceRecoveryToken() else { return }
+
+        syncDiagnosticsLog(
+            "SyncEngine",
+            "presence recovery attempt \(attempt)/\(maxAttempts) host=\(sidecarHost ?? uploadStore?.getBinding()?.host ?? "nil")"
+        )
+
+        sendPresenceHeartbeat(
+            clientId: clientId,
+            successReason: "presence_recovery_succeeded",
+            failureReason: "presence_recovery_failed",
+            updateStateOnFailure: false
+        ) { [weak self] success in
+            guard let self = self else { return }
+
+            if success {
+                // A successful heartbeat transitions binding state to connected,
+                // and that transition cancels the recovery probe/token. Treat
+                // the success callback as authoritative so recovery can resume
+                // pending uploads after desktop relaunch.
+                self.cancelPresenceRecoveryProbe(reason: "heartbeat_succeeded")
+                self.resumeSyncAfterConnectionRecovery(reason: "presence_recovery_succeeded")
+                return
+            }
+
+            guard token == self.currentPresenceRecoveryToken() else { return }
+
+            guard attempt < maxAttempts else {
+                self.cancelPresenceRecoveryProbe(reason: "exhausted")
+                self.updateBindingConnectionState(.offline, reason: "presence_recovery_exhausted")
+                return
+            }
+
+            let workItem = DispatchWorkItem { [weak self] in
+                self?.performPresenceRecoveryProbe(
+                    clientId: clientId,
+                    attempt: attempt + 1,
+                    maxAttempts: maxAttempts,
+                    retryInterval: retryInterval,
+                    token: token
+                )
+            }
+            self.setPresenceRecoveryWorkItem(workItem)
+            self.presenceRecoveryQueue.asyncAfter(deadline: .now() + retryInterval, execute: workItem)
+        }
+    }
+
+    private func resumeSyncAfterConnectionRecovery(reason: String) {
+        let configState = autoUploadConfigStore?.getConfig().state ?? "disabled"
+        let pendingCounts = uploadStore?.getPendingCountsBySource() ?? (auto: 0, manual: 0)
+        let shouldResume = configState == "active" || pendingCounts.manual > 0
+
+        guard shouldResume else {
+            syncDiagnosticsLog(
+                "SyncEngine",
+                "connection recovery did not resume sync (\(reason)) auto=\(configState) pending(manual=\(pendingCounts.manual) auto=\(pendingCounts.auto))"
+            )
+            return
+        }
+
+        if isSyncing && sessionService.state == .pausedNoTarget {
+            syncDiagnosticsLog(
+                "SyncEngine",
+                "connection recovery correcting stale syncing flag before resume (\(reason))"
+            )
+            isSyncing = false
+        }
+
+        syncDiagnosticsLog(
+            "SyncEngine",
+            "connection recovery resuming sync (\(reason)) auto=\(configState) pending(manual=\(pendingCounts.manual) auto=\(pendingCounts.auto)) isSyncing=\(isSyncing) session=\(sessionService.state.rawValue)"
+        )
+        startSync()
+    }
+
+    private func verifyPresenceWithRecovery(
+        clientId: String,
+        successReason: String = "presence_heartbeat_succeeded",
+        failureReason: String = "presence_heartbeat_failed"
+    ) {
+        let expectedHost = currentPresenceHeartbeatHost()
+        sendPresenceHeartbeat(
+            clientId: clientId,
+            successReason: successReason,
+            failureReason: failureReason,
+            updateStateOnFailure: false
+        ) { [weak self] success in
+            guard let self = self, !success else { return }
+            let currentHost = self.currentPresenceHeartbeatHost()
+            if currentHost != expectedHost {
+                syncDiagnosticsLog(
+                    "SyncEngine",
+                    "presence heartbeat result ignored because host changed \(expectedHost ?? "nil") -> \(currentHost ?? "nil")"
+                )
+                return
+            }
+            self.startPresenceRecoveryProbe(clientId: clientId)
+        }
     }
 
     private func currentAppStateLabel(for applicationState: UIApplication.State) -> String {
@@ -1102,10 +1633,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                         "auth": hmac,
                     ])
                 }
-                NSLog("[SyncEngine] pushed client metadata update to sidecar")
+                slog("[SyncEngine] pushed client metadata update to sidecar")
                 syncDiagnosticsLog("SyncEngine", "pushed client metadata update to sidecar")
             } catch {
-                NSLog("[SyncEngine] metadata refresh skipped: %@", "\(error)")
+                slog("[SyncEngine] metadata refresh skipped: %@", "\(error)")
                 syncDiagnosticsLog("SyncEngine", "metadata refresh skipped: \(error)")
             }
         }
@@ -1114,7 +1645,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private func beginBackgroundTransitionIfNeeded(reason: String) {
         guard transitionBackgroundTaskId == .invalid else { return }
         transitionBackgroundTaskId = backgroundService.beginTransitionTask()
-        NSLog("[BackgroundExec] began transition task reason=%@", reason)
+        slog("[BackgroundExec] began transition task reason=%@", reason)
         syncDiagnosticsLog("BackgroundExec", "began transition task reason=\(reason)")
     }
 
@@ -1122,16 +1653,95 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         guard transitionBackgroundTaskId != .invalid else { return }
         backgroundService.endTransitionTask(transitionBackgroundTaskId)
         transitionBackgroundTaskId = .invalid
-        NSLog("[BackgroundExec] ended transition task reason=%@", reason)
+        slog("[BackgroundExec] ended transition task reason=%@", reason)
         syncDiagnosticsLog("BackgroundExec", "ended transition task reason=\(reason)")
     }
 
     private func stopSyncLifecycle(finalState: SessionService.SyncEngineState) {
         isSyncing = false
+        shouldAbortActiveAutoUpload = false
+        shouldAbortActiveManualUpload = false
+        shouldAbortActiveUploadForBindingChange = false
         didAttemptRemoteHistoryReconciliation = false
         endBackgroundTransitionIfNeeded(reason: "syncStopped")
         SilentAudioService.shared.stop()
         sessionService.endSession(transitionTo: finalState)
+    }
+
+    private func interruptActiveSyncForBindingChange(reason: String, interruptCurrentSession: Bool = true) {
+        guard isSyncing else { return }
+
+        shouldAbortActiveUploadForBindingChange = true
+        photoLibraryChanged = true
+        slog("[SyncEngine] interrupting active sync because binding changed: %@", reason)
+        syncDiagnosticsLog("SyncEngine", "interrupting active sync because binding changed: \(reason)")
+        if interruptCurrentSession {
+            interruptActiveUploadResponse(error: SyncEngineError.bindingChanged, reason: reason)
+        }
+        resumeWatchLoopIfNeeded()
+    }
+
+    private func interruptActiveUploadResponse(error: Error, reason: String) {
+        if let activeUploadSession {
+            activeUploadSession.interruptPendingResponse(error: error)
+        } else if !isPairing {
+            protocolSession?.interruptPendingResponse(error: error)
+        } else {
+            syncDiagnosticsLog(
+                "SyncEngine",
+                "skipped protocolSession interrupt during pairing reason=\(reason)"
+            )
+        }
+    }
+
+    private func throwIfBindingChanged(expectedDeviceId: String? = nil) throws {
+        if shouldAbortActiveUploadForBindingChange {
+            throw SyncEngineError.bindingChanged
+        }
+        if let expectedDeviceId {
+            guard let currentDeviceId = uploadStore?.getBinding()?.deviceId,
+                  currentDeviceId == expectedDeviceId else {
+                throw SyncEngineError.bindingChanged
+            }
+        }
+    }
+
+    private func shouldSuppressAutomaticBackgroundResume(reason: String) -> Bool {
+        let reconnectExhausted =
+            runtimeLastErrorCode == "RECONNECT_EXHAUSTED" ||
+            sessionService.state == .pausedNoTarget
+        guard reconnectExhausted && bindingConnectionState == .offline else {
+            return false
+        }
+        syncDiagnosticsLog(
+            "BackgroundExec",
+            "skipping automatic background resume (\(reason)) state=\(sessionService.state.rawValue) connection=\(bindingConnectionState.rawValue) lastError=\(runtimeLastErrorCode ?? "nil")"
+        )
+        return true
+    }
+
+    func resumeSyncFromContinuedBackgroundTask() -> Bool {
+        guard !shouldSuppressAutomaticBackgroundResume(reason: "continued_task") else {
+            return false
+        }
+        sessionService.transitionTo(.syncingBackground)
+        startSync()
+        return true
+    }
+
+    func handleContinuedBackgroundTaskExpiration() {
+        guard !shouldSuppressAutomaticBackgroundResume(reason: "continued_task_expiration") else {
+            return
+        }
+        sessionService.transitionTo(.idle)
+    }
+
+    func resumeSyncFromMaintenanceBackgroundTask() -> Bool {
+        guard !shouldSuppressAutomaticBackgroundResume(reason: "maintenance_task") else {
+            return false
+        }
+        startSync()
+        return true
     }
 
     private struct UploadTuning {
@@ -1145,7 +1755,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let profileLabel: String
     }
 
-    private func resolvedUploadTuning() -> UploadTuning {
+    private func resolvedUploadTuning(targetDeviceType targetDeviceTypeOverride: String? = nil) -> UploadTuning {
         let perfLoggingEnabled = syncFlowBoolSetting(
             envKey: "SYNCFLOW_UPLOAD_PERF_LOG",
             userDefaultsKey: "SyncFlowUploadPerfLog"
@@ -1192,7 +1802,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let isLowPowerModeEnabled = processInfo.isLowPowerModeEnabled
         let isBackgroundSync = sessionService.state == .syncingBackground
         let isActiveBackgroundCapture = isBackgroundCaptureRecentlyActive()
-        let targetDeviceType = currentUploadTargetDeviceType()
+        let targetDeviceType = targetDeviceTypeOverride ?? currentUploadTargetDeviceType()
 
         switch thermalState {
         case .serious:
@@ -1295,7 +1905,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         ) else {
             return
         }
-        NSLog("[SyncPerf] %@", message)
+        slog("[SyncPerf] %@", message)
     }
 
     private func resolvedForcedSidecarTarget() -> (host: String, port: UInt16)? {
@@ -1322,7 +1932,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             switch syncError {
             case .networkError:
                 return true
-            case .databaseError, .pairingError, .permissionError, .lowDiskPaused:
+            case .databaseError, .pairingError, .permissionError, .lowDiskPaused, .storageUnavailable, .reconnectExhausted, .bindingChanged, .autoUploadInterrupted, .manualUploadCancelled:
                 return false
             }
         }
@@ -1390,6 +2000,19 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         return min(baseDelaySeconds * 1_000_000_000 + jitterNs, 30_000_000_000)
     }
 
+    private func maxUploadReconnectAttempts() -> Int {
+        min(
+            max(
+                syncFlowIntSetting(
+                    envKey: "SYNCFLOW_UPLOAD_MAX_RECONNECT_ATTEMPTS",
+                    userDefaultsKey: "SyncFlowUploadMaxReconnectAttempts"
+                ) ?? 3,
+                1
+            ),
+            10
+        )
+    }
+
     private func clearResolvedSidecarHost() {
         guard resolvedForcedSidecarTarget() == nil else { return }
         sidecarHost = nil
@@ -1404,12 +2027,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         // picked up on the next normal scan round.
         let thermal = ProcessInfo.processInfo.thermalState
         if thermal == .serious || thermal == .critical {
-            NSLog("[SyncEngine] deferring incremental rescan — thermal state %@", thermalStateLabel(thermal))
+            slog("[SyncEngine] deferring incremental rescan — thermal state %@", thermalStateLabel(thermal))
             pendingRescanAfterThermalRecovery = true
             return
         }
         if isAppBackgrounded() && thermal != .nominal {
-            NSLog("[SyncEngine] deferring incremental rescan — backgrounded + thermal %@", thermalStateLabel(thermal))
+            slog("[SyncEngine] deferring incremental rescan — backgrounded + thermal %@", thermalStateLabel(thermal))
             pendingRescanAfterThermalRecovery = true
             return
         }
@@ -1428,8 +2051,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private func performIncrementalQueueRescan(reason: String) {
         guard isSyncing, let store = uploadStore else { return }
 
+        // Skip auto-discovery when auto upload is not active
+        let autoUploadActive = isAutoUploadActiveForDiscovery()
+        guard autoUploadActive else {
+            slog("[SyncEngine] skipping incremental rescan — auto upload not active (%@)", reason)
+            return
+        }
+
         let clientId = bindingService.getOrCreateClientId()
-        let trackedFileKeys = Set(store.getTrackedFileKeys())
+        let trackedFileKeys = Set(store.getAutoDiscoveryTrackedFileKeys())
 
         // Prefer delta scan (only newly inserted/changed assets) over full-library
         // enumeration. Falls back to full scan when no cached fetchResult exists
@@ -1441,11 +2071,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         ) {
             untrackedAssets = deltaResults
             if !deltaResults.isEmpty {
-                NSLog("[SyncEngine] incremental delta scan found %d new assets (%@)", deltaResults.count, reason)
+                slog("[SyncEngine] incremental delta scan found %d new assets (%@)", deltaResults.count, reason)
                 syncDiagnosticsLog("SyncEngine", "incremental delta scan found \(deltaResults.count) new assets (\(reason))")
             }
         } else {
-            NSLog("[SyncEngine] no cached fetchResult — falling back to full scan (%@)", reason)
+            slog("[SyncEngine] no cached fetchResult — falling back to full scan (%@)", reason)
             untrackedAssets = photoScanner.scanForUntrackedAssets(
                 clientId: clientId,
                 trackedFileKeys: trackedFileKeys
@@ -1453,7 +2083,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
 
         guard !untrackedAssets.isEmpty else {
-            NSLog("[SyncEngine] incremental photo rescan found no new assets (%@)", reason)
+            slog("[SyncEngine] incremental photo rescan found no new assets (%@)", reason)
             syncDiagnosticsLog("SyncEngine", "incremental photo rescan found no new assets (\(reason))")
             return
         }
@@ -1480,7 +2110,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             try? store.upsertUploadItem(item)
         }
 
-        NSLog(
+        slog(
             "[SyncEngine] incremental photo rescan queued %d new assets (%@)",
             untrackedAssets.count,
             reason
@@ -1492,12 +2122,38 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     /// Start a full photo scan and serial upload session over the open TCP connection.
     func startSync() {
         guard !isSyncing else {
-            NSLog("[SyncEngine] startSync skipped — already syncing")
-            syncDiagnosticsLog("SyncEngine", "startSync skipped — already syncing")
+            // Already running — wake the watch loop so it picks up newly
+            // queued items (e.g. manual upload submitted while pipeline is
+            // idle-waiting for photoLibraryChanged).
+            slog("[SyncEngine] startSync: already syncing — waking watch loop")
+            syncDiagnosticsLog("SyncEngine", "startSync: already syncing — waking watch loop")
+            photoLibraryChanged = true
+            resumeWatchLoopIfNeeded()
             return
         }
+
+        // Check if there's anything to sync: auto upload must be active,
+        // OR there must be pending manual items. If neither, skip starting
+        // the full sync lifecycle (no background task, no audio session).
+        let configState = autoUploadConfigStore?.getConfig().state ?? "disabled"
+        let manualPending = uploadStore?.getPendingCountsBySource().manual ?? 0
+        if configState != "active" && manualPending == 0 {
+            slog("[SyncEngine] startSync skipped — auto upload %@, no manual pending", configState)
+            syncDiagnosticsLog("SyncEngine", "startSync skipped — auto upload \(configState), no manual pending")
+            // Emit current state so pages render correctly
+            let payload = runtimeSyncOverviewPayload(uploadState: configState == "interrupted" ? "paused_auto_upload" : "idle")
+            logSyncOverviewEmission("start_sync_skipped", payload: payload)
+            NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                payload
+            )
+            return
+        }
+
         isSyncing = true
-        NSLog("[SyncEngine] startSync")
+        clearRuntimeCurrentFile()
+        runtimeCurrentSpeedMbps = 0
+        clearRuntimeReconnectError()
+        slog("[SyncEngine] startSync")
         syncDiagnosticsLog("SyncEngine", "startSync")
         sessionService.transitionTo(.scanning)
         backgroundService.submitContinuedTask()
@@ -1509,7 +2165,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     }
 
     func resetAllStatus() async throws {
-        NSLog("[SyncEngine] resetAllStatus requested")
+        slog("[SyncEngine] resetAllStatus requested")
         syncDiagnosticsLog("SyncEngine", "resetAllStatus requested")
 
         // 1. Clear database status
@@ -1526,13 +2182,17 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         runtimeCurrentFileTotalBytes = 0
         runtimeCurrentSpeedMbps = 0
         runtimeUploadState = "idle"
+        shouldAbortActiveManualUpload = false
+        runtimeManualUploadCancelled = false
+        runtimeLastCompletedTaskSource = nil
+        runtimeRoundSource = nil
 
         // 3. Emit fresh states to JS
         emitQueueToJS()
         NativeSyncEngineModule.shared?.emitHistoryUpdated()
         NativeSyncEngineModule.shared?.emitSyncStateChanged(runtimeSyncOverviewPayload(uploadState: "idle"))
 
-        NSLog("[SyncEngine] resetAllStatus completed")
+        slog("[SyncEngine] resetAllStatus completed")
         syncDiagnosticsLog("SyncEngine", "resetAllStatus completed")
     }
 
@@ -1559,8 +2219,70 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             stopSyncLifecycle(finalState: .idle)
         } catch let error as SyncEngineError {
             switch error {
+            case .autoUploadInterrupted:
+                maintainConnectedBindingState(reason: "auto_upload_interrupted")
+                let clientId = bindingService.getOrCreateClientId()
+                sendPresenceHeartbeat(
+                    clientId: clientId,
+                    successReason: "auto_upload_interrupted_presence_restored",
+                    failureReason: "auto_upload_interrupted_presence_failed",
+                    updateStateOnFailure: false
+                )
+                let configState = autoUploadConfigStore?.getConfig().state ?? "disabled"
+                if configState == "disabled" {
+                    slog("[SyncEngine] sync pipeline stopped because auto upload was disabled")
+                    syncDiagnosticsLog("SyncEngine", "sync pipeline stopped because auto upload was disabled")
+                    clearRuntimeSyncRoundProgress(uploadState: "idle")
+                    let payload = runtimeSyncOverviewPayload(uploadState: "idle")
+                    logSyncOverviewEmission("pipeline_auto_disabled", payload: payload)
+                    NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                        payload
+                    )
+                    stopSyncLifecycle(finalState: .idle)
+                } else {
+                    slog("[SyncEngine] sync pipeline interrupted by user")
+                    syncDiagnosticsLog("SyncEngine", "sync pipeline interrupted by user")
+                    clearRuntimeSyncRoundProgress(uploadState: "paused_auto_upload")
+                    let payload = runtimeSyncOverviewPayload(uploadState: "paused_auto_upload")
+                    logSyncOverviewEmission("pipeline_auto_interrupted", payload: payload)
+                    NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                        payload
+                    )
+                    stopSyncLifecycle(finalState: .interruptedAutoUpload)
+                }
+            case .manualUploadCancelled:
+                slog("[SyncEngine] manual upload cancelled by user")
+                syncDiagnosticsLog("SyncEngine", "manual upload cancelled by user")
+                maintainConnectedBindingState(reason: "manual_upload_cancelled")
+                let clientId = bindingService.getOrCreateClientId()
+                sendPresenceHeartbeat(
+                    clientId: clientId,
+                    successReason: "manual_upload_cancelled_presence_restored",
+                    failureReason: "manual_upload_cancelled_presence_failed",
+                    updateStateOnFailure: false
+                )
+                clearRuntimeSyncRoundProgress(uploadState: "idle")
+                runtimeManualUploadCancelled = true
+                let payload = runtimeSyncOverviewPayload(
+                    uploadState: "idle",
+                    includePersistedIdleStats: false
+                )
+                logSyncOverviewEmission("pipeline_manual_cancelled", payload: payload)
+                NativeSyncEngineModule.shared?.emitSyncStateChanged(payload)
+                stopSyncLifecycle(finalState: .idle)
+            case .bindingChanged:
+                slog("[SyncEngine] sync pipeline stopped because binding changed")
+                syncDiagnosticsLog("SyncEngine", "sync pipeline stopped because binding changed")
+                clearRuntimeSyncRoundProgress(uploadState: "idle")
+                let payload = runtimeSyncOverviewPayload(
+                    uploadState: "idle",
+                    includePersistedIdleStats: false
+                )
+                logSyncOverviewEmission("pipeline_binding_changed", payload: payload)
+                NativeSyncEngineModule.shared?.emitSyncStateChanged(payload)
+                stopSyncLifecycle(finalState: .idle)
             case .lowDiskPaused(let message):
-                NSLog("[SyncEngine] sync pipeline paused due to low disk: %@", message)
+                slog("[SyncEngine] sync pipeline paused due to low disk: %@", message)
                 syncDiagnosticsLog("SyncEngine", "sync pipeline paused due to low disk: \(message)")
                 protocolSession?.disconnect()
                 protocolSession = nil
@@ -1570,8 +2292,42 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     "code": "LOW_DISK_PAUSED",
                     "message": message,
                 ])
+            case .storageUnavailable(let message, let source):
+                slog("[SyncEngine] sync pipeline paused because desktop storage is unavailable: %@ source=%@", message, source)
+                syncDiagnosticsLog("SyncEngine", "sync pipeline paused because desktop storage is unavailable: \(message) source=\(source)")
+                protocolSession?.disconnect()
+                protocolSession = nil
+                maintainConnectedBindingState(reason: "storage_unavailable")
+                let finalUploadState = source == "auto" ? "paused_auto_upload" : "idle"
+                let finalSessionState: SessionService.SyncEngineState = source == "auto" ? .interruptedAutoUpload : .idle
+                if source == "auto" {
+                    persistAutoUploadInterruptedState(reason: "storage_unavailable")
+                    setRuntimeReconnectError(code: "STORAGE_UNAVAILABLE", message: message)
+                }
+                clearRuntimeSyncRoundProgress(uploadState: finalUploadState)
+                let payload = runtimeSyncOverviewPayload(uploadState: finalUploadState)
+                logSyncOverviewEmission("pipeline_storage_unavailable", payload: payload)
+                NativeSyncEngineModule.shared?.emitSyncStateChanged(payload)
+                stopSyncLifecycle(finalState: finalSessionState)
+                recordRecentError(code: "STORAGE_UNAVAILABLE", message: message)
+                NativeSyncEngineModule.shared?.emitError([
+                    "code": "STORAGE_UNAVAILABLE",
+                    "message": message,
+                ])
+            case .reconnectExhausted(let message):
+                slog("[SyncEngine] sync pipeline paused after reconnect limit: %@", message)
+                syncDiagnosticsLog("SyncEngine", "sync pipeline paused after reconnect limit: \(message)")
+                protocolSession?.disconnect()
+                protocolSession = nil
+                clearResolvedSidecarHost()
+                if uploadStore?.getBinding() != nil {
+                    updateBindingConnectionState(.offline, reason: "upload_reconnect_exhausted")
+                }
+                setRuntimeReconnectError(code: "RECONNECT_EXHAUSTED", message: message)
+                backgroundService.cancelContinuedTask()
+                stopSyncLifecycle(finalState: .pausedNoTarget)
             default:
-                NSLog("[SyncEngine] sync pipeline failed: \(error)")
+                slog("[SyncEngine] sync pipeline failed: \(error)")
                 syncDiagnosticsLog("SyncEngine", "sync pipeline failed: \(error)")
                 protocolSession?.disconnect()
                 protocolSession = nil
@@ -1587,7 +2343,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 ])
             }
         } catch {
-            NSLog("[SyncEngine] sync pipeline failed: \(error)")
+            slog("[SyncEngine] sync pipeline failed: \(error)")
             syncDiagnosticsLog("SyncEngine", "sync pipeline failed: \(error)")
             protocolSession?.disconnect()
             protocolSession = nil
@@ -1605,27 +2361,18 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     }
 
     private func runSyncPipeline() async throws {
-        NSLog("[SyncPipeline] START")
+        slog("[SyncPipeline] START")
         syncDiagnosticsLog("SyncPipeline", "START")
 
         // 0. Check prerequisites
-        guard let binding = uploadStore?.getBinding() else {
+        guard uploadStore?.getBinding() != nil else {
             throw SyncEngineError.pairingError("No binding found — pair first")
-        }
-        guard let token = resolvedPairingToken(for: binding) else {
-            NSLog("[SyncPipeline] pairing token missing — clearing stale binding, need re-pair")
-            syncDiagnosticsLog("SyncPipeline", "pairing token missing — clearing stale binding")
-            try? uploadStore?.clearBinding()
-            bindingConnectionState = .offline
-            stopSyncLifecycle(finalState: .idle)
-            NativeSyncEngineModule.shared?.emitBindingStateChanged(nil)
-            return
         }
 
         // 1. Request photo permission
         let permStatus = await photoScanner.requestPermission()
         guard permStatus == .authorized || permStatus == .limited else {
-            NSLog("[SyncEngine] photo permission denied")
+            slog("[SyncEngine] photo permission denied")
             syncDiagnosticsLog("SyncEngine", "photo permission denied")
             stopSyncLifecycle(finalState: .pausedNoPermission)
             return
@@ -1636,25 +2383,51 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
         let clientId = bindingService.getOrCreateClientId()
 
-        // 3. Resolve sidecar IP for HTTP heartbeat (connect TCP briefly)
-        if sidecarHost == nil {
-            do {
-                try await resolveSidecarHost(binding: binding, token: token, clientId: clientId)
-                // Probe succeeded — Mac is reachable and authenticated. Signal connected
-                // so the UI stops showing the 'Connecting to xxx' banner while scanning.
-                updateBindingConnectionState(.connected, reason: "sidecar_probe_success")
-            } catch {
-                NSLog("[SyncPipeline] failed to resolve sidecar host: %@", "\(error)")
-                syncDiagnosticsLog("SyncPipeline", "failed to resolve sidecar host: \(error)")
-            }
-        }
-
-        // 4. Continuous loop: scan → connect → upload → disconnect → wait → repeat
+        // 3. Continuous loop: scan → connect → upload → disconnect → wait → repeat
         var roundNumber = 0
 
         while true {
             roundNumber += 1
+
+            // Re-read binding/token every round. A long-lived pipeline can be
+            // woken after the user switches desktops; using the startup binding
+            // here would upload the next manual batch to the previous device.
+            guard let binding = uploadStore?.getBinding() else {
+                throw SyncEngineError.pairingError("No binding found — pair first")
+            }
+            guard let token = resolvedPairingToken(for: binding) else {
+                slog("[SyncPipeline] pairing token missing — clearing stale binding, need re-pair")
+                syncDiagnosticsLog("SyncPipeline", "pairing token missing — clearing stale binding")
+                try? uploadStore?.clearBinding()
+                bindingConnectionState = .offline
+                stopSyncLifecycle(finalState: .idle)
+                NativeSyncEngineModule.shared?.emitBindingStateChanged(nil)
+                return
+            }
+
+            // Resolve sidecar IP for HTTP heartbeat (connect TCP briefly).
+            if sidecarHost == nil {
+                do {
+                    try await resolveSidecarHost(binding: binding, token: token, clientId: clientId)
+                    try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
+                    // Probe succeeded — Mac is reachable and authenticated. Signal connected
+                    // so the UI stops showing the 'Connecting to xxx' banner while scanning.
+                    updateBindingConnectionState(.connected, reason: "sidecar_probe_success")
+                } catch {
+                    if let syncError = error as? SyncEngineError,
+                       case .bindingChanged = syncError
+                    {
+                        throw syncError
+                    }
+                    slog("[SyncPipeline] failed to resolve sidecar host: %@", "\(error)")
+                    syncDiagnosticsLog("SyncPipeline", "failed to resolve sidecar host: \(error)")
+                }
+            }
+            try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
+
             sessionService.transitionTo(.scanning)
+            clearRuntimeCurrentFile()
+            runtimeCurrentSpeedMbps = 0
             NativeSyncEngineModule.shared?.emitSyncStateChanged(
                 runtimeSyncOverviewPayload(uploadState: "scanning", progressPercent: 0)
             )
@@ -1666,65 +2439,101 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
             var pendingAssets = buildPendingUploadAssets(clientId: clientId, limit: 200)
             var newAssets: [ScannedAsset] = []
-            var trackedAssetCount = uploadStore?.getTrackedFileKeys().count ?? 0
+            var trackedAssetCount = uploadStore?.getAutoDiscoveryTrackedFileKeys().count ?? 0
+            var reusableReconciliationScan: [ScannedAsset]?
 
             if pendingAssets.isEmpty {
                 // Scan only when the persisted pending queue is empty. Large historical queues
                 // are already stored in upload_items, so rescanning the full library every
                 // 200-file batch just burns CPU/PhotoKit and makes the device hotter.
-                var trackedKeys = Set(uploadStore?.getTrackedFileKeys() ?? [])
+                var trackedKeys = Set(uploadStore?.getAutoDiscoveryTrackedFileKeys() ?? [])
                 trackedAssetCount = trackedKeys.count
                 if trackedKeys.isEmpty {
-                    let restoredCount = await restoreCompletedUploadHistoryIfNeeded(
+                    let reconciliationResult = await restoreCompletedUploadHistoryIfNeeded(
                         clientId: clientId,
-                        fallbackHost: binding.host
+                        fallbackHost: binding.host,
+                        expectedDeviceId: binding.deviceId
                     )
-                    if restoredCount > 0 {
-                        trackedKeys = Set(uploadStore?.getTrackedFileKeys() ?? [])
+                    try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
+                    reusableReconciliationScan = reconciliationResult.scannedAssets
+                    if reconciliationResult.restoredCount > 0 {
+                        trackedKeys = Set(uploadStore?.getAutoDiscoveryTrackedFileKeys() ?? [])
                         trackedAssetCount = trackedKeys.count
-                        NSLog(
+                        slog(
                             "[SyncPipeline] restored %d historical completed uploads before scan",
-                            restoredCount
+                            reconciliationResult.restoredCount
                         )
-                        syncDiagnosticsLog("SyncPipeline", "restored \(restoredCount) historical completed uploads before scan")
+                        syncDiagnosticsLog("SyncPipeline", "restored \(reconciliationResult.restoredCount) historical completed uploads before scan")
                     }
                 }
-                newAssets = photoScanner.scanForUntrackedAssets(clientId: clientId, trackedFileKeys: trackedKeys)
+                // Only auto-scan when auto upload is active (PRD: disabled/interrupted = no auto discovery)
+                let autoUploadActive = isAutoUploadActiveForDiscovery()
+                if autoUploadActive {
+                    if let reusableReconciliationScan {
+                        newAssets = reusableReconciliationScan.filter { !trackedKeys.contains($0.fileKey) }
+                        slog(
+                            "[SyncPipeline] reusing reconciliation photo scan for auto queue (%d scanned, %d new, %d tracked)",
+                            reusableReconciliationScan.count,
+                            newAssets.count,
+                            trackedKeys.count
+                        )
+                        syncDiagnosticsLog(
+                            "SyncPipeline",
+                            "reusing reconciliation scan for auto queue scanned=\(reusableReconciliationScan.count) new=\(newAssets.count) tracked=\(trackedKeys.count)"
+                        )
+                    } else {
+                        newAssets = photoScanner.scanForUntrackedAssets(
+                            clientId: clientId,
+                            trackedFileKeys: trackedKeys
+                        ) { [weak self] scanned, total in
+                            self?.emitScanningProgress(scanned: scanned, total: total)
+                        }
+                    }
+                    try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
+                }
 
                 if !newAssets.isEmpty {
-                    let queuePersistStart = CFAbsoluteTimeGetCurrent()
-                    let queuedItems = newAssets.map { asset in
-                        UploadItemRecord(
-                            id: nil,
-                            assetLocalId: asset.asset.localIdentifier,
-                            modifiedAt: asset.asset.modificationDate?.iso8601String ?? "",
-                            mediaType: asset.mediaType,
-                            originalFilename: asset.originalFilename,
-                            fileKey: asset.fileKey,
-                            fileSize: asset.estimatedSize,
-                            status: "queued",
-                            tempFilePath: nil,
-                            ackedOffset: 0,
-                            lastErrorCode: nil,
-                            updatedAt: ISO8601DateFormatter().string(from: Date()),
-                            source: "auto",
-                            batchId: nil,
-                            priority: 0
+                    if isAutoUploadActiveForDiscovery() {
+                        try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
+                        let queuePersistStart = CFAbsoluteTimeGetCurrent()
+                        let queuedItems = newAssets.map { asset in
+                            UploadItemRecord(
+                                id: nil,
+                                assetLocalId: asset.asset.localIdentifier,
+                                modifiedAt: asset.asset.modificationDate?.iso8601String ?? "",
+                                mediaType: asset.mediaType,
+                                originalFilename: asset.originalFilename,
+                                fileKey: asset.fileKey,
+                                fileSize: asset.estimatedSize,
+                                status: "queued",
+                                tempFilePath: nil,
+                                ackedOffset: 0,
+                                lastErrorCode: nil,
+                                updatedAt: ISO8601DateFormatter().string(from: Date()),
+                                source: "auto",
+                                batchId: nil,
+                                priority: 0
+                            )
+                        }
+                        try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
+                        try? uploadStore?.upsertUploadItems(queuedItems)
+                        slog(
+                            "[SyncPipeline] persisted %d queued assets in %d ms",
+                            queuedItems.count,
+                            Int((CFAbsoluteTimeGetCurrent() - queuePersistStart) * 1000)
                         )
+                        syncDiagnosticsLog("SyncPipeline", "persisted \(queuedItems.count) queued assets")
+                        emitQueueToJS()
+                    } else {
+                        slog("[SyncPipeline] discarded %d scanned auto assets because auto upload was interrupted", newAssets.count)
+                        syncDiagnosticsLog("SyncPipeline", "discarded \(newAssets.count) scanned auto assets after auto upload interruption")
+                        newAssets = []
                     }
-                    try? uploadStore?.upsertUploadItems(queuedItems)
-                    NSLog(
-                        "[SyncPipeline] persisted %d queued assets in %d ms",
-                        queuedItems.count,
-                        Int((CFAbsoluteTimeGetCurrent() - queuePersistStart) * 1000)
-                    )
-                    syncDiagnosticsLog("SyncPipeline", "persisted \(queuedItems.count) queued assets")
-                    emitQueueToJS()
                 }
 
                 pendingAssets = buildPendingUploadAssets(clientId: clientId, limit: 200)
             } else {
-                NSLog(
+                slog(
                     "[SyncPipeline] round %d reusing persisted pending queue (%d assets in batch), skipping full library scan",
                     roundNumber,
                     pendingAssets.count
@@ -1734,9 +2543,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     "round \(roundNumber): reusing persisted pending queue (\(pendingAssets.count) assets in batch), skipping full library scan"
                 )
             }
+            try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
 
             let stats = uploadStore?.getQueueStats() ?? (totalCount: 0, totalBytes: 0, completedCount: 0, completedBytes: 0)
-            NSLog(
+            slog(
                 "[SyncPipeline] round %d: %d pending assets (batch), global: %d/%d items, %lld/%lld bytes",
                 roundNumber,
                 pendingAssets.count,
@@ -1748,22 +2558,71 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             syncDiagnosticsLog("SyncPipeline", "round \(roundNumber): \(pendingAssets.count) pending assets (\(newAssets.count) new, tracked: \(trackedAssetCount))")
 
             if pendingAssets.isEmpty {
-                // Nothing to upload — wait for photo library changes
-                NativeSyncEngineModule.shared?.emitSyncStateChanged(([
-                    "uploadState": "completed",
-                    "progressPercent": 100,
-                ] as [String: Any]).merging(
-                    runtimeSyncOverviewPayload(uploadState: "completed", progressPercent: 100)
-                ) { _, new in new })
+                // Determine idle reason based on auto upload state
+                let configState = autoUploadConfigStore?.getConfig().state ?? "disabled"
 
-                NSLog("[SyncPipeline] idle — waiting for new photos...")
-                syncDiagnosticsLog("SyncPipeline", "idle — waiting for new photos")
-                sessionService.transitionTo(.idle)
+                if configState == "interrupted" || isAutoUploadInterrupted {
+                    // Interrupted: report interrupted state regardless of pending count
+                    let autoPendingCount = uploadStore?.getPendingCountsBySource().auto ?? 0
+                    let payload = runtimeSyncOverviewPayload(uploadState: "paused_auto_upload")
+                    logSyncOverviewEmission("empty_queue_interrupted", payload: payload)
+                    NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                        payload
+                    )
+                    slog("[SyncPipeline] idle — auto upload interrupted (auto pending: %d)", autoPendingCount)
+                    syncDiagnosticsLog("SyncPipeline", "idle — auto interrupted (auto pending: \(autoPendingCount))")
+                    sessionService.transitionTo(.interruptedAutoUpload)
+                } else if configState == "disabled" {
+                    // Disabled: emit idle, NOT completed — page should show "自动上传未开启"
+                    let payload = runtimeSyncOverviewPayload(uploadState: "idle")
+                    logSyncOverviewEmission("empty_queue_disabled", payload: payload)
+                    NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                        payload
+                    )
+                    slog("[SyncPipeline] idle — auto upload disabled")
+                    syncDiagnosticsLog("SyncPipeline", "idle — auto upload disabled")
+                    sessionService.transitionTo(.idle)
+                } else {
+                    clearRuntimeCurrentFile()
+                    runtimeCurrentSpeedMbps = 0
+                    let completedRuntimeRound =
+                        runtimeQueueTotalCount > 0 &&
+                        runtimeQueueCompletedCount >= runtimeQueueTotalCount &&
+                        runtimeRoundSource != nil
+                    if completedRuntimeRound {
+                        let completedRoundSource = runtimeRoundSource
+                        let payload = ([
+                            "uploadState": "completed",
+                            "progressPercent": 100,
+                        ] as [String: Any]).merging(
+                            runtimeSyncOverviewPayload(uploadState: "completed", progressPercent: 100)
+                        ) { _, new in new }
+                        logSyncOverviewEmission("empty_queue_completed", payload: payload)
+                        NativeSyncEngineModule.shared?.emitSyncStateChanged(payload)
+                        if completedRoundSource == "auto" {
+                            clearRuntimeSyncRoundProgress(uploadState: "idle")
+                        }
+
+                        slog("[SyncPipeline] idle — upload round completed, waiting for new photos...")
+                        syncDiagnosticsLog("SyncPipeline", "idle — upload round completed")
+                    } else {
+                        let payload = runtimeSyncOverviewPayload(
+                            uploadState: "idle",
+                            includePersistedIdleStats: false
+                        )
+                        logSyncOverviewEmission("empty_queue_active_idle", payload: payload)
+                        NativeSyncEngineModule.shared?.emitSyncStateChanged(payload)
+
+                        slog("[SyncPipeline] idle — no new auto items, waiting for new photos...")
+                        syncDiagnosticsLog("SyncPipeline", "idle — no new auto items")
+                    }
+                    sessionService.transitionTo(.idle)
+                }
                 photoLibraryChanged = false
 
                 // Wait loop: send HTTP presence heartbeat every 30s while idle
                 while !photoLibraryChanged {
-                    sendPresenceHeartbeat(clientId: clientId)
+                    verifyPresenceWithRecovery(clientId: clientId)
                     await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
                         if photoLibraryChanged {
                             cont.resume()
@@ -1782,7 +2641,27 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             }
 
             // Connect, upload, disconnect — with retry on error
+            let manualRoundAssets = manualUploadQueueAssets(from: pendingAssets)
+            let manualRoundStats = manualRoundAssets.isEmpty
+                ? nil
+                : manualRoundAssets.first?.batchId.flatMap { uploadStore?.getManualQueueStats(batchId: $0) }
+            let uploadRoundAssets = manualRoundAssets.isEmpty
+                ? pendingAssets
+                : manualRoundAssets
+            let roundTotalCount = manualRoundAssets.isEmpty
+                ? stats.totalCount
+                : (manualRoundStats?.totalCount ?? uploadRoundAssets.count)
+            let roundTotalBytes = manualRoundAssets.isEmpty
+                ? stats.totalBytes
+                : (manualRoundStats?.totalBytes ?? estimatedTotalBytes(for: uploadRoundAssets))
+            let roundCompletedCount = manualRoundAssets.isEmpty
+                ? stats.completedCount
+                : (manualRoundStats?.completedCount ?? 0)
+            let roundCompletedBytes = manualRoundAssets.isEmpty
+                ? stats.completedBytes
+                : (manualRoundStats?.completedBytes ?? Int64(0))
             var retryAttempt = 0
+            let maxReconnectAttempts = maxUploadReconnectAttempts()
             let maxRetryDelay: UInt64 = 30_000_000_000
             var uploaded = false
 
@@ -1792,11 +2671,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                         binding: binding,
                         token: token,
                         clientId: clientId,
-                        assets: pendingAssets,
-                        totalCount: stats.totalCount,
-                        totalBytes: stats.totalBytes,
-                        completedCount: stats.completedCount,
-                        completedBytes: stats.completedBytes,
+                        assets: uploadRoundAssets,
+                        totalCount: roundTotalCount,
+                        totalBytes: roundTotalBytes,
+                        completedCount: roundCompletedCount,
+                        completedBytes: roundCompletedBytes,
                         recoveryMode: retryAttempt > 0
                     )
                     uploaded = true
@@ -1806,7 +2685,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                         throw CancellationError()
                     }
                     if !isRetryableSyncError(error) {
-                        NSLog("[SyncPipeline] upload failed with non-retryable error: %@", "\(error)")
+                        slog("[SyncPipeline] upload failed with non-retryable error: %@", "\(error)")
                         syncDiagnosticsLog("SyncPipeline", "upload failed with non-retryable error: \(error)")
                         throw error
                     }
@@ -1816,17 +2695,48 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     let delaySeconds = Double(delay) / 1_000_000_000
                     let retryableError = classifyRetryableSyncError(
                         error,
-                        targetDeviceType: currentUploadTargetDeviceType()
+                        targetDeviceType: uploadTargetDeviceType(for: binding)
                     )
+                    let exhaustedMessage = "Desktop did not become reachable after \(retryAttempt) reconnect attempts: \(retryableError.message)"
 
                     clearResolvedSidecarHost()
-                    updateBindingConnectionState(.offline, reason: "retryable_upload_failure")
                     sessionService.transitionTo(.backoffWaiting)
                     setRuntimeReconnectError(
                         code: retryableError.code,
                         message: retryableError.message
                     )
-                    NSLog("[SyncPipeline] upload failed with retryable error: %@ — reconnecting in %.1fs (attempt %d)",
+                    if retryAttempt >= maxReconnectAttempts {
+                        updateBindingConnectionState(.offline, reason: "upload_reconnect_exhausted")
+                        clearRuntimeCurrentFile()
+                        runtimeCurrentSpeedMbps = 0
+                        setRuntimeReconnectError(
+                            code: "RECONNECT_EXHAUSTED",
+                            message: exhaustedMessage
+                        )
+                        slog(
+                            "[SyncPipeline] upload reconnect exhausted after %d attempts: %@",
+                            retryAttempt,
+                            "\(error)"
+                        )
+                        syncDiagnosticsLog(
+                            "SyncPipeline",
+                            "upload reconnect exhausted after \(retryAttempt) attempts: \(error)"
+                        )
+                        recordRecentRetry(error: error, attempt: retryAttempt, delaySeconds: 0)
+                        recordRecentError(code: "RECONNECT_EXHAUSTED", message: exhaustedMessage)
+                        NativeSyncEngineModule.shared?.emitSyncStateChanged(([
+                            "lastErrorCode": "RECONNECT_EXHAUSTED",
+                            "lastErrorMessage": exhaustedMessage,
+                            "retryAttempt": retryAttempt,
+                            "retryLimit": maxReconnectAttempts,
+                            "reconnectExhausted": true,
+                        ] as [String: Any]).merging(
+                            runtimeSyncOverviewPayload(uploadState: "offline")
+                        ) { _, new in new })
+                        throw SyncEngineError.reconnectExhausted(exhaustedMessage)
+                    }
+                    updateBindingConnectionState(.connecting, reason: "retryable_upload_failure")
+                    slog("[SyncPipeline] upload failed with retryable error: %@ — reconnecting in %.1fs (attempt %d)",
                           "\(error)", delaySeconds, retryAttempt)
                     syncDiagnosticsLog("SyncPipeline", "upload failed with retryable error: \(error) — reconnecting in \(String(format: "%.1f", delaySeconds))s (attempt \(retryAttempt))")
                     recordRecentRetry(error: error, attempt: retryAttempt, delaySeconds: delaySeconds)
@@ -1843,6 +2753,30 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     try await Task.sleep(nanoseconds: sleepDelay)
                     discoveryService.startBrowsing()
                 }
+            }
+
+            // Post-round grace: poll briefly for newly queued pending items
+            // before letting the outer loop transition to idle/completed.
+            // If a new batch arrives within the window, the next iteration's
+            // scan picks it up while `completedCount < totalCount` still
+            // holds (totalCount bumps up when new items are queued), which
+            // lets the RN-side `isBetweenItems` mask hide the preparation
+            // UI during the inter-batch handoff. TCP still reconnects —
+            // this only smooths the state transition, it does not change
+            // session lifecycle.
+            let postRoundGraceMs: UInt64 = 3_000
+            let pollIntervalMs: UInt64 = 200
+            var gracedMs: UInt64 = 0
+            while gracedMs < postRoundGraceMs {
+                if Task.isCancelled { break }
+                let nextPending = buildPendingUploadAssets(clientId: clientId, limit: 1)
+                if !nextPending.isEmpty {
+                    slog("[SyncPipeline] post-round grace: new pending found after %llu ms", gracedMs)
+                    syncDiagnosticsLog("SyncPipeline", "post-round grace: new pending found after \(gracedMs) ms")
+                    break
+                }
+                try? await Task.sleep(nanoseconds: pollIntervalMs * 1_000_000)
+                gracedMs += pollIntervalMs
             }
         }
     }
@@ -1864,20 +2798,38 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let newTransport = TcpTransport()
         let session = ProtocolSession(transport: newTransport)
         protocolSession = session
-        updateBindingConnectionState(.connecting, reason: "connect_and_upload_started")
-        sessionService.transitionTo(.preparing)
+        activeUploadSession = session
+        let wasConnectedBeforeUpload = bindingConnectionState == .connected
+        let trimmedBindingHost = binding.host.trimmingCharacters(in: .whitespacesAndNewlines)
+        let roundTargetDeviceType = uploadTargetDeviceType(for: binding)
+        let hasForcedSidecarTarget = resolvedForcedSidecarTarget() != nil
+        let canUseKnownConnectedHost =
+            wasConnectedBeforeUpload &&
+            !trimmedBindingHost.isEmpty &&
+            !hasForcedSidecarTarget
+        if !recoveryMode {
+            updateBindingConnectionState(.connecting, reason: "connect_and_upload_started")
+            sessionService.transitionTo(.preparing)
+        }
         beginRuntimeSyncOverview(
             totalCount: totalCount,
             totalBytes: totalBytes,
             completedCount: completedCount,
-            completedBytes: completedBytes
+            completedBytes: completedBytes,
+            source: assets.first?.source
         )
-        NativeSyncEngineModule.shared?.emitSyncStateChanged(
-            runtimeSyncOverviewPayload(uploadState: "preparing", progressPercent: 0)
-        )
+        if !recoveryMode {
+            NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                runtimeSyncOverviewPayload(uploadState: "preparing", progressPercent: 0)
+            )
+        }
         var activeSessionId: String?
         var uploadRoundCompleted = false
         var uploadRoundPausedForLowDisk = false
+        var uploadRoundStorageUnavailable = false
+        var uploadRoundInterruptedByUser = false
+        var uploadRoundCancelledByUser = false
+        var uploadRoundStoppedForBindingChange = false
 
         defer {
             if let activeSessionId, sessionService.currentSessionId == activeSessionId {
@@ -1886,20 +2838,40 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             if protocolSession === session {
                 protocolSession = nil
             }
+            if activeUploadSession === session {
+                activeUploadSession = nil
+            }
             session.disconnect()
-            if !uploadRoundCompleted {
-                if uploadRoundPausedForLowDisk {
-                    if uploadStore?.getBinding() != nil {
-                        updateBindingConnectionState(.connected, reason: "upload_round_paused_low_disk")
-                    }
-                } else {
-                    clearResolvedSidecarHost()
-                    if uploadStore?.getBinding() != nil {
-                        updateBindingConnectionState(.offline, reason: "upload_round_incomplete")
+            if uploadRoundInterruptedByUser {
+                // User interrupted auto upload — close the TCP session so the
+                // sidecar clears its live "syncing" state, but keep the mobile
+                // binding state connected. The caller restores desktop presence
+                // immediately via a heartbeat.
+                maintainConnectedBindingState(reason: "upload_round_interrupted")
+            } else if uploadRoundCancelledByUser {
+                maintainConnectedBindingState(reason: "upload_round_manual_cancelled")
+            } else if uploadRoundStoppedForBindingChange {
+                syncDiagnosticsLog("SyncEngine", "upload round stopped after binding changed")
+            } else {
+                if !uploadRoundCompleted {
+                    if uploadRoundPausedForLowDisk {
+                        if uploadStore?.getBinding() != nil {
+                            updateBindingConnectionState(.connected, reason: "upload_round_paused_low_disk")
+                        }
+                    } else if uploadRoundStorageUnavailable {
+                        maintainConnectedBindingState(reason: "upload_round_storage_unavailable")
+                    } else {
+                        clearResolvedSidecarHost()
+                        syncDiagnosticsLog(
+                            "SyncEngine",
+                            "upload round ended incomplete; caller will classify retry/offline state"
+                        )
                     }
                 }
             }
         }
+
+        try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
 
         // Find target device — only match by the binding's deviceId; do NOT fall back to
         // an arbitrary mDNS device so we never upload to the wrong machine.
@@ -1908,7 +2880,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
 
         var targetDevice = findDevice()
-        if targetDevice == nil {
+        if targetDevice == nil && canUseKnownConnectedHost {
+            discoveryService.startBrowsing()
+            syncDiagnosticsLog(
+                "SyncPipeline",
+                "using connected binding host without blocking discovery host=\(trimmedBindingHost)"
+            )
+        } else if targetDevice == nil && !hasForcedSidecarTarget {
             discoveryService.startBrowsing()
             for _ in 0..<20 {
                 try await Task.sleep(nanoseconds: 500_000_000)
@@ -1925,9 +2903,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             fallbackHost: binding.host,
             fallbackPort: UInt16(binding.port)
         )
+        try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
         sidecarHost = preferredSidecarHost(probedHost: newTransport.remoteHost, device: targetDevice)
-        sharedFilesService.sidecarHost = sidecarHost
-        NSLog("[SyncPipeline] TCP connected to %@", sidecarHost ?? "unknown")
+            ?? (trimmedBindingHost.isEmpty ? nil : trimmedBindingHost)
+        slog("[SyncPipeline] TCP connected to %@", sidecarHost ?? "unknown")
         syncDiagnosticsLog("SyncPipeline", "TCP connected to \(sidecarHost ?? "unknown")")
 
         let (helloType, helloRes) = try await session.sendAndReceive(
@@ -1937,6 +2916,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         guard helloType == .helloRes else {
             throw SyncEngineError.networkError("Expected HELLO_RES")
         }
+        try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
+        refreshBoundServerMetadata(
+            expectedDeviceId: binding.deviceId,
+            serverName: helloRes["serverName"] as? String,
+            shareName: helloRes["serverCapabilities"]
+                .flatMap { ($0 as? [String: Any])?["shareName"] as? String },
+            host: sidecarHost
+        )
         if let nonce = helloRes["nonce"] as? String {
             let hmac = newTransport.computeHMAC(token: token, nonce: nonce)
             let (authType, _) = try await session.sendAndReceive(type: .authReq, payload: [
@@ -1946,9 +2933,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             if authType == .error {
                 throw SyncEngineError.pairingError("HMAC auth failed")
             }
-            NSLog("[SyncPipeline] auth successful")
+            slog("[SyncPipeline] auth successful")
             syncDiagnosticsLog("SyncPipeline", "auth successful")
         }
+        try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
         updateBindingConnectionState(.connected, reason: "auth_success")
 
         // SYNC_BEGIN
@@ -1967,15 +2955,16 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         guard syncOk else {
             throw SyncEngineError.networkError("SYNC_BEGIN rejected")
         }
+        try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
 
-        NSLog("[SyncPipeline] uploading %d files", assets.count)
+        slog("[SyncPipeline] uploading %d files", assets.count)
         syncDiagnosticsLog("SyncPipeline", "uploading \(assets.count) files")
 
-        var tuning = resolvedUploadTuning()
-        NSLog(
+        var tuning = resolvedUploadTuning(targetDeviceType: roundTargetDeviceType)
+        slog(
             "[SyncPipeline] upload tuning profile=%@ target=%@ chunkMiB=%.1f windowMiB=%.1f pipeline=%d prefetch=%@ throttleMiBps=%.1f",
             tuning.profileLabel,
-            currentUploadTargetDeviceType() ?? "unknown",
+            roundTargetDeviceType ?? "unknown",
             Double(tuning.chunkSizeBytes) / (1024 * 1024),
             Double(tuning.targetInFlightBytes) / (1024 * 1024),
             tuning.maxPipelineChunks,
@@ -1984,7 +2973,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         )
         syncDiagnosticsLog(
             "SyncPipeline",
-            "upload tuning profile=\(tuning.profileLabel) target=\(currentUploadTargetDeviceType() ?? "unknown") chunkMiB=\(String(format: "%.1f", Double(tuning.chunkSizeBytes) / (1024 * 1024))) windowMiB=\(String(format: "%.1f", Double(tuning.targetInFlightBytes) / (1024 * 1024))) pipeline=\(tuning.maxPipelineChunks) prefetch=\(tuning.prefetchNextFile ? "on" : "off") throttleMiBps=\(String(format: "%.1f", Double(tuning.throttleBytesPerSec) / (1024 * 1024)))"
+            "upload tuning profile=\(tuning.profileLabel) target=\(roundTargetDeviceType ?? "unknown") chunkMiB=\(String(format: "%.1f", Double(tuning.chunkSizeBytes) / (1024 * 1024))) windowMiB=\(String(format: "%.1f", Double(tuning.targetInFlightBytes) / (1024 * 1024))) pipeline=\(tuning.maxPipelineChunks) prefetch=\(tuning.prefetchNextFile ? "on" : "off") throttleMiBps=\(String(format: "%.1f", Double(tuning.throttleBytesPerSec) / (1024 * 1024)))"
         )
 
         // Exporting the next asset while the current one is uploading improves peak
@@ -1998,21 +2987,41 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         /// eventually finishes (handled by the task body itself).
         var prefetchInvalidated = false
 
+        func cancelPrefetchAndCleanup() async {
+            prefetchTask?.cancel()
+            await prefetchTask?.value
+            prefetchTask = nil
+            if let leakedExport = nextExport {
+                exportService.cleanup(tempURL: leakedExport.tempURL)
+                nextExport = nil
+            }
+        }
+
         if tuning.prefetchNextFile, !assets.isEmpty {
             nextExport = try? await exportAssetForUpload(assets[0])
         }
 
         for (index, asset) in assets.enumerated() {
-            // Between files: skip auto items when paused, skip cancelled batch items
+            try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
+
+            if isManualUploadCancelled(fileKey: asset.fileKey, source: asset.source) {
+                uploadRoundCancelledByUser = true
+                slog("[SyncPipeline] stopping manual upload after cancellation before file %@", asset.fileKey)
+                syncDiagnosticsLog("SyncPipeline", "stopping manual upload after cancellation before file \(asset.fileKey)")
+                await cancelPrefetchAndCleanup()
+                throw SyncEngineError.manualUploadCancelled
+            }
+
+            // Between files: skip auto items when interrupted, skip cancelled batch items
             if index > 0 {
-                if isAutoUploadPaused && asset.source == "auto" {
-                    NSLog("[SyncPipeline] skipping auto item %@ — auto upload paused", asset.fileKey)
+                if isAutoUploadInterrupted && asset.source == "auto" {
+                    slog("[SyncPipeline] skipping auto item %@ — auto upload interrupted", asset.fileKey)
                     continue
                 }
-                // Check if this item was cancelled in DB (e.g. manual batch cancel)
+                // Check if this item was cancelled in DB (e.g. manual queue cancel)
                 if let item = uploadStore?.getUploadItemByFileKey(asset.fileKey),
                    item.status == "cancelled" {
-                    NSLog("[SyncPipeline] skipping cancelled item %@", asset.fileKey)
+                    slog("[SyncPipeline] skipping cancelled item %@", asset.fileKey)
                     continue
                 }
                 emitPreparingStateForNextFile(nextAsset: asset)
@@ -2024,13 +3033,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             // multi-GB export to finish. The background task will clean up its own
             // temp file when it completes.
             let previousProfile = tuning.profileLabel
-            tuning = resolvedUploadTuning()
+            tuning = resolvedUploadTuning(targetDeviceType: roundTargetDeviceType)
             if previousProfile != tuning.profileLabel {
-                NSLog("[SyncPipeline] tuning changed mid-batch: %@ -> %@", previousProfile, tuning.profileLabel)
+                slog("[SyncPipeline] tuning changed mid-batch: %@ -> %@", previousProfile, tuning.profileLabel)
             }
 
             if !tuning.prefetchNextFile, prefetchTask != nil {
-                NSLog("[SyncPipeline] invalidating prefetch — tuning now %@", tuning.profileLabel)
+                slog("[SyncPipeline] invalidating prefetch — tuning now %@", tuning.profileLabel)
                 prefetchTask?.cancel()
                 // Do NOT await — PHAssetResourceManager.writeData is not cancellable
                 // and blocking here defeats the purpose of thermal-aware cancellation.
@@ -2074,7 +3083,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             // but before TCP upload begins, skip it and clean up the temp file.
             if let item = uploadStore?.getUploadItemByFileKey(asset.fileKey),
                item.status == "cancelled" {
-                NSLog("[SyncPipeline] skipping cancelled item %@ before TCP upload", asset.fileKey)
+                slog("[SyncPipeline] skipping cancelled item %@ before TCP upload", asset.fileKey)
                 exportService.cleanup(tempURL: exported.tempURL)
                 continue
             }
@@ -2090,6 +3099,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     index: completedCount + index,
                     total: totalCount,
                     session: session,
+                    expectedDeviceId: binding.deviceId,
+                    targetDeviceType: roundTargetDeviceType,
                     recoveryMode: recoveryMode
                 )
 
@@ -2100,11 +3111,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 if nextIndex < assets.count {
                     if let queueHead = uploadStore?.getPendingUploadItemsSorted(
                         limit: 1,
-                        excludeSource: isAutoUploadPaused ? "auto" : nil
+                        excludeSource: isAutoUploadInterrupted ? "auto" : nil
                     ).first {
                         let nextBatchFileKey = assets[nextIndex].fileKey
                         if queueHead.fileKey != nil && queueHead.fileKey != nextBatchFileKey {
-                            NSLog("[SyncPipeline] queue head changed (priority preemption) — breaking batch")
+                            slog("[SyncPipeline] queue head changed (priority preemption) — breaking batch")
                             // Cancel prefetch for the now-stale next item
                             prefetchTask?.cancel()
                             await prefetchTask?.value
@@ -2118,10 +3129,55 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 }
             } catch {
                 if let syncError = error as? SyncEngineError,
+                   case .bindingChanged = syncError
+                {
+                    uploadRoundStoppedForBindingChange = true
+                    slog("[SyncEngine] stopping upload round because binding changed")
+                    syncDiagnosticsLog("SyncEngine", "stopping upload round because binding changed")
+                    try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "queued")
+                    clearRuntimeCurrentFile()
+                    runtimeCurrentSpeedMbps = 0
+                    emitQueueToJS()
+                    prefetchTask?.cancel()
+                    await prefetchTask?.value
+                    if let leakedExport = nextExport {
+                        exportService.cleanup(tempURL: leakedExport.tempURL)
+                        nextExport = nil
+                    }
+                    throw syncError
+                }
+                if let syncError = error as? SyncEngineError,
+                   case .manualUploadCancelled = syncError
+                {
+                    uploadRoundCancelledByUser = true
+                    slog("[SyncEngine] manual upload cancelled during file %@", asset.fileKey)
+                    syncDiagnosticsLog("SyncEngine", "manual upload cancelled during file \(asset.fileKey)")
+                    try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "cancelled")
+                    clearRuntimeCurrentFile()
+                    runtimeCurrentSpeedMbps = 0
+                    emitQueueToJS()
+                    await cancelPrefetchAndCleanup()
+                    throw syncError
+                }
+                if let syncError = error as? SyncEngineError,
+                   case .autoUploadInterrupted = syncError
+                {
+                    uploadRoundInterruptedByUser = true
+                    slog("[SyncEngine] auto upload interrupted during file %@", asset.fileKey)
+                    syncDiagnosticsLog("SyncEngine", "auto upload interrupted during file \(asset.fileKey)")
+                    prefetchTask?.cancel()
+                    await prefetchTask?.value
+                    if let leakedExport = nextExport {
+                        exportService.cleanup(tempURL: leakedExport.tempURL)
+                        nextExport = nil
+                    }
+                    throw syncError
+                }
+                if let syncError = error as? SyncEngineError,
                    case .lowDiskPaused(let message) = syncError
                 {
                     uploadRoundPausedForLowDisk = true
-                    NSLog("[SyncEngine] low disk paused upload for %@: %@", asset.fileKey, message)
+                    slog("[SyncEngine] low disk paused upload for %@: %@", asset.fileKey, message)
                     syncDiagnosticsLog("SyncEngine", "low disk paused upload for \(asset.fileKey): \(message)")
                     recordRecentError(code: "LOW_DISK_PAUSED", message: message)
                     try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "queued")
@@ -2134,8 +3190,25 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     }
                     throw syncError
                 }
+                if let syncError = error as? SyncEngineError,
+                   case .storageUnavailable(let message, let sourceLabel) = syncError
+                {
+                    uploadRoundStorageUnavailable = true
+                    slog("[SyncEngine] storage unavailable for %@ source=%@: %@", asset.fileKey, sourceLabel, message)
+                    syncDiagnosticsLog("SyncEngine", "storage unavailable for \(asset.fileKey) source=\(sourceLabel): \(message)")
+                    recordRecentError(code: "STORAGE_UNAVAILABLE", message: message)
+                    try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "queued")
+                    emitQueueToJS()
+                    prefetchTask?.cancel()
+                    await prefetchTask?.value
+                    if let leakedExport = nextExport {
+                        exportService.cleanup(tempURL: leakedExport.tempURL)
+                        nextExport = nil
+                    }
+                    throw syncError
+                }
                 if isRetryableSyncError(error) {
-                    NSLog("[SyncEngine] retryable upload failure for %@: %@", asset.fileKey, "\(error)")
+                    slog("[SyncEngine] retryable upload failure for %@: %@", asset.fileKey, "\(error)")
                     syncDiagnosticsLog("SyncEngine", "retryable upload failure for \(asset.fileKey): \(error)")
                     try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "queued")
                     emitQueueToJS()
@@ -2149,7 +3222,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     throw error
                 }
 
-                NSLog("[SyncEngine] non-retryable upload failure for %@: %@", asset.fileKey, "\(error)")
+                slog("[SyncEngine] non-retryable upload failure for %@: %@", asset.fileKey, "\(error)")
                 syncDiagnosticsLog("SyncEngine", "non-retryable upload failure for \(asset.fileKey): \(error)")
                 recordRecentError(code: "UPLOAD_FILE_FAILED", message: "\(asset.fileKey): \(error)")
                 try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "failed")
@@ -2166,7 +3239,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         // SYNC_END — then TCP will be closed as this function returns
         let (_, _) = try await session.sendAndReceive(type: .syncEndReq, payload: [:])
         uploadRoundCompleted = true
-        NSLog("[SyncPipeline] upload round complete, disconnecting TCP")
+        slog("[SyncPipeline] upload round complete, disconnecting TCP")
         syncDiagnosticsLog("SyncPipeline", "upload round complete, disconnecting TCP")
     }
 
@@ -2179,10 +3252,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         index: Int,
         total: Int,
         session: ProtocolSession,
+        expectedDeviceId: String,
+        targetDeviceType: String?,
         recoveryMode: Bool
     ) async throws {
-        let tuning = resolvedUploadTuning()
+        let tuning = resolvedUploadTuning(targetDeviceType: targetDeviceType)
         let fileTransferStart = CFAbsoluteTimeGetCurrent()
+        try throwIfBindingChanged(expectedDeviceId: expectedDeviceId)
+        try throwIfManualUploadCancelled(fileKey: asset.fileKey, source: asset.source)
         try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "uploading")
         // Update filename + size now that we know them from export
         if var item = uploadStore?.getUploadItemByFileKey(asset.fileKey) {
@@ -2201,173 +3278,269 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             runtimeSyncOverviewPayload(uploadState: "uploading", progressPercent: 0)
         )
 
-        // FILE_INIT_REQ → FILE_INIT_RES
-        let (initType, initRes) = try await session.sendAndReceive(type: .fileInitReq, payload: [
-            "sessionId": sessionId,
-            "fileKey": asset.fileKey,
-            "originalFilename": exported.originalFilename,
-            "mediaType": exported.mediaType,
-            "mimeType": exported.mimeType,
-            "fileSize": exported.fileSize,
-            "createdAt": exported.createdAt,
-            "modifiedAt": exported.modifiedAt,
-            "queueIndex": index,
-            "queueTotalCount": total,
-        ])
+        do {
+            try throwIfBindingChanged(expectedDeviceId: expectedDeviceId)
+            try throwIfManualUploadCancelled(fileKey: asset.fileKey, source: asset.source)
 
-        guard initType == .fileInitRes else {
-            throw SyncEngineError.networkError("Expected FILE_INIT_RES, got \(initType)")
-        }
-
-        let action = initRes["action"] as? String ?? "REJECT"
-
-        switch action {
-        case "SKIP":
-            if tuning.perfLoggingEnabled {
-                perfLog("file=\(asset.fileKey) action=SKIP size=\(exported.fileSize)")
+            if asset.source == "auto" && shouldAbortActiveAutoUpload {
+                shouldAbortActiveAutoUpload = false
+                try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "cancelled")
+                clearRuntimeCurrentFile()
+                runtimeCurrentSpeedMbps = 0
+                emitQueueToJS()
+                throw SyncEngineError.autoUploadInterrupted
             }
-            NSLog("[SyncEngine] SKIP \(exported.originalFilename) (already exists)")
-            try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "completed")
-            runtimeQueueCompletedCount = max(runtimeQueueCompletedCount, index + 1)
-            runtimeQueueCompletedBytes += exported.fileSize
-            runtimeCurrentFileConfirmedBytes = exported.fileSize
-            runtimeCurrentFileTotalBytes = exported.fileSize
-            runtimeCurrentSpeedMbps = 0
-            emitQueueToJS()
-            NativeSyncEngineModule.shared?.emitSyncStateChanged(
-                runtimeSyncOverviewPayload(uploadState: "uploading", progressPercent: 100)
-            )
-            return
-        case "REJECT":
-            let reason = initRes["reason"] as? String ?? "unknown"
-            if tuning.perfLoggingEnabled {
-                perfLog("file=\(asset.fileKey) action=REJECT reason=\(reason) size=\(exported.fileSize)")
+
+            // FILE_INIT_REQ → FILE_INIT_RES
+            let (initType, initRes) = try await session.sendAndReceive(type: .fileInitReq, payload: [
+                "sessionId": sessionId,
+                "fileKey": asset.fileKey,
+                "originalFilename": exported.originalFilename,
+                "mediaType": exported.mediaType,
+                "mimeType": exported.mimeType,
+                "fileSize": exported.fileSize,
+                "createdAt": exported.createdAt,
+                "modifiedAt": exported.modifiedAt,
+                "queueIndex": index,
+                "queueTotalCount": total,
+            ])
+
+            guard initType == .fileInitRes else {
+                throw SyncEngineError.networkError("Expected FILE_INIT_RES, got \(initType)")
             }
-            NSLog("[SyncEngine] REJECT \(exported.originalFilename): \(reason)")
-            if reason == "LOW_DISK_PAUSED" {
-                try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "queued")
+            try throwIfBindingChanged(expectedDeviceId: expectedDeviceId)
+            try throwIfManualUploadCancelled(fileKey: asset.fileKey, source: asset.source)
+
+            let action = initRes["action"] as? String ?? "REJECT"
+
+            switch action {
+            case "SKIP":
+                if tuning.perfLoggingEnabled {
+                    perfLog("file=\(asset.fileKey) action=SKIP size=\(exported.fileSize)")
+                }
+                try throwIfBindingChanged(expectedDeviceId: expectedDeviceId)
+                slog("[SyncEngine] SKIP \(exported.originalFilename) (already exists)")
+                try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "completed")
+                runtimeLastCompletedTaskSource = asset.source
+                runtimeQueueCompletedCount = max(runtimeQueueCompletedCount, index + 1)
+                runtimeQueueCompletedBytes += exported.fileSize
+                runtimeCurrentFileConfirmedBytes = exported.fileSize
+                runtimeCurrentFileTotalBytes = exported.fileSize
+                runtimeCurrentSpeedMbps = 0
+                emitQueueToJS()
+                let payload = runtimeSyncOverviewPayload(uploadState: "uploading", progressPercent: 100)
+                if asset.source == "manual" || index + 1 >= total {
+                    logSyncOverviewEmission(
+                        "file_skipped_completed source=\(asset.source) index=\(index + 1)/\(total)",
+                        payload: payload
+                    )
+                }
+                NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                    payload
+                )
+                return
+            case "REJECT":
+                let reason = initRes["reason"] as? String ?? "unknown"
+                if tuning.perfLoggingEnabled {
+                    perfLog("file=\(asset.fileKey) action=REJECT reason=\(reason) size=\(exported.fileSize)")
+                }
+                slog("[SyncEngine] REJECT \(exported.originalFilename): \(reason)")
+                if reason == "LOW_DISK_PAUSED" {
+                    try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "queued")
+                    clearRuntimeCurrentFile()
+                    emitQueueToJS()
+                    throw SyncEngineError.lowDiskPaused(reason)
+                }
+                if reason == "STORAGE_UNAVAILABLE" {
+                    try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "queued")
+                    clearRuntimeCurrentFile()
+                    emitQueueToJS()
+                    throw SyncEngineError.storageUnavailable(reason, source: asset.source)
+                }
+                try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "skipped")
                 clearRuntimeCurrentFile()
                 emitQueueToJS()
-                throw SyncEngineError.lowDiskPaused(reason)
-            }
-            try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "skipped")
-            clearRuntimeCurrentFile()
-            emitQueueToJS()
-            return
-        case "RESUME":
-            let offset = initRes["resumeOffset"] as? Int64 ?? 0
-            if tuning.perfLoggingEnabled {
-                perfLog("file=\(asset.fileKey) action=RESUME resumeOffset=\(offset) size=\(exported.fileSize)")
-            }
-            NSLog("[SyncEngine] RESUME \(exported.originalFilename) from offset \(offset)")
-            try await streamFileData(
-                fileURL: exported.tempURL, fileKey: asset.fileKey,
-                startOffset: offset, fileSize: exported.fileSize,
-                recoveryMode: true
-            )
-        case "UPLOAD":
-            if tuning.perfLoggingEnabled {
-                perfLog("file=\(asset.fileKey) action=UPLOAD size=\(exported.fileSize)")
-            }
-            NSLog("[SyncEngine] UPLOAD \(exported.originalFilename) (\(exported.fileSize) bytes)")
-            try await streamFileData(
-                fileURL: exported.tempURL, fileKey: asset.fileKey,
-                startOffset: 0, fileSize: exported.fileSize,
-                recoveryMode: recoveryMode
-            )
-        default:
-            throw SyncEngineError.networkError("Unknown FILE_INIT action: \(action)")
-        }
-
-        // FILE_END_REQ → FILE_END_RES
-        let sha256 = "" // Skip SHA256 for speed; server validates file size instead
-
-        var (endType, endRes) = try await session.sendAndReceive(type: .fileEndReq, payload: [
-            "fileKey": asset.fileKey,
-            "fileSize": exported.fileSize,
-            "sha256": sha256,
-        ])
-
-        // FILE_ACK can still arrive in-flight because FILE_DATA uses a small pipeline.
-        // Keep draining until we get FILE_END_RES / ERROR.
-        if endType != .fileEndRes && endType != .error {
-            for _ in 0..<8 {
-                let (nextType, nextRes) = try await session.waitForNextMessage()
-                endType = nextType
-                endRes = nextRes
-                if endType == .fileEndRes || endType == .error {
-                    break
+                return
+            case "RESUME":
+                let offset = initRes["resumeOffset"] as? Int64 ?? 0
+                if tuning.perfLoggingEnabled {
+                    perfLog("file=\(asset.fileKey) action=RESUME resumeOffset=\(offset) size=\(exported.fileSize)")
                 }
-            }
-        }
-
-        // Check ok field — NSNumber from JSON might need special handling
-        let isOk: Bool
-        if let okBool = endRes["ok"] as? Bool { isOk = okBool }
-        else if let okNum = endRes["ok"] as? NSNumber { isOk = okNum.boolValue }
-        else if let okInt = endRes["ok"] as? Int { isOk = okInt != 0 }
-        else { isOk = (endType == .fileEndRes) }
-
-        // Always mark as completed + update history if we got a response
-        try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: isOk ? "completed" : "failed")
-        emitQueueToJS()
-
-        if isOk {
-            runtimeQueueCompletedCount = max(runtimeQueueCompletedCount, index + 1)
-            runtimeQueueCompletedBytes += exported.fileSize
-            runtimeCurrentFileConfirmedBytes = exported.fileSize
-            runtimeCurrentFileTotalBytes = exported.fileSize
-            updateRuntimeSpeed()
-            emitQueueToJS()
-            NativeSyncEngineModule.shared?.emitSyncStateChanged(
-                runtimeSyncOverviewPayload(uploadState: "uploading", progressPercent: 100)
-            )
-
-            let transmissionMs = endRes["activeTransmissionMs"] as? Int64
-                ?? (endRes["activeTransmissionMs"] as? NSNumber)?.int64Value
-                ?? 100
-            let binding = uploadStore?.getBinding()
-            if let binding = binding {
-                let dateStr = (endRes["ledgerDate"] as? String) ?? localDateKey()
-                let ip = binding.host.isEmpty ? (binding.deviceAlias ?? binding.deviceName) : binding.host
-                do {
-                    try historyStore?.upsertDailyLedger(
-                        date: dateStr,
-                        deviceId: binding.deviceId,
-                        deviceName: binding.deviceName,
-                        deviceIp: ip,
-                        fileCount: 1,
-                        totalBytes: exported.fileSize,
-                        transmissionMs: max(transmissionMs, 100)
-                    )
-                } catch {
-                    NSLog("[SyncUpload] [%d/%d] ledger update FAILED: %@", index + 1, total, error.localizedDescription)
-                }
-                NativeSyncEngineModule.shared?.emitHistoryUpdated()
-            }
-            if tuning.perfLoggingEnabled {
-                let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - fileTransferStart) * 1000)
-                perfLog(
-                    "file=\(asset.fileKey) action=COMPLETE size=\(exported.fileSize) endToEndMs=\(elapsedMs) sidecarActiveMs=\(transmissionMs)"
+                slog("[SyncEngine] RESUME \(exported.originalFilename) from offset \(offset)")
+                try await streamFileData(
+                    session: session,
+                    fileURL: exported.tempURL,
+                    fileKey: asset.fileKey,
+                    source: asset.source,
+                    expectedDeviceId: expectedDeviceId,
+                    targetDeviceType: targetDeviceType,
+                    startOffset: offset,
+                    fileSize: exported.fileSize,
+                    recoveryMode: true
                 )
+            case "UPLOAD":
+                if tuning.perfLoggingEnabled {
+                    perfLog("file=\(asset.fileKey) action=UPLOAD size=\(exported.fileSize)")
+                }
+                slog("[SyncEngine] UPLOAD \(exported.originalFilename) (\(exported.fileSize) bytes)")
+                try await streamFileData(
+                    session: session,
+                    fileURL: exported.tempURL,
+                    fileKey: asset.fileKey,
+                    source: asset.source,
+                    expectedDeviceId: expectedDeviceId,
+                    targetDeviceType: targetDeviceType,
+                    startOffset: 0,
+                    fileSize: exported.fileSize,
+                    recoveryMode: recoveryMode
+                )
+            default:
+                throw SyncEngineError.networkError("Unknown FILE_INIT action: \(action)")
             }
-            NSLog("[SyncUpload] [%d/%d] completed %@", index + 1, total, exported.originalFilename)
-        } else {
-            runtimeCurrentSpeedMbps = 0
-            if tuning.perfLoggingEnabled {
-                let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - fileTransferStart) * 1000)
-                perfLog("file=\(asset.fileKey) action=FAILED size=\(exported.fileSize) endToEndMs=\(elapsedMs)")
+
+            try throwIfManualUploadCancelled(fileKey: asset.fileKey, source: asset.source)
+            try throwIfBindingChanged(expectedDeviceId: expectedDeviceId)
+
+            // FILE_END_REQ → FILE_END_RES
+            let sha256 = "" // Skip SHA256 for speed; server validates file size instead
+
+            var (endType, endRes) = try await session.sendAndReceive(type: .fileEndReq, payload: [
+                "fileKey": asset.fileKey,
+                "fileSize": exported.fileSize,
+                "sha256": sha256,
+            ])
+
+            // FILE_ACK can still arrive in-flight because FILE_DATA uses a small pipeline.
+            // Keep draining until we get FILE_END_RES / ERROR.
+            if endType != .fileEndRes && endType != .error {
+                for _ in 0..<8 {
+                    let (nextType, nextRes) = try await session.waitForNextMessage()
+                    endType = nextType
+                    endRes = nextRes
+                    if endType == .fileEndRes || endType == .error {
+                        break
+                    }
+                }
             }
-            NSLog("[SyncUpload] [%d/%d] FILE_END not ok for %@", index + 1, total, exported.originalFilename)
-            clearRuntimeCurrentFile()
+
+            // Check ok field — NSNumber from JSON might need special handling
+            let isOk: Bool
+            if let okBool = endRes["ok"] as? Bool { isOk = okBool }
+            else if let okNum = endRes["ok"] as? NSNumber { isOk = okNum.boolValue }
+            else if let okInt = endRes["ok"] as? Int { isOk = okInt != 0 }
+            else { isOk = (endType == .fileEndRes) }
+
+            guard let completedBinding = uploadStore?.getBinding(),
+                  completedBinding.deviceId == expectedDeviceId else {
+                throw SyncEngineError.bindingChanged
+            }
+
+            // Always mark as completed + update history if we got a response
+            try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: isOk ? "completed" : "failed")
+            emitQueueToJS()
+
+            if isOk {
+                runtimeLastCompletedTaskSource = asset.source
+                runtimeQueueCompletedCount = max(runtimeQueueCompletedCount, index + 1)
+                runtimeQueueCompletedBytes += exported.fileSize
+                runtimeCurrentFileConfirmedBytes = exported.fileSize
+                runtimeCurrentFileTotalBytes = exported.fileSize
+                updateRuntimeSpeed()
+                emitQueueToJS()
+                let payload = runtimeSyncOverviewPayload(uploadState: "uploading", progressPercent: 100)
+                if asset.source == "manual" || index + 1 >= total {
+                    logSyncOverviewEmission(
+                        "file_completed source=\(asset.source) index=\(index + 1)/\(total)",
+                        payload: payload
+                    )
+                }
+                NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                    payload
+                )
+
+                let transmissionMs = endRes["activeTransmissionMs"] as? Int64
+                    ?? (endRes["activeTransmissionMs"] as? NSNumber)?.int64Value
+                    ?? 100
+                let binding = completedBinding
+                if binding.deviceId == expectedDeviceId {
+                    let dateStr = (endRes["ledgerDate"] as? String) ?? localDateKey()
+                    let ip = binding.host.isEmpty ? (binding.deviceAlias ?? binding.deviceName) : binding.host
+                    do {
+                        try historyStore?.upsertDailyLedger(
+                            date: dateStr,
+                            deviceId: binding.deviceId,
+                            deviceName: binding.deviceName,
+                            deviceIp: ip,
+                            fileCount: 1,
+                            totalBytes: exported.fileSize,
+                            transmissionMs: max(transmissionMs, 100)
+                        )
+                    } catch {
+                        slog("[SyncUpload] [%d/%d] ledger update FAILED: %@", index + 1, total, error.localizedDescription)
+                    }
+                    NativeSyncEngineModule.shared?.emitHistoryUpdated()
+                }
+                if tuning.perfLoggingEnabled {
+                    let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - fileTransferStart) * 1000)
+                    perfLog(
+                        "file=\(asset.fileKey) action=COMPLETE size=\(exported.fileSize) endToEndMs=\(elapsedMs) sidecarActiveMs=\(transmissionMs)"
+                    )
+                }
+                slog("[SyncUpload] [%d/%d] completed %@", index + 1, total, exported.originalFilename)
+            } else {
+                runtimeCurrentSpeedMbps = 0
+                if tuning.perfLoggingEnabled {
+                    let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - fileTransferStart) * 1000)
+                    perfLog("file=\(asset.fileKey) action=FAILED size=\(exported.fileSize) endToEndMs=\(elapsedMs)")
+                }
+                let reason = endRes["reason"] as? String ?? ""
+                if reason == "STORAGE_UNAVAILABLE" {
+                    try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "queued")
+                    clearRuntimeCurrentFile()
+                    emitQueueToJS()
+                    throw SyncEngineError.storageUnavailable(reason, source: asset.source)
+                }
+                slog("[SyncUpload] [%d/%d] FILE_END not ok for %@", index + 1, total, exported.originalFilename)
+                clearRuntimeCurrentFile()
+            }
+        } catch {
+            if let syncError = error as? SyncEngineError,
+               case .bindingChanged = syncError {
+                try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "queued")
+                clearRuntimeCurrentFile()
+                runtimeCurrentSpeedMbps = 0
+                emitQueueToJS()
+                throw syncError
+            }
+            if asset.source == "manual" && isManualUploadCancelled(fileKey: asset.fileKey, source: asset.source) {
+                shouldAbortActiveManualUpload = false
+                try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "cancelled")
+                clearRuntimeCurrentFile()
+                runtimeCurrentSpeedMbps = 0
+                emitQueueToJS()
+                throw SyncEngineError.manualUploadCancelled
+            }
+            if asset.source == "auto" && shouldAbortActiveAutoUpload {
+                shouldAbortActiveAutoUpload = false
+                try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "cancelled")
+                clearRuntimeCurrentFile()
+                runtimeCurrentSpeedMbps = 0
+                emitQueueToJS()
+                throw SyncEngineError.autoUploadInterrupted
+            }
+            throw error
         }
     }
 
     // MARK: - Stream FILE_DATA Chunks (spec Section 7.4, 7.7: 8 MiB chunks)
 
     private func streamFileData(
+        session: ProtocolSession,
         fileURL: URL,
         fileKey: String,
+        source: String,
+        expectedDeviceId: String,
+        targetDeviceType: String?,
         startOffset: Int64,
         fileSize: Int64,
         recoveryMode: Bool
@@ -2378,7 +3551,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             let sendStartedAt: CFTimeInterval
         }
 
-        let tuning = resolvedUploadTuning()
+        let tuning = resolvedUploadTuning(targetDeviceType: targetDeviceType)
         let ackTimeoutNs = tuning.ackTimeoutNs
         var uploadThrottleBytesPerSec = tuning.throttleBytesPerSec
         let ackTimeoutSafetyMarginNs: UInt64 = 2_000_000_000
@@ -2470,10 +3643,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         var streamOutcome = "STREAM_DONE"
         var streamFailure = ""
 
-        guard let session = protocolSession else {
-            throw SyncEngineError.networkError("No active protocol session")
-        }
-
         func oldestInFlightAgeMs(now: CFTimeInterval) -> Int {
             guard let first = inFlight.first else { return 0 }
             return Int(max(now - first.sendStartedAt, 0) * 1000)
@@ -2532,6 +3701,20 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             emitStreamSummary()
         }
 
+        func throwIfActiveUploadWasInterrupted() throws {
+            try throwIfBindingChanged(expectedDeviceId: expectedDeviceId)
+            if source == "manual" && isManualUploadCancelled(fileKey: fileKey, source: source) {
+                streamOutcome = "STREAM_INTERRUPTED"
+                streamFailure = "manual upload cancelled by user"
+                throw SyncEngineError.manualUploadCancelled
+            }
+            if source == "auto" && shouldAbortActiveAutoUpload {
+                streamOutcome = "STREAM_INTERRUPTED"
+                streamFailure = "auto upload interrupted by user"
+                throw SyncEngineError.autoUploadInterrupted
+            }
+        }
+
         if tuning.perfLoggingEnabled {
             perfLog(
                 "file=\(fileKey) action=STREAM_START chunkMiB=\(String(format: "%.1f", Double(chunkSize) / (1024 * 1024))) windowMiB=\(String(format: "%.1f", Double(steadyStateMaxInFlightBytes) / (1024 * 1024))) pipelineChunks=\(steadyStatePipelineWindowChunks) ackTimeoutNs=\(ackTimeoutNs) recoveryMode=\(conservativeStart) recoveryWindowMiB=\(String(format: "%.1f", Double(recoveryMaxInFlightBytes) / (1024 * 1024))) recoveryAckTimeoutNs=\(recoveryAckTimeoutNs)"
@@ -2539,6 +3722,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
 
         while acknowledgedOffset < fileSize {
+            try throwIfActiveUploadWasInterrupted()
             let activeMaxInFlightBytes = conservativeStart && ackCount == 0
                 ? recoveryMaxInFlightBytes
                 : steadyStateMaxInFlightBytes
@@ -2549,6 +3733,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             var windowFillChunks = 0
             let windowFillStartOffset = nextOffset
             while nextOffset < fileSize && inFlightBytes < activeMaxInFlightBytes {
+                try throwIfActiveUploadWasInterrupted()
                 let remaining = fileSize - nextOffset
                 let readSize = Int(min(Int64(chunkSize), remaining))
                 let readStart = CFAbsoluteTimeGetCurrent()
@@ -2609,7 +3794,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                             pauseElapsed += 5
                         }
                         let resumedThermalState = ProcessInfo.processInfo.thermalState
-                        let resumedProfile = resolvedUploadTuning().profileLabel
+                        let resumedProfile = resolvedUploadTuning(targetDeviceType: targetDeviceType).profileLabel
                         applyRuntimeThermalState(
                             profileLabel: resumedProfile,
                             thermalState: resumedThermalState
@@ -2630,7 +3815,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                         }
                     } else if runtimeIsThermalLimited {
                         applyRuntimeThermalState(
-                            profileLabel: resolvedUploadTuning().profileLabel,
+                            profileLabel: resolvedUploadTuning(targetDeviceType: targetDeviceType).profileLabel,
                             thermalState: currentThermal
                         )
                     }
@@ -2674,6 +3859,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 break
             }
 
+            try throwIfActiveUploadWasInterrupted()
             // Drain one ACK per loop and advance cumulative progress.
             let ackWaitStart = CFAbsoluteTimeGetCurrent()
             let ackType: LMUPMessageType
@@ -2742,6 +3928,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 if errCode == "LOW_DISK_PAUSED" {
                     throw SyncEngineError.lowDiskPaused(errMsg)
                 }
+                if errCode == "STORAGE_UNAVAILABLE" {
+                    throw SyncEngineError.storageUnavailable(errMsg, source: source)
+                }
                 throw SyncEngineError.networkError("FILE_DATA error: \(errMsg)")
             }
             // For other unexpected types, just continue
@@ -2787,10 +3976,29 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         NativeSyncEngineModule.shared?.emitQueueUpdated(bridgeQueueItems(pending))
     }
 
+    private func discoveredDevicesSignature(_ devices: [DiscoveredDevice]) -> String {
+        devices
+            .map {
+                [
+                    $0.deviceId,
+                    $0.name,
+                    $0.ip,
+                    $0.type,
+                    String($0.port),
+                    String($0.protoVersion),
+                    $0.authMode,
+                    $0.shareEnabled ? "1" : "0",
+                    $0.shareName ?? "",
+                ].joined(separator: "\u{1F}")
+            }
+            .sorted()
+            .joined(separator: "\u{1E}")
+    }
+
     // MARK: - PhotoScannerDelegate
 
     func photoLibraryDidChange() {
-        NSLog("[SyncEngine] photo library changed — flagging rescan")
+        slog("[SyncEngine] photo library changed — flagging rescan")
         photoLibraryChanged = true
         if isAppBackgrounded() {
             lastBackgroundPhotoLibraryChangeAt = CFAbsoluteTimeGetCurrent()
@@ -2802,12 +4010,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         scheduleIncrementalQueueRescan(reason: "photo_library_changed")
         // Wake up the watch loop if it's sleeping
         resumeWatchLoopIfNeeded()
+        // Notify RN so album browser can refresh (e.g. after limited picker)
+        NativeSyncEngineModule.shared?.emitPhotoLibraryChanged()
     }
 
     // MARK: - DiscoveryServiceDelegate
 
     func discoveryDidUpdate(devices: [DiscoveredDevice]) {
-        NSLog("[SyncEngine] discoveryDidUpdate called with \(devices.count) devices")
+        slog("[SyncEngine] discoveryDidUpdate called with \(devices.count) devices")
         syncDiagnosticsLog("SyncEngine", "discoveryDidUpdate called with \(devices.count) devices")
         let deviceSummary = devices.map {
             "\($0.name)/\($0.ip.isEmpty ? "no-ip" : $0.ip)/\($0.deviceId)/\($0.type)/port:\($0.port)"
@@ -2830,30 +4040,108 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 "shareName": device.shareName ?? NSNull(),
             ]
         }
-        if let bridge = NativeSyncEngineModule.shared {
-            NSLog("[SyncEngine] emitting \(mapped.count) devices to RN")
+        let devicesSignature = discoveredDevicesSignature(devices)
+        if devicesSignature == lastEmittedDiscoveredDevicesSignature {
+            syncDiagnosticsLog(
+                "SyncEngine",
+                "skipping unchanged discovered devices emit count=\(mapped.count)"
+            )
+        } else if let bridge = NativeSyncEngineModule.shared {
+            slog("[SyncEngine] emitting \(mapped.count) devices to RN")
             syncDiagnosticsLog("SyncEngine", "emitting \(mapped.count) devices to RN")
+            lastEmittedDiscoveredDevicesSignature = devicesSignature
             bridge.emitDiscoveredDevices(mapped)
         } else {
-            NSLog("[SyncEngine] WARNING: NativeSyncEngineModule.shared is nil, cannot emit")
+            slog("[SyncEngine] WARNING: NativeSyncEngineModule.shared is nil, cannot emit")
             syncDiagnosticsLog("SyncEngine", "warning: NativeSyncEngineModule.shared is nil, cannot emit")
+        }
+
+        // Detect bound device disappearing / reappearing from Bonjour
+        if let binding = uploadStore?.getBinding() {
+            let boundDevice = devices.first { $0.deviceId == binding.deviceId }
+            let boundDeviceVisible = boundDevice != nil
+            var boundDeviceHasUsablePresenceHost = false
+            if let device = boundDevice {
+                let resolvedHost = preferredSidecarHost(probedHost: device.ip, device: device)
+                if let resolvedHost, !resolvedHost.isEmpty {
+                    if syncFlowIsPrivateLANIPv4(resolvedHost) {
+                        boundDeviceHasUsablePresenceHost = true
+                        if uploadStore?.getBinding()?.deviceId == binding.deviceId {
+                            if sidecarHost != resolvedHost {
+                                syncDiagnosticsLog(
+                                    "SyncEngine",
+                                    "bound device discovery host refreshed \(sidecarHost ?? "nil") -> \(resolvedHost)"
+                                )
+                            }
+                            sidecarHost = resolvedHost
+                            refreshBoundServerMetadata(
+                                expectedDeviceId: binding.deviceId,
+                                serverName: nil,
+                                shareName: nil,
+                                host: resolvedHost
+                            )
+                        } else {
+                            syncDiagnosticsLog(
+                                "SyncEngine",
+                                "ignored bound device discovery host for stale device=\(binding.deviceId)"
+                            )
+                        }
+                    } else {
+                        syncDiagnosticsLog(
+                            "SyncEngine",
+                            "ignored bound device discovery host \(resolvedHost) because it is not a private LAN IPv4"
+                        )
+                    }
+                }
+            }
+            if !boundDeviceVisible && (bindingConnectionState == .connected || bindingConnectionState == .bound) {
+                // Bonjour is unreliable — the device can briefly disappear due to
+                // mDNS cache expiry or Wi-Fi transitions. Probe with a heartbeat
+                // before going offline; only mark offline if the probe also fails.
+                slog("[SyncEngine] bound device %@ disappeared from discovery, verifying via heartbeat", binding.deviceId)
+                syncDiagnosticsLog("SyncEngine", "bound device \(binding.deviceId) disappeared from discovery, verifying via heartbeat")
+                let clientId = bindingService.getOrCreateClientId()
+                verifyPresenceWithRecovery(clientId: clientId)
+            } else if boundDeviceVisible && (bindingConnectionState == .offline || bindingConnectionState == .bound) {
+                slog("[SyncEngine] bound device %@ reappeared in discovery, probing connection", binding.deviceId)
+                syncDiagnosticsLog("SyncEngine", "bound device \(binding.deviceId) reappeared in discovery, probing connection")
+                // Resolve sidecar host from the rediscovered Bonjour entry so the
+                // heartbeat has a target, then probe with short retries until the
+                // sidecar HTTP API is ready after desktop restart.
+                if boundDeviceHasUsablePresenceHost {
+                    let clientId = bindingService.getOrCreateClientId()
+                    startPresenceRecoveryProbe(clientId: clientId, promoteOfflineToConnecting: true)
+                } else {
+                    syncDiagnosticsLog(
+                        "SyncEngine",
+                        "bound device reappeared without a usable private LAN host; keeping \(bindingConnectionState.rawValue)"
+                    )
+                }
+            }
         }
     }
 
     // MARK: - Discovery
 
     func startDiscovery() {
-        NSLog("[SyncEngine] startDiscovery - delegate is \(discoveryService.delegate == nil ? "nil" : "set")")
+        slog("[SyncEngine] startDiscovery - delegate is \(discoveryService.delegate == nil ? "nil" : "set")")
         syncDiagnosticsLog("SyncEngine", "startDiscovery - delegate is \(discoveryService.delegate == nil ? "nil" : "set")")
         syncDiagnosticsLog(
             "SyncEngine",
             "startDiscovery existingDiscoveredDevices=\(discoveredDevices.count)"
         )
+        if discoveryService.isBrowsing {
+            syncDiagnosticsLog(
+                "SyncEngine",
+                "startDiscovery no-op: discovery already browsing"
+            )
+            return
+        }
         discoveryService.startBrowsing()
     }
 
     func stopDiscovery() {
-        NSLog("[SyncEngine] stopDiscovery")
+        slog("[SyncEngine] stopDiscovery")
         syncDiagnosticsLog("SyncEngine", "stopDiscovery")
         syncDiagnosticsLog(
             "SyncEngine",
@@ -2861,6 +4149,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         )
         discoveryService.stopBrowsing()
         discoveredDevices.removeAll()
+        lastEmittedDiscoveredDevicesSignature = nil
     }
 
     // MARK: - Permissions
@@ -2905,13 +4194,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     }
 
     func pairDevice(deviceId: String, host: String, port: Int, connectionCode: String) async throws {
-        NSLog("[SyncEngine] pairDevice: deviceId=\(deviceId) host=\(host) port=\(port)")
+        slog("[SyncEngine] pairDevice: deviceId=\(deviceId) host=\(host) port=\(port)")
 
         // Guard against concurrent pairing calls (e.g. QR scanner firing onCodeScanned
         // many times before the stale-closure guard takes effect). Only one pairing
         // attempt is allowed at a time.
         guard !isPairing else {
-            NSLog("[SyncEngine] pairDevice: already pairing — ignoring concurrent call")
+            slog("[SyncEngine] pairDevice: already pairing — ignoring concurrent call")
             return
         }
         isPairing = true
@@ -2926,26 +4215,72 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             session.disconnect()
         }
 
-        // 1. Connect TCP — allow explicit host override for Wi-Fi-only profiling.
+        // 1. Connect TCP — prefer the already-probed IPv4 host over the Bonjour
+        // service endpoint. The endpoint's `.local` resolution can lag behind
+        // the TXT `ip=` record after a Wi-Fi/DHCP change, which was the root
+        // cause of pairing attempts still dialing stale addresses.
+        let cachedDevice = discoveredDevices[deviceId]
+        let preferredPairHost = preferredSidecarHost(
+            probedHost: host,
+            device: cachedDevice
+        )
         if let forcedTarget = resolvedForcedSidecarTarget() {
-            NSLog("[SyncEngine] connecting via forced host:port")
+            slog("[SyncEngine] connecting via forced host:port")
             try await session.connect(host: forcedTarget.host, port: forcedTarget.port)
-        } else if let cachedDevice = discoveredDevices[deviceId], let endpoint = cachedDevice.endpoint {
-            NSLog("[SyncEngine] connecting via Bonjour endpoint")
+        } else if let preferredPairHost, !preferredPairHost.isEmpty {
+            slog("[SyncEngine] connecting via resolved host:port")
+            try await session.connect(
+                host: preferredPairHost,
+                port: cachedDevice?.port ?? UInt16(port)
+            )
+        } else if let endpoint = cachedDevice?.endpoint {
+            slog("[SyncEngine] connecting via Bonjour endpoint fallback")
             try await session.connect(endpoint: endpoint)
         } else if !host.isEmpty {
-            NSLog("[SyncEngine] connecting via host:port")
+            slog("[SyncEngine] connecting via host:port")
             try await session.connect(host: host, port: UInt16(port))
         } else {
             throw SyncEngineError.networkError("No endpoint or host available for device \(deviceId)")
         }
+        let confirmedHost = preferredSidecarHost(
+            probedHost: transport.remoteHost,
+            device: discoveredDevices[deviceId]
+        ) ?? host
+        if confirmedHost != host {
+            slog("[SyncEngine] pairDevice confirmed host %@ -> %@", host, confirmedHost)
+            syncDiagnosticsLog("SyncEngine", "pairDevice confirmed host \(host) -> \(confirmedHost)")
+        }
 
         let clientId = bindingService.getOrCreateClientId()
+        let trimmedConnectionCode = connectionCode.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        func resetAutoUploadStateForFreshPairing(reason: String) {
+            try? uploadStore?.resetAutoUploadConfig()
+            isAutoUploadInterrupted = false
+            slog("[SyncEngine] reset auto upload config after pairing: %@", reason)
+        }
 
         // 2. HELLO_REQ → HELLO_RES  (spec Section 7.8)
+        // Include any stored pairing token for this server so the server can
+        // recognize the client as already bound (authRequired=false) and we
+        // skip the connection-code prompt. Powers the "switch device" direct
+        // reconnect path; absent/rejected token falls through to PAIR_REQ.
+        //
+        // If the caller supplied a connection code, treat it as an explicit
+        // re-pairing attempt and do not send the stored token. Otherwise a
+        // still-valid old token could bypass validation after the desktop code
+        // has changed.
+        let storedToken: String?
+        if trimmedConnectionCode.isEmpty {
+            storedToken = bindingService.getPairingToken(
+                forKey: pairingTokenKeychainKey(for: deviceId)
+            ) ?? bindingService.getPairingToken(forKey: BindingService.legacyPairingTokenKey)
+        } else {
+            storedToken = nil
+        }
         let (helloType, helloRes) = try await session.sendAndReceive(
             type: .helloReq,
-            payload: await buildClientHelloPayload(clientId: clientId)
+            payload: await buildClientHelloPayload(clientId: clientId, pairingToken: storedToken)
         )
 
         guard helloType == .helloRes else {
@@ -2959,17 +4294,77 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
         guard authRequired else {
             // Already bound on server — ensure we have a local binding record too
-            NSLog("[SyncEngine] already bound on server, ensuring local binding exists")
+            slog("[SyncEngine] already bound on server, ensuring local binding exists")
             let serverId = helloRes["serverId"] as? String ?? deviceId
-            if let existingBinding = uploadStore?.getBinding() {
+            if var existingBinding = uploadStore?.getBinding() {
                 if existingBinding.deviceId != serverId {
-                    // Switching to a different device — reset queue so it receives all photos.
-                    NSLog(
+                    interruptActiveSyncForBindingChange(
+                        reason: "pair_device_switch_confirmed \(existingBinding.deviceId) -> \(serverId)"
+                    )
+                    // Switching to a different device — reset queue so it receives all photos,
+                    // and overwrite the local binding to point at the new server. The previous
+                    // server's pairing token is left in Keychain so the user can switch back
+                    // without re-entering its code.
+                    slog(
                         "[SyncEngine] device switch detected (authRequired=false): %@ → %@, resetting upload queue",
                         existingBinding.deviceId, serverId
                     )
                     try? uploadStore?.resetUploadQueue()
+
+                    // Reset in-memory runtime counter cache from the previous device's
+                    // session so the new device's SyncActivity starts from zero.
+                    // runtimeSyncOverviewPayload reads these directly and caches over
+                    // the DB; without resetting them the next emit re-reports the
+                    // previous device's completed=1/1 progress.
+                    // (We don't call resetAllStatus() because it also wipes upload
+                    // history, which should be preserved across device switches.)
+                    runtimeQueueTotalCount = 0
+                    runtimeQueueCompletedCount = 0
+                    runtimeQueueTotalBytes = 0
+                    runtimeQueueCompletedBytes = 0
+                    runtimeRoundBaselineCompletedCount = 0
+                    runtimeRoundBaselineCompletedBytes = 0
+                    runtimeCurrentFileKey = nil
+                    runtimeCurrentFilename = nil
+                    runtimeCurrentFileConfirmedBytes = 0
+                    runtimeCurrentFileTotalBytes = 0
+                    runtimeCurrentSpeedMbps = 0
+                    runtimeUploadState = "idle"
+                    runtimeLastCompletedTaskSource = nil
+                    runtimeRoundSource = nil
+
+                    resetAutoUploadStateForFreshPairing(reason: "device_switch_auth_not_required")
                     didAttemptRemoteHistoryReconciliation = false
+
+                    let serverName = helloRes["serverName"] as? String ?? ""
+                    let keychainKey = pairingTokenKeychainKey(for: serverId)
+                    let newBinding = BindingRecord(
+                        deviceId: serverId,
+                        deviceName: serverName,
+                        deviceAlias: nil,
+                        deviceType: inferredBindingDeviceType(for: deviceId),
+                        host: confirmedHost,
+                        port: port,
+                        pairingId: "",
+                        pairingTokenKeychainRef: keychainKey,
+                        shareName: helloRes["serverCapabilities"].flatMap { ($0 as? [String: Any])?["shareName"] as? String },
+                        lastBoundAt: ISO8601DateFormatter().string(from: Date())
+                    )
+                    try uploadStore?.saveBinding(newBinding)
+                    if let bonjourDevice = discoveredDevices[deviceId] {
+                        discoveredDevices[serverId] = bonjourDevice
+                    }
+                    slog("[SyncEngine] saved new binding after device switch: \(serverId)")
+                } else {
+                    // Explicitly entering a connection code is treated as a fresh pairing
+                    // session. The sync screen should start from the default "auto upload
+                    // not enabled" card instead of inheriting the previous active state.
+                    resetAutoUploadStateForFreshPairing(reason: "same_device_repair_auth_not_required")
+                }
+                if existingBinding.deviceId == serverId && existingBinding.host != confirmedHost {
+                    existingBinding.host = confirmedHost
+                    try uploadStore?.saveBinding(existingBinding)
+                    syncDiagnosticsLog("SyncEngine", "updated existing binding host after pairing confirmation host=\(confirmedHost)")
                 }
             } else {
                 // No local binding — recreate from HELLO_RES info
@@ -2980,20 +4375,39 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     deviceName: serverName,
                     deviceAlias: nil,
                     deviceType: inferredBindingDeviceType(for: deviceId),
-                    host: host,
+                    host: confirmedHost,
                     port: port,
                     pairingId: "",
                     pairingTokenKeychainRef: keychainKey,
                     shareName: helloRes["serverCapabilities"].flatMap { ($0 as? [String: Any])?["shareName"] as? String },
                     lastBoundAt: ISO8601DateFormatter().string(from: Date())
                 )
-                try? uploadStore?.saveBinding(binding)
+                try uploadStore?.saveBinding(binding)
+                resetAutoUploadStateForFreshPairing(reason: "recreate_local_binding_auth_not_required")
                 // Re-index Bonjour entry under the server UUID (only if originally found via Bonjour).
                 if let bonjourDevice = discoveredDevices[deviceId] {
                     discoveredDevices[serverId] = bonjourDevice
                 }
-                NSLog("[SyncEngine] recreated local binding for \(serverId)")
+                slog("[SyncEngine] recreated local binding for \(serverId)")
             }
+
+            // Both sub-branches above (device switch / recreate) just persisted
+            // a new binding. Mirror the PAIR_REQ success path's housekeeping so
+            // RN learns about the change: cache sidecarHost, mark connected,
+            // emit onBindingStateChanged so SyncActivityScreen re-renders, and
+            // fire an immediate presence heartbeat so the desktop sees us.
+            sidecarHost = confirmedHost
+            updateBindingConnectionState(.connected, reason: "auth_not_required_pairing_confirmed")
+            if let updatedBinding = uploadStore?.getBinding() {
+                NativeSyncEngineModule.shared?.emitBindingStateChanged(bindingStatePayload(binding: updatedBinding))
+            }
+            // Emit a fresh idle SyncOverview so SyncActivity drops the previous
+            // device's progress/completed counters from its UI cache.
+            NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                runtimeSyncOverviewPayload(uploadState: "idle")
+            )
+            sendPresenceHeartbeat(clientId: clientId)
+
             // Sync is no longer triggered automatically after pairing.
             // The user will initiate sync from the album workbench or sync screen.
             return
@@ -3003,7 +4417,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         var pairPayload: [String: Any] = [
             "clientId": clientId,
             "clientName": getClientDisplayName(),
-            "connectionCode": connectionCode,
+            "connectionCode": trimmedConnectionCode,
         ]
         if let clientIP = currentClientIPv4() {
             pairPayload["clientIp"] = clientIP
@@ -3020,8 +4434,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         else { pairOk = (pairType == .pairRes) }
 
         guard pairOk else {
-            let errMsg = pairRes["error"] as? String ?? "unknown"
-            throw SyncEngineError.pairingError("Pairing rejected: \(errMsg)")
+            let errMsg = pairRes["error"] as? String ?? "连接码错误或已过期"
+            throw SyncEngineError.pairingError(errMsg)
         }
 
         // 4. Persist pairing token in Keychain — keyed per server so that pairing
@@ -3037,13 +4451,23 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         //    If the user is switching to a DIFFERENT desktop device, reset the upload
         //    queue so the new device starts from scratch and receives all photos.
         //    daily_ledgers are kept so historical stats for the previous device are preserved.
+        let didSwitchDevice: Bool
         if let existingBinding = uploadStore?.getBinding(), existingBinding.deviceId != serverId {
-            NSLog(
+            didSwitchDevice = true
+            interruptActiveSyncForBindingChange(
+                reason: "pair_device_switch_confirmed \(existingBinding.deviceId) -> \(serverId)"
+            )
+            slog(
                 "[SyncEngine] device switch detected: %@ → %@, resetting upload queue",
                 existingBinding.deviceId, serverId
             )
             try? uploadStore?.resetUploadQueue()
+            resetAutoUploadStateForFreshPairing(reason: "device_switch_pair_required")
             didAttemptRemoteHistoryReconciliation = false
+            clearRuntimeSyncRoundProgress(uploadState: "idle")
+        } else {
+            didSwitchDevice = false
+            resetAutoUploadStateForFreshPairing(reason: "successful_pairing")
         }
 
         let binding = BindingRecord(
@@ -3051,7 +4475,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             deviceName: serverInfo["serverName"] as? String ?? "",
             deviceAlias: nil,
             deviceType: inferredBindingDeviceType(for: deviceId),
-            host: host,
+            host: confirmedHost,
             port: port,
             pairingId: pairRes["pairingId"] as? String ?? "",
             pairingTokenKeychainRef: keychainKey,
@@ -3070,15 +4494,28 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             discoveredDevices[bindingDeviceId] = bonjourDevice
         }
 
-        // 6. Notify RN bridge
-        bindingConnectionState = .bound
+        // 6. Notify RN bridge — mark as connected (not just bound) because
+        //    we just confirmed the host is reachable via TCP during pairing.
+        //    Also cache sidecarHost so presence heartbeats can reach the desktop.
+        sidecarHost = confirmedHost
+        updateBindingConnectionState(.connected, reason: "pairing_confirmed_reachable")
         NativeSyncEngineModule.shared?.emitBindingStateChanged(bindingStatePayload(binding: binding))
+        if didSwitchDevice {
+            NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                runtimeSyncOverviewPayload(uploadState: "idle")
+            )
+        }
 
-        NSLog("[SyncEngine] pairing successful — sync deferred until user action")
+        // 7. Send a presence heartbeat so the desktop UI shows device as online
+        //    immediately after pairing, without waiting for a full sync cycle.
+        sendPresenceHeartbeat(clientId: clientId)
+
+        slog("[SyncEngine] pairing successful — sync deferred until user action")
     }
 
     func disconnectAndUnbind() async throws {
-        NSLog("[SyncEngine] disconnectAndUnbind")
+        slog("[SyncEngine] disconnectAndUnbind")
+        interruptActiveSyncForBindingChange(reason: "disconnect_and_unbind")
         // Clear the token stored under the binding's per-device key (and the legacy
         // global key for bindings created before per-device storage was introduced).
         if let binding = uploadStore?.getBinding() {
@@ -3086,6 +4523,20 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
         bindingService.clearPairingToken()  // also wipe any legacy single-key token
         try uploadStore?.clearBinding()
+        try? uploadStore?.resetUploadQueue()
+
+        // Reset auto upload config so the next pairing starts with auto upload off.
+        // Without this, a stale "active" state from the previous session would cause
+        // the sync activity screen to show "auto upload running" immediately after
+        // re-pairing, even though the user never enabled it for the new session.
+        try? uploadStore?.resetAutoUploadConfig()
+        isAutoUploadInterrupted = false
+        clearRuntimeSyncRoundProgress(uploadState: "idle")
+        runtimeUploadState = "idle"
+        runtimeLastCompletedTaskSource = nil
+        runtimeRoundSource = nil
+
+        stopPresenceHeartbeatTimer()
         bindingConnectionState = .offline
         sidecarHost = nil
         endBackgroundTransitionIfNeeded(reason: "disconnectAndUnbind")
@@ -3096,6 +4547,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         transport.disconnect()
         sessionService.endSession()
         NativeSyncEngineModule.shared?.emitBindingStateChanged(nil)
+        emitQueueToJS()
+        NativeSyncEngineModule.shared?.emitSyncStateChanged(
+            runtimeSyncOverviewPayload(uploadState: "idle", includePersistedIdleStats: false)
+        )
     }
 
     // MARK: - State Queries
@@ -3131,7 +4586,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         guard let historyStore else {
             return ["items": [], "nextCursor": NSNull()]
         }
-        let result = historyStore.getDailyLedgers(cursor: cursor)
+        let normalizedCursor = cursor?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let result = historyStore.getDailyLedgers(
+            cursor: normalizedCursor?.isEmpty == true ? nil : normalizedCursor
+        )
         let items: [[String: Any]] = result.items.map { ledger in
             [
                 "ledgerDate": ledger.ledgerDate,
@@ -3193,6 +4651,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             return [
                 "name": device.name,
                 "model": device.model,
+                "osVersion": "\(device.systemName) \(device.systemVersion)",
                 "systemName": device.systemName,
                 "systemVersion": device.systemVersion,
                 "userInterfaceIdiom": device.userInterfaceIdiom.rawValue,
@@ -3238,6 +4697,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             "activeSession": activeSessionPayload,
             "recentRetry": diagnosticsIssueState.recentRetry ?? NSNull(),
             "recentError": diagnosticsIssueState.recentError ?? NSNull(),
+            // Current NWPath summary — pivotal for "why did the handset
+            // stop discovering the Mac" reports: reveals WiFi/cellular
+            // state, interface names, and constrained/expensive flags.
+            "networkPath": NetworkPathObserver.shared.snapshot(),
         ]
         let clientPayload: [String: Any] = [
             "clientId": bindingService.getOrCreateClientId(),
@@ -3335,7 +4798,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private func resolveSidecarHost(binding: BindingRecord, token: String, clientId: String) async throws {
         if let forcedTarget = resolvedForcedSidecarTarget() {
             sidecarHost = forcedTarget.host
-            NSLog("[SyncPipeline] using forced sidecar host: %@:%d", forcedTarget.host, Int(forcedTarget.port))
+            slog("[SyncPipeline] using forced sidecar host: %@:%d", forcedTarget.host, Int(forcedTarget.port))
             return
         }
 
@@ -3351,13 +4814,24 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         var endpoint = targetDevice?.endpoint
         if endpoint == nil {
             discoveryService.startBrowsing()
-            for _ in 0..<20 {
+            NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                runtimeSyncOverviewPayload(uploadState: "discovering").merging([
+                    "discoveryElapsedSec": 0,
+                ] as [String: Any]) { _, new in new }
+            )
+            for pollIndex in 0..<20 {
                 try await Task.sleep(nanoseconds: 500_000_000)
                 if let found = findDevice() {
                     targetDevice = found
                     endpoint = found.endpoint
                     break
                 }
+                let elapsed = Double(pollIndex + 1) * 0.5
+                NativeSyncEngineModule.shared?.emitSyncStateChanged(
+                    runtimeSyncOverviewPayload(uploadState: "discovering").merging([
+                        "discoveryElapsedSec": elapsed,
+                    ] as [String: Any]) { _, new in new }
+                )
             }
         }
         let transport = TcpTransport()
@@ -3368,15 +4842,25 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             fallbackHost: binding.host,
             fallbackPort: UInt16(binding.port)
         )
+        try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
         sidecarHost = preferredSidecarHost(probedHost: transport.remoteHost, device: targetDevice)
-        sharedFilesService.sidecarHost = sidecarHost
-        NSLog("[SyncPipeline] resolved sidecar host: %@", sidecarHost ?? "nil")
+        slog("[SyncPipeline] resolved sidecar host: %@", sidecarHost ?? "nil")
 
         // Auth so sidecar registers us as connected
         let (helloType, helloRes) = try await session.sendAndReceive(
             type: .helloReq,
             payload: await buildClientHelloPayload(clientId: clientId, pairingToken: token)
         )
+        try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
+        if helloType == .helloRes {
+            refreshBoundServerMetadata(
+                expectedDeviceId: binding.deviceId,
+                serverName: helloRes["serverName"] as? String,
+                shareName: helloRes["serverCapabilities"]
+                    .flatMap { ($0 as? [String: Any])?["shareName"] as? String },
+                host: sidecarHost
+            )
+        }
         if helloType == .helloRes, let nonce = helloRes["nonce"] as? String {
             let hmac = transport.computeHMAC(token: token, nonce: nonce)
             let _ = try? await session.sendAndReceive(type: .authReq, payload: [
@@ -3393,34 +4877,67 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let fileKeys: [String]
     }
 
+    private struct HistoryReconciliationResult {
+        let restoredCount: Int
+        let scannedAssets: [ScannedAsset]?
+
+        static let skipped = HistoryReconciliationResult(restoredCount: 0, scannedAssets: nil)
+    }
+
     private func restoreCompletedUploadHistoryIfNeeded(
         clientId: String,
-        fallbackHost: String
-    ) async -> Int {
-        guard !didAttemptRemoteHistoryReconciliation else { return 0 }
+        fallbackHost: String,
+        expectedDeviceId: String
+    ) async -> HistoryReconciliationResult {
+        guard !didAttemptRemoteHistoryReconciliation else { return .skipped }
+        guard uploadStore?.getBinding()?.deviceId == expectedDeviceId else {
+            syncDiagnosticsLog(
+                "SyncPipeline",
+                "skip history reconciliation for stale device=\(expectedDeviceId)"
+            )
+            return .skipped
+        }
 
-        guard let store = uploadStore else { return 0 }
-        guard store.getTrackedFileKeys().isEmpty else { return 0 }
+        guard let store = uploadStore else { return .skipped }
+        guard store.getTrackedFileKeys().isEmpty else { return .skipped }
         let host = (sidecarHost?.isEmpty == false ? sidecarHost : fallbackHost)
         guard let host, !host.isEmpty else {
-            NSLog("[SyncPipeline] skip history reconciliation: sidecar host unavailable")
+            slog("[SyncPipeline] skip history reconciliation: sidecar host unavailable")
             syncDiagnosticsLog("SyncPipeline", "skip history reconciliation: sidecar host unavailable")
-            return 0
+            return .skipped
         }
         didAttemptRemoteHistoryReconciliation = true
 
+        NativeSyncEngineModule.shared?.emitSyncStateChanged(
+            runtimeSyncOverviewPayload(uploadState: "reconciling")
+        )
+
         do {
             let remoteCompletedFileKeys = try await fetchRemoteExistingFileKeys(clientId: clientId, host: host)
+            guard uploadStore?.getBinding()?.deviceId == expectedDeviceId else {
+                syncDiagnosticsLog(
+                    "SyncPipeline",
+                    "discarded history reconciliation result for stale device=\(expectedDeviceId)"
+                )
+                return .skipped
+            }
             guard !remoteCompletedFileKeys.isEmpty else {
-                NSLog("[SyncPipeline] no remote files available on sidecar for reconciliation")
+                slog("[SyncPipeline] no remote files available on sidecar for reconciliation")
                 syncDiagnosticsLog("SyncPipeline", "no remote files available on sidecar for reconciliation")
-                return 0
+                return .skipped
             }
 
             let scannedAssets = photoScanner.scanForUntrackedAssets(clientId: clientId, trackedFileKeys: [])
+            guard uploadStore?.getBinding()?.deviceId == expectedDeviceId else {
+                syncDiagnosticsLog(
+                    "SyncPipeline",
+                    "discarded scanned reconciliation assets for stale device=\(expectedDeviceId)"
+                )
+                return .skipped
+            }
             let matchingAssets = scannedAssets.filter { remoteCompletedFileKeys.contains($0.fileKey) }
             guard !matchingAssets.isEmpty else {
-                NSLog(
+                slog(
                     "[SyncPipeline] sidecar existing-file-keys returned %d keys but none match current photo library",
                     remoteCompletedFileKeys.count
                 )
@@ -3428,7 +4945,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     "SyncPipeline",
                     "sidecar existing-file-keys returned \(remoteCompletedFileKeys.count) keys but none match current photo library"
                 )
-                return 0
+                return HistoryReconciliationResult(restoredCount: 0, scannedAssets: scannedAssets)
             }
 
             let now = ISO8601DateFormatter().string(from: Date())
@@ -3451,10 +4968,17 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     priority: 0
                 )
             }
+            guard uploadStore?.getBinding()?.deviceId == expectedDeviceId else {
+                syncDiagnosticsLog(
+                    "SyncPipeline",
+                    "skipped restoring history for stale device=\(expectedDeviceId)"
+                )
+                return .skipped
+            }
             try store.upsertUploadItems(restoredItems)
             emitQueueToJS()
 
-            NSLog(
+            slog(
                 "[SyncPipeline] restored %d/%d sidecar-confirmed uploads into local history",
                 restoredItems.count,
                 remoteCompletedFileKeys.count
@@ -3463,11 +4987,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 "SyncPipeline",
                 "restored \(restoredItems.count)/\(remoteCompletedFileKeys.count) sidecar-confirmed uploads into local history"
             )
-            return restoredItems.count
+            return HistoryReconciliationResult(restoredCount: restoredItems.count, scannedAssets: scannedAssets)
         } catch {
-            NSLog("[SyncPipeline] history reconciliation failed: %@", "\(error)")
+            slog("[SyncPipeline] history reconciliation failed: %@", "\(error)")
             syncDiagnosticsLog("SyncPipeline", "history reconciliation failed: \(error)")
-            return 0
+            return .skipped
         }
     }
 
@@ -3513,8 +5037,17 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     // MARK: - HTTP Presence Heartbeat
 
-    private func sendPresenceHeartbeat(clientId: String) {
-        guard let host = sidecarHost, !host.isEmpty else { return }
+    private func sendPresenceHeartbeat(
+        clientId: String,
+        successReason: String = "presence_heartbeat_succeeded",
+        failureReason: String = "presence_heartbeat_failed",
+        updateStateOnFailure: Bool = true,
+        completion: ((Bool) -> Void)? = nil
+    ) {
+        guard let expectedDeviceId = uploadStore?.getBinding()?.deviceId,
+              let host = currentPresenceHeartbeatHost() else {
+            return
+        }
         let port = 39394
         // IPv6 link-local needs brackets and zone ID in URL
         let hostPart = host.contains(":") ? "[\(host)]" : host
@@ -3523,12 +5056,51 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = 5
-        heartbeatSession.dataTask(with: request) { _, _, error in
+        heartbeatSession.dataTask(with: request) { data, response, error in
+            let currentHost = self.currentPresenceHeartbeatHost()
+            if currentHost != host {
+                syncDiagnosticsLog(
+                    "Presence",
+                    "heartbeat ignored stale host=\(host) current=\(currentHost ?? "nil") reason=\(failureReason)"
+                )
+                completion?(false)
+                return
+            }
+            guard self.uploadStore?.getBinding()?.deviceId == expectedDeviceId else {
+                syncDiagnosticsLog(
+                    "Presence",
+                    "heartbeat ignored stale device=\(expectedDeviceId) host=\(host)"
+                )
+                completion?(false)
+                return
+            }
             if let error {
-                NSLog("[Presence] heartbeat failed: %@", "\(error)")
-                self.updateBindingConnectionState(.offline, reason: "presence_heartbeat_failed")
+                slog("[Presence] heartbeat failed: %@", "\(error)")
+                syncDiagnosticsLog("Presence", "heartbeat failed host=\(host) reason=\(failureReason) error=\(error)")
+                if updateStateOnFailure {
+                    self.updateBindingConnectionState(.offline, reason: failureReason)
+                }
+                completion?(false)
             } else {
-                self.updateBindingConnectionState(.connected, reason: "presence_heartbeat_succeeded")
+                if let httpResponse = response as? HTTPURLResponse {
+                    slog("[Presence] heartbeat succeeded: HTTP %d", httpResponse.statusCode)
+                    syncDiagnosticsLog("Presence", "heartbeat succeeded host=\(host) status=\(httpResponse.statusCode) reason=\(successReason)")
+                } else {
+                    slog("[Presence] heartbeat succeeded")
+                    syncDiagnosticsLog("Presence", "heartbeat succeeded host=\(host) reason=\(successReason)")
+                }
+                if let data,
+                   let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                {
+                    self.refreshBoundServerMetadata(
+                        expectedDeviceId: expectedDeviceId,
+                        serverName: payload["serverName"] as? String,
+                        shareName: payload["shareName"] as? String,
+                        host: host
+                    )
+                }
+                self.updateBindingConnectionState(.connected, reason: successReason)
+                completion?(true)
             }
         }.resume()
     }
@@ -3557,6 +5129,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         return generated
     }
 
+    func getClientId() -> String {
+        bindingService.getOrCreateClientId()
+    }
+
     func setClientDisplayName(_ name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
@@ -3570,42 +5146,208 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         pushClientMetadataUpdateIfPossible()
     }
 
-    // MARK: - Auto Upload Pause / Resume
+    // MARK: - Auto Upload Interrupt / Enable
 
-    /// Pause auto upload: skips auto items in queue, only processes manual items.
-    func pauseAutoUpload() {
-        guard !isAutoUploadPaused else { return }
-        isAutoUploadPaused = true
-        NSLog("[SyncEngine] auto upload paused")
-        syncDiagnosticsLog("SyncEngine", "auto upload paused")
-        sessionService.transitionTo(.pausedAutoUpload)
+    private func persistAutoUploadInterruptedState(reason: String) {
+        isAutoUploadInterrupted = true
+
+        if var config = autoUploadConfigStore?.getConfig() {
+            config.state = "interrupted"
+            config.updatedAt = ISO8601DateFormatter().string(from: Date())
+            do {
+                try autoUploadConfigStore?.saveConfig(config)
+            } catch {
+                slog("[SyncEngine] WARN: failed to persist interrupted state (%@): %@", reason, "\(error)")
+            }
+        }
+    }
+
+    private func persistAutoUploadDisabledState(reason: String) {
+        isAutoUploadInterrupted = false
+
+        if var config = autoUploadConfigStore?.getConfig() {
+            config.enabled = false
+            config.state = "disabled"
+            config.updatedAt = ISO8601DateFormatter().string(from: Date())
+            do {
+                try autoUploadConfigStore?.saveConfig(config)
+            } catch {
+                slog("[SyncEngine] WARN: failed to persist disabled state (%@): %@", reason, "\(error)")
+            }
+        }
+    }
+
+    /// Interrupt auto upload: skips auto items in queue, only processes manual items.
+    /// Once interrupted, user must explicitly re-enable.
+    func interruptAutoUpload() {
+        guard !isAutoUploadInterrupted else { return }
+        persistAutoUploadInterruptedState(reason: "user_interrupt")
+        clearRuntimeReconnectError()
+
+        // Clear pending auto items so they don't block manual uploads
+        // (dedup check) and re-enabling auto upload starts a fresh scan.
+        do {
+            try uploadStore?.cancelPendingAutoItems()
+        } catch {
+            slog("[SyncEngine] WARN: failed to cancel pending auto items: %@", "\(error)")
+        }
+
+        let currentTaskSource = uploadStore?.getCurrentUploadingSource()
+        if isSyncing && currentTaskSource == "auto" {
+            shouldAbortActiveAutoUpload = true
+            clearRuntimeSyncRoundProgress(uploadState: "paused_auto_upload")
+            maintainConnectedBindingState(reason: "interrupt_auto_upload_requested")
+            syncDiagnosticsLog("SyncEngine", "interrupting in-flight auto upload")
+            interruptActiveUploadResponse(
+                error: SyncEngineError.autoUploadInterrupted,
+                reason: "interrupt_auto_upload_requested"
+            )
+        } else if currentTaskSource != "manual" &&
+                    runtimeLastCompletedTaskSource == "auto" &&
+                    runtimeQueueTotalCount > 0 &&
+                    runtimeQueueCompletedCount >= runtimeQueueTotalCount {
+            clearRuntimeSyncRoundProgress(uploadState: "paused_auto_upload")
+        }
+        emitQueueToJS()
+
+        slog("[SyncEngine] auto upload interrupted")
+        syncDiagnosticsLog("SyncEngine", "auto upload interrupted")
+        sessionService.transitionTo(.interruptedAutoUpload)
+        let payload = runtimeSyncOverviewPayload(uploadState: "paused_auto_upload")
+        logSyncOverviewEmission("interrupt_auto_upload", payload: payload)
         NativeSyncEngineModule.shared?.emitSyncStateChanged(
-            runtimeSyncOverviewPayload(uploadState: "paused_auto_upload")
+            payload
         )
     }
 
-    /// Resume auto upload: resumes processing auto items.
-    func resumeAutoUpload() {
-        guard isAutoUploadPaused else { return }
-        isAutoUploadPaused = false
-        NSLog("[SyncEngine] auto upload resumed")
-        syncDiagnosticsLog("SyncEngine", "auto upload resumed")
+    /// Disable auto upload: persists the feature as disabled and stops auto work.
+    /// Unlike interruptAutoUpload(), this represents the user turning the feature off.
+    func disableAutoUpload() {
+        persistAutoUploadDisabledState(reason: "user_disable")
+        clearRuntimeReconnectError()
+
+        do {
+            try uploadStore?.cancelPendingAutoItems()
+        } catch {
+            slog("[SyncEngine] WARN: failed to cancel pending auto items while disabling auto upload: %@", "\(error)")
+        }
+
+        let currentTaskSource = uploadStore?.getCurrentUploadingSource()
+        if isSyncing && currentTaskSource == "auto" {
+            shouldAbortActiveAutoUpload = true
+            clearRuntimeSyncRoundProgress(uploadState: "idle")
+            maintainConnectedBindingState(reason: "disable_auto_upload_requested")
+            syncDiagnosticsLog("SyncEngine", "disabling in-flight auto upload")
+            interruptActiveUploadResponse(
+                error: SyncEngineError.autoUploadInterrupted,
+                reason: "disable_auto_upload_requested"
+            )
+        } else {
+            shouldAbortActiveAutoUpload = false
+            runtimeLastCompletedTaskSource = nil
+            runtimeRoundSource = nil
+        }
+
+        emitQueueToJS()
+
+        slog("[SyncEngine] auto upload disabled")
+        syncDiagnosticsLog("SyncEngine", "auto upload disabled")
+        sessionService.transitionTo(.idle)
+        let payload = runtimeSyncOverviewPayload(uploadState: "idle")
+        logSyncOverviewEmission("disable_auto_upload", payload: payload)
+        NativeSyncEngineModule.shared?.emitSyncStateChanged(
+            payload
+        )
+    }
+
+    // DEPRECATED: to be removed, use enableAutoUpload/interruptAutoUpload instead
+    func pauseAutoUpload() {
+        interruptAutoUpload()
+    }
+
+    /// Re-enable auto upload: resumes processing auto items after interruption.
+    func enableAutoUpload() {
+        isAutoUploadInterrupted = false
+        shouldAbortActiveAutoUpload = false
+
+        // Persist active state so it survives app restart
+        if var config = autoUploadConfigStore?.getConfig() {
+            config.enabled = true
+            config.state = "active"
+            config.updatedAt = ISO8601DateFormatter().string(from: Date())
+            do {
+                try autoUploadConfigStore?.saveConfig(config)
+            } catch {
+                slog("[SyncEngine] WARN: failed to persist active state: %@", "\(error)")
+            }
+        }
+
+        slog("[SyncEngine] auto upload re-enabled")
+        syncDiagnosticsLog("SyncEngine", "auto upload re-enabled")
+        let currentTaskSource = uploadStore?.getCurrentUploadingSource()
+        if currentTaskSource == nil &&
+            runtimeQueueTotalCount > 0 &&
+            runtimeQueueCompletedCount >= runtimeQueueTotalCount {
+            clearRuntimeSyncRoundProgress(uploadState: "idle")
+        }
         if isSyncing {
             sessionService.transitionTo(.scanning)
+            // Signal the watch loop that a re-scan is needed. Without this,
+            // resumeWatchLoopIfNeeded() wakes the loop but it immediately
+            // goes back to sleep because photoLibraryChanged is still false.
+            photoLibraryChanged = true
+            resumeWatchLoopIfNeeded()
+        } else {
+            // Pipeline not running (e.g. manual upload already finished) —
+            // start it so auto upload actually begins scanning and uploading.
+            startSync()
         }
+        let payload = runtimeSyncOverviewPayload(uploadState: isSyncing ? "scanning" : "idle")
+        logSyncOverviewEmission("enable_auto_upload", payload: payload)
         NativeSyncEngineModule.shared?.emitSyncStateChanged(
-            runtimeSyncOverviewPayload(uploadState: isSyncing ? "scanning" : "idle")
+            payload
         )
-        // Wake up the watch loop if it's sleeping so the newly resumed auto items get processed
-        resumeWatchLoopIfNeeded()
     }
 
-    /// Cancel remaining items in a manual batch.
+    // DEPRECATED: to be removed, use enableAutoUpload/interruptAutoUpload instead
+    func resumeAutoUpload() {
+        enableAutoUpload()
+    }
+
+    /// Cancel remaining items in a manual queue.
     func cancelManualBatch(batchId: String) throws {
         try uploadStore?.cancelManualBatch(batchId: batchId)
-        NSLog("[SyncEngine] cancelled manual batch %@", batchId)
-        syncDiagnosticsLog("SyncEngine", "cancelled manual batch \(batchId)")
+        slog("[SyncEngine] cancelled manual queue %@", batchId)
+        syncDiagnosticsLog("SyncEngine", "cancelled manual queue \(batchId)")
         emitQueueToJS()
+    }
+
+    func cancelAllManualUploads() throws {
+        let currentTaskSource = uploadStore?.getCurrentUploadingSource()
+        let shouldAbortActiveManual = isSyncing && currentTaskSource == "manual"
+        try uploadStore?.cancelAllManualUploads()
+        if shouldAbortActiveManual {
+            shouldAbortActiveManualUpload = true
+            interruptActiveUploadResponse(
+                error: SyncEngineError.manualUploadCancelled,
+                reason: "cancel_manual_upload_requested"
+            )
+        }
+        clearRuntimeSyncRoundProgress(uploadState: "idle")
+        runtimeManualUploadCancelled = true
+        clearRuntimeReconnectError()
+        photoLibraryChanged = true
+        resumeWatchLoopIfNeeded()
+        maintainConnectedBindingState(reason: "cancel_manual_upload_requested")
+        slog("[SyncEngine] cancelled entire manual upload queue")
+        syncDiagnosticsLog("SyncEngine", "cancelled entire manual upload queue")
+        emitQueueToJS()
+        let payload = runtimeSyncOverviewPayload(
+            uploadState: "idle",
+            includePersistedIdleStats: false
+        )
+        logSyncOverviewEmission("cancel_manual_upload", payload: payload)
+        NativeSyncEngineModule.shared?.emitSyncStateChanged(payload)
     }
 
     // MARK: - Album Browser
@@ -3617,6 +5359,18 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         return dir
     }()
 
+    private func runOnAlbumBrowserQueue<T>(_ operation: () -> T) -> T {
+        if DispatchQueue.getSpecific(key: albumBrowserQueueKey) != nil {
+            return operation()
+        }
+        return albumBrowserQueue.sync(execute: operation)
+    }
+
+    private func canReadPhotoLibrary() -> Bool {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        return status == .authorized || status == .limited
+    }
+
     func browseAlbum(
         mediaFilter: String,
         transferFilter: String,
@@ -3624,32 +5378,46 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         limit: Int,
         collectionId: String? = nil
     ) -> [[String: Any]] {
-        guard let service = albumBrowserService else { return [] }
-        let assets = service.fetchAlbumAssets(
-            mediaFilter: mediaFilter,
-            transferFilter: transferFilter,
-            offset: offset,
-            limit: limit,
-            collectionId: collectionId
-        )
-        let thumbSize = CGSize(width: 200, height: 200)
-        return assets.map { asset in
-            // Generate cached thumbnail file
-            let thumbUri = cachedThumbnailUri(
-                service: service,
-                assetLocalId: asset.assetLocalId,
-                size: thumbSize
+        runOnAlbumBrowserQueue {
+            guard let service = albumBrowserService else { return [] }
+            var assets = service.fetchAlbumAssets(
+                mediaFilter: mediaFilter,
+                transferFilter: transferFilter,
+                offset: offset,
+                limit: limit,
+                collectionId: collectionId
             )
-            return [
-                "assetLocalId": asset.assetLocalId,
-                "filename": asset.filename,
-                "mediaType": asset.mediaType,
-                "fileSize": asset.fileSize,
-                "creationDate": asset.creationDate,
-                "thumbnailUri": thumbUri,
-                "isTransferred": asset.isTransferred,
-                "isQueued": asset.isQueued,
-            ] as [String: Any]
+
+            if assets.isEmpty && offset == 0 && canReadPhotoLibrary() {
+                Thread.sleep(forTimeInterval: 0.25)
+                assets = service.fetchAlbumAssets(
+                    mediaFilter: mediaFilter,
+                    transferFilter: transferFilter,
+                    offset: offset,
+                    limit: limit,
+                    collectionId: collectionId
+                )
+            }
+
+            let thumbSize = CGSize(width: 200, height: 200)
+            return assets.map { asset in
+                // Generate cached thumbnail file
+                let thumbUri = cachedThumbnailUri(
+                    service: service,
+                    assetLocalId: asset.assetLocalId,
+                    size: thumbSize
+                )
+                return [
+                    "assetLocalId": asset.assetLocalId,
+                    "filename": asset.filename,
+                    "mediaType": asset.mediaType,
+                    "fileSize": asset.fileSize,
+                    "creationDate": asset.creationDate,
+                    "thumbnailUri": thumbUri,
+                    "isTransferred": asset.isTransferred,
+                    "isQueued": asset.isQueued,
+                ] as [String: Any]
+            }
         }
     }
 
@@ -3669,8 +5437,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             return thumbFile.absoluteString
         }
 
-        // Generate thumbnail
-        guard let image = service.getThumbnail(assetLocalId: assetLocalId, size: size),
+        // Generate thumbnail. PhotoKit's backing XPC service can be restarted by
+        // iOS under pressure; a short retry avoids transient blank cells.
+        var image = service.getThumbnail(assetLocalId: assetLocalId, size: size)
+        if image == nil && canReadPhotoLibrary() {
+            Thread.sleep(forTimeInterval: 0.15)
+            image = service.getThumbnail(assetLocalId: assetLocalId, size: size)
+        }
+        guard let image,
               let data = image.jpegData(compressionQuality: 0.7) else {
             return ""
         }
@@ -3679,20 +5453,97 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     }
 
     func getAlbumStats() -> [String: Any] {
-        guard let service = albumBrowserService else {
-            return ["totalCount": 0, "transferredCount": 0, "queuedCount": 0]
+        runOnAlbumBrowserQueue {
+            guard let service = albumBrowserService else {
+                return [
+                    "totalCount": 0,
+                    "transferredCount": 0,
+                    "queuedCount": 0,
+                    "pendingCount": 0,
+                ]
+            }
+            var stats = service.getAlbumStats()
+            if stats.totalCount == 0 && canReadPhotoLibrary() {
+                Thread.sleep(forTimeInterval: 0.25)
+                stats = service.getAlbumStats()
+            }
+            return [
+                "totalCount": stats.totalCount,
+                "transferredCount": stats.transferredCount,
+                "queuedCount": stats.queuedCount,
+                "pendingCount": stats.pendingCount,
+            ]
         }
-        let stats = service.getAlbumStats()
-        return [
-            "totalCount": stats.totalCount,
-            "transferredCount": stats.transferredCount,
-            "queuedCount": stats.queuedCount,
-        ]
     }
 
     func getAlbumCollections(mediaFilter: String) -> [[String: Any]] {
-        guard let service = albumBrowserService else { return [] }
-        return service.getAlbumCollections(mediaFilter: mediaFilter)
+        runOnAlbumBrowserQueue {
+            guard let service = albumBrowserService else { return [] }
+            var collections = service.getAlbumCollections(mediaFilter: mediaFilter)
+            if collections.isEmpty && canReadPhotoLibrary() {
+                Thread.sleep(forTimeInterval: 0.25)
+                collections = service.getAlbumCollections(mediaFilter: mediaFilter)
+            }
+            return collections
+        }
+    }
+
+    func getAssetPreviewSource(assetLocalId: String) -> [String: Any] {
+        runOnAlbumBrowserQueue {
+            guard let service = albumBrowserService else {
+                return ["uri": "", "mediaType": "image", "error": "not_found"]
+            }
+            var result = service.getPreviewSource(assetLocalId: assetLocalId)
+            if (result["error"] as? String) == "not_found" && canReadPhotoLibrary() {
+                Thread.sleep(forTimeInterval: 0.25)
+                result = service.getPreviewSource(assetLocalId: assetLocalId)
+            }
+            return result
+        }
+    }
+
+    // MARK: - Album Preview Cache
+
+    private func cleanupPreviewCacheIfNeeded() {
+        DispatchQueue.global(qos: .utility).async {
+            let fm = FileManager.default
+            let dir = AlbumBrowserService.previewCacheDir()
+            guard let files = try? fm.contentsOfDirectory(
+                at: dir,
+                includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
+                options: .skipsHiddenFiles
+            ) else { return }
+
+            let now = Date()
+            let ttl: TimeInterval = 24 * 60 * 60
+            let sizeLimit: Int64 = 500 * 1024 * 1024
+
+            var survivors: [(URL, Date, Int64)] = []
+            var totalSize: Int64 = 0
+
+            for url in files {
+                let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+                let mtime = values?.contentModificationDate ?? .distantPast
+                let size = Int64(values?.fileSize ?? 0)
+
+                if now.timeIntervalSince(mtime) > ttl {
+                    try? fm.removeItem(at: url)
+                    continue
+                }
+                survivors.append((url, mtime, size))
+                totalSize += size
+            }
+
+            if totalSize > sizeLimit {
+                // LRU: sort by mtime asc (oldest first)
+                survivors.sort { $0.1 < $1.1 }
+                for (url, _, size) in survivors {
+                    if totalSize <= sizeLimit { break }
+                    try? fm.removeItem(at: url)
+                    totalSize -= size
+                }
+            }
+        }
     }
 
     // MARK: - Manual Upload
@@ -3713,12 +5564,23 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
 
         let result = service.submitManualUpload(assets: assets)
+        if result.queuedCount > 0 {
+            runtimeManualUploadCancelled = false
+        }
 
         // Emit queue update to JS
         emitQueueToJS()
 
-        // If we're syncing, wake up the watch loop so manual items get processed
-        if isSyncing {
+        // Manual uploads must start immediately even when auto upload is disabled.
+        // If the loop is already alive, just wake it; otherwise bootstrap it.
+        if result.queuedCount > 0 {
+            if isSyncing {
+                photoLibraryChanged = true
+                resumeWatchLoopIfNeeded()
+            } else {
+                startSync()
+            }
+        } else if isSyncing {
             resumeWatchLoopIfNeeded()
         }
 
@@ -3735,25 +5597,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         guard let configStore = autoUploadConfigStore else {
             return [
                 "enabled": false,
-                "mediaFilter": "all",
                 "timeRangeMode": "from_now",
                 "state": "disabled",
             ]
         }
         let config = configStore.getConfig()
-        let state: String
-        if !config.enabled {
-            state = "disabled"
-        } else if isAutoUploadPaused {
-            state = "paused"
-        } else {
-            state = "active"
-        }
         var result: [String: Any] = [
             "enabled": config.enabled,
-            "mediaFilter": config.mediaFilter,
             "timeRangeMode": config.timeRangeMode,
-            "state": state,
+            "state": config.state,
         ]
         if let customTimeFrom = config.customTimeFrom {
             result["customTimeFrom"] = customTimeFrom
@@ -3765,20 +5617,40 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         guard let configStore = autoUploadConfigStore else {
             throw SyncEngineError.databaseError("Auto upload config store not initialized")
         }
-        let wasEnabled = configStore.getConfig().enabled
+        let currentConfig = configStore.getConfig()
+        let newEnabled = config["enabled"] as? Bool ?? currentConfig.enabled
+
+        // Determine the persisted state from the state machine source of truth.
+        // `enabled` is now legacy compatibility data and may not reflect the UI state.
+        let newState: String
+        if !newEnabled {
+            newState = "disabled"
+        } else if currentConfig.state == "disabled" {
+            newState = "active"
+        } else {
+            newState = currentConfig.state
+        }
+
         let record = AutoUploadConfigRecord(
-            enabled: config["enabled"] as? Bool ?? false,
-            mediaFilter: config["mediaFilter"] as? String ?? "all",
-            timeRangeMode: config["timeRangeMode"] as? String ?? "from_now",
-            customTimeFrom: config["customTimeFrom"] as? String,
+            enabled: newEnabled,
+            timeRangeMode: config["timeRangeMode"] as? String ?? currentConfig.timeRangeMode,
+            customTimeFrom: config["customTimeFrom"] as? String ?? currentConfig.customTimeFrom,
+            state: newState,
             updatedAt: ISO8601DateFormatter().string(from: Date())
         )
         try configStore.saveConfig(record)
 
-        // When auto-upload is newly enabled (or config changed while active),
-        // wake the watch loop so it picks up the new config immediately.
-        if record.enabled && (!wasEnabled || isSyncing) {
-            NSLog("[SyncEngine] auto-upload config changed — waking scan loop")
+        // When newly enabled from disabled, clear interrupt flag and wake scan loop
+        if newEnabled && currentConfig.state == "disabled" {
+            isAutoUploadInterrupted = false
+            slog("[SyncEngine] auto-upload enabled — waking scan loop")
+            photoLibraryChanged = true
+            resumeWatchLoopIfNeeded()
+        }
+
+        // Config changed while already active — wake loop to pick up changes
+        if newEnabled && currentConfig.state == "active" && isSyncing {
+            slog("[SyncEngine] auto-upload config changed — waking scan loop")
             photoLibraryChanged = true
             resumeWatchLoopIfNeeded()
         }
@@ -3828,11 +5700,215 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     // MARK: - Settings
 
     func renameBoundDeviceAlias(alias: String) async throws {
-        NSLog("[SyncEngine] renameBoundDeviceAlias \(alias)")
+        slog("[SyncEngine] renameBoundDeviceAlias \(alias)")
         guard var binding = uploadStore?.getBinding() else {
             throw SyncEngineError.pairingError("No active binding to rename")
         }
         binding.deviceAlias = alias
         try uploadStore?.saveBinding(binding)
+    }
+
+    // MARK: - Account Identity Reset (Phase 1 / 2 / 3)
+
+    /// UserDefaults key used as a 2-phase sentinel around a wipe. While set,
+    /// the next cold start treats the wipe as interrupted and re-runs it. See
+    /// AppDelegate for the launch-time self-heal branch.
+    private static let wipeInProgressKey = "vivi_wipe_in_progress"
+    /// UserDefaults key that remembers the last auth user id bound to the
+    /// current sync identity. Used by the JS login flow to detect "user B
+    /// logging in on a device that still has user A's sync state" and trigger
+    /// a wipe. Stored as `String` so backend ids above 2^53 round-trip
+    /// losslessly across the RN bridge; absence means "no owner recorded yet".
+    /// Writes go through `setOwnerUserId(_:)` which flushes synchronously; see
+    /// there for rationale — this marker is the Phase-2 durability anchor and
+    /// a process kill before flush would defeat the owner-mismatch guard.
+    private static let ownerUserIdKey = "lastSyncOwnerUserId"
+
+    /// Prefixes of Keychain accounts that represent per-device pairing tokens.
+    /// The current build writes `syncflow_pairing_token_<serverId>`; historical
+    /// builds used `pairing_token_<serverId>` — we sweep both so an upgraded
+    /// user never carries a dangling legacy entry past logout.
+    private static let pairingTokenKeyPrefixes = ["syncflow_pairing_token_", "pairing_token_"]
+
+    /// Single orchestrator for all sync-identity cleanup. Safe to call multiple
+    /// times (idempotent — each step re-checks state). Individual step failures
+    /// are logged and do not abort the rest of the wipe; the 2-phase flag
+    /// ensures the next cold start retries if we are killed mid-way.
+    ///
+    /// Clears: binding row, pairing tokens (legacy + per-device), clientId,
+    /// upload queue + sessions + daily ledger, auto-upload config, runtime
+    /// pipeline state.
+    ///
+    /// Preserves: clientDisplayName (device preference, not account data)
+    /// plus every UserDefaults key not explicitly touched below — including
+    /// language/theme/permission state and diagnostic flags outside our
+    /// scope. (Note: the `@vividrop/debug/*` namespace lives in AsyncStorage
+    /// on the JS side, not UserDefaults; Swift never touches it here, so it
+    /// is preserved by virtue of layer separation rather than by any
+    /// allowlist on this method.)
+    ///
+    /// Flush semantics: the sentinel `set(...)` at the top is followed by an
+    /// explicit `synchronize()` so it lands on disk before we start mutating
+    /// anything else — `UserDefaults` otherwise batches writes and a process
+    /// kill between the set and the eventual flush would leave the flag
+    /// unobservable on next cold start, defeating the self-heal retry in
+    /// `AppDelegate`. The `removeObject(forKey:)` at the bottom can stay
+    /// batched: if we die before it flushes, the next cold start simply sees
+    /// the flag still set and re-runs this method, which is idempotent
+    /// against already-cleared state.
+    @objc
+    func wipeSyncIdentity() {
+        let defaults = UserDefaults.standard
+        defaults.set("1", forKey: Self.wipeInProgressKey)
+        defaults.synchronize()  // Flush sentinel to disk immediately — see note above.
+        slog("[SyncEngine] wipeSyncIdentity: begin (sentinel set)")
+        syncDiagnosticsLog("SyncEngine", "wipeSyncIdentity: begin")
+
+        // 1. Tear down any live networking / timers so we don't race the wipe.
+        stopPresenceHeartbeatTimer()
+        protocolSession?.disconnect()
+        protocolSession = nil
+        transport.disconnect()
+        sessionService.endSession()
+        sidecarHost = nil
+        bindingConnectionState = .offline
+        SilentAudioService.shared.stop()
+        isSyncing = false
+        isAutoUploadInterrupted = false
+        shouldAbortActiveAutoUpload = false
+        shouldAbortActiveManualUpload = false
+        shouldAbortActiveUploadForBindingChange = false
+        runtimeManualUploadCancelled = false
+        runtimeLastCompletedTaskSource = nil
+        clearRuntimeSyncRoundProgress(uploadState: "idle")
+        runtimeUploadState = "idle"
+        runtimeLastErrorCode = nil
+        runtimeLastErrorMessage = nil
+        endBackgroundTransitionIfNeeded(reason: "wipeSyncIdentity")
+
+        // 2. Enumerate per-device pairing tokens BEFORE clearing the binding
+        // row — some installs rely on binding.pairingTokenKeychainRef to
+        // locate the current device's token. Also fall back to a prefix
+        // sweep for any orphaned legacy entries.
+        let boundBinding = uploadStore?.getBinding()
+        var pairingKeysToClear: Set<String> = []
+        if let ref = boundBinding?.pairingTokenKeychainRef, !ref.isEmpty {
+            pairingKeysToClear.insert(ref)
+        }
+        // Always include the legacy single-key token for completeness.
+        pairingKeysToClear.insert(BindingService.legacyPairingTokenKey)
+        for key in bindingService.listStoredKeychainKeys() {
+            for prefix in Self.pairingTokenKeyPrefixes where key.hasPrefix(prefix) {
+                pairingKeysToClear.insert(key)
+            }
+        }
+
+        // 3. Clear binding row (SQLite).
+        do {
+            try uploadStore?.clearBinding()
+        } catch {
+            slog("[SyncEngine] wipeSyncIdentity: clearBinding failed: %@", "\(error)")
+        }
+
+        // 4. Clear every pairing token we located. `clearPairingToken(forKey:)`
+        // is already no-op safe when the entry is missing.
+        for key in pairingKeysToClear {
+            bindingService.clearPairingToken(forKey: key)
+        }
+        bindingService.clearPairingToken()  // belt-and-braces: legacy single-key API
+
+        // 5. Clear clientId so the next session generates a fresh UUID.
+        bindingService.clearClientId()
+
+        // 6. Clear upload queue + sessions + daily ledger in one shot.
+        do {
+            try uploadStore?.resetAllStatusData()
+        } catch {
+            slog("[SyncEngine] wipeSyncIdentity: resetAllStatusData failed: %@", "\(error)")
+        }
+
+        // 7. Reset auto upload config (persisted enabled flag, timeRangeMode,
+        // customTimeFrom, state). Falls back to schema default row on next
+        // read.
+        do {
+            try uploadStore?.resetAutoUploadConfig()
+        } catch {
+            slog("[SyncEngine] wipeSyncIdentity: resetAutoUploadConfig failed: %@", "\(error)")
+        }
+
+        // 8. Forget the previously-recorded owner so we don't false-trigger the
+        // owner-mismatch path on the very next login.
+        defaults.removeObject(forKey: Self.ownerUserIdKey)
+
+        // 9. Push fresh empty state to JS so any foregrounded UI does not keep
+        // rendering stale data (binding card, queue, history).
+        NativeSyncEngineModule.shared?.emitBindingStateChanged(nil)
+        NativeSyncEngineModule.shared?.emitQueueUpdated([])
+        NativeSyncEngineModule.shared?.emitHistoryUpdated()
+        NativeSyncEngineModule.shared?.emitSyncStateChanged(
+            runtimeSyncOverviewPayload(uploadState: "idle")
+        )
+
+        // 10. Clear the sentinel last — any crash before this point causes a
+        // self-heal retry on next launch.
+        defaults.removeObject(forKey: Self.wipeInProgressKey)
+        slog("[SyncEngine] wipeSyncIdentity: complete (sentinel cleared)")
+        syncDiagnosticsLog("SyncEngine", "wipeSyncIdentity: complete")
+    }
+
+    /// Last auth user id bound to the current sync identity, or `nil` if no
+    /// owner has been recorded yet (fresh install / post-wipe). The value is
+    /// a `String` so backend ids above 2^53 round-trip without hitting the
+    /// `NSNumber`/`Double` precision ceiling — the JS bootstrap compares
+    /// against `String(profile.id)`. `UserDefaults` is thread-safe, so this
+    /// accessor is safe to call off the main actor.
+    @objc
+    func getOwnerUserId() -> String? {
+        let defaults = UserDefaults.standard
+        return defaults.string(forKey: Self.ownerUserIdKey)
+    }
+
+    /// Write the owner id as a string to preserve full precision across the
+    /// RN bridge. `UserDefaults` is thread-safe; no main-actor hop needed.
+    ///
+    /// Returns `true` iff the write was durably flushed to disk. The caller
+    /// (RNBridge.setOwnerUserId) rejects the JS promise on `false` so
+    /// `bootstrapAuthedSession` can fail the bootstrap rather than flipping
+    /// the navigator into `AuthedStack` with an un-marked owner that a
+    /// future cold start can't detect.
+    @objc
+    func setOwnerUserId(_ id: String) -> Bool {
+        let defaults = UserDefaults.standard
+        defaults.set(id, forKey: Self.ownerUserIdKey)
+        // Durable flush — this marker is the ONLY signal the Phase-2 owner
+        // guard uses on next cold start. `UserDefaults` batches writes to
+        // disk, so a process kill between `set(...)` and the OS's eventual
+        // flush would leave the marker unobservable and bypass the guard.
+        // `synchronize()` is formally deprecated but remains the documented
+        // escape hatch for forced flush, and we are already using it for
+        // the install_marker and wipe_in_progress sentinels for the same
+        // reason (see AppDelegate.swift + wipeSyncIdentity above).
+        //
+        // `synchronize()` returns `false` if the write failed (disk full,
+        // sandbox permissions, etc.). We propagate that up so the JS layer
+        // can fail the bootstrap; silently treating it as success would
+        // leave us one process-kill away from a Phase-2 bypass.
+        let flushed = defaults.synchronize()
+        if !flushed {
+            slog("[SyncEngine] owner user id set FAILED to flush for %@", id)
+        } else {
+            slog("[SyncEngine] owner user id set to %@", id)
+        }
+        return flushed
+    }
+
+    func getKnownDeviceIds() -> [String] {
+        let keys = bindingService.listStoredKeychainKeys()
+        return keys.compactMap { key -> String? in
+            for prefix in Self.pairingTokenKeyPrefixes {
+                if key.hasPrefix(prefix) { return String(key.dropFirst(prefix.count)) }
+            }
+            return nil
+        }
     }
 }

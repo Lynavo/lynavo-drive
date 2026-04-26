@@ -1,9 +1,9 @@
 import { NativeModules } from 'react-native';
 import type {
   AlbumAssetDTO,
+  AssetPreviewSourceDTO,
   AutoUploadConfigDTO,
   SharedDirectoryDTO,
-  AutoUploadMediaFilter,
   AutoUploadTimeRangeMode,
 } from '@syncflow/contracts';
 
@@ -21,6 +21,12 @@ export interface AlbumStats {
   totalCount: number;
   transferredCount: number;
   queuedCount: number;
+  /**
+   * Remaining assets that still need to be uploaded. Honours the auto-upload
+   * time range filter when it is active; otherwise equals
+   * `totalCount - transferredCount`.
+   */
+  pendingCount: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -72,6 +78,13 @@ export async function getAlbumCollections(
   return (result ?? []) as AlbumCollectionInfo[];
 }
 
+export async function getAssetPreviewSource(
+  assetLocalId: string,
+): Promise<AssetPreviewSourceDTO> {
+  const result = await NativeSyncEngine.getAssetPreviewSource(assetLocalId);
+  return result as AssetPreviewSourceDTO;
+}
+
 export async function submitManualUpload(
   assetLocalIds: string[],
 ): Promise<ManualUploadResult> {
@@ -83,11 +96,22 @@ export async function cancelManualBatch(batchId: string): Promise<void> {
   await NativeSyncEngine.cancelManualBatch(batchId);
 }
 
-export async function pauseAutoUpload(): Promise<void> {
+export async function cancelAllManualUploads(): Promise<void> {
+  await NativeSyncEngine.cancelAllManualUploads();
+}
+
+/** Interrupt auto upload: stops processing auto items, persists 'interrupted' state. */
+export async function interruptAutoUpload(): Promise<void> {
   await NativeSyncEngine.pauseAutoUpload();
 }
 
-export async function resumeAutoUpload(): Promise<void> {
+/** Disable auto upload: turns the feature off, persists 'disabled' state. */
+export async function disableAutoUpload(): Promise<void> {
+  await NativeSyncEngine.disableAutoUpload();
+}
+
+/** Re-enable auto upload from interrupted/disabled state, persists 'active' state. */
+export async function enableAutoUpload(): Promise<void> {
   await NativeSyncEngine.resumeAutoUpload();
 }
 
@@ -98,7 +122,6 @@ export async function getAutoUploadConfig(): Promise<AutoUploadConfigDTO> {
 
 export async function saveAutoUploadConfig(config: {
   enabled: boolean;
-  mediaFilter: AutoUploadMediaFilter;
   timeRangeMode: AutoUploadTimeRangeMode;
   customTimeFrom?: string;
 }): Promise<void> {
@@ -130,4 +153,83 @@ export async function getSharedFileStreamUrl(path: string): Promise<string> {
 export async function shareFile(localPath: string): Promise<boolean> {
   const result = await NativeSyncEngine.shareFile(localPath);
   return result as boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Photo library permission helpers
+// ---------------------------------------------------------------------------
+
+export type PhotoAuthorizationStatus =
+  | 'authorized'
+  | 'limited'
+  | 'denied'
+  | 'restricted'
+  | 'notDetermined'
+  | 'unknown';
+
+/** Check current photo library authorization without prompting. */
+export async function getPhotoAuthorizationStatus(): Promise<PhotoAuthorizationStatus> {
+  const result = await NativeSyncEngine.getPhotoAuthorizationStatus();
+  return result as PhotoAuthorizationStatus;
+}
+
+/** Present the iOS limited photo picker so the user can add more photos. */
+export async function presentLimitedPhotoPicker(): Promise<void> {
+  await NativeSyncEngine.presentLimitedPhotoPicker();
+}
+
+// ---------------------------------------------------------------------------
+// Account Identity Reset (Phase 1 / 2 / 3)
+//
+// Single native entry point for clearing everything the sync layer has ever
+// persisted about the current account: binding, pairing tokens, clientId,
+// upload queue, sessions, daily ledger, auto-upload config. `clientDisplayName`
+// is preserved as a device preference. See the native
+// SyncEngineManager.wipeSyncIdentity (iOS) / performWipeSyncIdentity
+// companion (Android) implementations for the authoritative cleared-vs-kept
+// list.
+// ---------------------------------------------------------------------------
+
+/** Run the full native wipe. Awaited — the caller MUST hold navigation /
+ *  auth state until this resolves or rejects, otherwise the next login flow
+ *  can race into residual state. */
+export async function wipeSyncIdentity(): Promise<void> {
+  await NativeSyncEngine.wipeSyncIdentity();
+}
+
+/** Read the auth user-id last bound to the sync identity on this device.
+ *  `null` means "no owner recorded yet" (fresh install, post-wipe, or an
+ *  older build that never wrote the field).
+ *
+ *  Returned as a string so backend ids above 2^53 round-trip losslessly —
+ *  the native bridge would otherwise demote through `Double` on both
+ *  iOS (`NSNumber`) and Android (`Long`). Callers compare against
+ *  `String(profile.id)`. */
+export async function getOwnerUserId(): Promise<string | null> {
+  const result = await NativeSyncEngine.getOwnerUserId();
+  if (typeof result !== 'string' || result.length === 0) {
+    return null;
+  }
+  return result;
+}
+
+export async function getClientId(): Promise<string> {
+  const result = await NativeSyncEngine.getClientId();
+  return String(result);
+}
+
+/** Record the auth user-id now bound to the sync identity on this device.
+ *  Written after a successful login + owner-check, so a later login by a
+ *  different user can be detected via owner mismatch and force a wipe.
+ *
+ *  Accepts either `number | string` for caller convenience; we stringify
+ *  before the native call so the bridge layer never sees `Double` and
+ *  can't lose precision on ids above 2^53. */
+export async function setOwnerUserId(userId: number | string): Promise<void> {
+  await NativeSyncEngine.setOwnerUserId(String(userId));
+}
+
+export async function getKnownDeviceIds(): Promise<string[]> {
+  const result = await NativeSyncEngine.getKnownDeviceIds();
+  return (result ?? []) as string[];
 }

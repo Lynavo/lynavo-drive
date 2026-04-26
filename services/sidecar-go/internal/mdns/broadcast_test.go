@@ -336,6 +336,7 @@ func TestIsRFC1918(t *testing.T) {
 		{"172.16.0.1", true},
 		{"172.31.255.255", true},
 		{"172.32.0.1", false},
+		{"172.168.20.3", false},
 		{"192.168.1.100", true},
 		{"192.168.255.255", true},
 		{"8.8.8.8", false},
@@ -359,7 +360,6 @@ func TestIPAddrScore(t *testing.T) {
 	}{
 		{"192.168.1.1", 0},  // RFC1918 → positive score
 		{"10.0.0.1", 0},     // RFC1918 → positive score
-		{"8.8.8.8", 0},      // public but not APIPA → positive score
 		{"169.254.1.1", -6}, // APIPA → negative score
 	}
 	for _, tc := range cases {
@@ -380,20 +380,34 @@ func TestIPAddrScore(t *testing.T) {
 	}
 }
 
+func TestIPAddrScore_PublicAddressPenalised(t *testing.T) {
+	publicIP := net.ParseIP("172.168.20.3").To4()
+	rfc1918IP := net.ParseIP("172.16.21.43").To4()
+	if publicIP == nil || rfc1918IP == nil {
+		t.Fatal("invalid IP in test")
+	}
+	if ipAddrScore(publicIP) >= ipAddrScore(rfc1918IP) {
+		t.Fatalf("public address score must be lower than RFC1918")
+	}
+	if ipAddrScore(publicIP) >= 0 {
+		t.Fatalf("public address score must be negative")
+	}
+}
+
 func TestIsSpecialUseIP(t *testing.T) {
 	cases := []struct {
 		ip      string
 		special bool
 	}{
-		{"198.18.0.1", true},   // iCloud Private Relay lower bound
-		{"198.19.255.255", true}, // iCloud Private Relay upper bound
-		{"198.20.0.1", false},  // just outside the block
-		{"100.64.0.1", true},   // CGNAT/Tailscale lower bound
+		{"198.18.0.1", true},      // iCloud Private Relay lower bound
+		{"198.19.255.255", true},  // iCloud Private Relay upper bound
+		{"198.20.0.1", false},     // just outside the block
+		{"100.64.0.1", true},      // CGNAT/Tailscale lower bound
 		{"100.127.255.255", true}, // CGNAT upper bound
-		{"100.128.0.1", false}, // just outside
-		{"192.168.1.1", false}, // RFC 1918 — not special-use
-		{"10.0.0.1", false},    // RFC 1918 — not special-use
-		{"8.8.8.8", false},     // public IP
+		{"100.128.0.1", false},    // just outside
+		{"192.168.1.1", false},    // RFC 1918 — not special-use
+		{"10.0.0.1", false},       // RFC 1918 — not special-use
+		{"8.8.8.8", false},        // public IP
 	}
 	for _, tc := range cases {
 		ip := net.ParseIP(tc.ip).To4()

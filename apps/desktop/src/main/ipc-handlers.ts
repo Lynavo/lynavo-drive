@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { sidecarClient } from './sidecar-client';
+import { sidecarClient, supportsPairingRevocationOnCodeRotation } from './sidecar-client';
 import {
   openFolder,
   openFile,
@@ -38,6 +38,20 @@ export const IPC = {
   FILES_COPY_CLIPBOARD: 'files:copy-clipboard',
 } as const;
 
+async function regenerateConnectionCodeSafely(sidecarManager: SidecarManager): Promise<{ code: string }> {
+  let health = null;
+  try {
+    health = await sidecarClient.getHealth();
+  } catch {
+    // Regeneration is a foreground user action; recover the sidecar here so
+    // the UI cannot report a fresh code from a stale or missing service.
+  }
+  if (!supportsPairingRevocationOnCodeRotation(health)) {
+    await sidecarManager.retryStart();
+  }
+  return sidecarClient.regenerateConnectionCode();
+}
+
 export function registerIpcHandlers(sidecarManager: SidecarManager): void {
   // Sidecar — real HTTP calls
   ipcMain.handle(IPC.SIDECAR_HEALTH, () => sidecarClient.getHealth());
@@ -65,7 +79,9 @@ export function registerIpcHandlers(sidecarManager: SidecarManager): void {
     sidecarClient.updateSettings(partial),
   );
   ipcMain.handle(IPC.SIDECAR_RESET_STATE, () => sidecarClient.resetState());
-  ipcMain.handle(IPC.SIDECAR_REGENERATE_CODE, () => sidecarClient.regenerateConnectionCode());
+  ipcMain.handle(IPC.SIDECAR_REGENERATE_CODE, () =>
+    regenerateConnectionCodeSafely(sidecarManager),
+  );
   ipcMain.handle(IPC.SIDECAR_RUNTIME_STATE, () => sidecarManager.getState());
   ipcMain.handle(IPC.SIDECAR_RETRY_START, () => sidecarManager.retryStart());
   ipcMain.handle(IPC.SIDECAR_INSTALL_BONJOUR, () => installBonjourForWindows(sidecarManager));

@@ -30,6 +30,7 @@ export interface DeviceDetailState {
     options?: {
       date?: string;
       page?: number;
+      silent?: boolean;
     },
   ): Promise<void>;
   setDate(date: string): void;
@@ -59,7 +60,10 @@ export const useDeviceDetailStore = create<DeviceDetailState>((set, get) => ({
   fetchDeviceFiles: async (deviceId, options) => {
     const api = window.electronAPI;
     if (!api) return;
-    set({ loading: true, error: null });
+    const silent = options?.silent ?? false;
+    if (!silent) {
+      set({ loading: true, error: null });
+    }
     try {
       const datesRes = await api.sidecar.getDeviceDates(deviceId);
       const dates = datesRes.dates ?? [];
@@ -102,9 +106,11 @@ export const useDeviceDetailStore = create<DeviceDetailState>((set, get) => ({
         totalBytes: pageData.totalBytes,
         totalTransmissionMs: pageData.totalActiveTransmissionMs,
         loading: false,
+        error: null,
       });
     } catch (err) {
       console.error('Failed to fetch device files:', err);
+      if (silent) return;
       set({ loading: false, error: '加载文件记录失败' });
       toast.error('加载文件记录失败', { description: '请稍后重试' });
     }

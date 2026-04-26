@@ -1,0 +1,48 @@
+{
+  "title": "搜尋設備",
+  "subtitle": {
+    "ios": "正在掃描區域網路中的電腦端應用...",
+    "android": "正在掃描區域網路中的電腦端應用；若未發現設備，可改用手動輸入 IPv4。"
+  },
+  "scanning": {
+    "text": "掃描中，請稍候..."
+  },
+  "devices": {
+    "foundCount_one": "發現 {{count}} 台設備",
+    "foundCount": "發現 {{count}} 台設備",
+    "foundCount_other": "發現 {{count}} 台設備"
+  },
+  "emptyState": {
+    "default": "未發現設備",
+    "android": "未發現設備，請手動輸入 IP 繼續配對"
+  },
+  "actions": {
+    "manualPair": "手動配對",
+    "rescan": "重新掃描",
+    "manualInputIp": "手動輸入 IP",
+    "qrPair": "掃碼配對"
+  },
+  "dialogs": {
+    "openLinkFailed": {
+      "title": "開啟失敗",
+      "body": "暫時無法開啟{{label}}，請稍後重試。"
+    },
+    "manualInput": {
+      "title": "手動輸入 IP 配對",
+      "description": "如果掃描不到電腦，尤其是 Windows 設備，可直接輸入電腦端 IPv4 地址繼續配對。",
+      "confirm": "繼續",
+      "hint": "預設使用同步端口 39393，輸入後仍需在下一步填寫 6 位連接碼。",
+      "ipError": "請輸入有效的 IPv4 地址，例如 192.168.0.1"
+    }
+  },
+  "switch": {
+    "title": "切換設備",
+    "badge": {
+      "known": "直接切換",
+      "current": "當前"
+    },
+    "toast": {
+      "alreadyCurrent": "已是當前連接設備"
+    }
+  }
+}

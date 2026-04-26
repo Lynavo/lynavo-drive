@@ -27,6 +27,9 @@ export interface Spec extends TurboModule {
   getClientDisplayName(): Promise<string>;
   setClientDisplayName(name: string): Promise<void>;
   triggerSync(): Promise<void>;
+  pauseAutoUpload(): Promise<void>;
+  disableAutoUpload(): Promise<void>;
+  resumeAutoUpload(): Promise<void>;
   // 设置
   renameBoundDeviceAlias(alias: string): Promise<void>;
   // 事件 (Codegen EventEmitter)

@@ -1,0 +1,16 @@
+{
+  "ok": "好",
+  "cancel": "取消",
+  "confirm": "确认",
+  "back": "返回",
+  "retry": "重试",
+  "loading": "加载中",
+  "unknownVersion": "未知版本",
+  "privacyPolicy": "《隐私政策》",
+  "termsOfService": "《用户协议》",
+  "deviceNames": {
+    "default": "电脑",
+    "windows": "Windows 电脑"
+  },
+  "diagnosticsArchiveTitle": "Vivi Drop 诊断包"
+}

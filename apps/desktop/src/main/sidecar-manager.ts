@@ -6,7 +6,8 @@ import { promisify } from 'node:util';
 import { app } from 'electron';
 import log from 'electron-log';
 import { SIDECAR_HTTP_PORT } from '@syncflow/contracts';
-import { sidecarClient } from './sidecar-client';
+import { sidecarClient, supportsPairingRevocationOnCodeRotation } from './sidecar-client';
+import type { SidecarHealth } from './sidecar-client';
 import type {
   BonjourRuntimeSource,
   BonjourRuntimeState,
@@ -137,7 +138,8 @@ export class SidecarManager extends EventEmitter {
     const bonjour = this.detectBonjourRuntime();
     const reuseExisting = options.reuseExisting ?? !isDev;
 
-    if (reuseExisting && (await this.healthCheck())) {
+    const existingHealth = reuseExisting ? await this.getHealthSnapshot() : null;
+    if (existingHealth?.ok && this.canReuseExistingSidecar(existingHealth)) {
       this.restartCount = 0;
       this.startHealthCheck();
       this.setState({
@@ -150,6 +152,13 @@ export class SidecarManager extends EventEmitter {
       });
       log.info('[SidecarManager] reusing existing healthy sidecar');
       return;
+    }
+    if (existingHealth?.ok) {
+      log.warn('[SidecarManager] existing sidecar is healthy but lacks required capabilities; restarting bundled sidecar');
+      const killedExistingSidecar = await this.forceShutdownExistingSidecar();
+      if (killedExistingSidecar) {
+        await this.waitForSidecarToStop(SIDECAR_STOP_TIMEOUT_MS);
+      }
     }
 
     if (!reuseExisting) {
@@ -322,12 +331,20 @@ export class SidecarManager extends EventEmitter {
   }
 
   async healthCheck(): Promise<boolean> {
+    const res = await this.getHealthSnapshot();
+    return res?.ok === true && res.service === 'syncflow-sidecar';
+  }
+
+  private async getHealthSnapshot(): Promise<SidecarHealth | null> {
     try {
-      const res = await sidecarClient.getHealth();
-      return res.ok === true;
+      return await sidecarClient.getHealth();
     } catch {
-      return false;
+      return null;
     }
+  }
+
+  private canReuseExistingSidecar(health: SidecarHealth): boolean {
+    return supportsPairingRevocationOnCodeRotation(health);
   }
 
   private async waitForHealth(retries: number, intervalMs: number): Promise<void> {
@@ -388,10 +405,6 @@ export class SidecarManager extends EventEmitter {
   }
 
   private async forceShutdownSyncFlowBonjourBroadcasts(): Promise<void> {
-    if (process.platform !== 'win32') {
-      return;
-    }
-
     const pids = await findSyncFlowBonjourBroadcastPIDs();
     if (pids.length === 0) {
       return;
@@ -544,20 +557,22 @@ async function findProcessPIDsByName(processName: string): Promise<number[]> {
 }
 
 async function findSyncFlowBonjourBroadcastPIDs(): Promise<number[]> {
-  if (process.platform !== 'win32') {
-    return [];
-  }
-
   try {
-    const script = [
-      `$processes = Get-CimInstance Win32_Process -Filter "Name='${bonjourBinaryName}'" -ErrorAction SilentlyContinue | Where-Object {`,
-      "  $_.CommandLine -match 'dns-sd(\\\\.exe)?\\s+-R' -and",
-      "  $_.CommandLine -match '_syncflow\\._tcp' -and",
-      "  $_.CommandLine -match 'local\\.'",
-      '} | Select-Object -ExpandProperty ProcessId',
-      'if ($processes) { $processes | Sort-Object -Unique }',
-    ].join(' ');
-    const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', script]);
+    if (process.platform === 'win32') {
+      const script = [
+        `$processes = Get-CimInstance Win32_Process -Filter "Name='${bonjourBinaryName}'" -ErrorAction SilentlyContinue | Where-Object {`,
+        "  $_.CommandLine -match 'dns-sd(\\\\.exe)?\\s+-R' -and",
+        "  $_.CommandLine -match '_syncflow\\._tcp' -and",
+        "  $_.CommandLine -match 'local\\.'",
+        '} | Select-Object -ExpandProperty ProcessId',
+        'if ($processes) { $processes | Sort-Object -Unique }',
+      ].join(' ');
+      const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', script]);
+      return parsePIDList(stdout);
+    }
+
+    // macOS / Linux: use pgrep to find dns-sd processes advertising _syncflow._tcp
+    const { stdout } = await execFileAsync('pgrep', ['-f', 'dns-sd.*_syncflow._tcp']);
     return parsePIDList(stdout);
   } catch {
     return [];

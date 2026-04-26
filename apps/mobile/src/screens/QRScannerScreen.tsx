@@ -5,9 +5,11 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { Icon } from '../components/Icon';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 function IOSQRScannerScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const { t } = useTranslation();
   const [hasPermission, setHasPermission] = useState(false);
   const {
     Camera,
@@ -87,9 +89,9 @@ function IOSQRScannerScreen() {
   if (!hasPermission) {
     return (
       <View style={styles.center}>
-        <Text style={styles.text}>需要相机权限来扫描二维码</Text>
+        <Text style={styles.text}>{t('qrScanner.permissionDenied.text')}</Text>
         <TouchableOpacity style={styles.button} onPress={() => navigation.goBack()}>
-          <Text style={styles.buttonText}>返回</Text>
+          <Text style={styles.buttonText}>{t('common.back')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -98,9 +100,9 @@ function IOSQRScannerScreen() {
   if (device == null) {
     return (
       <View style={styles.center}>
-        <Text style={styles.text}>未找到相机设备</Text>
+        <Text style={styles.text}>{t('qrScanner.noCameraDevice')}</Text>
         <TouchableOpacity style={styles.button} onPress={() => navigation.goBack()}>
-          <Text style={styles.buttonText}>返回</Text>
+          <Text style={styles.buttonText}>{t('common.back')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -119,11 +121,11 @@ function IOSQRScannerScreen() {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <Icon name="chevron-back" size={28} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.title}>扫描配对二维码</Text>
+          <Text style={styles.title}>{t('qrScanner.title')}</Text>
         </View>
         <View style={styles.focusFrame} />
         <View style={styles.footer}>
-          <Text style={styles.footerText}>请将二维码放入框内即可自动连接</Text>
+          <Text style={styles.footerText}>{t('qrScanner.instruction')}</Text>
         </View>
       </View>
     </SafeAreaView>
@@ -132,6 +134,7 @@ function IOSQRScannerScreen() {
 
 function AndroidQRScannerFallback() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const { t } = useTranslation();
 
   return (
     <SafeAreaView style={styles.androidFallbackContainer}>
@@ -139,17 +142,15 @@ function AndroidQRScannerFallback() {
         <View style={styles.androidFallbackIcon}>
           <Icon name="scan-outline" size={28} color="#3b9fd8" />
         </View>
-        <Text style={styles.androidFallbackTitle}>{'Android 暂未提供扫码配对'}</Text>
+        <Text style={styles.androidFallbackTitle}>{t('qrScanner.android.title')}</Text>
         <Text style={styles.androidFallbackBody}>
-          {
-            '当前 Android 基线版本先开放基础桥接与手动配对入口。请返回上一页，使用“手动配对”输入桌面端 IPv4 地址继续。'
-          }
+          {t('qrScanner.android.body')}
         </Text>
         <TouchableOpacity
           style={styles.androidFallbackButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.androidFallbackButtonText}>{'返回手动配对'}</Text>
+          <Text style={styles.androidFallbackButtonText}>{t('qrScanner.android.backToManual')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

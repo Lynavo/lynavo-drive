@@ -4,11 +4,15 @@ import type { DashboardDeviceDTO, DashboardSummaryDTO } from '@syncflow/contract
 import type { DeviceDashboardStatus } from '@syncflow/contracts';
 import { useSidecarRuntimeStore } from './sidecar-runtime-store';
 
+const OFFLINE_STATUS_DEBOUNCE_MS = 3_000;
+
 const STATUS_PRIORITY: Record<DeviceDashboardStatus, number> = {
   transferring: 0,
   connected_idle: 1,
   offline: 2,
 };
+
+const pendingOfflineStatusTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function sortDevices(devices: DashboardDeviceDTO[]): DashboardDeviceDTO[] {
   return [...devices].sort(
@@ -18,6 +22,87 @@ function sortDevices(devices: DashboardDeviceDTO[]): DashboardDeviceDTO[] {
 
 function isSidecarHealthy(): boolean {
   return useSidecarRuntimeStore.getState().runtime.status === 'healthy';
+}
+
+function isStorageUnavailableError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err ?? '');
+  return message.includes('storage path unavailable');
+}
+
+function shouldPreserveRealtimeTransfer(
+  existing: DashboardDeviceDTO,
+  snapshot: DashboardDeviceDTO,
+): boolean {
+  if (existing.status !== 'transferring') {
+    return false;
+  }
+
+  if (!existing.currentFile) {
+    return snapshot.status !== 'transferring';
+  }
+
+  if (snapshot.status !== 'transferring') {
+    return existing.currentFile.progress < 100;
+  }
+
+  if (!snapshot.currentFile) {
+    return false;
+  }
+
+  return (
+    snapshot.currentFile.filename === existing.currentFile.filename &&
+    snapshot.currentFile.progress <= 0 &&
+    existing.currentFile.progress > 0
+  );
+}
+
+function clearPendingOfflineStatus(deviceId: string): void {
+  const timer = pendingOfflineStatusTimers.get(deviceId);
+  if (!timer) return;
+  clearTimeout(timer);
+  pendingOfflineStatusTimers.delete(deviceId);
+}
+
+function scheduleOfflineStatus(
+  deviceId: string,
+  set: (partial:
+    | Partial<DashboardState>
+    | ((state: DashboardState) => Partial<DashboardState>),
+  ) => void,
+): void {
+  clearPendingOfflineStatus(deviceId);
+
+  const timer = setTimeout(() => {
+    pendingOfflineStatusTimers.delete(deviceId);
+    set((state) => ({
+      devices: applyDeviceStatus(state.devices, deviceId, 'offline'),
+    }));
+  }, OFFLINE_STATUS_DEBOUNCE_MS);
+
+  pendingOfflineStatusTimers.set(deviceId, timer);
+}
+
+function applyDeviceStatus(
+  devices: DashboardDeviceDTO[],
+  deviceId: string,
+  status: DeviceDashboardStatus,
+): DashboardDeviceDTO[] {
+  return sortDevices(
+    devices.map((d) =>
+      d.deviceId === deviceId
+        ? {
+            ...d,
+            status,
+            currentFile: status === 'transferring' ? d.currentFile : undefined,
+          }
+        : d,
+    ),
+  );
+}
+
+export function resetPendingOfflineStatusDebounceForTests(): void {
+  pendingOfflineStatusTimers.forEach((timer) => clearTimeout(timer));
+  pendingOfflineStatusTimers.clear();
 }
 
 export interface DashboardState {
@@ -31,6 +116,47 @@ export interface DashboardState {
   updateDevices(devices: DashboardDeviceDTO[]): void;
   updateDeviceProgress(deviceId: string, fileKey: string, progress: number): void;
   updateDeviceStatus(deviceId: string, status: DeviceDashboardStatus): void;
+}
+
+function reconcileIncomingDevices(
+  incomingDevices: DashboardDeviceDTO[],
+  currentDevices: DashboardDeviceDTO[],
+  set: (partial:
+    | Partial<DashboardState>
+    | ((state: DashboardState) => Partial<DashboardState>),
+  ) => void,
+): DashboardDeviceDTO[] {
+  return incomingDevices.map((device) => {
+    const existing = currentDevices.find((current) => current.deviceId === device.deviceId);
+    if (!existing) {
+      return device;
+    }
+
+    const patched = { ...device };
+    const preserveRealtimeTransfer = shouldPreserveRealtimeTransfer(existing, device);
+
+    if (preserveRealtimeTransfer) {
+      patched.status = existing.status;
+    }
+
+    if (
+      preserveRealtimeTransfer &&
+      existing.currentFile &&
+      existing.currentFile.progress > (device.currentFile?.progress ?? 0)
+    ) {
+      patched.currentFile = existing.currentFile;
+    }
+
+    if (device.status === 'offline' && existing.status !== 'offline') {
+      scheduleOfflineStatus(device.deviceId, set);
+      patched.status = existing.status;
+      patched.currentFile = existing.status === 'transferring' ? existing.currentFile : undefined;
+      return patched;
+    }
+
+    clearPendingOfflineStatus(device.deviceId);
+    return patched;
+  });
 }
 
 export const useDashboardStore = create<DashboardState>((set, get) => ({
@@ -57,31 +183,21 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       ]);
       if (summary) set({ summary });
       if (devices) {
-        // Merge: preserve real-time WebSocket state over stale REST snapshots
-        const current = get().devices;
-        const merged = devices.map((d) => {
-          const existing = current.find((c) => c.deviceId === d.deviceId);
-          if (!existing) return d;
-          const patched = { ...d };
-          // Don't let REST downgrade status set by WebSocket event
-          if (
-            existing.status === 'transferring' &&
-            d.status !== 'transferring'
-          ) {
-            patched.status = existing.status;
-          }
-          // Keep higher progress from WebSocket if API returns lower/zero
-          if (existing.currentFile && existing.currentFile.progress > (d.currentFile?.progress ?? 0)) {
-            patched.currentFile = existing.currentFile;
-          }
-          return patched;
-        });
+        const merged = reconcileIncomingDevices(devices, get().devices, set);
         set({ devices: sortDevices(merged) });
       }
     } catch (err) {
       console.error('Failed to fetch dashboard:', err);
-      set({ error: '加载设备列表失败' });
-      toast.error('加载设备列表失败', { description: '请检查网络连接后重试' });
+      const storageUnavailable = isStorageUnavailableError(err);
+      const message = storageUnavailable
+        ? '接收目录不可用，请重新选择或恢复文件夹'
+        : '加载设备列表失败';
+      set({ error: message });
+      toast.error(message, {
+        description: storageUnavailable
+          ? '电脑端仍在线，但目前无法存取设置的接收位置'
+          : '请检查网络连接后重试',
+      });
     }
   },
 
@@ -89,7 +205,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   updateSummary: (summary) => { if (summary) set({ summary }); },
 
-  updateDevices: (devices) => set({ devices: sortDevices(devices) }),
+  updateDevices: (devices) => {
+    const merged = reconcileIncomingDevices(devices, get().devices, set);
+    set({ devices: sortDevices(merged) });
+  },
 
   updateDeviceProgress: (deviceId, fileKey, progress) => {
     if (progress <= 0) return; // ignore zero-progress events
@@ -110,12 +229,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   updateDeviceStatus: (deviceId, status) => {
+    if (status === 'offline') {
+      scheduleOfflineStatus(deviceId, set);
+      return;
+    }
+
+    clearPendingOfflineStatus(deviceId);
     set((state) => ({
-      devices: sortDevices(
-        state.devices.map((d) =>
-          d.deviceId === deviceId ? { ...d, status } : d,
-        ),
-      ),
+      devices: applyDeviceStatus(state.devices, deviceId, status),
     }));
   },
 }));

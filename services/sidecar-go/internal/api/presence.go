@@ -1,9 +1,12 @@
 package api
 
 import (
+	"database/sql"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/nicksyncflow/sidecar/internal/events"
 )
 
 // PresenceTracker tracks lightweight heartbeats from mobile clients.
@@ -39,5 +42,35 @@ func (s *Server) handlePresence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.presence.Touch(clientID)
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	if s.hub != nil {
+		s.hub.Broadcast(events.Event{
+			Type: "device.state.changed",
+			Payload: map[string]string{
+				"deviceId": clientID,
+				"status":   "connected_idle",
+			},
+		})
+	}
+
+	serverName, err := s.store.GetDeviceName()
+	if err != nil && err != sql.ErrNoRows {
+		writeError(w, http.StatusInternalServerError, "failed to get device name")
+		return
+	}
+
+	var shareName any = nil
+	shareConfig, err := s.store.GetShareConfig()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get share config")
+		return
+	}
+	if shareConfig != nil && shareConfig.ShareName != "" {
+		shareName = shareConfig.ShareName
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":         true,
+		"serverName": serverName,
+		"shareName":  shareName,
+	})
 }

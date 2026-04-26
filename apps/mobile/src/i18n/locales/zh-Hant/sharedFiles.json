@@ -1,0 +1,36 @@
+{
+  "defaultFolderName": "共享目錄",
+  "loading": "載入中...",
+  "files": {
+    "folder": "資料夾"
+  },
+  "emptyState": {
+    "title": "共享目錄暫無內容",
+    "message": "同步完成後，檔案將顯示在這裡"
+  },
+  "deviceUnavailable": {
+    "title": "設備不可用",
+    "message": "請先連接設備",
+    "recheck": "重新檢查"
+  },
+  "directoryInaccessible": {
+    "title": "共享目錄不可存取",
+    "message": "請檢查電腦端設定"
+  },
+  "networkError": {
+    "title": "載入失敗",
+    "message": "請稍後重試"
+  },
+  "preview": {
+    "playVideo": "點擊播放影片"
+  },
+  "dialogs": {
+    "downloadSavedToPhotos": "{{name}} 已儲存到相簿",
+    "downloadSaved": "{{name}} 已儲存",
+    "downloadComplete": "下載完成",
+    "downloadFailed": "下載失敗",
+    "downloadFailedMessage": "無法下載檔案，請稍後重試",
+    "previewFailed": "預覽失敗",
+    "previewFailedMessage": "無法取得檔案預覽"
+  }
+}

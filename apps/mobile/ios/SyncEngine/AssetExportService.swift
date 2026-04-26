@@ -36,7 +36,7 @@ class AssetExportService {
                 if let error {
                     if perfLoggingEnabled {
                         let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - exportStart) * 1000)
-                        NSLog("[SyncPerf] export asset=%@ file=%@ status=FAILED elapsedMs=%d error=%@", asset.localIdentifier, filename, elapsedMs, error.localizedDescription)
+                        slog("[SyncPerf] export asset=%@ file=%@ status=FAILED elapsedMs=%d error=%@", asset.localIdentifier, filename, elapsedMs, error.localizedDescription)
                     }
                     continuation.resume(throwing: error)
                 } else {
@@ -46,7 +46,7 @@ class AssetExportService {
                         let mimeType = Self.mimeType(for: filename)
                         if perfLoggingEnabled {
                             let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - exportStart) * 1000)
-                            NSLog("[SyncPerf] export asset=%@ file=%@ size=%lld mediaType=%@ elapsedMs=%d", asset.localIdentifier, filename, size, asset.mediaType == .video ? "video" : "image", elapsedMs)
+                            slog("[SyncPerf] export asset=%@ file=%@ size=%lld mediaType=%@ elapsedMs=%d", asset.localIdentifier, filename, size, asset.mediaType == .video ? "video" : "image", elapsedMs)
                         }
 
                         continuation.resume(returning: ExportedFile(

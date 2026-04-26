@@ -1,0 +1,6 @@
+{
+  "deviceLabel": "Connecting to: {{deviceName}} ({{host}})",
+  "prompt": "Enter the 6-digit pairing code shown on your computer",
+  "verifying": "Verifying pairing code...",
+  "helpText": "Make sure your phone and computer are on the same network. Open the app on your computer to see the pairing code."
+}

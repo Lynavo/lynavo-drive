@@ -1,0 +1,154 @@
+{
+  "title": "同步動態",
+  "phases": {
+    "discoveringTitle": "正在搜尋電腦…",
+    "reconcilingTitle": "正在同步歷史記錄…",
+    "scanningTitle": "正在掃描相簿…",
+    "preparingTitle": "正在建立連接…",
+    "defaultTitle": "準備中…",
+    "discoveringSubtitleWaited": "已等待 {{seconds}} 秒",
+    "discoveringSubtitleSearching": "正在區域網路中搜尋",
+    "reconcilingSubtitle": "首次使用需要核對已傳檔案",
+    "scanningSubtitleProgress": "已掃描 {{scanned}} / {{total}} 張",
+    "scanningSubtitleReading": "正在讀取相簿",
+    "preparingSubtitle": "正在與電腦建立安全連接",
+    "reconnectingTitle": "網路波動，正在重連…",
+    "reconnectingSubtitle": "恢復連線後會繼續本次上傳",
+    "autoPreparingTitle": "正在開啟自動同步…",
+    "autoPreparingSubtitle": "即將開始掃描新照片"
+  },
+  "badges": {
+    "manual": "手動",
+    "auto": "自動",
+    "manualUploading": "手動上傳中",
+    "autoEnabled": "自動上傳已開啟"
+  },
+  "running": {
+    "manualTitle": "手動上傳中",
+    "autoTitle": "正在自動上傳",
+    "autoRunningTitle": "自動上傳執行中",
+    "autoRunningSubtitle": "新素材將自動傳輸到 PC 端",
+    "queueInfo": "排隊中 {{queued}}項"
+  },
+  "standby": {
+    "title": "等待新素材",
+    "subtitle": "拍完後會自動傳輸到 PC 端"
+  },
+  "notStarted": {
+    "title": "自動上傳未開啟",
+    "subtitle": "開啟自動上傳，拍完就同步；或者也可以選手動傳輸",
+    "goToAlbum": "去相簿",
+    "enableAuto": "開啟自動上傳"
+  },
+  "interrupted": {
+    "title": "自動上傳已暫停",
+    "subtitle": "本次自動上傳已中斷，確認電腦端接收目錄後可重新開啟。",
+    "goToAlbum": "去相簿",
+    "resumeAuto": "重新開啟"
+  },
+  "offline": {
+    "title": "當前設備已離線",
+    "subtitle": "請檢查電腦是否在線並連接同一局域網，恢復後可繼續上傳或存取共享目錄",
+    "switchDevice": "切換設備",
+    "reconnect": "重新連接"
+  },
+  "stats": {
+    "speed": "速度",
+    "progress": "進度",
+    "transferred": "已傳輸",
+    "transferredCount": "{{count}} 個",
+    "dataAmount": "資料量"
+  },
+  "completed": {
+    "speedIdle": "--",
+    "auto": {
+      "title": "自動上傳已完成",
+      "subtitle": "本次同步 {{count}} 個檔案",
+      "fileCountLabel": "檔案數",
+      "fileCountValue": "{{count}} 個",
+      "latestSync": "最近同步：{{label}}",
+      "goToAlbum": "去相簿"
+    },
+    "manual": {
+      "title": "手動上傳已完成",
+      "subtitle": "已完成 {{completed}} / {{total}}",
+      "progressValue": "{{completed}} / {{total}}",
+      "hint": "本次上傳已完成\n自動上傳未開啟，可繼續手動上傳或開啟自動上傳",
+      "goToAlbum": "去相簿繼續上傳",
+      "enableAuto": "開啟自動上傳"
+    }
+  },
+  "actions": {
+    "cancelling": "正在取消...",
+    "cancelManualBatch": "取消本次手動上傳",
+    "closeAutoUpload": "關閉自動上傳"
+  },
+  "quickEntry": {
+    "title": "快捷入口",
+    "albumTitle": "相簿",
+    "albumDesc": "瀏覽並手動上傳素材",
+    "sharedFilesTitle": "共享目錄",
+    "sharedFilesDesc": "瀏覽 PC 設備的共享目錄"
+  },
+  "trialUpgrade": {
+    "entry": "免費試用剩餘 {{days}} 天，點擊升級 Pro 解鎖全部功能"
+  },
+  "expired": {
+    "title": "試用已結束",
+    "subtitle": "訂閱後可繼續使用素材上傳、自動上傳與共享檔案存取",
+    "subscribeCta": "立即訂閱",
+    "viewHelp": "查看幫助"
+  },
+  "dialogs": {
+    "syncError": {
+      "title": "同步異常",
+      "lowDiskPaused": "接收磁碟剩餘空間小於 500MB，已暫停新的接收任務",
+      "storageUnavailable": "電腦端接收目錄不可用，請在電腦端重新選擇或恢復資料夾"
+    },
+    "cancelManual": {
+      "title": "取消手動上傳",
+      "body": "確定取消當前的手動上傳隊列嗎？",
+      "rethink": "再想想",
+      "confirm": "確認取消"
+    },
+    "cancelManualFailed": {
+      "title": "取消失敗",
+      "body": "無法取消當前手動上傳，請稍後重試"
+    },
+    "closeAuto": {
+      "title": "關閉自動上傳",
+      "body": "關閉後，當前自動上傳任務將停止，後續新素材不會繼續自動上傳。",
+      "continue": "繼續上傳",
+      "confirm": "確認關閉"
+    },
+    "closeAutoFailed": {
+      "title": "操作失敗",
+      "body": "無法關閉自動上傳，請稍後重試"
+    },
+    "reconnectFailed": {
+      "title": "重連失敗",
+      "body": "請稍後重試"
+    },
+    "switchDevice": {
+      "title": "切換設備",
+      "body": "將斷開當前設備並返回設備掃描頁",
+      "confirm": "確認切換"
+    },
+    "enableAutoBlocked": {
+      "title": "無法開啟",
+      "body": "請先連接設備"
+    },
+    "switchUploadMode": {
+      "title": "切換上傳模式",
+      "body": "當前正在上傳，繼續自動上傳將中斷手動上傳，是否繼續？",
+      "confirm": "確認切換"
+    },
+    "enableAutoFailed": {
+      "title": "操作失敗",
+      "body": "無法開啟自動上傳，請稍後重試"
+    }
+  },
+  "performance": {
+    "thermalThrottled": "設備溫度較高，已降低傳輸強度"
+  }
+}

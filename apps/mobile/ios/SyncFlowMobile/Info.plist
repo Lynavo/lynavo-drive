@@ -2,6 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.syncflow.sync.continued</string>
+		<string>com.syncflow.sync.maintenance</string>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -35,10 +40,30 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>Vivi Drop 仅在需要识别附近设备时使用定位相关能力，不会采集您的位置信息</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_syncflow._tcp</string>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Vivi Drop 需要相机权限来扫描桌面端的二维码连接码</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Vivi Drop 需要访问本地网络以发现和连接同一局域网内的电脑</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Vivi Drop 仅在需要识别附近设备时使用定位相关能力，不会采集您的位置信息</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Vivi Drop 需要访问您的照片库以同步媒体文件到电脑</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Ionicons.ttf</string>
+		<string>MaterialCommunityIcons.ttf</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>processing</string>
+		<string>audio</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
@@ -58,30 +83,5 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Vivi Drop 需要访问本地网络以发现和连接同一局域网内的电脑</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Vivi Drop 需要相机权限来扫描桌面端的二维码连接码</string>
-	<key>NSBonjourServices</key>
-	<array>
-		<string>_syncflow._tcp</string>
-	</array>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Vivi Drop 需要访问您的照片库以同步媒体文件到电脑</string>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>processing</string>
-		<string>audio</string>
-	</array>
-	<key>BGTaskSchedulerPermittedIdentifiers</key>
-	<array>
-		<string>com.syncflow.sync.continued</string>
-		<string>com.syncflow.sync.maintenance</string>
-	</array>
-	<key>UIAppFonts</key>
-	<array>
-		<string>Ionicons.ttf</string>
-		<string>MaterialCommunityIcons.ttf</string>
-	</array>
 </dict>
 </plist>

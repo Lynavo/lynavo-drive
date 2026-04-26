@@ -75,6 +75,28 @@ func TestStagingDirReturnsCorrectPath(t *testing.T) {
 	}
 }
 
+func TestStagingDirFollowsCustomReceiveDirVolume(t *testing.T) {
+	cfg := &Config{
+		DataDir:    filepath.Join("/tmp", "syncflow-test"),
+		ReceiveDir: filepath.Join("/tmp", "external", "received"),
+	}
+	want := filepath.Join("/tmp", "external", "staging")
+	if got := cfg.StagingDir(); got != want {
+		t.Errorf("StagingDir() = %q, want %q", got, want)
+	}
+}
+
+func TestLegacyStagingDirReturnsDataDirStaging(t *testing.T) {
+	cfg := &Config{
+		DataDir:    filepath.Join("/tmp", "syncflow-test"),
+		ReceiveDir: filepath.Join("/tmp", "external", "received"),
+	}
+	want := filepath.Join("/tmp", "syncflow-test", "staging")
+	if got := cfg.LegacyStagingDir(); got != want {
+		t.Errorf("LegacyStagingDir() = %q, want %q", got, want)
+	}
+}
+
 func TestLogDirReturnsCorrectPath(t *testing.T) {
 	cfg := &Config{DataDir: "/tmp/syncflow-test"}
 	want := "/tmp/syncflow-test/logs"

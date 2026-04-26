@@ -1,0 +1,48 @@
+{
+  "title": "搜索设备",
+  "subtitle": {
+    "ios": "正在扫描局域网中的电脑端应用...",
+    "android": "正在扫描局域网中的电脑端应用；若未发现设备，可改用手动输入 IPv4。"
+  },
+  "scanning": {
+    "text": "扫描中，请稍候..."
+  },
+  "devices": {
+    "foundCount_one": "发现 {{count}} 台设备",
+    "foundCount": "发现 {{count}} 台设备",
+    "foundCount_other": "发现 {{count}} 台设备"
+  },
+  "emptyState": {
+    "default": "未发现设备",
+    "android": "未发现设备，请手动输入 IP 继续配对"
+  },
+  "actions": {
+    "manualPair": "手动配对",
+    "rescan": "重新扫描",
+    "manualInputIp": "手动输入 IP",
+    "qrPair": "扫码配对"
+  },
+  "dialogs": {
+    "openLinkFailed": {
+      "title": "打开失败",
+      "body": "暂时无法打开{{label}}，请稍后重试。"
+    },
+    "manualInput": {
+      "title": "手动输入 IP 配对",
+      "description": "如果扫描不到电脑，尤其是 Windows 设备，可直接输入电脑端 IPv4 地址继续配对。",
+      "confirm": "继续",
+      "hint": "默认使用同步端口 39393，输入后仍需在下一步填写 6 位连接码。",
+      "ipError": "请输入有效的 IPv4 地址，例如 192.168.0.1"
+    }
+  },
+  "switch": {
+    "title": "切换设备",
+    "badge": {
+      "known": "直接切换",
+      "current": "当前"
+    },
+    "toast": {
+      "alreadyCurrent": "已是当前连接设备"
+    }
+  }
+}

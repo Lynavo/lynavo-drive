@@ -1,5 +1,4 @@
 import type {
-  AutoUploadMediaFilter,
   AutoUploadState,
   AutoUploadTimeRangeMode,
   ConnectionState,
@@ -38,7 +37,12 @@ export interface DashboardSummaryDTO {
 
 export interface DashboardDeviceDTO {
   deviceId: string;
+  /** Resolved display label: deviceAlias ?? clientName ?? clientId */
+  displayName: string;
+  /** Raw device name reported at pairing time; kept for diagnostics */
   clientName: string;
+  /** Device platform identifier, e.g. "ios", "android" */
+  platform: string;
   ip: string;
   status: DeviceDashboardStatus;
   todayFileCount: number;
@@ -49,6 +53,10 @@ export interface DashboardDeviceDTO {
   storagePath: string;
   /** Device-specific directory under receive root */
   devicePath: string;
+  /** User-defined alias, if set (observability / diagnostics) */
+  deviceAlias?: string;
+  /** Stable directory name on disk (observability / diagnostics) */
+  receiveDirName?: string;
   currentFile?: {
     filename: string;
     progress: number;
@@ -128,10 +136,12 @@ export interface SyncSummaryDTO {
   isThermalLimited?: boolean;
   /** Source of the currently uploading task (auto or manual) */
   currentTaskSource?: UploadTaskSource | null;
+  /** Source of the most recently completed upload task */
+  lastCompletedTaskSource?: UploadTaskSource | null;
   /** Current state of the auto-upload feature */
   autoUploadState?: AutoUploadState;
-  /** Number of pending items in the current manual batch */
-  manualBatchPending?: number;
+  /** Number of pending items in the manual upload queue */
+  manualPending?: number;
   /** Number of pending auto-upload items */
   autoPending?: number;
 }
@@ -197,10 +207,22 @@ export interface AlbumAssetDTO {
   isQueued: boolean;
 }
 
+/**
+ * Preview source for a single album asset, fetched on demand from the album
+ * workbench. Shape mirrors the iOS native bridge return value.
+ *
+ * Invariant: when `error` is set, `uri` will be `''`. Consumers should branch
+ * on `error` presence first before using `uri`.
+ */
+export interface AssetPreviewSourceDTO {
+  uri: string;
+  mediaType: 'image' | 'video';
+  error?: 'cloud_unavailable' | 'not_found';
+}
+
 /** Auto-upload configuration (single-row persisted on mobile) */
 export interface AutoUploadConfigDTO {
   enabled: boolean;
-  mediaFilter: AutoUploadMediaFilter;
   timeRangeMode: AutoUploadTimeRangeMode;
   /** ISO 8601 timestamp, only used when timeRangeMode is 'custom' */
   customTimeFrom?: string;
@@ -224,4 +246,48 @@ export interface SharedDirectoryDTO {
   path: string;
   files: SharedFileDTO[];
   totalCount: number;
+}
+
+/**
+ * Platforms the paywall catalog supports. Kept as a string literal union
+ * (not enum) so server-side additions do not break older clients — an
+ * unknown platform string is treated as "filtered out" rather than a hard
+ * parse error.
+ */
+export type SubscriptionPlanPlatform = 'ios' | 'android';
+
+/**
+ * Server-controlled paywall entry. Returned by GET /api/v1/subscription/plans.
+ *
+ * The server owns the *business* layer: which SKUs to show, in what
+ * order, with what marketing copy. Price / currency / period come from
+ * Apple StoreKit at render time — not from this DTO. The mobile client
+ * merges server rows with StoreKit product info to build the final paywall.
+ *
+ * Date fields are ISO 8601 strings (Go time.Time default format, RFC 3339).
+ */
+export interface SubscriptionPlanDto {
+  id: number;
+  /** Apple IAP product identifier, e.g. "com.vividrop.mobile.china.monthly.999". */
+  product_id: string;
+  platform: SubscriptionPlanPlatform;
+  /** Display name for the card header (Chinese by default). */
+  name: string;
+  /** One-line subtitle shown under the name. */
+  description: string;
+  /** Short marketing labels (e.g. "8.8 折", "限時"). Always an array — never null. */
+  badges: string[];
+  /** Highlighted card in the paywall. At most one plan per platform should be flagged. */
+  recommended: boolean;
+  /** Ascending order; lower values render first. */
+  sort_order: number;
+  /** Soft-delete flag. Server filters inactive rows before responding, so clients will not normally observe `false`. */
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Envelope returned by GET /api/v1/subscription/plans. */
+export interface SubscriptionPlansResponse {
+  plans: SubscriptionPlanDto[];
 }

@@ -1,0 +1,17 @@
+{
+  "title": "History",
+  "emptyState": {
+    "noRecords": "No sync history yet"
+  },
+  "cards": {
+    "statsLabel": "Files synced",
+    "statsUnit": "",
+    "durationLabel": "Duration"
+  },
+  "dates": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "monthDay": "{{month}}/{{day}}"
+  },
+  "liveLabel": "Live syncing"
+}

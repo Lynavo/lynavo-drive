@@ -3,7 +3,9 @@ import type { DashboardDeviceDTO } from '@syncflow/contracts';
 export const mockDevices: DashboardDeviceDTO[] = [
   {
     deviceId: 'd1',
+    displayName: 'iPhone 15 Pro',
     clientName: 'iPhone 15 Pro',
+    platform: 'ios',
     ip: '192.168.1.201',
     status: 'transferring',
     todayFileCount: 12,
@@ -19,7 +21,9 @@ export const mockDevices: DashboardDeviceDTO[] = [
   },
   {
     deviceId: 'd2',
+    displayName: 'Galaxy S24 Ultra',
     clientName: 'Galaxy S24 Ultra',
+    platform: 'android',
     ip: '192.168.1.205',
     status: 'connected_idle',
     todayFileCount: 8,
@@ -30,7 +34,9 @@ export const mockDevices: DashboardDeviceDTO[] = [
   },
   {
     deviceId: 'd3',
+    displayName: 'iPad Pro',
     clientName: 'iPad Pro',
+    platform: 'ios',
     ip: '192.168.1.210',
     status: 'connected_idle',
     todayFileCount: 5,
@@ -41,7 +47,9 @@ export const mockDevices: DashboardDeviceDTO[] = [
   },
   {
     deviceId: 'd4',
+    displayName: 'GoPro Hero 12',
     clientName: 'GoPro Hero 12',
+    platform: 'other',
     ip: '192.168.1.188',
     status: 'offline',
     todayFileCount: 0,
@@ -52,7 +60,9 @@ export const mockDevices: DashboardDeviceDTO[] = [
   },
   {
     deviceId: 'd5',
+    displayName: 'iPhone 14',
     clientName: 'iPhone 14',
+    platform: 'ios',
     ip: '192.168.1.198',
     status: 'offline',
     todayFileCount: 3,

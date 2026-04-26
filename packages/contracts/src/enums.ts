@@ -37,6 +37,4 @@ export type UploadTaskSource = 'auto' | 'manual';
 
 export type AutoUploadTimeRangeMode = 'from_now' | 'from_today' | 'all' | 'custom';
 
-export type AutoUploadMediaFilter = 'all' | 'photos' | 'videos';
-
-export type AutoUploadState = 'disabled' | 'active' | 'paused';
+export type AutoUploadState = 'disabled' | 'active' | 'interrupted';

@@ -1,0 +1,48 @@
+{
+  "title": "Find Devices",
+  "subtitle": {
+    "ios": "Scanning for desktop apps on your local network...",
+    "android": "Scanning for desktop apps on your local network. If no device is found, enter the IPv4 address manually."
+  },
+  "scanning": {
+    "text": "Scanning, please wait..."
+  },
+  "devices": {
+    "foundCount": "{{count}} device found",
+    "foundCount_one": "{{count}} device found",
+    "foundCount_other": "{{count}} devices found"
+  },
+  "emptyState": {
+    "default": "No devices found",
+    "android": "No devices found. Enter the IP address manually to continue pairing."
+  },
+  "actions": {
+    "manualPair": "Manual Pairing",
+    "rescan": "Scan Again",
+    "manualInputIp": "Enter IP Manually",
+    "qrPair": "Scan QR Code"
+  },
+  "dialogs": {
+    "openLinkFailed": {
+      "title": "Cannot Open",
+      "body": "Could not open {{label}} right now. Please try again later."
+    },
+    "manualInput": {
+      "title": "Enter IP to Pair",
+      "description": "If the scan can't find your computer — especially Windows — enter the desktop app's IPv4 address directly.",
+      "confirm": "Continue",
+      "hint": "Uses sync port 39393 by default. You'll still need to enter the 6-digit pairing code in the next step.",
+      "ipError": "Please enter a valid IPv4 address, e.g. 192.168.0.1"
+    }
+  },
+  "switch": {
+    "title": "Switch Device",
+    "badge": {
+      "known": "Switch Directly",
+      "current": "Current"
+    },
+    "toast": {
+      "alreadyCurrent": "Already connected to this device"
+    }
+  }
+}

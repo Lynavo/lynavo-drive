@@ -38,6 +38,7 @@ describe('settings-store', () => {
     const updated: SettingsDTO = {
       deviceName: 'New Mac',
       connectionCode: '111222',
+      rootPath: '/tmp',
       receivePath: '/tmp/new-path',
       sharedPath: '/tmp/shared',
       shareAddress: 'smb://10.0.0.1/Share',
@@ -88,6 +89,7 @@ describe('settings-store', () => {
     const updated: SettingsDTO = {
       deviceName: 'Studio Mac',
       connectionCode: '333444',
+      rootPath: '/tmp',
       receivePath: '/tmp/studio',
       sharedPath: '/tmp/shared',
       shareAddress: '\\\\STUDIO\\SyncFlow',

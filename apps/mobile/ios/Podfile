@@ -15,6 +15,10 @@ if linkage != nil
 end
 
 ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
+# Use prebuilt ReactNativeDependencies xcframework (glog/folly/boost/fmt/etc.)
+# instead of building from source. Required on Xcode 26 / iOS 26 SDK where
+# glog 0.3.5 source build is broken (NO_THREADS / pread / mutex.h issues).
+ENV['RCT_USE_RN_DEP'] = '1'
 
 target 'SyncFlowMobile' do
   config = use_native_modules!

@@ -19,9 +19,9 @@ class AutoUploadConfigStore {
         // Return default config when no row exists yet
         return AutoUploadConfigRecord(
             enabled: false,
-            mediaFilter: "all",
-            timeRangeMode: "from_now",
+            timeRangeMode: "all",
             customTimeFrom: nil,
+            state: "disabled",
             updatedAt: ""
         )
     }
@@ -33,8 +33,8 @@ class AutoUploadConfigStore {
         var configToSave = config
         configToSave.updatedAt = ISO8601DateFormatter().string(from: Date())
         try store.saveAutoUploadConfig(configToSave)
-        NSLog("[AutoUploadConfigStore] config saved: enabled=%d, mediaFilter=%@, timeRangeMode=%@",
-              config.enabled ? 1 : 0, config.mediaFilter, config.timeRangeMode)
+        slog("[AutoUploadConfigStore] config saved: enabled=%d, timeRangeMode=%@",
+              config.enabled ? 1 : 0, config.timeRangeMode)
     }
 
     // MARK: - Helpers
@@ -66,7 +66,7 @@ class AutoUploadConfigStore {
                 if let parsed = fmtFrac.date(from: customFrom) {
                     return parsed
                 }
-                NSLog("[AutoUploadConfig] failed to parse customTimeFrom: %@, falling back to no filter", customFrom)
+                slog("[AutoUploadConfig] failed to parse customTimeFrom: %@, falling back to no filter", customFrom)
             }
             return nil
         case "all":
@@ -76,19 +76,4 @@ class AutoUploadConfigStore {
         }
     }
 
-    /// Returns the media type predicate filter based on the current config.
-    /// Returns nil if no media type filter should be applied (filter is 'all').
-    func resolvedMediaFilter() -> String? {
-        let config = getConfig()
-        guard config.enabled else { return nil }
-
-        switch config.mediaFilter {
-        case "photos":
-            return "photos"
-        case "videos":
-            return "videos"
-        default:
-            return nil
-        }
-    }
 }

@@ -1,0 +1,162 @@
+{
+  "title": "相册",
+  "loading": "正在加载相册...",
+  "tabs": {
+    "all": "全部",
+    "photos": "照片",
+    "videos": "视频",
+    "untransferred": "未传",
+    "transferred": "已传"
+  },
+  "timeFilters": {
+    "all": "全部",
+    "fromNow": "此时此刻",
+    "custom": "自定义时间"
+  },
+  "emptyStates": {
+    "transferredEmpty": {
+      "title": "暂无已传素材",
+      "subtitle": "已上传完成的素材会显示在这里"
+    },
+    "untransferredEmpty": {
+      "title": "暂无待上传素材",
+      "subtitle": "当前没有符合条件的未传素材"
+    },
+    "photosEmpty": {
+      "title": "暂无照片",
+      "subtitle": "当前筛选下没有可显示的照片"
+    },
+    "videosEmpty": {
+      "title": "暂无视频",
+      "subtitle": "当前筛选下没有可显示的视频"
+    },
+    "genericEmpty": {
+      "title": "暂无素材",
+      "subtitle": "请确保已授予照片访问权限"
+    },
+    "limitedAccess": {
+      "title": "尚未选择照片",
+      "subtitle": "当前为「限制访问」模式，请选择要授权的照片",
+      "selectPhotos": "选择照片"
+    }
+  },
+  "dates": {
+    "full": "{{year}}年{{month}}月{{day}}日 {{hour}}:{{minute}}"
+  },
+  "selectedCount": "已选 {{count}} 个素材",
+  "selectedCount_one": "已选 {{count}} 个素材",
+  "selectedCount_other": "已选 {{count}} 个素材",
+  "selectionHint": {
+    "none": "未选择素材",
+    "autoActiveLock": "自动上传中，手动上传不可用"
+  },
+  "deviceDisconnected": "设备已断开",
+  "mediaTypes": {
+    "video": "视频",
+    "photo": "图片"
+  },
+  "badges": {
+    "queued": "排队中",
+    "transferred": "已传"
+  },
+  "actions": {
+    "startUpload": "开始上传",
+    "pickTime": "点击设置时间"
+  },
+  "config": {
+    "sectionTitle": "自动上传",
+    "toggleLabel": "自动上传",
+    "stateOn": "已开启",
+    "stateOff": "已关闭",
+    "timeRangeLabel": "时间范围"
+  },
+  "summary": {
+    "title": "自动上传已开启",
+    "subtitle": "等待新素材时会自动传输到 PC 端",
+    "transferredThisRound": "本次已传",
+    "pending": "待上传",
+    "totalAssets": "素材总数",
+    "timeRange": "时间范围",
+    "unitCount": "个"
+  },
+  "stats": {
+    "total": "总数",
+    "selected": "已选",
+    "transferred": "已传",
+    "new": "新增"
+  },
+  "datePicker": {
+    "title": "选择时间",
+    "cancel": "取消",
+    "confirm": "确认"
+  },
+  "collectionSheet": {
+    "title": "选择相册",
+    "allPhotos": "全部照片"
+  },
+  "selectAll": "全选",
+  "deselectAll": "取消全选",
+  "preview": {
+    "cloudUnavailable": "iCloud 视频未下载，无法预览",
+    "notFound": "素材找不到"
+  },
+  "dialogs": {
+    "cannotUpload": {
+      "title": "无法上传",
+      "autoActive": "请先关闭自动上传",
+      "notConnected": "请先连接设备"
+    },
+    "submitted": {
+      "title": "已提交",
+      "queuedOnly_one": "已入队 {{count}} 个文件",
+      "queuedOnly": "已入队 {{count}} 个文件",
+      "queuedOnly_other": "已入队 {{count}} 个文件",
+      "queuedWithSkipped": "已入队 {{queued}} 个文件，{{skipped}} 个重复素材已自动跳过"
+    },
+    "allDuplicate": {
+      "title": "全部重复",
+      "body_one": "所选 {{count}} 个素材已存在于上传队列中，无需重复提交",
+      "body": "所选 {{count}} 个素材已存在于上传队列中，无需重复提交",
+      "body_other": "所选 {{count}} 个素材已存在于上传队列中，无需重复提交"
+    },
+    "submitFailed": {
+      "title": "提交失败",
+      "body": "无法提交上传任务，请稍后重试"
+    },
+    "closeAuto": {
+      "title": "关闭自动上传",
+      "body": "确认关闭自动上传？关闭后新素材将不再自动传输到 PC 端。",
+      "keepUploading": "继续上传",
+      "confirm": "确认关闭"
+    },
+    "closeAutoFailed": {
+      "title": "操作失败",
+      "body": "关闭自动上传失败，请重试"
+    },
+    "cannotEnable": {
+      "title": "无法开启",
+      "notConnected": "请先连接设备"
+    },
+    "configIncomplete": {
+      "title": "配置不完整",
+      "body": "请先设置自定义时间点"
+    },
+    "switchUploadMode": {
+      "title": "切换上传模式",
+      "body": "当前正在上传，继续自动上传将中断手动上传，是否继续？",
+      "confirm": "确认切换"
+    },
+    "enableAutoFailed": {
+      "title": "操作失败",
+      "body": "自动上传开启失败，请重试"
+    },
+    "toggleAutoFailed": {
+      "title": "操作失败",
+      "body": "自动上传状态切换失败，请重试"
+    },
+    "saveConfigFailed": {
+      "title": "保存失败",
+      "body": "自动上传配置保存失败，请重试"
+    }
+  }
+}

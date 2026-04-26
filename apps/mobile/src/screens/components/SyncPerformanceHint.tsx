@@ -1,5 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 type SyncPerformanceHintProps = {
   uploadState: string;
@@ -9,11 +11,11 @@ type SyncPerformanceHintProps = {
 
 const ACTIVE_UPLOAD_STATES = new Set(['preparing', 'uploading', 'reconnecting']);
 
-export function getSyncPerformanceHintMessage({
-  uploadState,
-  performanceHint,
-  performanceMessage,
-}: SyncPerformanceHintProps): string | null {
+export function getSyncPerformanceHintMessage(
+  props: SyncPerformanceHintProps,
+  t: TFunction,
+): string | null {
+  const { uploadState, performanceHint, performanceMessage } = props;
   if (!ACTIVE_UPLOAD_STATES.has(uploadState) || performanceHint !== 'thermal_limited') {
     return null;
   }
@@ -21,11 +23,12 @@ export function getSyncPerformanceHintMessage({
   const trimmedMessage = performanceMessage?.trim();
   return trimmedMessage && trimmedMessage.length > 0
     ? trimmedMessage
-    : '设备温度较高，已降低传输强度';
+    : t('syncActivity.performance.thermalThrottled');
 }
 
 export function SyncPerformanceHint(props: SyncPerformanceHintProps) {
-  const message = getSyncPerformanceHintMessage(props);
+  const { t } = useTranslation();
+  const message = getSyncPerformanceHintMessage(props, t);
   if (!message) {
     return null;
   }

@@ -69,20 +69,28 @@ func (s *Server) handleDeviceFiles(w http.ResponseWriter, r *http.Request) {
 	sortField := r.URL.Query().Get("sortField")
 	sortDirection := r.URL.Query().Get("sortDirection")
 
-	uploadsPage, err := s.store.ListUploadsPageByDeviceAndDateRange(
+	uploads, err := s.store.ListCompletedUploadsByDeviceAndDateRange(
 		deviceID,
 		date,
 		endDate,
 		sortField,
 		sortDirection,
-		page,
-		pageSize,
 	)
 	if err != nil {
 		slog.Error("list device files", "err", err, "deviceId", deviceID, "date", date, "endDate", endDate, "page", page, "pageSize", pageSize)
 		writeError(w, http.StatusInternalServerError, "failed to list files")
 		return
 	}
+
+	filteredUploads := make([]store.Upload, 0, len(uploads))
+	for _, upload := range uploads {
+		if !uploadfs.FinalFileExists(s.config.ReceiveDir, upload.FinalPath) {
+			continue
+		}
+		filteredUploads = append(filteredUploads, upload)
+	}
+
+	uploadsPage := buildUploadPage(filteredUploads, page, pageSize)
 	if uploadsPage.TotalItems == 0 {
 		fsUploads, err := s.filesystemUploadsPageRange(deviceID, date, endDate, sortField, sortDirection, page, pageSize)
 		if err != nil {
@@ -98,6 +106,43 @@ func (s *Server) handleDeviceFiles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, uploadsPage)
+}
+
+func buildUploadPage(uploads []store.Upload, page, pageSize int) store.UploadPage {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 200
+	}
+
+	totalBytes := int64(0)
+	totalTransmissionMs := int64(0)
+	for _, upload := range uploads {
+		totalBytes += upload.FileSize
+		totalTransmissionMs += upload.ActiveTransmissionMs
+	}
+
+	start := (page - 1) * pageSize
+	if start > len(uploads) {
+		start = len(uploads)
+	}
+	end := start + pageSize
+	if end > len(uploads) {
+		end = len(uploads)
+	}
+
+	items := make([]store.Upload, 0, end-start)
+	items = append(items, uploads[start:end]...)
+
+	return store.UploadPage{
+		Items:                     items,
+		Page:                      page,
+		PageSize:                  pageSize,
+		TotalItems:                len(uploads),
+		TotalBytes:                totalBytes,
+		TotalActiveTransmissionMs: totalTransmissionMs,
+	}
 }
 
 func (s *Server) handleDeviceDates(w http.ResponseWriter, r *http.Request) {

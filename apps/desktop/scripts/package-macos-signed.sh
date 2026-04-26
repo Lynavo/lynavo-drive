@@ -8,9 +8,10 @@ TARGET="${1:-dmg}"
 IOS_WORKSPACE="${REPO_ROOT}/apps/mobile/ios/SyncFlowMobile.xcworkspace"
 IOS_SCHEME="SyncFlowMobile"
 
-DEFAULT_API_KEY="${REPO_ROOT}/AuthKey_HY8CAHGPW9.p8"
 DEFAULT_API_KEY_ID="HY8CAHGPW9"
+DEFAULT_API_KEY="${REPO_ROOT}/AuthKey_${DEFAULT_API_KEY_ID}.p8"
 DEFAULT_API_ISSUER="54cad458-4184-4fc6-a1c7-cb4b0c6ded0e"
+DEFAULT_CSC_NAME="Shenzhen Kaiyun Information Technology Co., Ltd. (GKN7JQNCMC)"
 
 usage() {
   cat <<'EOF'
@@ -34,10 +35,21 @@ if [[ "${TARGET}" != "dmg" && "${TARGET}" != "dir" ]]; then
   exit 1
 fi
 
-detect_identity() {
+list_developer_identities() {
   security find-identity -v -p codesigning \
-    | sed -n 's/.*"Developer ID Application: \(.*\)"/\1/p' \
-    | head -n 1
+    | sed -n 's/.*"Developer ID Application: \(.*\)"/\1/p'
+}
+
+detect_identity() {
+  local identities
+  identities="$(list_developer_identities)"
+
+  if [[ -n "${DEFAULT_CSC_NAME}" ]] && grep -Fxq "${DEFAULT_CSC_NAME}" <<<"${identities}"; then
+    echo "${DEFAULT_CSC_NAME}"
+    return 0
+  fi
+
+  echo "${identities}" | head -n 1
 }
 
 resolve_ios_build_number() {
@@ -50,6 +62,10 @@ export APPLE_API_KEY="${APPLE_API_KEY:-${DEFAULT_API_KEY}}"
 export APPLE_API_KEY_ID="${APPLE_API_KEY_ID:-${DEFAULT_API_KEY_ID}}"
 export APPLE_API_ISSUER="${APPLE_API_ISSUER:-${DEFAULT_API_ISSUER}}"
 export SYNCFLOW_BUILD_NUMBER="${SYNCFLOW_BUILD_NUMBER:-$(resolve_ios_build_number)}"
+
+if [[ "${APPLE_API_KEY}" != /* ]]; then
+  export APPLE_API_KEY="${REPO_ROOT}/${APPLE_API_KEY}"
+fi
 
 if [[ -z "${CSC_NAME}" ]]; then
   echo "No Developer ID Application identity found in keychain." >&2

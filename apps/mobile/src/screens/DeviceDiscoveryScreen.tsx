@@ -18,13 +18,19 @@ import {
   Modal,
   Pressable,
   KeyboardAvoidingView,
-  Linking,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import {
+  CommonActions,
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+} from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { DiscoveredDeviceDTO } from '@syncflow/contracts';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -138,13 +144,16 @@ type NavigationProp = StackNavigationProp<
   'DeviceDiscovery'
 >;
 
-const PRIVACY_POLICY_URL = 'https://www.vividrop.cn/privacy/';
-const TERMS_OF_SERVICE_URL = 'https://www.vividrop.cn/terms';
 
 export function DeviceDiscoveryScreen() {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const isAndroid = Platform.OS === 'android';
+  const route = useRoute<RouteProp<RootStackParamList, 'DeviceDiscovery'>>();
+  const mode = route.params?.mode ?? 'initial';
+  const [knownDeviceIds, setKnownDeviceIds] = useState<Set<string>>(new Set());
+  const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   const [scanning, setScanning] = useState(true);
   const [devices, setDevices] = useState<DiscoveredDevice[]>([]);
   const [manualHost, setManualHost] = useState('');
@@ -158,6 +167,29 @@ export function DeviceDiscoveryScreen() {
   const [showManualModal, setShowManualModal] = useState(false);
   const devicesRef = useRef<DiscoveredDevice[]>([]);
   const preserveCachedDevicesRef = useRef(false);
+
+  useEffect(() => {
+    if (mode !== 'switch') return;
+    let cancelled = false;
+    const { NativeSyncEngine: NSE } = NativeModules;
+    Promise.all([
+      (NSE?.getKnownDeviceIds?.() ?? Promise.resolve([])).catch((err: unknown) => {
+        console.warn('[DiscoveryScreen] switch bootstrap: getKnownDeviceIds failed', err);
+        return [] as string[];
+      }),
+      (NSE?.getBindingState?.() ?? Promise.resolve(null)).catch((err: unknown) => {
+        console.warn('[DiscoveryScreen] switch bootstrap: getBindingState failed', err);
+        return null;
+      }),
+    ]).then(([ids, binding]) => {
+      if (cancelled) return;
+      setKnownDeviceIds(new Set(ids as string[]));
+      setCurrentDeviceId((binding as { deviceId?: string } | null)?.deviceId ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode]);
 
   useEffect(() => {
     devicesRef.current = devices;
@@ -175,6 +207,7 @@ export function DeviceDiscoveryScreen() {
 
       let subscription: { remove: () => void } | undefined;
       let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
+      let active = true;
 
       try {
         const { NativeSyncEngine } = NativeModules;
@@ -216,8 +249,15 @@ export function DeviceDiscoveryScreen() {
               }
             },
           );
-          console.log('[DiscoveryScreen] calling startDiscovery');
-          NativeSyncEngine.startDiscovery()
+          console.log('[DiscoveryScreen] restarting discovery');
+          NativeSyncEngine.stopDiscovery()
+            .catch((e: Error) =>
+              console.warn('[DiscoveryScreen] stopDiscovery before start failed:', e),
+            )
+            .then(() => {
+              if (!active) return undefined;
+              return NativeSyncEngine.startDiscovery();
+            })
             .then(() => console.log('[DiscoveryScreen] startDiscovery resolved'))
             .catch((e: Error) =>
               console.warn('[DiscoveryScreen] startDiscovery failed:', e),
@@ -240,6 +280,7 @@ export function DeviceDiscoveryScreen() {
       }
 
       return () => {
+        active = false;
         console.log(
           '[DiscoveryScreen] blurred, cleaning up discovery listeners',
         );
@@ -295,8 +336,15 @@ export function DeviceDiscoveryScreen() {
       const { NativeSyncEngine } = NativeModules;
       if (NativeSyncEngine) {
         console.log('[DiscoveryScreen] handleRescan restarting discovery');
-        NativeSyncEngine.stopDiscovery();
-        NativeSyncEngine.startDiscovery();
+        NativeSyncEngine.stopDiscovery()
+          .catch((e: Error) =>
+            console.warn('[DiscoveryScreen] handleRescan stopDiscovery failed:', e),
+          )
+          .then(() => NativeSyncEngine.startDiscovery())
+          .catch((e: Error) => {
+            console.warn('[DiscoveryScreen] handleRescan startDiscovery failed:', e);
+            setScanning(false);
+          });
         return;
       }
     } catch {
@@ -306,13 +354,54 @@ export function DeviceDiscoveryScreen() {
   }, []);
 
   const handleDevicePress = useCallback(
-    (device: DiscoveredDevice) => {
+    async (device: DiscoveredDevice) => {
       console.log(
         '[DiscoveryScreen] handleDevicePress',
-        `${device.name}/${device.ip || 'no-ip'}/${device.deviceId}/${
-          device.type
-        }`,
+        `${device.name}/${device.ip || 'no-ip'}/${device.deviceId}/${device.type}`,
       );
+
+      if (mode !== 'switch') {
+        navigation.navigate('CodeVerify', {
+          deviceId: device.deviceId,
+          host: device.ip,
+          port: device.port,
+          deviceName: device.name,
+        });
+        return;
+      }
+
+      if (device.deviceId === currentDeviceId) {
+        Alert.alert(t('deviceDiscovery.switch.toast.alreadyCurrent'));
+        return;
+      }
+
+      if (knownDeviceIds.has(device.deviceId)) {
+        try {
+          const { NativeSyncEngine } = NativeModules;
+          if (!NativeSyncEngine) {
+            throw new Error('NativeSyncEngine unavailable');
+          }
+          await NativeSyncEngine.pairDevice({
+            deviceId: device.deviceId,
+            host: device.ip,
+            port: device.port,
+            connectionCode: '',
+          });
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: 'SyncActivity' }],
+            }),
+          );
+          return;
+        } catch (error) {
+          console.warn(
+            '[DiscoveryScreen] known device direct switch failed, requiring code verification',
+            error,
+          );
+        }
+      }
+
       navigation.navigate('CodeVerify', {
         deviceId: device.deviceId,
         host: device.ip,
@@ -320,7 +409,7 @@ export function DeviceDiscoveryScreen() {
         deviceName: device.name,
       });
     },
-    [navigation],
+    [mode, navigation, currentDeviceId, knownDeviceIds, t],
   );
 
   const handleManualPair = useCallback(() => {
@@ -329,7 +418,7 @@ export function DeviceDiscoveryScreen() {
 
     if (!manualDevice) {
       console.log('[DiscoveryScreen] handleManualPair rejected invalid host');
-      setManualHostError('请输入有效的 IPv4 地址，例如 192.168.0.1');
+      setManualHostError(t('deviceDiscovery.dialogs.manualInput.ipError'));
       return;
     }
 
@@ -349,9 +438,9 @@ export function DeviceDiscoveryScreen() {
       await shareDiagnosticsArchive();
     } catch (error) {
       if (isDiagnosticsExportUnavailable(error)) {
-        Alert.alert('无法导出', '当前版本暂不支持导出诊断包');
+        Alert.alert(t('settings.dialogs.exportUnavailable.title'), t('settings.dialogs.exportUnavailable.body'));
       } else {
-        Alert.alert('导出失败', '诊断包导出失败，请稍后重试');
+        Alert.alert(t('settings.dialogs.exportFailed.title'), t('settings.dialogs.exportFailed.body'));
       }
     } finally {
       setIsExportingDiagnostics(false);
@@ -359,30 +448,47 @@ export function DeviceDiscoveryScreen() {
   }, []);
 
   const renderDevice = useCallback(
-    ({ item }: ListRenderItemInfo<DiscoveredDevice>) => (
-      <TouchableOpacity
-        style={styles.deviceCard}
-        activeOpacity={0.7}
-        onPress={() => handleDevicePress(item)}
-      >
-        {/* Monitor icon with gradient bg */}
-        <View style={styles.deviceIconWrapper}>
-          <Icon name="desktop-outline" size={20} color="#fff" />
-        </View>
+    ({ item }: ListRenderItemInfo<DiscoveredDevice>) => {
+      const isCurrentDevice = mode === 'switch' && item.deviceId === currentDeviceId;
+      const isKnownDevice =
+        mode === 'switch' && !isCurrentDevice && knownDeviceIds.has(item.deviceId);
 
-        {/* Device info */}
-        <View style={styles.deviceInfo}>
-          <Text style={styles.deviceName}>{item.name}</Text>
-          <Text style={styles.deviceMeta}>
-            {item.type === 'win' ? 'Windows' : 'macOS'} {'·'} {item.ip}
-          </Text>
-        </View>
-
-        {/* Chevron */}
-        <Icon name="chevron-forward" size={20} color="#b0c8da" />
-      </TouchableOpacity>
-    ),
-    [handleDevicePress],
+      return (
+        <TouchableOpacity
+          style={styles.deviceCard}
+          activeOpacity={0.7}
+          onPress={() => handleDevicePress(item)}
+        >
+          <View style={styles.deviceIconWrapper}>
+            <Icon name="desktop-outline" size={20} color="#fff" />
+          </View>
+          <View style={styles.deviceInfo}>
+            <Text style={styles.deviceName}>{item.name}</Text>
+            <Text style={styles.deviceMeta}>
+              {item.type === 'win' ? 'Windows' : 'macOS'} {'·'} {item.ip}
+            </Text>
+          </View>
+          {isCurrentDevice && (
+            <View style={styles.badgeCurrent}>
+              <Text style={styles.badgeCurrentText}>
+                {t('deviceDiscovery.switch.badge.current')}
+              </Text>
+            </View>
+          )}
+          {isKnownDevice && (
+            <View style={styles.badgeKnown}>
+              <Text style={styles.badgeKnownText}>
+                {t('deviceDiscovery.switch.badge.known')}
+              </Text>
+            </View>
+          )}
+          {!isCurrentDevice && !isKnownDevice && (
+            <Icon name="chevron-forward" size={20} color="#b0c8da" />
+          )}
+        </TouchableOpacity>
+      );
+    },
+    [handleDevicePress, mode, currentDeviceId, knownDeviceIds, t],
   );
 
   const keyExtractor = useCallback(
@@ -397,14 +503,6 @@ export function DeviceDiscoveryScreen() {
     );
   }, []);
 
-  const openLegalLink = useCallback(async (url: string, label: string) => {
-    try {
-      await Linking.openURL(url);
-    } catch (error) {
-      console.warn(`[DiscoveryScreen] failed to open ${label}:`, error);
-      Alert.alert('打开失败', `暂时无法打开${label}，请稍后重试。`);
-    }
-  }, []);
 
   const manualDockBottom =
     keyboardHeight > 0 ? Math.max(12, keyboardHeight - insets.bottom) : 0;
@@ -417,29 +515,43 @@ export function DeviceDiscoveryScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerTopRow}>
-            <View style={styles.wifiIconBox}>
-              <Icon name="wifi" size={24} color="#3b9fd8" />
-            </View>
-            <TouchableOpacity
-              style={styles.scanButton}
-              activeOpacity={0.8}
-              onPress={() => {
-                if (isAndroid) {
-                  setShowManualModal(true);
-                  return;
-                }
-                setShowPairingMenu(true);
-              }}
-            >
-              <Icon name="settings-outline" size={16} color="#3b9fd8" />
-              <Text style={styles.scanButtonText}>手动配对</Text>
-            </TouchableOpacity>
+            {mode === 'switch' ? (
+              <TouchableOpacity
+                style={styles.backButton}
+                activeOpacity={0.7}
+                onPress={() => navigation.goBack()}
+              >
+                <Icon name="chevron-back" size={20} color="#3b9fd8" />
+              </TouchableOpacity>
+            ) : (
+              <>
+                <View style={styles.wifiIconBox}>
+                  <Icon name="wifi" size={24} color="#3b9fd8" />
+                </View>
+                <TouchableOpacity
+                  style={styles.scanButton}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    if (isAndroid) {
+                      setShowManualModal(true);
+                      return;
+                    }
+                    setShowPairingMenu(true);
+                  }}
+                >
+                  <Icon name="settings-outline" size={16} color="#3b9fd8" />
+                  <Text style={styles.scanButtonText}>{t('deviceDiscovery.actions.manualPair')}</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
-          <Text style={styles.title}>{'搜索设备'}</Text>
+          <Text style={styles.title}>
+            {mode === 'switch' ? t('deviceDiscovery.switch.title') : t('deviceDiscovery.title')}
+          </Text>
           <Text style={styles.subtitle}>
             {isAndroid
-              ? '正在扫描局域网中的电脑端应用；若未发现设备，可改用手动输入 IPv4。'
-              : '正在扫描局域网中的电脑端应用...'}
+              ? t('deviceDiscovery.subtitle.android')
+              : t('deviceDiscovery.subtitle.ios')}
           </Text>
         </View>
 
@@ -447,7 +559,7 @@ export function DeviceDiscoveryScreen() {
         {scanning && devices.length === 0 && (
           <View style={styles.scanningSection}>
             <PulseRings />
-            <Text style={styles.scanningText}>{'扫描中，请稍候...'}</Text>
+            <Text style={styles.scanningText}>{t('deviceDiscovery.scanning.text')}</Text>
           </View>
         )}
 
@@ -458,15 +570,15 @@ export function DeviceDiscoveryScreen() {
           >
             {devices.length > 0 && (
               <Text style={styles.deviceCount}>
-                {'发现'} {devices.length} {'台设备'}
+                {t('deviceDiscovery.devices.foundCount', { count: devices.length })}
               </Text>
             )}
             {devices.length === 0 ? (
               <View style={styles.emptySection}>
                 <Text style={styles.emptyText}>
                   {isAndroid
-                    ? '未发现设备，请手动输入 IP 继续配对'
-                    : '未发现设备'}
+                    ? t('deviceDiscovery.emptyState.android')
+                    : t('deviceDiscovery.emptyState.default')}
                 </Text>
               </View>
             ) : (
@@ -504,30 +616,9 @@ export function DeviceDiscoveryScreen() {
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
                 >
                   <Icon name="refresh" size={16} color="#5a9abf" />
-                  <Text style={styles.rescanText}>{'重新扫描'}</Text>
+                  <Text style={styles.rescanText}>{t('deviceDiscovery.actions.rescan')}</Text>
                 </View>
               </TouchableOpacity>
-              <View style={styles.legalLinksRow}>
-                <TouchableOpacity
-                  style={styles.legalLinkButton}
-                  activeOpacity={0.7}
-                  onPress={() =>
-                    void openLegalLink(PRIVACY_POLICY_URL, '隐私政策')
-                  }
-                >
-                  <Text style={styles.legalLinkText}>{'隐私政策'}</Text>
-                </TouchableOpacity>
-                <Text style={styles.legalLinkDivider}>{'/'}</Text>
-                <TouchableOpacity
-                  style={styles.legalLinkButton}
-                  activeOpacity={0.7}
-                  onPress={() =>
-                    void openLegalLink(TERMS_OF_SERVICE_URL, '用户协议')
-                  }
-                >
-                  <Text style={styles.legalLinkText}>{'用户协议'}</Text>
-                </TouchableOpacity>
-              </View>
             </View>
           )}
         </View>
@@ -552,7 +643,7 @@ export function DeviceDiscoveryScreen() {
                 }}
               >
                 <Icon name="create-outline" size={20} color="#3b9fd8" />
-                <Text style={styles.popoverText}>手动输入 IP</Text>
+                <Text style={styles.popoverText}>{t('deviceDiscovery.actions.manualInputIp')}</Text>
               </TouchableOpacity>
               {isAndroid ? null : (
                 <>
@@ -565,7 +656,7 @@ export function DeviceDiscoveryScreen() {
                     }}
                   >
                     <Icon name="scan-outline" size={20} color="#3b9fd8" />
-                    <Text style={styles.popoverText}>扫码配对</Text>
+                    <Text style={styles.popoverText}>{t('deviceDiscovery.actions.qrPair')}</Text>
                   </TouchableOpacity>
                   <View style={styles.popoverDivider} />
                   <TouchableOpacity
@@ -576,8 +667,8 @@ export function DeviceDiscoveryScreen() {
                     <Icon name="download-outline" size={20} color="#3b9fd8" />
                     <Text style={styles.popoverText}>
                       {isExportingDiagnostics
-                        ? '正在导出诊断包…'
-                        : '导出诊断包'}
+                        ? t('settings.actions.exportingDiagnostics')
+                        : t('settings.actions.exportDiagnostics')}
                     </Text>
                   </TouchableOpacity>
                 </>
@@ -604,15 +695,13 @@ export function DeviceDiscoveryScreen() {
               <Pressable onPress={() => {}}>
                 <View style={styles.manualCard}>
                   <View style={styles.modalHeader}>
-                    <Text style={styles.manualTitle}>{'手动输入 IP 配对'}</Text>
+                    <Text style={styles.manualTitle}>{t('deviceDiscovery.dialogs.manualInput.title')}</Text>
                     <TouchableOpacity onPress={() => setShowManualModal(false)}>
                       <Icon name="close" size={22} color="#8aa9bc" />
                     </TouchableOpacity>
                   </View>
                   <Text style={styles.manualDescription}>
-                    {
-                      '如果扫描不到电脑，尤其是 Windows 设备，可直接输入电脑端 IPv4 地址继续配对。'
-                    }
+                    {t('deviceDiscovery.dialogs.manualInput.description')}
                   </Text>
                   <View style={styles.manualInputRow}>
                     <TextInput
@@ -641,7 +730,7 @@ export function DeviceDiscoveryScreen() {
                       activeOpacity={0.8}
                       onPress={handleManualPair}
                     >
-                      <Text style={styles.manualButtonText}>{'继续'}</Text>
+                      <Text style={styles.manualButtonText}>{t('deviceDiscovery.dialogs.manualInput.confirm')}</Text>
                     </TouchableOpacity>
                   </View>
                   {manualHostError ? (
@@ -650,9 +739,7 @@ export function DeviceDiscoveryScreen() {
                     </Text>
                   ) : (
                     <Text style={styles.manualHint}>
-                      {
-                        '默认使用同步端口 39393，输入后仍需在下一步填写 6 位连接码。'
-                      }
+                      {t('deviceDiscovery.dialogs.manualInput.hint')}
                     </Text>
                   )}
                 </View>
@@ -820,6 +907,40 @@ const styles = StyleSheet.create({
     color: '#8aabbd',
     marginTop: 2,
   },
+  badgeCurrent: {
+    backgroundColor: 'rgba(59,159,216,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(59,159,216,0.4)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  badgeCurrentText: {
+    color: '#3b9fd8',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  badgeKnown: {
+    backgroundColor: 'rgba(63,207,127,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(63,207,127,0.4)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  badgeKnownText: {
+    color: '#3fcf7f',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(59,159,216,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   // Empty state
   emptySection: {
@@ -845,25 +966,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#5a9abf',
-  },
-  legalLinksRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  legalLinkButton: {
-    paddingHorizontal: 4,
-    paddingVertical: 4,
-  },
-  legalLinkText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#6a96b8',
-  },
-  legalLinkDivider: {
-    fontSize: 12,
-    color: '#8aabbd',
   },
 
   // Popover Styles

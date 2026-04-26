@@ -7,5 +7,8 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 		"ok":      true,
 		"service": "syncflow-sidecar",
 		"version": "0.1.0",
+		"capabilities": map[string]any{
+			"revokesPairingsOnCodeRotation": true,
+		},
 	})
 }

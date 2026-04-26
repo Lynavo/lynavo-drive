@@ -19,6 +19,14 @@ import (
 	"github.com/nicksyncflow/sidecar/internal/store"
 )
 
+type fakePresenceStateProvider struct {
+	alive bool
+}
+
+func (f fakePresenceStateProvider) IsAlive(clientID string, window time.Duration) bool {
+	return f.alive
+}
+
 const (
 	testClientID    = "test-iphone-001"
 	testClientName  = "Test iPhone"
@@ -520,6 +528,62 @@ func TestReturningHelloRefreshesClientNameAndIPv4(t *testing.T) {
 	}
 	if paired.LastIP == nil || *paired.LastIP != advertisedIPv4 {
 		t.Fatalf("last ip=%v, want %q", paired.LastIP, advertisedIPv4)
+	}
+}
+
+func TestConnectionCodeRotationForcesReturningDeviceToRePair(t *testing.T) {
+	client, st, cfg, cleanup := setupTestConnection(t)
+	defer cleanup()
+
+	pairingToken := doPairing(t, client)
+	client.Close()
+	time.Sleep(50 * time.Millisecond)
+
+	revokedCount, err := st.SetConnectionCodeAndRevokePairedDevices("654321")
+	if err != nil {
+		t.Fatalf("SetConnectionCodeAndRevokePairedDevices: %v", err)
+	}
+	if revokedCount != 1 {
+		t.Fatalf("expected 1 revoked device, got %d", revokedCount)
+	}
+
+	client2, cleanup2 := setupTestConnectionWithStore(t, st, cfg)
+	defer cleanup2()
+
+	sendJSON(t, client2, protocol.TypeHelloReq, protocol.HelloReq{
+		ClientID:       testClientID,
+		ClientName:     testClientName,
+		ClientPlatform: "ios",
+		AppVersion:     "0.1.0",
+		PairingToken:   pairingToken,
+		AppState:       "foreground",
+	})
+
+	var helloRes protocol.HelloRes
+	recvJSON(t, client2, protocol.TypeHelloRes, &helloRes)
+	if !helloRes.AuthRequired {
+		t.Fatal("expected authRequired=true after connection code rotation revoked old token")
+	}
+	if helloRes.Bound {
+		t.Fatal("expected bound=false after connection code rotation revoked old token")
+	}
+}
+
+func TestDisconnectBroadcastStatus_UsesPresenceState(t *testing.T) {
+	tcpSrv := NewTCPServer(nil, nil, events.NewHub())
+
+	if got := tcpSrv.DisconnectBroadcastStatus(testClientID); got != "offline" {
+		t.Fatalf("expected offline without presence, got %q", got)
+	}
+
+	tcpSrv.SetPresenceProvider(fakePresenceStateProvider{alive: true})
+	if got := tcpSrv.DisconnectBroadcastStatus(testClientID); got != "connected_idle" {
+		t.Fatalf("expected connected_idle with live presence, got %q", got)
+	}
+
+	tcpSrv.SetPresenceProvider(fakePresenceStateProvider{alive: false})
+	if got := tcpSrv.DisconnectBroadcastStatus(testClientID); got != "offline" {
+		t.Fatalf("expected offline with stale presence, got %q", got)
 	}
 }
 

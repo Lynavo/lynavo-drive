@@ -1,0 +1,36 @@
+{
+  "defaultFolderName": "共享目录",
+  "loading": "加载中...",
+  "files": {
+    "folder": "文件夹"
+  },
+  "emptyState": {
+    "title": "共享目录暂无内容",
+    "message": "同步完成后，文件将显示在这里"
+  },
+  "deviceUnavailable": {
+    "title": "设备不可用",
+    "message": "请先连接设备",
+    "recheck": "重新检查"
+  },
+  "directoryInaccessible": {
+    "title": "共享目录不可访问",
+    "message": "请检查电脑端设置"
+  },
+  "networkError": {
+    "title": "加载失败",
+    "message": "请稍后重试"
+  },
+  "preview": {
+    "playVideo": "点击播放视频"
+  },
+  "dialogs": {
+    "downloadSavedToPhotos": "{{name}} 已保存到相册",
+    "downloadSaved": "{{name}} 已保存",
+    "downloadComplete": "下载完成",
+    "downloadFailed": "下载失败",
+    "downloadFailedMessage": "无法下载文件，请稍后重试",
+    "previewFailed": "预览失败",
+    "previewFailedMessage": "无法获取文件预览"
+  }
+}

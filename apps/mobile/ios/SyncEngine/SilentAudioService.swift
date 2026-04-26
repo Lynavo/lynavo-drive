@@ -48,9 +48,9 @@ class SilentAudioService {
             audioPlayer?.volume = 0.0
             audioPlayer?.play()
             isPlaying = true
-            NSLog("[SilentAudio] started background audio")
+            slog("[SilentAudio] started background audio")
         } catch {
-            NSLog("[SilentAudio] failed to start: %@", "\(error)")
+            slog("[SilentAudio] failed to start: %@", "\(error)")
         }
     }
 
@@ -60,7 +60,7 @@ class SilentAudioService {
         audioPlayer = nil
         isPlaying = false
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        NSLog("[SilentAudio] stopped")
+        slog("[SilentAudio] stopped")
     }
 }
 

@@ -20,7 +20,16 @@ function getCreationTimestamp(creationDate: string): number {
 export function sortAlbumAssetsForDisplay(
   assets: AlbumAssetDTO[],
 ): AlbumAssetDTO[] {
-  return [...assets].sort((left, right) => {
+  // Deduplicate by assetLocalId — pagination overlap or refresh can
+  // introduce duplicates, which causes React key collisions in FlatList.
+  const seen = new Set<string>();
+  const unique = assets.filter(a => {
+    if (seen.has(a.assetLocalId)) return false;
+    seen.add(a.assetLocalId);
+    return true;
+  });
+
+  return unique.sort((left, right) => {
     const rankDelta = getSortRank(left) - getSortRank(right);
     if (rankDelta !== 0) {
       return rankDelta;
