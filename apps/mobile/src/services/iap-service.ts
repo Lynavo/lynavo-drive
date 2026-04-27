@@ -452,8 +452,9 @@ class IapServiceImpl implements IapService {
     // pending entry (Map preserves insertion order) and resolve it with the
     // real receipt/transactionId so the server can verify against the truth.
     if (this.pendingPurchase.size > 0) {
-      const incomingPlan =
-        await resolveSubscriptionProductPlan(incomingProductId);
+      const incomingPlan = await resolveSubscriptionProductPlan(
+        incomingProductId,
+      );
       if (!incomingPlan) {
         await this.handleOrphanPurchase(p);
         return;
@@ -481,9 +482,16 @@ class IapServiceImpl implements IapService {
         productId,
         hasTransactionId: !!purchase.transactionId,
       });
-      const refreshedReceipt = await this.refreshReceiptForUserPurchase();
+      // A successful StoreKit purchase update already carries the receipt RN-IAP
+      // obtained for this transaction. Forcing a unified receipt refresh here
+      // often triggers ASDErrorDomain 603 ("Request throttled") because the
+      // receipt is already valid/current. Plan-switch mismatch handling can
+      // still explicitly refresh from SubscriptionScreen when the backend
+      // proves the transaction receipt was stale.
       const transactionReceipt =
-        refreshedReceipt ?? purchase.transactionReceipt ?? '';
+        purchase.transactionReceipt ||
+        (await this.refreshReceiptForUserPurchase()) ||
+        '';
       if (!transactionReceipt) {
         throw new Error('purchase receipt is empty');
       }

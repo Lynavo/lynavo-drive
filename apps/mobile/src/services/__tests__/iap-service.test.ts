@@ -245,7 +245,7 @@ describe('iapService — purchase', () => {
     });
   });
 
-  test('uses a freshly refreshed iOS receipt when StoreKit has one', async () => {
+  test('does not force-refresh the iOS receipt when the purchase event has one', async () => {
     (getReceiptIOS as jest.Mock).mockResolvedValueOnce('FRESH_RECEIPT_BLOB');
 
     const pending = iapService.purchase(IAP_PRODUCTS.monthly);
@@ -253,8 +253,29 @@ describe('iapService — purchase', () => {
 
     updatedCb?.({
       productId: IAP_PRODUCTS.monthly,
-      transactionReceipt: 'STALE_RECEIPT_BLOB',
+      transactionReceipt: 'BASE64BLOB',
       transactionId: 'tx_fresh',
+    });
+
+    const receipt = await pending;
+    expect(getReceiptIOS).not.toHaveBeenCalled();
+    expect(receipt).toEqual({
+      productId: IAP_PRODUCTS.monthly,
+      transactionReceipt: 'BASE64BLOB',
+      transactionId: 'tx_fresh',
+    });
+  });
+
+  test('falls back to a refreshed iOS receipt when the purchase event receipt is empty', async () => {
+    (getReceiptIOS as jest.Mock).mockResolvedValueOnce('FRESH_RECEIPT_BLOB');
+
+    const pending = iapService.purchase(IAP_PRODUCTS.monthly);
+    await flushPurchasePreflight();
+
+    updatedCb?.({
+      productId: IAP_PRODUCTS.monthly,
+      transactionReceipt: '',
+      transactionId: 'tx_empty_receipt',
     });
 
     const receipt = await pending;
@@ -262,7 +283,7 @@ describe('iapService — purchase', () => {
     expect(receipt).toEqual({
       productId: IAP_PRODUCTS.monthly,
       transactionReceipt: 'FRESH_RECEIPT_BLOB',
-      transactionId: 'tx_fresh',
+      transactionId: 'tx_empty_receipt',
     });
   });
 
@@ -306,7 +327,7 @@ describe('iapService — purchase', () => {
     expect(receipt.transactionId).toBe('tx_yearly_upgrade');
   });
 
-  test('refreshes receipt for monthly → yearly group-parent delivery', async () => {
+  test('returns transaction receipt for monthly → yearly group-parent delivery', async () => {
     (getReceiptIOS as jest.Mock).mockResolvedValueOnce('FRESH_YEARLY_RECEIPT');
 
     const pending = iapService.purchase(IAP_PRODUCTS.yearly);
@@ -319,9 +340,10 @@ describe('iapService — purchase', () => {
     });
 
     const receipt = await pending;
+    expect(getReceiptIOS).not.toHaveBeenCalled();
     expect(receipt).toEqual({
       productId: IAP_PRODUCTS.monthly,
-      transactionReceipt: 'FRESH_YEARLY_RECEIPT',
+      transactionReceipt: 'STALE_MONTHLY_RECEIPT',
       transactionId: 'tx_yearly_upgrade_fresh',
     });
   });
