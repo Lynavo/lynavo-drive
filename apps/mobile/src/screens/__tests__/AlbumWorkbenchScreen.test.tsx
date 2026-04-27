@@ -1151,4 +1151,56 @@ describe('AlbumWorkbenchScreen', () => {
     ).toContain(0);
     expect(allTextValues).not.toContain(8);
   });
+
+  it('keeps active auto upload round progress when entering album mid-round', async () => {
+    const nativeModules = NativeModules as typeof NativeModules & {
+      NativeSyncEngine?: {
+        getSyncOverview: jest.Mock;
+      };
+    };
+    nativeModules.NativeSyncEngine?.getSyncOverview.mockResolvedValue({
+      uploadState: 'uploading',
+      completedCount: 3,
+      totalCount: 7,
+      roundBaselineCompletedCount: 0,
+      currentTaskSource: 'auto',
+      autoUploadState: 'active',
+      autoPending: 4,
+    });
+    mockedBrowseAlbum.mockResolvedValue([]);
+    mockedGetAlbumStats.mockResolvedValue({
+      totalCount: 28,
+      transferredCount: 3,
+      queuedCount: 4,
+      pendingCount: 25,
+    });
+    mockedGetAutoUploadConfig.mockResolvedValue({
+      enabled: true,
+      state: 'active',
+      timeRangeMode: 'custom',
+      customTimeFrom: '2026-04-27T09:00:00.000Z',
+    });
+
+    let tree: ReactTestRenderer.ReactTestRenderer | undefined;
+    await ReactTestRenderer.act(async () => {
+      tree = createAlbumWorkbenchScreen();
+    });
+    await ReactTestRenderer.act(async () => {
+      await Promise.resolve();
+    });
+
+    const transferredSummaryItem = tree!.root.findAllByType(View).find(node => {
+      const itemTextValues = node
+        .findAllByType(Text)
+        .flatMap(text => flattenTextChildren(text.props.children));
+      return itemTextValues.includes('本次已传');
+    });
+
+    expect(transferredSummaryItem).toBeDefined();
+    expect(
+      transferredSummaryItem!
+        .findAllByType(Text)
+        .flatMap(node => flattenTextChildren(node.props.children)),
+    ).toContain(3);
+  });
 });

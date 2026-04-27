@@ -45,7 +45,12 @@ import DateTimePicker, {
 } from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import type { AlbumAssetDTO, AutoUploadConfigDTO } from '@syncflow/contracts';
+import type {
+  AlbumAssetDTO,
+  AutoUploadConfigDTO,
+  AutoUploadState,
+  UploadTaskSource,
+} from '@syncflow/contracts';
 import { AssetPreviewModal } from '../components/AssetPreviewModal';
 import { Icon } from '../components/Icon';
 import {
@@ -112,6 +117,16 @@ type ViewMode = 'grid' | 'list';
 type GridItemRef = React.ComponentRef<typeof View>;
 type GridDragSelectionMode = 'select' | 'deselect';
 
+interface AutoUploadRoundOverview {
+  uploadState: string;
+  completedCount: number;
+  totalCount: number;
+  roundBaselineCompletedCount?: number;
+  currentTaskSource?: UploadTaskSource | null;
+  autoPending?: number;
+  autoUploadState?: AutoUploadState | null;
+}
+
 interface MeasuredGridItem {
   assetLocalId: string;
   isTransferred: boolean;
@@ -143,6 +158,100 @@ const TIME_RANGE_OPTIONS = [
   key: AutoUploadConfigDTO['timeRangeMode'];
   labelKey: string;
 }>;
+
+const AUTO_UPLOAD_ROUND_STATES = new Set([
+  'discovering',
+  'reconciling',
+  'scanning',
+  'preparing',
+  'uploading',
+  'cloud_downloading',
+  'reconnecting',
+  'backoff_waiting',
+  'completed',
+]);
+
+function readNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+function buildAutoUploadRoundOverview(
+  payload: Record<string, unknown> | null | undefined,
+  previous: AutoUploadRoundOverview | null,
+): AutoUploadRoundOverview | null {
+  if (!payload) return previous;
+
+  const hasRoundBaseline = Object.prototype.hasOwnProperty.call(
+    payload,
+    'roundBaselineCompletedCount',
+  );
+  const hasCurrentTaskSource = Object.prototype.hasOwnProperty.call(
+    payload,
+    'currentTaskSource',
+  );
+  const hasAutoUploadState = Object.prototype.hasOwnProperty.call(
+    payload,
+    'autoUploadState',
+  );
+
+  const currentTaskSource =
+    payload.currentTaskSource === 'auto' ||
+    payload.currentTaskSource === 'manual'
+      ? payload.currentTaskSource
+      : hasCurrentTaskSource
+        ? null
+        : previous?.currentTaskSource;
+  const autoUploadState =
+    payload.autoUploadState === 'active' ||
+    payload.autoUploadState === 'disabled' ||
+    payload.autoUploadState === 'interrupted'
+      ? payload.autoUploadState
+      : hasAutoUploadState
+        ? null
+        : previous?.autoUploadState;
+
+  return {
+    uploadState:
+      typeof payload.uploadState === 'string'
+        ? payload.uploadState
+        : (previous?.uploadState ?? 'idle'),
+    completedCount:
+      readNumber(payload.completedCount) ?? previous?.completedCount ?? 0,
+    totalCount:
+      readNumber(payload.totalCount) ??
+      readNumber(payload.queueTotalCount) ??
+      previous?.totalCount ??
+      0,
+    roundBaselineCompletedCount: hasRoundBaseline
+      ? readNumber(payload.roundBaselineCompletedCount)
+      : previous?.roundBaselineCompletedCount,
+    currentTaskSource,
+    autoPending: readNumber(payload.autoPending) ?? previous?.autoPending,
+    autoUploadState,
+  };
+}
+
+function getAutoUploadRoundCompletedCount(
+  overview: AutoUploadRoundOverview | null,
+  isAutoUploadActive: boolean,
+): number | null {
+  if (!overview || !isAutoUploadActive) return null;
+  if (
+    overview.autoUploadState !== undefined &&
+    overview.autoUploadState !== null &&
+    overview.autoUploadState !== 'active'
+  ) {
+    return null;
+  }
+  if (overview.currentTaskSource === 'manual') return null;
+  if (!AUTO_UPLOAD_ROUND_STATES.has(overview.uploadState)) return null;
+  if (overview.totalCount <= 0 && overview.completedCount <= 0) return null;
+
+  const baseline = overview.roundBaselineCompletedCount ?? 0;
+  return Math.max(0, overview.completedCount - baseline);
+}
 
 function getEmptyStateCopy(
   filter: UnifiedFilter,
@@ -256,6 +365,8 @@ export function AlbumWorkbenchScreen() {
   const [autoUploadConfig, setAutoUploadConfig] =
     useState<AutoUploadConfigDTO | null>(null);
   const [configExpanded, setConfigExpanded] = useState(false);
+  const [autoUploadRoundOverview, setAutoUploadRoundOverview] =
+    useState<AutoUploadRoundOverview | null>(null);
 
   // Custom time picker
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -422,10 +533,25 @@ export function AlbumWorkbenchScreen() {
     }
   }, []);
 
+  const loadSyncOverview = useCallback(async () => {
+    try {
+      const payload = await NativeModules.NativeSyncEngine?.getSyncOverview?.();
+      setAutoUploadRoundOverview(prev =>
+        buildAutoUploadRoundOverview(
+          (payload as Record<string, unknown> | null | undefined) ?? null,
+          prev,
+        ),
+      );
+    } catch (e) {
+      console.warn('[AlbumWorkbench] loadSyncOverview error:', e);
+    }
+  }, []);
+
   useEffect(() => {
     void loadAssets(mediaFilter, transferFilter, true, collectionId);
     void loadStats();
     void loadConfig();
+    void loadSyncOverview();
     // Seed initial connection and photo auth state
     void (async () => {
       try {
@@ -451,6 +577,7 @@ export function AlbumWorkbenchScreen() {
     loadAssets,
     loadStats,
     loadConfig,
+    loadSyncOverview,
   ]);
 
   const statsTransferredCount = stats?.transferredCount;
@@ -506,7 +633,13 @@ export function AlbumWorkbenchScreen() {
       void refreshVisibleAssets();
       void loadStats();
     });
-    const stateSub = emitter.addListener('onSyncStateChanged', () => {
+    const stateSub = emitter.addListener('onSyncStateChanged', payload => {
+      setAutoUploadRoundOverview(prev =>
+        buildAutoUploadRoundOverview(
+          (payload as Record<string, unknown> | null | undefined) ?? null,
+          prev,
+        ),
+      );
       void loadStats();
     });
     const bindingSub = emitter.addListener(
@@ -521,6 +654,7 @@ export function AlbumWorkbenchScreen() {
     const photoLibSub = emitter.addListener('onPhotoLibraryChanged', () => {
       void loadAssets(mediaFilter, transferFilter, true, collectionId);
       void loadStats();
+      void loadSyncOverview();
       void getPhotoAuthorizationStatus()
         .then(setPhotoAuthStatus)
         .catch(() => {});
@@ -538,6 +672,7 @@ export function AlbumWorkbenchScreen() {
     loadAssets,
     refreshVisibleAssets,
     loadStats,
+    loadSyncOverview,
   ]);
 
   // Re-fetch when returning from background / permission dialog.
@@ -553,6 +688,7 @@ export function AlbumWorkbenchScreen() {
       ) {
         void loadAssets(mediaFilter, transferFilter, true, collectionId);
         void loadStats();
+        void loadSyncOverview();
         // Re-check auth status — may have changed from notDetermined to
         // limited/authorized while the permission dialog was showing.
         void getPhotoAuthorizationStatus()
@@ -562,7 +698,14 @@ export function AlbumWorkbenchScreen() {
       appStateRef.current = next;
     });
     return () => sub.remove();
-  }, [loadAssets, mediaFilter, transferFilter, collectionId, loadStats]);
+  }, [
+    loadAssets,
+    mediaFilter,
+    transferFilter,
+    collectionId,
+    loadStats,
+    loadSyncOverview,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Selection handlers
@@ -1501,14 +1644,19 @@ export function AlbumWorkbenchScreen() {
   // Render
   // ---------------------------------------------------------------------------
 
+  const autoUploadRoundCompletedCount = getAutoUploadRoundCompletedCount(
+    autoUploadRoundOverview,
+    isAutoUploadActive,
+  );
   const autoUploadTransferredThisRound =
-    isAutoUploadActive && stats
+    autoUploadRoundCompletedCount ??
+    (isAutoUploadActive && stats
       ? Math.max(
           0,
           stats.transferredCount -
             (autoUploadTransferredBaseline ?? stats.transferredCount),
         )
-      : 0;
+      : 0);
 
   // Derive custom time display string for summary card
   const timeRangeDisplayLabel = (() => {
@@ -2021,10 +2169,10 @@ export function AlbumWorkbenchScreen() {
           {isAutoUploadActive
             ? t('albumWorkbench.selectionHint.autoActiveLock')
             : selectedIds.size > 0
-            ? t('albumWorkbench.selectedCount', {
-                count: selectedIds.size,
-              })
-            : t('albumWorkbench.selectionHint.none')}
+              ? t('albumWorkbench.selectedCount', {
+                  count: selectedIds.size,
+                })
+              : t('albumWorkbench.selectionHint.none')}
         </Text>
         <View style={styles.uploadBarRight}>
           {!deviceConnected && !isAutoUploadActive && (
