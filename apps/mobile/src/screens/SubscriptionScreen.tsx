@@ -32,7 +32,11 @@ import {
   SubscriptionStatusIcon,
   getSubscriptionStatusIconTone,
 } from '../components/SubscriptionStatusIcon';
-import { isFeatureAccessAllowed, useAuth } from '../stores/auth-store';
+import {
+  isFeatureAccessAllowed,
+  useAuth,
+  type SubscriptionInfo,
+} from '../stores/auth-store';
 import { iapService } from '../services/iap-service';
 import { resolveSubscriptionPlanTier } from '../services/subscription-plans-service';
 import {
@@ -72,6 +76,13 @@ const CHECK_BG = 'rgba(83, 200, 120, 0.12)';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PLAN_CARD_GAP = 12;
 const PLAN_CARD_HORIZONTAL_PADDING = 16;
+const POST_VERIFY_STATUS_POLL_DELAYS_MS = [
+  2_000,
+  5_000,
+  10_000,
+  20_000,
+  30_000,
+] as const;
 
 /** Card width grows/shrinks with plan count so 2 or 3 cards always tile
  *  edge-to-edge under the section padding. The base styles default to the
@@ -114,6 +125,10 @@ function formatExpireDate(dateStr: string | null): string {
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return '';
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 async function resolvePostSubscriptionRoute(): Promise<PostSubscriptionRoute> {
@@ -785,8 +800,7 @@ export function SubscriptionScreen() {
   const handleSubscribe = useCallback(async () => {
     if (!selectedEntry || selectedPlanTier == null) {
       // Catalog hasn't resolved yet, or selection couldn't map back to a
-      // backend tier (would only happen if the server registered a SKU
-      // outside the bootstrap product list). Bail rather than guessing.
+      // backend tier. Bail rather than guessing which entitlement to verify.
       return;
     }
     const targetProductId = selectedEntry.plan.product_id;
@@ -888,8 +902,10 @@ export function SubscriptionScreen() {
       let verifiedViaSilentSuccess = false;
       const delays = [0, 1_000, 4_000];
       let lastErr: unknown = null;
+      let refreshedAfterVerifyFailure = false;
+      let shouldPollAfterStaleMismatch = false;
       for (const delay of delays) {
-        if (delay > 0) await new Promise<void>(r => setTimeout(r, delay));
+        if (delay > 0) await wait(delay);
         try {
           await verifyIapReceipt(
             receiptData,
@@ -955,9 +971,11 @@ export function SubscriptionScreen() {
               }
             }
             if (shouldRefreshReceiptOnMismatch && isProductIdMismatch) {
+              shouldPollAfterStaleMismatch = true;
+              lastErr = err;
               recordDiagnosticsLog(
                 'SubscriptionScreen',
-                'verify product mismatch deferred finish',
+                'verify product mismatch deferred polling',
                 {
                   targetTier,
                   targetProductId,
@@ -966,8 +984,7 @@ export function SubscriptionScreen() {
                   receiptProductMatchesSelection,
                 },
               );
-              Alert.alert(t('subscription.errors.verifyRetrying'));
-              return;
+              break;
             }
             await iapService.finishTransaction(receipt.transactionId);
             recordDiagnosticsLog(
@@ -983,11 +1000,35 @@ export function SubscriptionScreen() {
             if (cls.i18nKey) Alert.alert(t(cls.i18nKey as never));
             return;
           }
+          const isIapVerifyFailed =
+            typeof err === 'object' &&
+            err !== null &&
+            'code' in err &&
+            (err as { code?: unknown }).code === ERROR_CODE.IAP_VERIFY_FAILED;
+          if (isIapVerifyFailed && !refreshedAfterVerifyFailure) {
+            refreshedAfterVerifyFailure = true;
+            const refreshedReceipt = await iapService.refreshReceipt();
+            if (refreshedReceipt) {
+              recordDiagnosticsLog(
+                'SubscriptionScreen',
+                'verify failure refreshed receipt',
+                {
+                  targetTier,
+                  targetProductId,
+                  receiptProductId: receipt.productId,
+                },
+              );
+              receiptData = refreshedReceipt;
+              lastErr = err;
+              continue;
+            }
+          }
           lastErr = err;
           // Retryable / network — loop continues.
         }
       }
 
+      let fresh: SubscriptionInfo | null = null;
       if (!verified) {
         const cls = classifyIapError(lastErr);
         recordDiagnosticsLog('SubscriptionScreen', 'verify exhausted', {
@@ -995,13 +1036,62 @@ export function SubscriptionScreen() {
           kind: cls.kind,
           i18nKey: cls.i18nKey,
         });
-        if (cls.kind === IapErrorClass.FatalMismatch) {
-          await iapService.finishTransaction(receipt.transactionId);
+        if (
+          cls.kind === IapErrorClass.Retryable ||
+          shouldPollAfterStaleMismatch
+        ) {
+          for (const delay of POST_VERIFY_STATUS_POLL_DELAYS_MS) {
+            await wait(delay);
+            try {
+              const candidate = await loadSubscription();
+              recordDiagnosticsLog(
+                'SubscriptionScreen',
+                'post-verify poll status',
+                {
+                  targetTier,
+                  status: candidate.status,
+                  plan: candidate.plan,
+                },
+              );
+              if (
+                candidate.status === 'subscribed' &&
+                candidate.plan === targetTier
+              ) {
+                fresh = candidate;
+                verified = true;
+                recordDiagnosticsLog(
+                  'SubscriptionScreen',
+                  'post-verify poll recovered',
+                  {
+                    targetTier,
+                  },
+                );
+                break;
+              }
+            } catch {
+              recordDiagnosticsLog(
+                'SubscriptionScreen',
+                'post-verify poll failed',
+                {
+                  targetTier,
+                },
+              );
+            }
+          }
         }
-        Alert.alert(
-          t((cls.i18nKey ?? 'subscription.errors.verifyRetrying') as never),
-        );
-        return;
+        if (!verified) {
+          if (shouldPollAfterStaleMismatch) {
+            Alert.alert(t('subscription.errors.verifyRetrying'));
+            return;
+          }
+          if (cls.kind === IapErrorClass.FatalMismatch) {
+            await iapService.finishTransaction(receipt.transactionId);
+          }
+          Alert.alert(
+            t((cls.i18nKey ?? 'subscription.errors.verifyRetrying') as never),
+          );
+          return;
+        }
       }
 
       // loadSubscription returns the freshly-fetched snapshot so we can
@@ -1009,25 +1099,30 @@ export function SubscriptionScreen() {
       // React to re-render with the new context value. If the backend hasn't
       // yet reflected the upgraded plan, expireAt may still be the previous
       // period — acceptable degradation vs. hiding the date entirely.
-      let fresh: typeof subscription = null;
-      try {
-        fresh = await loadSubscription();
-        recordDiagnosticsLog('SubscriptionScreen', 'post-verify load success', {
-          status: fresh?.status,
-          plan: fresh?.plan,
-        });
-        if (
-          fresh &&
-          isPlanSwitch &&
-          fresh.plan !== targetTier &&
-          (fresh.status === 'subscribed' || fresh.status === 'trialing')
-        ) {
-          fresh = { ...fresh, plan: targetTier };
-          setSubscription(fresh);
+      if (fresh == null) {
+        try {
+          fresh = await loadSubscription();
+          recordDiagnosticsLog(
+            'SubscriptionScreen',
+            'post-verify load success',
+            {
+              status: fresh?.status,
+              plan: fresh?.plan,
+            },
+          );
+          if (
+            fresh &&
+            isPlanSwitch &&
+            fresh.plan !== targetTier &&
+            (fresh.status === 'subscribed' || fresh.status === 'trialing')
+          ) {
+            fresh = { ...fresh, plan: targetTier };
+            setSubscription(fresh);
+          }
+        } catch {
+          recordDiagnosticsLog('SubscriptionScreen', 'post-verify load failed');
+          // Fall through — modal will just hide the expiry line.
         }
-      } catch {
-        recordDiagnosticsLog('SubscriptionScreen', 'post-verify load failed');
-        // Fall through — modal will just hide the expiry line.
       }
 
       // When `verified` came from a 2002 silent-success AND the server's

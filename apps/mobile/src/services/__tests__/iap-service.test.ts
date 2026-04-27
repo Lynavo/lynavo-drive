@@ -179,6 +179,7 @@ const bootstrapProductPlans = [
   { productId: IAP_PRODUCTS.yearly, plan: 'yearly' as const },
 ];
 const adminMonthlySku = 'admin.catalog.alpha';
+const adminYearlySku = 'admin.catalog.yearly';
 
 function mockDefaultCatalogPlanResolvers(): void {
   mockGetSubscriptionProductPlans.mockResolvedValue(bootstrapProductPlans);
@@ -345,6 +346,69 @@ describe('iapService — purchase', () => {
       productId: IAP_PRODUCTS.monthly,
       transactionReceipt: 'STALE_MONTHLY_RECEIPT',
       transactionId: 'tx_yearly_upgrade_fresh',
+    });
+  });
+
+  test('resolves server-catalog yearly SKU when Apple delivers a server-catalog monthly SKU', async () => {
+    mockResolveSubscriptionProductPlan.mockImplementation((productId: string) =>
+      Promise.resolve(
+        productId === adminYearlySku
+          ? 'yearly'
+          : productId === adminMonthlySku
+            ? 'monthly'
+            : null,
+      ),
+    );
+
+    const pending = iapService.purchase(adminYearlySku);
+    await flushPurchasePreflight();
+    expect(requestSubscription).toHaveBeenCalledWith({ sku: adminYearlySku });
+
+    updatedCb?.({
+      productId: adminMonthlySku,
+      transactionReceipt: 'ADMIN_YEARLY_RECEIPT',
+      transactionId: 'tx_admin_yearly_upgrade',
+    });
+
+    await expect(pending).resolves.toEqual({
+      productId: adminMonthlySku,
+      transactionReceipt: 'ADMIN_YEARLY_RECEIPT',
+      transactionId: 'tx_admin_yearly_upgrade',
+    });
+  });
+
+  test('treats a yearly event during a monthly purchase as orphan, not pending success', async () => {
+    mockResolveSubscriptionProductPlan.mockImplementation((productId: string) =>
+      Promise.resolve(
+        productId === adminYearlySku
+          ? 'yearly'
+          : productId === adminMonthlySku
+            ? 'monthly'
+            : null,
+      ),
+    );
+
+    const pending = iapService.purchase(adminMonthlySku);
+    await flushPurchasePreflight();
+
+    updatedCb?.({
+      productId: adminYearlySku,
+      transactionReceipt: 'STALE_YEARLY_RECEIPT',
+      transactionId: 'tx_stale_yearly',
+    });
+
+    await new Promise<void>(r => setImmediate(r));
+
+    updatedCb?.({
+      productId: adminMonthlySku,
+      transactionReceipt: 'MONTHLY_RECEIPT',
+      transactionId: 'tx_monthly',
+    });
+
+    await expect(pending).resolves.toEqual({
+      productId: adminMonthlySku,
+      transactionReceipt: 'MONTHLY_RECEIPT',
+      transactionId: 'tx_monthly',
     });
   });
 
@@ -589,6 +653,31 @@ describe('iapService — orphan recovery', () => {
     );
     expect(finishTxMock).not.toHaveBeenCalled();
     expect(listener).not.toHaveBeenCalled();
+  });
+
+  test('orphan with unknown productId is throttled for the same transaction', async () => {
+    (verifyIapReceipt as jest.Mock).mockRejectedValue(
+      new ApiError(ERROR_CODE.PRODUCT_ID_MISMATCH, 'mismatch'),
+    );
+    const purchase = {
+      productId: 'com.other.garbage',
+      transactionReceipt: 'BLOB',
+      transactionId: 'tx_unknown_retry_throttle',
+    };
+
+    updatedCb?.(purchase);
+    await new Promise<void>(r => setImmediate(r));
+    await new Promise<void>(r => setImmediate(r));
+    const callsAfterFirstReplay = (verifyIapReceipt as jest.Mock).mock.calls
+      .length;
+
+    updatedCb?.(purchase);
+    await new Promise<void>(r => setImmediate(r));
+    await new Promise<void>(r => setImmediate(r));
+
+    expect(callsAfterFirstReplay).toBeGreaterThan(0);
+    expect(verifyIapReceipt).toHaveBeenCalledTimes(callsAfterFirstReplay);
+    expect(finishTxMock).not.toHaveBeenCalled();
   });
 
   test('orphan with network failure → do NOT finish (retry later)', async () => {

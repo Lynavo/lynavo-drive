@@ -444,23 +444,22 @@ class IapServiceImpl implements IapService {
       return;
     }
 
-    // 2. Group-aware fallback: Apple may deliver an upgrade's SKPaymentTransaction
-    // with the group-parent (e.g. previous monthly) SKU rather than the newly
-    // requested yearly SKU. Because `purchase()` dedupes by productId and the
-    // entire app uses a single subscription group, any in-flight pending entry
-    // must correspond to the transaction we just received. Pick the most recent
-    // pending entry (Map preserves insertion order) and resolve it with the
-    // real receipt/transactionId so the server can verify against the truth.
+    // 2. Group-aware fallback: Apple may deliver a monthly->yearly upgrade's
+    // SKPaymentTransaction with the previous monthly SKU. Keep this narrow so
+    // a late event from an earlier timed-out yearly purchase cannot resolve a
+    // newer monthly pending purchase.
     if (this.pendingPurchase.size > 0) {
-      const incomingPlan = await resolveSubscriptionProductPlan(
-        incomingProductId,
-      );
-      if (!incomingPlan) {
+      const keys = Array.from(this.pendingPurchase.keys());
+      const fallbackKey = keys[keys.length - 1]!;
+      if (
+        !(await this.canResolvePendingWithGroupParent(
+          fallbackKey,
+          incomingProductId,
+        ))
+      ) {
         await this.handleOrphanPurchase(p);
         return;
       }
-      const keys = Array.from(this.pendingPurchase.keys());
-      const fallbackKey = keys[keys.length - 1]!;
       const fallback = this.pendingPurchase.get(fallbackKey)!;
       this.clearPendingTimers(fallback);
       this.pendingPurchase.delete(fallbackKey);
@@ -470,6 +469,17 @@ class IapServiceImpl implements IapService {
 
     // 3. True orphan — redelivered or out-of-band transaction.
     await this.handleOrphanPurchase(p);
+  }
+
+  private async canResolvePendingWithGroupParent(
+    requestedProductId: string,
+    incomingProductId: string,
+  ): Promise<boolean> {
+    const [requestedPlan, incomingPlan] = await Promise.all([
+      resolveSubscriptionProductPlan(requestedProductId),
+      resolveSubscriptionProductPlan(incomingProductId),
+    ]);
+    return requestedPlan === 'yearly' && incomingPlan === 'monthly';
   }
 
   private async resolvePendingPurchase(
@@ -707,33 +717,6 @@ class IapServiceImpl implements IapService {
   private async handleOrphanPurchase(p: Purchase): Promise<void> {
     const productId = p.productId;
     const txId = p.transactionId ?? '';
-    const plan = await resolveSubscriptionProductPlan(productId);
-    if (!plan) {
-      // Product may be an inactive/deprecated SKU that is still valid for an
-      // existing subscriber. Do not finish it until the server rejects both
-      // entitlement tiers; finishing first would lose the recovery path.
-      const receiptCandidates = this.restoreReceiptCandidates(
-        null,
-        p.transactionReceipt,
-      );
-      const restored =
-        receiptCandidates.length > 0
-          ? await this.verifyRestoredPurchase(
-              receiptCandidates,
-              undefined,
-              txId,
-              productId,
-            )
-          : null;
-      if (restored) {
-        this.orphanListeners.forEach(cb => cb());
-        return;
-      }
-      recordDiagnosticsLog('IAP', 'orphan purchase unknown product deferred', {
-        productId,
-      });
-      return;
-    }
     const orphanKey = this.orphanPurchaseKey(p);
     if (this.orphanVerificationInFlight.has(orphanKey)) {
       return;
@@ -744,12 +727,50 @@ class IapServiceImpl implements IapService {
     }
 
     this.orphanVerificationInFlight.add(orphanKey);
-    recordDiagnosticsLog('IAP', 'orphan purchase verify start', {
-      productId,
-      plan,
-      hasTransactionId: !!txId,
-    });
+    let plan: SubscriptionPlanTier | null = null;
     try {
+      plan = await resolveSubscriptionProductPlan(productId);
+      if (!plan) {
+        // Product may be an inactive/deprecated SKU that is still valid for an
+        // existing subscriber. Do not finish it until the server rejects both
+        // entitlement tiers; finishing first would lose the recovery path.
+        const receiptCandidates = this.restoreReceiptCandidates(
+          null,
+          p.transactionReceipt,
+        );
+        const restored =
+          receiptCandidates.length > 0
+            ? await this.verifyRestoredPurchase(
+                receiptCandidates,
+                undefined,
+                txId,
+                productId,
+              )
+            : null;
+        if (restored) {
+          this.orphanRetryAfter.delete(orphanKey);
+          this.orphanListeners.forEach(cb => cb());
+          return;
+        }
+        this.orphanRetryAfter.set(
+          orphanKey,
+          Date.now() + ORPHAN_PURCHASE_RETRY_BACKOFF_MS,
+        );
+        recordDiagnosticsLog(
+          'IAP',
+          'orphan purchase unknown product deferred',
+          {
+            productId,
+          },
+        );
+        return;
+      }
+
+      recordDiagnosticsLog('IAP', 'orphan purchase verify start', {
+        productId,
+        plan,
+        hasTransactionId: !!txId,
+      });
       await verifyIapReceipt(p.transactionReceipt, plan, productId, txId);
       await this.finishTransaction(txId).catch(() => {});
       this.orphanRetryAfter.delete(orphanKey);
