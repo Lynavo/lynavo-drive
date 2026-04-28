@@ -52,6 +52,7 @@ export function CodeVerifyScreen() {
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const filledCount = code.filter(Boolean).length;
 
   const inputRefs = useRef<(TextInput | null)[]>([]);
   const codeBoxSize = Math.min(
@@ -119,7 +120,7 @@ export function CodeVerifyScreen() {
           );
       }, VERIFY_DELAY_MS);
     },
-    [navigation, deviceId, host, port],
+    [navigation, deviceId, host, port, t],
   );
 
   // Auto-focus first input on mount (iOS autoFocus can be unreliable)
@@ -206,10 +207,16 @@ export function CodeVerifyScreen() {
         >
           <Icon name="chevron-back" size={20} color={DARK} />
         </TouchableOpacity>
+        <Text style={styles.headerTitle}>{t('codeVerify.title')}</Text>
       </View>
       <View style={styles.container}>
         {/* Device name context */}
-        <Text style={styles.deviceLabel}>{t('codeVerify.deviceLabel', { deviceName, host })}</Text>
+        <View style={styles.deviceLabelRow}>
+          <View style={styles.deviceIconBox}>
+            <Icon name="desktop-outline" size={16} color="#3b82f6" />
+          </View>
+          <Text style={styles.deviceLabel}>{t('codeVerify.deviceLabel', { deviceName, host })}</Text>
+        </View>
 
         {/* Prompt */}
         <Text style={styles.prompt}>{t('codeVerify.prompt')}</Text>
@@ -247,6 +254,18 @@ export function CodeVerifyScreen() {
           ))}
         </View>
 
+        <View style={styles.progressDots}>
+          {Array.from({ length: CODE_LENGTH }).map((_, index) => (
+            <View
+              key={index}
+              style={[
+                styles.progressDot,
+                index < filledCount && styles.progressDotFilled,
+              ]}
+            />
+          ))}
+        </View>
+
         {/* Status: verifying */}
         {verifying && (
           <View style={styles.statusRow}>
@@ -264,9 +283,31 @@ export function CodeVerifyScreen() {
 
         {/* Help text */}
         <View style={styles.helpCard}>
-          <Text style={styles.helpText}>
-            {t('codeVerify.helpText')}
-          </Text>
+          <View style={styles.helpIconBox}>
+            <Icon name="desktop-outline" size={22} color="#3b82f6" />
+          </View>
+          <View style={styles.helpCopy}>
+            <Text style={styles.helpTitle}>{t('codeVerify.helpTitle')}</Text>
+            <Text style={styles.helpText}>{t('codeVerify.helpText')}</Text>
+            <Text style={styles.helpSecondary}>{t('codeVerify.helpSecondary')}</Text>
+          </View>
+          <View style={styles.helpExample}>
+            <View style={styles.helpExampleRow}>
+              {['3', '8', '5'].map(digit => (
+                <View key={digit} style={styles.helpExampleDigit}>
+                  <Text style={styles.helpExampleDigitText}>{digit}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={styles.helpExampleRow}>
+              {['2', '1', '7'].map(digit => (
+                <View key={digit} style={styles.helpExampleDigit}>
+                  <Text style={styles.helpExampleDigitText}>{digit}</Text>
+                </View>
+              ))}
+            </View>
+            <Text style={styles.helpExampleLabel}>{t('codeVerify.exampleLabel')}</Text>
+          </View>
         </View>
       </View>
     </SafeAreaView>
@@ -280,7 +321,7 @@ export function CodeVerifyScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#c4e4f5',
+    backgroundColor: '#eef7ff',
   },
   header: {
     flexDirection: 'row',
@@ -288,6 +329,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 4,
     paddingBottom: 12,
+    gap: 10,
   },
   backButton: {
     width: 36,
@@ -297,25 +339,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  headerTitle: {
+    color: DARK,
+    fontSize: 17,
+    fontWeight: '700',
+  },
   container: {
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingTop: 30,
   },
 
   // Device label
-  deviceLabel: {
-    fontSize: 13,
-    color: '#6a96b8',
+  deviceLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginBottom: 24,
+  },
+  deviceIconBox: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: 'rgba(59,130,246,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deviceLabel: {
+    flexShrink: 1,
+    fontSize: 13,
+    color: '#5a7a96',
+    fontWeight: '500',
   },
 
   // Prompt
   prompt: {
-    fontSize: 14,
-    color: colors.foreground,
-    opacity: 0.7,
+    fontSize: 15,
+    color: DARK,
+    fontWeight: '600',
     letterSpacing: 0.5,
     marginBottom: 32,
   },
@@ -333,21 +395,21 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     textAlign: 'center',
     fontWeight: 'bold',
-    color: colors.foreground,
+    color: DARK,
     // Shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowColor: 'rgba(59,130,210,0.35)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
     elevation: 1,
   },
   codeBoxEmpty: {
-    borderColor: 'rgba(255,255,255,0.6)',
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    borderColor: 'rgba(148,163,184,0.25)',
+    backgroundColor: 'rgba(255,255,255,0.56)',
   },
   codeBoxFilled: {
-    borderColor: 'rgba(42,108,181,0.4)',
-    backgroundColor: '#ffffff',
+    borderColor: 'rgba(59,130,246,0.26)',
+    backgroundColor: 'rgba(255,255,255,0.94)',
   },
   codeBoxError: {
     borderColor: colors.destructive,
@@ -361,7 +423,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 4,
+    marginTop: 6,
   },
   statusText: {
     fontSize: 14,
@@ -374,19 +436,101 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 20,
   },
+  progressDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  progressDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(148,163,184,0.3)',
+  },
+  progressDotFilled: {
+    width: 8,
+    backgroundColor: '#3b82f6',
+  },
 
   // Help card
   helpCard: {
-    marginTop: 40,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    borderRadius: 16,
-    paddingHorizontal: 20,
+    width: '100%',
+    marginTop: 36,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.62)',
+    paddingHorizontal: 16,
     paddingVertical: 16,
+    shadowColor: 'rgba(59,130,210,0.3)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 2,
+  },
+  helpIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: 'rgba(59,130,246,0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(59,130,246,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  helpCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  helpTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: DARK,
   },
   helpText: {
+    marginTop: 6,
     fontSize: 12,
-    color: 'rgba(26,42,60,0.5)',
+    color: '#5a7a96',
     lineHeight: 18,
-    textAlign: 'center',
+  },
+  helpSecondary: {
+    marginTop: 6,
+    fontSize: 11,
+    color: '#94a3b8',
+    lineHeight: 16,
+  },
+  helpExample: {
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 2,
+  },
+  helpExampleRow: {
+    flexDirection: 'row',
+    gap: 3,
+  },
+  helpExampleDigit: {
+    width: 16,
+    height: 20,
+    borderRadius: 5,
+    backgroundColor: 'rgba(59,130,246,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(59,130,246,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  helpExampleDigitText: {
+    color: '#3b82f6',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  helpExampleLabel: {
+    marginTop: 1,
+    color: '#94a3b8',
+    fontSize: 9,
+    fontWeight: '600',
   },
 });

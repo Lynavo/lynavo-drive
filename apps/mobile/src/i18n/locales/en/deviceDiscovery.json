@@ -22,6 +22,12 @@
     "manualInputIp": "Enter IP Manually",
     "qrPair": "Scan QR Code"
   },
+  "troubleshooting": {
+    "title": "Can't find a device or not sure how to connect?",
+    "sameWifi": "Make sure your phone and computer are connected to the same Wi-Fi or local network.",
+    "desktopApp": "Open www.vividrop.cn in your computer browser, download the desktop app, and keep it open.",
+    "cta": "View full illustrated tutorial >"
+  },
   "onboarding": {
     "unconnected": {
       "skip": "Skip",
@@ -54,6 +60,9 @@
     "manualInput": {
       "title": "Enter IP to Pair",
       "description": "If the scan can't find your computer — especially Windows — enter the desktop app's IPv4 address directly.",
+      "guideTitle": "Where do I find the code and IP?",
+      "guideBody": "Open Vivi Drop on your computer, choose Global Settings from the sidebar, then check the 6-digit code, device IP, or QR code.",
+      "hostLabel": "Server address",
       "confirm": "Continue",
       "hint": "Uses sync port 39393 by default. You'll still need to enter the 6-digit pairing code in the next step.",
       "ipError": "Please enter a valid IPv4 address, e.g. 192.168.0.1"

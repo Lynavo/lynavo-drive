@@ -1,86 +1,55 @@
 {
-  "title": "Help",
+  "title": "Help Center",
   "sections": {
-    "features": "Overview",
-    "gettingStarted": "Getting Started",
-    "uploadShare": "Upload & Shared Files",
+    "gettingStarted": "Quick Start",
     "faq": "FAQ",
-    "contact": "Contact Us"
+    "contact": "Contact Support"
   },
-  "features": {
-    "feature0": {
-      "title": "What is Vivi Drop?",
-      "description": "Vivi Drop is a LAN media sync tool that helps short-video teams transfer phone media to a PC seamlessly. As long as your phone and computer are on the same Wi-Fi, connect in one tap and sync automatically."
-    },
-    "feature1": {
-      "title": "How do I connect to my computer?",
-      "description": "After opening the app, scan for the Vivi Drop desktop app on your local network, or use the QR code on the PC to connect directly. Once connected, you can start uploading."
-    },
-    "feature2": {
-      "title": "How do I upload media?",
-      "description": "Both auto and manual upload are supported. Auto upload silently syncs new media in the background; manual upload lets you select photos and videos from the album and submit them at once."
-    },
-    "feature3": {
-      "title": "How do I access the shared directory?",
-      "description": "Tap \"Shared Files\" on the home screen to browse the shared folder on your computer. You can preview images and videos; subscribers can also download files to their phone."
-    }
+  "product": {
+    "title": "Vivi Drop",
+    "description": "A LAN media sync tool that sends photos and videos from your phone to your computer at high speed."
   },
   "steps": {
     "step0": {
-      "title": "Connect to Your Computer",
-      "description": "Make sure your phone and computer are on the same Wi-Fi. Open Vivi Drop on your PC, then tap \"Scan for devices\" on your phone to find and connect to the computer, or scan the QR code on the PC."
+      "title": "Download the PC App",
+      "description": "Visit vividrop.cn on your computer to download and install."
     },
     "step1": {
-      "title": "Enable Auto Upload",
-      "description": "Go to the Album screen, expand the \"Auto upload\" panel, and turn on the switch. New media will then transfer to your computer in the background automatically."
+      "title": "Connect Your Device",
+      "description": "Scan with your phone or enter the 6-digit pairing code."
     },
     "step2": {
-      "title": "Manual Upload",
-      "description": "In the Album screen, select the photos or videos you want to upload (already-transferred items are greyed out), then tap the \"Upload\" button at the bottom to add them to the queue."
-    },
-    "step3": {
-      "title": "Browse Shared Files",
-      "description": "Tap the \"Shared Files\" card on the home screen to browse the shared folder on your computer. You can preview images and videos; subscribers can download files."
+      "title": "Start Syncing",
+      "description": "Send media manually, or enable background auto upload."
     }
   },
-  "uploadShare": {
-    "item0": {
-      "title": "Auto Upload vs. Manual Upload",
-      "answer": "Auto upload: once enabled, the app monitors your photo library and automatically transfers new photos and videos to your computer — great for everyday use.\n\nManual upload: manually select files in the album to transfer in bulk — ideal for one-off batch transfers of older media.\n\nBoth modes can be used together; manual uploads are sent first."
-    },
-    "item1": {
-      "title": "received Directory vs. shared Directory",
-      "answer": "received directory: files transferred from your phone are saved here, automatically sorted by date.\n\nshared directory: a folder on your computer shared for your phone to browse. Set it in the desktop app settings. Your phone can preview images and videos inside."
-    },
-    "item2": {
-      "title": "Shared Directory Is Read-Only",
-      "answer": "Browsing the shared directory on your phone is read-only — no files on the computer are modified or deleted. Subscribers can download shared files to the phone's photo library."
-    }
+  "download": {
+    "label": "PC app download: www.vividrop.cn"
   },
   "faq": {
     "item0": {
-      "title": "What do I do if the device is offline?",
-      "answer": "• Check that your phone and computer are on the same Wi-Fi network\n• Verify that Vivi Drop is running on your computer\n• Try tapping \"Reconnect\" on the Sync Activity screen\n• Disable any VPN or proxy software and try again"
+      "title": "What if the app keeps looking for devices?",
+      "answer": "Make sure your phone and computer are on the same Wi-Fi network, and that Vivi Drop for PC is running. Try restarting the desktop app, then tap scan again on your phone, or connect manually with the 6-digit pairing code."
     },
     "item1": {
-      "title": "What do I do if an upload fails?",
-      "answer": "• Check that your Wi-Fi connection is stable\n• Confirm that photo library access is granted on your phone\n• iCloud photos may need to be downloaded locally first\n• Export a diagnostics bundle and send it to support"
+      "title": "Why does auto upload pause?",
+      "answer": "Auto upload pauses after Wi-Fi changes or when the computer sleeps. Reconnect the device and return to the home screen to resume. It can also pause when background permissions are limited; check that Vivi Drop has background refresh permission in system settings."
     },
     "item2": {
-      "title": "What do I do if the shared directory is empty?",
-      "answer": "• Confirm that a shared directory path is set in the desktop app\n• Check that the shared directory actually contains files\n• Make sure the device is online\n• Try pulling down to refresh the Shared Files screen"
+      "title": "What should I do if an upload fails?",
+      "answer": "Check network stability and confirm the PC app is still running. Retry failed tasks from the transfer page, or export a diagnostics bundle and contact support."
     },
     "item3": {
-      "title": "What do I do if I can't connect to the computer?",
-      "answer": "• Confirm that your phone and computer are on the same LAN / Wi-Fi\n• Check that your computer's firewall is not blocking Vivi Drop\n• Restart Vivi Drop on your computer and try again\n• Try entering the computer's IP address and pairing code manually"
+      "title": "What if QR pairing does not work?",
+      "answer": "Aim the phone camera at the QR code shown on the PC. If scanning fails, connect by manually entering the 6-digit pairing code."
     },
     "item4": {
-      "title": "How long is the trial?",
-      "answer": "New users get a 7-day free trial with access to all features. After the trial ends, a subscription is required to continue using upload features."
+      "title": "How long is the trial, and how do I renew?",
+      "answer": "New users get a 7-day free trial after registration. After it ends, a subscription is required to continue using Vivi Drop. Go to Settings → Membership to view subscription status or purchase."
     },
     "item5": {
-      "title": "How do I manage my subscription?",
-      "answer": "Subscriptions are managed through the Apple App Store. To cancel or change your subscription, go to Settings → Apple ID → Subscriptions."
+      "title": "What if the shared directory is empty?",
+      "answer": "Confirm the shared directory path is set in Vivi Drop on the PC, and that the folder contains files. After setting it, pull to refresh on your phone to see the contents."
     }
   },
   "contact": {

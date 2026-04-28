@@ -1,6 +1,10 @@
 {
+  "title": "Connect Device",
   "deviceLabel": "Connecting to: {{deviceName}} ({{host}})",
-  "prompt": "Enter the 6-digit pairing code shown on your computer",
+  "prompt": "Enter the 6-digit pairing code",
   "verifying": "Verifying pairing code...",
-  "helpText": "Make sure your phone and computer are on the same network. Open the app on your computer to see the pairing code."
+  "helpTitle": "Where do I find the pairing code?",
+  "helpText": "Open Vivi Drop on your computer, choose Global Settings from the sidebar, and check the 6-digit pairing code.",
+  "helpSecondary": "The code does not refresh automatically. Use Regenerate to update it manually.",
+  "exampleLabel": "Example"
 }

@@ -27,10 +27,15 @@ const SCREEN_BG = '#d6ecf8';
 const CARD_BG = '#ffffff';
 const CARD_BORDER = 'rgba(187, 214, 233, 0.72)';
 const MUTED_TEXT = '#7893ab';
-const SECTION_TEXT = '#6e8aa3';
+const SECTION_TEXT = '#a0bdd0';
 const ROW_CHEVRON = '#b8d0e4';
-const ACCENT_LINE = '#3b9fd8';
-const STEP_BG = '#2a6cb5';
+const STEP_LINE = '#dbe9f4';
+const ICON_BLUE_BG = '#e8f2ff';
+const ICON_PURPLE_BG = '#f0eafe';
+const ICON_GREEN_BG = '#e6f8ed';
+const ICON_PURPLE = '#8b6fed';
+const ICON_GREEN = '#1dbb63';
+const DOWNLOAD_URL = 'https://www.vividrop.cn';
 
 // ---------------------------------------------------------------------------
 // Data types
@@ -43,7 +48,9 @@ interface FeatureItem {
 }
 
 interface StepItem {
-  step: number;
+  icon: string;
+  iconColor: string;
+  iconBackground: string;
   title: string;
   description: string;
 }
@@ -64,33 +71,67 @@ export function HelpScreen() {
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [isExporting, setIsExporting] = useState(false);
 
-  const FEATURE_ITEMS: FeatureItem[] = [
-    { icon: 'link-outline', title: t('help.features.feature0.title'), description: t('help.features.feature0.description') },
-    { icon: 'link-outline', title: t('help.features.feature1.title'), description: t('help.features.feature1.description') },
-    { icon: 'cloud-upload-outline', title: t('help.features.feature2.title'), description: t('help.features.feature2.description') },
-    { icon: 'folder-outline', title: t('help.features.feature3.title'), description: t('help.features.feature3.description') },
-  ];
+  const PRODUCT: FeatureItem = {
+    icon: 'desktop-outline',
+    title: t('help.product.title'),
+    description: t('help.product.description'),
+  };
 
   const STEP_ITEMS: StepItem[] = [
-    { step: 1, title: t('help.steps.step0.title'), description: t('help.steps.step0.description') },
-    { step: 2, title: t('help.steps.step1.title'), description: t('help.steps.step1.description') },
-    { step: 3, title: t('help.steps.step2.title'), description: t('help.steps.step2.description') },
-    { step: 4, title: t('help.steps.step3.title'), description: t('help.steps.step3.description') },
-  ];
-
-  const UPLOAD_SHARE_ITEMS: ExpandableItem[] = [
-    { icon: 'sync-outline', title: t('help.uploadShare.item0.title'), answer: t('help.uploadShare.item0.answer') },
-    { icon: 'folder-outline', title: t('help.uploadShare.item1.title'), answer: t('help.uploadShare.item1.answer') },
-    { icon: 'share-outline', title: t('help.uploadShare.item2.title'), answer: t('help.uploadShare.item2.answer') },
+    {
+      icon: 'desktop-outline',
+      iconColor: BLUE,
+      iconBackground: ICON_BLUE_BG,
+      title: t('help.steps.step0.title'),
+      description: t('help.steps.step0.description'),
+    },
+    {
+      icon: 'scan-outline',
+      iconColor: ICON_PURPLE,
+      iconBackground: ICON_PURPLE_BG,
+      title: t('help.steps.step1.title'),
+      description: t('help.steps.step1.description'),
+    },
+    {
+      icon: 'flash-outline',
+      iconColor: ICON_GREEN,
+      iconBackground: ICON_GREEN_BG,
+      title: t('help.steps.step2.title'),
+      description: t('help.steps.step2.description'),
+    },
   ];
 
   const FAQ_ITEMS: ExpandableItem[] = [
-    { icon: 'help-circle-outline', title: t('help.faq.item0.title'), answer: t('help.faq.item0.answer') },
-    { icon: 'help-circle-outline', title: t('help.faq.item1.title'), answer: t('help.faq.item1.answer') },
-    { icon: 'help-circle-outline', title: t('help.faq.item2.title'), answer: t('help.faq.item2.answer') },
-    { icon: 'help-circle-outline', title: t('help.faq.item3.title'), answer: t('help.faq.item3.answer') },
-    { icon: 'help-circle-outline', title: t('help.faq.item4.title'), answer: t('help.faq.item4.answer') },
-    { icon: 'help-circle-outline', title: t('help.faq.item5.title'), answer: t('help.faq.item5.answer') },
+    {
+      icon: 'help-circle-outline',
+      title: t('help.faq.item0.title'),
+      answer: t('help.faq.item0.answer'),
+    },
+    {
+      icon: 'help-circle-outline',
+      title: t('help.faq.item1.title'),
+      answer: t('help.faq.item1.answer'),
+    },
+    {
+      icon: 'help-circle-outline',
+      title: t('help.faq.item2.title'),
+      answer: t('help.faq.item2.answer'),
+    },
+    {
+      icon: 'help-circle-outline',
+      title: t('help.faq.item3.title'),
+      answer: t('help.faq.item3.answer'),
+    },
+    {
+      icon: 'help-circle-outline',
+      title: t('help.faq.item4.title'),
+      answer: t('help.faq.item4.answer'),
+    },
+    {
+      icon: 'help-circle-outline',
+      title: t('help.faq.item5.title'),
+      answer: t('help.faq.item5.answer'),
+    },
   ];
 
   const toggleExpand = useCallback((key: string) => {
@@ -111,13 +152,23 @@ export function HelpScreen() {
       await shareDiagnosticsArchive();
     } catch (error) {
       if (isDiagnosticsExportUnavailable(error)) {
-        Alert.alert(t('settings.dialogs.exportUnavailable.title'), t('settings.dialogs.exportUnavailable.body'));
+        Alert.alert(
+          t('settings.dialogs.exportUnavailable.title'),
+          t('settings.dialogs.exportUnavailable.body'),
+        );
       } else {
-        Alert.alert(t('settings.dialogs.exportFailed.title'), t('settings.dialogs.exportFailed.body'));
+        Alert.alert(
+          t('settings.dialogs.exportFailed.title'),
+          t('settings.dialogs.exportFailed.body'),
+        );
       }
     } finally {
       setIsExporting(false);
     }
+  }, [t]);
+
+  const handleOpenDownload = useCallback(() => {
+    void Linking.openURL(DOWNLOAD_URL);
   }, []);
 
   // ---------------------------------------------------------------------------
@@ -142,14 +193,12 @@ export function HelpScreen() {
             <Text style={styles.expandRowTitle}>{item.title}</Text>
           </View>
           <Icon
-            name={isOpen ? 'chevron-down' : 'chevron-up'}
+            name={isOpen ? 'chevron-up' : 'chevron-down'}
             size={16}
-            color={MUTED_TEXT}
+            color={ROW_CHEVRON}
           />
         </TouchableOpacity>
-        {isOpen && (
-          <Text style={styles.expandAnswer}>{item.answer}</Text>
-        )}
+        {isOpen && <Text style={styles.expandAnswer}>{item.answer}</Text>}
         {!isLast && <View style={styles.listSep} />}
       </View>
     );
@@ -179,70 +228,56 @@ export function HelpScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ============================================================= */}
-        {/* Section 1: features                                            */}
-        {/* ============================================================= */}
-        <Text style={styles.sectionLabel}>{t('help.sections.features')}</Text>
-        <View style={styles.listCard}>
-          {FEATURE_ITEMS.map((item, index) => (
-            <View key={index}>
-              <View style={styles.featureRow}>
-                <View style={styles.featureAccent} />
-                <View style={styles.featureIconCircle}>
-                  <Icon name={item.icon} size={18} color={BLUE} />
-                </View>
-                <View style={styles.featureContent}>
-                  <Text style={styles.featureTitle}>{item.title}</Text>
-                  <Text style={styles.featureDesc}>{item.description}</Text>
-                </View>
-              </View>
-              {index < FEATURE_ITEMS.length - 1 && (
-                <View style={styles.listSep} />
-              )}
-            </View>
-          ))}
+        <View style={styles.productCard}>
+          <View style={styles.productIconBox}>
+            <Icon name={PRODUCT.icon} size={30} color={BLUE} />
+          </View>
+          <View style={styles.productContent}>
+            <Text style={styles.productTitle}>{PRODUCT.title}</Text>
+            <Text style={styles.productDesc}>{PRODUCT.description}</Text>
+          </View>
         </View>
 
-        {/* ============================================================= */}
-        {/* Section 2: gettingStarted                                      */}
-        {/* ============================================================= */}
-        <Text style={styles.sectionLabel}>{t('help.sections.gettingStarted')}</Text>
-        <View style={styles.listCard}>
+        <Text style={styles.sectionLabel}>
+          {t('help.sections.gettingStarted')}
+        </Text>
+        <View style={styles.quickStartCard}>
           {STEP_ITEMS.map((item, index) => (
-            <View key={index}>
-              <View style={styles.stepRow}>
-                <View style={styles.stepBadge}>
-                  <Text style={styles.stepBadgeText}>{item.step}</Text>
+            <View key={index} style={styles.stepItem}>
+              <View style={styles.stepRail}>
+                <View
+                  style={[
+                    styles.stepIconCircle,
+                    { backgroundColor: item.iconBackground },
+                  ]}
+                >
+                  <Icon name={item.icon} size={20} color={item.iconColor} />
                 </View>
-                <View style={styles.stepContent}>
-                  <Text style={styles.stepTitle}>{item.title}</Text>
-                  <Text style={styles.stepDesc}>{item.description}</Text>
-                </View>
+                {index < STEP_ITEMS.length - 1 && (
+                  <View style={styles.stepLine} />
+                )}
               </View>
-              {index < STEP_ITEMS.length - 1 && (
-                <View style={styles.listSep} />
-              )}
+              <View style={styles.stepContent}>
+                <Text style={styles.stepTitle}>{item.title}</Text>
+                <Text style={styles.stepDesc}>{item.description}</Text>
+              </View>
             </View>
           ))}
+          <TouchableOpacity
+            style={styles.downloadCta}
+            activeOpacity={0.7}
+            onPress={handleOpenDownload}
+          >
+            <View style={styles.downloadCtaLeft}>
+              <Icon name="desktop-outline" size={18} color={BLUE} />
+              <Text style={styles.downloadCtaText}>
+                {t('help.download.label')}
+              </Text>
+            </View>
+            <Icon name="chevron-forward" size={16} color={BLUE} />
+          </TouchableOpacity>
         </View>
 
-        {/* ============================================================= */}
-        {/* Section 3: uploadShare                                         */}
-        {/* ============================================================= */}
-        <Text style={styles.sectionLabel}>{t('help.sections.uploadShare')}</Text>
-        <View style={styles.listCard}>
-          {UPLOAD_SHARE_ITEMS.map((item, index) =>
-            renderExpandableRow(
-              item,
-              `share-${index}`,
-              index === UPLOAD_SHARE_ITEMS.length - 1,
-            ),
-          )}
-        </View>
-
-        {/* ============================================================= */}
-        {/* Section 4: faq                                                 */}
-        {/* ============================================================= */}
         <Text style={styles.sectionLabel}>{t('help.sections.faq')}</Text>
         <View style={styles.listCard}>
           {FAQ_ITEMS.map((item, index) =>
@@ -254,12 +289,8 @@ export function HelpScreen() {
           )}
         </View>
 
-        {/* ============================================================= */}
-        {/* Section 5: contact                                             */}
-        {/* ============================================================= */}
         <Text style={styles.sectionLabel}>{t('help.sections.contact')}</Text>
         <View style={styles.listCard}>
-          {/* support email */}
           <TouchableOpacity
             style={styles.contactRow}
             activeOpacity={0.6}
@@ -268,9 +299,15 @@ export function HelpScreen() {
             }}
           >
             <View style={styles.contactRowLeft}>
-              <Icon name="mail-outline" size={18} color={BLUE} />
+              <View
+                style={[styles.contactIconCircle, styles.contactIconPurple]}
+              >
+                <Icon name="mail-outline" size={18} color="#6b63ff" />
+              </View>
               <View>
-                <Text style={styles.contactRowTitle}>{t('help.contact.supportEmail')}</Text>
+                <Text style={styles.contactRowTitle}>
+                  {t('help.contact.supportEmail')}
+                </Text>
                 <Text style={styles.contactRowSub}>support@vividrop.cn</Text>
               </View>
             </View>
@@ -286,10 +323,16 @@ export function HelpScreen() {
             }}
           >
             <View style={styles.contactRowLeft}>
-              <Icon name="download-outline" size={18} color={BLUE} />
+              <View
+                style={[styles.contactIconCircle, styles.contactIconOrange]}
+              >
+                <Icon name="cube-outline" size={18} color="#f08a24" />
+              </View>
               <View>
                 <Text style={styles.contactRowTitle}>
-                  {isExporting ? t('help.contact.exportingDiagnostics') : t('help.contact.exportDiagnostics')}
+                  {isExporting
+                    ? t('help.contact.exportingDiagnostics')
+                    : t('help.contact.exportDiagnostics')}
                 </Text>
                 <Text style={styles.contactRowSub}>
                   {t('help.contact.exportHint')}
@@ -344,20 +387,20 @@ const styles = StyleSheet.create({
 
   // Section label
   sectionLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: SECTION_TEXT,
-    marginBottom: 8,
-    marginTop: 8,
+    marginBottom: 10,
+    marginTop: 6,
     marginLeft: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
   },
 
   // Shared list card
   listCard: {
-    backgroundColor: CARD_BG,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    borderRadius: 24,
     overflow: 'hidden',
     marginBottom: 12,
     shadowColor: '#4f8fbc',
@@ -372,87 +415,132 @@ const styles = StyleSheet.create({
     marginHorizontal: 18,
   },
 
-  // ---------------------------------------------------------------------------
-  // Feature rows
-  // ---------------------------------------------------------------------------
-  featureRow: {
+  // Product card
+  productCard: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 14,
-    paddingRight: 18,
-    paddingLeft: 4,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.60)',
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.55)',
+    padding: 18,
+    marginBottom: 18,
+    shadowColor: '#4f8fbc',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 2,
   },
-  featureAccent: {
-    width: 3,
-    alignSelf: 'stretch',
-    borderRadius: 2,
-    backgroundColor: ACCENT_LINE,
-    marginRight: 12,
-  },
-  featureIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(59,159,216,0.1)',
+  productIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
-    marginTop: 1,
+    marginRight: 16,
+    shadowColor: '#8db7d8',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    elevation: 2,
   },
-  featureContent: {
+  productContent: {
     flex: 1,
     minWidth: 0,
   },
-  featureTitle: {
-    fontSize: 14,
+  productTitle: {
+    fontSize: 18,
     fontWeight: '700',
     color: DARK,
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  featureDesc: {
-    fontSize: 12,
-    lineHeight: 18,
+  productDesc: {
+    fontSize: 14,
+    lineHeight: 22,
     color: MUTED_TEXT,
   },
 
   // ---------------------------------------------------------------------------
-  // Step rows
+  // Quick start
   // ---------------------------------------------------------------------------
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 14,
-    paddingHorizontal: 18,
+  quickStartCard: {
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 22,
+    overflow: 'hidden',
+    marginBottom: 12,
+    shadowColor: '#4f8fbc',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 2,
   },
-  stepBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: STEP_BG,
+  stepItem: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    minHeight: 76,
+  },
+  stepRail: {
+    width: 44,
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  stepIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
-    marginTop: 1,
   },
-  stepBadgeText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#fff',
+  stepLine: {
+    flex: 1,
+    width: 2,
+    backgroundColor: STEP_LINE,
+    marginVertical: 6,
   },
   stepContent: {
     flex: 1,
     minWidth: 0,
+    paddingTop: 2,
+    paddingBottom: 18,
   },
   stepTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     color: DARK,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   stepDesc: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 20,
     color: MUTED_TEXT,
+  },
+  downloadCta: {
+    minHeight: 52,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#c9def5',
+    backgroundColor: '#f3f9ff',
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  downloadCtaLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    minWidth: 0,
+  },
+  downloadCtaText: {
+    flex: 1,
+    color: BLUE,
+    fontSize: 14,
+    fontWeight: '700',
   },
 
   // ---------------------------------------------------------------------------
@@ -504,6 +592,19 @@ const styles = StyleSheet.create({
     gap: 10,
     flex: 1,
     minWidth: 0,
+  },
+  contactIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contactIconPurple: {
+    backgroundColor: '#efedff',
+  },
+  contactIconOrange: {
+    backgroundColor: '#fff1df',
   },
   contactRowTitle: {
     fontSize: 14,

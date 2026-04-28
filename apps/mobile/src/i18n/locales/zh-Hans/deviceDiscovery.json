@@ -22,6 +22,12 @@
     "manualInputIp": "手动输入 IP",
     "qrPair": "扫码配对"
   },
+  "troubleshooting": {
+    "title": "找不到设备或不知道怎么连？",
+    "sameWifi": "确保手机与电脑连接在同一个 Wi-Fi（局域网）下。",
+    "desktopApp": "请在电脑端浏览器访问 www.vividrop.cn 下载并打开 PC 端。",
+    "cta": "查看详细图文教程 >"
+  },
   "onboarding": {
     "unconnected": {
       "skip": "跳过",
@@ -54,6 +60,9 @@
     "manualInput": {
       "title": "手动输入 IP 配对",
       "description": "如果扫描不到电脑，尤其是 Windows 设备，可直接输入电脑端 IPv4 地址继续配对。",
+      "guideTitle": "去哪里找连接码和 IP？",
+      "guideBody": "请在电脑端 Vivi Drop 左侧导航栏点击「全局设置」，即可查看 6 位连接码、设备 IP 或展示二维码。",
+      "hostLabel": "服务器地址",
       "confirm": "继续",
       "hint": "默认使用同步端口 39393，输入后仍需在下一步填写 6 位连接码。",
       "ipError": "请输入有效的 IPv4 地址，例如 192.168.0.1"
