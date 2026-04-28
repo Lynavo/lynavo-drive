@@ -1,5 +1,15 @@
 {
   "title": "Subscription",
+  "diagnostics": {
+    "button": "Upload logs",
+    "unavailableTitle": "Unable to Upload Logs",
+    "unavailableBody": "This build does not support exporting diagnostics.",
+    "successTitle": "Logs Uploaded",
+    "successBody": "Reference {{refId}} has been copied. Share it with support to investigate subscription issues.",
+    "tooLarge": "The diagnostics bundle is too large. Please try again later or contact support.",
+    "aborted": "Upload cancelled",
+    "failure": "Log upload failed. Please try again later."
+  },
   "hero": {
     "title": "Unlock the Full Version",
     "subtitle": "7-day free trial. Subscribe after to keep using all features."

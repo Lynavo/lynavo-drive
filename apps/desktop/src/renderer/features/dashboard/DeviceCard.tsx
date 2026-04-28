@@ -11,6 +11,24 @@ const colors = {
   iconOfflineBg: 'rgba(0,0,0,0.06)',
 } as const;
 
+function formatDateKeyLabel(dateKey: string): string {
+  const parts = dateKey.split('-').map(Number);
+  if (parts.length !== 3 || parts.some((part) => Number.isNaN(part))) {
+    return dateKey;
+  }
+
+  const [year, month, day] = parts;
+  const date = new Date(year, month - 1, day);
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const targetStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.floor((todayStart.getTime() - targetStart.getTime()) / 86_400_000);
+
+  if (diffDays === 0) return '今天';
+  if (diffDays === 1) return '昨天';
+  return `${month}月${day}日`;
+}
+
 interface DeviceCardProps {
   device: DashboardDeviceDTO;
   onClick: () => void;
@@ -19,6 +37,14 @@ interface DeviceCardProps {
 export function DeviceCard({ device, onClick }: DeviceCardProps) {
   const isOffline = device.status === 'offline';
   const isTransferring = device.status === 'transferring';
+  const latestDate = device.latestDate ?? '';
+  const shouldShowLatestStats =
+    device.todayFileCount === 0 && latestDate !== '' && (device.latestFileCount ?? 0) > 0;
+  const statsLabel = shouldShowLatestStats ? `最近 ${formatDateKeyLabel(latestDate)}` : '今日';
+  const displayedFileCount = shouldShowLatestStats
+    ? (device.latestFileCount ?? 0)
+    : device.todayFileCount;
+  const displayedBytes = shouldShowLatestStats ? (device.latestBytes ?? 0) : device.todayBytes;
 
   return (
     <button
@@ -42,21 +68,15 @@ export function DeviceCard({ device, onClick }: DeviceCardProps) {
             <div
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
               style={{
-                background: isOffline
-                  ? colors.iconOfflineBg
-                  : colors.iconGradient,
-                boxShadow: isOffline
-                  ? 'none'
-                  : '0 2px 8px rgba(59,130,246,0.3)',
+                background: isOffline ? colors.iconOfflineBg : colors.iconGradient,
+                boxShadow: isOffline ? 'none' : '0 2px 8px rgba(59,130,246,0.3)',
               }}
             >
               <Smartphone className="h-5 w-5 text-white" />
             </div>
             <div>
               <h3 className="text-sm font-semibold">{device.displayName}</h3>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {device.ip}
-              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{device.ip}</p>
             </div>
           </div>
           <StatusBadge status={device.status} />
@@ -69,9 +89,7 @@ export function DeviceCard({ device, onClick }: DeviceCardProps) {
             style={{ background: 'rgba(59,130,246,0.06)' }}
           >
             <div className="mb-2 flex items-center justify-between text-xs">
-              <span className="max-w-44 truncate font-medium">
-                {device.currentFile.filename}
-              </span>
+              <span className="max-w-44 truncate font-medium">{device.currentFile.filename}</span>
               <span className="font-semibold text-blue-500">
                 {Math.round(device.currentFile.progress)}%
               </span>
@@ -103,16 +121,13 @@ export function DeviceCard({ device, onClick }: DeviceCardProps) {
         >
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <FileVideo className="h-3.5 w-3.5" />
-            <span className="font-semibold text-foreground">
-              {device.todayFileCount}
-            </span>
+            <span>{statsLabel}</span>
+            <span className="font-semibold text-foreground">{displayedFileCount}</span>
             个文件
           </div>
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <HardDrive className="h-3.5 w-3.5" />
-            <span className="font-semibold text-foreground">
-              {formatBytes(device.todayBytes)}
-            </span>
+            <span className="font-semibold text-foreground">{formatBytes(displayedBytes)}</span>
           </div>
         </div>
       </GlassCard>

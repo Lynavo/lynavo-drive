@@ -1,5 +1,10 @@
 {
   "title": "同步動態",
+  "header": {
+    "help": "幫助",
+    "history": "同步歷史",
+    "settings": "設定"
+  },
   "phases": {
     "discoveringTitle": "正在搜尋電腦…",
     "reconcilingTitle": "正在同步歷史記錄…",
@@ -98,6 +103,32 @@
     "subtitle": "訂閱後可繼續使用素材上傳、自動上傳與共享檔案存取",
     "subscribeCta": "立即訂閱",
     "viewHelp": "查看幫助"
+  },
+  "onboarding": {
+    "skip": "跳過引導",
+    "previous": "上一步",
+    "next": "下一步 {{step}}/{{total}}",
+    "startJourney": "開啟旅程",
+    "manual": {
+      "title": "手動同步",
+      "body": "點擊這裡發送素材至電腦。進入相簿後勾選照片或影片，按需提交到傳輸隊列。"
+    },
+    "panel": {
+      "title": "無感備份",
+      "body": "這裡即時展示自動上傳進度。開啟後台自動上傳，新增素材會同步至電腦。"
+    },
+    "history": {
+      "title": "傳輸歷史",
+      "body": "查看所有已完成的傳輸記錄，包括傳輸時間、檔案大小和目標路徑。"
+    },
+    "settings": {
+      "title": "全域設定",
+      "body": "查看目前連接的設備與訂閱狀態，修改手機顯示名稱，或取得技術支援。"
+    },
+    "help": {
+      "title": "幫助中心",
+      "body": "遇到問題？隨時點擊這裡查看快速上手指南，或聯繫我們取得支援。"
+    }
   },
   "dialogs": {
     "syncError": {

@@ -1,5 +1,10 @@
 {
   "title": "同步动态",
+  "header": {
+    "help": "帮助",
+    "history": "同步历史",
+    "settings": "设置"
+  },
   "phases": {
     "discoveringTitle": "正在搜索电脑…",
     "reconcilingTitle": "正在同步历史记录…",
@@ -98,6 +103,32 @@
     "subtitle": "订阅后可继续使用素材上传、自动上传与共享文件访问",
     "subscribeCta": "立即订阅",
     "viewHelp": "查看帮助"
+  },
+  "onboarding": {
+    "skip": "跳过引导",
+    "previous": "上一步",
+    "next": "下一步 {{step}}/{{total}}",
+    "startJourney": "开启旅程",
+    "manual": {
+      "title": "手动同步",
+      "body": "点击这里发送素材至电脑。进入相册后勾选照片或视频，按需提交到传输队列。"
+    },
+    "panel": {
+      "title": "无感备份",
+      "body": "这里实时展示自动上传进度。开启后台自动上传，新增素材会同步至电脑。"
+    },
+    "history": {
+      "title": "传输历史",
+      "body": "查看所有已完成的传输记录，包括传输时间、文件大小和目标路径。"
+    },
+    "settings": {
+      "title": "全局设置",
+      "body": "查看当前连接的设备与订阅状态，修改手机显示名称，或获取技术支持。"
+    },
+    "help": {
+      "title": "帮助中心",
+      "body": "遇到问题？随时点击这里查看快速上手指南，或联系我们获取支持。"
+    }
   },
   "dialogs": {
     "syncError": {

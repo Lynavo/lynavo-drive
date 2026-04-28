@@ -56,6 +56,11 @@ jest.mock('../../utils/shareDiagnosticsArchive', () => ({
   shareDiagnosticsArchive: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../../utils/onboardingStorage', () => ({
+  hasSeenUnconnectedGuide: jest.fn().mockResolvedValue(true),
+  markUnconnectedGuideSeen: jest.fn().mockResolvedValue(undefined),
+}));
+
 import i18n from '../../i18n';
 import { DeviceDiscoveryScreen } from '../DeviceDiscoveryScreen';
 

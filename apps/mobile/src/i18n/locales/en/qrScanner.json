@@ -1,6 +1,15 @@
 {
   "title": "Scan Pairing QR Code",
   "instruction": "Place the QR code in the frame to connect automatically.",
+  "guide": {
+    "title": "How do I get the QR code?",
+    "body": "Open Vivi Drop on your computer, find the pairing code in Global Settings, then aim the camera at the QR code to connect automatically.",
+    "cta": "View full illustrated tutorial >"
+  },
+  "trouble": {
+    "title": "Having trouble scanning?",
+    "body": "Return to the device list, choose the device manually, then enter the pairing code."
+  },
   "permissionDenied": {
     "text": "Camera access is required to scan the QR code."
   },

@@ -30,7 +30,10 @@ import type {
   SubscriptionPlansResponse,
 } from '@syncflow/contracts';
 import { apiGet, ApiError } from '../api';
-import { subscriptionPlansService } from '../subscription-plans-service';
+import {
+  resolveSubscriptionPlanTier,
+  subscriptionPlansService,
+} from '../subscription-plans-service';
 import { IAP_PRODUCTS } from '../../constants/iap';
 
 const CACHE_KEY = '@vividrop/subscription-plans-cache:v1';
@@ -38,6 +41,7 @@ const CACHE_KEY = '@vividrop/subscription-plans-cache:v1';
 const monthlyPlan: SubscriptionPlanDto = {
   id: 1,
   product_id: IAP_PRODUCTS.monthly,
+  plan: 'monthly',
   platform: 'ios',
   name: '月度方案',
   description: '按月訂閱',
@@ -52,12 +56,28 @@ const monthlyPlan: SubscriptionPlanDto = {
 const yearlyPlan: SubscriptionPlanDto = {
   id: 2,
   product_id: IAP_PRODUCTS.yearly,
+  plan: 'yearly',
   platform: 'ios',
   name: '年度方案',
   description: '一年無限同步',
   badges: ['8.8 折'],
   recommended: true,
   sort_order: 20,
+  active: true,
+  created_at: '2026-04-24T00:00:00Z',
+  updated_at: '2026-04-24T00:00:00Z',
+};
+
+const adminPlan = {
+  id: 10,
+  product_id: 'admin.catalog.alpha',
+  platform: 'ios' as const,
+  plan: 'monthly' as const,
+  name: '後台方案',
+  description: '後台設定 SKU',
+  badges: [],
+  recommended: false,
+  sort_order: 5,
   active: true,
   created_at: '2026-04-24T00:00:00Z',
   updated_at: '2026-04-24T00:00:00Z',
@@ -106,6 +126,19 @@ describe('subscriptionPlansService.fetchPlans', () => {
     };
     expect(envelope.platform).toBe('ios');
     expect(envelope.plans).toEqual([monthlyPlan, yearlyPlan]);
+  });
+
+  test('preserves server plan/tier metadata for admin-configured SKUs', async () => {
+    (apiGet as jest.Mock).mockResolvedValueOnce({ plans: [adminPlan] });
+
+    const result = await subscriptionPlansService.fetchPlans('ios');
+
+    expect(result.source).toBe('network');
+    expect(result.plans[0]?.product_id).toBe('admin.catalog.alpha');
+    expect(resolveSubscriptionPlanTier(result.plans[0]!)).toBe('monthly');
+    const setItemCalls = (AsyncStorage.setItem as jest.Mock).mock.calls;
+    const [, raw] = setItemCalls[0] as [string, string];
+    expect(JSON.parse(raw).plans[0].plan).toBe('monthly');
   });
 
   test('coalesces concurrent requests for the same platform', async () => {

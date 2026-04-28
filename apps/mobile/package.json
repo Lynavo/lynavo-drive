@@ -33,6 +33,7 @@
     "react-native-localize": "^3.7.0",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-screens": "^4.24.0",
+    "react-native-svg": "^15.15.4",
     "react-native-vector-icons": "^10.3.0",
     "react-native-video": "^6.19.1",
     "react-native-vision-camera": "4.6.0"

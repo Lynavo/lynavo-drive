@@ -40,6 +40,11 @@ import {
   isDiagnosticsExportUnavailable,
   shareDiagnosticsArchive,
 } from '../utils/shareDiagnosticsArchive';
+import { UnconnectedGuide } from '../components/onboarding/UnconnectedGuide';
+import {
+  hasSeenUnconnectedGuide,
+  markUnconnectedGuideSeen,
+} from '../utils/onboardingStorage';
 import { buildManualPairDevice } from './deviceDiscoveryManualPairing';
 import { shouldKeepCachedDevicesVisible } from './deviceDiscoveryRefresh';
 
@@ -148,8 +153,10 @@ type NavigationProp = StackNavigationProp<
 export function DeviceDiscoveryScreen() {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isAndroid = Platform.OS === 'android';
+  const language = i18n.resolvedLanguage ?? i18n.language;
+  const popoverMenuWidth = language.startsWith('zh') ? 176 : 200;
   const route = useRoute<RouteProp<RootStackParamList, 'DeviceDiscovery'>>();
   const mode = route.params?.mode ?? 'initial';
   const [knownDeviceIds, setKnownDeviceIds] = useState<Set<string>>(new Set());
@@ -161,6 +168,7 @@ export function DeviceDiscoveryScreen() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [manualSectionHeight, setManualSectionHeight] = useState(0);
   const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false);
+  const [showUnconnectedGuide, setShowUnconnectedGuide] = useState(false);
 
   // Popover & Modal state
   const [showPairingMenu, setShowPairingMenu] = useState(false);
@@ -185,6 +193,23 @@ export function DeviceDiscoveryScreen() {
       if (cancelled) return;
       setKnownDeviceIds(new Set(ids as string[]));
       setCurrentDeviceId((binding as { deviceId?: string } | null)?.deviceId ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode === 'switch') {
+      setShowUnconnectedGuide(false);
+      return;
+    }
+
+    let cancelled = false;
+    void hasSeenUnconnectedGuide().then(seen => {
+      if (!cancelled) {
+        setShowUnconnectedGuide(!seen);
+      }
     });
     return () => {
       cancelled = true;
@@ -447,6 +472,11 @@ export function DeviceDiscoveryScreen() {
     }
   }, []);
 
+  const handleDismissUnconnectedGuide = useCallback(async () => {
+    await markUnconnectedGuideSeen();
+    setShowUnconnectedGuide(false);
+  }, []);
+
   const renderDevice = useCallback(
     ({ item }: ListRenderItemInfo<DiscoveredDevice>) => {
       const isCurrentDevice = mode === 'switch' && item.deviceId === currentDeviceId;
@@ -502,6 +532,37 @@ export function DeviceDiscoveryScreen() {
       currentHeight === nextHeight ? currentHeight : nextHeight,
     );
   }, []);
+
+  const troubleshootingCard = (
+    <View style={styles.troubleshootingCard}>
+      <Text style={styles.troubleshootingTitle}>
+        {t('deviceDiscovery.troubleshooting.title')}
+      </Text>
+      <View style={styles.troubleshootingList}>
+        <View style={styles.troubleshootingItem}>
+          <View style={styles.troubleshootingBullet} />
+          <Text style={styles.troubleshootingText}>
+            {t('deviceDiscovery.troubleshooting.sameWifi')}
+          </Text>
+        </View>
+        <View style={styles.troubleshootingItem}>
+          <View style={styles.troubleshootingBullet} />
+          <Text style={styles.troubleshootingText}>
+            {t('deviceDiscovery.troubleshooting.desktopApp')}
+          </Text>
+        </View>
+      </View>
+      <TouchableOpacity
+        style={styles.troubleshootingLink}
+        activeOpacity={0.72}
+        onPress={() => navigation.navigate('ConnectionTutorial')}
+      >
+        <Text style={styles.troubleshootingLinkText}>
+          {t('deviceDiscovery.troubleshooting.cta')}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
 
 
   const manualDockBottom =
@@ -619,9 +680,17 @@ export function DeviceDiscoveryScreen() {
                   <Text style={styles.rescanText}>{t('deviceDiscovery.actions.rescan')}</Text>
                 </View>
               </TouchableOpacity>
+              {mode === 'switch' ? null : troubleshootingCard}
             </View>
           )}
         </View>
+
+        {showUnconnectedGuide && (
+          <UnconnectedGuide
+            onSkip={() => void handleDismissUnconnectedGuide()}
+            onStart={() => void handleDismissUnconnectedGuide()}
+          />
+        )}
 
         {/* Pairing Menu Popover */}
         <Modal
@@ -634,7 +703,12 @@ export function DeviceDiscoveryScreen() {
             style={styles.popoverOverlay}
             onPress={() => setShowPairingMenu(false)}
           >
-            <View style={[styles.popoverMenu, { top: insets.top + 60 }]}>
+            <View
+              style={[
+                styles.popoverMenu,
+                { top: insets.top + 60, width: popoverMenuWidth },
+              ]}
+            >
               <TouchableOpacity
                 style={styles.popoverItem}
                 onPress={() => {
@@ -694,6 +768,7 @@ export function DeviceDiscoveryScreen() {
             >
               <Pressable onPress={() => {}}>
                 <View style={styles.manualCard}>
+                  <View style={styles.manualHandle} />
                   <View style={styles.modalHeader}>
                     <Text style={styles.manualTitle}>{t('deviceDiscovery.dialogs.manualInput.title')}</Text>
                     <TouchableOpacity onPress={() => setShowManualModal(false)}>
@@ -702,6 +777,22 @@ export function DeviceDiscoveryScreen() {
                   </View>
                   <Text style={styles.manualDescription}>
                     {t('deviceDiscovery.dialogs.manualInput.description')}
+                  </Text>
+                  <View style={styles.manualCallout}>
+                    <View style={styles.manualCalloutIcon}>
+                      <Icon name="desktop-outline" size={22} color="#3b82f6" />
+                    </View>
+                    <View style={styles.manualCalloutCopy}>
+                      <Text style={styles.manualCalloutTitle}>
+                        {t('deviceDiscovery.dialogs.manualInput.guideTitle')}
+                      </Text>
+                      <Text style={styles.manualCalloutBody}>
+                        {t('deviceDiscovery.dialogs.manualInput.guideBody')}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.manualLabel}>
+                    {t('deviceDiscovery.dialogs.manualInput.hostLabel')}
                   </Text>
                   <View style={styles.manualInputRow}>
                     <TextInput
@@ -944,12 +1035,56 @@ const styles = StyleSheet.create({
 
   // Empty state
   emptySection: {
-    alignItems: 'center',
+    alignItems: 'stretch',
     paddingVertical: 48,
   },
   emptyText: {
     fontSize: 14,
     color: '#8aabbd',
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  troubleshootingCard: {
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(219,234,254,0.45)',
+  },
+  troubleshootingTitle: {
+    color: '#1e40af',
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 10,
+  },
+  troubleshootingList: {
+    gap: 8,
+  },
+  troubleshootingItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  troubleshootingBullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#3b82f6',
+    marginTop: 6,
+  },
+  troubleshootingText: {
+    flex: 1,
+    color: '#3b5a8a',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  troubleshootingLink: {
+    alignSelf: 'flex-start',
+    marginTop: 12,
+  },
+  troubleshootingLinkText: {
+    color: '#2563eb',
+    fontSize: 12,
+    fontWeight: '700',
   },
 
   // Rescan
@@ -975,8 +1110,7 @@ const styles = StyleSheet.create({
   },
   popoverMenu: {
     position: 'absolute',
-    right: 20,
-    width: 160,
+    right: 16,
     backgroundColor: '#fff',
     borderRadius: 14,
     paddingVertical: 6,
@@ -993,10 +1127,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
   },
   popoverText: {
+    flex: 1,
+    flexShrink: 1,
     fontSize: 14,
+    lineHeight: 20,
     fontWeight: '500',
     color: colors.screenTitle,
   },
@@ -1009,9 +1146,8 @@ const styles = StyleSheet.create({
   // Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
+    backgroundColor: 'rgba(13,27,39,0.42)',
+    justifyContent: 'flex-end',
   },
   modalContent: {
     width: '100%',
@@ -1023,14 +1159,27 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   manualCard: {
-    padding: 20,
-    borderRadius: 24,
-    backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 28,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    backgroundColor: 'rgba(236,247,253,0.98)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.68)',
+    shadowColor: '#173d58',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
     elevation: 10,
+  },
+  manualHandle: {
+    alignSelf: 'center',
+    width: 42,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(90,122,150,0.28)',
+    marginBottom: 18,
   },
   manualSection: {
     paddingHorizontal: 20,
@@ -1046,25 +1195,73 @@ const styles = StyleSheet.create({
     color: colors.screenTitle,
   },
   manualDescription: {
-    marginTop: 8,
+    marginTop: 6,
     fontSize: 13,
     lineHeight: 19,
     color: '#6a96b8',
+  },
+  manualCallout: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginTop: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.62)',
+    shadowColor: 'rgba(59,130,210,0.3)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
+    elevation: 2,
+  },
+  manualCalloutIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: 'rgba(59,130,246,0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(59,130,246,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  manualCalloutCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  manualCalloutTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1a3a5c',
+  },
+  manualCalloutBody: {
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#5a7a96',
+  },
+  manualLabel: {
+    marginTop: 18,
+    marginBottom: 8,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#5a7a96',
   },
   manualInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginTop: 18,
   },
   manualInput: {
     flex: 1,
     minHeight: 52,
     paddingHorizontal: 16,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e1eef5',
-    backgroundColor: '#f8fbfe',
+    borderWidth: 1.5,
+    borderColor: 'rgba(59,130,246,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.82)',
     color: colors.screenTitle,
     fontSize: 16,
   },
@@ -1077,7 +1274,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#3b9fd8',
+    backgroundColor: '#3b82f6',
+    shadowColor: 'rgba(59,130,246,0.5)',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 3,
   },
   manualButtonText: {
     fontSize: 15,

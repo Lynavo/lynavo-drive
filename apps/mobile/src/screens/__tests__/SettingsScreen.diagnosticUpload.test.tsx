@@ -202,19 +202,26 @@ const mockNativeSyncEngine = {
   removeListeners: jest.fn(),
 };
 
-/** Simulate pressing a named button on the most-recent Alert.alert call. */
-function pressAlertButton(buttonText: string): void {
-  const alertMock = Alert.alert as jest.Mock;
-  const lastCall = alertMock.mock.calls[alertMock.mock.calls.length - 1];
-  const buttons: Array<{ text: string; onPress?: () => void }> =
+/**
+ * Simulate the user pressing a button on the diagnostic confirm dialog.
+ * The confirm dialog uses Alert.prompt (iOS), so we read the most-recent
+ * Alert.prompt call and optionally inject typed text into the OK button's
+ * onPress callback to mimic the user typing a problem description.
+ */
+function pressPromptButton(buttonText: string, typedText?: string): void {
+  const promptMock = Alert.prompt as jest.Mock;
+  const lastCall = promptMock.mock.calls[promptMock.mock.calls.length - 1];
+  const buttons: Array<{ text: string; onPress?: (t?: string) => void }> =
     lastCall[2] ?? [];
   const btn = buttons.find(b => b.text === buttonText);
   if (!btn) {
     throw new Error(
-      `Alert button "${buttonText}" not found. Available: ${buttons.map(b => b.text).join(', ')}`,
+      `Prompt button "${buttonText}" not found. Available: ${buttons
+        .map(b => b.text)
+        .join(', ')}`,
     );
   }
-  btn.onPress?.();
+  btn.onPress?.(typedText);
 }
 
 // ---------------------------------------------------------------------------
@@ -234,8 +241,11 @@ describe('SettingsScreen — diagnostic upload flow', () => {
     NativeModules.NativeSyncEngine = mockNativeSyncEngine;
     jest
       .spyOn(NativeEventEmitter.prototype, 'addListener')
-      .mockImplementation(() => ({ remove: jest.fn() }) as never);
+      .mockImplementation(() => ({ remove: jest.fn() } as never));
     jest.spyOn(Alert, 'alert');
+    // Alert.prompt is iOS-only and may be undefined under jest's RN preset.
+    // Stub it as a jest.fn so we can spy on confirm-dialog calls.
+    (Alert as unknown as { prompt: jest.Mock }).prompt = jest.fn();
     jest.spyOn(Clipboard, 'setString').mockImplementation(() => undefined);
   });
 
@@ -248,13 +258,15 @@ describe('SettingsScreen — diagnostic upload flow', () => {
 
     fireEvent.press(getByText('上傳診斷包'));
 
-    expect(Alert.alert).toHaveBeenCalledWith(
+    expect(Alert.prompt).toHaveBeenCalledWith(
       '上傳診斷包',
       expect.stringContaining('Vivi Drop'),
       expect.arrayContaining([
         expect.objectContaining({ text: '取消' }),
         expect.objectContaining({ text: '繼續' }),
       ]),
+      'plain-text',
+      '',
     );
   });
 
@@ -266,7 +278,7 @@ describe('SettingsScreen — diagnostic upload flow', () => {
     });
 
     fireEvent.press(getByText('上傳診斷包'));
-    pressAlertButton('取消');
+    pressPromptButton('取消');
 
     expect(mockUpload).not.toHaveBeenCalled();
   });
@@ -286,7 +298,7 @@ describe('SettingsScreen — diagnostic upload flow', () => {
     fireEvent.press(getByText('上傳診斷包'));
 
     await act(async () => {
-      pressAlertButton('繼續');
+      pressPromptButton('繼續');
     });
 
     await waitFor(() => {
@@ -295,6 +307,7 @@ describe('SettingsScreen — diagnostic upload flow', () => {
         'mobile-client-uuid',
         expect.any(AbortSignal),
         expect.any(Function),
+        undefined,
       );
     });
 
@@ -323,7 +336,7 @@ describe('SettingsScreen — diagnostic upload flow', () => {
     fireEvent.press(getByText('上傳診斷包'));
 
     await act(async () => {
-      pressAlertButton('繼續');
+      pressPromptButton('繼續');
     });
 
     await waitFor(() => {
@@ -351,7 +364,7 @@ describe('SettingsScreen — diagnostic upload flow', () => {
     fireEvent.press(getByText('上傳診斷包'));
 
     await act(async () => {
-      pressAlertButton('繼續');
+      pressPromptButton('繼續');
     });
 
     await waitFor(() => {
@@ -378,7 +391,7 @@ describe('SettingsScreen — diagnostic upload flow', () => {
     fireEvent.press(getByText('上傳診斷包'));
 
     await act(async () => {
-      pressAlertButton('繼續');
+      pressPromptButton('繼續');
     });
 
     await waitFor(() => {
@@ -387,6 +400,65 @@ describe('SettingsScreen — diagnostic upload flow', () => {
         c => typeof c[0] === 'string' && c[0].includes('失敗'),
       );
       expect(toastCall).toBeTruthy();
+    });
+  });
+
+  test('user-typed problem description is trimmed and forwarded to upload service as note', async () => {
+    mockUpload.mockResolvedValueOnce({
+      refId: 'NOTE1234',
+      uploadedAt: '2026-04-25T10:00:00.000Z',
+    });
+
+    const { getByText } = render(<SettingsScreen />);
+
+    await waitFor(() => {
+      expect(getByText('上傳診斷包')).toBeTruthy();
+    });
+
+    fireEvent.press(getByText('上傳診斷包'));
+
+    await act(async () => {
+      // Leading/trailing whitespace must be trimmed before reaching upload().
+      pressPromptButton('繼續', '  上傳一直卡在 30%  ');
+    });
+
+    await waitFor(() => {
+      expect(mockUpload).toHaveBeenCalledWith(
+        'file:///tmp/diagnostics-test.zip',
+        'mobile-client-uuid',
+        expect.any(AbortSignal),
+        expect.any(Function),
+        '上傳一直卡在 30%',
+      );
+    });
+  });
+
+  test('whitespace-only note is normalized to undefined', async () => {
+    mockUpload.mockResolvedValueOnce({
+      refId: 'BLANK000',
+      uploadedAt: '2026-04-25T10:00:00.000Z',
+    });
+
+    const { getByText } = render(<SettingsScreen />);
+
+    await waitFor(() => {
+      expect(getByText('上傳診斷包')).toBeTruthy();
+    });
+
+    fireEvent.press(getByText('上傳診斷包'));
+
+    await act(async () => {
+      pressPromptButton('繼續', '   ');
+    });
+
+    await waitFor(() => {
+      expect(mockUpload).toHaveBeenCalledWith(
+        'file:///tmp/diagnostics-test.zip',
+        'mobile-client-uuid',
+        expect.any(AbortSignal),
+        expect.any(Function),
+        undefined,
+      );
     });
   });
 });

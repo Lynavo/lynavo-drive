@@ -1,6 +1,6 @@
 import React from 'react';
-import { NativeModules } from 'react-native';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { Alert, Clipboard, NativeModules } from 'react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import type {
   SubscriptionPlanDto,
   SubscriptionPlanPlatform,
@@ -76,6 +76,11 @@ jest.mock('../../services/subscription-plans-service', () => ({
   subscriptionPlansService: {
     fetchPlans: jest.fn(),
   },
+  resolveSubscriptionPlanTier: (plan: { plan?: string; tier?: string }) => {
+    if (plan.plan === 'monthly' || plan.plan === 'yearly') return plan.plan;
+    if (plan.tier === 'monthly' || plan.tier === 'yearly') return plan.tier;
+    return null;
+  },
   // Hook imports `buildBootstrapPlans` and `buildBootstrapProducts` to seed
   // initial render. Empty seeds are fine here because all assertions wait
   // for `loading: false` before checking — by then `fetchPlans` mock has
@@ -94,6 +99,26 @@ jest.mock('../../services/subscription-service', () => ({
     trialEnd: null,
   }),
 }));
+
+const mockDiagnosticUpload = jest.fn();
+jest.mock('../../services/diagnostic-upload-service', () => {
+  class DiagnosticUploadError extends Error {
+    readonly detail: { kind: string };
+
+    constructor(detail: { kind: string }) {
+      super(detail.kind);
+      this.detail = detail;
+      this.name = 'DiagnosticUploadError';
+    }
+  }
+
+  return {
+    DiagnosticUploadError,
+    diagnosticUploadService: {
+      upload: (...args: unknown[]) => mockDiagnosticUpload(...args),
+    },
+  };
+});
 
 jest.mock('../../constants/features', () => ({
   FEATURES: {
@@ -136,6 +161,8 @@ import { SubscriptionScreen, resolveCurrentPlan } from '../SubscriptionScreen';
 import { iapService, type IapProductSummary } from '../../services/iap-service';
 import { subscriptionPlansService } from '../../services/subscription-plans-service';
 import { IAP_PRODUCTS } from '../../constants/iap';
+import { verifyIapReceipt } from '../../services/subscription-service';
+import { ApiError, ERROR_CODE } from '../../services/api';
 
 // ---------------------------------------------------------------------------
 // Fixture builders — CN storefront data, mirrors what the server + StoreKit
@@ -150,6 +177,7 @@ function makePlan(
   const platform: SubscriptionPlanPlatform = 'ios';
   return {
     name: 'Plan',
+    plan: 'monthly',
     description: '',
     badges: [],
     recommended: false,
@@ -165,6 +193,7 @@ function makePlan(
 const monthlyPlan: SubscriptionPlanDto = makePlan({
   id: 1,
   product_id: IAP_PRODUCTS.monthly,
+  plan: 'monthly',
   name: '月度方案',
   description: '按月訂閱',
   sort_order: 10,
@@ -173,6 +202,7 @@ const monthlyPlan: SubscriptionPlanDto = makePlan({
 const yearlyPlan: SubscriptionPlanDto = makePlan({
   id: 2,
   product_id: IAP_PRODUCTS.yearly,
+  plan: 'yearly',
   name: '年度方案',
   description: '一年無限同步',
   badges: ['8.8 折'],
@@ -200,6 +230,27 @@ const yearlyProduct: IapProductSummary = {
   eligibleForIntroOffer: false,
 };
 
+const adminMonthlySku = 'admin.catalog.alpha';
+const adminMonthlyPlan: SubscriptionPlanDto = makePlan({
+  id: 10,
+  product_id: adminMonthlySku,
+  plan: 'monthly',
+  name: 'Admin 月費',
+  description: '後台設定 SKU',
+  recommended: true,
+  sort_order: 5,
+});
+
+const adminMonthlyProduct: IapProductSummary = {
+  productId: adminMonthlySku,
+  displayPrice: '¥12.00',
+  priceAmount: 12,
+  currency: 'CNY',
+  periodUnit: 'MONTH',
+  periodCount: 1,
+  eligibleForIntroOffer: false,
+};
+
 function mockCatalog(
   plans: SubscriptionPlanDto[],
   products: IapProductSummary[],
@@ -214,6 +265,14 @@ function mockCatalog(
 
 function renderScreen() {
   return render(<SubscriptionScreen />);
+}
+
+async function advanceTimers(ms: number): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+    await jest.advanceTimersByTimeAsync(ms);
+    await Promise.resolve();
+  });
 }
 
 describe('SubscriptionScreen', () => {
@@ -233,6 +292,10 @@ describe('SubscriptionScreen', () => {
     mockSetSubscription.mockReset();
     // Default catalog — both plans, both products. Individual tests override.
     mockCatalog([monthlyPlan, yearlyPlan], [monthlyProduct, yearlyProduct]);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   test('renders one card per server plan with server-provided names', async () => {
@@ -319,6 +382,338 @@ describe('SubscriptionScreen', () => {
     );
   });
 
+  test('renders and purchases an admin catalog SKU without monthly/yearly in the product id', async () => {
+    mockCatalog([adminMonthlyPlan], [adminMonthlyProduct]);
+    (iapService.purchase as jest.Mock).mockResolvedValueOnce({
+      productId: adminMonthlySku,
+      transactionReceipt: 'ADMIN_RECEIPT',
+      transactionId: 'tx_admin',
+    });
+    mockLoadSubscription.mockResolvedValueOnce({
+      status: 'subscribed',
+      plan: 'monthly',
+      expireAt: '2026-04-28T00:00:00Z',
+      trialEnd: null,
+    });
+
+    const { findByText } = renderScreen();
+    expect(await findByText('Admin 月費')).toBeTruthy();
+    expect(await findByText('¥12.00')).toBeTruthy();
+
+    fireEvent.press(await findByText(/立即订阅|立即訂閱|Subscribe Now/));
+
+    await waitFor(() =>
+      expect(iapService.purchase).toHaveBeenCalledWith(adminMonthlySku),
+    );
+    await waitFor(() =>
+      expect(verifyIapReceipt).toHaveBeenCalledWith(
+        'ADMIN_RECEIPT',
+        'monthly',
+        adminMonthlySku,
+        'tx_admin',
+      ),
+    );
+  });
+
+  test('refreshes receipt before surfacing mismatch when StoreKit returns the previous SKU', async () => {
+    // Arrange: user selects yearly, but StoreKit resolves the purchase event
+    // with the previous monthly SKU. This happens in sandbox during
+    // subscription-group switches even when the user tapped the yearly card.
+    jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+    (iapService.purchase as jest.Mock).mockResolvedValueOnce({
+      productId: IAP_PRODUCTS.monthly,
+      transactionReceipt: 'OLD_MONTHLY_RECEIPT',
+      transactionId: 'tx_1',
+    });
+    (iapService.refreshReceipt as jest.Mock).mockResolvedValueOnce(
+      'FRESH_YEARLY_RECEIPT',
+    );
+    (verifyIapReceipt as jest.Mock)
+      .mockRejectedValueOnce(
+        new ApiError(ERROR_CODE.PRODUCT_ID_MISMATCH, 'mismatch'),
+      )
+      .mockResolvedValueOnce(undefined);
+    mockLoadSubscription.mockResolvedValueOnce({
+      status: 'subscribed',
+      plan: 'yearly',
+      expireAt: '2026-04-28T00:00:00Z',
+      trialEnd: null,
+    });
+
+    // Act
+    const { findByText } = renderScreen();
+    await findByText('年度方案');
+    fireEvent.press(await findByText(/立即订阅|立即訂閱|Subscribe Now/));
+
+    // Assert: first verify uses the stale receipt, then we refresh and retry
+    // with the fresh app receipt instead of showing PRODUCT_ID_MISMATCH.
+    await waitFor(() =>
+      expect(iapService.purchase).toHaveBeenCalledWith(IAP_PRODUCTS.yearly),
+    );
+    await waitFor(
+      () => expect(iapService.refreshReceipt).toHaveBeenCalledTimes(1),
+      { timeout: 3000 },
+    );
+    await waitFor(
+      () => expect(iapService.finishTransaction).toHaveBeenCalledWith('tx_1'),
+      { timeout: 5000 },
+    );
+    expect(verifyIapReceipt).toHaveBeenNthCalledWith(
+      1,
+      'OLD_MONTHLY_RECEIPT',
+      'yearly',
+      IAP_PRODUCTS.yearly,
+      'tx_1',
+    );
+    expect(verifyIapReceipt).toHaveBeenNthCalledWith(
+      2,
+      'FRESH_YEARLY_RECEIPT',
+      'yearly',
+      IAP_PRODUCTS.yearly,
+      'tx_1',
+    );
+    expect(Alert.alert).not.toHaveBeenCalledWith(
+      expect.stringMatching(
+        /产品设置有误|產品設定有誤|Product configuration error/,
+      ),
+    );
+  });
+
+  test('does not finish transaction when product mismatch still looks like a stale StoreKit receipt', async () => {
+    jest.useFakeTimers();
+    try {
+      // Arrange: StoreKit returns the old monthly SKU after the user selected
+      // yearly. Even after one app-receipt refresh, backend still sees 2003.
+      // This should remain retryable/redeliverable instead of finishing the
+      // paid transaction and losing Apple's chance to redeliver it.
+      jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+      (iapService.purchase as jest.Mock).mockResolvedValueOnce({
+        productId: IAP_PRODUCTS.monthly,
+        transactionReceipt: 'OLD_MONTHLY_RECEIPT',
+        transactionId: 'tx_1',
+      });
+      (iapService.refreshReceipt as jest.Mock).mockResolvedValueOnce(
+        'FRESH_APP_RECEIPT',
+      );
+      (verifyIapReceipt as jest.Mock)
+        .mockRejectedValueOnce(
+          new ApiError(ERROR_CODE.PRODUCT_ID_MISMATCH, 'mismatch'),
+        )
+        .mockRejectedValueOnce(
+          new ApiError(ERROR_CODE.PRODUCT_ID_MISMATCH, 'mismatch'),
+        );
+      mockLoadSubscription.mockResolvedValue({
+        status: 'sub_expired',
+        plan: 'monthly',
+        expireAt: null,
+        trialEnd: null,
+      });
+
+      // Act
+      const { findByText } = renderScreen();
+      await findByText('年度方案');
+      fireEvent.press(await findByText(/立即订阅|立即訂閱|Subscribe Now/));
+
+      // Assert: refresh once, wait through the status-poll window, surface
+      // "still verifying", and leave the transaction unfinished so StoreKit can
+      // redeliver / user can retry.
+      await waitFor(
+        () => expect(iapService.refreshReceipt).toHaveBeenCalledTimes(1),
+        { timeout: 3000 },
+      );
+      await advanceTimers(1_000);
+      await waitFor(() => expect(verifyIapReceipt).toHaveBeenCalledTimes(2));
+      await advanceTimers(70_000);
+      await waitFor(() =>
+        expect(Alert.alert).toHaveBeenCalledWith('正在验证付款...'),
+      );
+      expect(iapService.finishTransaction).not.toHaveBeenCalled();
+      expect(Alert.alert).not.toHaveBeenCalledWith(
+        expect.stringMatching(
+          /产品设置有误|產品設定有誤|Product configuration error/,
+        ),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('recovers stale product mismatch when webhook updates the selected plan during polling', async () => {
+    jest.useFakeTimers();
+    try {
+      jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+      (iapService.purchase as jest.Mock).mockResolvedValueOnce({
+        productId: IAP_PRODUCTS.monthly,
+        transactionReceipt: 'OLD_MONTHLY_RECEIPT',
+        transactionId: 'tx_mismatch_webhook_lag',
+      });
+      (iapService.refreshReceipt as jest.Mock).mockResolvedValueOnce(
+        'FRESH_APP_RECEIPT',
+      );
+      (verifyIapReceipt as jest.Mock)
+        .mockRejectedValueOnce(
+          new ApiError(ERROR_CODE.PRODUCT_ID_MISMATCH, 'mismatch'),
+        )
+        .mockRejectedValueOnce(
+          new ApiError(ERROR_CODE.PRODUCT_ID_MISMATCH, 'mismatch'),
+        );
+      let loadCalls = 0;
+      mockLoadSubscription.mockImplementation(async () => {
+        loadCalls += 1;
+        if (loadCalls < 2) {
+          return {
+            status: 'subscribed',
+            plan: 'monthly',
+            expireAt: '2026-04-27T11:26:41Z',
+            trialEnd: null,
+          };
+        }
+        return {
+          status: 'subscribed',
+          plan: 'yearly',
+          expireAt: '2026-04-27T12:02:41Z',
+          trialEnd: null,
+        };
+      });
+
+      const { findByText } = renderScreen();
+      await findByText('年度方案');
+      fireEvent.press(await findByText(/立即订阅|立即訂閱|Subscribe Now/));
+
+      await waitFor(
+        () => expect(iapService.refreshReceipt).toHaveBeenCalledTimes(1),
+        { timeout: 3000 },
+      );
+      await advanceTimers(1_000);
+      await waitFor(() => expect(verifyIapReceipt).toHaveBeenCalledTimes(2));
+      await advanceTimers(70_000);
+
+      await waitFor(() =>
+        expect(iapService.finishTransaction).toHaveBeenCalledWith(
+          'tx_mismatch_webhook_lag',
+        ),
+      );
+      expect(Alert.alert).not.toHaveBeenCalledWith('正在验证付款...');
+      expect(Alert.alert).not.toHaveBeenCalledWith(
+        expect.stringMatching(
+          /产品设置有误|產品設定有誤|Product configuration error/,
+        ),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('refreshes receipt once after IAP verify failure before exhausting retries', async () => {
+    jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+    (iapService.purchase as jest.Mock).mockResolvedValueOnce({
+      productId: IAP_PRODUCTS.yearly,
+      transactionReceipt: 'STALE_APP_RECEIPT',
+      transactionId: 'tx_verify_retry',
+    });
+    (iapService.refreshReceipt as jest.Mock).mockResolvedValueOnce(
+      'FRESH_APP_RECEIPT',
+    );
+    (verifyIapReceipt as jest.Mock)
+      .mockRejectedValueOnce(
+        new ApiError(ERROR_CODE.IAP_VERIFY_FAILED, 'verify failed'),
+      )
+      .mockResolvedValueOnce(undefined);
+    mockLoadSubscription.mockResolvedValueOnce({
+      status: 'subscribed',
+      plan: 'yearly',
+      expireAt: '2026-04-28T00:00:00Z',
+      trialEnd: null,
+    });
+
+    const { findByText } = renderScreen();
+    await findByText('年度方案');
+    fireEvent.press(await findByText(/立即订阅|立即訂閱|Subscribe Now/));
+
+    await waitFor(
+      () => expect(iapService.refreshReceipt).toHaveBeenCalledTimes(1),
+      { timeout: 3000 },
+    );
+    await waitFor(
+      () =>
+        expect(iapService.finishTransaction).toHaveBeenCalledWith(
+          'tx_verify_retry',
+        ),
+      { timeout: 5000 },
+    );
+    expect(verifyIapReceipt).toHaveBeenNthCalledWith(
+      1,
+      'STALE_APP_RECEIPT',
+      'yearly',
+      IAP_PRODUCTS.yearly,
+      'tx_verify_retry',
+    );
+    expect(verifyIapReceipt).toHaveBeenNthCalledWith(
+      2,
+      'FRESH_APP_RECEIPT',
+      'yearly',
+      IAP_PRODUCTS.yearly,
+      'tx_verify_retry',
+    );
+    expect(Alert.alert).not.toHaveBeenCalledWith('验证失败，请稍后重试');
+  });
+
+  test('polls subscription status after retryable verify exhaustion before showing failure', async () => {
+    jest.useFakeTimers();
+    try {
+      jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+      (iapService.purchase as jest.Mock).mockResolvedValueOnce({
+        productId: IAP_PRODUCTS.yearly,
+        transactionReceipt: 'STALE_APP_RECEIPT',
+        transactionId: 'tx_webhook_lag',
+      });
+      (iapService.refreshReceipt as jest.Mock).mockResolvedValue(null);
+      (verifyIapReceipt as jest.Mock).mockRejectedValue(
+        new ApiError(ERROR_CODE.IAP_VERIFY_FAILED, 'verify failed'),
+      );
+      let loadCalls = 0;
+      mockLoadSubscription.mockImplementation(async () => {
+        loadCalls += 1;
+        if (loadCalls < 2) {
+          return {
+            status: 'sub_expired',
+            plan: 'monthly',
+            expireAt: null,
+            trialEnd: null,
+          };
+        }
+        return {
+          status: 'subscribed',
+          plan: 'yearly',
+          expireAt: '2026-04-28T00:00:00Z',
+          trialEnd: null,
+        };
+      });
+
+      const { findByText } = renderScreen();
+      await findByText('年度方案');
+      fireEvent.press(await findByText(/立即订阅|立即訂閱|Subscribe Now/));
+
+      await waitFor(() => expect(verifyIapReceipt).toHaveBeenCalledTimes(1));
+      await advanceTimers(1_000);
+      await waitFor(() => expect(verifyIapReceipt).toHaveBeenCalledTimes(2));
+      await advanceTimers(4_000);
+      await waitFor(() => expect(verifyIapReceipt).toHaveBeenCalledTimes(3));
+      await advanceTimers(0);
+      await advanceTimers(70_000);
+      await advanceTimers(0);
+
+      await waitFor(() =>
+        expect(iapService.finishTransaction).toHaveBeenCalledWith(
+          'tx_webhook_lag',
+        ),
+      );
+      expect(Alert.alert).not.toHaveBeenCalledWith('验证失败，请稍后重试');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test('subscribe CTA is disabled when there is no selectable plan', async () => {
     // Arrange: empty catalog → nothing to auto-select → CTA must stay
     // un-tappable so we never fire purchase against an undefined SKU.
@@ -345,6 +740,44 @@ describe('SubscriptionScreen', () => {
 
     // Assert
     await waitFor(() => expect(iapService.restore).toHaveBeenCalled());
+  });
+
+  test('header upload logs button uploads diagnostics and copies reference id', async () => {
+    // Arrange
+    const exportDiagnostics = jest.fn().mockResolvedValue('/tmp/sub-log.zip');
+    const getClientId = jest.fn().mockResolvedValue('client-1');
+    (NativeModules as Record<string, unknown>).NativeSyncEngine = {
+      getBindingState: jest.fn().mockResolvedValue(null),
+      exportDiagnostics,
+      getClientId,
+    };
+    mockDiagnosticUpload.mockResolvedValueOnce({
+      refId: 'diag-123',
+      uploadedAt: '2026-04-27T00:00:00Z',
+    });
+    jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+    jest.spyOn(Clipboard, 'setString').mockImplementation(jest.fn());
+
+    // Act
+    const { findByLabelText } = renderScreen();
+    fireEvent.press(await findByLabelText(/上传日志|上傳日誌|Upload logs/));
+
+    // Assert
+    await waitFor(() => expect(mockDiagnosticUpload).toHaveBeenCalled());
+    expect(exportDiagnostics).toHaveBeenCalled();
+    expect(getClientId).toHaveBeenCalled();
+    expect(mockDiagnosticUpload).toHaveBeenCalledWith(
+      'file:///tmp/sub-log.zip',
+      'client-1',
+      expect.any(AbortSignal),
+      undefined,
+      'subscription-screen',
+    );
+    expect(Clipboard.setString).toHaveBeenCalledWith('diag-123');
+    expect(Alert.alert).toHaveBeenCalledWith(
+      '日志已上传',
+      '追踪编号 diag-123 已复制，可提供给客服排查订阅问题。',
+    );
   });
 });
 

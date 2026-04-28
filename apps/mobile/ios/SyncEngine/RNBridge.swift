@@ -34,6 +34,7 @@ private func appendDiagnosticsMultipartString(_ value: String, to data: inout Da
 private func diagnosticsMultipartBody(
     archiveURL: URL,
     clientId: String,
+    note: String,
     boundary: String
 ) throws -> Data {
     var body = Data()
@@ -43,6 +44,13 @@ private func diagnosticsMultipartBody(
     appendDiagnosticsMultipartString("Content-Disposition: form-data; name=\"client_id\"\r\n\r\n", to: &body)
     appendDiagnosticsMultipartString(clientId, to: &body)
     appendDiagnosticsMultipartString("\r\n", to: &body)
+
+    if !note.isEmpty {
+        appendDiagnosticsMultipartString("--\(boundary)\r\n", to: &body)
+        appendDiagnosticsMultipartString("Content-Disposition: form-data; name=\"note\"\r\n\r\n", to: &body)
+        appendDiagnosticsMultipartString(note, to: &body)
+        appendDiagnosticsMultipartString("\r\n", to: &body)
+    }
 
     appendDiagnosticsMultipartString("--\(boundary)\r\n", to: &body)
     appendDiagnosticsMultipartString(
@@ -74,6 +82,7 @@ private func performDiagnosticsArchiveUpload(
     archiveURL: URL,
     uploadURL: URL,
     clientId: String,
+    note: String,
     headers: [String: String]
 ) async throws -> [String: Any] {
     let boundary = "syncflow-\(UUID().uuidString)"
@@ -90,11 +99,12 @@ private func performDiagnosticsArchiveUpload(
     request.httpBody = try diagnosticsMultipartBody(
         archiveURL: archiveURL,
         clientId: clientId,
+        note: note,
         boundary: boundary
     )
     let uploadBytes = request.httpBody?.count ?? 0
     diagnosticsUploadLog(
-        "started url=\(uploadURL.absoluteString) archive=\(archiveURL.lastPathComponent) bytes=\(uploadBytes) client_id=\(clientId) contentType=\(contentType)"
+        "started url=\(uploadURL.absoluteString) archive=\(archiveURL.lastPathComponent) bytes=\(uploadBytes) client_id=\(clientId) noteLen=\(note.count) contentType=\(contentType)"
     )
 
     let data: Data
@@ -356,6 +366,11 @@ class NativeSyncEngineModule: RCTEventEmitter {
     }
 
     @objc
+    func recordDiagnosticsLog(_ category: NSString, message: NSString) {
+        syncDiagnosticsLog(String(category), String(message))
+    }
+
+    @objc
     func uploadDiagnosticsArchive(_ params: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         guard let urlString = params["url"] as? String,
               let uploadURL = URL(string: urlString),
@@ -368,6 +383,10 @@ class NativeSyncEngineModule: RCTEventEmitter {
         }
 
         let headers = diagnosticsHeaders(from: params["headers"])
+        // Optional user-supplied problem description. Server caps length again, so we
+        // only need to ensure non-nil + trim here.
+        let note = (params["note"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
         Task {
             do {
@@ -375,6 +394,7 @@ class NativeSyncEngineModule: RCTEventEmitter {
                     archiveURL: archiveURL,
                     uploadURL: uploadURL,
                     clientId: clientId,
+                    note: note,
                     headers: headers
                 )
                 resolve(result)

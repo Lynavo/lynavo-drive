@@ -5,6 +5,7 @@ import settings_en from './locales/en/settings.json';
 import syncActivity_en from './locales/en/syncActivity.json';
 import codeVerify_en from './locales/en/codeVerify.json';
 import qrScanner_en from './locales/en/qrScanner.json';
+import connectionTutorial_en from './locales/en/connectionTutorial.json';
 import deviceDiscovery_en from './locales/en/deviceDiscovery.json';
 import help_en from './locales/en/help.json';
 import sharedFiles_en from './locales/en/sharedFiles.json';
@@ -19,6 +20,7 @@ import settings_zh_Hans from './locales/zh-Hans/settings.json';
 import syncActivity_zh_Hans from './locales/zh-Hans/syncActivity.json';
 import codeVerify_zh_Hans from './locales/zh-Hans/codeVerify.json';
 import qrScanner_zh_Hans from './locales/zh-Hans/qrScanner.json';
+import connectionTutorial_zh_Hans from './locales/zh-Hans/connectionTutorial.json';
 import deviceDiscovery_zh_Hans from './locales/zh-Hans/deviceDiscovery.json';
 import help_zh_Hans from './locales/zh-Hans/help.json';
 import sharedFiles_zh_Hans from './locales/zh-Hans/sharedFiles.json';
@@ -33,6 +35,7 @@ import settings_zh_Hant from './locales/zh-Hant/settings.json';
 import syncActivity_zh_Hant from './locales/zh-Hant/syncActivity.json';
 import codeVerify_zh_Hant from './locales/zh-Hant/codeVerify.json';
 import qrScanner_zh_Hant from './locales/zh-Hant/qrScanner.json';
+import connectionTutorial_zh_Hant from './locales/zh-Hant/connectionTutorial.json';
 import deviceDiscovery_zh_Hant from './locales/zh-Hant/deviceDiscovery.json';
 import help_zh_Hant from './locales/zh-Hant/help.json';
 import sharedFiles_zh_Hant from './locales/zh-Hant/sharedFiles.json';
@@ -49,6 +52,7 @@ export const LOCALE_SECTIONS = [
   'syncActivity',
   'codeVerify',
   'qrScanner',
+  'connectionTutorial',
   'deviceDiscovery',
   'help',
   'sharedFiles',
@@ -66,6 +70,7 @@ export const translationSchema = {
   syncActivity: syncActivity_zh_Hant,
   codeVerify: codeVerify_zh_Hant,
   qrScanner: qrScanner_zh_Hant,
+  connectionTutorial: connectionTutorial_zh_Hant,
   deviceDiscovery: deviceDiscovery_zh_Hant,
   help: help_zh_Hant,
   sharedFiles: sharedFiles_zh_Hant,
@@ -85,6 +90,7 @@ export const resources = {
       syncActivity: syncActivity_en,
       codeVerify: codeVerify_en,
       qrScanner: qrScanner_en,
+      connectionTutorial: connectionTutorial_en,
       deviceDiscovery: deviceDiscovery_en,
       help: help_en,
       sharedFiles: sharedFiles_en,
@@ -103,6 +109,7 @@ export const resources = {
       syncActivity: syncActivity_zh_Hans,
       codeVerify: codeVerify_zh_Hans,
       qrScanner: qrScanner_zh_Hans,
+      connectionTutorial: connectionTutorial_zh_Hans,
       deviceDiscovery: deviceDiscovery_zh_Hans,
       help: help_zh_Hans,
       sharedFiles: sharedFiles_zh_Hans,
@@ -121,6 +128,7 @@ export const resources = {
       syncActivity: syncActivity_zh_Hant,
       codeVerify: codeVerify_zh_Hant,
       qrScanner: qrScanner_zh_Hant,
+      connectionTutorial: connectionTutorial_zh_Hant,
       deviceDiscovery: deviceDiscovery_zh_Hant,
       help: help_zh_Hant,
       sharedFiles: sharedFiles_zh_Hant,

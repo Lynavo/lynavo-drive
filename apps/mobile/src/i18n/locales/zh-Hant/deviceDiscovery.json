@@ -22,6 +22,37 @@
     "manualInputIp": "手動輸入 IP",
     "qrPair": "掃碼配對"
   },
+  "troubleshooting": {
+    "title": "找不到設備或不知道怎麼連？",
+    "sameWifi": "確保手機與電腦連接在同一個 Wi-Fi（區域網路）下。",
+    "desktopApp": "請在電腦端瀏覽器訪問 www.vividrop.cn 下載並打開 PC 端。",
+    "cta": "查看詳細圖文教程 >"
+  },
+  "onboarding": {
+    "unconnected": {
+      "skip": "跳過",
+      "title": "開始使用 Vivi Drop",
+      "subtitle": "手機與電腦無線同步素材，三步搞定",
+      "downloadStep": {
+        "title": "下載 PC 端",
+        "body": "在電腦上安裝 Vivi Drop"
+      },
+      "connectStep": {
+        "title": "手機連接",
+        "body": "輸入連接碼或掃碼連接"
+      },
+      "syncStep": {
+        "title": "開始同步",
+        "body": "素材自動傳輸到電腦"
+      },
+      "copy": "複製",
+      "copyDone": "下載地址已複製",
+      "copyFailed": "暫時無法複製下載地址，請稍後重試。",
+      "copyHint": "複製後在電腦瀏覽器中打開即可下載",
+      "start": "我已經下載好了，去連接設備",
+      "footerNote": "首次使用引導 · 可在幫助頁重新查看"
+    }
+  },
   "dialogs": {
     "openLinkFailed": {
       "title": "開啟失敗",
@@ -30,6 +61,9 @@
     "manualInput": {
       "title": "手動輸入 IP 配對",
       "description": "如果掃描不到電腦，尤其是 Windows 設備，可直接輸入電腦端 IPv4 地址繼續配對。",
+      "guideTitle": "去哪裡找連接碼和 IP？",
+      "guideBody": "請在電腦端 Vivi Drop 左側導覽列點擊「全域設定」，即可查看 6 位連接碼、設備 IP 或顯示二維碼。",
+      "hostLabel": "伺服器地址",
       "confirm": "繼續",
       "hint": "預設使用同步端口 39393，輸入後仍需在下一步填寫 6 位連接碼。",
       "ipError": "請輸入有效的 IPv4 地址，例如 192.168.0.1"

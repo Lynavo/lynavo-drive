@@ -256,6 +256,16 @@ describe('SettingsScreen', () => {
     alertSpy.mockRestore();
   });
 
+  test('does not expose the sandbox IAP queue flush action', async () => {
+    const { getByText, queryByText } = render(<SettingsScreen />);
+
+    await waitFor(() => {
+      expect(getByText('恢復已購買訂閱')).toBeTruthy();
+    });
+
+    expect(queryByText('TEST: Flush IAP Queue')).toBeNull();
+  });
+
   test('disables reset sync status while uploading', async () => {
     mockNativeSyncEngine.getSyncOverview.mockResolvedValueOnce({
       progressPercent: 42,

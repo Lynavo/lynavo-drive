@@ -151,7 +151,7 @@ export function LoginScreen() {
               <View style={styles.phonePrefix}>
                 <Icon
                   name="phone-portrait-outline"
-                  size={20}
+                  size={16}
                   color={AUTH_COLORS.textMuted}
                 />
                 <Text style={styles.prefixText}>+86</Text>
@@ -185,7 +185,7 @@ export function LoginScreen() {
               style={[styles.checkbox, agreed && styles.checkboxChecked]}
             >
               {agreed ? (
-                <Icon name="checkmark" size={16} color="#ffffff" />
+                <Icon name="checkmark" size={12} color="#ffffff" />
               ) : null}
             </Pressable>
             <Text style={styles.agreementText}>
@@ -246,17 +246,17 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: AUTH_COLORS.surface,
-    borderRadius: 34,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: AUTH_COLORS.surfaceBorder,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingTop: 28,
-    paddingBottom: 24,
-    shadowColor: '#66a9ff',
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.14,
-    shadowRadius: 30,
-    elevation: 10,
+    paddingBottom: 28,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
+    elevation: 4,
   },
   noticeBanner: {
     flexDirection: 'row',
@@ -277,11 +277,11 @@ const styles = StyleSheet.create({
     color: AUTH_COLORS.text,
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '500',
-    color: AUTH_COLORS.textMuted,
+    color: AUTH_COLORS.textFaint,
     textAlign: 'center',
-    marginBottom: 28,
+    marginBottom: 20,
   },
   fieldWrap: {
     marginBottom: 20,
@@ -289,12 +289,12 @@ const styles = StyleSheet.create({
   phoneField: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 70,
-    borderRadius: 24,
-    borderWidth: 1,
+    minHeight: 52,
+    borderRadius: 14,
+    borderWidth: 1.5,
     borderColor: AUTH_COLORS.inputBorder,
     backgroundColor: AUTH_COLORS.inputBackground,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
   },
   phoneFieldError: {
     borderColor: AUTH_COLORS.danger,
@@ -302,26 +302,25 @@ const styles = StyleSheet.create({
   phonePrefix: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   prefixText: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
     color: AUTH_COLORS.textMuted,
   },
   divider: {
     width: 1,
-    height: 40,
-    backgroundColor: 'rgba(154, 184, 214, 0.42)',
-    marginHorizontal: 16,
+    height: 24,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    marginHorizontal: 12,
   },
   phoneInput: {
     flex: 1,
     paddingVertical: 0,
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '500',
     color: AUTH_COLORS.text,
-    letterSpacing: 0.4,
   },
   phoneErrorText: {
     marginTop: 10,
@@ -332,53 +331,52 @@ const styles = StyleSheet.create({
   agreementRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    gap: 10,
     marginBottom: 24,
-    paddingHorizontal: 2,
   },
   checkbox: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
+    width: 18,
+    height: 18,
+    borderRadius: 4,
     borderWidth: 1.5,
     borderColor: AUTH_COLORS.checkBorder,
-    backgroundColor: '#ffffff',
+    backgroundColor: 'rgba(255,255,255,0.90)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 1,
+    marginTop: 2,
   },
   checkboxChecked: {
     borderColor: AUTH_COLORS.checkFill,
     backgroundColor: AUTH_COLORS.checkFill,
     shadowColor: AUTH_COLORS.checkFill,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 2,
   },
   agreementText: {
     flex: 1,
-    fontSize: 14,
-    lineHeight: 24,
-    color: AUTH_COLORS.textMuted,
+    fontSize: 12,
+    lineHeight: 19,
+    color: AUTH_COLORS.textFaint,
   },
   agreementLinkText: {
     color: AUTH_COLORS.link,
     fontWeight: '600',
   },
   sendButton: {
-    minHeight: 64,
-    borderRadius: 22,
+    minHeight: 48,
+    borderRadius: 14,
     backgroundColor: AUTH_COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 10,
     shadowColor: AUTH_COLORS.primary,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.26,
-    shadowRadius: 22,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 4,
   },
   sendButtonDisabled: {
     backgroundColor: AUTH_COLORS.primaryDisabled,
@@ -389,10 +387,9 @@ const styles = StyleSheet.create({
     backgroundColor: AUTH_COLORS.primaryPressed,
   },
   sendButtonText: {
-    fontSize: 17,
+    fontSize: 14,
     fontWeight: '700',
     color: '#ffffff',
-    letterSpacing: 0.3,
   },
   sendButtonTextDisabled: {
     color: AUTH_COLORS.primaryTextDisabled,

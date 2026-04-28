@@ -15,15 +15,23 @@ export interface Spec extends TurboModule {
   startDiscovery(): Promise<void>;
   stopDiscovery(): Promise<void>;
   // 绑定
-  pairDevice(params: { deviceId: string; host: string; port: number; connectionCode: string }): Promise<void>;
+  pairDevice(params: {
+    deviceId: string;
+    host: string;
+    port: number;
+    connectionCode: string;
+  }): Promise<void>;
   disconnectAndUnbind(): Promise<void>;
   // 状态查询
   getBindingState(): Promise<BindingStateDTO | null>;
   getSyncOverview(): Promise<SyncSummaryDTO>;
   getReadOnlyQueue(): Promise<ReadOnlyQueueItemDTO[]>;
-  getHistoryDays(cursor?: string): Promise<{ items: HistoryLedgerCardDTO[]; nextCursor: string | null }>;
+  getHistoryDays(
+    cursor?: string,
+  ): Promise<{ items: HistoryLedgerCardDTO[]; nextCursor: string | null }>;
   getAppInfo(): Promise<{ appName: string; version: string; build: string }>;
   exportDiagnostics(): Promise<string>;
+  recordDiagnosticsLog(category: string, message: string): void;
   getClientDisplayName(): Promise<string>;
   setClientDisplayName(name: string): Promise<void>;
   triggerSync(): Promise<void>;

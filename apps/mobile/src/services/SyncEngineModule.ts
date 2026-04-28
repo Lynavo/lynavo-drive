@@ -6,6 +6,10 @@ import type {
   SharedDirectoryDTO,
   AutoUploadTimeRangeMode,
 } from '@syncflow/contracts';
+import {
+  clearAutoUploadSessionBestEffort,
+  startAutoUploadSessionBestEffort,
+} from '../utils/autoUploadRoundProgress';
 
 // ---------------------------------------------------------------------------
 // Raw native module reference
@@ -108,10 +112,26 @@ export async function interruptAutoUpload(): Promise<void> {
 /** Disable auto upload: turns the feature off, persists 'disabled' state. */
 export async function disableAutoUpload(): Promise<void> {
   await NativeSyncEngine.disableAutoUpload();
+  await clearAutoUploadSessionBestEffort();
 }
 
 /** Re-enable auto upload from interrupted/disabled state, persists 'active' state. */
 export async function enableAutoUpload(): Promise<void> {
+  let currentConfig: AutoUploadConfigDTO | undefined;
+  try {
+    currentConfig = (await NativeSyncEngine.getAutoUploadConfig?.()) as
+      | AutoUploadConfigDTO
+      | undefined;
+  } catch (e) {
+    console.warn(
+      '[SyncEngineModule] getAutoUploadConfig before enable failed:',
+      e,
+    );
+  }
+  if (currentConfig?.state === 'disabled') {
+    await clearAutoUploadSessionBestEffort();
+  }
+  await startAutoUploadSessionBestEffort();
   await NativeSyncEngine.resumeAutoUpload();
 }
 
@@ -140,7 +160,9 @@ export interface DownloadResult {
   localPath: string | null;
 }
 
-export async function downloadSharedFile(path: string): Promise<DownloadResult> {
+export async function downloadSharedFile(
+  path: string,
+): Promise<DownloadResult> {
   const result = await NativeSyncEngine.downloadSharedFile(path);
   return result as DownloadResult;
 }

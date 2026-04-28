@@ -1,4 +1,10 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from 'react';
 import {
   View,
   Text,
@@ -10,6 +16,7 @@ import {
   ActivityIndicator,
   Dimensions,
   NativeModules,
+  Clipboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -25,13 +32,13 @@ import {
   SubscriptionStatusIcon,
   getSubscriptionStatusIconTone,
 } from '../components/SubscriptionStatusIcon';
-import { isFeatureAccessAllowed, useAuth } from '../stores/auth-store';
-import { iapService } from '../services/iap-service';
 import {
-  ALL_PRODUCT_IDS,
-  productIdToPlan,
-  type IapProductId,
-} from '../constants/iap';
+  isFeatureAccessAllowed,
+  useAuth,
+  type SubscriptionInfo,
+} from '../stores/auth-store';
+import { iapService } from '../services/iap-service';
+import { resolveSubscriptionPlanTier } from '../services/subscription-plans-service';
 import {
   useSubscriptionPlans,
   type PlanWithProduct,
@@ -46,11 +53,17 @@ import { logout as serverLogout } from '../services/auth-service';
 import { wipeSyncIdentity } from '../services/SyncEngineModule';
 import { resetCurrentDesktopSidecarIfReachable } from '../services/sidecar-reset-service';
 import { clearUserScopedStorage } from '../utils/clearUserScopedStorage';
+import {
+  DiagnosticUploadError,
+  diagnosticUploadService,
+} from '../services/diagnostic-upload-service';
+import { recordDiagnosticsLog } from '../services/diagnostics-log-service';
 import { FEATURES } from '../constants/features';
 import {
   resolveSubscriptionDisplayState,
   type SubscriptionDisplayState,
 } from '../utils/subscriptionStatusDisplay';
+import { ERROR_CODE } from '../services/api';
 
 const DARK = '#202022';
 const SCREEN_BG = '#d6ecf8';
@@ -63,6 +76,13 @@ const CHECK_BG = 'rgba(83, 200, 120, 0.12)';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PLAN_CARD_GAP = 12;
 const PLAN_CARD_HORIZONTAL_PADDING = 16;
+const POST_VERIFY_STATUS_POLL_DELAYS_MS = [
+  2_000,
+  5_000,
+  10_000,
+  20_000,
+  30_000,
+] as const;
 
 /** Card width grows/shrinks with plan count so 2 or 3 cards always tile
  *  edge-to-edge under the section padding. The base styles default to the
@@ -93,12 +113,6 @@ export function resolveCurrentPlan(
 }
 type PlanKey = 'monthly' | 'yearly';
 
-const KNOWN_IAP_SKUS: ReadonlySet<string> = new Set(ALL_PRODUCT_IDS);
-
-function isKnownIapProductId(productId: string): productId is IapProductId {
-  return KNOWN_IAP_SKUS.has(productId);
-}
-
 function isDowngradePlan(
   currentPlan: PlanKey | null,
   targetPlan: PlanKey,
@@ -111,6 +125,10 @@ function formatExpireDate(dateStr: string | null): string {
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return '';
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 async function resolvePostSubscriptionRoute(): Promise<PostSubscriptionRoute> {
@@ -457,6 +475,8 @@ export function SubscriptionScreen() {
     setSignedOutTransition,
   } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isUploadingDiagnostics, setIsUploadingDiagnostics] = useState(false);
+  const diagnosticAbortRef = useRef<AbortController | null>(null);
 
   // Which Apple-level plan the user is currently holding (null when on
   // account trial, post-expiry, or no Apple IAP yet). Drives the "目前
@@ -468,7 +488,8 @@ export function SubscriptionScreen() {
   // first plan once the catalog resolves. Keying by product_id (instead of
   // the legacy 'monthly' | 'yearly' enum) lets us render N plans driven by
   // the server catalog while still mapping back to backend tier semantics
-  // via productIdToPlan() for downgrade checks and verify-receipt calls.
+  // via the catalog `plan` / `tier` field for downgrade checks and
+  // verify-receipt calls.
   const [selectedProductId, setSelectedProductId] = useState<string | null>(
     null,
   );
@@ -484,14 +505,29 @@ export function SubscriptionScreen() {
     null,
   );
 
+  useEffect(
+    () => () => {
+      diagnosticAbortRef.current?.abort();
+    },
+    [],
+  );
+
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
+      recordDiagnosticsLog('SubscriptionScreen', 'focus refresh start');
       void getSubscriptionStatus()
         .then(info => {
+          recordDiagnosticsLog('SubscriptionScreen', 'focus refresh success', {
+            status: info.status,
+            plan: info.plan,
+          });
           if (!cancelled) setSubscription(info);
         })
         .catch(err => {
+          recordDiagnosticsLog('SubscriptionScreen', 'focus refresh failed', {
+            error: err instanceof Error ? err.message : String(err),
+          });
           console.warn('[subscription] refresh on focus failed', err);
         });
       return () => {
@@ -626,7 +662,7 @@ export function SubscriptionScreen() {
   );
   const selectedPlanTier = useMemo<PlanKey | null>(() => {
     if (!selectedEntry) return null;
-    return productIdToPlan(selectedEntry.plan.product_id);
+    return resolveSubscriptionPlanTier(selectedEntry.plan);
   }, [selectedEntry]);
   const selectedPlanIsCurrent =
     currentPlan != null &&
@@ -640,7 +676,7 @@ export function SubscriptionScreen() {
     if (!selectedPlanIsCurrent && !selectedPlanIsDowngrade) return;
     // Find an alternative — preferring recommended, otherwise first non-self.
     const alternative = plans.find(entry => {
-      const tier = productIdToPlan(entry.plan.product_id);
+      const tier = resolveSubscriptionPlanTier(entry.plan);
       if (tier == null) return false;
       if (currentPlan != null && tier === currentPlan) return false;
       if (isDowngradePlan(currentPlan, tier)) return false;
@@ -653,41 +689,145 @@ export function SubscriptionScreen() {
 
   const handleRestore = useCallback(async () => {
     if (!FEATURES.IAP_ENABLED || !FEATURES.IAP_RESTORE_ENABLED) return;
+    recordDiagnosticsLog('SubscriptionScreen', 'restore start');
     setIsRestoring(true);
     try {
       const restored = await iapService.restore();
+      recordDiagnosticsLog('SubscriptionScreen', 'restore result', {
+        count: restored.length,
+      });
       if (restored.length === 0) {
         Alert.alert(t('subscription.restore.empty'));
         return;
       }
       await loadSubscription();
+      recordDiagnosticsLog('SubscriptionScreen', 'restore success');
       Alert.alert(t('subscription.restore.success'));
     } catch (err) {
       const cls = classifyIapError(err);
+      recordDiagnosticsLog('SubscriptionScreen', 'restore failed', {
+        kind: cls.kind,
+        i18nKey: cls.i18nKey,
+      });
       Alert.alert(t((cls.i18nKey ?? 'subscription.restore.failed') as never));
     } finally {
       setIsRestoring(false);
     }
   }, [t, loadSubscription]);
 
+  const handleUploadDiagnostics = useCallback(() => {
+    if (isUploadingDiagnostics) return;
+    recordDiagnosticsLog('SubscriptionScreen', 'diagnostics upload start');
+
+    void (async () => {
+      const { NativeSyncEngine } = NativeModules;
+      if (!NativeSyncEngine?.exportDiagnostics) {
+        recordDiagnosticsLog(
+          'SubscriptionScreen',
+          'diagnostics export unavailable',
+        );
+        Alert.alert(
+          t('subscription.diagnostics.unavailableTitle'),
+          t('subscription.diagnostics.unavailableBody'),
+        );
+        return;
+      }
+
+      const abortController = new AbortController();
+      diagnosticAbortRef.current = abortController;
+      setIsUploadingDiagnostics(true);
+
+      try {
+        const archivePath: string = await NativeSyncEngine.exportDiagnostics();
+        recordDiagnosticsLog(
+          'SubscriptionScreen',
+          'diagnostics export success',
+        );
+        const archiveUrl = archivePath.startsWith('file://')
+          ? archivePath
+          : `file://${archivePath}`;
+        const clientId = String(await NativeSyncEngine.getClientId());
+        const result = await diagnosticUploadService.upload(
+          archiveUrl,
+          clientId,
+          abortController.signal,
+          undefined,
+          'subscription-screen',
+        );
+
+        recordDiagnosticsLog(
+          'SubscriptionScreen',
+          'diagnostics upload success',
+          {
+            refId: result.refId,
+          },
+        );
+        Clipboard.setString(result.refId);
+        Alert.alert(
+          t('subscription.diagnostics.successTitle'),
+          t('subscription.diagnostics.successBody', {
+            refId: result.refId,
+          }),
+        );
+      } catch (error) {
+        recordDiagnosticsLog(
+          'SubscriptionScreen',
+          'diagnostics upload failed',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+        );
+        if (
+          error instanceof DiagnosticUploadError &&
+          error.detail.kind === 'BUNDLE_TOO_LARGE'
+        ) {
+          Alert.alert(t('subscription.diagnostics.tooLarge'));
+        } else if (
+          error instanceof DiagnosticUploadError &&
+          error.detail.kind === 'ABORTED'
+        ) {
+          Alert.alert(t('subscription.diagnostics.aborted'));
+        } else {
+          Alert.alert(t('subscription.diagnostics.failure'));
+        }
+      } finally {
+        diagnosticAbortRef.current = null;
+        setIsUploadingDiagnostics(false);
+      }
+    })();
+  }, [isUploadingDiagnostics, t]);
+
   const handleSubscribe = useCallback(async () => {
     if (!selectedEntry || selectedPlanTier == null) {
       // Catalog hasn't resolved yet, or selection couldn't map back to a
-      // backend tier (would only happen if the server registered a SKU
-      // outside the bootstrap product list). Bail rather than guessing.
+      // backend tier. Bail rather than guessing which entitlement to verify.
       return;
     }
     const targetProductId = selectedEntry.plan.product_id;
     const targetTier = selectedPlanTier;
+    recordDiagnosticsLog('SubscriptionScreen', 'subscribe start', {
+      productId: targetProductId,
+      targetTier,
+      currentPlan,
+    });
 
     if (
       (currentPlan != null && targetTier === currentPlan) ||
       isDowngradePlan(currentPlan, targetTier)
     ) {
+      recordDiagnosticsLog('SubscriptionScreen', 'subscribe blocked current', {
+        productId: targetProductId,
+        targetTier,
+        currentPlan,
+      });
       return;
     }
 
     if (!FEATURES.IAP_ENABLED) {
+      recordDiagnosticsLog(
+        'SubscriptionScreen',
+        'subscribe blocked iap disabled',
+      );
       Alert.alert(
         t('subscription.alert.devTitle'),
         t('subscription.alert.devBody'),
@@ -702,30 +842,53 @@ export function SubscriptionScreen() {
         const fresh = await getSubscriptionStatus();
         setSubscription(fresh);
         const freshPlan = resolveCurrentPlan(fresh);
+        recordDiagnosticsLog(
+          'SubscriptionScreen',
+          'subscribe preflight status',
+          {
+            status: fresh.status,
+            plan: fresh.plan,
+            freshPlan,
+          },
+        );
         if (
           (freshPlan != null && targetTier === freshPlan) ||
           isDowngradePlan(freshPlan, targetTier)
         ) {
+          recordDiagnosticsLog(
+            'SubscriptionScreen',
+            'subscribe blocked by preflight',
+            {
+              targetTier,
+              freshPlan,
+            },
+          );
           return;
         }
       } catch (err) {
+        recordDiagnosticsLog(
+          'SubscriptionScreen',
+          'subscribe preflight failed',
+          {
+            error: err instanceof Error ? err.message : String(err),
+          },
+        );
         console.warn('[subscription] preflight refresh failed', err);
       }
 
-      if (!isKnownIapProductId(targetProductId)) {
-        // Defensive: server returned a SKU we don't know how to verify.
-        // Hook already filters unknown SKUs from StoreKit lookup, but
-        // re-narrow here so iapService.purchase gets a typed productId.
-        console.warn(
-          '[subscription] cannot purchase unknown product_id',
-          targetProductId,
-        );
-        Alert.alert(t('subscription.errors.productMismatch'));
-        return;
-      }
       const receipt = await iapService.purchase(targetProductId);
+      recordDiagnosticsLog('SubscriptionScreen', 'purchase resolved', {
+        productId: receipt.productId,
+        hasReceipt: receipt.transactionReceipt.length > 0,
+        hasTransactionId: receipt.transactionId.length > 0,
+      });
       let receiptData = receipt.transactionReceipt;
       const isPlanSwitch = currentPlan != null && currentPlan !== targetTier;
+      const receiptProductMatchesSelection =
+        receipt.productId === targetProductId;
+      const shouldRefreshReceiptOnMismatch =
+        isPlanSwitch || !receiptProductMatchesSelection;
+      let refreshedAfterMismatch = false;
 
       // Retry verify twice (1s → 4s) before surfacing error — Apple already
       // charged, so we must try hard before handing retry to the user.
@@ -739,50 +902,196 @@ export function SubscriptionScreen() {
       let verifiedViaSilentSuccess = false;
       const delays = [0, 1_000, 4_000];
       let lastErr: unknown = null;
+      let refreshedAfterVerifyFailure = false;
+      let shouldPollAfterStaleMismatch = false;
       for (const delay of delays) {
-        if (delay > 0) await new Promise<void>(r => setTimeout(r, delay));
+        if (delay > 0) await wait(delay);
         try {
-          await verifyIapReceipt(receiptData, targetTier);
+          await verifyIapReceipt(
+            receiptData,
+            targetTier,
+            targetProductId,
+            receipt.transactionId,
+          );
           verified = true;
+          recordDiagnosticsLog('SubscriptionScreen', 'verify success', {
+            targetTier,
+            attempt: delay === 0 ? 1 : delay === 1_000 ? 2 : 3,
+          });
           break;
         } catch (err) {
           const cls = classifyIapError(err);
+          recordDiagnosticsLog('SubscriptionScreen', 'verify attempt failed', {
+            targetTier,
+            kind: cls.kind,
+            i18nKey: cls.i18nKey,
+          });
           if (cls.kind === IapErrorClass.SilentSuccess) {
             verified = true;
             verifiedViaSilentSuccess = true;
+            recordDiagnosticsLog(
+              'SubscriptionScreen',
+              'verify silent success',
+              {
+                targetTier,
+              },
+            );
             break;
           }
           if (cls.kind === IapErrorClass.FatalMismatch) {
-            if (isPlanSwitch) {
+            const isProductIdMismatch =
+              typeof err === 'object' &&
+              err !== null &&
+              'code' in err &&
+              (err as { code?: unknown }).code ===
+                ERROR_CODE.PRODUCT_ID_MISMATCH;
+            if (shouldRefreshReceiptOnMismatch && !refreshedAfterMismatch) {
               // StoreKit can briefly expose the previous subscription-group
-              // receipt after a plan switch. Refresh once before treating the
-              // backend mismatch as a real product configuration error.
+              // receipt after a plan switch or return the old SKU in the
+              // purchase event even after the user selected a new SKU. Refresh
+              // once before treating the backend mismatch as a real product
+              // configuration error.
+              refreshedAfterMismatch = true;
               const refreshedReceipt = await iapService.refreshReceipt();
               if (refreshedReceipt) {
+                recordDiagnosticsLog(
+                  'SubscriptionScreen',
+                  'verify mismatch refreshed receipt',
+                  {
+                    targetTier,
+                    targetProductId,
+                    receiptProductId: receipt.productId,
+                    isPlanSwitch,
+                    receiptProductMatchesSelection,
+                  },
+                );
                 receiptData = refreshedReceipt;
                 lastErr = err;
                 continue;
               }
             }
+            if (shouldRefreshReceiptOnMismatch && isProductIdMismatch) {
+              shouldPollAfterStaleMismatch = true;
+              lastErr = err;
+              recordDiagnosticsLog(
+                'SubscriptionScreen',
+                'verify product mismatch deferred polling',
+                {
+                  targetTier,
+                  targetProductId,
+                  receiptProductId: receipt.productId,
+                  isPlanSwitch,
+                  receiptProductMatchesSelection,
+                },
+              );
+              break;
+            }
             await iapService.finishTransaction(receipt.transactionId);
+            recordDiagnosticsLog(
+              'SubscriptionScreen',
+              'verify fatal mismatch',
+              {
+                targetTier,
+                isPlanSwitch,
+                receiptProductMatchesSelection,
+              },
+            );
             // cls.i18nKey is always a valid translation key for FatalMismatch
             if (cls.i18nKey) Alert.alert(t(cls.i18nKey as never));
             return;
+          }
+          const isIapVerifyFailed =
+            typeof err === 'object' &&
+            err !== null &&
+            'code' in err &&
+            (err as { code?: unknown }).code === ERROR_CODE.IAP_VERIFY_FAILED;
+          if (isIapVerifyFailed && !refreshedAfterVerifyFailure) {
+            refreshedAfterVerifyFailure = true;
+            const refreshedReceipt = await iapService.refreshReceipt();
+            if (refreshedReceipt) {
+              recordDiagnosticsLog(
+                'SubscriptionScreen',
+                'verify failure refreshed receipt',
+                {
+                  targetTier,
+                  targetProductId,
+                  receiptProductId: receipt.productId,
+                },
+              );
+              receiptData = refreshedReceipt;
+              lastErr = err;
+              continue;
+            }
           }
           lastErr = err;
           // Retryable / network — loop continues.
         }
       }
 
+      let fresh: SubscriptionInfo | null = null;
       if (!verified) {
         const cls = classifyIapError(lastErr);
-        if (cls.kind === IapErrorClass.FatalMismatch) {
-          await iapService.finishTransaction(receipt.transactionId);
+        recordDiagnosticsLog('SubscriptionScreen', 'verify exhausted', {
+          targetTier,
+          kind: cls.kind,
+          i18nKey: cls.i18nKey,
+        });
+        if (
+          cls.kind === IapErrorClass.Retryable ||
+          shouldPollAfterStaleMismatch
+        ) {
+          for (const delay of POST_VERIFY_STATUS_POLL_DELAYS_MS) {
+            await wait(delay);
+            try {
+              const candidate = await loadSubscription();
+              recordDiagnosticsLog(
+                'SubscriptionScreen',
+                'post-verify poll status',
+                {
+                  targetTier,
+                  status: candidate.status,
+                  plan: candidate.plan,
+                },
+              );
+              if (
+                candidate.status === 'subscribed' &&
+                candidate.plan === targetTier
+              ) {
+                fresh = candidate;
+                verified = true;
+                recordDiagnosticsLog(
+                  'SubscriptionScreen',
+                  'post-verify poll recovered',
+                  {
+                    targetTier,
+                  },
+                );
+                break;
+              }
+            } catch {
+              recordDiagnosticsLog(
+                'SubscriptionScreen',
+                'post-verify poll failed',
+                {
+                  targetTier,
+                },
+              );
+            }
+          }
         }
-        Alert.alert(
-          t((cls.i18nKey ?? 'subscription.errors.verifyRetrying') as never),
-        );
-        return;
+        if (!verified) {
+          if (shouldPollAfterStaleMismatch) {
+            Alert.alert(t('subscription.errors.verifyRetrying'));
+            return;
+          }
+          if (cls.kind === IapErrorClass.FatalMismatch) {
+            await iapService.finishTransaction(receipt.transactionId);
+          }
+          Alert.alert(
+            t((cls.i18nKey ?? 'subscription.errors.verifyRetrying') as never),
+          );
+          return;
+        }
       }
 
       // loadSubscription returns the freshly-fetched snapshot so we can
@@ -790,20 +1099,30 @@ export function SubscriptionScreen() {
       // React to re-render with the new context value. If the backend hasn't
       // yet reflected the upgraded plan, expireAt may still be the previous
       // period — acceptable degradation vs. hiding the date entirely.
-      let fresh: typeof subscription = null;
-      try {
-        fresh = await loadSubscription();
-        if (
-          fresh &&
-          isPlanSwitch &&
-          fresh.plan !== targetTier &&
-          (fresh.status === 'subscribed' || fresh.status === 'trialing')
-        ) {
-          fresh = { ...fresh, plan: targetTier };
-          setSubscription(fresh);
+      if (fresh == null) {
+        try {
+          fresh = await loadSubscription();
+          recordDiagnosticsLog(
+            'SubscriptionScreen',
+            'post-verify load success',
+            {
+              status: fresh?.status,
+              plan: fresh?.plan,
+            },
+          );
+          if (
+            fresh &&
+            isPlanSwitch &&
+            fresh.plan !== targetTier &&
+            (fresh.status === 'subscribed' || fresh.status === 'trialing')
+          ) {
+            fresh = { ...fresh, plan: targetTier };
+            setSubscription(fresh);
+          }
+        } catch {
+          recordDiagnosticsLog('SubscriptionScreen', 'post-verify load failed');
+          // Fall through — modal will just hide the expiry line.
         }
-      } catch {
-        // Fall through — modal will just hide the expiry line.
       }
 
       // When `verified` came from a 2002 silent-success AND the server's
@@ -826,6 +1145,9 @@ export function SubscriptionScreen() {
         await iapService
           .finishTransaction(receipt.transactionId)
           .catch(() => {});
+        recordDiagnosticsLog('SubscriptionScreen', 'silent success rejected', {
+          targetTier,
+        });
         return;
       }
 
@@ -834,8 +1156,16 @@ export function SubscriptionScreen() {
       setConfirmedProductId(targetProductId);
       setConfirmedExpireAt(fresh?.expireAt ?? null);
       setShowPaymentSuccess(true);
+      recordDiagnosticsLog('SubscriptionScreen', 'subscribe success', {
+        productId: targetProductId,
+        targetTier,
+      });
     } catch (err) {
       const cls = classifyIapError(err);
+      recordDiagnosticsLog('SubscriptionScreen', 'subscribe failed', {
+        kind: cls.kind,
+        i18nKey: cls.i18nKey,
+      });
       if (cls.kind === IapErrorClass.Cancelled) {
         return; // silent
       }
@@ -985,8 +1315,8 @@ export function SubscriptionScreen() {
     currentPlan === 'yearly'
       ? t('subscription.actions.currentYearly')
       : currentPlan && selectedPlanTier && selectedPlanTier !== currentPlan
-      ? t('subscription.actions.switchPlan')
-      : t('subscription.actions.subscribe');
+        ? t('subscription.actions.switchPlan')
+        : t('subscription.actions.subscribe');
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -1008,6 +1338,20 @@ export function SubscriptionScreen() {
           </TouchableOpacity>
         ) : null}
         <Text style={styles.headerTitle}>{t('subscription.title')}</Text>
+        <TouchableOpacity
+          style={styles.diagnosticsButton}
+          activeOpacity={0.7}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          onPress={handleUploadDiagnostics}
+          disabled={isUploadingDiagnostics || isLoggingOut}
+          accessibilityLabel={t('subscription.diagnostics.button')}
+        >
+          {isUploadingDiagnostics ? (
+            <ActivityIndicator size="small" color={DARK} />
+          ) : (
+            <Icon name="cloud-upload-outline" size={20} color={DARK} />
+          )}
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -1042,7 +1386,7 @@ export function SubscriptionScreen() {
             const product = entry.product;
             // entry.product is non-null here — `plans` filtered out null
             // products above. Cast keeps TS happy without an extra guard.
-            const tier = productIdToPlan(entry.plan.product_id);
+            const tier = resolveSubscriptionPlanTier(entry.plan);
             const cardIsCurrent = tier != null && currentPlan === tier;
             const cardIsDowngrade =
               tier != null && isDowngradePlan(currentPlan, tier);
@@ -1184,9 +1528,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
+    flex: 1,
     fontSize: 18,
     fontWeight: 'bold',
     color: '#32475b',
+  },
+  diagnosticsButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollContent: {
     paddingHorizontal: 16,

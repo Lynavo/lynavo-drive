@@ -1,5 +1,10 @@
 {
   "title": "Sync Activity",
+  "header": {
+    "help": "Help",
+    "history": "Sync History",
+    "settings": "Settings"
+  },
   "phases": {
     "discoveringTitle": "Searching for your computer...",
     "reconcilingTitle": "Syncing history...",
@@ -98,6 +103,32 @@
     "subtitle": "Subscribe to continue using photo upload, auto upload, and shared file access.",
     "subscribeCta": "Subscribe Now",
     "viewHelp": "View Help"
+  },
+  "onboarding": {
+    "skip": "Skip guide",
+    "previous": "Back",
+    "next": "Next {{step}}/{{total}}",
+    "startJourney": "Start Journey",
+    "manual": {
+      "title": "Manual Sync",
+      "body": "Send media to your computer from here. Open the album, choose photos or videos, and submit them to the transfer queue."
+    },
+    "panel": {
+      "title": "Hands-free Backup",
+      "body": "This panel shows live auto-upload progress. Enable background auto upload so new media syncs to your computer."
+    },
+    "history": {
+      "title": "Transfer History",
+      "body": "Review completed transfers, including transfer time, file size, and destination path."
+    },
+    "settings": {
+      "title": "Global Settings",
+      "body": "Check the connected device and subscription status, edit the phone display name, or get technical support."
+    },
+    "help": {
+      "title": "Help Center",
+      "body": "Need help? Tap here anytime to open the quick start guide or contact support."
+    }
   },
   "dialogs": {
     "syncError": {

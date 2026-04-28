@@ -25,7 +25,31 @@ jest.mock('react-native-video', () => 'Video');
 
 jest.mock('react-i18next', () => jest.requireActual('react-i18next'));
 
+const mockAsyncStorageValues = new Map<string, string>();
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  __esModule: true,
+  default: {
+    getItem: jest.fn((key: string) =>
+      Promise.resolve(mockAsyncStorageValues.get(key) ?? null),
+    ),
+    setItem: jest.fn((key: string, value: string) => {
+      mockAsyncStorageValues.set(key, value);
+      return Promise.resolve();
+    }),
+    removeItem: jest.fn((key: string) => {
+      mockAsyncStorageValues.delete(key);
+      return Promise.resolve();
+    }),
+  },
+}));
+
 import i18n from '../../i18n';
+import {
+  clearAutoUploadSessionForTest,
+  clearRememberedAutoUploadRoundProgressForTest,
+  rememberAutoUploadRoundProgress,
+  setAutoUploadSessionBaselineForTest,
+} from '../../utils/autoUploadRoundProgress';
 import { AlbumWorkbenchScreen } from '../AlbumWorkbenchScreen';
 
 function flattenTextChildren(value: unknown): Array<string | number> {
@@ -171,7 +195,10 @@ describe('AlbumWorkbenchScreen', () => {
     });
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    mockAsyncStorageValues.clear();
+    await clearAutoUploadSessionForTest();
+    clearRememberedAutoUploadRoundProgressForTest();
     jest.restoreAllMocks();
     jest.spyOn(Animated, 'loop').mockReturnValue({
       start: jest.fn(),
@@ -185,6 +212,7 @@ describe('AlbumWorkbenchScreen', () => {
       NativeSyncEngine?: {
         getBindingState: jest.Mock;
         getSyncOverview: jest.Mock;
+        getAlbumStats: jest.Mock;
         triggerSync: jest.Mock;
         addListener: jest.Mock;
         removeListeners: jest.Mock;
@@ -193,6 +221,7 @@ describe('AlbumWorkbenchScreen', () => {
     nativeModules.NativeSyncEngine = {
       getBindingState: jest.fn(),
       getSyncOverview: jest.fn(),
+      getAlbumStats: jest.fn(),
       triggerSync: jest.fn(),
       addListener: jest.fn(),
       removeListeners: jest.fn(),
@@ -200,6 +229,12 @@ describe('AlbumWorkbenchScreen', () => {
 
     mockedBrowseAlbum.mockResolvedValue([]);
     mockedGetAlbumStats.mockResolvedValue({
+      totalCount: 12,
+      transferredCount: 0,
+      queuedCount: 0,
+      pendingCount: 12,
+    });
+    nativeModules.NativeSyncEngine.getAlbumStats.mockResolvedValue({
       totalCount: 12,
       transferredCount: 0,
       queuedCount: 0,
@@ -1150,5 +1185,175 @@ describe('AlbumWorkbenchScreen', () => {
         .flatMap(node => flattenTextChildren(node.props.children)),
     ).toContain(0);
     expect(allTextValues).not.toContain(8);
+  });
+
+  it('keeps active auto upload round progress when entering album mid-round', async () => {
+    const nativeModules = NativeModules as typeof NativeModules & {
+      NativeSyncEngine?: {
+        getSyncOverview: jest.Mock;
+      };
+    };
+    nativeModules.NativeSyncEngine?.getSyncOverview.mockResolvedValue({
+      uploadState: 'uploading',
+      completedCount: 3,
+      totalCount: 7,
+      roundBaselineCompletedCount: 0,
+      currentTaskSource: 'auto',
+      autoUploadState: 'active',
+      autoPending: 4,
+    });
+    mockedBrowseAlbum.mockResolvedValue([]);
+    mockedGetAlbumStats.mockResolvedValue({
+      totalCount: 28,
+      transferredCount: 3,
+      queuedCount: 4,
+      pendingCount: 25,
+    });
+    mockedGetAutoUploadConfig.mockResolvedValue({
+      enabled: true,
+      state: 'active',
+      timeRangeMode: 'custom',
+      customTimeFrom: '2026-04-27T09:00:00.000Z',
+    });
+
+    let tree: ReactTestRenderer.ReactTestRenderer | undefined;
+    await ReactTestRenderer.act(async () => {
+      tree = createAlbumWorkbenchScreen();
+    });
+    await ReactTestRenderer.act(async () => {
+      await Promise.resolve();
+    });
+
+    const transferredSummaryItem = tree!.root.findAllByType(View).find(node => {
+      const itemTextValues = node
+        .findAllByType(Text)
+        .flatMap(text => flattenTextChildren(text.props.children));
+      return itemTextValues.includes('本次已传');
+    });
+
+    expect(transferredSummaryItem).toBeDefined();
+    expect(
+      transferredSummaryItem!
+        .findAllByType(Text)
+        .flatMap(node => flattenTextChildren(node.props.children)),
+    ).toContain(3);
+  });
+
+  it('infers auto upload session baseline from native round progress when no persisted baseline exists', async () => {
+    const nativeModules = NativeModules as typeof NativeModules & {
+      NativeSyncEngine?: {
+        getSyncOverview: jest.Mock;
+        getAlbumStats: jest.Mock;
+      };
+    };
+    nativeModules.NativeSyncEngine?.getSyncOverview.mockResolvedValue({
+      uploadState: 'uploading',
+      completedCount: 59,
+      totalCount: 59,
+      roundBaselineCompletedCount: 58,
+      currentTaskSource: 'auto',
+      autoUploadState: 'active',
+      autoPending: 0,
+    });
+    nativeModules.NativeSyncEngine?.getAlbumStats.mockResolvedValue({
+      totalCount: 59,
+      transferredCount: 59,
+      queuedCount: 0,
+      pendingCount: 0,
+    });
+    mockedBrowseAlbum.mockResolvedValue([]);
+    mockedGetAlbumStats.mockResolvedValue({
+      totalCount: 59,
+      transferredCount: 59,
+      queuedCount: 0,
+      pendingCount: 0,
+    });
+    mockedGetAutoUploadConfig.mockResolvedValue({
+      enabled: true,
+      state: 'active',
+      timeRangeMode: 'custom',
+      customTimeFrom: '2026-04-27T09:00:00.000Z',
+    });
+
+    let tree: ReactTestRenderer.ReactTestRenderer | undefined;
+    await ReactTestRenderer.act(async () => {
+      tree = createAlbumWorkbenchScreen();
+    });
+    await ReactTestRenderer.act(async () => {
+      await Promise.resolve();
+    });
+
+    const transferredSummaryItem = tree!.root.findAllByType(View).find(node => {
+      const itemTextValues = node
+        .findAllByType(Text)
+        .flatMap(text => flattenTextChildren(text.props.children));
+      return itemTextValues.includes('本次已传');
+    });
+
+    expect(transferredSummaryItem).toBeDefined();
+    expect(
+      transferredSummaryItem!
+        .findAllByType(Text)
+        .flatMap(node => flattenTextChildren(node.props.children)),
+    ).toContain(1);
+  });
+
+  it('keeps the last completed auto round after native settles back to idle', async () => {
+    await setAutoUploadSessionBaselineForTest(45);
+    const nativeModules = NativeModules as typeof NativeModules & {
+      NativeSyncEngine?: {
+        getSyncOverview: jest.Mock;
+        getAlbumStats: jest.Mock;
+      };
+    };
+    nativeModules.NativeSyncEngine?.getSyncOverview.mockResolvedValue({
+      uploadState: 'idle',
+      completedCount: 0,
+      totalCount: 0,
+      currentTaskSource: null,
+      autoUploadState: 'active',
+      autoPending: 0,
+    });
+    nativeModules.NativeSyncEngine?.getAlbumStats.mockResolvedValue({
+      totalCount: 47,
+      transferredCount: 47,
+      queuedCount: 0,
+      pendingCount: 0,
+    });
+    mockedBrowseAlbum.mockResolvedValue([]);
+    mockedGetAlbumStats.mockResolvedValue({
+      totalCount: 47,
+      transferredCount: 47,
+      queuedCount: 0,
+      pendingCount: 0,
+    });
+    mockedGetAutoUploadConfig.mockResolvedValue({
+      enabled: true,
+      state: 'active',
+      timeRangeMode: 'custom',
+      customTimeFrom: '2026-04-27T09:00:00.000Z',
+    });
+
+    let tree: ReactTestRenderer.ReactTestRenderer | undefined;
+    await ReactTestRenderer.act(async () => {
+      tree = createAlbumWorkbenchScreen();
+    });
+    await ReactTestRenderer.act(async () => {
+      await Promise.resolve();
+    });
+
+    const transferredSummaryItem = tree!.root.findAllByType(View).find(node => {
+      const itemTextValues = node
+        .findAllByType(Text)
+        .flatMap(text => flattenTextChildren(text.props.children));
+      return itemTextValues.includes('本次已传');
+    });
+
+    expect(transferredSummaryItem).toBeDefined();
+    expect(
+      transferredSummaryItem!
+        .findAllByType(Text)
+        .flatMap(node => flattenTextChildren(node.props.children)),
+    ).toContain(2);
   });
 });

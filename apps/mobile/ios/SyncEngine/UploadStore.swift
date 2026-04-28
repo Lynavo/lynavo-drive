@@ -214,7 +214,7 @@ class UploadStore {
               id                INTEGER PRIMARY KEY CHECK (id = 1),
               enabled           INTEGER NOT NULL DEFAULT 0,
               media_filter      TEXT NOT NULL DEFAULT 'all',
-              time_range_mode   TEXT NOT NULL DEFAULT 'from_now',
+              time_range_mode   TEXT NOT NULL DEFAULT 'all',
               custom_time_from  TEXT,
               state             TEXT NOT NULL DEFAULT 'disabled',
               updated_at        TEXT NOT NULL DEFAULT ''

@@ -55,7 +55,7 @@
     "button": "Upload diagnostics",
     "confirm": {
       "title": "Upload diagnostics",
-      "message": "This will bundle current runtime state and upload to the Vivi Drop support team. Continue?",
+      "message": "Briefly describe the issue you ran into (e.g. upload stuck, shared folder not loading). We'll bundle current runtime state along with your note and send it to the Vivi Drop support team.",
       "ok": "Continue",
       "cancel": "Cancel"
     },

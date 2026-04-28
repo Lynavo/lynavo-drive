@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type {
   SubscriptionPlanDto,
   SubscriptionPlanPlatform,
+  SubscriptionPlanTier,
   SubscriptionPlansResponse,
 } from '@syncflow/contracts';
 import { apiGet, ApiError } from './api';
@@ -18,10 +19,16 @@ const MEMORY_CACHE_TTL_MS = 60_000;
 const BOOTSTRAP_MEMORY_CACHE_TTL_MS = 5_000;
 
 export type SubscriptionPlansSource = 'network' | 'cache' | 'bootstrap';
+export type CatalogSubscriptionPlan = SubscriptionPlanDto;
 
 export interface SubscriptionPlansResult {
-  plans: SubscriptionPlanDto[];
+  plans: CatalogSubscriptionPlan[];
   source: SubscriptionPlansSource;
+}
+
+export interface SubscriptionProductPlan {
+  productId: string;
+  plan: SubscriptionPlanTier;
 }
 
 export interface SubscriptionPlansService {
@@ -47,7 +54,7 @@ const inFlightFetches = new Map<
 
 interface PlansCacheEnvelope {
   platform: SubscriptionPlanPlatform;
-  plans: SubscriptionPlanDto[];
+  plans: CatalogSubscriptionPlan[];
   /** ISO 8601 timestamp of when the network response was cached. Currently
    *  informational only — we do not TTL the cache because the bootstrap
    *  fallback already protects the UI on truly stale data. */
@@ -58,12 +65,13 @@ function isPlatform(value: unknown): value is SubscriptionPlanPlatform {
   return value === 'ios' || value === 'android';
 }
 
-function isPlanShape(value: unknown): value is SubscriptionPlanDto {
+function isPlanShape(value: unknown): value is CatalogSubscriptionPlan {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
   return (
     typeof v.id === 'number' &&
     typeof v.product_id === 'string' &&
+    isSubscriptionPlanTier(v.plan) &&
     isPlatform(v.platform) &&
     typeof v.name === 'string' &&
     typeof v.description === 'string' &&
@@ -75,6 +83,16 @@ function isPlanShape(value: unknown): value is SubscriptionPlanDto {
     typeof v.created_at === 'string' &&
     typeof v.updated_at === 'string'
   );
+}
+
+function isSubscriptionPlanTier(value: unknown): value is SubscriptionPlanTier {
+  return value === 'monthly' || value === 'yearly';
+}
+
+export function resolveSubscriptionPlanTier(
+  plan: SubscriptionPlanDto,
+): SubscriptionPlanTier | null {
+  return isSubscriptionPlanTier(plan.plan) ? plan.plan : null;
 }
 
 function parseCache(raw: string | null): PlansCacheEnvelope | null {
@@ -100,7 +118,7 @@ function parseCache(raw: string | null): PlansCacheEnvelope | null {
 
 async function readCache(
   platform: SubscriptionPlanPlatform,
-): Promise<SubscriptionPlanDto[] | null> {
+): Promise<CatalogSubscriptionPlan[] | null> {
   try {
     const raw = await AsyncStorage.getItem(CACHE_KEY);
     const env = parseCache(raw);
@@ -115,7 +133,7 @@ async function readCache(
 
 async function writeCache(
   platform: SubscriptionPlanPlatform,
-  plans: SubscriptionPlanDto[],
+  plans: CatalogSubscriptionPlan[],
 ): Promise<void> {
   const envelope: PlansCacheEnvelope = {
     platform,
@@ -154,13 +172,14 @@ async function writeCache(
  */
 export function buildBootstrapPlans(
   platform: SubscriptionPlanPlatform,
-): SubscriptionPlanDto[] {
+): CatalogSubscriptionPlan[] {
   const epoch = new Date(0).toISOString();
   const allowedSkus: ReadonlySet<string> = new Set(ALL_PRODUCT_IDS);
-  const candidates: SubscriptionPlanDto[] = [
+  const candidates: CatalogSubscriptionPlan[] = [
     {
       id: 1,
       product_id: IAP_PRODUCTS.monthly,
+      plan: 'monthly',
       platform,
       name: '月付试水',
       description: '按月计费，随时取消',
@@ -174,6 +193,7 @@ export function buildBootstrapPlans(
     {
       id: 3,
       product_id: IAP_PRODUCTS.yearlyPromo,
+      plan: 'yearly',
       platform,
       name: '限时年费',
       description: '新用户限时优惠价',
@@ -324,3 +344,26 @@ class SubscriptionPlansServiceImpl implements SubscriptionPlansService {
 
 export const subscriptionPlansService: SubscriptionPlansService =
   new SubscriptionPlansServiceImpl();
+
+export async function getSubscriptionProductPlans(
+  platform: SubscriptionPlanPlatform = 'ios',
+): Promise<SubscriptionProductPlan[]> {
+  const catalog = await subscriptionPlansService.fetchPlans(platform);
+  return catalog.plans
+    .filter(plan => plan.active)
+    .map(plan => {
+      const tier = resolveSubscriptionPlanTier(plan);
+      return tier ? { productId: plan.product_id, plan: tier } : null;
+    })
+    .filter((entry): entry is SubscriptionProductPlan => entry != null);
+}
+
+export async function resolveSubscriptionProductPlan(
+  productId: string,
+  platform: SubscriptionPlanPlatform = 'ios',
+): Promise<SubscriptionPlanTier | null> {
+  const productPlans = await getSubscriptionProductPlans(platform);
+  return (
+    productPlans.find(entry => entry.productId === productId)?.plan ?? null
+  );
+}

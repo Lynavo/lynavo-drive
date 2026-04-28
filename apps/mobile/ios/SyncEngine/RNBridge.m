@@ -16,6 +16,7 @@ RCT_EXTERN_METHOD(getReadOnlyQueue:(RCTPromiseResolveBlock)resolve reject:(RCTPr
 RCT_EXTERN_METHOD(getHistoryDays:(id)cursor resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(getAppInfo:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(exportDiagnostics:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(recordDiagnosticsLog:(NSString *)category message:(NSString *)message)
 RCT_EXTERN_METHOD(uploadDiagnosticsArchive:(NSDictionary *)params resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(getClientDisplayName:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(getClientId:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)

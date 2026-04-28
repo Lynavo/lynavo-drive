@@ -61,11 +61,11 @@ export function SmsVerifyScreen() {
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const codeBoxSize = Math.min(
     48,
-    Math.floor((windowWidth - 24 * 2 - 22 * 2 - 10 * (CODE_LENGTH - 1)) / CODE_LENGTH),
+    Math.floor((windowWidth - 24 * 2 - 24 * 2 - 8 * (CODE_LENGTH - 1)) / CODE_LENGTH),
   );
   const resolvedCodeBoxSize = Math.max(40, codeBoxSize);
   const codeBoxRadius = Math.max(14, Math.floor(resolvedCodeBoxSize * 0.3));
-  const codeDigitSize = Math.max(22, Math.floor(resolvedCodeBoxSize * 0.5));
+  const codeDigitSize = Math.max(18, Math.floor(resolvedCodeBoxSize * 0.42));
 
   // -----------------------------------------------------------------------
   // Countdown timer
@@ -367,24 +367,24 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: AUTH_COLORS.surface,
-    borderRadius: 34,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: AUTH_COLORS.surfaceBorder,
-    paddingHorizontal: 22,
+    paddingHorizontal: 24,
     paddingTop: 28,
-    paddingBottom: 24,
-    shadowColor: '#66a9ff',
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.14,
-    shadowRadius: 30,
-    elevation: 10,
+    paddingBottom: 28,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
+    elevation: 4,
   },
   prompt: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '500',
     color: AUTH_COLORS.textFaint,
     textAlign: 'center',
-    marginBottom: 28,
+    marginBottom: 24,
   },
   hiddenInput: {
     position: 'absolute',
@@ -398,17 +398,17 @@ const styles = StyleSheet.create({
   },
   codePressArea: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
     justifyContent: 'center',
   },
   codeBox: {
-    borderWidth: 1.5,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   codeBoxEmpty: {
-    borderColor: '#d8dee7',
-    backgroundColor: '#fbfdff',
+    borderColor: 'rgba(0,0,0,0.08)',
+    backgroundColor: AUTH_COLORS.inputBackground,
   },
   codeBoxFilled: {
     borderColor: AUTH_COLORS.inputBorderStrong,
@@ -417,10 +417,10 @@ const styles = StyleSheet.create({
   codeBoxActive: {
     borderColor: AUTH_COLORS.primary,
     shadowColor: AUTH_COLORS.primary,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 2,
   },
   codeBoxError: {
     borderColor: AUTH_COLORS.danger,
@@ -440,7 +440,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   statusText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: AUTH_COLORS.primary,
   },
@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
   },
   resendRow: {
     alignItems: 'center',
-    marginTop: 28,
+    marginTop: 24,
   },
   countdownText: {
     fontSize: 14,

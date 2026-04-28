@@ -1,5 +1,15 @@
 {
   "title": "會員訂閱",
+  "diagnostics": {
+    "button": "上傳日誌",
+    "unavailableTitle": "無法上傳日誌",
+    "unavailableBody": "目前版本暫不支援匯出診斷包。",
+    "successTitle": "日誌已上傳",
+    "successBody": "追蹤編號 {{refId}} 已複製，可提供給客服排查訂閱問題。",
+    "tooLarge": "診斷包太大，請稍後再試或聯絡客服。",
+    "aborted": "已取消上傳",
+    "failure": "日誌上傳失敗，請稍後再試"
+  },
   "hero": {
     "title": "解鎖完整版",
     "subtitle": "7 天免費體驗，到期後訂閱繼續使用全部功能。"

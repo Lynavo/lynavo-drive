@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * "already shown today" suppression.
  */
 const REMINDER_KEY_PREFIX = '@vividrop/reminder-shown/';
+const AUTO_UPLOAD_SESSION_KEY = '@vividrop/auto-upload-session/v1';
 
 /**
  * Remove every AsyncStorage entry that is scoped to the currently-signed-in
@@ -30,7 +31,10 @@ const REMINDER_KEY_PREFIX = '@vividrop/reminder-shown/';
  */
 export async function clearUserScopedStorage(): Promise<void> {
   const keys = await AsyncStorage.getAllKeys();
-  const toRemove = keys.filter((key) => key.startsWith(REMINDER_KEY_PREFIX));
+  const toRemove = keys.filter(
+    key =>
+      key.startsWith(REMINDER_KEY_PREFIX) || key === AUTO_UPLOAD_SESSION_KEY,
+  );
   if (toRemove.length === 0) {
     return;
   }

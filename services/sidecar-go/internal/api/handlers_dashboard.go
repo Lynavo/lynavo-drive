@@ -17,6 +17,12 @@ type dashboardExistingFileStats struct {
 	TotalBytes int64
 }
 
+type dashboardLatestFileStats struct {
+	Date       string
+	FileCount  int
+	TotalBytes int64
+}
+
 func (s *Server) handleDashboardSummary(w http.ResponseWriter, _ *http.Request) {
 	if !s.ensureStorageDirsForRequest(w, "dashboard.summary") {
 		return
@@ -72,20 +78,23 @@ func (s *Server) handleDashboardDevices(w http.ResponseWriter, _ *http.Request) 
 
 	// Transform to DashboardDeviceDTO shape expected by desktop renderer
 	type deviceDTO struct {
-		DeviceID       string `json:"deviceId"`
-		ClientName     string `json:"clientName"`
-		DisplayName    string `json:"displayName"`
-		DeviceAlias    string `json:"deviceAlias,omitempty"`
-		ReceiveDirName string `json:"receiveDirName,omitempty"`
-		Platform       string `json:"platform"`
-		IP             string `json:"ip"`
-		Status         string `json:"status"`
-		TodayFileCount int    `json:"todayFileCount"`
-		TodayBytes     int64  `json:"todayBytes"`
-		StorageLeft    string `json:"storageLeft"`
-		StoragePath    string `json:"storagePath"`
-		DevicePath     string `json:"devicePath"`
-		CurrentFile    *struct {
+		DeviceID        string `json:"deviceId"`
+		ClientName      string `json:"clientName"`
+		DisplayName     string `json:"displayName"`
+		DeviceAlias     string `json:"deviceAlias,omitempty"`
+		ReceiveDirName  string `json:"receiveDirName,omitempty"`
+		Platform        string `json:"platform"`
+		IP              string `json:"ip"`
+		Status          string `json:"status"`
+		TodayFileCount  int    `json:"todayFileCount"`
+		TodayBytes      int64  `json:"todayBytes"`
+		LatestDate      string `json:"latestDate,omitempty"`
+		LatestFileCount int    `json:"latestFileCount,omitempty"`
+		LatestBytes     int64  `json:"latestBytes,omitempty"`
+		StorageLeft     string `json:"storageLeft"`
+		StoragePath     string `json:"storagePath"`
+		DevicePath      string `json:"devicePath"`
+		CurrentFile     *struct {
 			Filename string  `json:"filename"`
 			Progress float64 `json:"progress"`
 			FileSize int64   `json:"fileSize"`
@@ -147,6 +156,14 @@ func (s *Server) handleDashboardDevices(w http.ResponseWriter, _ *http.Request) 
 		} else {
 			dto.TodayFileCount = stats.FileCount
 			dto.TodayBytes = stats.TotalBytes
+			latestStats, err := s.dashboardLatestExistingFileStatsForDevice(d.ClientID, today, stats)
+			if err != nil {
+				slog.Warn("get dashboard latest device stats", "err", err, "clientID", d.ClientID)
+			} else if latestStats.Date != "" {
+				dto.LatestDate = latestStats.Date
+				dto.LatestFileCount = latestStats.FileCount
+				dto.LatestBytes = latestStats.TotalBytes
+			}
 		}
 		// Phase 5 observability: expose alias & dir name for diagnostics
 		if d.DeviceAlias != nil {
@@ -229,6 +246,42 @@ func (s *Server) dashboardExistingFileStatsForDevice(deviceID, today string) (da
 		FileCount:  fsUploads.TotalItems,
 		TotalBytes: fsUploads.TotalBytes,
 	}, nil
+}
+
+func (s *Server) dashboardLatestExistingFileStatsForDevice(
+	deviceID, today string,
+	todayStats dashboardExistingFileStats,
+) (dashboardLatestFileStats, error) {
+	dates, err := s.store.GetAvailableDates(deviceID)
+	if err != nil {
+		return dashboardLatestFileStats{}, err
+	}
+
+	fsDates, err := s.filesystemDates(deviceID)
+	if err != nil {
+		return dashboardLatestFileStats{}, err
+	}
+	dates = mergeDateKeys(dates, fsDates)
+
+	for _, date := range dates {
+		stats := todayStats
+		if date != today {
+			stats, err = s.dashboardExistingFileStatsForDevice(deviceID, date)
+			if err != nil {
+				return dashboardLatestFileStats{}, err
+			}
+		}
+		if stats.FileCount <= 0 {
+			continue
+		}
+		return dashboardLatestFileStats{
+			Date:       date,
+			FileCount:  stats.FileCount,
+			TotalBytes: stats.TotalBytes,
+		}, nil
+	}
+
+	return dashboardLatestFileStats{}, nil
 }
 
 func formatBytesHuman(b uint64) string {

@@ -32,6 +32,7 @@ interface NativeDiagnosticsUploadModule {
     url: string;
     archivePath: string;
     client_id: string;
+    note?: string;
     headers: Record<string, string>;
   }) => Promise<{ ref_id: string; uploaded_at: string }>;
 }
@@ -44,31 +45,41 @@ function buildMultipartBundle(
   zipBlob: Blob,
   clientId: string,
   filename: string,
+  note: string,
 ): { body: Blob; contentType: string } {
   const boundary = `syncflow-${Date.now()}-${Math.random()
     .toString(36)
     .slice(2)}`;
-  const body = new Blob(
-    [
+  const parts: Array<string | Blob> = [
+    `--${boundary}\r\n`,
+    'Content-Disposition: form-data; name="client_id"',
+    '\r\n\r\n',
+    clientId,
+    '\r\n',
+  ];
+  if (note) {
+    parts.push(
       `--${boundary}\r\n`,
-      'Content-Disposition: form-data; name="client_id"',
+      'Content-Disposition: form-data; name="note"',
       '\r\n\r\n',
-      clientId,
+      note,
       '\r\n',
-      `--${boundary}\r\n`,
-      `Content-Disposition: form-data; name="bundle"; filename="${filename}"`,
-      '\r\n',
-      'Content-Type: application/zip',
-      '\r\n\r\n',
-      zipBlob,
-      '\r\n',
-      `--${boundary}--\r\n`,
-    ],
-    {
-      type: `multipart/form-data; boundary=${boundary}`,
-      lastModified: Date.now(),
-    },
+    );
+  }
+  parts.push(
+    `--${boundary}\r\n`,
+    `Content-Disposition: form-data; name="bundle"; filename="${filename}"`,
+    '\r\n',
+    'Content-Type: application/zip',
+    '\r\n\r\n',
+    zipBlob,
+    '\r\n',
+    `--${boundary}--\r\n`,
   );
+  const body = new Blob(parts, {
+    type: `multipart/form-data; boundary=${boundary}`,
+    lastModified: Date.now(),
+  });
 
   return {
     body,
@@ -82,6 +93,7 @@ export interface DiagnosticUploadService {
     clientId: string,
     signal: AbortSignal,
     onProgress?: UploadProgress,
+    note?: string,
   ): Promise<UploadResult>;
 }
 
@@ -91,7 +103,9 @@ class XHRDiagnosticUploadService implements DiagnosticUploadService {
     clientId: string,
     signal: AbortSignal,
     onProgress?: UploadProgress,
+    note?: string,
   ): Promise<UploadResult> {
+    const trimmedNote = (note ?? '').trim();
     return new Promise((resolve, reject) => {
       const normalizedUri = normalizeFileUri(zipFileUri);
       if (!normalizedUri) {
@@ -114,6 +128,7 @@ class XHRDiagnosticUploadService implements DiagnosticUploadService {
             url: buildUrl('/diagnostics/upload'),
             archivePath: normalizedUri,
             client_id: clientId,
+            note: trimmedNote || undefined,
             headers: authHeaders(),
           })
           .then(result => {
@@ -173,12 +188,11 @@ class XHRDiagnosticUploadService implements DiagnosticUploadService {
           zipBlob,
           clientId,
           `diagnostics-${Date.now()}.zip`,
+          trimmedNote,
         );
 
         const headers = authHeaders();
-        Object.entries(headers).forEach(([k, v]) =>
-          xhr.setRequestHeader(k, v),
-        );
+        Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
         xhr.setRequestHeader('Content-Type', contentType);
 
         if (onProgress) {

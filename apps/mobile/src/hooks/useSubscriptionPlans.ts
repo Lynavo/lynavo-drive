@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { SubscriptionPlanDto } from '@syncflow/contracts';
 import { iapService, type IapProductSummary } from '../services/iap-service';
 import {
   subscriptionPlansService,
   buildBootstrapPlans,
   buildBootstrapProducts,
+  type CatalogSubscriptionPlan,
   type SubscriptionPlansSource,
 } from '../services/subscription-plans-service';
-import type { IapProductId } from '../constants/iap';
-import { ALL_PRODUCT_IDS } from '../constants/iap';
 import { FEATURES } from '../constants/features';
 
 // ---------------------------------------------------------------------------
@@ -22,7 +20,7 @@ export interface YearlySavings {
 }
 
 export interface PlanWithProduct {
-  plan: SubscriptionPlanDto;
+  plan: CatalogSubscriptionPlan;
   /** `null` when StoreKit did not return a SKU matching `plan.product_id`.
    *  Reasons: ASC mis-config, sandbox not signed in, region restriction.
    *  Decision: keep the entry so the screen can render an "unavailable"
@@ -61,12 +59,6 @@ export interface UseSubscriptionPlansArgs {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const ALLOWED_SKUS: ReadonlySet<string> = new Set(ALL_PRODUCT_IDS);
-
-function isKnownIapProductId(productId: string): productId is IapProductId {
-  return ALLOWED_SKUS.has(productId);
-}
 
 /**
  * Pick the monthly anchor for savings math: lowest-priced product whose
@@ -151,7 +143,7 @@ export function useSubscriptionPlans({
   // response so a successful refresh is visually a no-op for the user.
   // When `enabled` is false (IAP feature flag off) we deliberately stay
   // empty so the screen renders nothing IAP-related.
-  const [plans, setPlans] = useState<SubscriptionPlanDto[]>(() =>
+  const [plans, setPlans] = useState<CatalogSubscriptionPlan[]>(() =>
     enabled ? buildBootstrapPlans('ios') : [],
   );
   // Seed `products` alongside `plans` so the paywall renders real-looking
@@ -185,7 +177,7 @@ export function useSubscriptionPlans({
     // Decoupled from StoreKit so a slow / failed catalog fetch doesn't
     // hold the Subscribe gate hostage when StoreKit responds first, and
     // vice versa.
-    let validPlans: SubscriptionPlanDto[] = [];
+    let validPlans: CatalogSubscriptionPlan[] = [];
     try {
       const catalog = await subscriptionPlansService.fetchPlans('ios');
       validPlans = catalog.plans.filter(p => p.active);
@@ -199,13 +191,11 @@ export function useSubscriptionPlans({
 
     // Step 2 — Apple StoreKit prices/period for the SKUs the server told
     // us to render. Runs in its own try/finally so a StoreKit failure
-    // doesn't roll back the catalog already shown to the user. Filter
-    // out unknown SKUs defensively so a server typo cannot crash StoreKit
-    // lookup.
+    // doesn't roll back the catalog already shown to the user. Do not
+    // whitelist against bootstrap constants here: the server catalog is the
+    // registry and admin-controlled SKUs must reach StoreKit.
     try {
-      const skus = validPlans
-        .map(p => p.product_id)
-        .filter(isKnownIapProductId);
+      const skus = validPlans.map(p => p.product_id);
       const fetchedProducts =
         skus.length > 0 ? await iapService.getProductSummaries(skus) : [];
       setProducts(fetchedProducts);

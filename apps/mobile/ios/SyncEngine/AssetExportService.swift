@@ -34,6 +34,7 @@ class AssetExportService {
         return try await withCheckedThrowingContinuation { continuation in
             PHAssetResourceManager.default().writeData(for: resource, toFile: tempURL, options: options) { error in
                 if let error {
+                    try? FileManager.default.removeItem(at: tempURL)
                     if perfLoggingEnabled {
                         let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - exportStart) * 1000)
                         slog("[SyncPerf] export asset=%@ file=%@ status=FAILED elapsedMs=%d error=%@", asset.localIdentifier, filename, elapsedMs, error.localizedDescription)

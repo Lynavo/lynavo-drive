@@ -22,6 +22,36 @@ function getDateLabel(iso: string): string {
   return iso === today ? `今天 (${formatted})` : formatted;
 }
 
+interface DateSelectProps {
+  label: string;
+  value: string;
+  dates: string[];
+  disabled: boolean;
+  onChange: (date: string) => void;
+}
+
+function DateSelect({ label, value, dates, disabled, onChange }: DateSelectProps) {
+  return (
+    <Select value={value} onValueChange={onChange} disabled={disabled}>
+      <SelectTrigger
+        aria-label={label}
+        className="w-[140px] rounded-xl"
+        disabled={disabled}
+        title={disabled ? '只有一个完成日期' : undefined}
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {dates.map((date) => (
+          <SelectItem key={date} value={date}>
+            {getDateLabel(date)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 export function DateFilter({
   dates,
   startDate,
@@ -31,10 +61,12 @@ export function DateFilter({
 }: DateFilterProps) {
   // Ensure today is always in the list and at the top
   const today = new Date().toLocaleDateString('sv-SE');
-  const allDates = dates.includes(today) ? dates : [today, ...dates];
+  const allDates = Array.from(new Set([today, ...dates])).sort((a, b) => b.localeCompare(a));
+  const startValue = allDates.includes(startDate) ? startDate : allDates[0];
 
   // End date options: only dates >= startDate
-  const endDates = allDates.filter((d) => d >= startDate);
+  const endDates = allDates.filter((d) => d >= startValue);
+  const endValue = endDates.includes(endDate) ? endDate : endDates[0];
 
   const handleStartChange = (date: string) => {
     if (date > endDate) {
@@ -53,35 +85,26 @@ export function DateFilter({
 
   return (
     <div className="flex items-center gap-2">
+      <span className="text-xs text-muted-foreground">完成日期</span>
       <div className="flex items-center gap-1.5">
         <span className="text-xs text-muted-foreground">从</span>
-        <Select value={startDate} onValueChange={handleStartChange}>
-          <SelectTrigger className="w-[140px] rounded-xl">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {allDates.map((date) => (
-              <SelectItem key={date} value={date}>
-                {getDateLabel(date)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <DateSelect
+          label="开始完成日期"
+          value={startValue}
+          dates={allDates}
+          disabled={allDates.length <= 1}
+          onChange={handleStartChange}
+        />
       </div>
       <div className="flex items-center gap-1.5">
         <span className="text-xs text-muted-foreground">至</span>
-        <Select value={endDate} onValueChange={handleEndChange}>
-          <SelectTrigger className="w-[140px] rounded-xl">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {endDates.map((date) => (
-              <SelectItem key={date} value={date}>
-                {getDateLabel(date)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <DateSelect
+          label="结束完成日期"
+          value={endValue}
+          dates={endDates}
+          disabled={endDates.length <= 1}
+          onChange={handleEndChange}
+        />
       </div>
     </div>
   );

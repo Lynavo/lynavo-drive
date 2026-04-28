@@ -6,9 +6,6 @@
 // Flip to `true` only when the corresponding backend / IAP plumbing is wired,
 // QA'd and ready to ship to real users.
 
-// NOTE (2026-04-21, TestFlight IAP testing): enabled for release/TestFlight
-// builds so Apple sandbox purchases can be exercised outside dev builds.
-
 export const FEATURES = {
   /**
    * Gate routing on subscription status (trial_expired / sub_expired ⇒

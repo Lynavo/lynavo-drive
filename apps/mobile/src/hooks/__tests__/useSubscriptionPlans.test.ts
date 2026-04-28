@@ -47,6 +47,7 @@ function makePlan(
   const platform: SubscriptionPlanPlatform = 'ios';
   return {
     name: 'Plan',
+    plan: 'monthly',
     description: '',
     badges: [],
     recommended: false,
@@ -70,6 +71,7 @@ const monthlyPlan: SubscriptionPlanDto = makePlan({
 const yearlyPlan: SubscriptionPlanDto = makePlan({
   id: 2,
   product_id: IAP_PRODUCTS.yearly,
+  plan: 'yearly',
   name: '年度方案',
   description: '一年無限同步',
   badges: ['8.8 折'],
@@ -80,6 +82,7 @@ const yearlyPlan: SubscriptionPlanDto = makePlan({
 const yearlyPromoPlan: SubscriptionPlanDto = makePlan({
   id: 3,
   product_id: IAP_PRODUCTS.yearlyPromo,
+  plan: 'yearly',
   name: '年度限時',
   description: '限時優惠',
   sort_order: 30,
@@ -111,6 +114,24 @@ const yearlyPromoProduct: IapProductSummary = {
   priceAmount: 99,
   currency: 'CNY',
   periodUnit: 'YEAR',
+  periodCount: 1,
+  eligibleForIntroOffer: false,
+};
+
+const adminSku = 'admin.catalog.alpha';
+const adminPlan: SubscriptionPlanDto = makePlan({
+  id: 10,
+  product_id: adminSku,
+  name: '後台方案',
+  description: '不含週期字樣的 SKU',
+  sort_order: 5,
+});
+const adminProduct: IapProductSummary = {
+  productId: adminSku,
+  displayPrice: '¥12.00',
+  priceAmount: 12,
+  currency: 'CNY',
+  periodUnit: 'MONTH',
   periodCount: 1,
   eligibleForIntroOffer: false,
 };
@@ -186,6 +207,25 @@ describe('useSubscriptionPlans', () => {
     expect(yearlyEntry).toBeDefined();
     expect(yearlyEntry?.product).toBeNull();
     expect(yearlyEntry?.savings).toBeNull();
+  });
+
+  test('passes admin catalog SKUs through to StoreKit without bootstrap whitelist filtering', async () => {
+    (subscriptionPlansService.fetchPlans as jest.Mock).mockResolvedValueOnce({
+      plans: [adminPlan],
+      source: 'network',
+    });
+    (iapService.getProductSummaries as jest.Mock).mockResolvedValueOnce([
+      adminProduct,
+    ]);
+
+    const { result } = renderHook(() =>
+      useSubscriptionPlans({ formatPrice, formatSavings }),
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(iapService.getProductSummaries).toHaveBeenCalledWith([adminSku]);
+    expect(result.current.plans).toHaveLength(1);
+    expect(result.current.plans[0]?.product?.productId).toBe(adminSku);
   });
 
   test('short-circuits all fetches when enabled is false', async () => {

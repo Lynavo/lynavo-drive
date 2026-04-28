@@ -1,5 +1,15 @@
 {
   "title": "会员订阅",
+  "diagnostics": {
+    "button": "上传日志",
+    "unavailableTitle": "无法上传日志",
+    "unavailableBody": "当前版本暂不支持导出诊断包。",
+    "successTitle": "日志已上传",
+    "successBody": "追踪编号 {{refId}} 已复制，可提供给客服排查订阅问题。",
+    "tooLarge": "诊断包太大，请稍后重试或联系客服。",
+    "aborted": "已取消上传",
+    "failure": "日志上传失败，请稍后重试"
+  },
   "hero": {
     "title": "解锁完整版",
     "subtitle": "7 天免费体验，到期后订阅继续使用全部功能。"

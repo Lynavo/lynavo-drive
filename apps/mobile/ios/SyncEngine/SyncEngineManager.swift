@@ -255,6 +255,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         qos: .utility
     )
     private var incrementalQueueRescanWorkItem: DispatchWorkItem?
+    private let deferredAutoExportFailuresLock = NSLock()
+    private var deferredAutoExportFailures: [String: CFTimeInterval] = [:]
+    private let deferredAutoExportRetryAfterSeconds: CFTimeInterval = 60
     private let cloudAssetDetectionLock = NSLock()
     private let cloudAssetDetectionQueue = DispatchQueue(
         label: "com.syncflow.cloud-asset-detection",
@@ -704,6 +707,52 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         )
     }
 
+    private func activeDeferredAutoExportFailureKeys() -> Set<String> {
+        let now = CFAbsoluteTimeGetCurrent()
+        deferredAutoExportFailuresLock.lock()
+        deferredAutoExportFailures = deferredAutoExportFailures.filter { _, retryAfter in
+            retryAfter > now
+        }
+        let keys = Set(deferredAutoExportFailures.keys)
+        deferredAutoExportFailuresLock.unlock()
+        return keys
+    }
+
+    private func deferAutoExportFailure(fileKey: String) {
+        deferredAutoExportFailuresLock.lock()
+        deferredAutoExportFailures[fileKey] = CFAbsoluteTimeGetCurrent() + deferredAutoExportRetryAfterSeconds
+        deferredAutoExportFailuresLock.unlock()
+    }
+
+    private func clearDeferredAutoExportFailure(fileKey: String) {
+        deferredAutoExportFailuresLock.lock()
+        deferredAutoExportFailures.removeValue(forKey: fileKey)
+        deferredAutoExportFailuresLock.unlock()
+    }
+
+    private func isPhotoKitExportError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return nsError.domain == PHPhotosErrorDomain
+    }
+
+    private func photoKitExportErrorSummary(_ error: Error) -> String {
+        let nsError = error as NSError
+        guard nsError.domain == PHPhotosErrorDomain else {
+            return "\(error)"
+        }
+        return "\(nsError.domain) Code=\(nsError.code)"
+    }
+
+    private func photoExportRetryDelayNs(forAttempt attempt: Int) -> UInt64 {
+        let seconds: UInt64
+        switch attempt {
+        case 1: seconds = 1
+        case 2: seconds = 3
+        default: seconds = 6
+        }
+        return seconds * 1_000_000_000
+    }
+
     private func buildPendingUploadAssets(clientId: String, limit: Int? = 200) -> [ScannedAsset] {
         guard let store = uploadStore else { return [] }
 
@@ -948,14 +997,45 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     }
 
     private func exportAssetForUpload(_ asset: ScannedAsset) async throws -> ExportedFile {
-        markAssetPreparing(asset: asset)
+        let maxAttempts = asset.source == "auto" ? 4 : 2
+        var attempt = 1
 
-        var markedCloudDownload = false
-        return try await exportService.exportAsset(asset.asset) { [weak self] progress in
-            guard progress < 1.0, !markedCloudDownload else { return }
-            markedCloudDownload = true
-            try? self?.uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "cloud_downloading")
-            self?.emitQueueToJS()
+        while true {
+            markAssetPreparing(asset: asset)
+
+            var markedCloudDownload = false
+            do {
+                let exported = try await exportService.exportAsset(asset.asset) { [weak self] progress in
+                    guard progress < 1.0, !markedCloudDownload else { return }
+                    markedCloudDownload = true
+                    try? self?.uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "cloud_downloading")
+                    self?.emitQueueToJS()
+                }
+                clearDeferredAutoExportFailure(fileKey: asset.fileKey)
+                return exported
+            } catch {
+                guard isPhotoKitExportError(error), attempt < maxAttempts else {
+                    throw error
+                }
+                let delayNs = photoExportRetryDelayNs(forAttempt: attempt)
+                slog(
+                    "[SyncPipeline] PhotoKit export failed for %@ (%@), retrying in %.1fs (attempt %d/%d)",
+                    asset.fileKey,
+                    photoKitExportErrorSummary(error),
+                    Double(delayNs) / 1_000_000_000,
+                    attempt + 1,
+                    maxAttempts
+                )
+                syncDiagnosticsLog(
+                    "SyncPipeline",
+                    "PhotoKit export failed for \(asset.fileKey) (\(photoKitExportErrorSummary(error))), retrying attempt \(attempt + 1)/\(maxAttempts)"
+                )
+                try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "queued")
+                clearRuntimeCurrentFile()
+                emitQueueToJS()
+                try await Task.sleep(nanoseconds: delayNs)
+                attempt += 1
+            }
         }
     }
 
@@ -2060,6 +2140,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
         let clientId = bindingService.getOrCreateClientId()
         let trackedFileKeys = Set(store.getAutoDiscoveryTrackedFileKeys())
+            .union(activeDeferredAutoExportFailureKeys())
 
         // Prefer delta scan (only newly inserted/changed assets) over full-library
         // enumeration. Falls back to full scan when no cached fetchResult exists
@@ -2447,6 +2528,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 // are already stored in upload_items, so rescanning the full library every
                 // 200-file batch just burns CPU/PhotoKit and makes the device hotter.
                 var trackedKeys = Set(uploadStore?.getAutoDiscoveryTrackedFileKeys() ?? [])
+                    .union(activeDeferredAutoExportFailureKeys())
                 trackedAssetCount = trackedKeys.count
                 if trackedKeys.isEmpty {
                     let reconciliationResult = await restoreCompletedUploadHistoryIfNeeded(
@@ -2458,6 +2540,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     reusableReconciliationScan = reconciliationResult.scannedAssets
                     if reconciliationResult.restoredCount > 0 {
                         trackedKeys = Set(uploadStore?.getAutoDiscoveryTrackedFileKeys() ?? [])
+                            .union(activeDeferredAutoExportFailureKeys())
                         trackedAssetCount = trackedKeys.count
                         slog(
                             "[SyncPipeline] restored %d historical completed uploads before scan",
@@ -3055,12 +3138,36 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             prefetchTask = nil
 
             let exported: ExportedFile
-            if !prefetchInvalidated, let prefetched = nextExport {
-                exported = prefetched
-                nextExport = nil
-            } else {
-                prefetchInvalidated = false
-                exported = try await exportAssetForUpload(asset)
+            do {
+                if !prefetchInvalidated, let prefetched = nextExport {
+                    exported = prefetched
+                    nextExport = nil
+                } else {
+                    prefetchInvalidated = false
+                    exported = try await exportAssetForUpload(asset)
+                }
+            } catch {
+                if asset.source == "auto", isPhotoKitExportError(error) {
+                    let summary = photoKitExportErrorSummary(error)
+                    slog(
+                        "[SyncPipeline] deferring auto item %@ after PhotoKit export failure: %@",
+                        asset.fileKey,
+                        summary
+                    )
+                    syncDiagnosticsLog(
+                        "SyncPipeline",
+                        "deferring auto item \(asset.fileKey) after PhotoKit export failure: \(summary)"
+                    )
+                    deferAutoExportFailure(fileKey: asset.fileKey)
+                    try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "failed")
+                    runtimeQueueTotalCount = max(runtimeQueueTotalCount - 1, 0)
+                    runtimeQueueTotalBytes = max(runtimeQueueTotalBytes - max(asset.estimatedSize, 0), 0)
+                    clearRuntimeCurrentFile()
+                    runtimeCurrentSpeedMbps = 0
+                    emitQueueToJS()
+                    continue
+                }
+                throw error
             }
 
             let nextIndex = index + 1
@@ -5597,7 +5704,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         guard let configStore = autoUploadConfigStore else {
             return [
                 "enabled": false,
-                "timeRangeMode": "from_now",
+                "timeRangeMode": "all",
                 "state": "disabled",
             ]
         }

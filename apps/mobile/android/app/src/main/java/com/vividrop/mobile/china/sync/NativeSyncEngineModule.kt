@@ -43,6 +43,8 @@ class NativeSyncEngineModule(
   private val discoveredCandidates = mutableMapOf<String, DiscoveredServiceCandidate>()
   private val reachableCandidates = mutableMapOf<String, DiscoveredServiceCandidate>()
   private val pendingResolveKeys = mutableSetOf<String>()
+  private val diagnosticsLogLock = Any()
+  private val diagnosticsLogLines = mutableListOf<String>()
 
   override fun getName(): String = MODULE_NAME
 
@@ -221,9 +223,21 @@ class NativeSyncEngineModule(
           },
         )
         put("binding", loadBinding()?.toJson() ?: JSONObject.NULL)
+        put("logs", JSONArray(diagnosticsLogSnapshot()))
       }
       archive.writeText(payload.toString(2), StandardCharsets.UTF_8)
       promise.resolve(archive.absolutePath)
+    }
+  }
+
+  @ReactMethod
+  fun recordDiagnosticsLog(category: String, message: String) {
+    val line = "${isoNow()} [${category.trim().ifBlank { "JS" }}] ${message.trim().ifBlank { "<empty>" }}"
+    synchronized(diagnosticsLogLock) {
+      diagnosticsLogLines.add(line)
+      if (diagnosticsLogLines.size > MAX_DIAGNOSTICS_LOG_LINES) {
+        diagnosticsLogLines.subList(0, diagnosticsLogLines.size - MAX_DIAGNOSTICS_LOG_LINES).clear()
+      }
     }
   }
 
@@ -742,6 +756,11 @@ class NativeSyncEngineModule(
     return formatter.format(Date())
   }
 
+  private fun diagnosticsLogSnapshot(): List<String> =
+    synchronized(diagnosticsLogLock) {
+      diagnosticsLogLines.toList()
+    }
+
   private val prefs
     get() = reactApplicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -1192,6 +1211,7 @@ class NativeSyncEngineModule(
 
   companion object {
     private const val MODULE_NAME = "NativeSyncEngine"
+    private const val MAX_DIAGNOSTICS_LOG_LINES = 2_000
     const val PREFS_NAME = "syncflow.android.native_sync_engine"
     private const val PREF_BINDING = "binding"
     private const val PREF_CLIENT_ID = "client_id"

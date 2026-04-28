@@ -21,6 +21,7 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { SmsVerifyScreen } from '../screens/SmsVerifyScreen';
 import { DeviceDiscoveryScreen } from '../screens/DeviceDiscoveryScreen';
 import { CodeVerifyScreen } from '../screens/CodeVerifyScreen';
+import { ConnectionTutorialScreen } from '../screens/ConnectionTutorialScreen';
 import { SyncActivityScreen } from '../screens/SyncActivityScreen';
 import { AlbumWorkbenchScreen } from '../screens/AlbumWorkbenchScreen';
 import { SharedFilesScreen } from '../screens/SharedFilesScreen';
@@ -53,6 +54,7 @@ export type RootStackParamList = {
     prefilledCode?: string;
   };
   QRScanner: undefined;
+  ConnectionTutorial: undefined;
   SyncActivity: undefined;
   AlbumWorkbench: undefined;
   SharedFiles: undefined;
@@ -340,6 +342,10 @@ function AuthedStack({
           component={DeviceDiscoveryScreen}
         />
         <Stack.Screen name="QRScanner" component={QRScannerScreen} />
+        <Stack.Screen
+          name="ConnectionTutorial"
+          component={ConnectionTutorialScreen}
+        />
         <Stack.Screen name="CodeVerify" component={CodeVerifyScreen} />
         <Stack.Screen name="SyncActivity" component={SyncActivityScreen} />
         <Stack.Screen name="AlbumWorkbench" component={AlbumWorkbenchScreen} />

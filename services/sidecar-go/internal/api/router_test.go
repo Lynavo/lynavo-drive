@@ -318,6 +318,70 @@ func TestDashboardStatsIgnoreDeletedFinalFiles(t *testing.T) {
 	}
 }
 
+func TestDashboardDevicesIncludeLatestHistoricalStats(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	nowText := time.Now().Format(time.RFC3339)
+	dirName := "History iPhone"
+	if err := st.UpsertPairedDevice(store.PairedDevice{
+		ClientID:         "history-device-1",
+		ClientName:       "History iPhone",
+		Platform:         "ios",
+		PairingID:        "pair-history-1",
+		PairingTokenHash: "hash-history-1",
+		CreatedAt:        nowText,
+		LastSeenAt:       nowText,
+		ReceiveDirName:   &dirName,
+	}); err != nil {
+		t.Fatalf("UpsertPairedDevice: %v", err)
+	}
+
+	latestDate := time.Now().AddDate(0, 0, -3).Format("2006-01-02")
+	dateDir := filepath.Join(cfg.ReceiveDir, dirName, latestDate)
+	if err := os.MkdirAll(dateDir, 0o755); err != nil {
+		t.Fatalf("mkdir latest date dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dateDir, "IMG_0001.JPG"), []byte("history"), 0o644); err != nil {
+		t.Fatalf("write latest file: %v", err)
+	}
+
+	resp, err := http.Get(srv.URL + "/dashboard/devices")
+	if err != nil {
+		t.Fatalf("GET /dashboard/devices: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var devices []struct {
+		DeviceID        string `json:"deviceId"`
+		TodayFileCount  int    `json:"todayFileCount"`
+		TodayBytes      int64  `json:"todayBytes"`
+		LatestDate      string `json:"latestDate"`
+		LatestFileCount int    `json:"latestFileCount"`
+		LatestBytes     int64  `json:"latestBytes"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&devices); err != nil {
+		t.Fatalf("decode devices: %v", err)
+	}
+	if len(devices) != 1 {
+		t.Fatalf("expected one dashboard device, got %d", len(devices))
+	}
+	if devices[0].TodayFileCount != 0 || devices[0].TodayBytes != 0 {
+		t.Fatalf("expected today stats to stay empty, got %d files/%d bytes", devices[0].TodayFileCount, devices[0].TodayBytes)
+	}
+	if devices[0].LatestDate != latestDate {
+		t.Fatalf("expected latestDate %q, got %q", latestDate, devices[0].LatestDate)
+	}
+	if devices[0].LatestFileCount != 1 {
+		t.Fatalf("expected latestFileCount 1, got %d", devices[0].LatestFileCount)
+	}
+	if devices[0].LatestBytes != int64(len("history")) {
+		t.Fatalf("expected latestBytes %d, got %d", len("history"), devices[0].LatestBytes)
+	}
+}
+
 func TestPresenceHeartbeatBroadcastsConnectedIdleEvent(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	if err := st.SetDeviceName("Desk Renamed"); err != nil {

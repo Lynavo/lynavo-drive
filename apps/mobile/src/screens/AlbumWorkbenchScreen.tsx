@@ -67,6 +67,14 @@ import { formatBytes } from '../utils/format';
 import { sortAlbumAssetsForDisplay } from '../utils/sortAlbumAssets';
 import { hasPendingManualWork } from '../utils/manualUploadState';
 import { deriveDeviceConnected } from '../utils/deriveDeviceConnected';
+import {
+  buildAutoUploadRoundOverview,
+  getAutoUploadRoundCompletedCount,
+  getAutoUploadSessionTransferredCount,
+  getRememberedAutoUploadRoundProgress,
+  rememberAutoUploadRoundProgress,
+  type AutoUploadRoundOverview,
+} from '../utils/autoUploadRoundProgress';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -104,6 +112,18 @@ function formatCustomTime(iso: string, t: TFunction): string {
     hour,
     minute,
   });
+}
+
+function rememberAndBuildAutoUploadRoundOverview(
+  payload: unknown,
+  previous: AutoUploadRoundOverview | null,
+): AutoUploadRoundOverview | null {
+  const overview = buildAutoUploadRoundOverview(
+    (payload as Record<string, unknown> | null | undefined) ?? null,
+    previous,
+  );
+  rememberAutoUploadRoundProgress(overview);
+  return overview;
 }
 
 type MediaFilter = 'all' | 'photos' | 'videos';
@@ -256,6 +276,14 @@ export function AlbumWorkbenchScreen() {
   const [autoUploadConfig, setAutoUploadConfig] =
     useState<AutoUploadConfigDTO | null>(null);
   const [configExpanded, setConfigExpanded] = useState(false);
+  const [autoUploadRoundOverview, setAutoUploadRoundOverview] =
+    useState<AutoUploadRoundOverview | null>(
+      getRememberedAutoUploadRoundProgress,
+    );
+  const [
+    autoUploadSessionTransferredCount,
+    setAutoUploadSessionTransferredCount,
+  ] = useState<number | null>(null);
 
   // Custom time picker
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -388,14 +416,36 @@ export function AlbumWorkbenchScreen() {
     [],
   );
 
-  const loadStats = useCallback(async () => {
-    try {
-      const result = await getAlbumStats();
-      setStats(result);
-    } catch (e) {
-      console.warn('[AlbumWorkbench] loadStats error:', e);
-    }
-  }, []);
+  const loadAutoUploadSessionProgress = useCallback(
+    async (active = isAutoUploadActive, transferredCount?: number) => {
+      try {
+        const count = await getAutoUploadSessionTransferredCount(
+          active,
+          transferredCount,
+        );
+        setAutoUploadSessionTransferredCount(count);
+      } catch (e) {
+        console.warn(
+          '[AlbumWorkbench] loadAutoUploadSessionProgress error:',
+          e,
+        );
+      }
+    },
+    [isAutoUploadActive],
+  );
+
+  const loadStats = useCallback(
+    async (active = isAutoUploadActive) => {
+      try {
+        const result = await getAlbumStats();
+        setStats(result);
+        void loadAutoUploadSessionProgress(active, result.transferredCount);
+      } catch (e) {
+        console.warn('[AlbumWorkbench] loadStats error:', e);
+      }
+    },
+    [isAutoUploadActive, loadAutoUploadSessionProgress],
+  );
 
   const primeAutoUploadRoundBaseline = useCallback(async () => {
     let baseline = stats?.transferredCount ?? 0;
@@ -413,6 +463,7 @@ export function AlbumWorkbenchScreen() {
     try {
       const config = await getAutoUploadConfig();
       setAutoUploadConfig(config);
+      void loadAutoUploadSessionProgress(config.state === 'active');
       // Auto-expand config panel when auto-upload is enabled/paused
       if (config.enabled) {
         setConfigExpanded(true);
@@ -420,12 +471,24 @@ export function AlbumWorkbenchScreen() {
     } catch (e) {
       console.warn('[AlbumWorkbench] loadConfig error:', e);
     }
+  }, [loadAutoUploadSessionProgress]);
+
+  const loadSyncOverview = useCallback(async () => {
+    try {
+      const payload = await NativeModules.NativeSyncEngine?.getSyncOverview?.();
+      setAutoUploadRoundOverview(prev =>
+        rememberAndBuildAutoUploadRoundOverview(payload, prev),
+      );
+    } catch (e) {
+      console.warn('[AlbumWorkbench] loadSyncOverview error:', e);
+    }
   }, []);
 
   useEffect(() => {
     void loadAssets(mediaFilter, transferFilter, true, collectionId);
     void loadStats();
     void loadConfig();
+    void loadSyncOverview();
     // Seed initial connection and photo auth state
     void (async () => {
       try {
@@ -451,6 +514,7 @@ export function AlbumWorkbenchScreen() {
     loadAssets,
     loadStats,
     loadConfig,
+    loadSyncOverview,
   ]);
 
   const statsTransferredCount = stats?.transferredCount;
@@ -506,7 +570,10 @@ export function AlbumWorkbenchScreen() {
       void refreshVisibleAssets();
       void loadStats();
     });
-    const stateSub = emitter.addListener('onSyncStateChanged', () => {
+    const stateSub = emitter.addListener('onSyncStateChanged', payload => {
+      setAutoUploadRoundOverview(prev =>
+        rememberAndBuildAutoUploadRoundOverview(payload, prev),
+      );
       void loadStats();
     });
     const bindingSub = emitter.addListener(
@@ -521,6 +588,7 @@ export function AlbumWorkbenchScreen() {
     const photoLibSub = emitter.addListener('onPhotoLibraryChanged', () => {
       void loadAssets(mediaFilter, transferFilter, true, collectionId);
       void loadStats();
+      void loadSyncOverview();
       void getPhotoAuthorizationStatus()
         .then(setPhotoAuthStatus)
         .catch(() => {});
@@ -538,6 +606,7 @@ export function AlbumWorkbenchScreen() {
     loadAssets,
     refreshVisibleAssets,
     loadStats,
+    loadSyncOverview,
   ]);
 
   // Re-fetch when returning from background / permission dialog.
@@ -553,6 +622,7 @@ export function AlbumWorkbenchScreen() {
       ) {
         void loadAssets(mediaFilter, transferFilter, true, collectionId);
         void loadStats();
+        void loadSyncOverview();
         // Re-check auth status — may have changed from notDetermined to
         // limited/authorized while the permission dialog was showing.
         void getPhotoAuthorizationStatus()
@@ -562,7 +632,14 @@ export function AlbumWorkbenchScreen() {
       appStateRef.current = next;
     });
     return () => sub.remove();
-  }, [loadAssets, mediaFilter, transferFilter, collectionId, loadStats]);
+  }, [
+    loadAssets,
+    mediaFilter,
+    transferFilter,
+    collectionId,
+    loadStats,
+    loadSyncOverview,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Selection handlers
@@ -1501,14 +1578,27 @@ export function AlbumWorkbenchScreen() {
   // Render
   // ---------------------------------------------------------------------------
 
+  const autoUploadRoundCompletedCount = getAutoUploadRoundCompletedCount(
+    autoUploadRoundOverview,
+    isAutoUploadActive,
+  );
+  const resolvedAutoUploadTransferredCount =
+    autoUploadSessionTransferredCount !== null &&
+    autoUploadRoundCompletedCount !== null
+      ? Math.max(
+          autoUploadSessionTransferredCount,
+          autoUploadRoundCompletedCount,
+        )
+      : (autoUploadSessionTransferredCount ?? autoUploadRoundCompletedCount);
   const autoUploadTransferredThisRound =
-    isAutoUploadActive && stats
+    resolvedAutoUploadTransferredCount ??
+    (isAutoUploadActive && stats
       ? Math.max(
           0,
           stats.transferredCount -
             (autoUploadTransferredBaseline ?? stats.transferredCount),
         )
-      : 0;
+      : 0);
 
   // Derive custom time display string for summary card
   const timeRangeDisplayLabel = (() => {
@@ -2021,10 +2111,10 @@ export function AlbumWorkbenchScreen() {
           {isAutoUploadActive
             ? t('albumWorkbench.selectionHint.autoActiveLock')
             : selectedIds.size > 0
-            ? t('albumWorkbench.selectedCount', {
-                count: selectedIds.size,
-              })
-            : t('albumWorkbench.selectionHint.none')}
+              ? t('albumWorkbench.selectedCount', {
+                  count: selectedIds.size,
+                })
+              : t('albumWorkbench.selectionHint.none')}
         </Text>
         <View style={styles.uploadBarRight}>
           {!deviceConnected && !isAutoUploadActive && (

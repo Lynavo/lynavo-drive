@@ -68,22 +68,23 @@ import {
 // Constants
 // ---------------------------------------------------------------------------
 
-const BLUE = '#3b9fd8';
-const DARK = '#1a3a5c';
-const SCREEN_BG = '#d6ecf8';
-const CARD_BG = '#ffffff';
-const CARD_BORDER = 'rgba(187, 214, 233, 0.72)';
-const MUTED_TEXT = '#7893ab';
-const SECTION_TEXT = '#6e8aa3';
-const ROW_CHEVRON = '#b8d0e4';
+const BLUE = '#3b82f6';
+const DARK = '#1c1c1e';
+const SCREEN_BG = '#dceefa';
+const CARD_BG = 'rgba(255,255,255,0.84)';
+const CARD_BORDER = 'rgba(255,255,255,0.72)';
+const HAIRLINE = 'rgba(0,0,0,0.055)';
+const MUTED_TEXT = '#8e8e93';
+const SECTION_TEXT = '#8e8e93';
+const ROW_CHEVRON = '#c7c7cc';
 const ONLINE_GREEN = '#22c55e';
 const ONLINE_TEXT = '#16a34a';
 const CONNECTING_AMBER = '#f3b24c';
 const CONNECTING_TEXT = '#b45309';
-const OFFLINE_SLATE = '#94a3b8';
-const OFFLINE_TEXT = '#72859a';
+const OFFLINE_SLATE = '#ef4444';
+const OFFLINE_TEXT = '#ef4444';
 const DANGER_RED = '#ef4444';
-const DANGER_BG = 'rgba(239,68,68,0.04)';
+const DANGER_BG = CARD_BG;
 const APPLE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
 
 function waitForLogoutOverlayFrame(): Promise<void> {
@@ -530,117 +531,108 @@ export function SettingsScreen() {
   }, [navigation, syncOverviewState, t]);
 
   const handleUploadDiagnostics = useCallback(() => {
-    Alert.alert(
-      t('settings.uploadDiagnostic.confirm.title'),
-      t('settings.uploadDiagnostic.confirm.message'),
-      [
-        {
-          text: t('settings.uploadDiagnostic.confirm.cancel'),
-          style: 'cancel',
-        },
-        {
-          text: t('settings.uploadDiagnostic.confirm.ok'),
-          onPress: () => {
-            void (async () => {
-              const { NativeSyncEngine } = NativeModules;
-              if (!NativeSyncEngine?.exportDiagnostics) {
-                Alert.alert(
-                  t('settings.dialogs.exportUnavailable.title'),
-                  t('settings.dialogs.exportUnavailable.body'),
-                );
-                return;
+    const startUpload = (rawNote?: string): void => {
+      void (async () => {
+        const { NativeSyncEngine } = NativeModules;
+        if (!NativeSyncEngine?.exportDiagnostics) {
+          Alert.alert(
+            t('settings.dialogs.exportUnavailable.title'),
+            t('settings.dialogs.exportUnavailable.body'),
+          );
+          return;
+        }
+
+        const abortController = new AbortController();
+        diagnosticAbortRef.current = abortController;
+        setDiagnosticUploadProgress(0);
+        setIsUploadingDiagnostics(true);
+
+        try {
+          const archivePath: string =
+            await NativeSyncEngine.exportDiagnostics();
+          const archiveUrl = archivePath.startsWith('file://')
+            ? archivePath
+            : `file://${archivePath}`;
+
+          const clientId = String(await NativeSyncEngine.getClientId());
+          const note = (rawNote ?? '').trim();
+
+          const result = await diagnosticUploadService.upload(
+            archiveUrl,
+            clientId,
+            abortController.signal,
+            (loaded, total) => {
+              if (total > 0) {
+                setDiagnosticUploadProgress(Math.round((loaded / total) * 100));
               }
+            },
+            note || undefined,
+          );
 
-              const abortController = new AbortController();
-              diagnosticAbortRef.current = abortController;
-              setDiagnosticUploadProgress(0);
-              setIsUploadingDiagnostics(true);
+          Clipboard.setString(result.refId);
+          Alert.alert(
+            t('settings.uploadDiagnostic.success.toast', {
+              refId: result.refId,
+            }),
+          );
+        } catch (error) {
+          if (
+            error instanceof DiagnosticUploadError &&
+            error.detail.kind === 'BUNDLE_TOO_LARGE'
+          ) {
+            Alert.alert(t('settings.uploadDiagnostic.tooLarge.toast'));
+          } else if (
+            error instanceof DiagnosticUploadError &&
+            error.detail.kind === 'ABORTED'
+          ) {
+            Alert.alert(t('settings.uploadDiagnostic.aborted.toast'));
+          } else {
+            Alert.alert(t('settings.uploadDiagnostic.failure.toast'));
+          }
+        } finally {
+          diagnosticAbortRef.current = null;
+          setIsUploadingDiagnostics(false);
+          setDiagnosticUploadProgress(0);
+        }
+      })();
+    };
 
-              try {
-                const archivePath: string =
-                  await NativeSyncEngine.exportDiagnostics();
-                const archiveUrl = archivePath.startsWith('file://')
-                  ? archivePath
-                  : `file://${archivePath}`;
-
-                const clientId = String(await NativeSyncEngine.getClientId());
-
-                const result = await diagnosticUploadService.upload(
-                  archiveUrl,
-                  clientId,
-                  abortController.signal,
-                  (loaded, total) => {
-                    if (total > 0) {
-                      setDiagnosticUploadProgress(
-                        Math.round((loaded / total) * 100),
-                      );
-                    }
-                  },
-                );
-
-                Clipboard.setString(result.refId);
-                Alert.alert(
-                  t('settings.uploadDiagnostic.success.toast', {
-                    refId: result.refId,
-                  }),
-                );
-              } catch (error) {
-                if (
-                  error instanceof DiagnosticUploadError &&
-                  error.detail.kind === 'BUNDLE_TOO_LARGE'
-                ) {
-                  Alert.alert(t('settings.uploadDiagnostic.tooLarge.toast'));
-                } else if (
-                  error instanceof DiagnosticUploadError &&
-                  error.detail.kind === 'ABORTED'
-                ) {
-                  Alert.alert(t('settings.uploadDiagnostic.aborted.toast'));
-                } else {
-                  Alert.alert(t('settings.uploadDiagnostic.failure.toast'));
-                }
-              } finally {
-                diagnosticAbortRef.current = null;
-                setIsUploadingDiagnostics(false);
-                setDiagnosticUploadProgress(0);
-              }
-            })();
+    // Alert.prompt is iOS-only; fall back to Alert.alert (without the input
+    // field) on platforms where it isn't available so the upload still works.
+    if (Platform.OS === 'ios' && typeof Alert.prompt === 'function') {
+      Alert.prompt(
+        t('settings.uploadDiagnostic.confirm.title'),
+        t('settings.uploadDiagnostic.confirm.message'),
+        [
+          {
+            text: t('settings.uploadDiagnostic.confirm.cancel'),
+            style: 'cancel',
           },
-        },
-      ],
-    );
+          {
+            text: t('settings.uploadDiagnostic.confirm.ok'),
+            onPress: (note?: string) => startUpload(note),
+          },
+        ],
+        'plain-text',
+        '',
+      );
+    } else {
+      Alert.alert(
+        t('settings.uploadDiagnostic.confirm.title'),
+        t('settings.uploadDiagnostic.confirm.message'),
+        [
+          {
+            text: t('settings.uploadDiagnostic.confirm.cancel'),
+            style: 'cancel',
+          },
+          {
+            text: t('settings.uploadDiagnostic.confirm.ok'),
+            onPress: () => startUpload(),
+          },
+        ],
+      );
+    }
   }, [auth.user?.id, t]);
-
-  // DEV-only: drain stale sandbox transactions from SKPaymentQueue.
-  // The cold-start "Purchase Successful" storm comes from unfinished
-  // sandbox txs that react-native-iap re-emits the moment a listener
-  // attaches. Calling this once finishes them all so subsequent cold
-  // starts are quiet. Production builds should never see this button —
-  // see iapService._devFlushAllPending for the production guard.
-  const handleDevFlushIap = useCallback(() => {
-    if (!__DEV__) return;
-    Alert.alert(
-      'DEV: Flush IAP Queue',
-      'Finish ALL pending StoreKit transactions without server verify. Use only on sandbox / dev builds — never in production.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Flush',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await iapService._devFlushAllPending();
-              Alert.alert('DEV: IAP queue flush requested');
-            } catch (err) {
-              Alert.alert(
-                'DEV: Flush failed',
-                err instanceof Error ? err.message : String(err),
-              );
-            }
-          },
-        },
-      ],
-    );
-  }, []);
 
   const handleResetSyncStatus = useCallback(() => {
     if (isResetSyncDisabled) return;
@@ -1074,8 +1066,27 @@ export function SettingsScreen() {
           {/* Left: Connected device card (compact) */}
           <View style={[styles.topCard, styles.topCardLeft]}>
             <View style={styles.topCardIconRow}>
-              <View style={styles.wifiIconCircle}>
-                <Icon name="wifi" size={18} color="#fff" />
+              <View
+                style={[
+                  styles.wifiIconCircle,
+                  isConnected
+                    ? styles.wifiIconCircleOnline
+                    : isConnecting
+                      ? styles.wifiIconCircleConnecting
+                      : styles.wifiIconCircleOffline,
+                ]}
+              >
+                <Icon
+                  name={isConnected || isConnecting ? 'wifi' : 'wifi-outline'}
+                  size={20}
+                  color={
+                    isConnected
+                      ? ONLINE_GREEN
+                      : isConnecting
+                        ? CONNECTING_TEXT
+                        : OFFLINE_TEXT
+                  }
+                />
               </View>
               <Text style={styles.topCardSmallLabel}>
                 {t('settings.sections.connectedDevice')}
@@ -1121,6 +1132,7 @@ export function SettingsScreen() {
                 activeOpacity={0.6}
                 onPress={handleSwitchDevice}
               >
+                <Icon name="refresh-outline" size={13} color={BLUE} />
                 <Text style={styles.switchButtonText}>
                   {t('settings.actions.switch')}
                 </Text>
@@ -1139,13 +1151,13 @@ export function SettingsScreen() {
               {subscriptionIconTone ? (
                 <SubscriptionStatusIcon
                   tone={subscriptionIconTone}
-                  size={20}
+                  size={21}
                   framed
-                  frameSize={32}
+                  frameSize={40}
                 />
               ) : (
                 <View style={styles.subIconCircle}>
-                  <Icon name="time-outline" size={18} color={MUTED_TEXT} />
+                  <Icon name="time-outline" size={20} color={MUTED_TEXT} />
                 </View>
               )}
               <Text style={styles.topCardSmallLabel}>
@@ -1470,22 +1482,6 @@ export function SettingsScreen() {
               </TouchableOpacity>
             </>
           ) : null}
-          {__DEV__ ? (
-            <>
-              <View style={styles.listSep} />
-              <TouchableOpacity
-                style={styles.actionRow}
-                activeOpacity={0.6}
-                onPress={handleDevFlushIap}
-              >
-                <View style={styles.actionRowLeft}>
-                  <Icon name="trash-outline" size={18} color={BLUE} />
-                  <Text style={styles.actionRowText}>DEV: Flush IAP Queue</Text>
-                </View>
-                <Icon name="chevron-forward" size={16} color={ROW_CHEVRON} />
-              </TouchableOpacity>
-            </>
-          ) : null}
         </View>
 
         {/* ============================================================= */}
@@ -1519,12 +1515,7 @@ export function SettingsScreen() {
             </View>
             <Icon name="chevron-forward" size={16} color={ROW_CHEVRON} />
           </TouchableOpacity>
-        </View>
-
-        {/* ============================================================= */}
-        {/* Logout                                                         */}
-        {/* ============================================================= */}
-        <View style={[styles.listCard, styles.dangerCard, styles.logoutCard]}>
+          <View style={styles.listSep} />
           <TouchableOpacity
             style={styles.actionRow}
             activeOpacity={0.6}
@@ -1661,21 +1652,21 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingTop: 4,
-    paddingBottom: 12,
+    paddingBottom: 8,
     gap: 12,
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.6)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.07)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   title: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: 'bold',
     color: DARK,
   },
@@ -1683,19 +1674,19 @@ const styles = StyleSheet.create({
   // Scroll
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 40,
+    paddingTop: 16,
+    paddingBottom: 48,
   },
 
   // Android notice
   androidNoticeCard: {
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.76)',
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.88)',
+    borderColor: CARD_BORDER,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    marginBottom: 12,
+    marginBottom: 20,
   },
   androidNoticeTitle: {
     fontSize: 14,
@@ -1712,10 +1703,10 @@ const styles = StyleSheet.create({
   // Section label
   sectionLabel: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
     color: SECTION_TEXT,
     marginBottom: 8,
-    marginTop: 8,
+    marginTop: 10,
     marginLeft: 4,
   },
 
@@ -1724,67 +1715,78 @@ const styles = StyleSheet.create({
   // ---------------------------------------------------------------------------
   topCardRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 12,
+    gap: 12,
+    marginBottom: 20,
   },
   topCard: {
     flex: 1,
     backgroundColor: CARD_BG,
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: CARD_BORDER,
     padding: 14,
-    shadowColor: '#4f8fbc',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
+    minHeight: 164,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
     elevation: 2,
   },
   topCardLeft: {},
   topCardRight: {},
   topCardIconRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 6,
   },
   wifiIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#4abe7b',
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  wifiIconCircleOnline: {
+    backgroundColor: 'rgba(52,199,89,0.12)',
+  },
+  wifiIconCircleConnecting: {
+    backgroundColor: 'rgba(245,158,11,0.1)',
+  },
+  wifiIconCircleOffline: {
+    backgroundColor: 'rgba(239,68,68,0.09)',
+  },
   subIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(120, 147, 171, 0.1)',
   },
   topCardSmallLabel: {
     fontSize: 11,
+    fontWeight: '500',
     color: MUTED_TEXT,
     flexShrink: 1,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   topCardTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: DARK,
-    marginBottom: 2,
+    marginBottom: 3,
   },
   topCardSubtext: {
-    fontSize: 11,
+    fontSize: 12,
     color: MUTED_TEXT,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   topCardBottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 4,
+    marginTop: 10,
   },
   subCtaRow: {
     flexDirection: 'row',
@@ -1803,9 +1805,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   statusDotOnline: {
     backgroundColor: ONLINE_GREEN,
@@ -1845,15 +1847,15 @@ const styles = StyleSheet.create({
   // ---------------------------------------------------------------------------
   card: {
     backgroundColor: CARD_BG,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: CARD_BORDER,
-    padding: 18,
-    marginBottom: 12,
-    shadowColor: '#4f8fbc',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
     elevation: 2,
   },
 
@@ -1906,21 +1908,19 @@ const styles = StyleSheet.create({
   },
   nameInput: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#b8d8ea',
-    borderRadius: 8,
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    fontSize: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: '#5a6bf5',
+    paddingHorizontal: 0,
+    paddingVertical: 2,
+    fontSize: 17,
     fontWeight: '600',
     color: DARK,
   },
   confirmButton: {
     width: 28,
     height: 28,
-    borderRadius: 8,
-    backgroundColor: 'rgba(59,159,216,0.12)',
+    borderRadius: 14,
+    backgroundColor: 'rgba(90,107,245,0.12)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1939,21 +1939,21 @@ const styles = StyleSheet.create({
   // ---------------------------------------------------------------------------
   listCard: {
     backgroundColor: CARD_BG,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: CARD_BORDER,
     overflow: 'hidden',
-    marginBottom: 12,
-    shadowColor: '#4f8fbc',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
     elevation: 2,
   },
   listSep: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: '#e4eff7',
-    marginHorizontal: 18,
+    backgroundColor: HAIRLINE,
+    marginHorizontal: 16,
   },
 
   // Info rows
@@ -1961,7 +1961,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 14,
     gap: 12,
   },
@@ -1971,12 +1971,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   infoRowLabel: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '500',
     color: DARK,
   },
   infoRowValue: {
-    fontSize: 13,
+    fontSize: 15,
     color: MUTED_TEXT,
     flexShrink: 1,
     textAlign: 'right',
@@ -1994,7 +1994,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   languageRow: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 14,
     gap: 10,
   },
@@ -2012,15 +2012,15 @@ const styles = StyleSheet.create({
     minHeight: 34,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#d4e5f1',
-    backgroundColor: '#f7fbfe',
+    borderColor: 'rgba(0,0,0,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.58)',
     paddingHorizontal: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   languageOptionSelected: {
     borderColor: BLUE,
-    backgroundColor: 'rgba(59,159,216,0.12)',
+    backgroundColor: 'rgba(59,130,246,0.1)',
   },
   languageOptionText: {
     fontSize: 13,
@@ -2036,7 +2036,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 14,
   },
   actionRowDisabled: {
@@ -2056,8 +2056,7 @@ const styles = StyleSheet.create({
   // Danger zone
   dangerCard: {
     backgroundColor: DANGER_BG,
-    borderColor: 'rgba(239,68,68,0.12)',
-    marginTop: 8,
+    borderColor: CARD_BORDER,
   },
   dangerRowText: {
     fontSize: 15,
@@ -2070,7 +2069,7 @@ const styles = StyleSheet.create({
 
   // Logout card
   logoutCard: {
-    marginTop: 4,
+    marginTop: -8,
   },
   logoutTransitionOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -2125,13 +2124,13 @@ const styles = StyleSheet.create({
   // ---------------------------------------------------------------------------
   deletingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(214, 236, 248, 0.88)',
+    backgroundColor: 'rgba(220,238,250,0.88)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
   },
   deletingOverlayCard: {
-    backgroundColor: CARD_BG,
+    backgroundColor: 'rgba(255,255,255,0.98)',
     borderRadius: 20,
     borderWidth: 1,
     borderColor: CARD_BORDER,
@@ -2140,10 +2139,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
     minWidth: 200,
-    shadowColor: '#4f8fbc',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 24,
     elevation: 6,
   },
   deletingOverlayText: {
@@ -2157,7 +2156,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: 'rgba(59,159,216,0.1)',
+    backgroundColor: 'rgba(59,130,246,0.1)',
   },
   uploadCancelText: {
     fontSize: 14,

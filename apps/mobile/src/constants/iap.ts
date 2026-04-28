@@ -19,9 +19,9 @@
  *   - `ALL_PRODUCT_IDS`        — used by `iap-service` to warm up StoreKit
  *                                with the canonical SKU set on app launch.
  *   - `productIdToPlan` /
- *     `planToProductId`        — receipt-verification mapping between Apple
- *                                productId strings and the backend's two
- *                                tier plans ('monthly' | 'yearly').
+ *     `planToProductId`        — bootstrap-only fallback mapping. Runtime
+ *                                receipt verification must use the server
+ *                                catalog's `plan` field instead.
  *   - `TRIAL_ELIGIBLE_PRODUCTS`— Apple configures the 7-day intro trial only
  *                                on the monthly product; this stays static
  *                                and platform-driven, not server-driven.
@@ -41,7 +41,7 @@ export const IAP_PRODUCTS = {
   yearlyPromo: 'com.vividrop.mobile.china.yearly.9900',
 } as const;
 
-export type IapProductId = (typeof IAP_PRODUCTS)[keyof typeof IAP_PRODUCTS];
+export type IapProductId = string;
 export type IapPlanKey = keyof typeof IAP_PRODUCTS;
 
 export const ALL_PRODUCT_IDS: readonly IapProductId[] =

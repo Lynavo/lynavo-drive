@@ -1,6 +1,10 @@
 {
+  "title": "連接設備",
   "deviceLabel": "正在連接：{{deviceName}} ({{host}})",
-  "prompt": "請輸入電腦端顯示的 6 位連接碼",
+  "prompt": "請輸入 6 位數字連接碼",
   "verifying": "正在驗證連接碼...",
-  "helpText": "請確保手機與電腦處於同一區域網路下，在電腦端開啟應用即可看到連接碼"
+  "helpTitle": "去哪裡找連接碼？",
+  "helpText": "請在電腦端 Vivi Drop 左側導覽列點擊「全域設定」，即可查看 6 位數字連接碼。",
+  "helpSecondary": "連接碼不會自動刷新，需手動點擊「重新產生」才會更新。",
+  "exampleLabel": "示例"
 }
