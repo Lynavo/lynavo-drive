@@ -153,8 +153,10 @@ type NavigationProp = StackNavigationProp<
 export function DeviceDiscoveryScreen() {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isAndroid = Platform.OS === 'android';
+  const language = i18n.resolvedLanguage ?? i18n.language;
+  const popoverMenuWidth = language.startsWith('zh') ? 176 : 200;
   const route = useRoute<RouteProp<RootStackParamList, 'DeviceDiscovery'>>();
   const mode = route.params?.mode ?? 'initial';
   const [knownDeviceIds, setKnownDeviceIds] = useState<Set<string>>(new Set());
@@ -701,7 +703,12 @@ export function DeviceDiscoveryScreen() {
             style={styles.popoverOverlay}
             onPress={() => setShowPairingMenu(false)}
           >
-            <View style={[styles.popoverMenu, { top: insets.top + 60 }]}>
+            <View
+              style={[
+                styles.popoverMenu,
+                { top: insets.top + 60, width: popoverMenuWidth },
+              ]}
+            >
               <TouchableOpacity
                 style={styles.popoverItem}
                 onPress={() => {
@@ -1103,8 +1110,7 @@ const styles = StyleSheet.create({
   },
   popoverMenu: {
     position: 'absolute',
-    right: 20,
-    width: 160,
+    right: 16,
     backgroundColor: '#fff',
     borderRadius: 14,
     paddingVertical: 6,
@@ -1121,10 +1127,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
   },
   popoverText: {
+    flex: 1,
+    flexShrink: 1,
     fontSize: 14,
+    lineHeight: 20,
     fontWeight: '500',
     color: colors.screenTitle,
   },
