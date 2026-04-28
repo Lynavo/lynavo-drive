@@ -68,6 +68,7 @@ const ionicons: Record<string, number> = {
   'lock-closed-outline': 60624,
   'card-outline': 60162,
   'star-outline': 61087,
+  'cube-outline': 60314,
   'trash-outline': 61175,
 };
 
