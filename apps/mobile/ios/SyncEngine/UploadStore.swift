@@ -214,7 +214,7 @@ class UploadStore {
               id                INTEGER PRIMARY KEY CHECK (id = 1),
               enabled           INTEGER NOT NULL DEFAULT 0,
               media_filter      TEXT NOT NULL DEFAULT 'all',
-              time_range_mode   TEXT NOT NULL DEFAULT 'from_now',
+              time_range_mode   TEXT NOT NULL DEFAULT 'all',
               custom_time_from  TEXT,
               state             TEXT NOT NULL DEFAULT 'disabled',
               updated_at        TEXT NOT NULL DEFAULT ''
@@ -650,7 +650,7 @@ class UploadStore {
             return AutoUploadConfigRecord(
                 enabled: (row["enabled"] as? Int64 ?? 0) != 0,
                 // media_filter column ignored — auto upload uploads everything
-                timeRangeMode: row["time_range_mode"] as? String ?? "from_now",
+                timeRangeMode: row["time_range_mode"] as? String ?? "all",
                 customTimeFrom: row["custom_time_from"] as? String,
                 state: row["state"] as? String ?? "disabled",
                 updatedAt: row["updated_at"] as? String ?? ""

@@ -19,7 +19,7 @@ class AutoUploadConfigStore {
         // Return default config when no row exists yet
         return AutoUploadConfigRecord(
             enabled: false,
-            timeRangeMode: "from_now",
+            timeRangeMode: "all",
             customTimeFrom: nil,
             state: "disabled",
             updatedAt: ""

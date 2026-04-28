@@ -1039,7 +1039,7 @@ describe('getSyncActivityDisplayProgressPercent', () => {
 });
 
 describe('getSyncActivityAutoRoundDisplayMetrics', () => {
-  it('uses the current auto round as the progress denominator instead of cumulative completed history', () => {
+  it('seeds a session baseline from pre-existing completed history before auto upload starts', () => {
     expect(
       getSyncActivityAutoRoundDisplayMetrics({
         overview: {
@@ -1126,38 +1126,73 @@ describe('getSyncActivityAutoRoundDisplayMetrics', () => {
     });
   });
 
-  it('prefers the native-provided round baseline when entering mid-round', () => {
+  it('keeps auto upload running progress on the session total instead of the native batch total', () => {
     expect(
       getSyncActivityAutoRoundDisplayMetrics({
         overview: {
           uploadState: 'uploading',
-          completedCount: 7,
-          totalCount: 6046,
-          completedBytes: 4096,
+          completedCount: 927,
+          totalCount: 1618,
+          completedBytes: 12_700,
           currentTaskSource: 'auto',
-          lastCompletedTaskSource: 'manual',
+          lastCompletedTaskSource: 'auto',
           autoUploadState: 'active',
-          autoPending: 6039,
-          roundBaselineCompletedCount: 4,
-          roundBaselineCompletedBytes: 1024,
+          autoPending: 691,
+          roundBaselineCompletedCount: 800,
+          roundBaselineCompletedBytes: 10_000,
         },
         isManualUploading: false,
         rawMainCardState: 'running',
-        baseline: null,
+        baseline: {
+          completedCount: 0,
+          completedBytes: 0,
+        },
       }),
     ).toEqual({
       shouldTrack: true,
       baseline: {
-        completedCount: 4,
-        completedBytes: 1024,
+        completedCount: 0,
+        completedBytes: 0,
       },
-      completedCount: 3,
-      totalCount: 6042,
-      completedBytes: 3072,
+      completedCount: 927,
+      totalCount: 1618,
+      completedBytes: 12_700,
+    });
+
+    expect(
+      getSyncActivityAutoRoundDisplayMetrics({
+        overview: {
+          uploadState: 'uploading',
+          completedCount: 1610,
+          totalCount: 1618,
+          completedBytes: 30_735_000_000,
+          currentTaskSource: 'auto',
+          lastCompletedTaskSource: 'auto',
+          autoUploadState: 'active',
+          autoPending: 8,
+          roundBaselineCompletedCount: 1600,
+          roundBaselineCompletedBytes: 30_700_000_000,
+        },
+        isManualUploading: false,
+        rawMainCardState: 'running',
+        baseline: {
+          completedCount: 0,
+          completedBytes: 0,
+        },
+      }),
+    ).toEqual({
+      shouldTrack: true,
+      baseline: {
+        completedCount: 0,
+        completedBytes: 0,
+      },
+      completedCount: 1610,
+      totalCount: 1618,
+      completedBytes: 30_735_000_000,
     });
   });
 
-  it('keeps the same auto-round baseline through completed and standby cards', () => {
+  it('shows cumulative totals on the completed card while keeping the auto-round baseline for standby', () => {
     const baseline = {
       completedCount: 4,
       completedBytes: 1024,
@@ -1182,9 +1217,9 @@ describe('getSyncActivityAutoRoundDisplayMetrics', () => {
     ).toEqual({
       shouldTrack: true,
       baseline,
-      completedCount: 6,
-      totalCount: 6,
-      completedBytes: 7168,
+      completedCount: 10,
+      totalCount: 10,
+      completedBytes: 8192,
     });
 
     expect(
@@ -1209,6 +1244,34 @@ describe('getSyncActivityAutoRoundDisplayMetrics', () => {
       completedCount: 6,
       totalCount: 6,
       completedBytes: 7168,
+    });
+  });
+
+  it('shows cumulative auto session totals on the completed card instead of the final upload batch', () => {
+    expect(
+      getSyncActivityAutoRoundDisplayMetrics({
+        overview: {
+          uploadState: 'completed',
+          completedCount: 1611,
+          totalCount: 1611,
+          completedBytes: 30_737_316_309,
+          currentTaskSource: undefined,
+          lastCompletedTaskSource: 'auto',
+          autoUploadState: 'active',
+          autoPending: 0,
+          roundBaselineCompletedCount: 1600,
+          roundBaselineCompletedBytes: 30_697_316_309,
+        },
+        isManualUploading: false,
+        rawMainCardState: 'auto_completed',
+        baseline: null,
+      }),
+    ).toEqual({
+      shouldTrack: true,
+      baseline: null,
+      completedCount: 1611,
+      totalCount: 1611,
+      completedBytes: 30_737_316_309,
     });
   });
 

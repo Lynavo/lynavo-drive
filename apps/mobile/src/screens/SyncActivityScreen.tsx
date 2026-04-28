@@ -479,21 +479,21 @@ export function getSyncActivityAutoRoundDisplayMetrics(input: {
     };
   }
 
-  const nativeBaseline =
-    typeof overview.roundBaselineCompletedCount === 'number' &&
-    typeof overview.roundBaselineCompletedBytes === 'number'
-      ? {
-          completedCount: overview.roundBaselineCompletedCount,
-          completedBytes: overview.roundBaselineCompletedBytes,
-        }
-      : null;
-  const resolvedKnownBaseline = nativeBaseline ?? baseline ?? null;
+  const resolvedKnownBaseline = baseline ?? null;
+
+  if (rawMainCardState === 'auto_completed') {
+    return {
+      shouldTrack: true,
+      baseline: resolvedKnownBaseline,
+      completedCount: overview.completedCount,
+      totalCount: overview.totalCount,
+      completedBytes: overview.completedBytes,
+    };
+  }
 
   const canSeedBaseline =
     baseline !== null ||
-    (overview.currentTaskSource !== 'auto' &&
-      rawMainCardState !== 'auto_completed' &&
-      rawMainCardState !== 'standby');
+    (overview.currentTaskSource !== 'auto' && rawMainCardState !== 'standby');
 
   if (!resolvedKnownBaseline && !canSeedBaseline) {
     return {

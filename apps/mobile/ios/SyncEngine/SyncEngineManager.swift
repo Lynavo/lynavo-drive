@@ -5704,7 +5704,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         guard let configStore = autoUploadConfigStore else {
             return [
                 "enabled": false,
-                "timeRangeMode": "from_now",
+                "timeRangeMode": "all",
                 "state": "disabled",
             ]
         }
