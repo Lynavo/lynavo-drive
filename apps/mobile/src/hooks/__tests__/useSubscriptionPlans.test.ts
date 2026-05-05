@@ -8,11 +8,6 @@ jest.mock('../../services/subscription-plans-service', () => ({
   subscriptionPlansService: {
     fetchPlans: jest.fn(),
   },
-  // The hook imports `buildBootstrapPlans` and `buildBootstrapProducts` to
-  // seed initial `plans` and `products` state and avoid the blank-row /
-  // "—" price flash before the network response arrives. Tests overwrite
-  // the seeds via `setPlans` / `setProducts` once `fetchPlans` resolves,
-  // so empty seeds are enough — assertions all fire after `loading: false`.
   buildBootstrapPlans: jest.fn(() => []),
   buildBootstrapProducts: jest.fn(() => []),
 }));
@@ -31,7 +26,11 @@ jest.mock('../../constants/features', () => ({
   },
 }));
 
-import { subscriptionPlansService } from '../../services/subscription-plans-service';
+import {
+  buildBootstrapPlans,
+  buildBootstrapProducts,
+  subscriptionPlansService,
+} from '../../services/subscription-plans-service';
 import { iapService, type IapProductSummary } from '../../services/iap-service';
 import { useSubscriptionPlans } from '../useSubscriptionPlans';
 import { IAP_PRODUCTS } from '../../constants/iap';
@@ -136,6 +135,17 @@ const adminProduct: IapProductSummary = {
   eligibleForIntroOffer: false,
 };
 
+function mockFixedBootstrapSkuFallback(): void {
+  (buildBootstrapPlans as jest.Mock).mockReturnValue([
+    monthlyPlan,
+    yearlyPromoPlan,
+  ]);
+  (buildBootstrapProducts as jest.Mock).mockReturnValue([
+    monthlyProduct,
+    yearlyPromoProduct,
+  ]);
+}
+
 // Identity formatters keep assertions deterministic without depending on
 // Hermes Intl quirks. The hook's only contract with the formatters is that
 // `formatSavings(formatPrice(...))` produces a string the screen can render.
@@ -147,6 +157,8 @@ const formatSavings = (savingsDisplay: string): string =>
 describe('useSubscriptionPlans', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (buildBootstrapPlans as jest.Mock).mockReturnValue([]);
+    (buildBootstrapProducts as jest.Mock).mockReturnValue([]);
   });
 
   test('merges server catalog with StoreKit products and computes yearly savings', async () => {
@@ -244,15 +256,16 @@ describe('useSubscriptionPlans', () => {
     expect(result.current.error).toBeNull();
   });
 
-  test('surfaces STOREKIT_EMPTY when Apple returns no products for known SKUs', async () => {
-    // Arrange: catalog has plans but StoreKit is empty (sandbox not signed
-    // in, ASC mis-config, etc.). Hook must promote that to a typed error so
-    // the screen can render the retry banner instead of empty cards.
+  test('falls back to the two fixed SKUs when Apple returns no products', async () => {
+    // Arrange: catalog has plans but StoreKit is empty (sandbox not signed in,
+    // ASC mis-config, etc.). The hook should keep the paywall renderable with
+    // the fixed bootstrap SKU pair.
     (subscriptionPlansService.fetchPlans as jest.Mock).mockResolvedValueOnce({
       plans: [monthlyPlan, yearlyPlan],
       source: 'network',
     });
     (iapService.getProductSummaries as jest.Mock).mockResolvedValueOnce([]);
+    mockFixedBootstrapSkuFallback();
 
     // Act
     const { result } = renderHook(() =>
@@ -261,7 +274,13 @@ describe('useSubscriptionPlans', () => {
 
     // Assert
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.error).toBe('STOREKIT_EMPTY');
+    await waitFor(() => expect(result.current.productsLoading).toBe(false));
+    expect(result.current.error).toBeNull();
+    expect(result.current.source).toBe('bootstrap');
+    expect(result.current.plans.map(entry => entry.plan.product_id)).toEqual([
+      IAP_PRODUCTS.monthly,
+      IAP_PRODUCTS.yearlyPromo,
+    ]);
   });
 
   test('refresh re-fetches both catalog and StoreKit products', async () => {

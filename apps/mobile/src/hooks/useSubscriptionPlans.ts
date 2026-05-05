@@ -21,11 +21,9 @@ export interface YearlySavings {
 
 export interface PlanWithProduct {
   plan: CatalogSubscriptionPlan;
-  /** `null` when StoreKit did not return a SKU matching `plan.product_id`.
-   *  Reasons: ASC mis-config, sandbox not signed in, region restriction.
-   *  Decision: keep the entry so the screen can render an "unavailable"
-   *  placeholder rather than silently dropping a server-driven plan. The
-   *  screen layer (#19) decides whether to filter or display the placeholder. */
+  /** `null` only when neither StoreKit nor the fixed fallback can describe
+   *  `plan.product_id`. Purchase still re-checks StoreKit availability before
+   *  requesting payment. */
   product: IapProductSummary | null;
   /** Yearly savings vs the cheapest monthly-period anchor in the same
    *  currency. `null` for monthly plans, plans without a product, or when no
@@ -125,6 +123,16 @@ function computePlanSavings(
   );
 }
 
+function buildFixedSkuFallback(): {
+  plans: CatalogSubscriptionPlan[];
+  products: IapProductSummary[];
+} {
+  return {
+    plans: buildBootstrapPlans('ios').filter(plan => plan.active),
+    products: buildBootstrapProducts(),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -184,7 +192,12 @@ export function useSubscriptionPlans({
       setPlans(validPlans);
       setSource(catalog.source);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      console.warn('[useSubscriptionPlans] catalog fetch failed', err);
+      const fallback = buildFixedSkuFallback();
+      validPlans = fallback.plans;
+      setPlans(fallback.plans);
+      setProducts(fallback.products);
+      setSource('bootstrap');
     } finally {
       setLoading(false);
     }
@@ -198,17 +211,23 @@ export function useSubscriptionPlans({
       const skus = validPlans.map(p => p.product_id);
       const fetchedProducts =
         skus.length > 0 ? await iapService.getProductSummaries(skus) : [];
-      setProducts(fetchedProducts);
-
-      // Surface STOREKIT_EMPTY when the catalog promised SKUs but Apple
-      // returned nothing. Bootstrap source can also legitimately produce
-      // zero products in dev — still useful signal.
       if (validPlans.length > 0 && fetchedProducts.length === 0) {
-        setError('STOREKIT_EMPTY');
+        console.warn(
+          '[useSubscriptionPlans] StoreKit returned no products; using fixed fallback SKUs',
+        );
+        const fallback = buildFixedSkuFallback();
+        setPlans(fallback.plans);
+        setProducts(fallback.products);
+        setSource('bootstrap');
+      } else {
+        setProducts(fetchedProducts);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setProducts([]);
+      console.warn('[useSubscriptionPlans] StoreKit product fetch failed', err);
+      const fallback = buildFixedSkuFallback();
+      setPlans(fallback.plans);
+      setProducts(fallback.products);
+      setSource('bootstrap');
     } finally {
       setProductsLoading(false);
     }

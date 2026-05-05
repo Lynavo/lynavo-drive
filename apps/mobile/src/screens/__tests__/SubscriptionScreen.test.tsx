@@ -81,11 +81,6 @@ jest.mock('../../services/subscription-plans-service', () => ({
     if (plan.tier === 'monthly' || plan.tier === 'yearly') return plan.tier;
     return null;
   },
-  // Hook imports `buildBootstrapPlans` and `buildBootstrapProducts` to seed
-  // initial render. Empty seeds are fine here because all assertions wait
-  // for `loading: false` before checking — by then `fetchPlans` mock has
-  // populated `plans` directly and `iapService.getProductSummaries` mock
-  // has populated `products` directly.
   buildBootstrapPlans: jest.fn(() => []),
   buildBootstrapProducts: jest.fn(() => []),
 }));
@@ -159,7 +154,11 @@ jest.mock('../../stores/auth-store', () => ({
 import i18n from '../../i18n';
 import { SubscriptionScreen, resolveCurrentPlan } from '../SubscriptionScreen';
 import { iapService, type IapProductSummary } from '../../services/iap-service';
-import { subscriptionPlansService } from '../../services/subscription-plans-service';
+import {
+  buildBootstrapPlans,
+  buildBootstrapProducts,
+  subscriptionPlansService,
+} from '../../services/subscription-plans-service';
 import { IAP_PRODUCTS } from '../../constants/iap';
 import { verifyIapReceipt } from '../../services/subscription-service';
 import { ApiError, ERROR_CODE } from '../../services/api';
@@ -251,6 +250,41 @@ const adminMonthlyProduct: IapProductSummary = {
   eligibleForIntroOffer: false,
 };
 
+const yearlyPromoPlan: SubscriptionPlanDto = makePlan({
+  id: 3,
+  product_id: IAP_PRODUCTS.yearlyPromo,
+  plan: 'yearly',
+  name: '限时年费',
+  description: '新用户限时优惠价',
+  badges: ['限时优惠'],
+  sort_order: 3,
+});
+
+const yearlyPromoProduct: IapProductSummary = {
+  productId: IAP_PRODUCTS.yearlyPromo,
+  displayPrice: '¥99.00',
+  priceAmount: 99,
+  currency: 'CNY',
+  periodUnit: 'YEAR',
+  periodCount: 1,
+  eligibleForIntroOffer: false,
+};
+
+function mockFixedBootstrapSkuFallback(): void {
+  (buildBootstrapPlans as jest.Mock).mockReturnValue([
+    monthlyPlan,
+    yearlyPromoPlan,
+  ]);
+  (buildBootstrapProducts as jest.Mock).mockReturnValue([
+    {
+      ...monthlyProduct,
+      displayPrice: '¥9.99',
+      priceAmount: 9.99,
+    },
+    yearlyPromoProduct,
+  ]);
+}
+
 function mockCatalog(
   plans: SubscriptionPlanDto[],
   products: IapProductSummary[],
@@ -290,6 +324,8 @@ describe('SubscriptionScreen', () => {
     mockAuthState.subscription = null;
     mockLoadSubscription.mockResolvedValue(null);
     mockSetSubscription.mockReset();
+    (buildBootstrapPlans as jest.Mock).mockReturnValue([]);
+    (buildBootstrapProducts as jest.Mock).mockReturnValue([]);
     // Default catalog — both plans, both products. Individual tests override.
     mockCatalog([monthlyPlan, yearlyPlan], [monthlyProduct, yearlyProduct]);
   });
@@ -340,19 +376,24 @@ describe('SubscriptionScreen', () => {
     expect(queryByText('月度方案')).toBeNull();
   });
 
-  test('shows STOREKIT_EMPTY error banner when no plans are renderable', async () => {
-    // Arrange: server catalog has rows but Apple returned nothing — the
-    // screen filters those out and lands on the empty-paywall error path.
+  test('renders fixed fallback SKU cards when StoreKit returns no products', async () => {
+    // Arrange: server catalog has rows but Apple returned nothing. The screen
+    // should switch to the fixed fallback SKU pair instead of showing the
+    // unavailable banner.
     mockCatalog([monthlyPlan, yearlyPlan], []);
+    mockFixedBootstrapSkuFallback();
 
     // Act
-    const { findByText } = renderScreen();
+    const { findByText, queryByText } = renderScreen();
 
-    // Assert: error banner copy + retry affordance render so the user can
-    // recover instead of staring at a blank paywall.
+    // Assert
+    expect(await findByText('月度方案')).toBeTruthy();
+    expect(await findByText('限时年费')).toBeTruthy();
+    expect(await findByText('¥9.99')).toBeTruthy();
+    expect(await findByText('¥99.00')).toBeTruthy();
     expect(
-      await findByText(/暂时无法获取方案信息|暫時無法獲取|temporarily unable/i),
-    ).toBeTruthy();
+      queryByText(/暂时无法获取方案信息|暫時無法獲取|temporarily unavailable/i),
+    ).toBeNull();
   });
 
   test('shows offline-mode footer note when source is bootstrap', async () => {
