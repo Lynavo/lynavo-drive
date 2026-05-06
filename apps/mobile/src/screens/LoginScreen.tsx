@@ -20,6 +20,10 @@ import {
   AUTH_COLORS,
   AuthScreenShell,
 } from '../components/auth/AuthScreenShell';
+import {
+  authCardSurfaceStyle,
+  authTextScalingProps,
+} from '../components/auth/authPlatformStyles';
 import { useAuth } from '../stores/auth-store';
 import { isValidChinaPhone } from '../utils/phone-validation';
 import { sendSmsCode } from '../services/auth-service';
@@ -152,12 +156,14 @@ export function LoginScreen() {
           {auth.signedOutTransition === 'session_replaced' ? (
             <View style={styles.noticeBanner}>
               <Icon name="alert-circle" size={18} color={AUTH_COLORS.primary} />
-              <Text style={styles.noticeText}>
+              <Text {...authTextScalingProps} style={styles.noticeText}>
                 {t('auth.login.sessionReplaced')}
               </Text>
             </View>
           ) : null}
-          <Text style={styles.cardTitle}>{t('auth.login.firstLoginHint')}</Text>
+          <Text {...authTextScalingProps} style={styles.cardTitle}>
+            {t('auth.login.firstLoginHint')}
+          </Text>
 
           <View style={styles.fieldWrap}>
             <View
@@ -172,10 +178,13 @@ export function LoginScreen() {
                   size={16}
                   color={AUTH_COLORS.textMuted}
                 />
-                <Text style={styles.prefixText}>+86</Text>
+                <Text {...authTextScalingProps} style={styles.prefixText}>
+                  +86
+                </Text>
               </View>
               <View style={styles.divider} />
               <TextInput
+                {...authTextScalingProps}
                 style={styles.phoneInput}
                 value={phone}
                 onChangeText={handlePhoneChange}
@@ -190,7 +199,9 @@ export function LoginScreen() {
               />
             </View>
             {phoneError && (
-              <Text style={styles.phoneErrorText}>{phoneError}</Text>
+              <Text {...authTextScalingProps} style={styles.phoneErrorText}>
+                {phoneError}
+              </Text>
             )}
           </View>
 
@@ -206,9 +217,10 @@ export function LoginScreen() {
                 <Icon name="checkmark" size={12} color="#ffffff" />
               ) : null}
             </Pressable>
-            <Text style={styles.agreementText}>
+            <Text {...authTextScalingProps} style={styles.agreementText}>
               {t('auth.login.agreePrefix')}
               <Text
+                {...authTextScalingProps}
                 style={styles.agreementLinkText}
                 onPress={handleOpenUserAgreement}
                 suppressHighlighting
@@ -217,6 +229,7 @@ export function LoginScreen() {
               </Text>
               {t('auth.login.agreeConjunction')}
               <Text
+                {...authTextScalingProps}
                 style={styles.agreementLinkText}
                 onPress={handleOpenPrivacyPolicy}
                 suppressHighlighting
@@ -236,10 +249,14 @@ export function LoginScreen() {
             activeOpacity={0.8}
             disabled={!buttonEnabled}
           >
+            {buttonEnabled && !sending ? (
+              <View pointerEvents="none" style={styles.sendButtonAccent} />
+            ) : null}
             {sending ? (
               <ActivityIndicator size="small" color="#ffffff" />
             ) : null}
             <Text
+              {...authTextScalingProps}
               style={[
                 styles.sendButtonText,
                 !buttonEnabled ? styles.sendButtonTextDisabled : null,
@@ -269,7 +286,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: AUTH_COLORS.surface,
     borderRadius: 24,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: AUTH_COLORS.surfaceBorder,
     paddingHorizontal: 24,
     paddingTop: 28,
@@ -278,7 +295,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
     shadowRadius: 24,
-    elevation: 4,
+    width: '100%',
+    maxWidth: 384,
+    alignSelf: 'center',
+    ...authCardSurfaceStyle,
   },
   noticeBanner: {
     flexDirection: 'row',
@@ -394,11 +414,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 10,
+    overflow: 'hidden',
     shadowColor: AUTH_COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 4,
+  },
+  sendButtonAccent: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: '55%',
+    backgroundColor: '#60c4f0',
+    opacity: 0.85,
   },
   sendButtonDisabled: {
     backgroundColor: AUTH_COLORS.primaryDisabled,
@@ -412,6 +442,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#ffffff',
+    zIndex: 1,
   },
   sendButtonTextDisabled: {
     color: AUTH_COLORS.primaryTextDisabled,

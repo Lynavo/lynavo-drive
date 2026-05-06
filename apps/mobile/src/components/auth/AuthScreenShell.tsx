@@ -15,13 +15,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '../Icon';
+import { authTextScalingProps } from './authPlatformStyles';
 
 const APP_LOGO = require('../../assets/icons/app-logo.png');
 
 export const AUTH_COLORS = {
-  background: '#f0f9ff',
+  background: '#ffffff',
   surface: 'rgba(255,255,255,0.86)',
-  surfaceBorder: 'rgba(59,130,246,0.12)',
+  surfaceBorder: 'rgba(59,130,246,0.08)',
   primary: '#3b82f6',
   primaryPressed: '#2563eb',
   primaryDisabled: 'rgba(0,0,0,0.06)',
@@ -54,10 +55,7 @@ export function AuthScreenShell({
   const { t } = useTranslation();
   return (
     <View style={styles.root}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor="#e0f2fe"
-      />
+      <StatusBar barStyle="dark-content" backgroundColor="#e0f2fe" />
       <View style={styles.backgroundLayer} pointerEvents="none">
         <View style={styles.topWash} />
         <View style={styles.middleWash} />
@@ -98,8 +96,12 @@ export function AuthScreenShell({
                   resizeMode="contain"
                 />
               </View>
-              <Text style={styles.brandTitle}>Vivi Drop</Text>
-              <Text style={styles.brandSubtitle}>{subtitle}</Text>
+              <Text {...authTextScalingProps} style={styles.brandTitle}>
+                Vivi Drop
+              </Text>
+              <Text {...authTextScalingProps} style={styles.brandSubtitle}>
+                {subtitle}
+              </Text>
             </View>
 
             {children}
@@ -131,15 +133,15 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: '42%',
+    height: '34%',
     backgroundColor: '#e0f2fe',
   },
   middleWash: {
     position: 'absolute',
-    top: '34%',
+    top: '28%',
     left: 0,
     right: 0,
-    height: '30%',
+    height: '34%',
     backgroundColor: '#f0f9ff',
   },
   bottomWash: {
@@ -147,8 +149,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: '40%',
-    backgroundColor: '#f0f9ff',
+    height: '45%',
+    backgroundColor: '#ffffff',
   },
   backButton: {
     position: 'absolute',
@@ -177,19 +179,19 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   logoWrap: {
-    width: 96,
+    width: 116,
     height: 64,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
   },
   logo: {
-    width: 96,
+    width: 116,
     height: 64,
   },
   brandTitle: {
     fontSize: 24,
-    fontWeight: '800',
+    fontWeight: '700',
     color: AUTH_COLORS.text,
   },
   brandSubtitle: {
