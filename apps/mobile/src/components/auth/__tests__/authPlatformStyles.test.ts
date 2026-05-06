@@ -12,7 +12,12 @@ describe('auth platform styles', () => {
   });
 
   it('keeps a light Android card elevation matching the v0 login surface', () => {
-    expect(getAuthCardSurfaceStyle('android')).toEqual({ elevation: 4 });
+    expect(getAuthCardSurfaceStyle('android')).toEqual({
+      backgroundColor: '#fbfdff',
+      borderColor: 'rgba(59,130,246,0.10)',
+      borderWidth: 1,
+      elevation: 4,
+    });
   });
 
   it('keeps iOS auth text scalable within the designed cap', () => {

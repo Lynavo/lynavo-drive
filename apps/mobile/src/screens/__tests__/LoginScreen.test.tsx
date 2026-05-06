@@ -1,6 +1,7 @@
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import type { ReactTestRendererJSON } from 'react-test-renderer';
 
 jest.mock('react-native-localize', () => ({
   getLocales: () => [
@@ -76,6 +77,29 @@ import i18n from '../../i18n';
 import { LoginScreen } from '../LoginScreen';
 import { ApiError, ERROR_CODE } from '../../services/api';
 
+function collectBackgroundColors(
+  node: ReactTestRendererJSON | ReactTestRendererJSON[] | null,
+): string[] {
+  if (!node) {
+    return [];
+  }
+
+  if (Array.isArray(node)) {
+    return node.flatMap(child => collectBackgroundColors(child));
+  }
+
+  const style = StyleSheet.flatten(node.props.style);
+  const ownColor =
+    style && typeof style.backgroundColor === 'string'
+      ? [style.backgroundColor]
+      : [];
+  const childColors = (node.children ?? []).flatMap(child =>
+    typeof child === 'string' ? [] : collectBackgroundColors(child),
+  );
+
+  return [...ownColor, ...childColors];
+}
+
 describe('LoginScreen', () => {
   beforeAll(async () => {
     await i18n.changeLanguage('zh-Hant');
@@ -130,5 +154,14 @@ describe('LoginScreen', () => {
         authBaseUrl: 'https://review-api.vividrop.cn',
       });
     });
+  });
+
+  it('renders the enabled request-code button without a secondary blue overlay', () => {
+    const { getByPlaceholderText, getByRole, toJSON } = render(<LoginScreen />);
+
+    fireEvent.changeText(getByPlaceholderText('請輸入手機號碼'), '17000000002');
+    fireEvent.press(getByRole('checkbox'));
+
+    expect(collectBackgroundColors(toJSON())).not.toContain('#60c4f0');
   });
 });

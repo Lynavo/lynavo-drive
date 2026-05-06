@@ -249,9 +249,6 @@ export function LoginScreen() {
             activeOpacity={0.8}
             disabled={!buttonEnabled}
           >
-            {buttonEnabled && !sending ? (
-              <View pointerEvents="none" style={styles.sendButtonAccent} />
-            ) : null}
             {sending ? (
               <ActivityIndicator size="small" color="#ffffff" />
             ) : null}
@@ -420,15 +417,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 4,
-  },
-  sendButtonAccent: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width: '55%',
-    backgroundColor: '#60c4f0',
-    opacity: 0.85,
   },
   sendButtonDisabled: {
     backgroundColor: AUTH_COLORS.primaryDisabled,

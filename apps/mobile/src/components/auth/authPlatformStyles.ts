@@ -24,9 +24,17 @@ export function getAuthTextScalingProps(
 
 export function getAuthCardSurfaceStyle(
   platform: PlatformName = Platform.OS,
-): Pick<ViewStyle, 'elevation'> {
+): Pick<
+  ViewStyle,
+  'backgroundColor' | 'borderColor' | 'borderWidth' | 'elevation'
+> {
   if (platform === 'android') {
-    return { elevation: 4 };
+    return {
+      backgroundColor: '#fbfdff',
+      borderColor: 'rgba(59,130,246,0.10)',
+      borderWidth: 1,
+      elevation: 4,
+    };
   }
 
   return {};
