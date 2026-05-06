@@ -11,6 +11,7 @@ import {
   Alert,
   Linking,
   Platform,
+  Modal,
   ActivityIndicator,
   Clipboard,
 } from 'react-native';
@@ -243,6 +244,9 @@ export function SettingsScreen() {
     useState(false);
   const [isUploadingDiagnostics, setIsUploadingDiagnostics] = useState(false);
   const [diagnosticUploadProgress, setDiagnosticUploadProgress] = useState(0);
+  const [diagnosticPromptVisible, setDiagnosticPromptVisible] =
+    useState(false);
+  const [diagnosticPromptNote, setDiagnosticPromptNote] = useState('');
   const diagnosticAbortRef = useRef<AbortController | null>(null);
   const [languagePreference, setLanguagePreference] =
     useState<LanguagePreference>('system');
@@ -531,8 +535,8 @@ export function SettingsScreen() {
     }
   }, [navigation, syncOverviewState, t]);
 
-  const handleUploadDiagnostics = useCallback(() => {
-    const startUpload = (rawNote?: string): void => {
+  const startDiagnosticUpload = useCallback(
+    (rawNote?: string): void => {
       void (async () => {
         const { NativeSyncEngine } = NativeModules;
         if (!NativeSyncEngine?.exportDiagnostics) {
@@ -596,10 +600,13 @@ export function SettingsScreen() {
           setDiagnosticUploadProgress(0);
         }
       })();
-    };
+    },
+    [t],
+  );
 
-    // Alert.prompt is iOS-only; fall back to Alert.alert (without the input
-    // field) on platforms where it isn't available so the upload still works.
+  const handleUploadDiagnostics = useCallback(() => {
+    // Alert.prompt is iOS-only; Android uses the in-tree modal below so both
+    // platforms can attach a short support note before upload.
     if (Platform.OS === 'ios' && typeof Alert.prompt === 'function') {
       Alert.prompt(
         t('settings.uploadDiagnostic.confirm.title'),
@@ -611,29 +618,17 @@ export function SettingsScreen() {
           },
           {
             text: t('settings.uploadDiagnostic.confirm.ok'),
-            onPress: (note?: string) => startUpload(note),
+            onPress: (note?: string) => startDiagnosticUpload(note),
           },
         ],
         'plain-text',
         '',
       );
     } else {
-      Alert.alert(
-        t('settings.uploadDiagnostic.confirm.title'),
-        t('settings.uploadDiagnostic.confirm.message'),
-        [
-          {
-            text: t('settings.uploadDiagnostic.confirm.cancel'),
-            style: 'cancel',
-          },
-          {
-            text: t('settings.uploadDiagnostic.confirm.ok'),
-            onPress: () => startUpload(),
-          },
-        ],
-      );
+      setDiagnosticPromptNote('');
+      setDiagnosticPromptVisible(true);
     }
-  }, [auth.user?.id, t]);
+  }, [startDiagnosticUpload, t]);
 
   const handleResetSyncStatus = useCallback(() => {
     if (isResetSyncDisabled) return;
@@ -1559,6 +1554,71 @@ export function SettingsScreen() {
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
+      <Modal
+        visible={diagnosticPromptVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setDiagnosticPromptVisible(false);
+          setDiagnosticPromptNote('');
+        }}
+      >
+        <View style={styles.diagnosticPromptBackdrop}>
+          <View style={styles.diagnosticPromptCard}>
+            <Text style={styles.diagnosticPromptTitle}>
+              {t('settings.uploadDiagnostic.confirm.title')}
+            </Text>
+            <Text style={styles.diagnosticPromptMessage}>
+              {t('settings.uploadDiagnostic.confirm.message')}
+            </Text>
+            <TextInput
+              value={diagnosticPromptNote}
+              onChangeText={setDiagnosticPromptNote}
+              placeholder={t('settings.uploadDiagnostic.confirm.placeholder')}
+              placeholderTextColor={MUTED_TEXT}
+              style={styles.diagnosticPromptInput}
+              multiline
+              maxLength={500}
+              textAlignVertical="top"
+              accessibilityLabel={t(
+                'settings.uploadDiagnostic.confirm.placeholder',
+              )}
+            />
+            <View style={styles.diagnosticPromptActions}>
+              <TouchableOpacity
+                style={styles.diagnosticPromptButton}
+                activeOpacity={0.75}
+                onPress={() => {
+                  setDiagnosticPromptVisible(false);
+                  setDiagnosticPromptNote('');
+                }}
+              >
+                <Text style={styles.diagnosticPromptCancelText}>
+                  {t('settings.uploadDiagnostic.confirm.cancel')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.diagnosticPromptButton,
+                  styles.diagnosticPromptPrimaryButton,
+                ]}
+                activeOpacity={0.75}
+                onPress={() => {
+                  const note = diagnosticPromptNote;
+                  setDiagnosticPromptVisible(false);
+                  setDiagnosticPromptNote('');
+                  startDiagnosticUpload(note);
+                }}
+              >
+                <Text style={styles.diagnosticPromptPrimaryText}>
+                  {t('settings.uploadDiagnostic.confirm.ok')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {isLoggingOut ? (
         <View
           style={styles.logoutTransitionOverlay}
@@ -2120,6 +2180,77 @@ const styles = StyleSheet.create({
 
   bottomSpacer: {
     height: 20,
+  },
+
+  // Diagnostics upload prompt
+  diagnosticPromptBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(28,28,30,0.34)',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  diagnosticPromptCard: {
+    backgroundColor: 'rgba(255,255,255,0.98)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    padding: 18,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  diagnosticPromptTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: DARK,
+    textAlign: 'center',
+  },
+  diagnosticPromptMessage: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: MUTED_TEXT,
+  },
+  diagnosticPromptInput: {
+    minHeight: 92,
+    maxHeight: 140,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.12)',
+    backgroundColor: 'rgba(248,250,252,0.98)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: DARK,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  diagnosticPromptActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  diagnosticPromptButton: {
+    minHeight: 40,
+    minWidth: 76,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  diagnosticPromptPrimaryButton: {
+    backgroundColor: BLUE,
+  },
+  diagnosticPromptCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: MUTED_TEXT,
+  },
+  diagnosticPromptPrimaryText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
   },
 
   // ---------------------------------------------------------------------------

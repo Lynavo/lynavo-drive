@@ -56,6 +56,7 @@
     "confirm": {
       "title": "Upload diagnostics",
       "message": "Briefly describe the issue you ran into (e.g. upload stuck, shared folder not loading). We'll bundle current runtime state along with your note and send it to the Vivi Drop support team.",
+      "placeholder": "e.g. Upload stuck at 30%",
       "ok": "Continue",
       "cancel": "Cancel"
     },

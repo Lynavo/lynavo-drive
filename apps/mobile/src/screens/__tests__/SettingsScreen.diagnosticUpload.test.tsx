@@ -8,7 +8,7 @@
  *  - Error paths: BUNDLE_TOO_LARGE, ABORTED, NETWORK_ERROR → correct toast
  */
 import React from 'react';
-import { Alert, Clipboard } from 'react-native';
+import { Alert, Clipboard, Platform } from 'react-native';
 import { fireEvent, render, waitFor, act } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SubscriptionInfo, UserProfile } from '../../stores/auth-store';
@@ -178,6 +178,13 @@ import { NativeModules, NativeEventEmitter } from 'react-native';
 // Helpers
 // ---------------------------------------------------------------------------
 
+function setPlatformOS(os: 'ios' | 'android'): void {
+  Object.defineProperty(Platform, 'OS', {
+    configurable: true,
+    get: () => os,
+  });
+}
+
 const EXPORT_PATH = '/tmp/diagnostics-test.zip';
 
 const mockNativeSyncEngine = {
@@ -235,6 +242,8 @@ describe('SettingsScreen — diagnostic upload flow', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUpload.mockReset();
+    setPlatformOS('ios');
     (AsyncStorage.getItem as jest.Mock).mockResolvedValue(null);
     (AsyncStorage.setItem as jest.Mock).mockResolvedValue(undefined);
     (AsyncStorage.removeItem as jest.Mock).mockResolvedValue(undefined);
@@ -268,6 +277,39 @@ describe('SettingsScreen — diagnostic upload flow', () => {
       'plain-text',
       '',
     );
+  });
+
+  test('android confirm modal includes a note input and forwards the typed note', async () => {
+    setPlatformOS('android');
+    mockUpload.mockResolvedValueOnce({
+      refId: 'ANDROID1',
+      uploadedAt: '2026-04-25T10:00:00.000Z',
+    });
+
+    const { getByText, getByPlaceholderText } = render(<SettingsScreen />);
+
+    await waitFor(() => {
+      expect(getByText('上傳診斷包')).toBeTruthy();
+    });
+
+    fireEvent.press(getByText('上傳診斷包'));
+
+    fireEvent.changeText(getByPlaceholderText('例如：上傳卡在 30%'), '  Android 上傳失敗  ');
+
+    await act(async () => {
+      fireEvent.press(getByText('繼續'));
+    });
+
+    expect(Alert.prompt).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(mockUpload).toHaveBeenCalledWith(
+        'file:///tmp/diagnostics-test.zip',
+        'mobile-client-uuid',
+        expect.any(AbortSignal),
+        expect.any(Function),
+        'Android 上傳失敗',
+      );
+    });
   });
 
   test('pressing Cancel in confirm modal does not invoke upload service', async () => {
