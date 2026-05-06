@@ -19,14 +19,40 @@ const androidBuildGradle = readFileSync(
 const [defaultConfig] = launch.configurations;
 
 assert.equal(defaultConfig?.name, 'Mobile: Android Debug (F5)');
-assert.equal(defaultConfig.type, 'reactnative');
+assert.equal(defaultConfig.type, 'node-terminal');
 assert.equal(defaultConfig.request, 'launch');
-assert.equal(defaultConfig.platform, 'android');
-assert.equal(defaultConfig.target, 'device');
-assert.equal(defaultConfig.cwd, '${workspaceFolder}/apps/mobile');
-assert.equal(defaultConfig.variant, 'debug');
 assert.equal(defaultConfig.preLaunchTask, 'mobile: start metro');
-assert.deepEqual(defaultConfig.logCatArguments, ['*:S', 'ReactNative:V', 'ReactNativeJS:V']);
+assert.match(
+  defaultConfig.command,
+  /corepack pnpm --filter @syncflow\/mobile exec react-native run-android --mode debug --no-packager/,
+);
+assert.equal(defaultConfig.platform, undefined);
+assert.equal(defaultConfig.target, undefined);
+assert.equal(defaultConfig.cwd, undefined);
+assert.equal(defaultConfig.variant, undefined);
+assert.equal(defaultConfig.logCatArguments, undefined);
+
+const iosNoMetroConfig = launch.configurations.find(
+  (configuration) => configuration.name === 'Mobile: iOS Simulator (no Metro)',
+);
+assert.ok(iosNoMetroConfig, 'Mobile: iOS Simulator (no Metro) should exist');
+assert.equal(iosNoMetroConfig.type, 'node-terminal');
+assert.equal(iosNoMetroConfig.request, 'launch');
+assert.equal(iosNoMetroConfig.preLaunchTask, 'mobile: start metro');
+assert.match(
+  iosNoMetroConfig.command,
+  /corepack pnpm --filter @syncflow\/mobile exec react-native run-ios --no-packager/,
+);
+
+const androidIosCompound = launch.compounds?.find(
+  (compound) => compound.name === 'Mobile: Android + iOS',
+);
+assert.ok(androidIosCompound, 'Mobile: Android + iOS compound should exist');
+assert.deepEqual(androidIosCompound.configurations, [
+  'Mobile: Android Debug (F5)',
+  'Mobile: iOS Simulator (no Metro)',
+]);
+assert.equal(androidIosCompound.stopAll, false);
 
 assert.equal(
   launch.configurations.some(

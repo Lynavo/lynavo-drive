@@ -3,20 +3,23 @@
   "configurations": [
     {
       "name": "Mobile: Android Debug (F5)",
-      "cwd": "${workspaceFolder}/apps/mobile",
-      "type": "reactnative",
+      "type": "node-terminal",
       "request": "launch",
-      "platform": "android",
-      "target": "device",
-      "variant": "debug",
       "preLaunchTask": "mobile: start metro",
-      "logCatArguments": ["*:S", "ReactNative:V", "ReactNativeJS:V"]
+      "command": "cd \"${workspaceFolder}\" && corepack pnpm --filter @syncflow/mobile exec react-native run-android --mode debug --no-packager"
     },
     {
       "name": "Mobile: iOS (macOS)",
       "type": "node-terminal",
       "request": "launch",
       "command": "cd \"${workspaceFolder}\" && corepack pnpm --filter @syncflow/mobile ios"
+    },
+    {
+      "name": "Mobile: iOS Simulator (no Metro)",
+      "type": "node-terminal",
+      "request": "launch",
+      "preLaunchTask": "mobile: start metro",
+      "command": "cd \"${workspaceFolder}\" && corepack pnpm --filter @syncflow/mobile exec react-native run-ios --no-packager"
     },
     {
       "name": "Mobile: Metro (macOS)",
@@ -29,6 +32,16 @@
       "type": "node-terminal",
       "request": "launch",
       "command": "cd \"${workspaceFolder}\" && corepack pnpm --filter @syncflow/desktop dev"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Mobile: Android + iOS",
+      "configurations": [
+        "Mobile: Android Debug (F5)",
+        "Mobile: iOS Simulator (no Metro)"
+      ],
+      "stopAll": false
     }
   ]
 }
