@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ANDROID_DIR="$ROOT_DIR/apps/mobile/android"
 METRO_PORT="${METRO_PORT:-${RCT_METRO_PORT:-8081}}"
+METRO_READY_TIMEOUT_SECONDS="${SYNCFLOW_ANDROID_METRO_READY_TIMEOUT_SECONDS:-20}"
 APP_ID="${SYNCFLOW_ANDROID_APP_ID:-com.vividrop.mobile.china}"
 MAIN_ACTIVITY="${SYNCFLOW_ANDROID_MAIN_ACTIVITY:-.MainActivity}"
 
@@ -23,16 +24,14 @@ trim_carriage_return() {
   tr -d '\r'
 }
 
+metro_ready() {
+  local status
+  status="$(curl -fsS --max-time 2 "http://127.0.0.1:$METRO_PORT/status" 2>/dev/null || true)"
+  [[ "$status" == "packager-status:running" ]]
+}
+
 require_command adb
 require_command curl
-
-metro_status="$(curl -fsS --max-time 2 "http://127.0.0.1:$METRO_PORT/status" 2>/dev/null || true)"
-if [[ "$metro_status" != "packager-status:running" ]]; then
-  echo "Metro is not running on port $METRO_PORT."
-  echo "Start Metro with the VS Code 'Mobile: Metro (macOS)' launch target or run:"
-  echo "  corepack pnpm --filter @syncflow/mobile start"
-  exit 1
-fi
 
 selected_device="${SYNCFLOW_ANDROID_DEVICE:-${ANDROID_SERIAL:-}}"
 if [[ -n "$selected_device" ]]; then
@@ -81,6 +80,21 @@ echo "Installing SyncFlowMobile Android debug build on $device_model ($selected_
 echo "Configuring Metro reverse port $METRO_PORT..."
 if ! adb -s "$selected_device" reverse "tcp:$METRO_PORT" "tcp:$METRO_PORT"; then
   echo "Warning: adb reverse failed. The app may not reach Metro over USB." >&2
+fi
+
+if ! metro_ready; then
+  echo "Waiting for Metro on port $METRO_PORT..."
+  metro_deadline=$((SECONDS + METRO_READY_TIMEOUT_SECONDS))
+  while ! metro_ready; do
+    if (( SECONDS >= metro_deadline )); then
+      echo "Metro is not running on port $METRO_PORT."
+      echo "Start Metro with the VS Code 'Mobile: Metro (macOS)' launch target or run:"
+      echo "  corepack pnpm --filter @syncflow/mobile start"
+      exit 1
+    fi
+
+    sleep 1
+  done
 fi
 
 echo "Launching SyncFlowMobile Android on $device_model ($selected_device)..."

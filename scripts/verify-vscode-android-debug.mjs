@@ -15,13 +15,18 @@ const androidBuildGradle = readFileSync(
   resolve(root, 'apps/mobile/android/app/build.gradle'),
   'utf8',
 );
+const metroConfig = readFileSync(resolve(root, 'apps/mobile/metro.config.js'), 'utf8');
 
 const [defaultConfig] = launch.configurations;
 
 assert.equal(defaultConfig?.name, 'Mobile: Android Debug (F5)');
 assert.equal(defaultConfig.type, 'node-terminal');
 assert.equal(defaultConfig.request, 'launch');
-assert.equal(defaultConfig.preLaunchTask, undefined);
+assert.equal(defaultConfig.preLaunchTask, 'mobile: start metro');
+assert.match(
+  defaultConfig.command,
+  /SYNCFLOW_ANDROID_METRO_READY_TIMEOUT_SECONDS=180/,
+);
 assert.match(
   defaultConfig.command,
   /bash scripts\/dev\/run-mobile-android-device\.sh/,
@@ -97,4 +102,10 @@ assert.match(
   androidBuildGradle,
   /missingDimensionStrategy\s+["']store["']\s*,\s*["']play["']/,
   'Android debug builds should resolve react-native-iap to the Play store flavor',
+);
+
+assert.match(
+  metroConfig,
+  /watchFolders:\s*\[contractsRoot,\s*workspaceNodeModules\]/,
+  'Metro should watch workspace node_modules so pnpm symlink targets can resolve',
 );

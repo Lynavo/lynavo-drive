@@ -5,7 +5,8 @@
       "name": "Mobile: Android Debug (F5)",
       "type": "node-terminal",
       "request": "launch",
-      "command": "cd \"${workspaceFolder}\" && bash scripts/dev/run-mobile-android-device.sh"
+      "preLaunchTask": "mobile: start metro",
+      "command": "cd \"${workspaceFolder}\" && SYNCFLOW_ANDROID_METRO_READY_TIMEOUT_SECONDS=180 bash scripts/dev/run-mobile-android-device.sh"
     },
     {
       "name": "Mobile: iOS (macOS)",

@@ -30,7 +30,6 @@ if [[ -n "${existing_pid}" ]]; then
 fi
 
 echo "Starting Metro on port ${PORT}..."
-echo "Metro launch requested"
 cd "${ROOT}"
 
 unset NODE_OPTIONS
@@ -38,4 +37,22 @@ unset VSCODE_INSPECTOR_OPTIONS
 unset VSCODE_JS_DEBUG_BOOTLOADER
 unset VSCODE_DEBUGGING
 
-exec corepack pnpm --filter @syncflow/mobile start
+corepack pnpm --filter @syncflow/mobile start &
+metro_pid="$!"
+
+cleanup() {
+  if kill -0 "${metro_pid}" 2>/dev/null; then
+    kill "${metro_pid}" 2>/dev/null || true
+  fi
+}
+
+trap cleanup INT TERM
+
+sleep 1
+if ! kill -0 "${metro_pid}" 2>/dev/null; then
+  wait "${metro_pid}"
+  exit $?
+fi
+
+echo "Metro launch requested"
+wait "${metro_pid}"

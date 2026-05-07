@@ -25,6 +25,8 @@ const blockList = [
 const config = {
   // Keep Metro's file map narrow. Watching the repo root makes Android bundle
   // requests wait on a full monorepo scan before the app can finish reloading.
+  // pnpm installs app dependencies as symlinks into the workspace node_modules
+  // store, so Metro must be able to see that target tree when resolving files.
   watchFolders: [contractsRoot, workspaceNodeModules],
 
   resolver: {
