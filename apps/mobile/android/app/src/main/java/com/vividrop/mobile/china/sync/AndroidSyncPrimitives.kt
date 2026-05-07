@@ -136,6 +136,37 @@ object AndroidSyncPrimitives {
     permissionGranted: Boolean,
   ): Boolean = sdkInt >= ANDROID_13_API && !permissionGranted
 
+  fun buildSubnetProbeHosts(
+    clientIp: String,
+    prefixLength: Int,
+    maxHosts: Int,
+  ): List<String> {
+    if (prefixLength !in 1..30 || maxHosts <= 0) {
+      return emptyList()
+    }
+
+    val client = ipv4ToLong(clientIp) ?: return emptyList()
+    val mask = (IPV4_MASK shl (32 - prefixLength)) and IPV4_MASK
+    val network = client and mask
+    val broadcast = network or (mask.inv() and IPV4_MASK)
+    val firstHost = network + 1
+    val lastHost = broadcast - 1
+    val hostCount = lastHost - firstHost + 1
+    if (hostCount <= 0 || hostCount > maxHosts) {
+      return emptyList()
+    }
+
+    val hosts = mutableListOf<String>()
+    var current = firstHost
+    while (current <= lastHost) {
+      if (current != client) {
+        hosts.add(longToIpv4(current))
+      }
+      current += 1
+    }
+    return hosts
+  }
+
   fun computeFileKey(
     clientId: String,
     assetLocalId: String,
@@ -302,6 +333,31 @@ object AndroidSyncPrimitives {
   private fun normalizeLogMessage(message: String): String =
     message.trim().ifBlank { "<empty>" }
 
+  private fun ipv4ToLong(ip: String): Long? {
+    val parts = ip.trim().split(".")
+    if (parts.size != 4) {
+      return null
+    }
+
+    var result = 0L
+    for (part in parts) {
+      val octet = part.toIntOrNull() ?: return null
+      if (octet !in 0..255) {
+        return null
+      }
+      result = (result shl 8) or octet.toLong()
+    }
+    return result and IPV4_MASK
+  }
+
+  private fun longToIpv4(value: Long): String =
+    listOf(
+      (value ushr 24) and 0xff,
+      (value ushr 16) and 0xff,
+      (value ushr 8) and 0xff,
+      value and 0xff,
+    ).joinToString(".")
+
   private fun hexToBytes(hex: String): ByteArray {
     val normalized = hex.trim()
     require(normalized.length % 2 == 0) { "Invalid hex length" }
@@ -325,5 +381,6 @@ object AndroidSyncPrimitives {
 
   private const val CONNECTION_CODE_LENGTH = 6
   private const val ANDROID_13_API = 33
+  private const val IPV4_MASK = 0xffffffffL
   private val LIVE_BINDING_STATES = setOf("connected", "bound")
 }

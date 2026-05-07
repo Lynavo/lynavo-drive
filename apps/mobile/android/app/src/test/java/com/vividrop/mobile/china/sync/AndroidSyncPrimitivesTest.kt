@@ -120,6 +120,31 @@ class AndroidSyncPrimitivesTest {
   }
 
   @Test
+  fun buildSubnetProbeHostsIncludesPeerAcrossSlash22() {
+    val hosts = AndroidSyncPrimitives.buildSubnetProbeHosts(
+      clientIp = "172.16.22.15",
+      prefixLength = 22,
+      maxHosts = 2_000,
+    )
+
+    assertTrue(hosts.contains("172.16.21.43"))
+    assertFalse(hosts.contains("172.16.22.15"))
+    assertFalse(hosts.contains("172.16.20.0"))
+    assertFalse(hosts.contains("172.16.23.255"))
+  }
+
+  @Test
+  fun buildSubnetProbeHostsSkipsNetworksThatAreTooLarge() {
+    val hosts = AndroidSyncPrimitives.buildSubnetProbeHosts(
+      clientIp = "10.0.20.15",
+      prefixLength = 16,
+      maxHosts = 2_000,
+    )
+
+    assertTrue(hosts.isEmpty())
+  }
+
+  @Test
   fun computeFileKeyMatchesIosClientAssetMediaTypeShape() {
     val key = AndroidSyncPrimitives.computeFileKey(
       clientId = "client-123",

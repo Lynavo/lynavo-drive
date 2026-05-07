@@ -45,6 +45,9 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 import org.json.JSONArray
 import org.json.JSONObject
@@ -236,14 +239,16 @@ class NativeSyncEngineModule(
     }
 
     val listener: NsdManager.DiscoveryListener
+    val generation: Long
     synchronized(discoveryLock) {
       stopDiscoveryLocked()
       nsdManager = manager
       acquireMulticastLockLocked()
       discoveryGeneration += 1
+      generation = discoveryGeneration
       listener = createDiscoveryListener(
         manager = manager,
-        generation = discoveryGeneration,
+        generation = generation,
       )
       discoveryListener = listener
     }
@@ -251,6 +256,7 @@ class NativeSyncEngineModule(
     emitDiscoveredDevicesChanged()
     try {
       manager.discoverServices(BONJOUR_SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, listener)
+      scheduleSubnetDiscoveryFallback(generation)
     } catch (error: Throwable) {
       synchronized(discoveryLock) {
         stopDiscoveryLocked()
@@ -971,6 +977,10 @@ class NativeSyncEngineModule(
   }
 
   private fun currentClientIPv4(): String? {
+    return currentClientIPv4Network()?.address
+  }
+
+  private fun currentClientIPv4Network(): IPv4Network? {
     return try {
       val interfaces = NetworkInterface.getNetworkInterfaces() ?: return null
       while (interfaces.hasMoreElements()) {
@@ -979,11 +989,17 @@ class NativeSyncEngineModule(
           continue
         }
 
-        val addresses = networkInterface.inetAddresses
-        while (addresses.hasMoreElements()) {
-          val address = addresses.nextElement()
+        for (interfaceAddress in networkInterface.interfaceAddresses) {
+          val address = interfaceAddress.address
           if (address is Inet4Address && !address.isLoopbackAddress && !address.isLinkLocalAddress) {
-            return address.hostAddress
+            val prefixLength = interfaceAddress.networkPrefixLength.toInt()
+            val hostAddress = address.hostAddress ?: continue
+            if (prefixLength in 1..30) {
+              return IPv4Network(
+                address = hostAddress,
+                prefixLength = prefixLength,
+              )
+            }
           }
         }
       }
@@ -2792,6 +2808,122 @@ class NativeSyncEngineModule(
     }
   }
 
+  private fun scheduleSubnetDiscoveryFallback(generation: Long) {
+    thread(name = "NativeSyncEngineDiscoveryFallback", isDaemon = true) {
+      try {
+        Thread.sleep(DISCOVERY_FALLBACK_DELAY_MS)
+      } catch (_: InterruptedException) {
+        return@thread
+      }
+
+      val shouldScan = synchronized(discoveryLock) {
+        generation == discoveryGeneration && reachableCandidates.isEmpty()
+      }
+      if (!shouldScan) {
+        return@thread
+      }
+
+      val network = currentClientIPv4Network()
+      if (network == null) {
+        recordNativeLog("Discovery", "fallback skipped: no IPv4 network", Log.WARN)
+        return@thread
+      }
+
+      val hosts = AndroidSyncPrimitives.buildSubnetProbeHosts(
+        clientIp = network.address,
+        prefixLength = network.prefixLength,
+        maxHosts = DISCOVERY_FALLBACK_MAX_HOSTS,
+      )
+      if (hosts.isEmpty()) {
+        recordNativeLog(
+          "Discovery",
+          "fallback skipped: unsupported subnet ip=${network.address} prefix=${network.prefixLength}",
+          Log.WARN,
+        )
+        return@thread
+      }
+
+      recordNativeLog(
+        "Discovery",
+        "fallback probing ${hosts.size} hosts from ${network.address}/${network.prefixLength}",
+      )
+      val latch = CountDownLatch(hosts.size)
+      val executor = Executors.newFixedThreadPool(DISCOVERY_FALLBACK_CONCURRENCY)
+      for (host in hosts) {
+        executor.execute {
+          try {
+            val candidate = probeFallbackHost(host)
+            if (candidate != null) {
+              val shouldEmit = synchronized(discoveryLock) {
+                val hasBonjourCandidate = reachableCandidates.values.any {
+                  !it.serviceKey.startsWith(FALLBACK_SERVICE_KEY_PREFIX)
+                }
+                if (generation != discoveryGeneration || hasBonjourCandidate) {
+                  return@synchronized false
+                }
+                discoveredCandidates[candidate.serviceKey] = candidate
+                reachableCandidates[candidate.serviceKey] = candidate
+                true
+              }
+              if (shouldEmit) {
+                recordNativeLog("Discovery", "fallback reachable ${candidate.name} via $host")
+                emitReachableDevices()
+              }
+            }
+          } finally {
+            latch.countDown()
+          }
+        }
+      }
+
+      try {
+        latch.await(DISCOVERY_FALLBACK_SCAN_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+      } catch (_: InterruptedException) {
+        // Stop waiting; executor shutdown below will cancel queued probes.
+      } finally {
+        executor.shutdownNow()
+      }
+    }
+  }
+
+  private fun probeFallbackHost(host: String): DiscoveredServiceCandidate? {
+    val url = URL("http", host, DEFAULT_SIDECAR_HTTP_PORT, "/health")
+    val connection = (url.openConnection() as? HttpURLConnection) ?: return null
+    return try {
+      connection.requestMethod = "GET"
+      connection.connectTimeout = DISCOVERY_FALLBACK_HTTP_TIMEOUT_MS
+      connection.readTimeout = DISCOVERY_FALLBACK_HTTP_TIMEOUT_MS
+      val status = connection.responseCode
+      if (status !in 200..299) {
+        return null
+      }
+      val body = readResponseBody(connection, status)
+      val json = JSONObject(body)
+      if (!json.optBoolean("ok", false) || json.optString("service") != "syncflow-sidecar") {
+        return null
+      }
+      val now = isoNow()
+      DiscoveredServiceCandidate(
+        serviceKey = "$FALLBACK_SERVICE_KEY_PREFIX$host",
+        deviceId = "fallback-$host",
+        name = "Vivi Drop $host",
+        type = "mac",
+        ip = host,
+        probeHost = host,
+        port = DEFAULT_PROTOCOL_PORT,
+        protoVersion = PROTOCOL_VERSION,
+        authMode = "code",
+        shareEnabled = false,
+        shareName = null,
+        lastSeenAt = now,
+      )
+    } catch (_: Throwable) {
+      null
+    } finally {
+      connection.disconnect()
+    }
+  }
+
   private fun emitReachableDevices() {
     val payload = synchronized(discoveryLock) {
       buildReachableDevicesPayloadLocked()
@@ -3066,6 +3198,11 @@ class NativeSyncEngineModule(
     }
   }
 
+  private data class IPv4Network(
+    val address: String,
+    val prefixLength: Int,
+  )
+
   private data class AutoUploadConfig(
     val enabled: Boolean,
     val state: String,
@@ -3117,6 +3254,12 @@ class NativeSyncEngineModule(
     private const val DEFAULT_SIDECAR_HTTP_PORT = 39_394
     private const val BONJOUR_SERVICE_TYPE = "_syncflow._tcp"
     private const val DISCOVERY_PROBE_TIMEOUT_MS = 2_000
+    private const val DISCOVERY_FALLBACK_DELAY_MS = 2_500L
+    private const val DISCOVERY_FALLBACK_HTTP_TIMEOUT_MS = 350
+    private const val DISCOVERY_FALLBACK_SCAN_TIMEOUT_MS = 6_000L
+    private const val DISCOVERY_FALLBACK_MAX_HOSTS = 2_000
+    private const val DISCOVERY_FALLBACK_CONCURRENCY = 64
+    private const val FALLBACK_SERVICE_KEY_PREFIX = "fallback|"
     private const val SHARED_HTTP_TIMEOUT_MS = 15_000
     private const val SHARED_DOWNLOAD_TIMEOUT_MS = 300_000
     private const val FILE_CHUNK_SIZE = 1024 * 1024
