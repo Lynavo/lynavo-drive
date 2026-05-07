@@ -5,8 +5,7 @@
       "name": "Mobile: Android Debug (F5)",
       "type": "node-terminal",
       "request": "launch",
-      "preLaunchTask": "mobile: start metro",
-      "command": "cd \"${workspaceFolder}\" && corepack pnpm --filter @syncflow/mobile exec react-native run-android --mode debug --no-packager"
+      "command": "cd \"${workspaceFolder}\" && bash scripts/dev/run-mobile-android-device.sh"
     },
     {
       "name": "Mobile: iOS (macOS)",

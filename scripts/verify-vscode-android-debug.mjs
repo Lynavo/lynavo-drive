@@ -21,10 +21,10 @@ const [defaultConfig] = launch.configurations;
 assert.equal(defaultConfig?.name, 'Mobile: Android Debug (F5)');
 assert.equal(defaultConfig.type, 'node-terminal');
 assert.equal(defaultConfig.request, 'launch');
-assert.equal(defaultConfig.preLaunchTask, 'mobile: start metro');
+assert.equal(defaultConfig.preLaunchTask, undefined);
 assert.match(
   defaultConfig.command,
-  /corepack pnpm --filter @syncflow\/mobile exec react-native run-android --mode debug --no-packager/,
+  /bash scripts\/dev\/run-mobile-android-device\.sh/,
 );
 assert.equal(defaultConfig.platform, undefined);
 assert.equal(defaultConfig.target, undefined);
