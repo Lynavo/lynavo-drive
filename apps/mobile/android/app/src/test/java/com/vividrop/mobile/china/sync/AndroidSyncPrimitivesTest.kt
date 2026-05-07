@@ -152,6 +152,28 @@ class AndroidSyncPrimitivesTest {
   }
 
   @Test
+  fun shouldProbeBindingConnectionStateSkipsProbeDuringActiveSync() {
+    assertTrue(
+      AndroidSyncPrimitives.shouldProbeBindingConnectionState(
+        currentState = "connected",
+        syncInProgress = false,
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldProbeBindingConnectionState(
+        currentState = "connected",
+        syncInProgress = true,
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldProbeBindingConnectionState(
+        currentState = "offline",
+        syncInProgress = false,
+      ),
+    )
+  }
+
+  @Test
   fun shouldRequestNearbyWifiPermissionOnlyOnAndroid13PlusWhenMissing() {
     assertFalse(
       AndroidSyncPrimitives.shouldRequestNearbyWifiPermission(
@@ -376,6 +398,28 @@ class AndroidSyncPrimitivesTest {
   }
 
   @Test
+  fun cancelPendingAutoItemsCancelsOnlyAutoPendingQueue() {
+    val updatedAt = "2026-05-07T09:00:00Z"
+    val items = listOf(
+      testUploadItem(fileKey = "auto-queued", source = "auto", status = "queued"),
+      testUploadItem(fileKey = "auto-preparing", source = "auto", status = "preparing"),
+      testUploadItem(fileKey = "auto-uploading", source = "auto", status = "uploading"),
+      testUploadItem(fileKey = "manual-queued", source = "manual", status = "queued"),
+      testUploadItem(fileKey = "auto-completed", source = "auto", status = "completed"),
+    )
+
+    val cancelled = AndroidSyncPrimitives.cancelPendingAutoItems(items, updatedAt)
+      .associateBy { it.fileKey }
+
+    assertEquals("cancelled", cancelled["auto-queued"]?.status)
+    assertEquals(updatedAt, cancelled["auto-queued"]?.updatedAt)
+    assertEquals("cancelled", cancelled["auto-preparing"]?.status)
+    assertEquals("uploading", cancelled["auto-uploading"]?.status)
+    assertEquals("queued", cancelled["manual-queued"]?.status)
+    assertEquals("completed", cancelled["auto-completed"]?.status)
+  }
+
+  @Test
   fun writeZipArchiveCreatesReadableDiagnosticsJsonEntry() {
     val archive = kotlin.io.path.createTempFile(
       prefix = "syncflow-diagnostics-test-",
@@ -527,4 +571,26 @@ class AndroidSyncPrimitivesTest {
     assertEquals(0.0, fields.currentFileTotalBytes, 0.0)
     assertEquals("auto", fields.lastCompletedTaskSource)
   }
+
+  private fun testUploadItem(
+    fileKey: String,
+    source: String,
+    status: String,
+  ): AndroidUploadItem =
+    AndroidUploadItem(
+      assetLocalId = fileKey,
+      fileKey = fileKey,
+      filename = "$fileKey.jpg",
+      mediaType = "image",
+      mimeType = "image/jpeg",
+      fileSize = 10,
+      createdAt = "2026-01-01T00:00:00Z",
+      modifiedAt = "2026-01-01T00:00:00Z",
+      uri = "content://$fileKey",
+      status = status,
+      source = source,
+      batchId = if (source == "manual") "batch-1" else null,
+      ackedOffset = 0,
+      updatedAt = "2026-01-01T00:00:00Z",
+    )
 }

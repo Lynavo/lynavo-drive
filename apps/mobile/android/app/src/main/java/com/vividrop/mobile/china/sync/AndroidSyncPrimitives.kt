@@ -128,6 +128,15 @@ object AndroidSyncPrimitives {
     return autoUploadState == "active"
   }
 
+  fun cancelPendingAutoItems(items: List<AndroidUploadItem>, updatedAt: String): List<AndroidUploadItem> =
+    items.map { item ->
+      if (item.source == "auto" && item.status in AUTO_UPLOAD_CANCELABLE_STATUSES) {
+        item.copy(status = "cancelled", updatedAt = updatedAt)
+      } else {
+        item
+      }
+    }
+
   fun buildClientHelloPayloadFields(
     clientId: String,
     clientName: String,
@@ -153,8 +162,8 @@ object AndroidSyncPrimitives {
     return fields
   }
 
-  fun shouldProbeBindingConnectionState(currentState: String): Boolean =
-    currentState.trim().ifBlank { "bound" } in LIVE_BINDING_STATES
+  fun shouldProbeBindingConnectionState(currentState: String, syncInProgress: Boolean = false): Boolean =
+    !syncInProgress && currentState.trim().ifBlank { "bound" } in LIVE_BINDING_STATES
 
   fun deriveBindingConnectionStateFromProbe(
     currentState: String,
@@ -472,6 +481,13 @@ object AndroidSyncPrimitives {
     "ready",
     "cloud_downloading",
     "uploading",
+  )
+  private val AUTO_UPLOAD_CANCELABLE_STATUSES = setOf(
+    "discovered",
+    "queued",
+    "preparing",
+    "ready",
+    "cloud_downloading",
   )
 
   private const val CONNECTION_CODE_LENGTH = 6

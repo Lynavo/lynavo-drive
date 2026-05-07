@@ -801,6 +801,8 @@ class NativeSyncEngineModule(
   fun pauseAutoUpload(promise: Promise) {
     recordNativeLog("AutoUpload", "pause requested")
     persistAutoUploadInterruptedState()
+    uploadStore.cancelPendingAutoItems(isoNow())
+    emitQueueUpdated(uploadStore.queueToWritableArray(uploadStore.getPendingItems(limit = 100)))
     emitSyncState(loadBinding(), "paused_auto_upload")
     promise.resolve(null)
   }
@@ -809,6 +811,8 @@ class NativeSyncEngineModule(
   fun disableAutoUpload(promise: Promise) {
     recordNativeLog("AutoUpload", "disable requested")
     persistAutoUploadDisabledState()
+    uploadStore.cancelPendingAutoItems(isoNow())
+    emitQueueUpdated(uploadStore.queueToWritableArray(uploadStore.getPendingItems(limit = 100)))
     recordDiagnosticsLog("AutoUpload", "disabled persisted")
     emitIdleSyncState(loadBinding())
     promise.resolve(null)
@@ -1209,10 +1213,6 @@ class NativeSyncEngineModule(
         var lastCompletedTaskSource: String? = null
         for ((index, item) in pending.withIndex()) {
           val current = uploadStore.getItemByAssetId(item.assetLocalId) ?: item
-          if (current.status == "cancelled") {
-            completedCount += 1
-            continue
-          }
           val currentAutoState = loadAutoUploadConfig().state
           if (!AndroidSyncPrimitives.shouldContinueAutoUploadRound(reason, current.source, currentAutoState)) {
             recordDiagnosticsLog(
@@ -1220,6 +1220,10 @@ class NativeSyncEngineModule(
               "round stopped reason=$reason autoState=$currentAutoState before fileKey=${current.fileKey}",
             )
             break
+          }
+          if (current.status == "cancelled") {
+            completedCount += 1
+            continue
           }
           val result = uploadOneItem(
             connection = connection,
@@ -1499,7 +1503,7 @@ class NativeSyncEngineModule(
       while (offset < item.fileSize) {
         val currentAutoState = loadAutoUploadConfig().state
         if (!AndroidSyncPrimitives.shouldContinueAutoUploadRound(roundReason, item.source, currentAutoState)) {
-          uploadStore.updateStatus(item.fileKey, "queued", isoNow())
+          uploadStore.updateStatus(item.fileKey, "cancelled", isoNow())
           recordDiagnosticsLog(
             "AutoUpload",
             "current item stopped autoState=$currentAutoState fileKey=${item.fileKey} ackedOffset=$offset",
@@ -2455,7 +2459,7 @@ class NativeSyncEngineModule(
     if (binding == null) {
       return null
     }
-    if (!AndroidSyncPrimitives.shouldProbeBindingConnectionState(binding.connectionState)) {
+    if (!AndroidSyncPrimitives.shouldProbeBindingConnectionState(binding.connectionState, syncInProgress)) {
       return binding
     }
 
@@ -3421,7 +3425,9 @@ class NativeSyncEngineModule(
     )
     saveBinding(updated)
     emitBindingStateChanged(updated)
-    emitIdleSyncState(updated)
+    if (!syncInProgress) {
+      emitIdleSyncState(updated)
+    }
     if (updated.connectionState == "connected") {
       cancelPresenceRecoveryProbe(reason = "discovery_refreshed_connected")
       sendPresenceHeartbeatAsync(updated, reason = "bound_device_discovery_refreshed", recoverOnFailure = true)

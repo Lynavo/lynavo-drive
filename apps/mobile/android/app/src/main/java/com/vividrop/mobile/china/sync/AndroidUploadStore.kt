@@ -144,6 +144,11 @@ class AndroidUploadStore(context: Context) {
   }
 
   @Synchronized
+  fun cancelPendingAutoItems(updatedAt: String) {
+    writeItems(AndroidSyncPrimitives.cancelPendingAutoItems(readItems(), updatedAt))
+  }
+
+  @Synchronized
   fun resetQueue() {
     prefs.edit().remove(PREF_QUEUE).apply()
   }
