@@ -465,6 +465,34 @@ class AndroidSyncPrimitivesTest {
   }
 
   @Test
+  fun computeTransferSpeedReportsMiBPerSecondFromByteDelta() {
+    assertEquals(
+      2.0,
+      AndroidSyncPrimitives.computeTransferSpeedMbps(
+        bytesDelta = 1_048_576,
+        elapsedMs = 500,
+      ),
+      0.001,
+    )
+    assertEquals(
+      0.0,
+      AndroidSyncPrimitives.computeTransferSpeedMbps(
+        bytesDelta = 1_048_576,
+        elapsedMs = 0,
+      ),
+      0.0,
+    )
+    assertEquals(
+      0.0,
+      AndroidSyncPrimitives.computeTransferSpeedMbps(
+        bytesDelta = -1,
+        elapsedMs = 500,
+      ),
+      0.0,
+    )
+  }
+
+  @Test
   fun buildSyncOverviewFieldsReportsCompletedRoundAndClearsActiveFile() {
     val fields = AndroidSyncPrimitives.buildSyncOverviewFields(
       AndroidSyncOverviewInput(

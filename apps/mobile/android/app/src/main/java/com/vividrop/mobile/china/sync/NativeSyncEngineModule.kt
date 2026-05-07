@@ -11,6 +11,7 @@ import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Environment
+import android.os.SystemClock
 import android.provider.MediaStore
 import android.util.Log
 import com.facebook.react.bridge.Arguments
@@ -808,6 +809,7 @@ class NativeSyncEngineModule(
   fun disableAutoUpload(promise: Promise) {
     recordNativeLog("AutoUpload", "disable requested")
     persistAutoUploadDisabledState()
+    recordDiagnosticsLog("AutoUpload", "disabled persisted")
     emitIdleSyncState(loadBinding())
     promise.resolve(null)
   }
@@ -1224,6 +1226,7 @@ class NativeSyncEngineModule(
             binding = binding,
             sessionId = sessionId,
             item = current,
+            roundReason = reason,
             queueIndex = index,
             queueTotalCount = pending.size,
             completedCount = completedCount,
@@ -1267,6 +1270,12 @@ class NativeSyncEngineModule(
         }
       }
     } catch (error: Throwable) {
+      if (error is AutoUploadRoundStoppedException) {
+        recordDiagnosticsLog("AutoUpload", "round stopped during current item autoState=${error.autoUploadState}")
+        emitQueueUpdated(uploadStore.queueToWritableArray(uploadStore.getPendingItems(limit = 100)))
+        emitIdleSyncState(loadBinding())
+        return
+      }
       val message = error.message ?: "Android sync failed"
       recordDiagnosticsLog("Sync", "sync failed: $message")
       emitError("ANDROID_SYNC_FAILED", message)
@@ -1336,6 +1345,7 @@ class NativeSyncEngineModule(
     binding: StoredBinding,
     sessionId: String,
     item: AndroidUploadItem,
+    roundReason: String,
     queueIndex: Int,
     queueTotalCount: Int,
     completedCount: Int,
@@ -1401,7 +1411,18 @@ class NativeSyncEngineModule(
           "SyncUpload",
           "[${queueIndex + 1}/$queueTotalCount] $action ${item.filename} offset=$startOffset",
         )
-        streamFileData(connection, binding, sessionId, item, startOffset, completedCount, queueTotalCount, completedBytes, totalBytes)
+        streamFileData(
+          connection = connection,
+          binding = binding,
+          sessionId = sessionId,
+          item = item,
+          startOffset = startOffset,
+          roundReason = roundReason,
+          completedCount = completedCount,
+          queueTotalCount = queueTotalCount,
+          completedBytes = completedBytes,
+          totalBytes = totalBytes,
+        )
       }
       else -> throw IllegalStateException("Unknown FILE_INIT action: $action")
     }
@@ -1450,6 +1471,7 @@ class NativeSyncEngineModule(
     sessionId: String,
     item: AndroidUploadItem,
     startOffset: Long,
+    roundReason: String,
     completedCount: Int,
     queueTotalCount: Int,
     completedBytes: Long,
@@ -1471,7 +1493,19 @@ class NativeSyncEngineModule(
 
       val buffer = ByteArray(FILE_CHUNK_SIZE)
       var offset = startOffset
+      var speedLastTransferredBytes = completedBytes + startOffset
+      var speedLastCheckElapsedMs = SystemClock.elapsedRealtime()
+      var currentSpeedMbps = 0.0
       while (offset < item.fileSize) {
+        val currentAutoState = loadAutoUploadConfig().state
+        if (!AndroidSyncPrimitives.shouldContinueAutoUploadRound(roundReason, item.source, currentAutoState)) {
+          uploadStore.updateStatus(item.fileKey, "queued", isoNow())
+          recordDiagnosticsLog(
+            "AutoUpload",
+            "current item stopped autoState=$currentAutoState fileKey=${item.fileKey} ackedOffset=$offset",
+          )
+          throw AutoUploadRoundStoppedException(currentAutoState)
+        }
         val read = rawInput.read(buffer, 0, minOf(buffer.size.toLong(), item.fileSize - offset).toInt())
         if (read <= 0) {
           break
@@ -1485,6 +1519,17 @@ class NativeSyncEngineModule(
         if (frame.type == TYPE_FILE_ACK) {
           val committedOffset = frame.payload.optLong("committedOffset", offset)
           uploadStore.updateOffset(item.fileKey, committedOffset, isoNow())
+          val nowElapsedMs = SystemClock.elapsedRealtime()
+          val transferredBytes = completedBytes + committedOffset
+          val elapsedMs = nowElapsedMs - speedLastCheckElapsedMs
+          if (elapsedMs >= SPEED_SAMPLE_INTERVAL_MS) {
+            currentSpeedMbps = AndroidSyncPrimitives.computeTransferSpeedMbps(
+              bytesDelta = transferredBytes - speedLastTransferredBytes,
+              elapsedMs = elapsedMs,
+            )
+            speedLastTransferredBytes = transferredBytes
+            speedLastCheckElapsedMs = nowElapsedMs
+          }
           emitEvent(
             "onSyncStateChanged",
             buildActiveSyncSummary(
@@ -1496,6 +1541,7 @@ class NativeSyncEngineModule(
               completedBytes = completedBytes,
               totalBytes = totalBytes,
               currentOffset = committedOffset,
+              currentSpeedMbps = currentSpeedMbps,
             ),
           )
         }
@@ -1556,6 +1602,7 @@ class NativeSyncEngineModule(
     completedBytes: Long,
     totalBytes: Long,
     currentOffset: Long,
+    currentSpeedMbps: Double = 0.0,
   ): WritableMap {
     val pendingItems = uploadStore.getPendingItems(limit = 10_000)
     val autoConfig = loadAutoUploadConfig()
@@ -1573,6 +1620,7 @@ class NativeSyncEngineModule(
         currentFilename = item.filename,
         currentFileConfirmedBytes = currentOffset,
         currentFileTotalBytes = item.fileSize,
+        currentSpeedMbps = currentSpeedMbps,
         activeTuningProfile = "standard",
         currentTaskSource = item.source,
         autoUploadState = autoConfig.state,
@@ -3686,6 +3734,10 @@ class NativeSyncEngineModule(
     message: String,
   ) : Exception(message)
 
+  private class AutoUploadRoundStoppedException(
+    val autoUploadState: String,
+  ) : Exception("Auto upload stopped: $autoUploadState")
+
   companion object {
     private const val MODULE_NAME = "NativeSyncEngine"
     private const val MAX_DIAGNOSTICS_LOG_LINES = 2_000
@@ -3740,6 +3792,7 @@ class NativeSyncEngineModule(
     private const val SHARED_HTTP_TIMEOUT_MS = 15_000
     private const val SHARED_DOWNLOAD_TIMEOUT_MS = 300_000
     private const val FILE_CHUNK_SIZE = 1024 * 1024
+    private const val SPEED_SAMPLE_INTERVAL_MS = 500L
     private val MAGIC_BYTES = byteArrayOf('L'.code.toByte(), 'M'.code.toByte(), 'U'.code.toByte(), 'P'.code.toByte())
     private const val PROTOCOL_VERSION = 2
     private const val TYPE_HELLO_REQ = 0x0001

@@ -354,6 +354,14 @@ object AndroidSyncPrimitives {
     return if (lines.size <= maxLines) lines else lines.takeLast(maxLines)
   }
 
+  fun computeTransferSpeedMbps(bytesDelta: Long, elapsedMs: Long): Double {
+    if (bytesDelta <= 0L || elapsedMs <= 0L) {
+      return 0.0
+    }
+    val elapsedSeconds = elapsedMs.toDouble() / 1_000.0
+    return bytesDelta.toDouble() / elapsedSeconds / (1024.0 * 1024.0)
+  }
+
   fun pendingCount(items: List<AndroidUploadItem>, source: String? = null): Int =
     items.count { it.status in PENDING_STATUSES && (source == null || it.source == source) }
 
