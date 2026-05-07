@@ -110,6 +110,7 @@ describe('DeviceDiscoveryScreen pairing options', () => {
       .spyOn(NativeEventEmitter.prototype, 'addListener')
       .mockReturnValue({ remove: jest.fn() } as any);
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    (Alert as typeof Alert & { prompt: jest.Mock }).prompt = jest.fn();
     jest.spyOn(Clipboard, 'setString').mockImplementation(() => undefined);
   });
 
@@ -158,14 +159,33 @@ describe('DeviceDiscoveryScreen pairing options', () => {
     });
   });
 
-  it('uploads diagnostics from the pairing popover', async () => {
+  it('prompts for a diagnostic note before uploading from the pairing popover on iOS', async () => {
     const { getByText } = render(<DeviceDiscoveryScreen />);
 
     fireEvent.press(getByText('手動配對'));
     await waitFor(() => expect(getByText('上傳診斷包')).toBeTruthy());
 
+    fireEvent.press(getByText('上傳診斷包'));
+
+    await waitFor(() => {
+      expect(Alert.prompt).toHaveBeenCalledWith(
+        '上傳診斷包',
+        expect.stringContaining('請簡述你遇到的問題'),
+        expect.any(Array),
+        'plain-text',
+        '',
+      );
+    });
+
+    const promptButtons = (Alert.prompt as jest.Mock).mock.calls[0][2] as Array<{
+      text: string;
+      onPress?: (note?: string) => void;
+    }>;
+    const continueButton = promptButtons.find(button => button.text === '繼續');
+    expect(continueButton?.onPress).toBeDefined();
+
     await act(async () => {
-      fireEvent.press(getByText('上傳診斷包'));
+      continueButton?.onPress?.('  搜尋設備頁上傳卡住  ');
     });
 
     await waitFor(() => {
@@ -176,7 +196,43 @@ describe('DeviceDiscoveryScreen pairing options', () => {
         'mobile-client-id',
         expect.any(AbortSignal),
         expect.any(Function),
-        undefined,
+        '搜尋設備頁上傳卡住',
+      );
+    });
+    expect(Clipboard.setString).toHaveBeenCalledWith('DISC1234');
+  });
+
+  it('shows a diagnostic note modal before uploading from the pairing popover on Android', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'android',
+    });
+
+    const { getByPlaceholderText, getByText } = render(<DeviceDiscoveryScreen />);
+
+    fireEvent.press(getByText('手動配對'));
+    await waitFor(() => expect(getByText('上傳診斷包')).toBeTruthy());
+
+    fireEvent.press(getByText('上傳診斷包'));
+
+    const noteInput = await waitFor(() =>
+      getByPlaceholderText('例如：上傳卡在 30%'),
+    );
+    fireEvent.changeText(noteInput, '  Android 找不到設備  ');
+
+    await act(async () => {
+      fireEvent.press(getByText('繼續'));
+    });
+
+    await waitFor(() => {
+      expect(Alert.prompt).not.toHaveBeenCalled();
+      expect(mockNativeSyncEngine.exportDiagnostics).toHaveBeenCalled();
+      expect(mockUploadDiagnostics).toHaveBeenCalledWith(
+        'file:///tmp/discovery-diagnostics.zip',
+        'mobile-client-id',
+        expect.any(AbortSignal),
+        expect.any(Function),
+        'Android 找不到設備',
       );
     });
     expect(Clipboard.setString).toHaveBeenCalledWith('DISC1234');

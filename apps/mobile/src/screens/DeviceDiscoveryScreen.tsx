@@ -174,6 +174,8 @@ export function DeviceDiscoveryScreen() {
   // Popover & Modal state
   const [showPairingMenu, setShowPairingMenu] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
+  const [diagnosticPromptVisible, setDiagnosticPromptVisible] = useState(false);
+  const [diagnosticPromptNote, setDiagnosticPromptNote] = useState('');
   const devicesRef = useRef<DiscoveredDevice[]>([]);
   const preserveCachedDevicesRef = useRef(false);
 
@@ -457,10 +459,9 @@ export function DeviceDiscoveryScreen() {
     handleDevicePress(manualDevice);
   }, [handleDevicePress, manualHost, t]);
 
-  const handleUploadDiagnostics = useCallback(async () => {
+  const startDiagnosticUpload = useCallback(async (rawNote?: string) => {
     try {
       setIsUploadingDiagnostics(true);
-      setShowPairingMenu(false);
 
       const { NativeSyncEngine } = NativeModules;
       if (!NativeSyncEngine?.exportDiagnostics) {
@@ -476,12 +477,13 @@ export function DeviceDiscoveryScreen() {
         ? archivePath
         : `file://${archivePath}`;
       const clientId = String(await NativeSyncEngine.getClientId());
+      const note = (rawNote ?? '').trim();
       const result = await diagnosticUploadService.upload(
         archiveUrl,
         clientId,
         new AbortController().signal,
         () => undefined,
-        undefined,
+        note || undefined,
       );
 
       Clipboard.setString(result.refId);
@@ -508,6 +510,33 @@ export function DeviceDiscoveryScreen() {
       setIsUploadingDiagnostics(false);
     }
   }, [t]);
+
+  const handleUploadDiagnostics = useCallback(() => {
+    setShowPairingMenu(false);
+
+    if (Platform.OS === 'ios' && typeof Alert.prompt === 'function') {
+      Alert.prompt(
+        t('settings.uploadDiagnostic.confirm.title'),
+        t('settings.uploadDiagnostic.confirm.message'),
+        [
+          {
+            text: t('settings.uploadDiagnostic.confirm.cancel'),
+            style: 'cancel',
+          },
+          {
+            text: t('settings.uploadDiagnostic.confirm.ok'),
+            onPress: (note?: string) => void startDiagnosticUpload(note),
+          },
+        ],
+        'plain-text',
+        '',
+      );
+      return;
+    }
+
+    setDiagnosticPromptNote('');
+    setDiagnosticPromptVisible(true);
+  }, [startDiagnosticUpload, t]);
 
   const handleDismissUnconnectedGuide = useCallback(async () => {
     await markUnconnectedGuideSeen();
@@ -765,7 +794,7 @@ export function DeviceDiscoveryScreen() {
               <TouchableOpacity
                 style={styles.popoverItem}
                 disabled={isUploadingDiagnostics}
-                onPress={() => void handleUploadDiagnostics()}
+                onPress={handleUploadDiagnostics}
               >
                 <Icon name="cloud-upload-outline" size={20} color="#3b9fd8" />
                 <Text style={styles.popoverText}>
@@ -775,6 +804,87 @@ export function DeviceDiscoveryScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+          </Pressable>
+        </Modal>
+
+        {/* Diagnostic Upload Prompt */}
+        <Modal
+          visible={diagnosticPromptVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            setDiagnosticPromptVisible(false);
+            setDiagnosticPromptNote('');
+          }}
+        >
+          <Pressable
+            style={styles.diagnosticPromptBackdrop}
+            onPress={() => {
+              setDiagnosticPromptVisible(false);
+              setDiagnosticPromptNote('');
+            }}
+          >
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.diagnosticPromptKeyboard}
+            >
+              <Pressable onPress={() => {}}>
+                <View style={styles.diagnosticPromptCard}>
+                  <Text style={styles.diagnosticPromptTitle}>
+                    {t('settings.uploadDiagnostic.confirm.title')}
+                  </Text>
+                  <Text style={styles.diagnosticPromptMessage}>
+                    {t('settings.uploadDiagnostic.confirm.message')}
+                  </Text>
+                  <TextInput
+                    style={styles.diagnosticPromptInput}
+                    value={diagnosticPromptNote}
+                    onChangeText={setDiagnosticPromptNote}
+                    placeholder={t(
+                      'settings.uploadDiagnostic.confirm.placeholder',
+                    )}
+                    placeholderTextColor="#8aa9bc"
+                    multiline
+                    maxLength={500}
+                    textAlignVertical="top"
+                    accessibilityLabel={t(
+                      'settings.uploadDiagnostic.confirm.placeholder',
+                    )}
+                  />
+                  <View style={styles.diagnosticPromptActions}>
+                    <TouchableOpacity
+                      style={styles.diagnosticPromptButton}
+                      activeOpacity={0.72}
+                      onPress={() => {
+                        setDiagnosticPromptVisible(false);
+                        setDiagnosticPromptNote('');
+                      }}
+                    >
+                      <Text style={styles.diagnosticPromptCancelText}>
+                        {t('settings.uploadDiagnostic.confirm.cancel')}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.diagnosticPromptButton,
+                        styles.diagnosticPromptPrimaryButton,
+                      ]}
+                      activeOpacity={0.82}
+                      onPress={() => {
+                        const note = diagnosticPromptNote;
+                        setDiagnosticPromptVisible(false);
+                        setDiagnosticPromptNote('');
+                        void startDiagnosticUpload(note);
+                      }}
+                    >
+                      <Text style={styles.diagnosticPromptPrimaryText}>
+                        {t('settings.uploadDiagnostic.confirm.ok')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </Pressable>
+            </KeyboardAvoidingView>
           </Pressable>
         </Modal>
 
@@ -1184,6 +1294,77 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
+  },
+  diagnosticPromptBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(13,27,39,0.42)',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  diagnosticPromptKeyboard: {
+    width: '100%',
+  },
+  diagnosticPromptCard: {
+    borderRadius: 24,
+    backgroundColor: 'rgba(236,247,253,0.98)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.68)',
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    shadowColor: '#173d58',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  diagnosticPromptTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.screenTitle,
+  },
+  diagnosticPromptMessage: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#6a96b8',
+  },
+  diagnosticPromptInput: {
+    marginTop: 14,
+    minHeight: 88,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(59,130,246,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.82)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: colors.screenTitle,
+    fontSize: 14,
+  },
+  diagnosticPromptActions: {
+    marginTop: 16,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  diagnosticPromptButton: {
+    minWidth: 76,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  diagnosticPromptPrimaryButton: {
+    backgroundColor: '#3b82f6',
+  },
+  diagnosticPromptCancelText: {
+    color: '#6a96b8',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  diagnosticPromptPrimaryText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   manualCard: {
     paddingHorizontal: 20,
