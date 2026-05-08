@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   Dimensions,
+  type LayoutChangeEvent,
   Modal,
   Platform,
   StyleSheet,
@@ -29,6 +30,41 @@ export interface TourTargetLayout {
   top: number;
   width: number;
   height: number;
+}
+
+export function isValidTourTargetLayout(
+  layout: TourTargetLayout | undefined,
+): layout is TourTargetLayout {
+  return (
+    !!layout &&
+    Number.isFinite(layout.left) &&
+    Number.isFinite(layout.top) &&
+    Number.isFinite(layout.width) &&
+    Number.isFinite(layout.height) &&
+    layout.width > 0 &&
+    layout.height > 0
+  );
+}
+
+interface TourViewportSize {
+  width: number;
+  height: number;
+}
+
+function isValidViewportSize(
+  size: TourViewportSize | null,
+): size is TourViewportSize {
+  return (
+    !!size &&
+    Number.isFinite(size.width) &&
+    Number.isFinite(size.height) &&
+    size.width > 0 &&
+    size.height > 0
+  );
+}
+
+function firstPositiveDimension(...values: number[]): number {
+  return values.find(value => Number.isFinite(value) && value > 0) ?? 0;
 }
 
 interface TourStep {
@@ -126,7 +162,7 @@ function getTargetRect(
   measuredTargetTopOffset = 0,
 ): TourLayout['target'] {
   const measured = measuredLayouts?.[target];
-  if (measured) {
+  if (isValidTourTargetLayout(measured)) {
     return applyTargetPadding(
       {
         ...measured,
@@ -287,11 +323,32 @@ export function SyncActivityTour({
   targetLayouts,
 }: SyncActivityTourProps) {
   const { t } = useTranslation();
-  const { width, height } = useWindowDimensions();
-  const overlayHeight =
-    Platform.OS === 'android' ? Dimensions.get('screen').height : height;
+  const windowDimensions = useWindowDimensions();
+  const fallbackWindowDimensions = Dimensions.get('window');
+  const fallbackScreenDimensions = Dimensions.get('screen');
+  const [overlaySize, setOverlaySize] = useState<TourViewportSize | null>(null);
+  const viewportWidth = isValidViewportSize(overlaySize)
+    ? overlaySize.width
+    : firstPositiveDimension(
+        windowDimensions.width,
+        fallbackWindowDimensions.width,
+        fallbackScreenDimensions.width,
+      );
+  const viewportHeight = isValidViewportSize(overlaySize)
+    ? overlaySize.height
+    : Platform.OS === 'android'
+    ? firstPositiveDimension(
+        fallbackScreenDimensions.height,
+        windowDimensions.height,
+        fallbackWindowDimensions.height,
+      )
+    : firstPositiveDimension(
+        windowDimensions.height,
+        fallbackWindowDimensions.height,
+        fallbackScreenDimensions.height,
+      );
   const measuredTargetTopOffset =
-    Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0;
+    Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0;
   const [stepIndex, setStepIndex] = useState(0);
   const steps: TourStep[] = useMemo(
     () => [
@@ -332,11 +389,31 @@ export function SyncActivityTour({
   const isLast = stepIndex === steps.length - 1;
   const layout = getTourLayout(
     current.target,
-    width,
-    overlayHeight,
+    viewportWidth,
+    viewportHeight,
     targetLayouts,
     measuredTargetTopOffset,
   );
+  const handleOverlayLayout = (event: LayoutChangeEvent) => {
+    const next: TourViewportSize = {
+      width: event.nativeEvent.layout.width,
+      height: event.nativeEvent.layout.height,
+    };
+
+    if (!isValidViewportSize(next)) return;
+
+    setOverlaySize(currentSize => {
+      if (
+        currentSize &&
+        Math.abs(currentSize.width - next.width) < 0.5 &&
+        Math.abs(currentSize.height - next.height) < 0.5
+      ) {
+        return currentSize;
+      }
+
+      return next;
+    });
+  };
   const highlightRadius = getHighlightRadius(current.target);
   const highlightStrokeOffset =
     HIGHLIGHT_STROKE_GAP + HIGHLIGHT_STROKE_WIDTH / 2;
@@ -349,18 +426,23 @@ export function SyncActivityTour({
       statusBarTranslucent
       navigationBarTranslucent
     >
-      <View style={styles.overlay} testID="sync-activity-tour">
+      <View
+        style={styles.overlay}
+        testID="sync-activity-tour"
+        onLayout={handleOverlayLayout}
+      >
         <Svg
+          key={`${viewportWidth}:${viewportHeight}:${current.target}`}
           pointerEvents="none"
           style={StyleSheet.absoluteFill}
-          width={width}
-          height={overlayHeight}
+          width={viewportWidth}
+          height={viewportHeight}
         >
           <Path
             testID="sync-activity-tour-cutout-overlay"
             d={getCutoutOverlayPath(
-              width,
-              overlayHeight,
+              viewportWidth,
+              viewportHeight,
               layout.target,
               highlightRadius,
             )}
@@ -368,6 +450,7 @@ export function SyncActivityTour({
             fillRule="evenodd"
           />
           <Rect
+            testID="sync-activity-tour-highlight"
             x={layout.target.left - highlightStrokeOffset}
             y={layout.target.top - highlightStrokeOffset}
             width={layout.target.width + highlightStrokeOffset * 2}

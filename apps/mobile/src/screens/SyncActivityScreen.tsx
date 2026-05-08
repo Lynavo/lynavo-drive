@@ -27,6 +27,7 @@ import { Icon } from '../components/Icon';
 import { SubscriptionStatusIcon } from '../components/SubscriptionStatusIcon';
 import {
   SyncActivityTour,
+  isValidTourTargetLayout,
   type TourTarget,
   type TourTargetLayout,
 } from '../components/onboarding/SyncActivityTour';
@@ -165,6 +166,8 @@ const OFFLINE_DISPLAY_DELAY_MS = 800;
 const AUTO_UPLOAD_PREPARING_MIN_MS = 400;
 /** Safety timeout — force-clear optimistic preparing state if native never confirms. */
 const AUTO_UPLOAD_PREPARING_SAFETY_MS = 35000;
+const SYNC_ACTIVITY_TOUR_MEASURE_RETRY_LIMIT = 5;
+const SYNC_ACTIVITY_TOUR_MEASURE_RETRY_DELAY_MS = 80;
 const NATIVE_SYNC_LOOP_ACTIVE_STATES = new Set([
   'scanning',
   'preparing',
@@ -622,20 +625,28 @@ export function SyncActivityScreen() {
     (
       target: TourTarget,
       ref: React.RefObject<MeasurableTourRef | null>,
+      attempt = 0,
     ) => {
       const node = ref.current;
       if (!node) return;
 
       requestAnimationFrame(() => {
         node.measureInWindow((x, y, measuredWidth, measuredHeight) => {
-          if (measuredWidth <= 0 || measuredHeight <= 0) return;
-
           const next: TourTargetLayout = {
             left: x,
             top: y,
             width: measuredWidth,
             height: measuredHeight,
           };
+
+          if (!isValidTourTargetLayout(next)) {
+            if (attempt < SYNC_ACTIVITY_TOUR_MEASURE_RETRY_LIMIT) {
+              setTimeout(() => {
+                measureSyncActivityTourTarget(target, ref, attempt + 1);
+              }, SYNC_ACTIVITY_TOUR_MEASURE_RETRY_DELAY_MS);
+            }
+            return;
+          }
 
           setSyncActivityTourTargetLayouts(prev => {
             const current = prev[target];
