@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IPC, registerIpcHandlers } from '../ipc-handlers';
+import { checkForUpdates, uploadDiagnostics } from '../diagnostics';
 import { sidecarClient } from '../sidecar-client';
 
 type IpcHandler = (...args: unknown[]) => unknown;
@@ -61,6 +62,13 @@ vi.mock('../sidecar-client', () => ({
     health.capabilities?.revokesPairingsOnCodeRotation === true,
 }));
 
+vi.mock('../diagnostics', () => ({
+  exportDiagnostics: vi.fn(),
+  uploadDiagnostics: vi.fn(),
+  getAppInfo: vi.fn(() => ({ name: 'Vivi Drop', version: '0.1.0', buildNumber: '1' })),
+  checkForUpdates: vi.fn(),
+}));
+
 describe('registerIpcHandlers', () => {
   beforeEach(() => {
     handlers.clear();
@@ -106,5 +114,45 @@ describe('registerIpcHandlers', () => {
     await expect(handler()).resolves.toEqual({ code: '654321' });
     expect(manager.retryStart).toHaveBeenCalledTimes(1);
     expect(sidecarClient.regenerateConnectionCode).toHaveBeenCalledTimes(1);
+  });
+
+  it('registers diagnostics upload IPC with description payload', async () => {
+    const manager = { retryStart: vi.fn(), getState: vi.fn() };
+    vi.mocked(uploadDiagnostics).mockResolvedValue({
+      refId: 'DIA1234',
+      uploadedAt: '2026-05-08T03:00:00Z',
+    });
+
+    registerIpcHandlers(manager as never);
+    const handler = handlers.get(IPC.SUPPORT_UPLOAD_DIAGNOSTICS);
+
+    await expect(
+      handler?.(undefined, { description: 'Wi-Fi 断线', locale: 'zh-Hans' }),
+    ).resolves.toEqual({
+      refId: 'DIA1234',
+      uploadedAt: '2026-05-08T03:00:00Z',
+    });
+    expect(uploadDiagnostics).toHaveBeenCalledWith(manager, {
+      description: 'Wi-Fi 断线',
+      locale: 'zh-Hans',
+    });
+  });
+
+  it('registers update-check IPC', async () => {
+    vi.mocked(checkForUpdates).mockResolvedValue({
+      updateAvailable: true,
+      latestVersion: '0.2.0',
+      checkedAt: '2026-05-08T03:00:00Z',
+    });
+
+    registerIpcHandlers({ retryStart: vi.fn() } as never);
+    const handler = handlers.get(IPC.SUPPORT_CHECK_FOR_UPDATES);
+
+    await expect(handler?.()).resolves.toEqual({
+      updateAvailable: true,
+      latestVersion: '0.2.0',
+      checkedAt: '2026-05-08T03:00:00Z',
+    });
+    expect(checkForUpdates).toHaveBeenCalledTimes(1);
   });
 });

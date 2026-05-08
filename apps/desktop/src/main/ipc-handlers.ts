@@ -8,7 +8,13 @@ import {
   copyToClipboard,
 } from './file-operations';
 import type { SidecarManager } from './sidecar-manager';
-import { exportDiagnostics, getAppInfo } from './diagnostics';
+import {
+  checkForUpdates,
+  exportDiagnostics,
+  getAppInfo,
+  uploadDiagnostics,
+  type DiagnosticsUploadRequest,
+} from './diagnostics';
 import { installBonjourForWindows } from './bonjour-installer';
 
 // Channel constants — shared between main and preload
@@ -29,7 +35,9 @@ export const IPC = {
   SIDECAR_VALIDATE_SHARE: 'sidecar:validate-share',
   SIDECAR_TRANSFER_ACTIVE: 'sidecar:transfer-active',
   SIDECAR_SHARED_LIST: 'sidecar:shared-list',
+  SUPPORT_UPLOAD_DIAGNOSTICS: 'support:upload-diagnostics',
   SUPPORT_EXPORT_DIAGNOSTICS: 'support:export-diagnostics',
+  SUPPORT_CHECK_FOR_UPDATES: 'support:check-for-updates',
   SUPPORT_APP_INFO: 'support:app-info',
   FILES_OPEN_FOLDER: 'files:open-folder',
   FILES_OPEN_FILE: 'files:open-file',
@@ -38,7 +46,9 @@ export const IPC = {
   FILES_COPY_CLIPBOARD: 'files:copy-clipboard',
 } as const;
 
-async function regenerateConnectionCodeSafely(sidecarManager: SidecarManager): Promise<{ code: string }> {
+async function regenerateConnectionCodeSafely(
+  sidecarManager: SidecarManager,
+): Promise<{ code: string }> {
   let health = null;
   try {
     health = await sidecarClient.getHealth();
@@ -79,21 +89,21 @@ export function registerIpcHandlers(sidecarManager: SidecarManager): void {
     sidecarClient.updateSettings(partial),
   );
   ipcMain.handle(IPC.SIDECAR_RESET_STATE, () => sidecarClient.resetState());
-  ipcMain.handle(IPC.SIDECAR_REGENERATE_CODE, () =>
-    regenerateConnectionCodeSafely(sidecarManager),
-  );
+  ipcMain.handle(IPC.SIDECAR_REGENERATE_CODE, () => regenerateConnectionCodeSafely(sidecarManager));
   ipcMain.handle(IPC.SIDECAR_RUNTIME_STATE, () => sidecarManager.getState());
   ipcMain.handle(IPC.SIDECAR_RETRY_START, () => sidecarManager.retryStart());
   ipcMain.handle(IPC.SIDECAR_INSTALL_BONJOUR, () => installBonjourForWindows(sidecarManager));
   ipcMain.handle(IPC.SIDECAR_SHARE_STATUS, () => sidecarClient.getShareStatus());
   ipcMain.handle(IPC.SIDECAR_VALIDATE_SHARE, () => sidecarClient.validateShare());
   ipcMain.handle(IPC.SIDECAR_TRANSFER_ACTIVE, () => sidecarClient.getTransferActive());
-  ipcMain.handle(IPC.SIDECAR_SHARED_LIST, (_e, path?: string) =>
-    sidecarClient.getSharedList(path),
+  ipcMain.handle(IPC.SIDECAR_SHARED_LIST, (_e, path?: string) => sidecarClient.getSharedList(path));
+  ipcMain.handle(IPC.SUPPORT_UPLOAD_DIAGNOSTICS, (_e, request: DiagnosticsUploadRequest) =>
+    uploadDiagnostics(sidecarManager, request),
   );
   ipcMain.handle(IPC.SUPPORT_EXPORT_DIAGNOSTICS, (_e, locale?: string) =>
     exportDiagnostics(sidecarManager, locale),
   );
+  ipcMain.handle(IPC.SUPPORT_CHECK_FOR_UPDATES, () => checkForUpdates());
   ipcMain.handle(IPC.SUPPORT_APP_INFO, () => getAppInfo());
 
   // File operations — real Electron APIs

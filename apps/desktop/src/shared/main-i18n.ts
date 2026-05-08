@@ -23,6 +23,15 @@ const MAIN_STRINGS = {
         '',
       ],
     },
+    updates: {
+      title: 'Vivi Drop update available',
+      message: 'Version v{{version}} is available',
+      minimumRequired: 'This version must be updated before continuing.',
+      releaseNotes: 'Update content',
+      openDownload: 'Open download page',
+      later: 'Later',
+      ok: 'OK',
+    },
   },
   'zh-Hans': {
     diagnostics: {
@@ -45,6 +54,15 @@ const MAIN_STRINGS = {
         '请将整个 ZIP 提供给开发团队进行排查。',
         '',
       ],
+    },
+    updates: {
+      title: 'Vivi Drop 有可用更新',
+      message: '有新版本 v{{version}} 可用',
+      minimumRequired: '此版本需要更新后继续使用。',
+      releaseNotes: '更新内容',
+      openDownload: '打开下载页',
+      later: '稍后',
+      ok: '确定',
     },
   },
   'zh-Hant': {
@@ -69,9 +87,20 @@ const MAIN_STRINGS = {
         '',
       ],
     },
+    updates: {
+      title: 'Vivi Drop 有可用更新',
+      message: '有新版本 v{{version}} 可用',
+      minimumRequired: '此版本需要更新後繼續使用。',
+      releaseNotes: '更新內容',
+      openDownload: '開啟下載頁',
+      later: '稍後',
+      ok: '確定',
+    },
   },
 } as const;
 
-export function getMainStrings(locale: string | null | undefined): (typeof MAIN_STRINGS)[SupportedLocale] {
+export function getMainStrings(
+  locale: string | null | undefined,
+): (typeof MAIN_STRINGS)[SupportedLocale] {
   return MAIN_STRINGS[isSupportedLocale(locale) ? locale : 'en'];
 }

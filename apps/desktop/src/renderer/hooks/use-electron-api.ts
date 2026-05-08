@@ -33,11 +33,14 @@ const mockSidecar: ElectronAPI['sidecar'] = {
   }),
   getDeviceDates: async () => ({ dates: [] }),
   getSettings: async () => ({ ...defaultSettings }),
-  updateSettings: async (s) =>
-    ({ ...defaultSettings, ...s }) as SettingsDTO,
+  updateSettings: async (s) => ({ ...defaultSettings, ...s }) as SettingsDTO,
   resetState: async () => ({ ok: true }),
   regenerateConnectionCode: async () => ({ code: '000000' }),
-  getRuntimeState: async () => ({ ...INITIAL_SIDECAR_RUNTIME_STATE, status: 'healthy', message: null }),
+  getRuntimeState: async () => ({
+    ...INITIAL_SIDECAR_RUNTIME_STATE,
+    status: 'healthy',
+    message: null,
+  }),
   retryStart: async () => {},
   installBonjour: async () => ({
     status: 'already_installed' as const,
@@ -89,7 +92,16 @@ const mockAPI: ElectronAPI = {
   events: mockEvents,
   platform: mockPlatform,
   support: {
+    uploadDiagnostics: async () => ({
+      refId: 'local-mock',
+      uploadedAt: new Date().toISOString(),
+    }),
     exportDiagnostics: async () => null,
+    checkForUpdates: async () => ({
+      updateAvailable: false,
+      latestVersion: '0.1.1',
+      checkedAt: new Date().toISOString(),
+    }),
     getAppInfo: async () => ({ name: 'SyncFlow', version: '0.1.1', buildNumber: '5' }),
   },
 };

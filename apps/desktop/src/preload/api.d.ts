@@ -12,6 +12,26 @@ import type { SidecarEvent } from '@syncflow/contracts';
 import type { BonjourInstallResult } from '../shared/bonjour';
 import type { SidecarRuntimeState } from '../shared/sidecar-runtime';
 
+export type DiagnosticsUploadRequest = {
+  description: string;
+  locale?: string;
+};
+
+export type DiagnosticsUploadResult = {
+  refId: string;
+  uploadedAt: string;
+};
+
+export type UpdateCheckResult = {
+  updateAvailable: boolean;
+  latestVersion: string;
+  latestBuildNumber?: string;
+  minimumRequired?: boolean;
+  downloadUrl?: string;
+  releaseNotes?: string;
+  checkedAt: string;
+};
+
 export interface ElectronAPI {
   sidecar: {
     getHealth(): Promise<{ ok: boolean; service: string }>;
@@ -59,7 +79,9 @@ export interface ElectronAPI {
     getLocalIPs(): string[];
   };
   support: {
+    uploadDiagnostics(request: DiagnosticsUploadRequest): Promise<DiagnosticsUploadResult>;
     exportDiagnostics(locale?: string): Promise<string | null>;
+    checkForUpdates(): Promise<UpdateCheckResult>;
     getAppInfo(): Promise<{ name: string; version: string; buildNumber: string }>;
   };
 }

@@ -28,6 +28,12 @@ AuthKey_*.p8
 .vscode/
 .claude/
 
+# Locale resource files must remain trackable even if a developer has a broad
+# global settings.json ignore rule.
+!apps/desktop/src/renderer/i18n/locales/en/settings.json
+!apps/desktop/src/renderer/i18n/locales/zh-Hans/settings.json
+!apps/desktop/src/renderer/i18n/locales/zh-Hant/settings.json
+
 # Local docs (not tracked)
 Vivi Drop-*.md
 UI/

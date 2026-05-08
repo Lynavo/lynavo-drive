@@ -23,7 +23,9 @@ const IPC = {
   SIDECAR_VALIDATE_SHARE: 'sidecar:validate-share',
   SIDECAR_TRANSFER_ACTIVE: 'sidecar:transfer-active',
   SIDECAR_SHARED_LIST: 'sidecar:shared-list',
+  SUPPORT_UPLOAD_DIAGNOSTICS: 'support:upload-diagnostics',
   SUPPORT_EXPORT_DIAGNOSTICS: 'support:export-diagnostics',
+  SUPPORT_CHECK_FOR_UPDATES: 'support:check-for-updates',
   SUPPORT_APP_INFO: 'support:app-info',
   FILES_OPEN_FOLDER: 'files:open-folder',
   FILES_OPEN_FILE: 'files:open-file',
@@ -103,8 +105,10 @@ const electronAPI: ElectronAPI = {
     },
   },
   support: {
+    uploadDiagnostics: (request) => ipcRenderer.invoke(IPC.SUPPORT_UPLOAD_DIAGNOSTICS, request),
     exportDiagnostics: (locale?: string) =>
       ipcRenderer.invoke(IPC.SUPPORT_EXPORT_DIAGNOSTICS, locale),
+    checkForUpdates: () => ipcRenderer.invoke(IPC.SUPPORT_CHECK_FOR_UPDATES),
     getAppInfo: () => ipcRenderer.invoke(IPC.SUPPORT_APP_INFO),
   },
 };

@@ -1,9 +1,10 @@
 import { app, dialog, shell } from 'electron';
 import log from 'electron-log';
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { copyFile, mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
-import { networkInterfaces, release, tmpdir, type } from 'node:os';
+import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { hostname, networkInterfaces, release, tmpdir, type } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { sidecarClient } from './sidecar-client';
@@ -45,7 +46,11 @@ type EnvironmentSnapshot = {
 
 type DiagnosticSnapshot = {
   generatedAt: string;
-  app: AppInfo & { platform: NodeJS.Platform };
+  app: AppInfo & { build: string; platform: NodeJS.Platform };
+  device: {
+    model: string;
+    osVersion: string;
+  };
   environment: EnvironmentSnapshot;
   sidecar: {
     runtimeState: unknown;
@@ -62,6 +67,40 @@ type DiagnosticSnapshot = {
     sidecarLogFiles: string[];
   };
 };
+
+export type DiagnosticsUploadRequest = {
+  description: string;
+  locale?: string;
+};
+
+export type DiagnosticsUploadResult = {
+  refId: string;
+  uploadedAt: string;
+};
+
+export type UpdateCheckResult = {
+  updateAvailable: boolean;
+  latestVersion: string;
+  latestBuildNumber?: string;
+  minimumRequired?: boolean;
+  downloadUrl?: string;
+  releaseNotes?: string;
+  checkedAt: string;
+};
+
+export class DiagnosticsUploadError extends Error {
+  constructor(
+    public readonly code:
+      | 'NETWORK_UNREACHABLE'
+      | 'BUNDLE_TOO_LARGE'
+      | 'SERVER_ERROR'
+      | 'INVALID_RESPONSE',
+    message: string,
+  ) {
+    super(`${code}: ${message}`);
+    this.name = 'DiagnosticsUploadError';
+  }
+}
 
 function diagnosticsTimestamp(): string {
   const now = new Date();
@@ -206,6 +245,40 @@ export function getAppInfo(): AppInfo {
   };
 }
 
+function defaultApiBaseUrl(): string {
+  return app.isPackaged ? 'https://api.vividrop.cn' : 'http://127.0.0.1:8080';
+}
+
+function configuredUrl(envName: string, fallbackPath: string): string {
+  const explicit = process.env[envName]?.trim();
+  if (explicit) return explicit;
+  const base =
+    process.env.VIVIDROP_API_BASE_URL?.trim() ||
+    process.env.SYNCFLOW_API_BASE_URL?.trim() ||
+    defaultApiBaseUrl();
+  return new URL(fallbackPath, base.endsWith('/') ? base : `${base}/`).toString();
+}
+
+function diagnosticsUploadUrl(): string {
+  return configuredUrl('VIVIDROP_DIAGNOSTICS_UPLOAD_URL', '/api/v1/diagnostics/upload');
+}
+
+function updateCheckUrl(): string {
+  return configuredUrl('VIVIDROP_DESKTOP_UPDATE_URL', '/api/v1/desktop/update-check');
+}
+
+function optionalApiToken(): string | null {
+  return (
+    process.env.VIVIDROP_DIAGNOSTICS_TOKEN?.trim() || process.env.VIVIDROP_API_TOKEN?.trim() || null
+  );
+}
+
+function desktopClientId(): string {
+  const source = `${app.getPath('userData')}|${hostname()}`;
+  const digest = createHash('sha256').update(source).digest('hex').slice(0, 16);
+  return `desktop-${digest}`;
+}
+
 function resolveBuildNumber(): string {
   const fallback = '';
   const packagedPackageJson = join(app.getAppPath(), 'package.json');
@@ -255,6 +328,24 @@ export async function exportDiagnostics(
     return null;
   }
 
+  const { tempRoot, bundleDir } = await createDiagnosticsBundle(sidecarManager, locale, timestamp);
+
+  try {
+    await compressBundle(bundleDir, dialogResult.filePath, true);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+
+  shell.showItemInFolder(dialogResult.filePath);
+  return dialogResult.filePath;
+}
+
+async function createDiagnosticsBundle(
+  sidecarManager: SidecarManager,
+  locale?: string,
+  timestamp = diagnosticsTimestamp(),
+): Promise<{ tempRoot: string; bundleDir: string }> {
+  const strings = getMainStrings(locale);
   const tempRoot = join(tmpdir(), `syncflow-diagnostics-${timestamp}`);
   const bundleDir = join(tempRoot, `${strings.diagnostics.filenamePrefix}-${timestamp}`);
   const filesDir = join(bundleDir, 'files');
@@ -272,7 +363,12 @@ export async function exportDiagnostics(
     generatedAt: new Date().toISOString(),
     app: {
       ...appInfo,
+      build: appInfo.buildNumber,
       platform: process.platform,
+    },
+    device: {
+      model: `${type()} ${process.arch}`,
+      osVersion: `${type()} ${release()}`,
     },
     environment,
     sidecar: {
@@ -292,11 +388,7 @@ export async function exportDiagnostics(
   };
 
   await writeFile(join(bundleDir, 'diagnostics.json'), JSON.stringify(snapshot, null, 2), 'utf8');
-  await writeFile(
-    join(bundleDir, 'README.txt'),
-    strings.diagnostics.readme.join('\n'),
-    'utf8',
-  );
+  await writeFile(join(bundleDir, 'README.txt'), strings.diagnostics.readme.join('\n'), 'utf8');
 
   if (await exists(desktopLogPath)) {
     await copyFile(desktopLogPath, join(filesDir, 'desktop-main.log'));
@@ -312,23 +404,176 @@ export async function exportDiagnostics(
     await copyFile(logPath, join(filesDir, baseName));
   }
 
+  return { tempRoot, bundleDir };
+}
+
+async function compressBundle(
+  bundleDir: string,
+  outputPath: string,
+  includeParent: boolean,
+): Promise<void> {
   if (process.platform === 'win32') {
     await execFileAsync('powershell.exe', [
       '-NoProfile',
       '-Command',
-      `Compress-Archive -Path '${bundleDir.replace(/'/g, "''")}\\*' -DestinationPath '${dialogResult.filePath.replace(/'/g, "''")}' -Force`,
+      `Compress-Archive -Path '${bundleDir.replace(/'/g, "''")}\\*' -DestinationPath '${outputPath.replace(/'/g, "''")}' -Force`,
     ]);
-  } else {
+    return;
+  }
+
+  if (includeParent) {
     await execFileAsync('ditto', [
       '-c',
       '-k',
       '--sequesterRsrc',
       '--keepParent',
       bundleDir,
-      dialogResult.filePath,
+      outputPath,
     ]);
+  } else {
+    await execFileAsync('ditto', ['-c', '-k', '--sequesterRsrc', bundleDir, outputPath]);
   }
-  await rm(tempRoot, { recursive: true, force: true });
-  shell.showItemInFolder(dialogResult.filePath);
-  return dialogResult.filePath;
+}
+
+function parseDiagnosticsUploadResponse(value: unknown): DiagnosticsUploadResult {
+  if (!value || typeof value !== 'object') {
+    throw new DiagnosticsUploadError('INVALID_RESPONSE', 'upload response is not an object');
+  }
+  const data = value as Record<string, unknown>;
+  const refId = data.ref_id ?? data.refId;
+  const uploadedAt = data.uploaded_at ?? data.uploadedAt;
+  if (typeof refId !== 'string' || typeof uploadedAt !== 'string') {
+    throw new DiagnosticsUploadError('INVALID_RESPONSE', 'upload response missing ref_id');
+  }
+  return { refId, uploadedAt };
+}
+
+export async function uploadDiagnostics(
+  sidecarManager: SidecarManager,
+  request: DiagnosticsUploadRequest,
+): Promise<DiagnosticsUploadResult> {
+  const description = request.description.trim();
+  const timestamp = diagnosticsTimestamp();
+  const { tempRoot, bundleDir } = await createDiagnosticsBundle(
+    sidecarManager,
+    request.locale,
+    timestamp,
+  );
+  const archivePath = join(tempRoot, `upload-${timestamp}.zip`);
+
+  try {
+    await compressBundle(bundleDir, archivePath, false);
+
+    const form = new FormData();
+    form.append('client_id', desktopClientId());
+    if (description) {
+      form.append('note', description);
+    }
+    const zipBytes = await readFile(archivePath);
+    form.append(
+      'bundle',
+      new Blob([new Uint8Array(zipBytes)], { type: 'application/zip' }),
+      'diagnostics.zip',
+    );
+
+    const headers: Record<string, string> = {};
+    const token = optionalApiToken();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(diagnosticsUploadUrl(), {
+        method: 'POST',
+        headers,
+        body: form,
+      });
+    } catch (error) {
+      throw new DiagnosticsUploadError(
+        'NETWORK_UNREACHABLE',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      if (response.status === 413) {
+        throw new DiagnosticsUploadError('BUNDLE_TOO_LARGE', body || 'bundle too large');
+      }
+      throw new DiagnosticsUploadError('SERVER_ERROR', body || `HTTP ${response.status}`);
+    }
+
+    return parseDiagnosticsUploadResponse(await response.json());
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function numericVersionParts(version: string): number[] {
+  return version
+    .split(/[.-]/)
+    .map((part) => Number.parseInt(part, 10))
+    .map((part) => (Number.isFinite(part) ? part : 0));
+}
+
+function compareVersions(left: string, right: string): number {
+  const a = numericVersionParts(left);
+  const b = numericVersionParts(right);
+  const length = Math.max(a.length, b.length);
+  for (let i = 0; i < length; i += 1) {
+    const diff = (a[i] ?? 0) - (b[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+function parseUpdateCheckResponse(value: unknown, current: AppInfo): UpdateCheckResult {
+  if (!value || typeof value !== 'object') {
+    throw new Error('update check response is not an object');
+  }
+  const data = value as Record<string, unknown>;
+  const latestVersion = data.latest_version ?? data.latestVersion;
+  if (typeof latestVersion !== 'string' || !latestVersion) {
+    throw new Error('update check response missing latest version');
+  }
+
+  const explicitUpdate = data.update_available ?? data.updateAvailable;
+  const updateAvailable =
+    typeof explicitUpdate === 'boolean'
+      ? explicitUpdate
+      : compareVersions(latestVersion, current.version) > 0;
+  const latestBuildNumber = data.latest_build_number ?? data.latestBuildNumber;
+  const minimumRequired = data.minimum_required ?? data.minimumRequired;
+  const downloadUrl = data.download_url ?? data.downloadUrl;
+  const releaseNotes = data.release_notes ?? data.releaseNotes;
+  const checkedAt = data.checked_at ?? data.checkedAt;
+
+  return {
+    updateAvailable,
+    latestVersion,
+    latestBuildNumber: typeof latestBuildNumber === 'string' ? latestBuildNumber : undefined,
+    minimumRequired: typeof minimumRequired === 'boolean' ? minimumRequired : undefined,
+    downloadUrl: typeof downloadUrl === 'string' ? downloadUrl : undefined,
+    releaseNotes: typeof releaseNotes === 'string' ? releaseNotes : undefined,
+    checkedAt: typeof checkedAt === 'string' ? checkedAt : new Date().toISOString(),
+  };
+}
+
+export async function checkForUpdates(): Promise<UpdateCheckResult> {
+  const appInfo = getAppInfo();
+  const url = new URL(updateCheckUrl());
+  url.searchParams.set('platform', process.platform);
+  url.searchParams.set('arch', process.arch);
+  url.searchParams.set('version', appInfo.version);
+  if (appInfo.buildNumber) {
+    url.searchParams.set('build', appInfo.buildNumber);
+  }
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error(`update check failed: HTTP ${response.status}`);
+  }
+
+  return parseUpdateCheckResponse(await response.json(), appInfo);
 }

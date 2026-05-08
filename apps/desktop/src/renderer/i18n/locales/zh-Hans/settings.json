@@ -1,0 +1,112 @@
+{
+  "title": "设置",
+  "sections": {
+    "language": "语言",
+    "languageDescription": "选择桌面端界面显示语言",
+    "deviceName": "设备名称",
+    "deviceNameDescription": "手机端会看到这个名称",
+    "connectionCode": "连接码管理",
+    "connectionCodeDescription": "重新生成后，旧手机需要重新配对",
+    "bonjour": "Windows Bonjour 广播",
+    "bonjourDescription": "用于让手机在同一局域网内发现这台电脑"
+  },
+  "language": {
+    "label": "界面语言",
+    "options": {
+      "en": "English",
+      "zhHans": "简体中文",
+      "zhHant": "繁体中文"
+    }
+  },
+  "deviceName": {
+    "lockedHint": "正在接收文件，完成后再修改名称"
+  },
+  "connectionCode": {
+    "regenerate": "重新生成"
+  },
+  "filePath": {
+    "receiveAddress": "接收目录",
+    "sharedAddress": "共享目录",
+    "chooseFolder": "选择文件夹",
+    "openReceived": "打开接收目录",
+    "openShared": "打开共享目录"
+  },
+  "shareAddress": {
+    "label": "局域网共享地址",
+    "recommendedHost": "这台电脑",
+    "validating": "正在检测共享状态",
+    "validatingDetail": "正在检查 Windows 共享配置。",
+    "validatingDetailMac": "正在检查 macOS 文件共享配置。",
+    "ready": "共享已就绪",
+    "readyDetail": "{{shareName}} 可以被同一局域网内的设备访问。",
+    "needsManualEnable": "需要手动开启共享",
+    "needsManualEnableDetailMac": "请在系统设置中开启文件共享，并允许 Vivi Drop 访问接收目录。",
+    "needsManualEnableDetailWindows": "请开启 Windows 高级共享，并确认网络发现可用。",
+    "shareRegistered": "共享目录已登记",
+    "shareRegisteredDetailMac": "系统共享可能需要一点时间刷新，请保持文件共享开启。",
+    "shareRegisteredDetailWindows": "共享目录已登记，请确认 Windows 防火墙允许文件共享。",
+    "error": "共享检测失败",
+    "errorDetail": "请检查系统共享设置后重试。",
+    "unknown": "共享状态未知",
+    "unknownDetail": "背景服务尚未回报共享状态。",
+    "refresh": "重新检测",
+    "windowsManualHint": "Windows 需要开启高级共享后，手机才能读取共享目录。",
+    "windowsQuickConfig": "Windows 快速配置",
+    "windowsQuickConfigDescription": "打开系统高级共享设置，确认网络发现和文件共享已启用。",
+    "openAdvancedSharing": "打开高级共享",
+    "copyRecommendedAddress": "复制推荐地址",
+    "recommendedAddress": "推荐地址",
+    "systemGuide": "系统指引"
+  },
+  "bonjour": {
+    "defaultMessage": "Bonjour 用于让 iPhone 自动发现这台电脑。",
+    "install": "安装 Bonjour",
+    "retry": "重新检测",
+    "openApplePage": "打开 Apple 下载页",
+    "mode": "发现模式",
+    "appleBonjour": "Apple Bonjour",
+    "fallbackMode": "内置广播",
+    "advertisedIp": "广播 IP",
+    "sameLanHint": "请确认手机和电脑连接到同一个局域网。",
+    "runtimePath": "运行路径",
+    "runtimeNotFound": "未检测到",
+    "installHint": "安装完成后请重新检测。"
+  },
+  "systemGuide": {
+    "macTitle": "macOS 文件共享",
+    "macSubtitle": "确认文件共享和接收目录权限已开启。",
+    "windowsTitle": "Windows 文件共享",
+    "windowsDescription": "开启网络发现、文件和打印机共享，并允许接收目录共享。",
+    "steps": [
+      "打开高级共享设置",
+      "启用网络发现",
+      "启用文件和打印机共享",
+      "确认接收目录允许当前用户写入"
+    ]
+  },
+  "support": {
+    "title": "支持与诊断",
+    "description": "上传诊断包给支持团队；只有网络不可用时才会改为本地导出。",
+    "uploadDiagnostics": "上传诊断包",
+    "exportDiagnostics": "导出诊断包",
+    "diagnosticsDescriptionLabel": "问题描述",
+    "diagnosticsDescriptionPlaceholder": "请描述出现问题的步骤、手机型号、网络环境或错误现象",
+    "diagnosticsDescriptionHelp": "描述会随诊断包一起上传，方便定位问题。",
+    "diagnosticsCancel": "取消",
+    "diagnosticsSubmit": "上传",
+    "confirmReset": "确认重置",
+    "reset": "重置数据",
+    "lastSuccessfulSync": "最近成功同步",
+    "advertisedIp": "广播 IP",
+    "sameLanHint": "请确认手机和电脑连接到同一个局域网。",
+    "desktopVersion": "桌面端版本",
+    "checkUpdates": "检查更新",
+    "checkingUpdates": "正在检查",
+    "updateAvailable": "有新版本 v{{version}} 可用",
+    "upToDate": "已是最新版本",
+    "updateUnavailable": "暂时无法检查更新",
+    "minimumRequired": "此版本需要更新后继续使用。",
+    "openDownload": "打开下载页",
+    "releaseNotes": "更新内容"
+  }
+}

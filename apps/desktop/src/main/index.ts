@@ -2,6 +2,7 @@ import { app, BrowserWindow } from 'electron';
 import { join } from 'path';
 import { registerIpcHandlers } from './ipc-handlers';
 import { SidecarManager } from './sidecar-manager';
+import { checkForUpdatesOnStartup } from './startup-update-check';
 import { WsBridge } from './ws-bridge';
 import type { SidecarRuntimeState } from '../shared/sidecar-runtime';
 
@@ -74,6 +75,7 @@ export async function createMainWindow() {
 app.whenReady().then(async () => {
   registerIpcHandlers(sidecar);
   await createMainWindow();
+  void checkForUpdatesOnStartup(() => mainWindow);
   wsBridge = new WsBridge(() => mainWindow);
   void sidecar.start().catch((err) => {
     console.error('Failed to start sidecar:', err);

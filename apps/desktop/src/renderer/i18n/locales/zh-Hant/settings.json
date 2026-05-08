@@ -1,0 +1,112 @@
+{
+  "title": "設定",
+  "sections": {
+    "language": "語言",
+    "languageDescription": "選擇桌面端介面顯示語言",
+    "deviceName": "裝置名稱",
+    "deviceNameDescription": "手機端會看到這個名稱",
+    "connectionCode": "連線碼管理",
+    "connectionCodeDescription": "重新產生後，舊手機需要重新配對",
+    "bonjour": "Windows Bonjour 廣播",
+    "bonjourDescription": "用於讓手機在同一個區域網路內發現這台電腦"
+  },
+  "language": {
+    "label": "介面語言",
+    "options": {
+      "en": "English",
+      "zhHans": "簡體中文",
+      "zhHant": "繁體中文"
+    }
+  },
+  "deviceName": {
+    "lockedHint": "正在接收檔案，完成後再修改名稱"
+  },
+  "connectionCode": {
+    "regenerate": "重新產生"
+  },
+  "filePath": {
+    "receiveAddress": "接收目錄",
+    "sharedAddress": "共享目錄",
+    "chooseFolder": "選擇資料夾",
+    "openReceived": "開啟接收目錄",
+    "openShared": "開啟共享目錄"
+  },
+  "shareAddress": {
+    "label": "區域網路共享位址",
+    "recommendedHost": "這台電腦",
+    "validating": "正在偵測共享狀態",
+    "validatingDetail": "正在檢查 Windows 共享設定。",
+    "validatingDetailMac": "正在檢查 macOS 檔案共享設定。",
+    "ready": "共享已就緒",
+    "readyDetail": "{{shareName}} 可以被同一個區域網路內的裝置存取。",
+    "needsManualEnable": "需要手動開啟共享",
+    "needsManualEnableDetailMac": "請在系統設定中開啟檔案共享，並允許 Vivi Drop 存取接收目錄。",
+    "needsManualEnableDetailWindows": "請開啟 Windows 進階共享，並確認網路探索可用。",
+    "shareRegistered": "共享目錄已登記",
+    "shareRegisteredDetailMac": "系統共享可能需要一點時間重新整理，請保持檔案共享開啟。",
+    "shareRegisteredDetailWindows": "共享目錄已登記，請確認 Windows 防火牆允許檔案共享。",
+    "error": "共享偵測失敗",
+    "errorDetail": "請檢查系統共享設定後重試。",
+    "unknown": "共享狀態未知",
+    "unknownDetail": "背景服務尚未回報共享狀態。",
+    "refresh": "重新偵測",
+    "windowsManualHint": "Windows 需要開啟進階共享後，手機才能讀取共享目錄。",
+    "windowsQuickConfig": "Windows 快速設定",
+    "windowsQuickConfigDescription": "開啟系統進階共享設定，確認網路探索和檔案共享已啟用。",
+    "openAdvancedSharing": "開啟進階共享",
+    "copyRecommendedAddress": "複製建議位址",
+    "recommendedAddress": "建議位址",
+    "systemGuide": "系統指引"
+  },
+  "bonjour": {
+    "defaultMessage": "Bonjour 用於讓 iPhone 自動發現這台電腦。",
+    "install": "安裝 Bonjour",
+    "retry": "重新偵測",
+    "openApplePage": "開啟 Apple 下載頁",
+    "mode": "探索模式",
+    "appleBonjour": "Apple Bonjour",
+    "fallbackMode": "內建廣播",
+    "advertisedIp": "廣播 IP",
+    "sameLanHint": "請確認手機和電腦連到同一個區域網路。",
+    "runtimePath": "執行路徑",
+    "runtimeNotFound": "未偵測到",
+    "installHint": "安裝完成後請重新偵測。"
+  },
+  "systemGuide": {
+    "macTitle": "macOS 檔案共享",
+    "macSubtitle": "確認檔案共享和接收目錄權限已開啟。",
+    "windowsTitle": "Windows 檔案共享",
+    "windowsDescription": "開啟網路探索、檔案和印表機共享，並允許接收目錄共享。",
+    "steps": [
+      "開啟進階共享設定",
+      "啟用網路探索",
+      "啟用檔案和印表機共享",
+      "確認接收目錄允許目前使用者寫入"
+    ]
+  },
+  "support": {
+    "title": "支援與診斷",
+    "description": "上傳診斷包給支援團隊；只有網路不可用時才會改為本機匯出。",
+    "uploadDiagnostics": "上傳診斷包",
+    "exportDiagnostics": "匯出診斷包",
+    "diagnosticsDescriptionLabel": "問題描述",
+    "diagnosticsDescriptionPlaceholder": "請描述出現問題的步驟、手機型號、網路環境或錯誤現象",
+    "diagnosticsDescriptionHelp": "描述會隨診斷包一起上傳，方便定位問題。",
+    "diagnosticsCancel": "取消",
+    "diagnosticsSubmit": "上傳",
+    "confirmReset": "確認重置",
+    "reset": "重置資料",
+    "lastSuccessfulSync": "最近成功同步",
+    "advertisedIp": "廣播 IP",
+    "sameLanHint": "請確認手機和電腦連到同一個區域網路。",
+    "desktopVersion": "桌面端版本",
+    "checkUpdates": "檢查更新",
+    "checkingUpdates": "正在檢查",
+    "updateAvailable": "有新版本 v{{version}} 可用",
+    "upToDate": "已是最新版本",
+    "updateUnavailable": "暫時無法檢查更新",
+    "minimumRequired": "此版本需要更新後繼續使用。",
+    "openDownload": "開啟下載頁",
+    "releaseNotes": "更新內容"
+  }
+}
