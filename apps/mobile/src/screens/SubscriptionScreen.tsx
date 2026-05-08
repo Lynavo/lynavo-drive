@@ -1043,6 +1043,7 @@ export function SubscriptionScreen() {
           for (const delay of POST_VERIFY_STATUS_POLL_DELAYS_MS) {
             await wait(delay);
             try {
+              markSubscriptionJustActivated();
               const candidate = await loadSubscription();
               recordDiagnosticsLog(
                 'SubscriptionScreen',
@@ -1101,6 +1102,9 @@ export function SubscriptionScreen() {
       // period — acceptable degradation vs. hiding the date entirely.
       if (fresh == null) {
         try {
+          if (!verifiedViaSilentSuccess) {
+            markSubscriptionJustActivated();
+          }
           fresh = await loadSubscription();
           recordDiagnosticsLog(
             'SubscriptionScreen',

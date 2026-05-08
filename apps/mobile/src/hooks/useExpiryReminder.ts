@@ -46,13 +46,19 @@ export function __resetJustActivatedForTesting(): void {
 }
 
 export function classifyReminder(
-  sub: Pick<SubscriptionInfo, 'status'> & Partial<Pick<SubscriptionInfo, 'expireAt' | 'trialEnd'>> | null,
+  sub:
+    | (Pick<SubscriptionInfo, 'status'> &
+        Partial<Pick<SubscriptionInfo, 'expireAt' | 'trialEnd' | 'autoRenewing'>>)
+    | null,
   now: number,
 ): Classification {
   if (!sub) return { level: 'none', days: 0 };
 
   if (sub.status === 'sub_expired') return { level: 'expired', days: 0 };
   if (sub.status === 'trial_expired') return { level: 'expired', days: 0 };
+  if (sub.status === 'subscribed' && sub.autoRenewing === true) {
+    return { level: 'none', days: 0 };
+  }
 
   const targetIso =
     sub.status === 'trialing' ? sub.trialEnd : sub.expireAt;

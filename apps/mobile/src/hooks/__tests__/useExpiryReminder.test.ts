@@ -33,6 +33,15 @@ describe('classifyReminder', () => {
     expect(r.days).toBe(5);
   });
 
+  test('status subscribed and auto-renewing with expireAt in [1..7] days → none', () => {
+    const r = classifyReminder({
+      status: 'subscribed',
+      expireAt: new Date(now + 5 * MS_PER_DAY).toISOString(),
+      autoRenewing: true,
+    }, now);
+    expect(r.level).toBe('none');
+  });
+
   test('status subscribed with expireAt today (<1 day) → warnToday', () => {
     const r = classifyReminder({
       status: 'subscribed',

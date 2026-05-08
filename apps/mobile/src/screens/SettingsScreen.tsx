@@ -824,8 +824,8 @@ export function SettingsScreen() {
         Alert.alert(t('subscription.restore.empty'));
         return;
       }
-      await auth.loadSubscription();
       markSubscriptionJustActivated();
+      await auth.loadSubscription();
       Alert.alert(t('subscription.restore.success'));
     } catch (err) {
       const cls = classifyIapError(err);
