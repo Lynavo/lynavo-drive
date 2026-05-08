@@ -106,8 +106,8 @@ const electronAPI: ElectronAPI = {
   },
   support: {
     uploadDiagnostics: (request) => ipcRenderer.invoke(IPC.SUPPORT_UPLOAD_DIAGNOSTICS, request),
-    exportDiagnostics: (locale?: string) =>
-      ipcRenderer.invoke(IPC.SUPPORT_EXPORT_DIAGNOSTICS, locale),
+    exportDiagnostics: (locale?: string, description?: string) =>
+      ipcRenderer.invoke(IPC.SUPPORT_EXPORT_DIAGNOSTICS, locale, description),
     checkForUpdates: () => ipcRenderer.invoke(IPC.SUPPORT_CHECK_FOR_UPDATES),
     getAppInfo: () => ipcRenderer.invoke(IPC.SUPPORT_APP_INFO),
   },

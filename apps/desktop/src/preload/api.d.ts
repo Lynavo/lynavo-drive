@@ -80,7 +80,7 @@ export interface ElectronAPI {
   };
   support: {
     uploadDiagnostics(request: DiagnosticsUploadRequest): Promise<DiagnosticsUploadResult>;
-    exportDiagnostics(locale?: string): Promise<string | null>;
+    exportDiagnostics(locale?: string, description?: string): Promise<string | null>;
     checkForUpdates(): Promise<UpdateCheckResult>;
     getAppInfo(): Promise<{ name: string; version: string; buildNumber: string }>;
   };

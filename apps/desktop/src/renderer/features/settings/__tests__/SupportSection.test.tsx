@@ -118,7 +118,7 @@ describe('SupportSection', () => {
     fireEvent.click(screen.getByRole('button', { name: /^上传$/ }));
 
     await waitFor(() => {
-      expect(exportDiagnostics).toHaveBeenCalledWith('zh-Hans');
+      expect(exportDiagnostics).toHaveBeenCalledWith('zh-Hans', '公司网络无法上传');
     });
   });
 

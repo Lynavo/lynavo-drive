@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { hostname, networkInterfaces, release, tmpdir, type } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { sidecarClient } from './sidecar-client';
 import type { SidecarManager } from './sidecar-manager';
@@ -25,6 +25,9 @@ type EnvironmentSnapshot = {
     type: string;
     release: string;
     arch: string;
+    hostname: string;
+    locale: string | null;
+    timeZone: string | null;
   };
   wifi: {
     ssid: string | null;
@@ -46,7 +49,26 @@ type EnvironmentSnapshot = {
 
 type DiagnosticSnapshot = {
   generatedAt: string;
+  issue: {
+    description: string | null;
+  };
   app: AppInfo & { build: string; platform: NodeJS.Platform };
+  process: {
+    pid: number;
+    cwd: string;
+    execPath: string;
+    packaged: boolean;
+    electron: string | null;
+    chrome: string | null;
+    node: string;
+    v8: string | null;
+  };
+  api: {
+    diagnosticsUploadUrl: string;
+    updateCheckUrl: string;
+    baseUrl: string;
+    baseUrlSource: string;
+  };
   device: {
     model: string;
     osVersion: string;
@@ -62,9 +84,15 @@ type DiagnosticSnapshot = {
   };
   files: {
     desktopLogPath: string | null;
+    desktopLogFiles: string[];
     sidecarDbPath: string | null;
     sidecarDataDir: string;
     sidecarLogFiles: string[];
+  };
+  paths: {
+    userData: string;
+    logs: string[];
+    sidecarDbPath: string | null;
   };
 };
 
@@ -199,6 +227,9 @@ async function captureEnvironmentSnapshot(): Promise<EnvironmentSnapshot> {
       type: type(),
       release: release(),
       arch: process.arch,
+      hostname: hostname(),
+      locale: app.getLocale?.() ?? null,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
     },
     wifi: await detectWiFiIdentity(),
     networkInterfaces: summarizeNetworkInterfaces(),
@@ -236,6 +267,48 @@ async function listSidecarLogFiles(sidecarDataDir: string): Promise<string[]> {
   }
 }
 
+/**
+ * Electron-log can create main, renderer, and rotated files in the same log
+ * directory. Collecting that directory gives support enough history to debug
+ * renderer-only failures and logs that rotated before the report was captured.
+ */
+async function listDesktopLogFiles(activeLogPath: string): Promise<string[]> {
+  const logsDir = dirname(activeLogPath);
+  const activeBaseName = basename(activeLogPath);
+  const present = new Set<string>();
+
+  if (await exists(activeLogPath)) {
+    present.add(activeLogPath);
+  }
+
+  try {
+    const entries = await readdir(logsDir);
+    const candidates = entries
+      .filter(
+        (name) =>
+          name === activeBaseName ||
+          name.startsWith(`${activeBaseName}.`) ||
+          /\.log(?:\.\d+)?$/i.test(name),
+      )
+      .sort((a, b) => {
+        if (a === activeBaseName) return -1;
+        if (b === activeBaseName) return 1;
+        return a.localeCompare(b, 'en');
+      })
+      .map((name) => join(logsDir, name));
+
+    for (const candidate of candidates) {
+      if (await exists(candidate)) {
+        present.add(candidate);
+      }
+    }
+  } catch {
+    // Best effort: the active log path above is still included if it exists.
+  }
+
+  return Array.from(present);
+}
+
 export function getAppInfo(): AppInfo {
   const buildNumber = resolveBuildNumber();
   return {
@@ -249,14 +322,40 @@ function defaultApiBaseUrl(): string {
   return app.isPackaged ? 'https://api.vividrop.cn' : 'http://127.0.0.1:8080';
 }
 
+function configuredApiBase(): { baseUrl: string; source: string } {
+  const vividropBase = process.env.VIVIDROP_API_BASE_URL?.trim();
+  if (vividropBase) return { baseUrl: vividropBase, source: 'VIVIDROP_API_BASE_URL' };
+
+  const syncflowBase = process.env.SYNCFLOW_API_BASE_URL?.trim();
+  if (syncflowBase) return { baseUrl: syncflowBase, source: 'SYNCFLOW_API_BASE_URL' };
+
+  return {
+    baseUrl: defaultApiBaseUrl(),
+    source: app.isPackaged ? 'packaged-default' : 'dev-default',
+  };
+}
+
 function configuredUrl(envName: string, fallbackPath: string): string {
   const explicit = process.env[envName]?.trim();
   if (explicit) return explicit;
-  const base =
-    process.env.VIVIDROP_API_BASE_URL?.trim() ||
-    process.env.SYNCFLOW_API_BASE_URL?.trim() ||
-    defaultApiBaseUrl();
+  const { baseUrl: base } = configuredApiBase();
   return new URL(fallbackPath, base.endsWith('/') ? base : `${base}/`).toString();
+}
+
+function redactUrlForDiagnostics(value: string): string {
+  try {
+    const url = new URL(value);
+    if (url.username) url.username = 'redacted';
+    if (url.password) url.password = 'redacted';
+    for (const key of ['token', 'access_token', 'api_key', 'apikey', 'key', 'secret']) {
+      if (url.searchParams.has(key)) {
+        url.searchParams.set(key, 'redacted');
+      }
+    }
+    return url.toString();
+  } catch {
+    return value;
+  }
 }
 
 function diagnosticsUploadUrl(): string {
@@ -312,6 +411,7 @@ function resolveBuildNumber(): string {
 export async function exportDiagnostics(
   sidecarManager: SidecarManager,
   locale?: string,
+  description?: string,
 ): Promise<string | null> {
   const strings = getMainStrings(locale);
   const timestamp = diagnosticsTimestamp();
@@ -328,7 +428,12 @@ export async function exportDiagnostics(
     return null;
   }
 
-  const { tempRoot, bundleDir } = await createDiagnosticsBundle(sidecarManager, locale, timestamp);
+  const { tempRoot, bundleDir } = await createDiagnosticsBundle(
+    sidecarManager,
+    locale,
+    timestamp,
+    description,
+  );
 
   try {
     await compressBundle(bundleDir, dialogResult.filePath, true);
@@ -344,6 +449,7 @@ async function createDiagnosticsBundle(
   sidecarManager: SidecarManager,
   locale?: string,
   timestamp = diagnosticsTimestamp(),
+  description?: string,
 ): Promise<{ tempRoot: string; bundleDir: string }> {
   const strings = getMainStrings(locale);
   const tempRoot = join(tmpdir(), `syncflow-diagnostics-${timestamp}`);
@@ -352,19 +458,41 @@ async function createDiagnosticsBundle(
   const sidecarDataDir = app.getPath('userData');
   const sidecarDbPath = join(sidecarDataDir, 'sidecar.db');
   const desktopLogPath = log.transports.file.getFile().path;
+  const issueDescription = description?.trim() || null;
 
   await rm(tempRoot, { recursive: true, force: true });
   await mkdir(filesDir, { recursive: true });
 
   const appInfo = getAppInfo();
+  const desktopLogFiles = await listDesktopLogFiles(desktopLogPath);
   const sidecarLogFiles = await listSidecarLogFiles(sidecarDataDir);
   const environment = await captureEnvironmentSnapshot();
+  const apiBase = configuredApiBase();
   const snapshot: DiagnosticSnapshot = {
     generatedAt: new Date().toISOString(),
+    issue: {
+      description: issueDescription,
+    },
     app: {
       ...appInfo,
       build: appInfo.buildNumber || 'dev',
       platform: process.platform,
+    },
+    process: {
+      pid: process.pid,
+      cwd: process.cwd(),
+      execPath: process.execPath,
+      packaged: app.isPackaged,
+      electron: process.versions.electron ?? null,
+      chrome: process.versions.chrome ?? null,
+      node: process.versions.node,
+      v8: process.versions.v8 ?? null,
+    },
+    api: {
+      diagnosticsUploadUrl: redactUrlForDiagnostics(diagnosticsUploadUrl()),
+      updateCheckUrl: redactUrlForDiagnostics(updateCheckUrl()),
+      baseUrl: redactUrlForDiagnostics(apiBase.baseUrl),
+      baseUrlSource: apiBase.source,
     },
     device: {
       model: `${type()} ${process.arch}`,
@@ -381,17 +509,23 @@ async function createDiagnosticsBundle(
     },
     files: {
       desktopLogPath: (await exists(desktopLogPath)) ? desktopLogPath : null,
+      desktopLogFiles,
       sidecarDbPath: (await exists(sidecarDbPath)) ? sidecarDbPath : null,
       sidecarDataDir,
       sidecarLogFiles,
+    },
+    paths: {
+      userData: sidecarDataDir,
+      logs: [...desktopLogFiles, ...sidecarLogFiles],
+      sidecarDbPath: (await exists(sidecarDbPath)) ? sidecarDbPath : null,
     },
   };
 
   await writeFile(join(bundleDir, 'diagnostics.json'), JSON.stringify(snapshot, null, 2), 'utf8');
   await writeFile(join(bundleDir, 'README.txt'), strings.diagnostics.readme.join('\n'), 'utf8');
 
-  if (await exists(desktopLogPath)) {
-    await copyFile(desktopLogPath, join(filesDir, 'desktop-main.log'));
+  for (const desktopLogFile of desktopLogFiles) {
+    await copyFile(desktopLogFile, join(filesDir, basename(desktopLogFile)));
   }
   if (await exists(sidecarDbPath)) {
     await copyFile(sidecarDbPath, join(filesDir, 'sidecar.db'));
@@ -458,6 +592,7 @@ export async function uploadDiagnostics(
     sidecarManager,
     request.locale,
     timestamp,
+    description,
   );
   const archivePath = join(tempRoot, `upload-${timestamp}.zip`);
 

@@ -1,16 +1,17 @@
 import { app, BrowserWindow } from 'electron';
+import log from 'electron-log';
 import { join } from 'path';
 import { registerIpcHandlers } from './ipc-handlers';
+import { attachRendererLogging } from './renderer-logging';
 import { SidecarManager } from './sidecar-manager';
 import { checkForUpdatesOnStartup } from './startup-update-check';
 import { WsBridge } from './ws-bridge';
 import type { SidecarRuntimeState } from '../shared/sidecar-runtime';
 
-
 // Prevent crash on broken pipe (sidecar stdout/stderr)
 process.on('uncaughtException', (err) => {
   if (err.message.includes('write EIO') || err.message.includes('EPIPE')) return;
-  console.error('Uncaught exception:', err);
+  log.error('Uncaught exception:', err);
 });
 
 let mainWindow: BrowserWindow | null = null;
@@ -64,6 +65,7 @@ export async function createMainWindow() {
       sandbox: false,
     },
   });
+  attachRendererLogging(mainWindow);
 
   if (isDev && process.env['ELECTRON_RENDERER_URL']) {
     await mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
@@ -73,12 +75,15 @@ export async function createMainWindow() {
 }
 
 app.whenReady().then(async () => {
+  log.info(
+    `[App] ready version=${app.getVersion()} packaged=${app.isPackaged} platform=${process.platform} arch=${process.arch}`,
+  );
   registerIpcHandlers(sidecar);
   await createMainWindow();
   void checkForUpdatesOnStartup(() => mainWindow);
   wsBridge = new WsBridge(() => mainWindow);
   void sidecar.start().catch((err) => {
-    console.error('Failed to start sidecar:', err);
+    log.error('Failed to start sidecar:', err);
   });
 
   app.on('activate', async () => {
@@ -100,7 +105,5 @@ app.on('before-quit', (event) => {
   event.preventDefault();
   isQuitting = true;
   wsBridge?.disconnect();
-  sidecar
-    .stop({ killExternal: true, killBonjourBroadcasts: true })
-    .finally(() => app.quit());
+  sidecar.stop({ killExternal: true, killBonjourBroadcasts: true }).finally(() => app.quit());
 });

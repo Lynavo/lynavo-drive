@@ -132,6 +132,7 @@ export function SupportSection() {
       try {
         const archivePath = await api.support.exportDiagnostics(
           i18n.resolvedLanguage ?? i18n.language,
+          description,
         );
         if (archivePath) {
           toast.success(t('errors.settings.diagnosticsUploadFallbackExported'), {

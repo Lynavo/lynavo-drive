@@ -100,8 +100,8 @@ export function registerIpcHandlers(sidecarManager: SidecarManager): void {
   ipcMain.handle(IPC.SUPPORT_UPLOAD_DIAGNOSTICS, (_e, request: DiagnosticsUploadRequest) =>
     uploadDiagnostics(sidecarManager, request),
   );
-  ipcMain.handle(IPC.SUPPORT_EXPORT_DIAGNOSTICS, (_e, locale?: string) =>
-    exportDiagnostics(sidecarManager, locale),
+  ipcMain.handle(IPC.SUPPORT_EXPORT_DIAGNOSTICS, (_e, locale?: string, description?: string) =>
+    exportDiagnostics(sidecarManager, locale, description),
   );
   ipcMain.handle(IPC.SUPPORT_CHECK_FOR_UPDATES, () => checkForUpdates());
   ipcMain.handle(IPC.SUPPORT_APP_INFO, () => getAppInfo());
