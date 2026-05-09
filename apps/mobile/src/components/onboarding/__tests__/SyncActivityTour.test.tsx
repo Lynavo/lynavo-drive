@@ -110,6 +110,10 @@ describe('SyncActivityTour', () => {
       configurable: true,
       value: 'android',
     });
+    Object.defineProperty(Platform, 'Version', {
+      configurable: true,
+      value: 34,
+    });
     Object.defineProperty(StatusBar, 'currentHeight', {
       configurable: true,
       value: 24,
@@ -133,6 +137,40 @@ describe('SyncActivityTour', () => {
     expect(overlayPath?.props.d).toContain('Q28 432');
     expect(overlayPath?.props.d).toContain('Q192 432');
     expect(overlayPath?.props.d).toContain('Q192 546');
+  });
+
+  it('does not double-apply the status bar offset on Android edge-to-edge screens', () => {
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'android',
+    });
+    Object.defineProperty(Platform, 'Version', {
+      configurable: true,
+      value: 35,
+    });
+    Object.defineProperty(StatusBar, 'currentHeight', {
+      configurable: true,
+      value: 24,
+    });
+
+    const screen = render(
+      <SyncActivityTour
+        visible
+        onSkip={jest.fn()}
+        onFinish={jest.fn()}
+        targetLayouts={{
+          album: { left: 40, top: 420, width: 140, height: 90 },
+        }}
+      />,
+    );
+
+    const overlayPath = screen
+      .UNSAFE_getAllByType(Path)
+      .find(node => node.props.testID === 'sync-activity-tour-cutout-overlay');
+
+    expect(overlayPath?.props.d).toContain('Q28 408');
+    expect(overlayPath?.props.d).toContain('Q192 408');
+    expect(overlayPath?.props.d).toContain('Q192 522');
   });
 
   it('falls back to ratio positioning when cold-start measurement is invalid', () => {

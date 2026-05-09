@@ -92,6 +92,27 @@ const SIDE_PADDING = 16;
 const COACH_CARD_ESTIMATED_HEIGHT = 168;
 const HIGHLIGHT_STROKE_WIDTH = 1;
 const HIGHLIGHT_STROKE_GAP = 1;
+const ANDROID_EDGE_TO_EDGE_API_LEVEL = 35;
+
+function getMeasuredTargetTopOffset(): number {
+  if (Platform.OS !== 'android') return 0;
+
+  const androidVersion =
+    typeof Platform.Version === 'number'
+      ? Platform.Version
+      : Number.parseInt(String(Platform.Version), 10);
+
+  // Android 15+ enforces edge-to-edge for this target SDK, so measured targets
+  // are already in the same top-origin space as the translucent tour modal.
+  if (
+    Number.isFinite(androidVersion) &&
+    androidVersion >= ANDROID_EDGE_TO_EDGE_API_LEVEL
+  ) {
+    return 0;
+  }
+
+  return StatusBar.currentHeight ?? 0;
+}
 
 const TARGET_PADDING: Record<TourTarget, number> = {
   album: 12,
@@ -347,8 +368,7 @@ export function SyncActivityTour({
         fallbackWindowDimensions.height,
         fallbackScreenDimensions.height,
       );
-  const measuredTargetTopOffset =
-    Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0;
+  const measuredTargetTopOffset = getMeasuredTargetTopOffset();
   const [stepIndex, setStepIndex] = useState(0);
   const steps: TourStep[] = useMemo(
     () => [
