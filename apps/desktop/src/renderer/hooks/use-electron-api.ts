@@ -35,6 +35,7 @@ const mockSidecar: ElectronAPI['sidecar'] = {
   getSettings: async () => ({ ...defaultSettings }),
   updateSettings: async (s) => ({ ...defaultSettings, ...s }) as SettingsDTO,
   resetState: async () => ({ ok: true }),
+  redeemGiftCard: async () => ({ ok: true }),
   regenerateConnectionCode: async () => ({ code: '000000' }),
   getRuntimeState: async () => ({
     ...INITIAL_SIDECAR_RUNTIME_STATE,
@@ -74,6 +75,11 @@ const mockFiles: ElectronAPI['files'] = {
   copyToClipboard: async () => {},
 };
 
+const mockAuth: ElectronAPI['auth'] = {
+  sendSMSCode: async () => ({ ok: true }),
+  loginWithSMSCode: async () => ({ ok: true }),
+};
+
 const mockEvents: ElectronAPI['events'] = {
   onSidecarEvent: () => () => {},
   onSidecarRuntimeState: () => () => {},
@@ -89,6 +95,7 @@ const mockPlatform: ElectronAPI['platform'] = {
 const mockAPI: ElectronAPI = {
   sidecar: mockSidecar,
   files: mockFiles,
+  auth: mockAuth,
   events: mockEvents,
   platform: mockPlatform,
   support: {

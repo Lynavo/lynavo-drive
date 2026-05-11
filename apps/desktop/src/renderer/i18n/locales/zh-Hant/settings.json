@@ -7,6 +7,8 @@
     "deviceNameDescription": "手機端會看到這個名稱",
     "connectionCode": "連線碼管理",
     "connectionCodeDescription": "重新產生後，舊手機需要重新配對",
+    "giftCard": "禮品卡",
+    "giftCardDescription": "兌換禮品卡可提升配額、功能或同步時長",
     "bonjour": "Windows Bonjour 廣播",
     "bonjourDescription": "用於讓手機在同一個區域網路內發現這台電腦"
   },
@@ -23,6 +25,27 @@
   },
   "connectionCode": {
     "regenerate": "重新產生"
+  },
+  "giftCard": {
+    "title": "禮品卡兌換",
+    "description": "請輸入服務提供的禮品卡序號",
+    "codeLabel": "禮品卡序號",
+    "placeholder": "例如：VF-GIFT-XXXX",
+    "redeem": "兌換",
+    "redeemSuccess": "禮品卡已兌換成功",
+    "phoneLogin": {
+      "title": "手機登入",
+      "description": "請輸入手機號碼並完成驗證碼登入後繼續兌換。",
+      "phoneLabel": "手機號碼",
+      "phonePlaceholder": "請輸入手機號碼",
+      "codeLabel": "驗證碼",
+      "codePlaceholder": "6 位驗證碼",
+      "sendCode": "傳送驗證碼",
+      "loginAndRedeem": "登入並兌換",
+      "loginRequired": "請先用手機號碼登入後繼續兌換禮品卡",
+      "codeSent": "驗證碼已傳送",
+      "loginSuccess": "登入成功，正在繼續兌換"
+    }
   },
   "filePath": {
     "receiveAddress": "接收目錄",
