@@ -7,6 +7,8 @@
     "deviceNameDescription": "手机端会看到这个名称",
     "connectionCode": "连接码管理",
     "connectionCodeDescription": "重新生成后，旧手机需要重新配对",
+    "giftCard": "礼品卡",
+    "giftCardDescription": "兑换礼品卡可提升额度、功能或同步时长",
     "bonjour": "Windows Bonjour 广播",
     "bonjourDescription": "用于让手机在同一局域网内发现这台电脑"
   },
@@ -23,6 +25,27 @@
   },
   "connectionCode": {
     "regenerate": "重新生成"
+  },
+  "giftCard": {
+    "title": "礼品卡兑换",
+    "description": "请输入服务提供的礼品卡编号",
+    "codeLabel": "礼品卡编号",
+    "placeholder": "例如：VF-GIFT-XXXX",
+    "redeem": "兑换",
+    "redeemSuccess": "礼品卡兑换成功",
+    "phoneLogin": {
+      "title": "手机登入",
+      "description": "请输入手机号并完成验证码登入后继续兑换。",
+      "phoneLabel": "手机号",
+      "phonePlaceholder": "请输入手机号",
+      "codeLabel": "验证码",
+      "codePlaceholder": "6 位验证码",
+      "sendCode": "发送验证码",
+      "loginAndRedeem": "登入并兑换",
+      "loginRequired": "请先用手机号登入后继续兑换礼品卡",
+      "codeSent": "验证码已发送",
+      "loginSuccess": "登入成功，正在继续兑换"
+    }
   },
   "filePath": {
     "receiveAddress": "接收目录",

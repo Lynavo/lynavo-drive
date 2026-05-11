@@ -41,12 +41,26 @@ vi.mock('@renderer/components/ui/accordion', () => ({
   ),
 }));
 
+vi.mock('@renderer/features/settings/GiftCardSection', () => ({
+  GiftCardSection: () => <div data-testid="gift-card-section">兌換禮品卡</div>,
+}));
+
 describe('HelpPage', () => {
   it('renders page header', () => {
     render(<HelpPage />);
 
     expect(screen.getByText('帮助中心')).toBeInTheDocument();
     expect(screen.getByText(/为您了解和使用 Vivi Drop 提供全面的指导信息/)).toBeInTheDocument();
+  });
+
+  it('renders gift card redeem entry at the bottom of help', () => {
+    render(<HelpPage />);
+
+    const giftCardSection = screen.getByTestId('gift-card-section');
+
+    expect(giftCardSection).toBeInTheDocument();
+    expect(screen.getByText('兌換禮品卡')).toBeInTheDocument();
+    expect(giftCardSection.closest('section')?.nextElementSibling).toBeNull();
   });
 
   it('renders all 6 quick start steps', () => {

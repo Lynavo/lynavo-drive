@@ -18,6 +18,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@renderer/components/ui/accordion';
+import { GiftCardSection } from '@renderer/features/settings/GiftCardSection';
 
 interface QuickStartStep {
   title: string;
@@ -232,6 +233,13 @@ export function HelpPage() {
               );
             })}
           </div>
+        </section>
+
+        <section className="mb-8">
+          <h2 className="mb-4 text-base font-semibold text-foreground">
+            {t('settings.giftCard.title')}
+          </h2>
+          <GiftCardSection />
         </section>
       </div>
     </div>

@@ -27,6 +27,9 @@ export const IPC = {
   SIDECAR_SETTINGS: 'sidecar:settings',
   SIDECAR_UPDATE_SETTINGS: 'sidecar:update-settings',
   SIDECAR_RESET_STATE: 'sidecar:reset-state',
+  SIDECAR_REDEEM_GIFT_CARD: 'sidecar:redeem-gift-card',
+  AUTH_SEND_SMS_CODE: 'auth:send-sms-code',
+  AUTH_LOGIN_WITH_SMS_CODE: 'auth:login-with-sms-code',
   SIDECAR_REGENERATE_CODE: 'sidecar:regenerate-code',
   SIDECAR_RUNTIME_STATE: 'sidecar:runtime-state',
   SIDECAR_RETRY_START: 'sidecar:retry-start',
@@ -89,6 +92,15 @@ export function registerIpcHandlers(sidecarManager: SidecarManager): void {
     sidecarClient.updateSettings(partial),
   );
   ipcMain.handle(IPC.SIDECAR_RESET_STATE, () => sidecarClient.resetState());
+  ipcMain.handle(IPC.SIDECAR_REDEEM_GIFT_CARD, (_e, payload: { code: string }) =>
+    sidecarClient.redeemGiftCard(payload),
+  );
+  ipcMain.handle(IPC.AUTH_SEND_SMS_CODE, (_e, payload: { phone: string }) =>
+    sidecarClient.sendSMSCode(payload),
+  );
+  ipcMain.handle(IPC.AUTH_LOGIN_WITH_SMS_CODE, (_e, payload: { phone: string; code: string }) =>
+    sidecarClient.loginWithSMSCode(payload),
+  );
   ipcMain.handle(IPC.SIDECAR_REGENERATE_CODE, () => regenerateConnectionCodeSafely(sidecarManager));
   ipcMain.handle(IPC.SIDECAR_RUNTIME_STATE, () => sidecarManager.getState());
   ipcMain.handle(IPC.SIDECAR_RETRY_START, () => sidecarManager.retryStart());

@@ -14,6 +14,10 @@ const binName = process.platform === 'win32' ? 'electron-vite.cmd' : 'electron-v
 const binPath = path.join(projectRoot, 'node_modules', '.bin', binName);
 const env = { ...process.env };
 
+if (command === 'dev' && !env.SYNCFLOW_GIFTCARD_REDEEM_BASE_URL) {
+  env.SYNCFLOW_GIFTCARD_REDEEM_BASE_URL = 'http://127.0.0.1:8080';
+}
+
 if (process.platform === 'win32') {
   const syncScriptPath = path.join(__dirname, 'sync-bonjour-runtime.cjs');
   const syncResult = spawnSync(process.execPath, [syncScriptPath], {

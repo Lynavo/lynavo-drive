@@ -52,6 +52,17 @@ export interface ElectronAPI {
     getSettings(): Promise<SettingsDTO>;
     updateSettings(settings: Partial<SettingsDTO>): Promise<SettingsDTO>;
     resetState(): Promise<{ ok: boolean }>;
+    redeemGiftCard(payload: { code: string }): Promise<{
+      ok: boolean;
+      message?: string;
+      reason?:
+        | 'auth_required'
+        | 'invalid_code'
+        | 'expired'
+        | 'not_available'
+        | 'already_redeemed'
+        | 'plan_mismatch';
+    }>;
     regenerateConnectionCode(): Promise<{ code: string }>;
     getRuntimeState(): Promise<SidecarRuntimeState>;
     retryStart(): Promise<void>;
@@ -67,6 +78,24 @@ export interface ElectronAPI {
     openExternal(target: string): Promise<void>;
     selectFolder(): Promise<string | null>;
     copyToClipboard(text: string): Promise<void>;
+  };
+  auth: {
+    sendSMSCode(payload: { phone: string }): Promise<{
+      ok: boolean;
+      message?: string;
+      reason?: 'phone_invalid' | 'sms_too_frequent' | 'sms_send_failed';
+    }>;
+    loginWithSMSCode(payload: { phone: string; code: string }): Promise<{
+      ok: boolean;
+      message?: string;
+      reason?:
+        | 'phone_invalid'
+        | 'sms_code_invalid'
+        | 'sms_code_expired'
+        | 'token_invalid'
+        | 'sms_max_attempts'
+        | 'session_replaced';
+    }>;
   };
   events: {
     onSidecarEvent(callback: (event: SidecarEvent) => void): () => void;

@@ -7,6 +7,8 @@
     "deviceNameDescription": "This name is shown on mobile devices",
     "connectionCode": "Pairing code",
     "connectionCodeDescription": "After regeneration, old phones need to pair again",
+    "giftCard": "Gift card",
+    "giftCardDescription": "Redeem your gift card to unlock more features or storage capacity",
     "bonjour": "Windows Bonjour broadcast",
     "bonjourDescription": "Allows phones on the same LAN to discover this computer"
   },
@@ -23,6 +25,27 @@
   },
   "connectionCode": {
     "regenerate": "Regenerate"
+  },
+  "giftCard": {
+    "title": "Gift card redeem",
+    "description": "Enter the gift card code provided by the service team.",
+    "codeLabel": "Gift card code",
+    "placeholder": "For example: VF-GIFT-XXXX",
+    "redeem": "Redeem",
+    "redeemSuccess": "Gift card redeemed successfully",
+    "phoneLogin": {
+      "title": "Phone sign-in",
+      "description": "Enter your phone number and SMS code to continue redeeming.",
+      "phoneLabel": "Phone number",
+      "phonePlaceholder": "Enter phone number",
+      "codeLabel": "SMS code",
+      "codePlaceholder": "6-digit code",
+      "sendCode": "Send code",
+      "loginAndRedeem": "Sign in and redeem",
+      "loginRequired": "Sign in with your phone number to continue redeeming the gift card",
+      "codeSent": "SMS code sent",
+      "loginSuccess": "Signed in. Continuing redeem"
+    }
   },
   "filePath": {
     "receiveAddress": "Receive folder",

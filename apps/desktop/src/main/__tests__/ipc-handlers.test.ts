@@ -51,6 +51,9 @@ vi.mock('../sidecar-client', async () => {
       validateShare: vi.fn(),
       getTransferActive: vi.fn(),
       getSharedList: vi.fn(),
+      redeemGiftCard: vi.fn(),
+      sendSMSCode: vi.fn(),
+      loginWithSMSCode: vi.fn(),
     },
   };
 });
@@ -132,6 +135,45 @@ describe('registerIpcHandlers', () => {
     expect(uploadDiagnostics).toHaveBeenCalledWith(manager, {
       description: 'Wi-Fi 断线',
       locale: 'zh-Hans',
+    });
+  });
+
+  it('registers gift card redeem IPC', async () => {
+    vi.mocked(sidecarClient.redeemGiftCard).mockResolvedValue({
+      ok: true,
+      message: 'done',
+    });
+
+    registerIpcHandlers({ retryStart: vi.fn() } as never);
+    const handler = handlers.get(IPC.SIDECAR_REDEEM_GIFT_CARD);
+
+    await expect(handler?.(undefined, { code: 'ABCD-EFGH-IJKL' })).resolves.toEqual({
+      ok: true,
+      message: 'done',
+    });
+    expect(sidecarClient.redeemGiftCard).toHaveBeenCalledWith({ code: 'ABCD-EFGH-IJKL' });
+  });
+
+  it('registers phone auth IPC for SMS send and login', async () => {
+    vi.mocked(sidecarClient.sendSMSCode).mockResolvedValue({ ok: true });
+    vi.mocked(sidecarClient.loginWithSMSCode).mockResolvedValue({ ok: true });
+
+    registerIpcHandlers({ retryStart: vi.fn() } as never);
+    const sendHandler = handlers.get(IPC.AUTH_SEND_SMS_CODE);
+    const loginHandler = handlers.get(IPC.AUTH_LOGIN_WITH_SMS_CODE);
+
+    await expect(sendHandler?.(undefined, { phone: '13800138000' })).resolves.toEqual({
+      ok: true,
+    });
+    await expect(
+      loginHandler?.(undefined, { phone: '13800138000', code: '123456' }),
+    ).resolves.toEqual({
+      ok: true,
+    });
+    expect(sidecarClient.sendSMSCode).toHaveBeenCalledWith({ phone: '13800138000' });
+    expect(sidecarClient.loginWithSMSCode).toHaveBeenCalledWith({
+      phone: '13800138000',
+      code: '123456',
     });
   });
 
