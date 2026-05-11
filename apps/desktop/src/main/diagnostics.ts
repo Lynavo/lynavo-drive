@@ -319,7 +319,7 @@ export function getAppInfo(): AppInfo {
 }
 
 function defaultApiBaseUrl(): string {
-  return app.isPackaged ? 'https://api.vividrop.cn' : 'http://127.0.0.1:8080';
+  return 'https://api.vividrop.cn';
 }
 
 function configuredApiBase(): { baseUrl: string; source: string } {
