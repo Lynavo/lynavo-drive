@@ -98,13 +98,14 @@ class AndroidSyncPrimitivesTest {
   }
 
   @Test
-  fun buildClientHelloPayloadFieldsUsesOnlyMobileIdentity() {
+  fun buildClientHelloPayloadFieldsIncludesStableDeviceId() {
     val fields = AndroidSyncPrimitives.buildClientHelloPayloadFields(
       clientId = "android-client-1",
       clientName = "Android CDY-TN20",
       clientPlatform = "android",
       appVersion = "0.1.0",
       appState = "active",
+      stableDeviceId = "stable-device-1",
       clientIp = "192.168.10.239",
       pairingToken = "token-1",
     )
@@ -114,6 +115,7 @@ class AndroidSyncPrimitivesTest {
     assertEquals("android", fields["clientPlatform"])
     assertEquals("0.1.0", fields["appVersion"])
     assertEquals("active", fields["appState"])
+    assertEquals("stable-device-1", fields["stableDeviceId"])
     assertEquals("192.168.10.239", fields["clientIp"])
     assertEquals("token-1", fields["pairingToken"])
     assertFalse(fields.containsKey("deviceAlias"))
@@ -239,6 +241,78 @@ class AndroidSyncPrimitivesTest {
   }
 
   @Test
+  fun restoredConnectionResumesPendingManualUploadOnlyWhenIdle() {
+    assertTrue(
+      AndroidSyncPrimitives.shouldResumeManualUploadAfterReachabilityRestored(
+        previousConnectionState = "offline",
+        nextConnectionState = "connected",
+        manualPending = 1,
+        syncInProgress = false,
+      ),
+    )
+    assertTrue(
+      AndroidSyncPrimitives.shouldResumeManualUploadAfterReachabilityRestored(
+        previousConnectionState = "connecting",
+        nextConnectionState = "connected",
+        manualPending = 1,
+        syncInProgress = false,
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldResumeManualUploadAfterReachabilityRestored(
+        previousConnectionState = "connected",
+        nextConnectionState = "connected",
+        manualPending = 1,
+        syncInProgress = false,
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldResumeManualUploadAfterReachabilityRestored(
+        previousConnectionState = "offline",
+        nextConnectionState = "connected",
+        manualPending = 0,
+        syncInProgress = false,
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldResumeManualUploadAfterReachabilityRestored(
+        previousConnectionState = "offline",
+        nextConnectionState = "connected",
+        manualPending = 1,
+        syncInProgress = true,
+      ),
+    )
+  }
+
+  @Test
+  fun discoveryReachabilityReconnectResumesPendingManualUploadOnlyWhenIdle() {
+    assertTrue(
+      AndroidSyncPrimitives.shouldResumeManualUploadAfterDiscoveryReachabilityRestored(
+        previousConnectionState = "offline",
+        nextConnectionState = "connected",
+        manualPending = 1,
+        syncInProgress = false,
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldResumeManualUploadAfterDiscoveryReachabilityRestored(
+        previousConnectionState = "connected",
+        nextConnectionState = "connected",
+        manualPending = 1,
+        syncInProgress = false,
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldResumeManualUploadAfterDiscoveryReachabilityRestored(
+        previousConnectionState = "offline",
+        nextConnectionState = "connected",
+        manualPending = 1,
+        syncInProgress = true,
+      ),
+    )
+  }
+
+  @Test
   fun boundDiscoveryResolutionRefreshesPresenceWhenBindingIsOffline() {
     assertTrue(
       AndroidSyncPrimitives.shouldRefreshBoundPresenceFromDiscovery(
@@ -266,6 +340,102 @@ class AndroidSyncPrimitivesTest {
         bindingDeviceId = "desktop-1",
         candidateDeviceId = "desktop-1",
         connectionState = "connected",
+      ),
+    )
+  }
+
+  @Test
+  fun exhaustedPresenceRecoveryRestartsDiscoveryForBoundOfflineDevice() {
+    assertTrue(
+      AndroidSyncPrimitives.shouldRestartDiscoveryAfterPresenceRecoveryExhausted(
+        bindingDeviceId = "desktop-1",
+        connectionState = "offline",
+        reason = "presence_recovery_exhausted",
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldRestartDiscoveryAfterPresenceRecoveryExhausted(
+        bindingDeviceId = "",
+        connectionState = "offline",
+        reason = "presence_recovery_exhausted",
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldRestartDiscoveryAfterPresenceRecoveryExhausted(
+        bindingDeviceId = "desktop-1",
+        connectionState = "connecting",
+        reason = "presence_recovery_exhausted",
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldRestartDiscoveryAfterPresenceRecoveryExhausted(
+        bindingDeviceId = "desktop-1",
+        connectionState = "offline",
+        reason = "user_offline",
+      ),
+    )
+  }
+
+  @Test
+  fun networkAvailabilityRefreshesDiscoveryOnlyAfterBoundLanTransition() {
+    assertTrue(
+      AndroidSyncPrimitives.shouldRefreshBoundDiscoveryAfterNetworkAvailable(
+        bindingDeviceId = "desktop-1",
+        syncInProgress = false,
+        hasLanNetwork = true,
+        isInitialSnapshot = false,
+        previousLanNetworkAvailable = false,
+        networkChanged = false,
+      ),
+    )
+    assertTrue(
+      AndroidSyncPrimitives.shouldRefreshBoundDiscoveryAfterNetworkAvailable(
+        bindingDeviceId = "desktop-1",
+        syncInProgress = false,
+        hasLanNetwork = true,
+        isInitialSnapshot = false,
+        previousLanNetworkAvailable = true,
+        networkChanged = true,
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldRefreshBoundDiscoveryAfterNetworkAvailable(
+        bindingDeviceId = "desktop-1",
+        syncInProgress = false,
+        hasLanNetwork = true,
+        isInitialSnapshot = true,
+        previousLanNetworkAvailable = false,
+        networkChanged = false,
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldRefreshBoundDiscoveryAfterNetworkAvailable(
+        bindingDeviceId = "desktop-1",
+        syncInProgress = true,
+        hasLanNetwork = true,
+        isInitialSnapshot = false,
+        previousLanNetworkAvailable = false,
+        networkChanged = false,
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldRefreshBoundDiscoveryAfterNetworkAvailable(
+        bindingDeviceId = "",
+        syncInProgress = false,
+        hasLanNetwork = true,
+        isInitialSnapshot = false,
+        previousLanNetworkAvailable = false,
+        networkChanged = false,
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldRefreshBoundDiscoveryAfterNetworkAvailable(
+        bindingDeviceId = "desktop-1",
+        syncInProgress = false,
+        hasLanNetwork = true,
+        isInitialSnapshot = false,
+        previousLanNetworkAvailable = true,
+        networkChanged = false,
       ),
     )
   }

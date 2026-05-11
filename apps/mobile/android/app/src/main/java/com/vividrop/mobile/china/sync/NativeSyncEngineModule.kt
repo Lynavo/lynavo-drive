@@ -5,6 +5,9 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
@@ -13,6 +16,7 @@ import android.os.Build
 import android.os.Environment
 import android.os.SystemClock
 import android.provider.MediaStore
+import android.provider.Settings
 import android.util.Log
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -76,12 +80,19 @@ class NativeSyncEngineModule(
   private val presenceRecoveryLock = Any()
   private var presenceRecoveryGeneration = 0L
   private var presenceRecoveryFuture: ScheduledFuture<*>? = null
+  private val networkMonitorLock = Any()
+  private var connectivityManager: ConnectivityManager? = null
+  private var networkCallback: ConnectivityManager.NetworkCallback? = null
+  private var networkInitialSnapshotObserved = false
+  private var lastLanNetworkAvailable = false
+  private var lastLanNetworkKey: String? = null
   private var pendingPhotoPermissionPromise: Promise? = null
   private var pendingDiscoveryPermissionPromise: Promise? = null
   private val uploadStore by lazy { AndroidUploadStore(reactApplicationContext) }
   private val mediaStoreRepository by lazy { AndroidMediaStoreRepository(reactApplicationContext) }
 
   init {
+    registerNetworkAvailabilityMonitor()
     resumePresenceHeartbeatFromStoredBinding(reason = "module_initialized")
   }
 
@@ -91,6 +102,7 @@ class NativeSyncEngineModule(
     stopDiscoveryInternal(emitUpdate = false)
     cancelPresenceRecoveryProbe(reason = "module_invalidated")
     stopPresenceHeartbeatTimer()
+    unregisterNetworkAvailabilityMonitor()
     super.invalidate()
   }
 
@@ -241,6 +253,11 @@ class NativeSyncEngineModule(
   }
 
   private fun startDiscoveryAfterPermission(promise: Promise) {
+    startDiscoveryInternal()
+    promise.resolve(null)
+  }
+
+  private fun startDiscoveryInternal(): Boolean {
     val manager = reactApplicationContext.getSystemService(Context.NSD_SERVICE) as? NsdManager
     if (manager == null) {
       recordNativeLog("Discovery", "startDiscovery unavailable: NsdManager missing", Log.WARN)
@@ -249,8 +266,7 @@ class NativeSyncEngineModule(
         code = "ANDROID_DISCOVERY_UNAVAILABLE",
         message = "Android 系统未提供局域网发现服务，无法扫描电脑端设备。",
       )
-      promise.resolve(null)
-      return
+      return false
     }
 
     val listener: NsdManager.DiscoveryListener
@@ -272,6 +288,7 @@ class NativeSyncEngineModule(
     try {
       manager.discoverServices(BONJOUR_SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, listener)
       scheduleSubnetDiscoveryFallback(generation)
+      return true
     } catch (error: Throwable) {
       synchronized(discoveryLock) {
         stopDiscoveryLocked()
@@ -282,7 +299,7 @@ class NativeSyncEngineModule(
         message = "启动 Android 局域网发现失败：${error.message ?: "unknown error"}",
       )
     }
-    promise.resolve(null)
+    return false
   }
 
   @ReactMethod
@@ -290,6 +307,151 @@ class NativeSyncEngineModule(
     recordNativeLog("Discovery", "stopDiscovery requested")
     stopDiscoveryInternal(emitUpdate = true)
     promise.resolve(null)
+  }
+
+  private fun registerNetworkAvailabilityMonitor() {
+    val manager = reactApplicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+    if (manager == null) {
+      recordNativeLog("NetworkPath", "observer unavailable: ConnectivityManager missing", Log.WARN)
+      return
+    }
+
+    val callback = object : ConnectivityManager.NetworkCallback() {
+      override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
+        handleNetworkCapabilitiesChanged(network, networkCapabilities)
+      }
+
+      override fun onLost(network: Network) {
+        handleNetworkLost(network)
+      }
+    }
+
+    try {
+      manager.registerDefaultNetworkCallback(callback)
+      synchronized(networkMonitorLock) {
+        connectivityManager = manager
+        networkCallback = callback
+      }
+      recordDiagnosticsLog("NetworkPath", "observer started")
+    } catch (error: Throwable) {
+      recordNativeLog(
+        "NetworkPath",
+        "observer start failed: ${error.message ?: error.javaClass.simpleName}",
+        Log.WARN,
+      )
+    }
+  }
+
+  private fun unregisterNetworkAvailabilityMonitor() {
+    val pair = synchronized(networkMonitorLock) {
+      val manager = connectivityManager
+      val callback = networkCallback
+      connectivityManager = null
+      networkCallback = null
+      manager to callback
+    }
+    val manager = pair.first ?: return
+    val callback = pair.second ?: return
+    try {
+      manager.unregisterNetworkCallback(callback)
+      recordDiagnosticsLog("NetworkPath", "observer stopped")
+    } catch (_: Throwable) {
+      // Callback may already be unregistered during React Native teardown.
+    }
+  }
+
+  private fun handleNetworkCapabilitiesChanged(
+    network: Network,
+    networkCapabilities: NetworkCapabilities,
+  ) {
+    val hasLanNetwork = networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+      networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+    val networkKey = network.toString()
+    val binding = loadBinding()
+    var initialSnapshot = false
+    var previousLanNetworkAvailable = false
+    var networkChanged = false
+    val shouldRefresh = synchronized(networkMonitorLock) {
+      initialSnapshot = !networkInitialSnapshotObserved
+      previousLanNetworkAvailable = lastLanNetworkAvailable
+      networkChanged = lastLanNetworkKey != null && lastLanNetworkKey != networkKey
+
+      val result = AndroidSyncPrimitives.shouldRefreshBoundDiscoveryAfterNetworkAvailable(
+        bindingDeviceId = binding?.deviceId.orEmpty(),
+        syncInProgress = syncInProgress,
+        hasLanNetwork = hasLanNetwork,
+        isInitialSnapshot = initialSnapshot,
+        previousLanNetworkAvailable = previousLanNetworkAvailable,
+        networkChanged = networkChanged,
+      )
+
+      networkInitialSnapshotObserved = true
+      lastLanNetworkAvailable = hasLanNetwork
+      lastLanNetworkKey = if (hasLanNetwork) networkKey else null
+      result
+    }
+
+    if (initialSnapshot) {
+      recordDiagnosticsLog(
+        "NetworkPath",
+        "network initial snapshot observed; discovery refresh deferred available=$hasLanNetwork network=$networkKey",
+      )
+      return
+    }
+
+    if (!shouldRefresh || binding == null) {
+      return
+    }
+
+    refreshBoundDiscoveryAfterNetworkAvailable(
+      binding = binding,
+      reason = "network_available",
+      previousLanNetworkAvailable = previousLanNetworkAvailable,
+      networkChanged = networkChanged,
+    )
+  }
+
+  private fun handleNetworkLost(network: Network) {
+    val networkKey = network.toString()
+    val shouldLog = synchronized(networkMonitorLock) {
+      if (lastLanNetworkKey != networkKey && lastLanNetworkKey != null) {
+        return@synchronized false
+      }
+      val wasAvailable = lastLanNetworkAvailable
+      networkInitialSnapshotObserved = true
+      lastLanNetworkAvailable = false
+      lastLanNetworkKey = null
+      wasAvailable
+    }
+    if (shouldLog) {
+      recordDiagnosticsLog("NetworkPath", "lan network lost network=$networkKey")
+    }
+  }
+
+  private fun refreshBoundDiscoveryAfterNetworkAvailable(
+    binding: StoredBinding,
+    reason: String,
+    previousLanNetworkAvailable: Boolean,
+    networkChanged: Boolean,
+  ) {
+    recordDiagnosticsLog(
+      "NetworkPath",
+      "network available triggered discovery refresh deviceId=${binding.deviceId} state=${binding.connectionState} previousLan=$previousLanNetworkAvailable networkChanged=$networkChanged",
+    )
+    sendPresenceHeartbeatAsync(binding, reason = reason, recoverOnFailure = true)
+    if (shouldRequestNearbyWifiPermission()) {
+      recordNativeLog(
+        "Discovery",
+        "network available but nearby wifi permission is required; discovery refresh skipped",
+        Log.WARN,
+      )
+      return
+    }
+
+    val restarted = startDiscoveryInternal()
+    if (restarted) {
+      recordDiagnosticsLog("Discovery", "network available restarted discovery deviceId=${binding.deviceId}")
+    }
   }
 
   @ReactMethod
@@ -323,6 +485,7 @@ class NativeSyncEngineModule(
           clientPlatform = "android",
           appVersion = getVersionName(),
           appState = "active",
+          stableDeviceId = getOrCreateStableDeviceId(),
           pairingToken = storedPairingToken,
         ),
       )
@@ -1085,6 +1248,7 @@ class NativeSyncEngineModule(
 
       val pairPayload = JSONObject().apply {
         put("clientId", getOrCreateClientId())
+        put("stableDeviceId", getOrCreateStableDeviceId())
         put("clientName", getClientDisplayNameValue())
         put("connectionCode", connectionCode)
         currentClientIPv4()?.let { put("clientIp", it) }
@@ -1311,6 +1475,7 @@ class NativeSyncEngineModule(
         clientPlatform = "android",
         appVersion = getVersionName(),
         appState = "active",
+        stableDeviceId = getOrCreateStableDeviceId(),
         pairingToken = binding.pairingToken,
       ),
     )
@@ -1920,6 +2085,23 @@ class NativeSyncEngineModule(
     return generated
   }
 
+  private fun getOrCreateStableDeviceId(): String {
+    val androidId = try {
+      Settings.Secure.getString(
+        reactApplicationContext.contentResolver,
+        Settings.Secure.ANDROID_ID,
+      )
+    } catch (_: Throwable) {
+      null
+    }?.trim()?.lowercase()
+
+    if (!androidId.isNullOrBlank() && androidId != "9774d56d682e549c") {
+      return androidId
+    }
+
+    return getOrCreateClientId()
+  }
+
   private fun getClientDisplayNameValue(): String {
     val stored = prefs.getString(PREF_CLIENT_DISPLAY_NAME, null)
     if (!stored.isNullOrBlank()) {
@@ -2153,6 +2335,11 @@ class NativeSyncEngineModule(
     if (connectionState == "connected") {
       cancelPresenceRecoveryProbe(reason = reason ?: "state_connected")
       startPresenceHeartbeatTimer(updated)
+      wakeManualUploadAfterReconnectIfNeeded(
+        previousConnectionState = binding.connectionState,
+        updatedBinding = updated,
+        reason = reason ?: "state_connected",
+      )
     } else if (connectionState == "offline") {
       cancelPresenceRecoveryProbe(reason = reason ?: "state_offline")
       stopPresenceHeartbeatTimer()
@@ -2162,6 +2349,60 @@ class NativeSyncEngineModule(
       stopPresenceHeartbeatTimer()
     }
     return updated
+  }
+
+  private fun wakeManualUploadAfterReconnectIfNeeded(
+    previousConnectionState: String,
+    updatedBinding: StoredBinding,
+    reason: String,
+  ) {
+    val pendingItems = uploadStore.getPendingItems(limit = 10_000)
+    val manualPending = AndroidSyncPrimitives.pendingCount(pendingItems, "manual")
+    if (!AndroidSyncPrimitives.shouldResumeManualUploadAfterReachabilityRestored(
+        previousConnectionState = previousConnectionState,
+        nextConnectionState = updatedBinding.connectionState,
+        manualPending = manualPending,
+        syncInProgress = syncInProgress,
+      )
+    ) {
+      return
+    }
+
+    recordDiagnosticsLog(
+      "ManualUpload",
+      "resuming pending manual queue after reconnect pending=$manualPending reason=$reason",
+    )
+    resumePendingManualQueueAfterReconnect()
+  }
+
+  private fun wakeManualUploadAfterDiscoveryReconnectIfNeeded(
+    previousConnectionState: String,
+    updatedBinding: StoredBinding,
+    reason: String,
+  ) {
+    val pendingItems = uploadStore.getPendingItems(limit = 10_000)
+    val manualPending = AndroidSyncPrimitives.pendingCount(pendingItems, "manual")
+    if (!AndroidSyncPrimitives.shouldResumeManualUploadAfterDiscoveryReachabilityRestored(
+        previousConnectionState = previousConnectionState,
+        nextConnectionState = updatedBinding.connectionState,
+        manualPending = manualPending,
+        syncInProgress = syncInProgress,
+      )
+    ) {
+      return
+    }
+
+    recordDiagnosticsLog(
+      "ManualUpload",
+      "resuming pending manual queue after discovery reconnect pending=$manualPending reason=$reason",
+    )
+    resumePendingManualQueueAfterReconnect()
+  }
+
+  private fun resumePendingManualQueueAfterReconnect() {
+    thread(name = "NativeSyncEngineManualReconnect", isDaemon = true) {
+      performSyncRound(reason = "manual_upload")
+    }
   }
 
   private fun sendPresenceHeartbeatAsync(
@@ -2380,7 +2621,8 @@ class NativeSyncEngineModule(
       cancelPresenceRecoveryProbe(reason = "exhausted")
       val current = loadBinding()
       if (current != null && current.deviceId == deviceId) {
-        updateBindingConnectionState(current, "offline", reason = "presence_recovery_exhausted")
+        val updated = updateBindingConnectionState(current, "offline", reason = "presence_recovery_exhausted") ?: return
+        restartDiscoveryAfterPresenceRecoveryExhausted(updated, reason = "presence_recovery_exhausted")
       }
       return
     }
@@ -3357,6 +3599,7 @@ class NativeSyncEngineModule(
           clientPlatform = "android",
           appVersion = getVersionName(),
           appState = "active",
+          stableDeviceId = getOrCreateStableDeviceId(),
           clientIp = currentClientIPv4(),
         ),
       )
@@ -3432,6 +3675,11 @@ class NativeSyncEngineModule(
       cancelPresenceRecoveryProbe(reason = "discovery_refreshed_connected")
       sendPresenceHeartbeatAsync(updated, reason = "bound_device_discovery_refreshed", recoverOnFailure = true)
       startPresenceHeartbeatTimer(updated)
+      wakeManualUploadAfterDiscoveryReconnectIfNeeded(
+        previousConnectionState = binding.connectionState,
+        updatedBinding = updated,
+        reason = "bound_device_discovery_refreshed",
+      )
     }
   }
 
@@ -3473,6 +3721,37 @@ class NativeSyncEngineModule(
       "bound device discovery triggered presence refresh state=${updated.connectionState} host=${updated.host}",
     )
     sendPresenceHeartbeatAsync(updated, reason = reason, recoverOnFailure = false)
+  }
+
+  private fun restartDiscoveryAfterPresenceRecoveryExhausted(
+    binding: StoredBinding,
+    reason: String,
+  ) {
+    if (!AndroidSyncPrimitives.shouldRestartDiscoveryAfterPresenceRecoveryExhausted(
+        bindingDeviceId = binding.deviceId,
+        connectionState = binding.connectionState,
+        reason = reason,
+      )
+    ) {
+      return
+    }
+
+    if (shouldRequestNearbyWifiPermission()) {
+      recordNativeLog(
+        "Discovery",
+        "presence recovery exhausted but nearby wifi permission is required; discovery restart skipped",
+        Log.WARN,
+      )
+      return
+    }
+
+    val restarted = startDiscoveryInternal()
+    if (restarted) {
+      recordDiagnosticsLog(
+        "Discovery",
+        "presence recovery exhausted restarted discovery deviceId=${binding.deviceId}",
+      )
+    }
   }
 
   private fun parseTxtAttributes(serviceInfo: NsdServiceInfo): Map<String, String> {
@@ -3775,7 +4054,7 @@ class NativeSyncEngineModule(
     private const val BINDING_PROBE_TIMEOUT_MS = 1_200
     private const val PRESENCE_HEARTBEAT_TIMEOUT_MS = 5_000
     private const val PRESENCE_HEARTBEAT_INTERVAL_MS = 30_000L
-    private const val PRESENCE_RECOVERY_MAX_ATTEMPTS = 8
+    private const val PRESENCE_RECOVERY_MAX_ATTEMPTS = 60
     private const val PRESENCE_RECOVERY_INTERVAL_MS = 1_000L
     private const val HEADER_SIZE = 12
     private const val MAX_BODY_LENGTH = 64 * 1024 * 1024

@@ -143,6 +143,7 @@ object AndroidSyncPrimitives {
     clientPlatform: String,
     appVersion: String,
     appState: String,
+    stableDeviceId: String? = null,
     clientIp: String? = null,
     pairingToken: String? = null,
   ): Map<String, String> {
@@ -153,6 +154,9 @@ object AndroidSyncPrimitives {
       "appVersion" to appVersion,
       "appState" to appState,
     )
+    stableDeviceId?.trim()?.takeIf { it.isNotBlank() }?.let {
+      fields["stableDeviceId"] = it
+    }
     clientIp?.trim()?.takeIf { it.isNotBlank() }?.let {
       fields["clientIp"] = it
     }
@@ -250,6 +254,30 @@ object AndroidSyncPrimitives {
   ): Boolean =
     connectionState.trim() == "connected" && !syncInProgress
 
+  fun shouldResumeManualUploadAfterReachabilityRestored(
+    previousConnectionState: String,
+    nextConnectionState: String,
+    manualPending: Int,
+    syncInProgress: Boolean,
+  ): Boolean =
+    manualPending > 0 &&
+      !syncInProgress &&
+      previousConnectionState.trim() != "connected" &&
+      nextConnectionState.trim() == "connected"
+
+  fun shouldResumeManualUploadAfterDiscoveryReachabilityRestored(
+    previousConnectionState: String,
+    nextConnectionState: String,
+    manualPending: Int,
+    syncInProgress: Boolean,
+  ): Boolean =
+    shouldResumeManualUploadAfterReachabilityRestored(
+      previousConnectionState = previousConnectionState,
+      nextConnectionState = nextConnectionState,
+      manualPending = manualPending,
+      syncInProgress = syncInProgress,
+    )
+
   fun shouldRefreshBoundPresenceFromDiscovery(
     bindingDeviceId: String,
     candidateDeviceId: String,
@@ -261,6 +289,35 @@ object AndroidSyncPrimitives {
       return false
     }
     return connectionState.trim() != "connected"
+  }
+
+  fun shouldRestartDiscoveryAfterPresenceRecoveryExhausted(
+    bindingDeviceId: String,
+    connectionState: String,
+    reason: String,
+  ): Boolean {
+    val normalizedBindingDeviceId = bindingDeviceId.trim()
+    if (normalizedBindingDeviceId.isBlank()) {
+      return false
+    }
+    return connectionState.trim() == "offline" && reason == "presence_recovery_exhausted"
+  }
+
+  fun shouldRefreshBoundDiscoveryAfterNetworkAvailable(
+    bindingDeviceId: String,
+    syncInProgress: Boolean,
+    hasLanNetwork: Boolean,
+    isInitialSnapshot: Boolean,
+    previousLanNetworkAvailable: Boolean,
+    networkChanged: Boolean,
+  ): Boolean {
+    if (bindingDeviceId.trim().isBlank()) {
+      return false
+    }
+    if (syncInProgress || !hasLanNetwork || isInitialSnapshot) {
+      return false
+    }
+    return !previousLanNetworkAvailable || networkChanged
   }
 
   fun computeFileKey(
