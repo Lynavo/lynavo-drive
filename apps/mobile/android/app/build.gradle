@@ -97,8 +97,6 @@ android {
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
-            // Allow http://localhost backend during local development only.
-            manifestPlaceholders = [usesCleartextTraffic: "true"]
         }
         release {
             // Caution! In production, you need to generate your own keystore file.
@@ -106,9 +104,6 @@ android {
             signingConfig signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
-            // Force HTTPS in release: any cleartext request fails at the OS
-            // layer, defending against accidental http:// regressions.
-            manifestPlaceholders = [usesCleartextTraffic: "false"]
         }
     }
 }

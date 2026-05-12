@@ -3338,7 +3338,7 @@ class NativeSyncEngineModule(
           }
 
           override fun onServiceResolved(resolvedServiceInfo: NsdServiceInfo) {
-            val candidate = buildDiscoveredCandidate(resolvedServiceInfo)
+            val candidate = buildDiscoveredCandidate(resolvedServiceInfo, serviceKey)
             recordNativeLog(
               "Discovery",
               "resolved name=${candidate.name} host=${candidate.ip} probeHost=${candidate.probeHost} port=${candidate.port}",
@@ -3374,7 +3374,10 @@ class NativeSyncEngineModule(
     }
   }
 
-  private fun buildDiscoveredCandidate(serviceInfo: NsdServiceInfo): DiscoveredServiceCandidate {
+  private fun buildDiscoveredCandidate(
+    serviceInfo: NsdServiceInfo,
+    serviceKey: String,
+  ): DiscoveredServiceCandidate {
     val attributes = parseTxtAttributes(serviceInfo)
     val resolvedHost = serviceInfo.host?.hostAddress.orEmpty()
     val advertisedIp = attributes["ip"].orEmpty()
@@ -3383,7 +3386,7 @@ class NativeSyncEngineModule(
     val serviceName = serviceInfo.serviceName.takeIf { it.isNotBlank() } ?: "SyncFlow Desktop"
 
     return DiscoveredServiceCandidate(
-      serviceKey = serviceKeyFor(serviceInfo),
+      serviceKey = serviceKey,
       deviceId = attributes["id"]?.takeIf { it.isNotBlank() } ?: serviceName,
       name = attributes["name"]?.takeIf { it.isNotBlank() } ?: serviceName,
       type = when (attributes["type"]) {
