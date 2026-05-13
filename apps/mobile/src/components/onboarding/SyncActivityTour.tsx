@@ -5,7 +5,6 @@ import {
   type ImageSourcePropType,
   type LayoutChangeEvent,
   Modal,
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -14,7 +13,6 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import Svg, { Path, Rect } from 'react-native-svg';
 import { Icon } from '../Icon';
 
 interface SyncActivityTourProps {
@@ -97,9 +95,6 @@ const SIDE_PADDING = 16;
 const COACH_CARD_ESTIMATED_HEIGHT = 168;
 const TOUR_BACKGROUND_WIDTH = 790;
 const TOUR_BACKGROUND_HEIGHT = 1710;
-const DIM_COLOR = 'rgba(13,22,30,0.72)';
-const HIGHLIGHT_STROKE_WIDTH = 1;
-const HIGHLIGHT_STROKE_GAP = 1;
 const ZERO_COORDINATE_ORIGIN: TourCoordinateOrigin = { left: 0, top: 0 };
 
 const TOUR_BACKGROUND_IMAGES: Record<TourTarget, ImageSourcePropType> = {
@@ -269,69 +264,12 @@ function getTourLayout(
   };
 }
 
-function getHighlightRadius(target: TourTarget): number {
-  switch (target) {
-    case 'panel':
-      return 26;
-    case 'history':
-    case 'settings':
-    case 'help':
-      return 20;
-    case 'album':
-    default:
-      return 18;
-  }
-}
-
-function getHighlightStrokeColor(target: TourTarget): string {
-  if (target === 'panel') {
-    return 'rgba(217,240,255,0.95)';
-  }
-
-  return 'rgba(222,244,255,0.92)';
-}
-
-function getRoundedRectPath(rect: TourTargetLayout, radius: number): string {
-  const x = rect.left;
-  const y = rect.top;
-  const width = Math.max(0, rect.width);
-  const height = Math.max(0, rect.height);
-  const r = Math.min(radius, width / 2, height / 2);
-  const right = x + width;
-  const bottom = y + height;
-
-  return [
-    `M${x + r} ${y}`,
-    `H${right - r}`,
-    `Q${right} ${y} ${right} ${y + r}`,
-    `V${bottom - r}`,
-    `Q${right} ${bottom} ${right - r} ${bottom}`,
-    `H${x + r}`,
-    `Q${x} ${bottom} ${x} ${bottom - r}`,
-    `V${y + r}`,
-    `Q${x} ${y} ${x + r} ${y}`,
-    'Z',
-  ].join(' ');
-}
-
-function getCutoutOverlayPath(
-  screenWidth: number,
-  screenHeight: number,
-  targetRect: TourTargetLayout,
-  radius: number,
-): string {
-  return [
-    `M0 0 H${screenWidth} V${screenHeight} H0 Z`,
-    getRoundedRectPath(targetRect, radius),
-  ].join(' ');
-}
-
 export function SyncActivityTour({
   visible,
   onSkip,
   onFinish,
   targetLayouts,
-  targetFallbackMode = 'hiddenUntilMeasured',
+  targetFallbackMode = 'ratio',
 }: SyncActivityTourProps) {
   const { t } = useTranslation();
   const windowDimensions = useWindowDimensions();
@@ -350,16 +288,10 @@ export function SyncActivityTour({
       );
   const viewportHeight = isValidViewportSize(overlaySize)
     ? overlaySize.height
-    : Platform.OS === 'android'
-    ? firstPositiveDimension(
-        fallbackScreenDimensions.height,
-        windowDimensions.height,
-        fallbackWindowDimensions.height,
-      )
     : firstPositiveDimension(
+        fallbackScreenDimensions.height,
         windowDimensions.height,
         fallbackWindowDimensions.height,
-        fallbackScreenDimensions.height,
       );
   const [stepIndex, setStepIndex] = useState(0);
   const steps: TourStep[] = useMemo(
@@ -399,7 +331,6 @@ export function SyncActivityTour({
   );
   const current = steps[stepIndex];
   const isLast = stepIndex === steps.length - 1;
-  const usesStaticBackground = Platform.OS === 'android';
   const hasMeasuredCurrentTarget = isValidTourTargetLayout(
     targetLayouts?.[current.target],
   );
@@ -419,15 +350,10 @@ export function SyncActivityTour({
   const layout = getTourLayout(
     current.target,
     viewportWidth,
-    targetFallbackMode === 'ratio' && usesStaticBackground
-      ? backgroundHeight
-      : viewportHeight,
+    targetFallbackMode === 'ratio' ? backgroundHeight : viewportHeight,
     targetFallbackMode === 'ratio' ? undefined : targetLayouts,
     overlayWindowOrigin,
   );
-  const highlightRadius = getHighlightRadius(current.target);
-  const highlightStrokeOffset =
-    HIGHLIGHT_STROKE_GAP + HIGHLIGHT_STROKE_WIDTH / 2;
   const handleOverlayLayout = (event: LayoutChangeEvent) => {
     const next: TourViewportSize = {
       width: event.nativeEvent.layout.width,
@@ -473,59 +399,22 @@ export function SyncActivityTour({
     >
       <View
         ref={overlayRef}
-        style={[
-          styles.overlay,
-          usesStaticBackground && styles.staticBackgroundOverlay,
-        ]}
+        style={[styles.overlay, styles.staticBackgroundOverlay]}
         testID="sync-activity-tour"
         onLayout={handleOverlayLayout}
       >
-        {usesStaticBackground ? (
-          <Image
-            source={TOUR_BACKGROUND_IMAGES[current.target]}
-            resizeMode="stretch"
-            style={[
-              styles.backgroundImage,
-              {
-                width: viewportWidth,
-                height: backgroundHeight,
-              },
-            ]}
-            testID="sync-activity-tour-background"
-          />
-        ) : (
-          <Svg
-            key={`${viewportWidth}:${viewportHeight}:${current.target}`}
-            pointerEvents="none"
-            style={StyleSheet.absoluteFill}
-            width={viewportWidth}
-            height={viewportHeight}
-          >
-            <Path
-              testID="sync-activity-tour-cutout-overlay"
-              d={getCutoutOverlayPath(
-                viewportWidth,
-                viewportHeight,
-                layout.target,
-                highlightRadius,
-              )}
-              fill={DIM_COLOR}
-              fillRule="evenodd"
-            />
-            <Rect
-              testID="sync-activity-tour-highlight"
-              x={layout.target.left - highlightStrokeOffset}
-              y={layout.target.top - highlightStrokeOffset}
-              width={layout.target.width + highlightStrokeOffset * 2}
-              height={layout.target.height + highlightStrokeOffset * 2}
-              rx={highlightRadius + highlightStrokeOffset}
-              ry={highlightRadius + highlightStrokeOffset}
-              fill="none"
-              stroke={getHighlightStrokeColor(current.target)}
-              strokeWidth={HIGHLIGHT_STROKE_WIDTH}
-            />
-          </Svg>
-        )}
+        <Image
+          source={TOUR_BACKGROUND_IMAGES[current.target]}
+          resizeMode="stretch"
+          style={[
+            styles.backgroundImage,
+            {
+              width: viewportWidth,
+              height: backgroundHeight,
+            },
+          ]}
+          testID="sync-activity-tour-background"
+        />
 
         <View style={[styles.card, layout.card]}>
           <View style={styles.headingRow}>

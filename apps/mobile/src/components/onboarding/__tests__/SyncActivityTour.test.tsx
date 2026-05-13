@@ -2,7 +2,6 @@ import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 import * as ReactNative from 'react-native';
 import { Modal, Platform } from 'react-native';
-import { Path, Rect } from 'react-native-svg';
 
 import {
   convertWindowTargetToOverlayTarget,
@@ -38,7 +37,7 @@ describe('SyncActivityTour', () => {
     jest.restoreAllMocks();
   });
 
-  it('renders the iOS dim overlay as an even-odd path with the active target cut out', () => {
+  it('uses the static guide background on iOS instead of the SVG cutout overlay', () => {
     const screen = render(
       <SyncActivityTour
         visible
@@ -50,22 +49,11 @@ describe('SyncActivityTour', () => {
       />,
     );
 
-    const overlayPath = screen
-      .UNSAFE_getAllByType(Path)
-      .find(node => node.props.testID === 'sync-activity-tour-cutout-overlay');
-    const highlight = screen
-      .UNSAFE_getAllByType(Rect)
-      .find(node => node.props.testID === 'sync-activity-tour-highlight');
-
-    expect(screen.queryByTestId('sync-activity-tour-background')).toBeNull();
-    expect(overlayPath).toBeTruthy();
-    expect(overlayPath?.props.fillRule).toBe('evenodd');
-    expect(overlayPath?.props.d).toContain('M0 0');
-    expect(overlayPath?.props.d).toContain('Q28 408');
-    expect(overlayPath?.props.d).toContain('Q192 408');
-    expect(overlayPath?.props.d).toContain('Q192 522');
-    expect(highlight?.props.x).toBe(26.5);
-    expect(highlight?.props.y).toBe(406.5);
+    expect(screen.getByTestId('sync-activity-tour-background')).toBeTruthy();
+    expect(
+      screen.queryByTestId('sync-activity-tour-cutout-overlay'),
+    ).toBeNull();
+    expect(screen.queryByTestId('sync-activity-tour-highlight')).toBeNull();
   });
 
   it('does not render native dim corner patches inside the cutout', () => {
@@ -197,7 +185,7 @@ describe('SyncActivityTour', () => {
     ).toEqual({ left: 32, top: 396, width: 140, height: 90 });
   });
 
-  it('falls back to ratio positioning when cold-start measurement is invalid', () => {
+  it('renders the static guide background when cold-start measurement is invalid', () => {
     const screen = render(
       <SyncActivityTour
         visible
@@ -210,14 +198,10 @@ describe('SyncActivityTour', () => {
       />,
     );
 
-    const highlight = screen
-      .UNSAFE_getAllByType(Rect)
-      .find(node => node.props.testID === 'sync-activity-tour-highlight');
-
-    expect(Number.isFinite(highlight?.props.x)).toBe(true);
-    expect(Number.isFinite(highlight?.props.y)).toBe(true);
-    expect(Number.isFinite(highlight?.props.width)).toBe(true);
-    expect(Number.isFinite(highlight?.props.height)).toBe(true);
+    expect(screen.getByTestId('sync-activity-tour-background')).toBeTruthy();
+    expect(
+      screen.queryByTestId('sync-activity-tour-cutout-overlay'),
+    ).toBeNull();
   });
 
   it('stays hidden until the active target has a live measurement when requested', () => {
@@ -259,12 +243,12 @@ describe('SyncActivityTour', () => {
       },
     });
 
-    const overlayPath = screen
-      .UNSAFE_getAllByType(Path)
-      .find(node => node.props.testID === 'sync-activity-tour-cutout-overlay');
+    const backgroundStyle = ReactNative.StyleSheet.flatten(
+      screen.getByTestId('sync-activity-tour-background').props.style,
+    );
 
-    expect(overlayPath?.props.d).toContain('H390');
-    expect(overlayPath?.props.d).toContain('V844');
+    expect(backgroundStyle.width).toBe(390);
+    expect(backgroundStyle.height).toBeCloseTo((390 * 1710) / 790, 3);
   });
 
   it('falls back to screen dimensions before the modal root layout is ready', () => {
@@ -291,11 +275,11 @@ describe('SyncActivityTour', () => {
       />,
     );
 
-    const overlayPath = screen
-      .UNSAFE_getAllByType(Path)
-      .find(node => node.props.testID === 'sync-activity-tour-cutout-overlay');
+    const backgroundStyle = ReactNative.StyleSheet.flatten(
+      screen.getByTestId('sync-activity-tour-background').props.style,
+    );
 
-    expect(overlayPath?.props.d).toContain('H390');
-    expect(overlayPath?.props.d).toContain('V844');
+    expect(backgroundStyle.width).toBe(390);
+    expect(backgroundStyle.height).toBeCloseTo((390 * 1710) / 790, 3);
   });
 });

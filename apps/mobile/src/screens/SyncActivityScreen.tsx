@@ -2218,9 +2218,7 @@ export function SyncActivityScreen() {
         onSkip={() => void handleDismissSyncActivityTour()}
         onFinish={() => void handleDismissSyncActivityTour()}
         targetLayouts={syncActivityTourTargetLayouts}
-        targetFallbackMode={
-          Platform.OS === 'android' ? 'ratio' : 'hiddenUntilMeasured'
-        }
+        targetFallbackMode="ratio"
       />
     </SafeAreaView>
   );
