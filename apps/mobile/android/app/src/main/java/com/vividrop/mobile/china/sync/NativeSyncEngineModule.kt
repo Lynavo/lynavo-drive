@@ -999,6 +999,12 @@ class NativeSyncEngineModule(
         promise.reject("ANDROID_SYNC_TARGET_OFFLINE", "桌面端未连接，无法开启自动上传。")
         return@runAsync
       }
+      if (shouldStartRound && currentPhotoPermissionState() == "denied") {
+        recordDiagnosticsLog("AutoUpload", "resume blocked because photo permission is denied")
+        emitIdleSyncState(binding)
+        promise.reject("ANDROID_PHOTO_PERMISSION_DENIED", "Android 相簿权限尚未开启，无法扫描同步素材。")
+        return@runAsync
+      }
 
       saveAutoUploadConfig(nextConfig)
       recordDiagnosticsLog(

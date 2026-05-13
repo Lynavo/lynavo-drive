@@ -64,7 +64,7 @@ export function getAuthSingleLineInputStyle(
   if (platform === 'android') {
     return {
       height: 48,
-      lineHeight: 48,
+      paddingVertical: 0,
       paddingTop: 0,
       paddingBottom: 0,
       includeFontPadding: false,

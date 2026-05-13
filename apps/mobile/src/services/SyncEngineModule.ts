@@ -1,4 +1,4 @@
-import { NativeModules } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 import type {
   AlbumAssetDTO,
   AssetPreviewSourceDTO,
@@ -117,6 +117,15 @@ export async function disableAutoUpload(): Promise<void> {
 
 /** Re-enable auto upload from interrupted/disabled state, persists 'active' state. */
 export async function enableAutoUpload(): Promise<void> {
+  if (Platform.OS === 'android') {
+    const status = await requestPhotoPermission();
+    if (status !== 'authorized' && status !== 'limited') {
+      throw new Error(
+        'Android photo library access is required for auto upload',
+      );
+    }
+  }
+
   let currentConfig: AutoUploadConfigDTO | undefined;
   try {
     currentConfig = (await NativeSyncEngine.getAutoUploadConfig?.()) as

@@ -21,10 +21,10 @@ describe('auth platform styles', () => {
     });
   });
 
-  it('centers Android single-line auth inputs with an equal-height line box', () => {
+  it('centers Android single-line auth inputs without forcing a line box', () => {
     expect(getAuthSingleLineInputStyle('android')).toEqual({
       height: 48,
-      lineHeight: 48,
+      paddingVertical: 0,
       paddingTop: 0,
       paddingBottom: 0,
       includeFontPadding: false,

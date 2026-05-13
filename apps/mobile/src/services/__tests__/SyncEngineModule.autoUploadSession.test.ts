@@ -2,11 +2,18 @@ const mockGetAutoUploadConfig = jest.fn();
 const mockResumeAutoUpload = jest.fn();
 const mockDisableAutoUpload = jest.fn();
 const mockGetAlbumStats = jest.fn();
+const mockRequestPhotoPermission = jest.fn();
 const mockAsyncStorageGetItem = jest.fn();
 const mockAsyncStorageSetItem = jest.fn();
 const mockAsyncStorageRemoveItem = jest.fn();
+let mockPlatformOS = 'ios';
 
 jest.mock('react-native', () => ({
+  Platform: {
+    get OS() {
+      return mockPlatformOS;
+    },
+  },
   NativeModules: {
     NativeSyncEngine: {
       getAutoUploadConfig: (...args: unknown[]) =>
@@ -14,6 +21,8 @@ jest.mock('react-native', () => ({
       resumeAutoUpload: (...args: unknown[]) => mockResumeAutoUpload(...args),
       disableAutoUpload: (...args: unknown[]) => mockDisableAutoUpload(...args),
       getAlbumStats: (...args: unknown[]) => mockGetAlbumStats(...args),
+      requestPhotoPermission: (...args: unknown[]) =>
+        mockRequestPhotoPermission(...args),
     },
   },
 }));
@@ -36,6 +45,7 @@ import { disableAutoUpload, enableAutoUpload } from '../SyncEngineModule';
 describe('SyncEngineModule auto upload session baseline', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockPlatformOS = 'ios';
     mockGetAutoUploadConfig.mockResolvedValue({
       enabled: false,
       state: 'disabled',
@@ -43,6 +53,7 @@ describe('SyncEngineModule auto upload session baseline', () => {
     });
     mockResumeAutoUpload.mockResolvedValue(undefined);
     mockDisableAutoUpload.mockResolvedValue(undefined);
+    mockRequestPhotoPermission.mockResolvedValue('granted');
     mockGetAlbumStats.mockResolvedValue({
       totalCount: 10,
       transferredCount: 4,
@@ -71,6 +82,29 @@ describe('SyncEngineModule auto upload session baseline', () => {
     await expect(enableAutoUpload()).resolves.toBeUndefined();
 
     expect(mockResumeAutoUpload).toHaveBeenCalledTimes(1);
+  });
+
+  it('requests Android photo permission before enabling native auto upload', async () => {
+    mockPlatformOS = 'android';
+
+    await expect(enableAutoUpload()).resolves.toBeUndefined();
+
+    expect(mockRequestPhotoPermission).toHaveBeenCalledTimes(1);
+    expect(mockResumeAutoUpload).toHaveBeenCalledTimes(1);
+    expect(mockRequestPhotoPermission.mock.invocationCallOrder[0]).toBeLessThan(
+      mockResumeAutoUpload.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('does not enable native auto upload when Android photo permission is denied', async () => {
+    mockPlatformOS = 'android';
+    mockRequestPhotoPermission.mockResolvedValueOnce('denied');
+
+    await expect(enableAutoUpload()).rejects.toThrow(
+      'Android photo library access is required for auto upload',
+    );
+
+    expect(mockResumeAutoUpload).not.toHaveBeenCalled();
   });
 
   it('still resolves disable when baseline cleanup fails after native disables', async () => {
