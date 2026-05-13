@@ -97,4 +97,31 @@ describe('ConnectionTutorialScreen visuals', () => {
     fireEvent.press(screen.getByText('IP 直連'));
     expect(screen.getByTestId('connection-tutorial-visual-ip')).toBeTruthy();
   });
+
+  it('switches tabs when the tutorial pages are swiped horizontally', () => {
+    const screen = render(<ConnectionTutorialScreen />);
+    const pages = screen.getByTestId('connection-tutorial-pages');
+
+    fireEvent(pages, 'momentumScrollEnd', {
+      nativeEvent: {
+        contentOffset: { x: 343 },
+        layoutMeasurement: { width: 343 },
+      },
+    });
+
+    expect(screen.getByText('掃碼').props.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ color: '#ffffff' })]),
+    );
+
+    fireEvent(pages, 'momentumScrollEnd', {
+      nativeEvent: {
+        contentOffset: { x: 0 },
+        layoutMeasurement: { width: 343 },
+      },
+    });
+
+    expect(screen.getByText('搜尋').props.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ color: '#ffffff' })]),
+    );
+  });
 });

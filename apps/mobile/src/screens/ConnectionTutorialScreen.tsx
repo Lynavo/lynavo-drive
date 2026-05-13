@@ -1,11 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -116,8 +119,11 @@ function IpVisual() {
 export function ConnectionTutorialScreen() {
   const navigation = useNavigation();
   const { t } = useTranslation();
+  const { width: windowWidth } = useWindowDimensions();
+  const pageScrollRef = useRef<ScrollView>(null);
   const [activeTab, setActiveTab] = useState<TutorialTabId>('lan');
   const [showTroubleshoot, setShowTroubleshoot] = useState(false);
+  const pageWidth = Math.max(windowWidth - 32, 1);
 
   const tabs = useMemo<TutorialTab[]>(
     () => [
@@ -180,15 +186,36 @@ export function ConnectionTutorialScreen() {
     [t],
   );
 
-  const activeCard = cards[activeTab];
   const activeIndex = TAB_IDS.indexOf(activeTab);
-  const showTroubleshootCta =
-    activeTab === 'lan' || activeTab === 'qr' || activeTab === 'ip';
   const troubleshootItems = [
     t('connectionTutorial.troubleshoot.items.0'),
     t('connectionTutorial.troubleshoot.items.1'),
     t('connectionTutorial.troubleshoot.items.2'),
   ];
+
+  const selectTab = (tabId: TutorialTabId) => {
+    const nextIndex = TAB_IDS.indexOf(tabId);
+    setActiveTab(tabId);
+    pageScrollRef.current?.scrollTo({
+      x: pageWidth * nextIndex,
+      animated: true,
+    });
+  };
+
+  const handlePageMomentumEnd = (
+    event: NativeSyntheticEvent<NativeScrollEvent>,
+  ) => {
+    const measuredWidth =
+      event.nativeEvent.layoutMeasurement.width || pageWidth;
+    const nextIndex = Math.min(
+      TAB_IDS.length - 1,
+      Math.max(
+        0,
+        Math.round(event.nativeEvent.contentOffset.x / measuredWidth),
+      ),
+    );
+    setActiveTab(TAB_IDS[nextIndex]);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -224,7 +251,7 @@ export function ConnectionTutorialScreen() {
                 key={tab.id}
                 style={[styles.tabButton, active && styles.tabButtonActive]}
                 activeOpacity={0.78}
-                onPress={() => setActiveTab(tab.id)}
+                onPress={() => selectTab(tab.id)}
               >
                 <Icon
                   name={tab.icon}
@@ -239,47 +266,76 @@ export function ConnectionTutorialScreen() {
           })}
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.visual}>{activeCard.visual}</View>
+        <ScrollView
+          ref={pageScrollRef}
+          horizontal
+          pagingEnabled
+          bounces={false}
+          decelerationRate="fast"
+          showsHorizontalScrollIndicator={false}
+          style={styles.pageScroll}
+          onMomentumScrollEnd={handlePageMomentumEnd}
+          testID="connection-tutorial-pages"
+        >
+          {TAB_IDS.map(id => {
+            const card = cards[id];
+            const showTroubleshootCta =
+              id === 'lan' || id === 'qr' || id === 'ip';
 
-          <View style={styles.steps}>
-            {activeCard.steps.map((step, index) => (
-              <View key={step} style={styles.stepRow}>
-                <View style={styles.stepNumber}>
-                  <Text style={styles.stepNumberText}>{index + 1}</Text>
-                </View>
-                <Text style={styles.stepText}>{step}</Text>
-              </View>
-            ))}
-
-            {activeCard.warning ? (
-              <Text style={styles.downloadHint}>{activeCard.warning}</Text>
-            ) : null}
-
-            {showTroubleshootCta ? (
-              <TouchableOpacity
-                style={styles.troubleButton}
-                activeOpacity={0.8}
-                onPress={() => setShowTroubleshoot(true)}
+            return (
+              <View
+                key={id}
+                style={[styles.tutorialPage, { width: pageWidth }]}
               >
-                <Icon name="alert-circle-outline" size={17} color="#d97706" />
-                <Text style={styles.troubleText}>
-                  {t('connectionTutorial.troubleshoot.entry')}
-                </Text>
-                <Text style={styles.troubleLink}>
-                  {t('connectionTutorial.troubleshoot.cta')}
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        </View>
+                <View style={styles.card}>
+                  <View style={styles.visual}>{card.visual}</View>
+
+                  <View style={styles.steps}>
+                    {card.steps.map((step, index) => (
+                      <View key={step} style={styles.stepRow}>
+                        <View style={styles.stepNumber}>
+                          <Text style={styles.stepNumberText}>{index + 1}</Text>
+                        </View>
+                        <Text style={styles.stepText}>{step}</Text>
+                      </View>
+                    ))}
+
+                    {card.warning ? (
+                      <Text style={styles.downloadHint}>{card.warning}</Text>
+                    ) : null}
+
+                    {showTroubleshootCta ? (
+                      <TouchableOpacity
+                        style={styles.troubleButton}
+                        activeOpacity={0.8}
+                        onPress={() => setShowTroubleshoot(true)}
+                      >
+                        <Icon
+                          name="alert-circle-outline"
+                          size={17}
+                          color="#d97706"
+                        />
+                        <Text style={styles.troubleText}>
+                          {t('connectionTutorial.troubleshoot.entry')}
+                        </Text>
+                        <Text style={styles.troubleLink}>
+                          {t('connectionTutorial.troubleshoot.cta')}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
 
         <View style={styles.dots}>
           {TAB_IDS.map((id, index) => (
             <TouchableOpacity
               key={id}
               style={[styles.dot, index === activeIndex && styles.dotActive]}
-              onPress={() => setActiveTab(id)}
+              onPress={() => selectTab(id)}
               accessibilityLabel={tabs[index]?.label}
             />
           ))}
@@ -407,6 +463,12 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: '#ffffff',
+  },
+  pageScroll: {
+    marginHorizontal: -16,
+  },
+  tutorialPage: {
+    paddingHorizontal: 16,
   },
   card: {
     overflow: 'hidden',
