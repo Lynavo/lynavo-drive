@@ -6,6 +6,7 @@ import type {
   DeviceFileSortField,
   SortDirection,
 } from '@syncflow/contracts';
+import { desktopClientHeaders } from './app-info';
 
 const BASE = `http://127.0.0.1:${SIDECAR_HTTP_PORT}`;
 const API_BASE =
@@ -99,6 +100,10 @@ function apiAuthHeaders(): Record<string, string> {
     return {};
   }
   return { Authorization: `Bearer ${token}` };
+}
+
+function remoteApiHeaders(baseUrl: string): Record<string, string> {
+  return baseUrl === BASE ? {} : desktopClientHeaders();
 }
 
 function mapGiftCardRedeemFailureReason(code: number): GiftCardRedeemFailureReason | undefined {
@@ -292,7 +297,11 @@ async function request<T>(
       hostname: url.hostname,
       port: url.port ? Number(url.port) : undefined,
       path: url.pathname + url.search,
-      headers: { 'Content-Type': 'application/json', ...headers },
+      headers: {
+        'Content-Type': 'application/json',
+        ...remoteApiHeaders(baseUrl),
+        ...headers,
+      },
     };
 
     const req = transport.request(options, (res) => {

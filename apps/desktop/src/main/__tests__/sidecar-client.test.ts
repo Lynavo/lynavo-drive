@@ -1,6 +1,14 @@
 import { EventEmitter } from 'node:events';
 import { describe, expect, it, vi } from 'vitest';
 
+vi.mock('electron', () => ({
+  app: {
+    getAppPath: () => '/tmp/vividrop-app',
+    getName: () => 'Vivi Drop',
+    getVersion: () => '0.1.0',
+  },
+}));
+
 type RequestOptions = {
   method?: string;
   protocol?: string;
@@ -21,6 +29,12 @@ function createResponse(statusCode: number, body: string) {
   });
   return res;
 }
+
+const remoteClientHeaders = {
+  'X-Client-App': 'vividrop-desktop',
+  'X-Client-Platform': process.platform,
+  'X-Client-Version': '0.1.0',
+};
 
 describe('sidecarClient', () => {
   it('fetches client config from the public API without user auth', async () => {
@@ -72,7 +86,10 @@ describe('sidecarClient', () => {
     expect(options.hostname).toBe('config.example.test');
     expect(options.path).toBe('/api/v1/config');
     expect(options.method).toBe('GET');
-    expect(options.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(options.headers).toEqual({
+      'Content-Type': 'application/json',
+      ...remoteClientHeaders,
+    });
 
     vi.unstubAllEnvs();
     vi.resetModules();
@@ -129,7 +146,10 @@ describe('sidecarClient', () => {
     expect(options.hostname).toBe('gift.example.test');
     expect(options.path).toBe('/api/v1/gift-cards/redeem');
     expect(options.method).toBe('POST');
-    expect(options.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(options.headers).toEqual({
+      'Content-Type': 'application/json',
+      ...remoteClientHeaders,
+    });
     expect(typeof callback).toBe('function');
 
     vi.unstubAllEnvs();
@@ -219,6 +239,7 @@ describe('sidecarClient', () => {
     const [options] = httpsRequest.mock.calls[0] as [RequestOptions, (res: unknown) => void];
     expect(options.headers).toEqual({
       'Content-Type': 'application/json',
+      ...remoteClientHeaders,
       Authorization: 'Bearer redeem-token',
     });
 
@@ -445,7 +466,10 @@ describe('sidecarClient', () => {
     expect(httpRequest).not.toHaveBeenCalled();
     expect(httpsRequest).toHaveBeenCalledTimes(1);
     const [options] = httpsRequest.mock.calls[0] as [RequestOptions, (res: unknown) => void];
-    expect(options.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(options.headers).toEqual({
+      'Content-Type': 'application/json',
+      ...remoteClientHeaders,
+    });
 
     vi.unstubAllEnvs();
     vi.resetModules();
@@ -488,7 +512,10 @@ describe('sidecarClient', () => {
     expect(httpRequest).not.toHaveBeenCalled();
     expect(httpsRequest).toHaveBeenCalledTimes(1);
     const [options] = httpsRequest.mock.calls[0] as [RequestOptions, (res: unknown) => void];
-    expect(options.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(options.headers).toEqual({
+      'Content-Type': 'application/json',
+      ...remoteClientHeaders,
+    });
 
     vi.unstubAllEnvs();
     vi.resetModules();
@@ -553,6 +580,7 @@ describe('sidecarClient', () => {
     expect(redeemOptions.path).toBe('/api/v1/gift-cards/redeem');
     expect(redeemOptions.headers).toEqual({
       'Content-Type': 'application/json',
+      ...remoteClientHeaders,
       Authorization: 'Bearer user-access-token',
     });
 

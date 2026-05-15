@@ -2,22 +2,18 @@ import { app, dialog, shell } from 'electron';
 import log from 'electron-log';
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { hostname, networkInterfaces, release, tmpdir, type } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
+import { desktopClientHeaders, getAppInfo, type AppInfo } from './app-info';
 import { sidecarClient } from './sidecar-client';
 import type { SidecarManager } from './sidecar-manager';
 import { getMainStrings } from '../shared/main-i18n';
 
 const execFileAsync = promisify(execFile);
 
-type AppInfo = {
-  name: string;
-  version: string;
-  buildNumber: string;
-};
+export { getAppInfo } from './app-info';
 
 type EnvironmentSnapshot = {
   os: {
@@ -309,15 +305,6 @@ async function listDesktopLogFiles(activeLogPath: string): Promise<string[]> {
   return Array.from(present);
 }
 
-export function getAppInfo(): AppInfo {
-  const buildNumber = resolveBuildNumber();
-  return {
-    name: app.getName(),
-    version: app.getVersion(),
-    buildNumber,
-  };
-}
-
 function defaultApiBaseUrl(): string {
   return app.isPackaged ? 'https://api.vividrop.cn' : 'https://review-api.vividrop.cn';
 }
@@ -376,36 +363,6 @@ function desktopClientId(): string {
   const source = `${app.getPath('userData')}|${hostname()}`;
   const digest = createHash('sha256').update(source).digest('hex').slice(0, 16);
   return `desktop-${digest}`;
-}
-
-function resolveBuildNumber(): string {
-  const fallback = '';
-  const packagedPackageJson = join(app.getAppPath(), 'package.json');
-  const repoProject = join(
-    process.cwd(),
-    'apps',
-    'mobile',
-    'ios',
-    'SyncFlowMobile.xcodeproj',
-    'project.pbxproj',
-  );
-
-  try {
-    const packaged = JSON.parse(readFileSync(packagedPackageJson, 'utf8')) as {
-      syncflowBuildNumber?: string;
-    };
-    if (packaged.syncflowBuildNumber) return packaged.syncflowBuildNumber;
-  } catch {
-    // Fall through to repo build settings in development.
-  }
-
-  try {
-    const project = readFileSync(repoProject, 'utf8');
-    const match = project.match(/CURRENT_PROJECT_VERSION = (\d+);/);
-    return match?.[1] ?? fallback;
-  } catch {
-    return fallback;
-  }
 }
 
 export async function exportDiagnostics(
@@ -611,7 +568,7 @@ export async function uploadDiagnostics(
       'diagnostics.zip',
     );
 
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = desktopClientHeaders();
     const token = optionalApiToken();
     if (token) {
       headers.Authorization = `Bearer ${token}`;
@@ -705,7 +662,9 @@ export async function checkForUpdates(): Promise<UpdateCheckResult> {
     url.searchParams.set('build', appInfo.buildNumber);
   }
 
-  const response = await fetch(url.toString());
+  const response = await fetch(url.toString(), {
+    headers: desktopClientHeaders(),
+  });
   if (!response.ok) {
     throw new Error(`update check failed: HTTP ${response.status}`);
   }
