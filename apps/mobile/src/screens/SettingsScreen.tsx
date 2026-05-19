@@ -1569,7 +1569,9 @@ export function SettingsScreen() {
             </View>
             <Icon name="chevron-forward" size={16} color={ROW_CHEVRON} />
           </TouchableOpacity>
-          {FEATURES.IAP_ENABLED && FEATURES.IAP_RESTORE_ENABLED ? (
+          {FEATURES.IAP_ENABLED &&
+          FEATURES.IAP_RESTORE_ENABLED &&
+          Platform.OS === 'ios' ? (
             <>
               <View style={styles.listSep} />
               <TouchableOpacity
@@ -1689,6 +1691,10 @@ export function SettingsScreen() {
             </View>
           </>
         ) : null}
+
+        <View style={styles.footer}>
+          <Text style={styles.copyrightText}>{t('settings.copyright')}</Text>
+        </View>
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
@@ -2368,7 +2374,19 @@ const styles = StyleSheet.create({
   },
 
   bottomSpacer: {
-    height: 20,
+    height: 40,
+  },
+
+  footer: {
+    marginTop: 24,
+    marginBottom: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  copyrightText: {
+    fontSize: 12,
+    color: SECTION_TEXT,
+    opacity: 0.8,
   },
 
   // Diagnostics upload prompt

@@ -28,6 +28,7 @@ AuthKey_*.p8
 # IDE / tooling
 .vscode/
 .claude/
+.gemini/
 
 # Locale resource files must remain trackable even if a developer has a broad
 # global settings.json ignore rule.
