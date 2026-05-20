@@ -17,7 +17,9 @@ import { isFeatureAccessAllowed, useAuth } from '../stores/auth-store';
 import type { AccountStatus, SubscriptionInfo } from '../stores/auth-store';
 import { useExpiryReminder } from '../hooks/useExpiryReminder';
 import { FEATURES } from '../constants/features';
+import { isGlobalMarket } from '../markets';
 import { LoginScreen } from '../screens/LoginScreen';
+import { LoginGlobalScreen } from '../screens/LoginGlobalScreen';
 import { SmsVerifyScreen } from '../screens/SmsVerifyScreen';
 import { DeviceDiscoveryScreen } from '../screens/DeviceDiscoveryScreen';
 import { CodeVerifyScreen } from '../screens/CodeVerifyScreen';
@@ -187,8 +189,14 @@ function UnauthStack({
         initialRouteName="Login"
         screenOptions={{ headerShown: false }}
       >
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="SmsVerify" component={SmsVerifyScreen} />
+        {isGlobalMarket() ? (
+          <Stack.Screen name="Login" component={LoginGlobalScreen} />
+        ) : (
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="SmsVerify" component={SmsVerifyScreen} />
+          </>
+        )}
       </Stack.Navigator>
     </AuthRouteTransition>
   );
