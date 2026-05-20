@@ -12,7 +12,9 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>zh-Hans</string>
 	<key>CFBundleDisplayName</key>
-	<string>Vivi Drop</string>
+	<string>$(PRODUCT_NAME)</string>
+	<key>SyncFlowMarket</key>
+	<string>$(SYNCFLOW_MARKET)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

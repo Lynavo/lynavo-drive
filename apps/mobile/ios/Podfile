@@ -5,6 +5,8 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
+project 'SyncFlowMobile', 'DebugGlobal' => :debug, 'ReleaseGlobal' => :release
+
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
