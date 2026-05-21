@@ -8,9 +8,16 @@ REPO_ROOT="$(cd -- "${IOS_DIR}/../../.." && pwd)"
 MODE="${1:-archive-upload}"
 
 WORKSPACE="${IOS_DIR}/SyncFlowMobile.xcworkspace"
-SCHEME="SyncFlowMobile"
-CONFIGURATION="Release"
-EXPORT_OPTIONS="${IOS_DIR}/ExportOptions-TestFlight.plist"
+SCHEME="${SCHEME:-SyncFlowMobile}"
+CONFIGURATION="${CONFIGURATION:-Release}"
+
+if [[ -z "${EXPORT_OPTIONS:-}" ]]; then
+  if [[ "${SCHEME}" == "SyncFlowMobileGlobal" ]]; then
+    EXPORT_OPTIONS="${IOS_DIR}/ExportOptions-TestFlightGlobal.plist"
+  else
+    EXPORT_OPTIONS="${IOS_DIR}/ExportOptions-TestFlight.plist"
+  fi
+fi
 ARCHIVES_DIR="${IOS_DIR}/build/archives"
 EXPORT_DIR="/tmp/syncflow-export"
 IOS_EXPORT_SIGNING_CERTIFICATE="${IOS_EXPORT_SIGNING_CERTIFICATE:-Apple Distribution}"
