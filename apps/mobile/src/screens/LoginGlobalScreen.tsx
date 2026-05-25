@@ -2,24 +2,25 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
   Linking,
   NativeModules,
-  Platform,
   Pressable,
-  ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import Svg, { Path } from 'react-native-svg';
 
+import { AUTH_COLORS, AuthScreenShell } from '../components/auth/AuthScreenShell';
+import {
+  authCardSurfaceStyle,
+  authSingleLineInputStyle,
+  authTextScalingProps,
+} from '../components/auth/authPlatformStyles';
 import { appleLogin, googleLogin, sendEmailCode } from '../services/auth-service';
 import { useAuth } from '../stores/auth-store';
 import { PRIVACY_POLICY_URL, USER_AGREEMENT_URL } from '../constants/legal';
@@ -32,7 +33,7 @@ type LoginGlobalNavProp = StackNavigationProp<RootStackParamList, 'Login'>;
 // Premium Native SVG Icons
 // ---------------------------------------------------------------------------
 
-function AppleIcon({ color = '#ffffff' }: { color?: string }) {
+function AppleIcon({ color = '#000000' }: { color?: string }) {
   return (
     <Svg width={18} height={18} viewBox="0 0 170 170">
       <Path
@@ -66,7 +67,7 @@ function GoogleIcon() {
   );
 }
 
-function PhoneIcon({ color = '#ffffff' }: { color?: string }) {
+function PhoneIcon({ color = '#1a2a3a' }: { color?: string }) {
   return (
     <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
       <Path
@@ -175,199 +176,182 @@ export function LoginGlobalScreen() {
   }, []);
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" />
-      <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          style={styles.keyboardRoot}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <ScrollView
-            bounces={false}
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
+    <AuthScreenShell subtitle="Connect your desktop and keep media in sync.">
+      <View style={styles.card}>
+        {/* Header Title */}
+        <Text style={styles.title}>Log in or sign up</Text>
+
+        {/* Provider Buttons */}
+        <View style={styles.buttonList}>
+          <Pressable
+            accessibilityRole="button"
+            disabled={pendingProvider !== null}
+            onPress={() => void handleProviderPress('google')}
+            style={({ pressed }) => [
+              styles.providerButton,
+              pendingProvider !== null ? styles.buttonDisabled : null,
+              pressed ? styles.buttonPressed : null,
+            ]}
           >
-            <View style={styles.container}>
-              {/* Header Title */}
-              <Text style={styles.title}>Log in or sign up</Text>
-
-              {/* Provider Buttons */}
-              <View style={styles.buttonList}>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={pendingProvider !== null}
-                  onPress={() => void handleProviderPress('google')}
-                  style={({ pressed }) => [
-                    styles.providerButton,
-                    pendingProvider !== null ? styles.buttonDisabled : null,
-                    pressed ? styles.buttonPressed : null,
-                  ]}
-                >
-                  {pendingProvider === 'google' ? (
-                    <ActivityIndicator size="small" color="#ffffff" />
-                  ) : (
-                    <View style={styles.buttonContent}>
-                      <GoogleIcon />
-                      <Text style={styles.providerText}>Continue with Google</Text>
-                    </View>
-                  )}
-                </Pressable>
-
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={pendingProvider !== null}
-                  onPress={() => void handleProviderPress('apple')}
-                  style={({ pressed }) => [
-                    styles.providerButton,
-                    pendingProvider !== null ? styles.buttonDisabled : null,
-                    pressed ? styles.buttonPressed : null,
-                  ]}
-                >
-                  {pendingProvider === 'apple' ? (
-                    <ActivityIndicator size="small" color="#ffffff" />
-                  ) : (
-                    <View style={styles.buttonContent}>
-                      <AppleIcon color="#ffffff" />
-                      <Text style={styles.providerText}>Continue with Apple</Text>
-                    </View>
-                  )}
-                </Pressable>
-
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={pendingProvider !== null}
-                  onPress={handleContinueWithPhone}
-                  style={({ pressed }) => [
-                    styles.providerButton,
-                    pendingProvider !== null ? styles.buttonDisabled : null,
-                    pressed ? styles.buttonPressed : null,
-                  ]}
-                >
-                  <View style={styles.buttonContent}>
-                    <PhoneIcon color="#ffffff" />
-                    <Text style={styles.providerText}>Continue with phone</Text>
-                  </View>
-                </Pressable>
+            {pendingProvider === 'google' ? (
+              <ActivityIndicator size="small" color={AUTH_COLORS.text} />
+            ) : (
+              <View style={styles.buttonContent}>
+                <GoogleIcon />
+                <Text style={styles.providerText}>Continue with Google</Text>
               </View>
+            )}
+          </Pressable>
 
-              {/* OR Divider */}
-              <View style={styles.dividerContainer}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>OR</Text>
-                <View style={styles.dividerLine} />
+          <Pressable
+            accessibilityRole="button"
+            disabled={pendingProvider !== null}
+            onPress={() => void handleProviderPress('apple')}
+            style={({ pressed }) => [
+              styles.providerButton,
+              pendingProvider !== null ? styles.buttonDisabled : null,
+              pressed ? styles.buttonPressed : null,
+            ]}
+          >
+            {pendingProvider === 'apple' ? (
+              <ActivityIndicator size="small" color={AUTH_COLORS.text} />
+            ) : (
+              <View style={styles.buttonContent}>
+                <AppleIcon color={AUTH_COLORS.text} />
+                <Text style={styles.providerText}>Continue with Apple</Text>
               </View>
+            )}
+          </Pressable>
 
-              {/* Email Address Input */}
-              <View style={styles.inputSection}>
-                <TextInput
-                  style={[
-                    styles.textInput,
-                    emailError ? styles.textInputError : null,
-                  ]}
-                  value={email}
-                  onChangeText={(val) => {
-                    setEmail(val);
-                    if (emailError) setEmailError(null);
-                  }}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  placeholder="Email address"
-                  placeholderTextColor="rgba(255, 255, 255, 0.4)"
-                  editable={!pendingProvider}
-                  returnKeyType="done"
-                  onSubmitEditing={handleContinueWithEmail}
-                />
-                {emailError && (
-                  <Text style={styles.errorText}>{emailError}</Text>
-                )}
-              </View>
-
-              {/* Continue Action Button */}
-              <Pressable
-                accessibilityRole="button"
-                disabled={!isButtonEnabled}
-                onPress={handleContinueWithEmail}
-                style={({ pressed }) => [
-                  styles.continueButton,
-                  !isButtonEnabled ? styles.continueButtonDisabled : null,
-                  pressed ? { opacity: 0.9 } : null,
-                ]}
-              >
-                {pendingProvider === 'email' ? (
-                  <ActivityIndicator size="small" color="#000000" />
-                ) : (
-                  <Text style={styles.continueButtonText}>Continue</Text>
-                )}
-              </Pressable>
-
-              {/* Legal Footer */}
-              <View style={styles.legalFooter}>
-                <Text style={styles.legalText}>
-                  By continuing, you agree to our{' '}
-                  <Text style={styles.legalLink} onPress={handleOpenTerms}>
-                    Terms of Service
-                  </Text>{' '}
-                  and{' '}
-                  <Text style={styles.legalLink} onPress={handleOpenPrivacy}>
-                    Privacy Policy
-                  </Text>
-                  .
-                </Text>
-              </View>
+          <Pressable
+            accessibilityRole="button"
+            disabled={pendingProvider !== null}
+            onPress={handleContinueWithPhone}
+            style={({ pressed }) => [
+              styles.providerButton,
+              pendingProvider !== null ? styles.buttonDisabled : null,
+              pressed ? styles.buttonPressed : null,
+            ]}
+          >
+            <View style={styles.buttonContent}>
+              <PhoneIcon color={AUTH_COLORS.text} />
+              <Text style={styles.providerText}>Continue with phone</Text>
             </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </View>
+          </Pressable>
+        </View>
+
+        {/* OR Divider */}
+        <View style={styles.dividerContainer}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>OR</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        {/* Email Address Input */}
+        <View style={styles.inputSection}>
+          <TextInput
+            {...authTextScalingProps}
+            style={[
+              styles.textInput,
+              emailError ? styles.textInputError : null,
+            ]}
+            value={email}
+            onChangeText={(val) => {
+              setEmail(val);
+              if (emailError) setEmailError(null);
+            }}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="Email address"
+            placeholderTextColor={AUTH_COLORS.textFaint}
+            editable={!pendingProvider}
+            returnKeyType="done"
+            selectionColor={AUTH_COLORS.primary}
+            onSubmitEditing={handleContinueWithEmail}
+          />
+          {emailError && (
+            <Text style={styles.errorText}>{emailError}</Text>
+          )}
+        </View>
+
+        {/* Continue Action Button */}
+        <Pressable
+          accessibilityRole="button"
+          disabled={!isButtonEnabled}
+          onPress={handleContinueWithEmail}
+          style={({ pressed }) => [
+            styles.continueButton,
+            !isButtonEnabled ? styles.continueButtonDisabled : null,
+            pressed ? { opacity: 0.9 } : null,
+          ]}
+        >
+          {pendingProvider === 'email' ? (
+            <ActivityIndicator size="small" color="#ffffff" />
+          ) : (
+            <Text style={styles.continueButtonText}>Continue</Text>
+          )}
+        </Pressable>
+
+        {/* Legal Footer */}
+        <View style={styles.legalFooter}>
+          <Text style={styles.legalText}>
+            By continuing, you agree to our{' '}
+            <Text style={styles.legalLink} onPress={handleOpenTerms}>
+              Terms of Service
+            </Text>{' '}
+            and{' '}
+            <Text style={styles.legalLink} onPress={handleOpenPrivacy}>
+              Privacy Policy
+            </Text>
+            .
+          </Text>
+        </View>
+      </View>
+    </AuthScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  keyboardRoot: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-    paddingVertical: 40,
-  },
-  container: {
+  card: {
+    backgroundColor: AUTH_COLORS.surface,
+    borderRadius: 24,
+    borderWidth: 0,
+    borderColor: AUTH_COLORS.surfaceBorder,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 28,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 384,
     alignSelf: 'center',
+    ...authCardSurfaceStyle,
+    gap: 16,
   },
   title: {
-    fontSize: 28,
+    color: AUTH_COLORS.text,
+    fontSize: 22,
     fontWeight: '700',
-    color: '#ffffff',
     textAlign: 'center',
-    marginBottom: 36,
+    marginBottom: 6,
   },
   buttonList: {
-    gap: 14,
+    gap: 12,
   },
   providerButton: {
     height: 52,
     borderRadius: 26,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    backgroundColor: '#000000',
+    borderWidth: 1.5,
+    borderColor: AUTH_COLORS.inputBorder,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
   },
   buttonPressed: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(59,130,246,0.04)',
   },
   buttonDisabled: {
     opacity: 0.4,
@@ -379,45 +363,47 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   providerText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#ffffff',
+    color: AUTH_COLORS.text,
   },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 24,
+    marginVertical: 8,
     paddingHorizontal: 4,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
   },
   dividerText: {
-    color: 'rgba(255, 255, 255, 0.4)',
+    color: AUTH_COLORS.textFaint,
     fontSize: 12,
     fontWeight: '600',
     marginHorizontal: 16,
   },
   inputSection: {
-    marginBottom: 20,
+    marginBottom: 4,
   },
   textInput: {
     height: 52,
     borderRadius: 26,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    backgroundColor: '#000000',
+    borderWidth: 1.5,
+    borderColor: AUTH_COLORS.inputBorder,
+    backgroundColor: AUTH_COLORS.inputBackground,
     paddingHorizontal: 20,
-    color: '#ffffff',
-    fontSize: 16,
+    color: AUTH_COLORS.text,
+    fontSize: 15,
+    fontWeight: '500',
+    ...authSingleLineInputStyle,
   },
   textInputError: {
-    borderColor: '#db5b66',
+    borderColor: AUTH_COLORS.danger,
   },
   errorText: {
-    color: '#db5b66',
+    color: AUTH_COLORS.danger,
     fontSize: 13,
     marginTop: 6,
     marginLeft: 14,
@@ -425,38 +411,37 @@ const styles = StyleSheet.create({
   continueButton: {
     height: 52,
     borderRadius: 26,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#000000',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#ffffff',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
     elevation: 3,
   },
   continueButtonDisabled: {
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
     shadowOpacity: 0,
     elevation: 0,
   },
   continueButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#000000',
+    color: '#ffffff',
   },
   legalFooter: {
-    marginTop: 28,
+    marginTop: 8,
     paddingHorizontal: 8,
   },
   legalText: {
     fontSize: 12,
     lineHeight: 18,
-    color: 'rgba(255, 255, 255, 0.4)',
+    color: AUTH_COLORS.textFaint,
     textAlign: 'center',
   },
   legalLink: {
-    color: '#ffffff',
+    color: AUTH_COLORS.link,
     fontWeight: '600',
-    textDecorationLine: 'underline',
   },
 });
