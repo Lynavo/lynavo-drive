@@ -301,3 +301,30 @@ export interface SubscriptionPlanDto {
 export interface SubscriptionPlansResponse {
   plans: SubscriptionPlanDto[];
 }
+
+// ── P2P Tunneling & Signaling ──
+
+export interface TurnCredentialsDTO {
+  username: string;
+  credential: string;
+  urls: string[];
+}
+
+export interface SignalingMessageDTO {
+  type: 'offer' | 'answer' | 'candidate';
+  payload: string; // Serialized SDP or ICE candidate JSON
+  senderId: string;
+  receiverId: string;
+}
+
+export interface PairedDeviceInfo {
+  clientId: string;
+  pairingToken: string;
+}
+
+export interface DesktopRegisterMessage {
+  type: 'register_desktop';
+  clientId: string;
+  pairedDevices: PairedDeviceInfo[];
+}
+
