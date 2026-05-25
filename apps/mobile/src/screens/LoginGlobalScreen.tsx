@@ -2,35 +2,39 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Linking,
   NativeModules,
+  Platform,
   Pressable,
+  ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import Svg, { Path } from 'react-native-svg';
 
-import { AUTH_COLORS, AuthScreenShell } from '../components/auth/AuthScreenShell';
-import { appleLogin, googleLogin } from '../services/auth-service';
+import { appleLogin, googleLogin, sendEmailCode } from '../services/auth-service';
 import { useAuth } from '../stores/auth-store';
 import { PRIVACY_POLICY_URL, USER_AGREEMENT_URL } from '../constants/legal';
 import type { RootStackParamList } from '../navigation/RootNavigator';
-import { Icon } from '../components/Icon';
 
 type Provider = 'apple' | 'google' | 'email';
 type LoginGlobalNavProp = StackNavigationProp<RootStackParamList, 'Login'>;
 
 // ---------------------------------------------------------------------------
-// Native SVG Icons for premium branding
+// Premium Native SVG Icons
 // ---------------------------------------------------------------------------
 
 function AppleIcon({ color = '#ffffff' }: { color?: string }) {
   return (
-    <Svg width={16} height={19} viewBox="0 0 170 170">
+    <Svg width={18} height={18} viewBox="0 0 170 170">
       <Path
         d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.37.13-9.13-1.92-14.3-6.15-3.57-2.85-7.39-7.51-11.47-13.98-7.98-12.63-14.15-27.15-18.52-43.54-4.37-16.39-6.56-31.9-6.56-46.54 0-16.92 4.19-31.11 12.57-42.57 8.38-11.47 19.14-17.29 32.29-17.47 6.42 0 13.1 1.95 20.07 5.85 6.97 3.9 11.28 5.85 12.92 5.85 1.51 0 5.69-1.9 12.54-5.7 6.85-3.8 13.4-5.6 19.64-5.4 15.02.6 26.68 6.13 35 16.59-13.2 8.02-19.69 19.22-19.46 33.6.26 10.8 4.29 19.8 12.08 27 7.79 7.2 17.11 11.06 27.97 11.58-2.6 7.6-5.83 14.8-9.68 21.6zM119.22 32.4c0-7.85 2.8-15.11 8.4-21.79 5.6-6.68 12.35-10.74 20.25-12.2 1.34 8.2-1.4 15.93-8.2 23.2-6.8 7.27-14.4 11.07-22.8 11.4-.4-.8-.65-2-.65-3.6z"
         fill={color}
@@ -62,10 +66,29 @@ function GoogleIcon() {
   );
 }
 
+function PhoneIcon({ color = '#ffffff' }: { color?: string }) {
+  return (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 export function LoginGlobalScreen() {
   const navigation = useNavigation<LoginGlobalNavProp>();
+  const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [pendingProvider, setPendingProvider] = useState<Provider | null>(null);
   const { login } = useAuth();
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const isButtonEnabled = email.trim().length > 0 && !pendingProvider;
 
   useEffect(() => {
     try {
@@ -104,7 +127,6 @@ export function LoginGlobalScreen() {
         login(authRes.accessToken, authRes.refreshToken);
       }
     } catch (err: any) {
-      // Don't show alert if user cancelled explicitly
       const isCancelled =
         err.code === 'SIGN_IN_CANCELLED' ||
         err.message === 'Sign in cancelled' ||
@@ -118,9 +140,31 @@ export function LoginGlobalScreen() {
     }
   };
 
-  const handleOpenEmailLogin = useCallback(() => {
+  const handleContinueWithPhone = useCallback(() => {
+    if (pendingProvider) return;
     navigation.navigate('LoginEmail');
-  }, [navigation]);
+  }, [navigation, pendingProvider]);
+
+  const handleContinueWithEmail = useCallback(async () => {
+    const trimmed = email.trim();
+    if (!trimmed) return;
+
+    if (!emailRegex.test(trimmed)) {
+      setEmailError('Please enter a valid email address.');
+      return;
+    }
+
+    setEmailError(null);
+    setPendingProvider('email');
+    try {
+      await sendEmailCode(trimmed);
+      setPendingProvider(null);
+      navigation.navigate('SmsVerify', { email: trimmed });
+    } catch (err: any) {
+      setPendingProvider(null);
+      Alert.alert('Error', err.message || 'Failed to send email verification code.');
+    }
+  }, [email, navigation]);
 
   const handleOpenTerms = useCallback(() => {
     Linking.openURL(USER_AGREEMENT_URL);
@@ -131,120 +175,202 @@ export function LoginGlobalScreen() {
   }, []);
 
   return (
-    <AuthScreenShell subtitle="Connect your desktop and keep media in sync.">
-      <View style={styles.card}>
-        <Text style={styles.title}>Sign in to Vivi Drop</Text>
-        <Text style={styles.subtitle}>Choose a service to continue with your account.</Text>
-
-        <Pressable
-          accessibilityRole="button"
-          disabled={pendingProvider !== null}
-          onPress={() => void handleProviderPress('apple')}
-          style={({ pressed }) => [
-            styles.providerButton,
-            styles.appleButton,
-            pendingProvider !== null ? styles.buttonDisabled : null,
-            pressed ? { opacity: 0.9 } : null,
-          ]}
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          style={styles.keyboardRoot}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          {pendingProvider === 'apple' ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <View style={styles.buttonContent}>
-              <AppleIcon color="#ffffff" />
-              <Text style={[styles.providerText, styles.appleText]}>Sign in with Apple</Text>
+          <ScrollView
+            bounces={false}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.container}>
+              {/* Header Title */}
+              <Text style={styles.title}>Log in or sign up</Text>
+
+              {/* Provider Buttons */}
+              <View style={styles.buttonList}>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={pendingProvider !== null}
+                  onPress={() => void handleProviderPress('google')}
+                  style={({ pressed }) => [
+                    styles.providerButton,
+                    pendingProvider !== null ? styles.buttonDisabled : null,
+                    pressed ? styles.buttonPressed : null,
+                  ]}
+                >
+                  {pendingProvider === 'google' ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <View style={styles.buttonContent}>
+                      <GoogleIcon />
+                      <Text style={styles.providerText}>Continue with Google</Text>
+                    </View>
+                  )}
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={pendingProvider !== null}
+                  onPress={() => void handleProviderPress('apple')}
+                  style={({ pressed }) => [
+                    styles.providerButton,
+                    pendingProvider !== null ? styles.buttonDisabled : null,
+                    pressed ? styles.buttonPressed : null,
+                  ]}
+                >
+                  {pendingProvider === 'apple' ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <View style={styles.buttonContent}>
+                      <AppleIcon color="#ffffff" />
+                      <Text style={styles.providerText}>Continue with Apple</Text>
+                    </View>
+                  )}
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={pendingProvider !== null}
+                  onPress={handleContinueWithPhone}
+                  style={({ pressed }) => [
+                    styles.providerButton,
+                    pendingProvider !== null ? styles.buttonDisabled : null,
+                    pressed ? styles.buttonPressed : null,
+                  ]}
+                >
+                  <View style={styles.buttonContent}>
+                    <PhoneIcon color="#ffffff" />
+                    <Text style={styles.providerText}>Continue with phone</Text>
+                  </View>
+                </Pressable>
+              </View>
+
+              {/* OR Divider */}
+              <View style={styles.dividerContainer}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>OR</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              {/* Email Address Input */}
+              <View style={styles.inputSection}>
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    emailError ? styles.textInputError : null,
+                  ]}
+                  value={email}
+                  onChangeText={(val) => {
+                    setEmail(val);
+                    if (emailError) setEmailError(null);
+                  }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholder="Email address"
+                  placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                  editable={!pendingProvider}
+                  returnKeyType="done"
+                  onSubmitEditing={handleContinueWithEmail}
+                />
+                {emailError && (
+                  <Text style={styles.errorText}>{emailError}</Text>
+                )}
+              </View>
+
+              {/* Continue Action Button */}
+              <Pressable
+                accessibilityRole="button"
+                disabled={!isButtonEnabled}
+                onPress={handleContinueWithEmail}
+                style={({ pressed }) => [
+                  styles.continueButton,
+                  !isButtonEnabled ? styles.continueButtonDisabled : null,
+                  pressed ? { opacity: 0.9 } : null,
+                ]}
+              >
+                {pendingProvider === 'email' ? (
+                  <ActivityIndicator size="small" color="#000000" />
+                ) : (
+                  <Text style={styles.continueButtonText}>Continue</Text>
+                )}
+              </Pressable>
+
+              {/* Legal Footer */}
+              <View style={styles.legalFooter}>
+                <Text style={styles.legalText}>
+                  By continuing, you agree to our{' '}
+                  <Text style={styles.legalLink} onPress={handleOpenTerms}>
+                    Terms of Service
+                  </Text>{' '}
+                  and{' '}
+                  <Text style={styles.legalLink} onPress={handleOpenPrivacy}>
+                    Privacy Policy
+                  </Text>
+                  .
+                </Text>
+              </View>
             </View>
-          )}
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          disabled={pendingProvider !== null}
-          onPress={() => void handleProviderPress('google')}
-          style={({ pressed }) => [
-            styles.providerButton,
-            styles.googleButton,
-            pendingProvider !== null ? styles.buttonDisabled : null,
-            pressed ? { opacity: 0.9 } : null,
-          ]}
-        >
-          {pendingProvider === 'google' ? (
-            <ActivityIndicator size="small" color={AUTH_COLORS.text} />
-          ) : (
-            <View style={styles.buttonContent}>
-              <GoogleIcon />
-              <Text style={[styles.providerText, styles.googleText]}>Sign in with Google</Text>
-            </View>
-          )}
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          disabled={pendingProvider !== null}
-          onPress={handleOpenEmailLogin}
-          style={({ pressed }) => [
-            styles.providerButton,
-            styles.emailButton,
-            pendingProvider !== null ? styles.buttonDisabled : null,
-            pressed ? { opacity: 0.9 } : null,
-          ]}
-        >
-          <View style={styles.buttonContent}>
-            <Icon name="mail-outline" size={18} color="#1f2937" />
-            <Text style={[styles.providerText, styles.emailText]}>Sign in with Email</Text>
-          </View>
-        </Pressable>
-
-        <View style={styles.legalFooter}>
-          <Text style={styles.legalText}>
-            By signing in, you agree to our{' '}
-            <Text style={styles.legalLink} onPress={handleOpenTerms}>
-              Terms of Service
-            </Text>{' '}
-            and{' '}
-            <Text style={styles.legalLink} onPress={handleOpenPrivacy}>
-              Privacy Policy
-            </Text>
-            .
-          </Text>
-        </View>
-      </View>
-    </AuthScreenShell>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    marginHorizontal: 20,
-    marginTop: 32,
-    borderRadius: 24,
-    backgroundColor: '#ffffff',
-    padding: 24,
-    gap: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 24,
-    elevation: 3,
+  root: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  keyboardRoot: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    paddingVertical: 40,
+  },
+  container: {
+    width: '100%',
+    maxWidth: 380,
+    alignSelf: 'center',
   },
   title: {
-    color: AUTH_COLORS.text,
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: '700',
+    color: '#ffffff',
     textAlign: 'center',
+    marginBottom: 36,
   },
-  subtitle: {
-    color: AUTH_COLORS.textMuted,
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 8,
+  buttonList: {
+    gap: 14,
   },
   providerButton: {
     height: 52,
-    borderRadius: 16,
+    borderRadius: 26,
     borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: '#000000',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  buttonPressed: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  buttonDisabled: {
+    opacity: 0.4,
   },
   buttonContent: {
     flexDirection: 'row',
@@ -252,56 +378,85 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 12,
   },
-  appleButton: {
-    backgroundColor: '#000000',
-    borderColor: '#000000',
-  },
-  googleButton: {
-    backgroundColor: '#ffffff',
-    borderColor: 'rgba(0,0,0,0.12)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 1,
-  },
-  emailButton: {
-    backgroundColor: '#ffffff',
-    borderColor: 'rgba(0,0,0,0.12)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 1,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
   providerText: {
     fontSize: 16,
-    fontWeight: '700',
-  },
-  appleText: {
+    fontWeight: '600',
     color: '#ffffff',
   },
-  googleText: {
-    color: '#1f2937',
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 24,
+    paddingHorizontal: 4,
   },
-  emailText: {
-    color: '#1f2937',
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  dividerText: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 12,
+    fontWeight: '600',
+    marginHorizontal: 16,
+  },
+  inputSection: {
+    marginBottom: 20,
+  },
+  textInput: {
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: '#000000',
+    paddingHorizontal: 20,
+    color: '#ffffff',
+    fontSize: 16,
+  },
+  textInputError: {
+    borderColor: '#db5b66',
+  },
+  errorText: {
+    color: '#db5b66',
+    fontSize: 13,
+    marginTop: 6,
+    marginLeft: 14,
+  },
+  continueButton: {
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#ffffff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  continueButtonDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  continueButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000000',
   },
   legalFooter: {
-    marginTop: 8,
+    marginTop: 28,
     paddingHorizontal: 8,
   },
   legalText: {
     fontSize: 12,
     lineHeight: 18,
-    color: AUTH_COLORS.textFaint,
+    color: 'rgba(255, 255, 255, 0.4)',
     textAlign: 'center',
   },
   legalLink: {
-    color: AUTH_COLORS.link,
+    color: '#ffffff',
     fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });

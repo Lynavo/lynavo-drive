@@ -32,13 +32,7 @@ jest.mock('../../stores/auth-store', () => ({
 jest.mock('../../services/auth-service', () => ({
   appleLogin: jest.fn().mockResolvedValue({ accessToken: 'a', refreshToken: 'r' }),
   googleLogin: jest.fn().mockResolvedValue({ accessToken: 'a', refreshToken: 'r' }),
-}));
-
-jest.mock('../../components/Icon', () => ({
-  Icon: ({ name }: { name: string }) => {
-    const { Text } = require('react-native');
-    return <Text>{name}</Text>;
-  },
+  sendEmailCode: jest.fn().mockResolvedValue(undefined),
 }));
 
 describe('LoginGlobalScreen', () => {
@@ -55,20 +49,19 @@ describe('LoginGlobalScreen', () => {
     };
   });
 
-  it('shows Apple, Google and Email login without phone login', () => {
-    const { getByText, queryByText } = render(<LoginGlobalScreen />);
-
-    expect(getByText('Sign in with Apple')).toBeTruthy();
-    expect(getByText('Sign in with Google')).toBeTruthy();
-    expect(getByText('Sign in with Email')).toBeTruthy();
-    expect(queryByText('+86')).toBeNull();
-  });
-
-  it('navigates to LoginEmail screen when Email button is pressed', () => {
+  it('shows Google, Apple and Phone login buttons', () => {
     const { getByText } = render(<LoginGlobalScreen />);
 
-    const emailButton = getByText('Sign in with Email');
-    fireEvent.press(emailButton);
+    expect(getByText('Continue with Google')).toBeTruthy();
+    expect(getByText('Continue with Apple')).toBeTruthy();
+    expect(getByText('Continue with phone')).toBeTruthy();
+  });
+
+  it('navigates to LoginEmail screen when phone button is pressed', () => {
+    const { getByText } = render(<LoginGlobalScreen />);
+
+    const phoneButton = getByText('Continue with phone');
+    fireEvent.press(phoneButton);
 
     expect(mockNavigate).toHaveBeenCalledWith('LoginEmail');
   });
@@ -84,13 +77,13 @@ describe('LoginGlobalScreen', () => {
 
     const { getByText, queryByText } = render(<LoginGlobalScreen />);
 
-    const appleButton = getByText('Sign in with Apple');
+    const appleButton = getByText('Continue with Apple');
     fireEvent.press(appleButton);
 
     // Apple button is loading (text is temporarily replaced by ActivityIndicator)
     // Google button remains rendered (but disabled)
-    expect(queryByText('Sign in with Apple')).toBeNull();
-    expect(getByText('Sign in with Google')).toBeTruthy();
+    expect(queryByText('Continue with Apple')).toBeNull();
+    expect(getByText('Continue with Google')).toBeTruthy();
     
     // Resolve the promise to clean up
     resolveLogin({
