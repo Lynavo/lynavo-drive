@@ -13,6 +13,12 @@ class AppleAuthModule: NSObject, ASAuthorizationControllerDelegate, ASAuthorizat
   }
   
   @objc
+  func constantsToExport() -> [AnyHashable : Any]! {
+    let market = Bundle.main.object(forInfoDictionaryKey: "SyncFlowMarket") as? String ?? "cn"
+    return ["SYNCFLOW_MARKET": market]
+  }
+  
+  @objc
   func login(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
     self.resolve = resolve
     self.reject = reject
