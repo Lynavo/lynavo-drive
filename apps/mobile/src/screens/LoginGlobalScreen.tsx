@@ -3,11 +3,14 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Modal,
   NativeModules,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
@@ -83,12 +86,28 @@ function PhoneIcon({ color = '#1a2a3a' }: { color?: string }) {
   );
 }
 
+const COUNTRY_CODES = [
+  { code: '+86', name: 'China (中国)', flag: '🇨🇳', minLength: 11, maxLength: 11 },
+  { code: '+1', name: 'United States / Canada', flag: '🇺🇸', minLength: 10, maxLength: 10 },
+  { code: '+44', name: 'United Kingdom', flag: '🇬🇧', minLength: 10, maxLength: 11 },
+  { code: '+81', name: 'Japan (日本)', flag: '🇯🇵', minLength: 10, maxLength: 10 },
+  { code: '+82', name: 'South Korea (韩国)', flag: '🇰🇷', minLength: 9, maxLength: 10 },
+  { code: '+65', name: 'Singapore (新加坡)', flag: '🇸🇬', minLength: 8, maxLength: 8 },
+  { code: '+852', name: 'Hong Kong (香港)', flag: '🇭🇰', minLength: 8, maxLength: 8 },
+  { code: '+886', name: 'Taiwan (台湾)', flag: '🇹🇼', minLength: 9, maxLength: 9 },
+  { code: '+61', name: 'Australia', flag: '🇦🇺', minLength: 9, maxLength: 9 },
+  { code: '+49', name: 'Germany', flag: '🇩🇪', minLength: 10, maxLength: 11 },
+  { code: '+33', name: 'France', flag: '🇫🇷', minLength: 9, maxLength: 9 },
+];
+
 export function LoginGlobalScreen() {
   const navigation = useNavigation<LoginGlobalNavProp>();
   const [method, setMethod] = useState<'email' | 'phone'>('email');
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pendingProvider, setPendingProvider] = useState<Provider | null>(null);
+  const [selectedCountry, setSelectedCountry] = useState(COUNTRY_CODES[0]);
+  const [isPickerVisible, setIsPickerVisible] = useState(false);
   const { login } = useAuth();
 
   const isPhoneMode = method === 'phone';
@@ -155,29 +174,42 @@ export function LoginGlobalScreen() {
   const handleInputChange = useCallback((val: string) => {
     if (isPhoneMode) {
       // Only allow digits for phone number
-      const digits = val.replace(/\D/g, '').slice(0, 11);
+      const digits = val.replace(/\D/g, '').slice(0, selectedCountry.maxLength);
       setInputValue(digits);
     } else {
       setInputValue(val.trim());
     }
     setError(null);
-  }, [isPhoneMode]);
+  }, [isPhoneMode, selectedCountry]);
 
   const handleContinue = useCallback(async () => {
     const trimmed = inputValue.trim();
     if (!trimmed) return;
 
     if (isPhoneMode) {
-      if (!isValidChinaPhone(trimmed)) {
-        setError('Please enter a valid phone number.');
+      const isChina = selectedCountry.code === '+86';
+      const isValid = isChina
+        ? isValidChinaPhone(trimmed)
+        : /^\d+$/.test(trimmed) &&
+          trimmed.length >= selectedCountry.minLength &&
+          trimmed.length <= selectedCountry.maxLength;
+
+      if (!isValid) {
+        setError(
+          isChina
+            ? 'Please enter a valid phone number.'
+            : `Please enter a valid ${selectedCountry.name} phone number.`,
+        );
         return;
       }
+
+      const fullPhone = selectedCountry.code + trimmed;
       setError(null);
       setPendingProvider('email'); // reuse indicator state
       try {
-        const { authBaseUrl } = await sendSmsCode(trimmed);
+        const { authBaseUrl } = await sendSmsCode(fullPhone);
         setPendingProvider(null);
-        navigation.navigate('SmsVerify', { phone: trimmed, authBaseUrl });
+        navigation.navigate('SmsVerify', { phone: fullPhone, authBaseUrl });
       } catch (err: any) {
         setPendingProvider(null);
         Alert.alert('Error', err.message || 'Failed to send SMS verification code.');
@@ -198,7 +230,7 @@ export function LoginGlobalScreen() {
         Alert.alert('Error', err.message || 'Failed to send email verification code.');
       }
     }
-  }, [inputValue, isPhoneMode, navigation]);
+  }, [inputValue, isPhoneMode, selectedCountry, navigation]);
 
   const handleOpenTerms = useCallback(() => {
     Linking.openURL(USER_AGREEMENT_URL);
@@ -299,12 +331,17 @@ export function LoginGlobalScreen() {
           >
             {isPhoneMode ? (
               <>
-                <View style={styles.phonePrefix}>
+                <TouchableOpacity
+                  accessibilityRole="combobox"
+                  onPress={() => setIsPickerVisible(true)}
+                  style={styles.phonePrefix}
+                >
                   <PhoneIcon color={AUTH_COLORS.textMuted} />
                   <Text {...authTextScalingProps} style={styles.prefixText}>
-                    +86
+                    {selectedCountry.code}
                   </Text>
-                </View>
+                  <Text style={styles.dropdownArrow}>▼</Text>
+                </TouchableOpacity>
                 <View style={styles.inputDivider} />
               </>
             ) : (
@@ -329,7 +366,7 @@ export function LoginGlobalScreen() {
               editable={!pendingProvider}
               returnKeyType="done"
               selectionColor={AUTH_COLORS.primary}
-              maxLength={isPhoneMode ? 11 : 128}
+              maxLength={isPhoneMode ? selectedCountry.maxLength : 128}
               onSubmitEditing={handleContinue}
             />
           </View>
@@ -370,6 +407,54 @@ export function LoginGlobalScreen() {
             .
           </Text>
         </View>
+
+        {/* Country Code Picker Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={isPickerVisible}
+          onRequestClose={() => setIsPickerVisible(false)}
+        >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setIsPickerVisible(false)}
+          >
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Country / Region</Text>
+                <TouchableOpacity
+                  onPress={() => setIsPickerVisible(false)}
+                  style={styles.modalCloseButton}
+                >
+                  <Text style={styles.modalCloseText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.countryList}>
+                {COUNTRY_CODES.map((country) => (
+                  <TouchableOpacity
+                    key={country.code}
+                    style={[
+                      styles.countryItem,
+                      selectedCountry.code === country.code
+                        ? styles.countryItemActive
+                        : null,
+                    ]}
+                    onPress={() => {
+                      setSelectedCountry(country);
+                      setIsPickerVisible(false);
+                      setInputValue('');
+                      setError(null);
+                    }}
+                  >
+                    <Text style={styles.countryFlag}>{country.flag}</Text>
+                    <Text style={styles.countryName}>{country.name}</Text>
+                    <Text style={styles.countryCodeText}>{country.code}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </Pressable>
+        </Modal>
       </View>
     </AuthScreenShell>
   );
@@ -528,5 +613,76 @@ const styles = StyleSheet.create({
   legalLink: {
     color: AUTH_COLORS.link,
     fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 20,
+    paddingBottom: 40,
+    maxHeight: '60%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: AUTH_COLORS.text,
+  },
+  modalCloseButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  modalCloseText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: AUTH_COLORS.primary,
+  },
+  countryList: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  countryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  countryItemActive: {
+    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+  },
+  countryFlag: {
+    fontSize: 20,
+    marginRight: 14,
+  },
+  countryName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    color: AUTH_COLORS.text,
+  },
+  countryCodeText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: AUTH_COLORS.textMuted,
+  },
+  dropdownArrow: {
+    fontSize: 8,
+    color: AUTH_COLORS.textMuted,
+    marginLeft: 2,
+    marginTop: 1,
   },
 });

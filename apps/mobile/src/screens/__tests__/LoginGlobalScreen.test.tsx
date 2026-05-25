@@ -113,9 +113,9 @@ describe('LoginGlobalScreen', () => {
     fireEvent.press(getByText('Continue'));
 
     await waitFor(() => {
-      expect(mockSendSmsCode).toHaveBeenCalledWith('13312345678');
+      expect(mockSendSmsCode).toHaveBeenCalledWith('+8613312345678');
       expect(mockNavigate).toHaveBeenCalledWith('SmsVerify', {
-        phone: '13312345678',
+        phone: '+8613312345678',
         authBaseUrl: 'https://api.vivi.cn',
       });
     });
