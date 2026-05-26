@@ -5,7 +5,7 @@ export const globalMarketConfig: MobileMarketConfig = {
   appName: 'Vivi Drop',
   bundleId: 'com.vividrop.mobile.global',
   apiBaseUrl: 'https://api.vividrop.com',
-  reviewApiBaseUrl: 'https://review-api.vividrop.com',
+  reviewApiBaseUrl: 'https://review-api.vividrop.cn',
   appReviewPhone: '17000000002',
   privacyUrl: 'https://www.vividrop.com/privacy',
   termsUrl: 'https://www.vividrop.com/terms',
