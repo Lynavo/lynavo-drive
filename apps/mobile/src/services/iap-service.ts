@@ -38,6 +38,7 @@ type PendingPurchase = {
   reject: (err: unknown) => void;
   timeout: ReturnType<typeof setTimeout>;
   transientErrorTimeout: ReturnType<typeof setTimeout> | null;
+  orphanResolveTimeout?: ReturnType<typeof setTimeout> | null;
   requestedAtMs: number;
 };
 
@@ -755,6 +756,10 @@ class IapServiceImpl implements IapService {
       clearTimeout(pending.transientErrorTimeout);
       pending.transientErrorTimeout = null;
     }
+    if (pending.orphanResolveTimeout) {
+      clearTimeout(pending.orphanResolveTimeout);
+      pending.orphanResolveTimeout = null;
+    }
   }
 
   private async handleOrphanPurchase(p: Purchase): Promise<void> {
@@ -822,6 +827,28 @@ class IapServiceImpl implements IapService {
         productId,
         plan,
       });
+
+      const pending = this.pendingPurchase.get(productId);
+      if (pending) {
+        if (pending.orphanResolveTimeout) {
+          clearTimeout(pending.orphanResolveTimeout);
+        }
+        pending.orphanResolveTimeout = setTimeout(() => {
+          if (this.pendingPurchase.get(productId) === pending) {
+            this.clearPendingTimers(pending);
+            this.pendingPurchase.delete(productId);
+            pending.resolve({
+              productId,
+              transactionReceipt: p.transactionReceipt,
+              transactionId: txId,
+            });
+            recordDiagnosticsLog('IAP', 'pending purchase resolved via orphan fallback after delay', {
+              productId,
+              transactionId: txId,
+            });
+          }
+        }, 3000);
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === ERROR_CODE.RECEIPT_ALREADY_USED) {
@@ -832,6 +859,28 @@ class IapServiceImpl implements IapService {
             productId,
             plan,
           });
+
+          const pending = this.pendingPurchase.get(productId);
+          if (pending) {
+            if (pending.orphanResolveTimeout) {
+              clearTimeout(pending.orphanResolveTimeout);
+            }
+            pending.orphanResolveTimeout = setTimeout(() => {
+              if (this.pendingPurchase.get(productId) === pending) {
+                this.clearPendingTimers(pending);
+                this.pendingPurchase.delete(productId);
+                pending.resolve({
+                  productId,
+                  transactionReceipt: p.transactionReceipt,
+                  transactionId: txId,
+                });
+                recordDiagnosticsLog('IAP', 'pending purchase resolved via orphan fallback (already used) after delay', {
+                  productId,
+                  transactionId: txId,
+                });
+              }
+            }, 3000);
+          }
           return;
         }
         if (err.code === ERROR_CODE.PRODUCT_ID_MISMATCH) {
