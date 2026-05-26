@@ -467,8 +467,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const iapLifecycleReady =
     state.isLoggedIn &&
     state.user != null &&
-    !state.isLoading &&
-    !state.profileLoading &&
     state.profileError == null;
   useIapLifecycle({ isLoggedIn: iapLifecycleReady, loadSubscription });
 

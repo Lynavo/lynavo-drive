@@ -16,7 +16,7 @@ describe('mobile market configs', () => {
   it('keeps global build on Apple and Google login with global endpoints', () => {
     expect(globalMarketConfig.market).toBe('global');
     expect(globalMarketConfig.loginProviders).toEqual(['apple', 'google']);
-    expect(globalMarketConfig.apiBaseUrl).toBe('https://api.vividrop.com');
+    expect(globalMarketConfig.apiBaseUrl).toBe('https://global-api.vividrop.cn');
     expect(globalMarketConfig.reviewApiBaseUrl).toBe('https://review-api.vividrop.cn');
     expect(globalMarketConfig.privacyUrl).toBe('https://www.vividrop.cn/privacy');
     expect(globalMarketConfig.termsUrl).toBe('https://www.vividrop.cn/terms');

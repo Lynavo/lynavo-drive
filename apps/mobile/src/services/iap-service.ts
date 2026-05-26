@@ -160,7 +160,14 @@ class IapServiceImpl implements IapService {
     this.purchaseSub = null;
     this.errorSub = null;
     try {
-      await endConnection();
+      await Promise.race([
+        endConnection(),
+        new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error('endConnection timed out')), 2000)
+        ),
+      ]).catch(err => {
+        console.warn('[iap-service] endConnection failed or timed out', err);
+      });
     } finally {
       this.initialized = false;
       this.teardownPromise = null;
@@ -417,7 +424,12 @@ class IapServiceImpl implements IapService {
   }
 
   private async ensureProductAvailable(productId: string): Promise<void> {
-    const products = await getSubscriptions({ skus: [productId] });
+    const products = await Promise.race([
+      getSubscriptions({ skus: [productId] }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('getSubscriptions timed out')), 15000)
+      ),
+    ]);
     if (products.some(product => product.productId === productId)) {
       return;
     }
