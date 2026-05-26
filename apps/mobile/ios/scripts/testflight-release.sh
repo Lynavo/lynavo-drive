@@ -236,16 +236,23 @@ verify_export_signing() {
     exit 1
   fi
 
+  local ipa_key
+  ipa_key="$(/usr/libexec/PlistBuddy -c "Print" "${summary}" | grep " = Array" | head -n 1 | sed 's/^[[:space:]]*//;s/[[:space:]]*=.*//')"
+  if [[ -z "${ipa_key}" ]]; then
+    echo "ERROR: Could not resolve IPA key from DistributionSummary.plist" >&2
+    exit 1
+  fi
+
   local cert_type
-  cert_type="$(/usr/libexec/PlistBuddy -c "Print :${SCHEME}.ipa:0:certificate:type" "${summary}")"
-  if [[ "${cert_type}" != "${IOS_EXPORT_SIGNING_CERTIFICATE}" ]]; then
+  cert_type="$(/usr/libexec/PlistBuddy -c "Print :\"${ipa_key}\":0:certificate:type" "${summary}")"
+  if [[ "${cert_type}" != "${IOS_EXPORT_SIGNING_CERTIFICATE}" && ! ("${cert_type}" == "Cloud Managed Apple Distribution" && "${IOS_EXPORT_SIGNING_CERTIFICATE}" == "Apple Distribution") ]]; then
     echo "ERROR: exported IPA signing certificate mismatch." >&2
     echo "Expected: ${IOS_EXPORT_SIGNING_CERTIFICATE}" >&2
     echo "Actual: ${cert_type}" >&2
     exit 1
   fi
 
-  echo "Export signing certificate verified: ${cert_type}"
+  echo "Export signing certificate verified: ${cert_type} (for ${ipa_key})"
 }
 
 export_ipa() {
