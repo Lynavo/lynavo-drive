@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render } from '@testing-library/react-native';
+import { fireEvent, render, act } from '@testing-library/react-native';
 
 const mockNavigate = jest.fn();
 
@@ -87,5 +87,49 @@ describe('CodeVerifyScreen', () => {
     fireEvent.press(getByText('查看詳細圖文教學 >'));
 
     expect(mockNavigate).toHaveBeenCalledWith('ConnectionTutorial');
+  });
+
+  it('triggers Alert.alert when pairDevice throws APP_VERSION_INCOMPATIBLE', async () => {
+    const { Alert, NativeModules } = require('react-native');
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    const mockPairDevice = jest.fn().mockRejectedValueOnce(
+      new Error('APP_VERSION_INCOMPATIBLE: version mismatch')
+    );
+    NativeModules.NativeSyncEngine = {
+      pairDevice: mockPairDevice,
+    };
+
+    const nav = require('@react-navigation/native');
+    jest.spyOn(nav, 'useRoute').mockReturnValue({
+      params: {
+        deviceId: 'device-1',
+        host: '192.168.1.8',
+        port: 39393,
+        deviceName: 'Studio Mac',
+        prefilledCode: '123456',
+      },
+    });
+
+    render(<CodeVerifyScreen />);
+
+    // Wait for the deferred submitCode timer (500ms) to fire
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 600));
+    });
+
+    expect(mockPairDevice).toHaveBeenCalledWith({
+      deviceId: 'device-1',
+      host: '192.168.1.8',
+      port: 39393,
+      connectionCode: '123456',
+    });
+    expect(alertSpy).toHaveBeenCalledWith(
+      '版本不相容',
+      '手機與電腦端的版本不相容，請將電腦端（桌面端）App 更新至最新版本後再試。',
+      [{ text: '好' }]
+    );
+    
+    alertSpy.mockRestore();
   });
 });
