@@ -95,7 +95,9 @@ export function LoginGlobalScreen() {
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pendingProvider, setPendingProvider] = useState<Provider | null>(null);
-  const [selectedCountry, setSelectedCountry] = useState(COUNTRY_CODES[0]);
+  const [selectedCountry, setSelectedCountry] = useState(
+    COUNTRY_CODES.find(c => c.iso === 'CN') || COUNTRY_CODES[0]
+  );
   const [isPickerVisible, setIsPickerVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { login } = useAuth();

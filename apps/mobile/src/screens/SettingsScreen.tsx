@@ -48,6 +48,7 @@ import { getGiftCardRedeemFailureTranslationKey } from '../services/gift-card-er
 import { wipeSyncIdentity } from '../services/SyncEngineModule';
 import { resetCurrentDesktopSidecarIfReachable } from '../services/sidecar-reset-service';
 import { clearUserScopedStorage } from '../utils/clearUserScopedStorage';
+import { maskPhone } from '../utils/phone-validation';
 import { FEATURES } from '../constants/features';
 import { iapService } from '../services/iap-service';
 import { classifyIapError } from '../services/iap-errors';
@@ -1084,13 +1085,15 @@ export function SettingsScreen() {
   const [isPhoneRevealed, setIsPhoneRevealed] = useState(false);
   const primaryIdentity = auth.user?.primaryIdentity;
   const rawPhoneIdentifier =
-    primaryIdentity?.type === 'phone_cn'
+    primaryIdentity?.type === 'phone_cn' || primaryIdentity?.type === 'phone'
       ? primaryIdentity.identifier
       : undefined;
   const canTogglePhoneReveal = Boolean(rawPhoneIdentifier);
   const accountDisplayValue =
     isPhoneRevealed && rawPhoneIdentifier
       ? rawPhoneIdentifier
+      : rawPhoneIdentifier
+      ? maskPhone(rawPhoneIdentifier)
       : primaryIdentity?.display ?? '';
 
   // Pretty-format the Apple expireAt for the "Cancelled — valid until X"
