@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,7 +46,14 @@ func (m *P2PManager) Stop() {
 
 func (m *P2PManager) connectSignaling(paired []map[string]string) {
 	dialer := websocket.Dialer{HandshakeTimeout: 10 * time.Second}
-	url := m.serverURL + "/api/v1/tunnel/signaling?role=desktop&clientId=" + m.desktopID + "&token=" + m.authToken
+
+	wsURL := m.serverURL
+	if strings.HasPrefix(wsURL, "https://") {
+		wsURL = "wss://" + strings.TrimPrefix(wsURL, "https://")
+	} else if strings.HasPrefix(wsURL, "http://") {
+		wsURL = "ws://" + strings.TrimPrefix(wsURL, "http://")
+	}
+	url := wsURL + "/api/v1/tunnel/signaling?role=desktop&clientId=" + m.desktopID + "&token=" + m.authToken
 
 	backoff := time.Second
 	const maxBackoff = 60 * time.Second
@@ -228,15 +236,14 @@ func (m *P2PManager) createPeerConnection(signalingConn *safeWriteConn, mobileID
 				d.Close()
 				return
 			}
-			d.OnOpen(func() {
-				wrapper := NewDataChannelWrapper(d)
-				session, err := yamux.Server(wrapper, nil)
-				if err != nil {
-					slog.Error("yamux server creation failed", "err", err)
-					return
-				}
-				go m.acceptYamuxStreams(session)
-			})
+			// Directly start Yamux Server on receipt of incoming DataChannel since it is already open
+			wrapper := NewDataChannelWrapper(d)
+			session, err := yamux.Server(wrapper, nil)
+			if err != nil {
+				slog.Error("yamux server creation failed", "err", err, "mobileId", mobileID)
+				return
+			}
+			go m.acceptYamuxStreams(session)
 		}
 	})
 

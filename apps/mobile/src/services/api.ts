@@ -2,6 +2,7 @@ import i18next from 'i18next';
 import { NativeModules, Platform } from 'react-native';
 import { getAccessToken, getRefreshToken } from '../stores/auth-store';
 import { describeInsecureBaseUrl, getBaseUrl } from './config';
+import { maskPhone } from '../utils/phone-validation';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -242,13 +243,9 @@ async function request<T>(
           type = 'email';
           display = rawVal;
         } else {
-          // Format phone display: mask middle digits (e.g. +8617000000002 -> +86170****0002)
+          // Format phone display: mask middle digits using the unified utility
           type = rawVal.startsWith('+86') || /^\d{11}$/.test(rawVal) ? 'phone_cn' : 'phone';
-          if (rawVal.length > 7) {
-            display = rawVal.substring(0, rawVal.length - 8) + '****' + rawVal.substring(rawVal.length - 4);
-          } else {
-            display = rawVal;
-          }
+          display = maskPhone(rawVal);
         }
       }
       return {
