@@ -24,5 +24,7 @@
   "responseParseError": "响应解析失败",
   "profileLoadFailed": "加载用户信息失败",
   "profileLoadTitle": "无法加载账号信息",
-  "accountDeleteFailed": "删除帐号失败，请稍后再试"
+  "accountDeleteFailed": "删除帐号失败，请稍后再试",
+  "pairingVersionMismatchTitle": "版本不兼容",
+  "pairingVersionMismatchMessage": "手机与电脑端的版本不兼容，请将电脑端（桌面端）App 更新至最新版本后再试。"
 }

@@ -24,5 +24,7 @@
   "responseParseError": "Failed to parse response.",
   "profileLoadFailed": "Failed to load user profile.",
   "profileLoadTitle": "Unable to Load Account Info",
-  "accountDeleteFailed": "Could not delete your account. Please try again later."
+  "accountDeleteFailed": "Could not delete your account. Please try again later.",
+  "pairingVersionMismatchTitle": "Version Incompatible",
+  "pairingVersionMismatchMessage": "The app versions on your mobile device and computer are incompatible. Please update the desktop app to the latest version and try again."
 }
