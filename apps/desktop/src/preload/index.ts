@@ -19,6 +19,9 @@ const IPC = {
   SIDECAR_REDEEM_GIFT_CARD: 'sidecar:redeem-gift-card',
   AUTH_SEND_SMS_CODE: 'auth:send-sms-code',
   AUTH_LOGIN_WITH_SMS_CODE: 'auth:login-with-sms-code',
+  AUTH_GET_SESSION: 'auth:get-session',
+  AUTH_LOGOUT: 'auth:logout',
+  AUTH_LOGIN_WITH_OAUTH: 'auth:login-with-oauth',
   SIDECAR_REGENERATE_CODE: 'sidecar:regenerate-code',
   SIDECAR_RUNTIME_STATE: 'sidecar:runtime-state',
   SIDECAR_RETRY_START: 'sidecar:retry-start',
@@ -81,6 +84,10 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC.AUTH_SEND_SMS_CODE, payload),
     loginWithSMSCode: (payload: { phone: string; code: string }) =>
       ipcRenderer.invoke(IPC.AUTH_LOGIN_WITH_SMS_CODE, payload),
+    getAuthSession: () => ipcRenderer.invoke(IPC.AUTH_GET_SESSION),
+    logout: () => ipcRenderer.invoke(IPC.AUTH_LOGOUT),
+    loginWithOAuth: (payload: { provider: 'google' | 'apple' }) =>
+      ipcRenderer.invoke(IPC.AUTH_LOGIN_WITH_OAUTH, payload),
   },
   events: {
     onSidecarEvent: (callback) => {

@@ -103,6 +103,16 @@ export interface ElectronAPI {
         | 'sms_max_attempts'
         | 'session_replaced';
     }>;
+    getAuthSession(): Promise<{
+      accessToken: string;
+      refreshToken: string;
+    } | null>;
+    logout(): Promise<{ ok: boolean }>;
+    loginWithOAuth(payload: { provider: 'google' | 'apple' }): Promise<{
+      ok: boolean;
+      message?: string;
+      reason?: string;
+    }>;
   };
   events: {
     onSidecarEvent(callback: (event: SidecarEvent) => void): () => void;
