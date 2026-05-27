@@ -1,16 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Gift, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Button } from '@renderer/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@renderer/components/ui/dialog';
+import { LoginDialog } from '@renderer/components/shared/LoginDialog';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
 
@@ -62,6 +55,22 @@ function extractErrorText(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function decodeJWT(token: string): { phone?: string } | null {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(''),
+    );
+    return JSON.parse(jsonPayload) as { phone?: string };
+  } catch {
+    return null;
+  }
+}
+
 function getRedeemErrorMessage(result: RedeemResult, t: (key: string) => string): string {
   switch (result.reason) {
     case 'auth_required':
@@ -81,36 +90,6 @@ function getRedeemErrorMessage(result: RedeemResult, t: (key: string) => string)
   }
 }
 
-function getSMSSendErrorMessage(result: AuthResult, t: (key: string) => string): string {
-  switch (result.reason) {
-    case 'phone_invalid':
-      return t('errors.settings.phoneInvalid');
-    case 'sms_too_frequent':
-      return t('errors.settings.smsTooFrequent');
-    case 'sms_send_failed':
-      return t('errors.settings.smsSendFailed');
-    default:
-      return result.message || t('errors.settings.sendSMSCodeFailed');
-  }
-}
-
-function getSMSLoginErrorMessage(result: AuthResult, t: (key: string) => string): string {
-  switch (result.reason) {
-    case 'phone_invalid':
-      return t('errors.settings.phoneInvalid');
-    case 'sms_code_invalid':
-      return t('errors.settings.smsCodeInvalid');
-    case 'sms_code_expired':
-      return t('errors.settings.smsCodeExpired');
-    case 'sms_max_attempts':
-      return t('errors.settings.smsMaxAttempts');
-    case 'session_replaced':
-      return t('errors.settings.sessionReplaced');
-    default:
-      return result.message || t('errors.settings.loginWithSMSCodeFailed');
-  }
-}
-
 export function GiftCardSection() {
   const { t } = useTranslation();
   const [code, setCode] = useState('');
@@ -118,10 +97,44 @@ export function GiftCardSection() {
   const [lastResult, setLastResult] = useState<ResultState | null>(null);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const [pendingRedeemCode, setPendingRedeemCode] = useState('');
-  const [phone, setPhone] = useState('');
-  const [smsCode, setSMSCode] = useState('');
-  const [isSendingCode, setIsSendingCode] = useState(false);
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [session, setSession] = useState<{ accessToken: string } | null>(null);
+
+  const checkSession = useCallback(async () => {
+    const auth = getRuntimeAuthAPI();
+    if (auth?.getAuthSession) {
+      try {
+        const sess = await auth.getAuthSession();
+        setSession(sess);
+      } catch (error) {
+        console.error('Failed to get auth session:', error);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    void checkSession();
+  }, [checkSession]);
+
+  const handleLogout = useCallback(async () => {
+    const auth = getRuntimeAuthAPI();
+    if (!auth?.logout) {
+      toast.error('Auth API unavailable');
+      return;
+    }
+    try {
+      const res = await auth.logout();
+      if (res.ok) {
+        toast.success(t('settings.giftCard.phoneLogin.logoutSuccess', { defaultValue: '已成功登出' }));
+        setSession(null);
+      } else {
+        toast.error('Logout failed');
+      }
+    } catch (error) {
+      toast.error('Logout error', {
+        description: extractErrorText(error, 'Logout error'),
+      });
+    }
+  }, [t]);
 
   const performRedeem = useCallback(async (trimmedCode: string, openLoginOnAuth: boolean) => {
     const api = window.electronAPI?.sidecar;
@@ -143,11 +156,7 @@ export function GiftCardSection() {
         toast.success(t('settings.giftCard.redeemSuccess'));
         return true;
       } else {
-        if (
-          result.reason === 'auth_required' &&
-          openLoginOnAuth &&
-          getRuntimeAuthAPI()?.loginWithSMSCode
-        ) {
+        if (result.reason === 'auth_required' && openLoginOnAuth) {
           setPendingRedeemCode(trimmedCode);
           setLoginDialogOpen(true);
           toast.message(t('settings.giftCard.phoneLogin.loginRequired'));
@@ -190,85 +199,18 @@ export function GiftCardSection() {
     }
   }, [code, performRedeem, t]);
 
-  const handleSendSMSCode = useCallback(async () => {
-    const trimmedPhone = phone.trim();
-    if (!trimmedPhone) {
-      toast.error(t('errors.settings.phoneRequired'));
-      return;
-    }
-
-    const auth = getRuntimeAuthAPI();
-    if (!auth?.sendSMSCode) {
-      toast.error(t('errors.settings.authUnavailable'));
-      return;
-    }
-
-    setIsSendingCode(true);
-    try {
-      const result: AuthResult = await auth.sendSMSCode({ phone: trimmedPhone });
-      if (result.ok) {
-        toast.success(t('settings.giftCard.phoneLogin.codeSent'));
-      } else {
-        toast.error(getSMSSendErrorMessage(result, t));
+  const handleLoginSuccess = useCallback(async () => {
+    await checkSession();
+    if (pendingRedeemCode) {
+      setIsSubmitting(true);
+      try {
+        await performRedeem(pendingRedeemCode, false);
+      } finally {
+        setIsSubmitting(false);
+        setPendingRedeemCode('');
       }
-    } catch (error) {
-      toast.error(t('errors.settings.sendSMSCodeFailed'), {
-        description: extractErrorText(error, t('errors.settings.sendSMSCodeFailed')),
-      });
-    } finally {
-      setIsSendingCode(false);
     }
-  }, [phone, t]);
-
-  const handleLoginAndRedeem = useCallback(async () => {
-    const trimmedPhone = phone.trim();
-    const trimmedSMSCode = smsCode.trim();
-    if (!trimmedPhone) {
-      toast.error(t('errors.settings.phoneRequired'));
-      return;
-    }
-    if (!trimmedSMSCode) {
-      toast.error(t('errors.settings.smsCodeRequired'));
-      return;
-    }
-
-    const auth = getRuntimeAuthAPI();
-    if (!auth?.loginWithSMSCode) {
-      toast.error(t('errors.settings.authUnavailable'));
-      return;
-    }
-
-    setIsLoggingIn(true);
-    try {
-      const loginResult: AuthResult = await auth.loginWithSMSCode({
-        phone: trimmedPhone,
-        code: trimmedSMSCode,
-      });
-      if (!loginResult.ok) {
-        toast.error(getSMSLoginErrorMessage(loginResult, t));
-        return;
-      }
-
-      toast.success(t('settings.giftCard.phoneLogin.loginSuccess'));
-      setLoginDialogOpen(false);
-      setSMSCode('');
-
-      if (pendingRedeemCode) {
-        setIsSubmitting(true);
-        try {
-          await performRedeem(pendingRedeemCode, false);
-        } finally {
-          setIsSubmitting(false);
-        }
-      }
-    } catch (error) {
-      toast.error(t('errors.settings.loginWithSMSCodeFailed'), {
-        description: extractErrorText(error, t('errors.settings.loginWithSMSCodeFailed')),
-      });
-    } finally {
-      setIsLoggingIn(false);
-    }
-  }, [pendingRedeemCode, performRedeem, phone, smsCode, t]);
+  }, [pendingRedeemCode, performRedeem, checkSession]);
 
   return (
     <>
@@ -283,6 +225,44 @@ export function GiftCardSection() {
             </h3>
             <p className="text-xs text-muted-foreground">{t('settings.giftCard.description')}</p>
           </div>
+        </div>
+
+        {/* Account login/logout section */}
+        <div className="mb-5 flex items-center justify-between border-b border-border/50 pb-4">
+          <div className="flex flex-col">
+            <span className="text-xs font-semibold text-foreground">
+              {t('settings.giftCard.phoneLogin.accountStatus', { defaultValue: '帳號狀態' })}
+            </span>
+            <span className="text-xs text-muted-foreground mt-0.5">
+              {session ? (
+                <>
+                  {t('settings.giftCard.phoneLogin.loggedInAs', { defaultValue: '已登入' })}
+                  {decodeJWT(session.accessToken)?.phone ? ` (${decodeJWT(session.accessToken)?.phone})` : ''}
+                </>
+              ) : (
+                t('settings.giftCard.phoneLogin.notLoggedIn', { defaultValue: '尚未登入' })
+              )}
+            </span>
+          </div>
+          {session ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void handleLogout()}
+            >
+              {t('settings.giftCard.phoneLogin.logout', { defaultValue: '登出' })}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setLoginDialogOpen(true)}
+            >
+              {t('settings.giftCard.phoneLogin.login', { defaultValue: '登入' })}
+            </Button>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -324,71 +304,11 @@ export function GiftCardSection() {
         ) : null}
       </div>
 
-      <Dialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('settings.giftCard.phoneLogin.title')}</DialogTitle>
-            <DialogDescription>
-              {t('settings.giftCard.phoneLogin.description')}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="gift-card-phone">
-                {t('settings.giftCard.phoneLogin.phoneLabel')}
-              </Label>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  id="gift-card-phone"
-                  value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
-                  placeholder={t('settings.giftCard.phoneLogin.phonePlaceholder')}
-                  disabled={isLoggingIn}
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => void handleSendSMSCode()}
-                  disabled={isSendingCode || isLoggingIn || phone.trim().length === 0}
-                  className="w-full sm:w-auto"
-                >
-                  {isSendingCode ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    t('settings.giftCard.phoneLogin.sendCode')
-                  )}
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="gift-card-sms-code">
-                {t('settings.giftCard.phoneLogin.codeLabel')}
-              </Label>
-              <Input
-                id="gift-card-sms-code"
-                value={smsCode}
-                onChange={(event) => setSMSCode(event.target.value)}
-                placeholder={t('settings.giftCard.phoneLogin.codePlaceholder')}
-                disabled={isLoggingIn}
-                maxLength={12}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              onClick={() => void handleLoginAndRedeem()}
-              disabled={isLoggingIn || !phone.trim() || !smsCode.trim()}
-            >
-              {isLoggingIn ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                t('settings.giftCard.phoneLogin.loginAndRedeem')
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <LoginDialog
+        open={loginDialogOpen}
+        onOpenChange={setLoginDialogOpen}
+        onLoginSuccess={handleLoginSuccess}
+      />
     </>
   );
 }
