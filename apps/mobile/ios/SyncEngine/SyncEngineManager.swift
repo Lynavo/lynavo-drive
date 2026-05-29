@@ -213,7 +213,7 @@ private func syncDiagnosticsDumpToConsole(_ lines: [String]) {
 }
 
 @objc
-class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegate {
+class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegate, BackgroundUploadBindingSource {
     static let shared = SyncEngineManager()
 
     private enum BindingConnectionState: String {
@@ -222,6 +222,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         case connecting
         case connected
         case offline
+    }
+
+    private struct P2PTunnelCredentials: Equatable {
+        let signalingURL: String
+        let accessToken: String
+        let iceServersJSON: String
     }
 
     let discoveryService = DiscoveryService()
@@ -237,6 +243,25 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private var autoUploadConfigStore: AutoUploadConfigStore?
     private var manualUploadService: ManualUploadService?
     let sharedFilesService = SharedFilesService()
+    /// Live snapshot of the current binding. Takes priority over SQLite in
+    /// BackgroundUploadService.resolveCurrentBinding() so a just-paired
+    /// binding is visible before the row is flushed. Written by the pairing /
+    /// restore paths via `persistBinding(_:)`. Cleared by `clearBinding` /
+    /// wipe / logout paths.
+    private(set) var currentBinding: StoredBinding?
+    /// Set while the app is transitioning to background. The foreground TCP
+    /// upload loop observes this between files and breaks out so the
+    /// BackgroundUploadService can take over.
+    var isTransitioningToBackground = false
+    let backgroundUploadService = BackgroundUploadService.shared
+    /// Timeout / poll tuning for `transitionToBackgroundUpload`. Expressed as
+    /// private static lets so unit-level reasoning sees concrete numbers.
+    private static let transitionBackgroundWaitTimeoutSeconds: UInt64 = 25
+    private static let transitionPollIntervalMilliseconds: UInt64 = 100
+    /// Timeout for DELETE /upload cross-protocol reset. Not a background
+    /// URLSession request — fires on the short-lived HTTP client used by
+    /// `sidecarResetUpload`.
+    private static let crossProtocolResetDeleteTimeoutSeconds: TimeInterval = 10
     private var isAutoUploadInterrupted = false
     private var shouldAbortActiveAutoUpload = false
     private var shouldAbortActiveManualUpload = false
@@ -278,7 +303,52 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         config.timeoutIntervalForResource = 5
         return URLSession(configuration: config)
     }()
-    private var transitionBackgroundTaskId: UIBackgroundTaskIdentifier = .invalid
+    /// M8 — ref-counted background-transition assertion (FU5: state machine
+    /// extracted to `BackgroundTransitionRefCount` so it can be unit-tested
+    /// without UIKit).
+    ///
+    /// `appDidEnterBackground` and `transitionToBackgroundUpload` both call
+    /// `beginBackgroundTransitionIfNeeded` / `endBackgroundTransitionIfNeeded`
+    /// and nest: the outer pair spans the whole transition, the inner pair
+    /// only wraps the `transitionToBackgroundUpload` async body (via
+    /// `defer`). A pure bool / `== .invalid` gate would release the outer
+    /// UIApplication assertion the moment the inner `defer end()` ran,
+    /// leaving the outer caller with nothing to back it. The helper counts
+    /// open scopes and only ends the real UIApplication task when the count
+    /// drops back to zero; `forceEnd` clamps the count on terminal cleanup
+    /// paths.
+    private lazy var backgroundTransitionRefCount: BackgroundTransitionRefCount<UIBackgroundTaskIdentifier> = {
+        return BackgroundTransitionRefCount<UIBackgroundTaskIdentifier>(
+            invalidToken: .invalid,
+            acquire: { [weak self] in
+                guard let self = self else { return .invalid }
+                return self.backgroundService.beginTransitionTask()
+            },
+            release: { [weak self] token in
+                self?.backgroundService.endTransitionTask(token)
+            },
+            log: { event, reason, refCount in
+                // Preserve the exact log phrasing from the pre-extraction
+                // implementation so diagnostic log greps keep matching.
+                let phrase: String
+                switch event {
+                case "began": phrase = "began transition task"
+                case "nestedBegin": phrase = "nested begin transition"
+                case "ended": phrase = "ended transition task"
+                case "nestedEnd": phrase = "nested end transition"
+                case "forceEnded": phrase = "force-ended transition task"
+                default: phrase = "\(event) transition task"
+                }
+                if event == "forceEnded" {
+                    NSLog("[BackgroundExec] %@ reason=%@", phrase, reason)
+                    syncDiagnosticsLog("BackgroundExec", "\(phrase) reason=\(reason)")
+                } else {
+                    NSLog("[BackgroundExec] %@ reason=%@ refCount=%d", phrase, reason, refCount)
+                    syncDiagnosticsLog("BackgroundExec", "\(phrase) reason=\(reason) refCount=\(refCount)")
+                }
+            }
+        )
+    }()
     private var bindingConnectionState: BindingConnectionState = .offline
     private var presenceHeartbeatTimer: DispatchSourceTimer?
     private let presenceRecoveryQueue = DispatchQueue(
@@ -290,6 +360,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private let presenceRecoveryLock = NSLock()
     private var presenceRecoveryToken = UUID()
     private var presenceRecoveryWorkItem: DispatchWorkItem?
+    private let localTCPProxy = LocalTCPProxy()
+    private let p2pTunnelQueue = DispatchQueue(
+        label: "com.syncflow.p2p-tunnel",
+        qos: .utility
+    )
+    private var p2pTunnelCredentials: P2PTunnelCredentials?
+    private var p2pTunnelGeneration = 0
+    private var p2pTunnelStarting = false
     private let diagnosticsIssueLock = NSLock()
     private var recentRetryDiagnostic: [String: Any]?
     private var recentErrorDiagnostic: [String: Any]?
@@ -1087,6 +1165,19 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         return token
     }
 
+    /// True when the TCP loop has already consumed the armed continuation
+    /// matching `expectedToken` — i.e. the loop reached a file boundary and
+    /// signalled us via `resumeWatchLoopIfNeeded()`, clearing the shared slot.
+    /// Also true if the slot is empty (nothing armed) or if a newer token has
+    /// taken over (our armed sentinel is no longer relevant).
+    private func isTCPLoopAtFileBoundary(expectedToken: UUID) -> Bool {
+        watchLoopContinuationLock.lock()
+        defer { watchLoopContinuationLock.unlock() }
+        if watchLoopContinuation == nil { return true }
+        if watchLoopContinuationToken != expectedToken { return true }
+        return false
+    }
+
     private func resumeWatchLoopIfNeeded(expectedToken: UUID? = nil) {
         watchLoopContinuationLock.lock()
         guard let continuation = watchLoopContinuation else {
@@ -1114,6 +1205,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             albumBrowserService = AlbumBrowserService(uploadStore: uploadStore)
             autoUploadConfigStore = AutoUploadConfigStore(store: uploadStore!)
             manualUploadService = ManualUploadService(uploadStore: uploadStore, bindingService: bindingService)
+            // Wire the binding-version accessor (H2): BindingService reads /
+            // bumps the `binding_version` meta row through UploadStore, so
+            // both `currentBindingVersion()` and `bumpBindingVersion()` need
+            // the store reference before any pair completes.
+            bindingService.uploadStore = uploadStore
             photoScanner.autoUploadConfigStore = autoUploadConfigStore
             albumBrowserService?.autoUploadConfigStore = autoUploadConfigStore
 
@@ -1144,6 +1240,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         if uploadStore?.getBinding() != nil {
             bindingConnectionState = .bound
         }
+        refreshCurrentBindingFromStore()
         discoveryService.delegate = self
         photoScanner.delegate = self
 
@@ -1167,10 +1264,47 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         )
         // Sweep leftover export temp files from previous sessions (crash / jetsam kills leave
         // large video files on disk that accumulate across launches and cause OOM).
+        //
+        // Phase 3.6: DO NOT delete temp files still referenced by
+        // upload_items.temp_file_path — those are the prepared HTTP bodies
+        // that BackgroundUploadService hands to URLSession. Unconditional
+        // removal here would orphan every in-flight background upload and
+        // cause a 422 body_size_mismatch chain on relaunch.
         let exportTempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("syncflow_export", isDirectory: true)
-        try? FileManager.default.removeItem(at: exportTempDir)
-        slog("[SyncEngine] cleared export temp dir on init")
+        let preservePaths: Set<String> = Set(
+            (uploadStore?.getItemsWithTempFiles() ?? [])
+                .compactMap { $0.tempFilePath }
+                .filter { !$0.isEmpty }
+        )
+        if FileManager.default.fileExists(atPath: exportTempDir.path) {
+            if preservePaths.isEmpty {
+                try? FileManager.default.removeItem(at: exportTempDir)
+                slog("[SyncEngine] cleared export temp dir on init")
+            } else {
+                var preservedCount = 0
+                var deletedCount = 0
+                if let entries = try? FileManager.default.contentsOfDirectory(
+                    at: exportTempDir,
+                    includingPropertiesForKeys: nil,
+                    options: []
+                ) {
+                    for entry in entries {
+                        if preservePaths.contains(entry.path) {
+                            preservedCount += 1
+                            continue
+                        }
+                        try? FileManager.default.removeItem(at: entry)
+                        deletedCount += 1
+                    }
+                }
+                slog(
+                    "[SyncEngine] export temp dir sweep: preserved=%d deleted=%d (prepared HTTP bodies kept)",
+                    preservedCount,
+                    deletedCount
+                )
+            }
+        }
 
         // Start the passive network-path observer. Pure instrumentation:
         // it only writes to SyncDiagnosticsLogStore so the diagnostic
@@ -1185,14 +1319,153 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         slog("[SyncEngine] app entered background, isSyncing=\(isSyncing)")
         guard isSyncing else { return }
         beginBackgroundTransitionIfNeeded(reason: "didEnterBackground")
+        isTransitioningToBackground = true
         if sessionService.state == .syncingForeground {
             sessionService.transitionTo(.syncingBackground)
         }
+        Task { [weak self] in
+            await self?.transitionToBackgroundUpload()
+        }
+    }
+
+    /// Invoked when the app moves to background while a foreground TCP upload
+    /// loop is in flight. Waits (bounded) for the active FILE to drain so we
+    /// don't slice mid-FILE_DATA, then hands off the next queue-head file to
+    /// BackgroundUploadService for URLSession background transport.
+    ///
+    /// The wait path uses `watchLoopContinuation` so the existing foreground
+    /// loop can `resumeWatchLoopIfNeeded()` as soon as it detects
+    /// `isTransitioningToBackground == true` between files.
+    private func transitionToBackgroundUpload() async {
+        beginBackgroundTransitionIfNeeded(reason: "transitionToBackgroundUpload")
+        defer { endBackgroundTransitionIfNeeded(reason: "transitionToBackgroundUpload") }
+
+        // Clear the "foreground resume requested" flag before we enqueue a
+        // new background URLSession task. The flag is set every time the app
+        // enters the foreground (see appWillEnterForeground); without this
+        // clear, any subsequent bg→fg→bg cycle would leave it stuck true
+        // forever and chainNextIfAppropriate() would refuse to queue the
+        // next file after the first background completion.
+        //
+        // It must be cleared here (not in appDidEnterBackground) because
+        // background enqueue flows through transitionToBackgroundUpload
+        // only — clearing too early would also miss any direct call paths
+        // that bypass appDidEnterBackground.
+        backgroundUploadService.clearForegroundResumeRequest()
+
+        // (1) Install a sentinel watchLoopContinuation so the foreground TCP
+        //     loop can wake us at the next file boundary. The previous
+        //     implementation used `withTaskGroup` + `withCheckedContinuation`
+        //     racing against a timeout child; because `withCheckedContinuation`
+        //     does NOT exit on task cancellation, the group never returned if
+        //     the timeout branch won — the continuation child stayed suspended
+        //     waiting for `resume()`, `withTaskGroup` implicitly awaited all
+        //     children, and the handoff permanently deadlocked.
+        //
+        //     We now install a continuation whose ONLY purpose is to carry a
+        //     token the TCP loop can use to signal "I reached a file
+        //     boundary". We then poll-sleep on a bounded deadline instead of
+        //     awaiting the continuation. If the TCP loop resumes the
+        //     continuation (via `resumeWatchLoopIfNeeded()` in the file-boundary
+        //     check), it is cleared from the shared slot and the poll observes
+        //     that as "at file boundary". If the deadline elapses first the
+        //     poll exits; `resumeWatchLoopIfNeeded(expectedToken:)` below
+        //     cleans up whatever is still armed under our token.
+        let token = UUID()
+        // Park a sentinel continuation in the shared slot from a detached
+        // Task. The Task suspends on `withCheckedContinuation` until either
+        // the TCP loop (file boundary) or our own timeout path below calls
+        // `resumeWatchLoopIfNeeded(expectedToken: token)`, which resumes the
+        // sentinel and lets the detached Task finish. No continuation leak.
+        //
+        // We `await` an install-ack signal before starting the poll loop so
+        // there is no race where the poll observes an empty slot before the
+        // detached Task has parked the sentinel.
+        await withCheckedContinuation { (installAck: CheckedContinuation<Void, Never>) in
+            Task.detached { [weak self] in
+                guard let self else {
+                    installAck.resume()
+                    return
+                }
+                await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                    self.watchLoopContinuationLock.lock()
+                    if let existing = self.watchLoopContinuation {
+                        existing.resume()
+                    }
+                    self.watchLoopContinuation = cont
+                    self.watchLoopContinuationToken = token
+                    self.watchLoopContinuationLock.unlock()
+                    // Slot is now armed with our sentinel; unblock the caller
+                    // to begin its deadline-bounded poll.
+                    installAck.resume()
+                }
+            }
+        }
+
+        let deadline = Date().addingTimeInterval(
+            TimeInterval(Self.transitionBackgroundWaitTimeoutSeconds)
+        )
+        while Date() < deadline {
+            if isTCPLoopAtFileBoundary(expectedToken: token) {
+                break
+            }
+            try? await Task.sleep(
+                nanoseconds: Self.transitionPollIntervalMilliseconds * 1_000_000
+            )
+        }
+        // On both exit paths (file-boundary reached OR timeout elapsed) we
+        // must resume any still-armed continuation under our token so the
+        // detached Task above unblocks and releases resources.
+        resumeWatchLoopIfNeeded(expectedToken: token)
+
+        // (2) Hand off to the background upload service, if we still have a
+        //     binding. Preparation is disabled here because the foreground
+        //     loop is responsible for exporting the next asset; the
+        //     background path only enqueues an already-prepared body.
+        //
+        //     M7 / Spec L52: the fast path is explicitly budgeted
+        //     `BackgroundUploadService.backgroundTransitionPreparationBudgetSeconds`
+        //     for export/SHA256 work. That constant is currently 0, so
+        //     `allowPreparation` MUST be false here — any row without a
+        //     prepared body is deferred to the next BGProcessing wake-up
+        //     where preparation is actually budgeted. If the constant ever
+        //     grows non-zero, this call site is the single place to
+        //     branch on it.
+        precondition(
+            BackgroundUploadService.backgroundTransitionPreparationBudgetSeconds == 0,
+            "M7: transitionToBackgroundUpload assumes zero preparation budget — re-evaluate allowPreparation before raising the constant"
+        )
+        guard let binding = currentBinding else {
+            NSLog("[SyncEngine] background handoff skipped — no current binding")
+            return
+        }
+        let clientId = bindingService.getOrCreateClientId()
+        let result = await backgroundUploadService.enqueueNextPendingFileIfIdle(
+            binding: binding,
+            clientId: clientId,
+            allowPreparation: false
+        )
+        NSLog("[SyncEngine] background handoff result=%@", "\(result)")
+        syncDiagnosticsLog(
+            "SyncEngine",
+            "background handoff result=\(result) clientId=\(clientId.prefix(8))…"
+        )
     }
 
     @objc private func appWillEnterForeground() {
         slog("[SyncEngine] app entering foreground")
+        isTransitioningToBackground = false
+        backgroundUploadService.requestForegroundResumeAfterBackgroundTask()
         endBackgroundTransitionIfNeeded(reason: "willEnterForeground")
+        // M7 / Spec L49: `BackgroundUploadService.foregroundBannerForRepairDelaySeconds`
+        // is the (currently 0) delay between this foreground transition
+        // and surfacing a repair banner when needs_repair is true. With
+        // the value pinned at 0 no DispatchQueue.asyncAfter hop is
+        // required — the RN layer reads needs_repair on the next render
+        // pass immediately after this method returns. Any future
+        // non-zero value should schedule the banner on this queue using
+        // the constant; wiring lives on the RN side today so no hard
+        // reference appears here yet.
         if sessionService.state == .syncingBackground {
             sessionService.transitionTo(.syncingForeground)
         }
@@ -1330,7 +1603,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         guard !changedFields.isEmpty else { return }
 
         do {
-            try uploadStore?.saveBinding(binding)
+            try persistBinding(binding)
             syncDiagnosticsLog(
                 "SyncEngine",
                 "binding metadata refreshed fields=\(changedFields.joined(separator: ",")) serverName=\(binding.deviceName)"
@@ -1360,8 +1633,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         if newState == .connected {
             cancelPresenceRecoveryProbe(reason: "state_connected")
             startPresenceHeartbeatTimer()
+            startP2PTunnelIfNeeded(reason: "state_connected")
         } else {
             stopPresenceHeartbeatTimer()
+            stopP2PTunnel(reason: "state_\(newState.rawValue)")
         }
     }
 
@@ -1375,7 +1650,116 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         syncDiagnosticsLog("SyncEngine", "binding connection state remains connected (\(reason))")
         cancelPresenceRecoveryProbe(reason: reason)
         startPresenceHeartbeatTimer()
+        startP2PTunnelIfNeeded(reason: reason)
         emitBindingStateChanged()
+    }
+
+    func setTunnelCredentials(signalingURL: String, accessToken: String, iceServersJSON: String) {
+        let trimmedURL = signalingURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedToken = accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedIceServersJSON = iceServersJSON.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmedURL.isEmpty, !trimmedToken.isEmpty else {
+            p2pTunnelQueue.async { [weak self] in
+                guard let self else { return }
+                self.p2pTunnelCredentials = nil
+                self.stopP2PTunnelLocked(reason: "credentials_cleared")
+                slog("[SyncEngine] tunnel credentials cleared")
+                syncDiagnosticsLog("SyncEngine", "tunnel credentials cleared")
+            }
+            return
+        }
+
+        let credentials = P2PTunnelCredentials(
+            signalingURL: trimmedURL,
+            accessToken: trimmedToken,
+            iceServersJSON: trimmedIceServersJSON
+        )
+        p2pTunnelQueue.async { [weak self] in
+            guard let self else { return }
+            let changed = self.p2pTunnelCredentials != credentials
+            self.p2pTunnelCredentials = credentials
+            if changed {
+                self.stopP2PTunnelLocked(reason: "credentials_changed")
+            }
+            slog("[SyncEngine] setTunnelCredentials received signalingUrl=%@", trimmedURL)
+            syncDiagnosticsLog("SyncEngine", "setTunnelCredentials received signalingUrl=\(trimmedURL)")
+            if !trimmedIceServersJSON.isEmpty {
+                syncDiagnosticsLog("SyncEngine", "setTunnelCredentials received ICE servers JSON")
+            }
+            self.startP2PTunnelIfNeededLocked(reason: "credentials_received")
+        }
+    }
+
+    private func startP2PTunnelIfNeeded(reason: String) {
+        p2pTunnelQueue.async { [weak self] in
+            self?.startP2PTunnelIfNeededLocked(reason: reason)
+        }
+    }
+
+    private func startP2PTunnelIfNeededLocked(reason: String) {
+        guard let credentials = p2pTunnelCredentials else { return }
+        if p2pTunnelStarting { return }
+        if sharedFilesService.isTunnelActive, sharedFilesService.tunnelPort != nil {
+            return
+        }
+
+        guard let binding = uploadStore?.getBinding() else {
+            syncDiagnosticsLog("SyncEngine", "P2P tunnel skipped: no bound desktop (\(reason))")
+            return
+        }
+        guard let pairingToken = resolvedPairingToken(for: binding),
+              !pairingToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            syncDiagnosticsLog("SyncEngine", "P2P tunnel skipped: pairing token missing target=\(binding.deviceId)")
+            return
+        }
+
+        let clientId = bindingService.getOrCreateClientId()
+        let generation = p2pTunnelGeneration
+        p2pTunnelStarting = true
+        syncDiagnosticsLog("SyncEngine", "P2P tunnel starting target=\(binding.deviceId) reason=\(reason)")
+        let port = localTCPProxy.start(
+            signalingURL: credentials.signalingURL,
+            clientID: clientId,
+            targetClientID: binding.deviceId,
+            token: credentials.accessToken,
+            pairingToken: pairingToken,
+            iceServersJSON: credentials.iceServersJSON
+        )
+
+        let shouldCommit = generation == p2pTunnelGeneration && p2pTunnelCredentials == credentials
+        if shouldCommit, port > 0, port <= Int(UInt16.max) {
+            sharedFilesService.tunnelPort = UInt16(port)
+            sharedFilesService.isTunnelActive = true
+            p2pTunnelStarting = false
+            syncDiagnosticsLog("SyncEngine", "P2P tunnel active on local port \(port)")
+            return
+        }
+
+        if port > 0 {
+            localTCPProxy.stop()
+        }
+        if shouldCommit {
+            sharedFilesService.tunnelPort = nil
+            sharedFilesService.isTunnelActive = false
+            syncDiagnosticsLog("SyncEngine", "P2P tunnel failed to start, fallback to direct LAN")
+        }
+        p2pTunnelStarting = false
+    }
+
+    private func stopP2PTunnel(reason: String) {
+        p2pTunnelQueue.async { [weak self] in
+            self?.stopP2PTunnelLocked(reason: reason)
+        }
+    }
+
+    private func stopP2PTunnelLocked(reason: String) {
+        p2pTunnelGeneration += 1
+        p2pTunnelStarting = false
+        sharedFilesService.tunnelPort = nil
+        sharedFilesService.isTunnelActive = false
+        localTCPProxy.stop()
+        syncDiagnosticsLog("SyncEngine", "P2P tunnel stopped (\(reason))")
     }
 
     // MARK: - Standalone Presence Heartbeat Timer
@@ -1392,6 +1776,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             guard let self = self else { return }
             // Skip if sync pipeline is running — it has its own heartbeat loop
             guard !self.isSyncing else { return }
+            self.startP2PTunnelIfNeeded(reason: "presence_heartbeat_timer")
             // A single HTTP timeout on the presence port can be a transient Wi-Fi
             // hiccup; the DiscoveryService's TCP probe on the protocol port often
             // still sees the desktop. Don't flip the UI to offline on one miss —
@@ -1776,19 +2161,294 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
     }
 
-    private func beginBackgroundTransitionIfNeeded(reason: String) {
-        guard transitionBackgroundTaskId == .invalid else { return }
-        transitionBackgroundTaskId = backgroundService.beginTransitionTask()
-        slog("[BackgroundExec] began transition task reason=%@", reason)
-        syncDiagnosticsLog("BackgroundExec", "began transition task reason=\(reason)")
+    // MARK: - Background upload wiring (Phase 5)
+
+    /// Called from AppDelegate.didFinishLaunchingWithOptions to wire the
+    /// BackgroundUploadService with the stores/services it needs. Safe to
+    /// call repeatedly — iOS may cold-relaunch purely to deliver URLSession
+    /// events and we want the delegate callbacks to land on fully-wired
+    /// collaborators.
+    func configureBackgroundUploadService() {
+        guard let uploadStore = uploadStore, let historyStore = historyStore else {
+            slog("[SyncEngine] configureBackgroundUploadService: stores not ready")
+            return
+        }
+        backgroundUploadService.configureBackgroundUploadService(
+            uploadStore: uploadStore,
+            historyStore: historyStore,
+            bindingService: bindingService,
+            exportService: exportService
+        )
+        backgroundUploadService.syncEngineManager = self
+        slog("[SyncEngine] configureBackgroundUploadService: wired")
     }
 
+    // MARK: - Background task accessors (Phase 6)
+
+    /// Upload store handle exposed to BackgroundExecutionService so the
+    /// background task handlers can fall back to last_known_binding when
+    /// `currentBinding` is not yet populated (cold relaunch for URLSession
+    /// events).
+    var uploadStoreForBackground: UploadStore? { uploadStore }
+
+    /// Run an incremental photo scan suitable for the BGProcessing task
+    /// context. Unlike `scheduleIncrementalQueueRescan`, this bypasses the
+    /// `isSyncing` guard (background tasks don't go through startSync) and
+    /// still respects the thermal / backgrounded defer rules.
+    func performIncrementalPhotoScanIfBackgrounded() async {
+        guard let _ = uploadStore else { return }
+        let autoUploadActive = autoUploadConfigStore?.getConfig().state == "active"
+        guard autoUploadActive else {
+            NSLog("[SyncEngine] background task: skipping scan — auto upload not active")
+            return
+        }
+        let thermal = ProcessInfo.processInfo.thermalState
+        if thermal == .serious || thermal == .critical {
+            NSLog("[SyncEngine] background task: skipping scan — thermal %@", thermalStateLabel(thermal))
+            return
+        }
+        performIncrementalQueueRescanForBackgroundTask()
+    }
+
+    private func performIncrementalQueueRescanForBackgroundTask() {
+        guard let store = uploadStore else { return }
+        let clientId = bindingService.getOrCreateClientId()
+        let trackedFileKeys = Set(store.getAutoDiscoveryTrackedFileKeys())
+        guard let deltaResults = photoScanner.scanChangedAssets(
+            clientId: clientId,
+            trackedFileKeys: trackedFileKeys
+        ) else {
+            return
+        }
+        if deltaResults.isEmpty { return }
+        NSLog("[SyncEngine] background task: delta scan found %d new assets", deltaResults.count)
+        let now = ISO8601DateFormatter().string(from: Date())
+        let queuedItems = deltaResults.map { asset -> UploadItemRecord in
+            UploadItemRecord(
+                id: nil,
+                assetLocalId: asset.asset.localIdentifier,
+                modifiedAt: asset.asset.modificationDate?.iso8601String ?? "",
+                mediaType: asset.mediaType,
+                originalFilename: asset.originalFilename,
+                fileKey: asset.fileKey,
+                fileSize: asset.estimatedSize,
+                status: "queued",
+                tempFilePath: nil,
+                ackedOffset: 0,
+                lastErrorCode: nil,
+                updatedAt: now,
+                source: "auto",
+                batchId: nil,
+                priority: 0
+            )
+        }
+        try? store.upsertUploadItems(queuedItems)
+    }
+
+    // MARK: - Cross-protocol reset (DELETE /upload/<cid>/<fkey>)
+
+    /// T6 / M9 — the underlying enum + decision helper live in
+    /// `UploadResetStateMachine.swift` (module-level, Foundation-only)
+    /// so the state machine can be linked into test harnesses without
+    /// dragging UIKit/Photos. Re-export the nested-style names so
+    /// existing call sites like `SyncEngineManager.UploadResetResult`
+    /// keep compiling by aliasing to the top-level types in this
+    /// module.
+    typealias UploadResetResult = UploadResetResultT6
+    typealias CrossProtocolResetDecision = CrossProtocolResetDecisionT6
+    static func decideCrossProtocolReset(_ result: UploadResetResult) -> CrossProtocolResetDecision {
+        return decideCrossProtocolResetT6(result)
+    }
+
+    private lazy var resetUploadSession: URLSession = {
+        let cfg = URLSessionConfiguration.default
+        cfg.timeoutIntervalForRequest = Self.crossProtocolResetDeleteTimeoutSeconds
+        cfg.timeoutIntervalForResource = Self.crossProtocolResetDeleteTimeoutSeconds
+        cfg.waitsForConnectivity = false
+        cfg.allowsCellularAccess = true
+        cfg.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: cfg)
+    }()
+
+    /// Issue `DELETE /upload/<clientId>/<fileKey>` against the sidecar with
+    /// HMAC auth so a row that was last transported via HTTP can be safely
+    /// re-opened on the TCP path. This is the cross-protocol handshake: the
+    /// sidecar's .part file and committed_bytes are cleared before the TCP
+    /// pipeline re-sends FILE_DATA from offset 0.
+    ///
+    /// Returns:
+    ///   - `.reset`          — 200, rows/part cleared
+    ///   - `.notFound`       — 404, already clean, proceed
+    ///   - `.concurrentTransfer` — 409, another protocol owns the slot
+    ///   - `.failed`         — any network / status error (caller should bail)
+    private func sidecarResetUpload(
+        host: String,
+        port: Int,
+        clientId: String,
+        fileKey: String,
+        pairingToken: String
+    ) async -> UploadResetResult {
+        let scheme = "http"
+        let path = "/upload/\(clientId)/\(fileKey)"
+        let hostPart = host.contains(":") ? "[\(host)]" : host
+        guard let url = URL(string: "\(scheme)://\(hostPart):\(port)\(path)") else {
+            return .unknown("invalid_url")
+        }
+
+        let timestamp = String(Int64(Date().timeIntervalSince1970))
+        let nonce = HMACAuthHelper.randomHexNonce()
+        let canonical = HMACAuthHelper.canonicalDELETE(
+            path: path,
+            clientId: clientId,
+            fileKey: fileKey,
+            timestamp: timestamp,
+            nonce: nonce
+        )
+        let signature = HMACAuthHelper.hmacSHA256Hex(
+            pairingToken: pairingToken,
+            canonical: canonical
+        )
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue(clientId, forHTTPHeaderField: "X-SyncFlow-Client-Id")
+        request.setValue(fileKey, forHTTPHeaderField: "X-SyncFlow-File-Key")
+        request.setValue(timestamp, forHTTPHeaderField: "X-SyncFlow-Auth-Timestamp")
+        request.setValue(nonce, forHTTPHeaderField: "X-SyncFlow-Auth-Nonce")
+        request.setValue(signature, forHTTPHeaderField: "X-SyncFlow-Auth")
+
+        do {
+            let (data, response) = try await resetUploadSession.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                return .unknown("non_http_response")
+            }
+            let body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            switch http.statusCode {
+            case 200:
+                return .reset
+            case 404:
+                return .notFound
+            case 409:
+                let via = (body?["activeProtocol"] as? String) ?? "unknown"
+                return .concurrentTransfer(via: via)
+            case 500...599:
+                return .serverError(http.statusCode)
+            default:
+                let status = (body?["status"] as? String) ?? "http_\(http.statusCode)"
+                return .unknown(status)
+            }
+        } catch {
+            // M9: classify transport-level errors into timeout vs generic
+            // network failure so callers / logs can treat retry budgets
+            // differently.
+            let nsError = error as NSError
+            if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorTimedOut {
+                return .timeout
+            }
+            if nsError.domain == NSURLErrorDomain {
+                return .networkError("\(nsError.code):\(nsError.localizedDescription)")
+            }
+            // M9: non-NSURLError catches fall through to .unknown — they're
+            // not transport-layer failures (those hit the branches above),
+            // so classifying them as .networkError would mislead retry logic.
+            return .unknown("\(error)")
+        }
+    }
+
+    /// Persist a binding through UploadStore + last_known_binding snapshot
+    /// and update the in-memory `currentBinding` mirror. Single choke point
+    /// so the background upload pipeline can always resolve the latest
+    /// binding even immediately after pairing and before SQLite has caught
+    /// up.
+    private func persistBinding(_ binding: BindingRecord) throws {
+        try uploadStore?.saveBinding(binding)
+        let stored = StoredBinding(
+            serverId: binding.deviceId,
+            sidecarHost: binding.host,
+            port: binding.port,
+            pairingTokenKeychainRef: binding.pairingTokenKeychainRef
+        )
+        currentBinding = stored
+        // Best-effort — last_known_binding is a cache; a write failure just
+        // means we fall back to the SQLite binding row on cold relaunch.
+        do {
+            try uploadStore?.updateLastKnownBinding(stored)
+        } catch {
+            NSLog("[SyncEngine] updateLastKnownBinding failed: %@", "\(error)")
+        }
+        // H2 — bump the monotonic binding version so any background
+        // URLSession task enqueued after this point carries the new
+        // version and any in-flight callback from the previous binding
+        // fails the `applyBackgroundCompletion` predicate. Best-effort:
+        // a nil return just means no upload store was wired yet (tests).
+        if let newVersion = bindingService.bumpBindingVersion() {
+            NSLog("[SyncEngine] bindingVersion bumped to %d (persistBinding)", newVersion)
+        }
+        // H8 Phase 2 (L805-830): a successful re-pair is the only legitimate
+        // exit from `needs_repair=true`. Clear the flag + reason only on the
+        // actual true→false transition so we don't persist a no-op write and
+        // emit a no-op event on every initial pair. The emit is likewise
+        // gated — RN's reducer memoises on value equality so a redundant
+        // event is harmless, but emitting only on real transitions keeps
+        // the native → RN channel noise-free and easier to trace.
+        let previousRepair = uploadStore?.getNeedsRepair()
+        if previousRepair?.flag == true {
+            do {
+                try uploadStore?.setNeedsRepair(value: false, reason: nil)
+            } catch {
+                NSLog("[SyncEngine] clearNeedsRepair (persistBinding) failed: %@", "\(error)")
+            }
+            NativeSyncEngineModule.shared?.emitRepairStateChanged(
+                needsRepair: false,
+                reason: nil
+            )
+        }
+    }
+
+    /// Refresh `currentBinding` from the authoritative store. Used after
+    /// init and from code paths that go straight to `uploadStore.saveBinding`.
+    private func refreshCurrentBindingFromStore() {
+        guard let binding = uploadStore?.getBinding(),
+              !binding.deviceId.isEmpty else {
+            return
+        }
+        currentBinding = StoredBinding(
+            serverId: binding.deviceId,
+            sidecarHost: binding.host,
+            port: binding.port,
+            pairingTokenKeychainRef: binding.pairingTokenKeychainRef
+        )
+    }
+
+    /// M8 — ref-counted begin. Each call increments the refcount; the
+    /// first call acquires the physical UIApplication background task
+    /// assertion, subsequent calls are pure increments. Nested callers
+    /// (e.g. outer `appDidEnterBackground` + inner
+    /// `transitionToBackgroundUpload`) can safely pair begin/end
+    /// independently without the inner `end` releasing the outer caller's
+    /// assertion. Delegates to `BackgroundTransitionRefCount` (FU5).
+    private func beginBackgroundTransitionIfNeeded(reason: String) {
+        backgroundTransitionRefCount.begin(reason: reason)
+    }
+
+    /// M8 — force-release used by terminal cleanup paths
+    /// (stopSyncLifecycle / disconnectAndUnbind / wipeSyncIdentity /
+    /// willEnterForeground) that must guarantee the UIApplication
+    /// background task is gone no matter what. Clamps the refcount to 0
+    /// and releases the physical assertion if any was held. Counterpart
+    /// to `endBackgroundTransitionIfNeeded` for sites that historically
+    /// relied on the bool-gate semantics "end always wins".
+    private func forceEndBackgroundTransition(reason: String) {
+        backgroundTransitionRefCount.forceEnd(reason: reason)
+    }
+
+    /// M8 — ref-counted end. Decrements the refcount; only releases the
+    /// physical UIApplication background task when the count hits zero.
+    /// Extra `end` calls (refcount already at zero) are ignored so a
+    /// stray double-end can never release a live assertion the outer
+    /// caller still needs.
     private func endBackgroundTransitionIfNeeded(reason: String) {
-        guard transitionBackgroundTaskId != .invalid else { return }
-        backgroundService.endTransitionTask(transitionBackgroundTaskId)
-        transitionBackgroundTaskId = .invalid
-        slog("[BackgroundExec] ended transition task reason=%@", reason)
-        syncDiagnosticsLog("BackgroundExec", "ended transition task reason=\(reason)")
+        backgroundTransitionRefCount.end(reason: reason)
     }
 
     private func stopSyncLifecycle(finalState: SessionService.SyncEngineState) {
@@ -1797,8 +2457,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         shouldAbortActiveManualUpload = false
         shouldAbortActiveUploadForBindingChange = false
         didAttemptRemoteHistoryReconciliation = false
-        endBackgroundTransitionIfNeeded(reason: "syncStopped")
-        SilentAudioService.shared.stop()
+        // M8: terminal lifecycle — force-release so any dangling refcount
+        // from a backgrounded transition is cleared alongside the sync
+        // session.
+        forceEndBackgroundTransition(reason: "syncStopped")
         sessionService.endSession(transitionTo: finalState)
     }
 
@@ -2292,7 +2954,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         syncDiagnosticsLog("SyncEngine", "startSync")
         sessionService.transitionTo(.scanning)
         backgroundService.submitContinuedTask()
-        SilentAudioService.shared.start()
 
         Task { [weak self] in
             await self?.runStartSyncFlow()
@@ -2500,8 +3161,18 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         syncDiagnosticsLog("SyncPipeline", "START")
 
         // 0. Check prerequisites
-        guard uploadStore?.getBinding() != nil else {
+        guard let binding = uploadStore?.getBinding() else {
             throw SyncEngineError.pairingError("No binding found — pair first")
+        }
+        guard let token = resolvedPairingToken(for: binding) else {
+            slog("[SyncPipeline] pairing token missing — clearing stale binding, need re-pair")
+            syncDiagnosticsLog("SyncPipeline", "pairing token missing — clearing stale binding")
+            try? uploadStore?.clearBinding()
+            currentBinding = nil
+            bindingConnectionState = .offline
+            stopSyncLifecycle(finalState: .idle)
+            NativeSyncEngineModule.shared?.emitBindingStateChanged(nil)
+            return
         }
 
         // 1. Request photo permission
@@ -3141,6 +3812,17 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
 
         for (index, asset) in assets.enumerated() {
+            // File boundary: if the app transitioned to background, yield
+            // the TCP loop so BackgroundUploadService can take over via
+            // URLSession. We also wake any armed transition continuation so
+            // `transitionToBackgroundUpload()` can proceed to hand off.
+            if isTransitioningToBackground {
+                slog("[SyncPipeline] breaking TCP loop — app backgrounded")
+                syncDiagnosticsLog("SyncPipeline", "breaking TCP loop — app backgrounded")
+                resumeWatchLoopIfNeeded()
+                break
+            }
+
             try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
 
             if isManualUploadCancelled(fileKey: asset.fileKey, source: asset.source) {
@@ -3150,7 +3832,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 await cancelPrefetchAndCleanup()
                 throw SyncEngineError.manualUploadCancelled
             }
-
             // Between files: skip auto items when interrupted, skip cancelled batch items
             if index > 0 {
                 if isAutoUploadInterrupted && asset.source == "auto" {
@@ -3250,6 +3931,54 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 exportService.cleanup(tempURL: exported.tempURL)
                 continue
             }
+
+            // Phase 3.7 cross-protocol reset: if this row was last
+            // transported via HTTP (or is flagged `requires_remote_reset`),
+            // ask the sidecar to clear its .part before we restart TCP
+            // FILE_DATA from offset 0. Concurrent-transfer / network
+            // failures abort the TCP round so we don't race the HTTP path.
+            //
+            // T6: the classification of the DELETE outcome lives in the
+            // pure helper `Self.decideCrossProtocolReset(_:)`. Keeping
+            // the decision table there means the state machine is
+            // testable in isolation and the pipeline here just applies
+            // the resulting side effects.
+            var abortRoundForCrossProtocol = false
+            if let item = uploadStore?.getUploadItemByFileKey(asset.fileKey),
+               item.requiresRemoteReset {
+                let pairingToken = resolvedPairingToken(for: binding) ?? token
+                let host = sidecarHost ?? binding.host
+                let resetResult = await sidecarResetUpload(
+                    host: host,
+                    port: binding.port,
+                    clientId: clientId,
+                    fileKey: asset.fileKey,
+                    pairingToken: pairingToken
+                )
+                let decision = Self.decideCrossProtocolReset(resetResult)
+                if decision.clearRequiresRemoteReset {
+                    try? uploadStore?.setRequiresRemoteReset(fileKey: asset.fileKey, value: false)
+                    try? uploadStore?.resetUploadOffset(fileKey: asset.fileKey)
+                }
+                if decision.abortRound {
+                    NSLog(
+                        "[SyncPipeline] cross-protocol reset aborted round code=%@ fileKey=%@",
+                        decision.diagnosticCode, asset.fileKey
+                    )
+                    syncDiagnosticsLog(
+                        "SyncPipeline",
+                        "cross-protocol reset aborted round code=\(decision.diagnosticCode) fileKey=\(asset.fileKey)"
+                    )
+                    exportService.cleanup(tempURL: exported.tempURL)
+                    abortRoundForCrossProtocol = true
+                }
+                if abortRoundForCrossProtocol {
+                    break
+                }
+            }
+            // Row is ours now — advance the transport marker so the
+            // history ledger and diagnostics know TCP owns this file.
+            try? uploadStore?.updateTransport(fileKey: asset.fileKey, transport: "tcp")
 
             do {
                 defer {
@@ -4546,7 +5275,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     shareName: helloRes["serverCapabilities"].flatMap { ($0 as? [String: Any])?["shareName"] as? String },
                     lastBoundAt: ISO8601DateFormatter().string(from: Date())
                 )
-                try uploadStore?.saveBinding(binding)
+                try? persistBinding(binding)
                 resetAutoUploadStateForFreshPairing(reason: "recreate_local_binding_auth_not_required")
                 // Re-index Bonjour entry under the server UUID (only if originally found via Bonjour).
                 if let bonjourDevice = discoveredDevices[deviceId] {
@@ -4647,7 +5376,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             shareName: serverInfo["shareName"] as? String,
             lastBoundAt: ISO8601DateFormatter().string(from: Date())
         )
-        try uploadStore?.saveBinding(binding)
+        try persistBinding(binding)
 
         // Re-index the Bonjour-discovered entry under the server's own UUID so that
         // resolveSidecarHost can look it up by binding.deviceId in later rounds.
@@ -4689,6 +5418,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         bindingService.clearPairingToken()  // also wipe any legacy single-key token
         try uploadStore?.clearBinding()
         try? uploadStore?.resetUploadQueue()
+        currentBinding = nil
 
         // Reset auto upload config so the next pairing starts with auto upload off.
         // Without this, a stale "active" state from the previous session would cause
@@ -4702,10 +5432,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         runtimeRoundSource = nil
 
         stopPresenceHeartbeatTimer()
+        stopP2PTunnel(reason: "disconnectAndUnbind")
         bindingConnectionState = .offline
         sidecarHost = nil
-        endBackgroundTransitionIfNeeded(reason: "disconnectAndUnbind")
-        SilentAudioService.shared.stop()
+        // M8: terminal cleanup — force-release clears any nested refcount.
+        forceEndBackgroundTransition(reason: "disconnectAndUnbind")
         isSyncing = false
         protocolSession?.disconnect()
         protocolSession = nil
@@ -5853,10 +6584,18 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     }
 
     func downloadSharedFile(path: String) async throws -> [String: Any] {
-        let result = try await sharedFilesService.downloadFile(path: path)
+        let result = try await sharedFilesService.downloadFile(path: path) { bytesWritten, totalBytes, progress in
+            NativeSyncEngineModule.shared?.emitSharedFileDownloadProgress(
+                path: path,
+                bytesWritten: bytesWritten,
+                totalBytes: totalBytes,
+                progress: progress
+            )
+        }
         return [
             "savedToPhotos": result.savedToPhotos,
             "localPath": result.localPath ?? NSNull(),
+            "savedLocation": result.savedLocation ?? NSNull(),
         ]
     }
 
@@ -5872,7 +6611,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             throw SyncEngineError.pairingError("No active binding to rename")
         }
         binding.deviceAlias = alias
-        try uploadStore?.saveBinding(binding)
+        try persistBinding(binding)
     }
 
     // MARK: - Account Identity Reset (Phase 1 / 2 / 3)
@@ -5933,13 +6672,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
         // 1. Tear down any live networking / timers so we don't race the wipe.
         stopPresenceHeartbeatTimer()
+        stopP2PTunnel(reason: "wipeSyncIdentity")
         protocolSession?.disconnect()
         protocolSession = nil
         transport.disconnect()
         sessionService.endSession()
         sidecarHost = nil
         bindingConnectionState = .offline
-        SilentAudioService.shared.stop()
         isSyncing = false
         isAutoUploadInterrupted = false
         shouldAbortActiveAutoUpload = false
@@ -5951,7 +6690,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         runtimeUploadState = "idle"
         runtimeLastErrorCode = nil
         runtimeLastErrorMessage = nil
-        endBackgroundTransitionIfNeeded(reason: "wipeSyncIdentity")
+        // M8: full identity wipe — force-release any lingering refcount.
+        forceEndBackgroundTransition(reason: "wipeSyncIdentity")
 
         // 2. Enumerate per-device pairing tokens BEFORE clearing the binding
         // row — some installs rely on binding.pairingTokenKeychainRef to
@@ -5975,6 +6715,19 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             try uploadStore?.clearBinding()
         } catch {
             slog("[SyncEngine] wipeSyncIdentity: clearBinding failed: %@", "\(error)")
+        }
+        currentBinding = nil
+
+        // 3a. Clear auth-repair meta so RN banner doesn't briefly re-appear
+        // on the next getRepairState() read before a fresh pair lands.
+        do {
+            try uploadStore?.setNeedsRepair(value: false, reason: nil)
+            NativeSyncEngineModule.shared?.emitRepairStateChanged(
+                needsRepair: false,
+                reason: nil
+            )
+        } catch {
+            NSLog("[SyncEngine] wipeSyncIdentity: setNeedsRepair clear failed: %@", "\(error)")
         }
 
         // 4. Clear every pairing token we located. `clearPairingToken(forKey:)`
@@ -6077,5 +6830,21 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             }
             return nil
         }
+    }
+
+    // MARK: - H8 Phase 2: needs_repair bridge surface
+    //
+    // Thin pass-through so the RN bridge doesn't need to reach into the
+    // private `uploadStore`. Matches the `(flag, reason)` tuple returned by
+    // `UploadStore.getNeedsRepair()` and normalises the "no store wired yet"
+    // case (cold boot before `configureStores` finishes) to `(false, nil)` —
+    // the banner should stay hidden until we can confirm the flag.
+
+    /// Read the current repair state for the RN bridge. Returns
+    /// `(flag: false, reason: nil)` when the upload store isn't ready yet so
+    /// JS doesn't flash the banner during the boot window.
+    func getRepairStateForBridge() -> (flag: Bool, reason: String?) {
+        guard let store = uploadStore else { return (false, nil) }
+        return store.getNeedsRepair()
     }
 }

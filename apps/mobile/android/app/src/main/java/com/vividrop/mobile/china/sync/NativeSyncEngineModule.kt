@@ -29,6 +29,7 @@ import com.facebook.react.bridge.WritableMap
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.facebook.react.modules.core.PermissionAwareActivity
 import androidx.core.content.FileProvider
+import mobiletunnel.Mobiletunnel
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
@@ -90,6 +91,17 @@ class NativeSyncEngineModule(
   private var pendingDiscoveryPermissionPromise: Promise? = null
   private val uploadStore by lazy { AndroidUploadStore(reactApplicationContext) }
   private val mediaStoreRepository by lazy { AndroidMediaStoreRepository(reactApplicationContext) }
+  private val p2pTunnelLock = Any()
+  private val p2pTunnelExecutor = Executors.newSingleThreadExecutor { runnable ->
+    Thread(runnable, "ViviP2PTunnel").apply { isDaemon = true }
+  }
+  private var tunnelGeneration = 0L
+  private var tunnelPort: Int? = null
+  private var isTunnelActive = false
+  private var tunnelStarting = false
+  private var signalingUrl: String? = null
+  private var accessToken: String? = null
+  private var tunnelIceServersJSON: String = ""
 
   init {
     registerNetworkAvailabilityMonitor()
@@ -102,6 +114,7 @@ class NativeSyncEngineModule(
     stopDiscoveryInternal(emitUpdate = false)
     cancelPresenceRecoveryProbe(reason = "module_invalidated")
     stopPresenceHeartbeatTimer()
+    stopP2PTunnel()
     unregisterNetworkAvailabilityMonitor()
     super.invalidate()
   }
@@ -114,6 +127,47 @@ class NativeSyncEngineModule(
   @ReactMethod
   fun removeListeners(count: Double) {
     // Required for NativeEventEmitter compatibility.
+  }
+
+  @ReactMethod
+  fun setTunnelCredentials(
+    signalingUrl: String,
+    accessToken: String,
+    iceServersJSON: String,
+    promise: Promise,
+  ) {
+    if (signalingUrl.isBlank() || accessToken.isBlank()) {
+      synchronized(p2pTunnelLock) {
+        this.signalingUrl = null
+        this.accessToken = null
+        this.tunnelIceServersJSON = ""
+      }
+      stopP2PTunnel()
+      recordNativeLog("SyncEngine", "tunnel credentials cleared")
+      promise.resolve(null)
+      return
+    }
+
+    val credentialsChanged = synchronized(p2pTunnelLock) {
+      val changed = this.signalingUrl != signalingUrl ||
+        this.accessToken != accessToken ||
+        this.tunnelIceServersJSON != iceServersJSON
+      this.signalingUrl = signalingUrl
+      this.accessToken = accessToken
+      this.tunnelIceServersJSON = iceServersJSON
+      changed
+    }
+    if (credentialsChanged) {
+      stopP2PTunnel()
+    }
+
+    Log.d("NativeSyncEngine", "setTunnelCredentials received signalingUrl=$signalingUrl")
+    recordNativeLog("SyncEngine", "setTunnelCredentials received signalingUrl=$signalingUrl")
+    val currentBinding = loadBinding()
+    if (currentBinding != null && isBindingConnected(currentBinding)) {
+      startP2PTunnelIfNeeded(currentBinding)
+    }
+    promise.resolve(null)
   }
 
   @ReactMethod
@@ -518,6 +572,7 @@ class NativeSyncEngineModule(
   fun disconnectAndUnbind(promise: Promise) {
     recordNativeLog("Pairing", "disconnectAndUnbind requested")
     cancelPresenceRecoveryProbe(reason = "unbind")
+    stopP2PTunnel()
     stopPresenceHeartbeatTimer()
     clearBinding()
     emitBindingStateCleared()
@@ -808,6 +863,7 @@ class NativeSyncEngineModule(
   @ReactMethod
   fun wipeSyncIdentity(promise: Promise) {
     try {
+      stopP2PTunnel()
       performWipeSyncIdentity(prefs)
       emitBindingStateCleared()
       emitQueueUpdated(Arguments.createArray())
@@ -1943,11 +1999,17 @@ class NativeSyncEngineModule(
       }
       val mimeType = connection.contentType?.substringBefore(';')
         ?: AndroidSyncPrimitives.mimeTypeForFilename(filename)
+      val totalBytes = connection.contentLengthLong.takeIf { it > 0L } ?: 0L
       if (mediaType == "image" || mediaType == "video") {
         val collection = if (mediaType == "video") {
           MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         } else {
           MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        }
+        val savedLocation = if (mediaType == "video") {
+          "${Environment.DIRECTORY_MOVIES}/Vivi Drop"
+        } else {
+          "${Environment.DIRECTORY_PICTURES}/Vivi Drop"
         }
         val values = ContentValues().apply {
           put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
@@ -1955,7 +2017,7 @@ class NativeSyncEngineModule(
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             put(
               MediaStore.MediaColumns.RELATIVE_PATH,
-              if (mediaType == "video") "${Environment.DIRECTORY_MOVIES}/Vivi Drop" else "${Environment.DIRECTORY_PICTURES}/Vivi Drop",
+              savedLocation,
             )
             put(MediaStore.MediaColumns.IS_PENDING, 1)
           }
@@ -1963,7 +2025,9 @@ class NativeSyncEngineModule(
         val uri = reactApplicationContext.contentResolver.insert(collection, values)
           ?: throw IllegalStateException("Unable to create MediaStore item")
         reactApplicationContext.contentResolver.openOutputStream(uri)?.use { output ->
-          connection.inputStream.use { input -> input.copyTo(output) }
+          connection.inputStream.use { input ->
+            copySharedDownloadWithProgress(path, input, output, totalBytes)
+          }
         } ?: throw IllegalStateException("Unable to write MediaStore item")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
           values.clear()
@@ -1973,6 +2037,7 @@ class NativeSyncEngineModule(
         return Arguments.createMap().apply {
           putBoolean("savedToPhotos", true)
           putNull("localPath")
+          putString("savedLocation", savedLocation)
         }
       }
 
@@ -1982,15 +2047,59 @@ class NativeSyncEngineModule(
       }
       val destFile = File(destDir, filename)
       connection.inputStream.use { input ->
-        destFile.outputStream().use { output -> input.copyTo(output) }
+        destFile.outputStream().use { output ->
+          copySharedDownloadWithProgress(path, input, output, totalBytes)
+        }
       }
       return Arguments.createMap().apply {
         putBoolean("savedToPhotos", false)
         putString("localPath", destFile.absolutePath)
+        putString("savedLocation", destFile.absolutePath)
       }
     } finally {
       connection.disconnect()
     }
+  }
+
+  private fun copySharedDownloadWithProgress(
+    path: String,
+    input: java.io.InputStream,
+    output: OutputStream,
+    totalBytes: Long,
+  ) {
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    var bytesWritten = 0L
+    while (true) {
+      val read = input.read(buffer)
+      if (read < 0) break
+      output.write(buffer, 0, read)
+      bytesWritten += read.toLong()
+      emitSharedFileDownloadProgress(path, bytesWritten, totalBytes)
+    }
+    output.flush()
+    emitSharedFileDownloadProgress(path, bytesWritten, totalBytes, forceComplete = true)
+  }
+
+  private fun emitSharedFileDownloadProgress(
+    path: String,
+    bytesWritten: Long,
+    totalBytes: Long,
+    forceComplete: Boolean = false,
+  ) {
+    val progress = when {
+      forceComplete -> 1.0
+      totalBytes > 0L -> (bytesWritten.toDouble() / totalBytes.toDouble()).coerceIn(0.0, 1.0)
+      else -> 0.0
+    }
+    emitEvent(
+      "onSharedFileDownloadProgress",
+      Arguments.createMap().apply {
+        putString("path", path)
+        putDouble("bytesWritten", bytesWritten.toDouble())
+        putDouble("totalBytes", totalBytes.toDouble())
+        putDouble("progress", progress)
+      },
+    )
   }
 
   private fun readHttpString(url: URL): String {
@@ -2010,6 +2119,115 @@ class NativeSyncEngineModule(
     }
   }
 
+  private fun startP2PTunnelIfNeeded(binding: StoredBinding) {
+    val clientId = getOrCreateClientId()
+    val targetClientId = binding.deviceId
+    val pairingToken = binding.pairingToken
+
+    val startSnapshot = synchronized(p2pTunnelLock) {
+      val currentSignalingUrl = signalingUrl
+      val currentAccessToken = accessToken
+      if (currentSignalingUrl.isNullOrBlank() || currentAccessToken.isNullOrBlank()) {
+        recordNativeLog("SyncEngine", "P2P tunnel skipped: credentials not set")
+        return
+      }
+      if (isTunnelActive && tunnelPort != null) {
+        return
+      }
+      if (tunnelStarting) {
+        return
+      }
+      tunnelStarting = true
+      P2PTunnelStartSnapshot(
+        generation = tunnelGeneration,
+        signalingUrl = currentSignalingUrl,
+        accessToken = currentAccessToken,
+        iceServersJSON = tunnelIceServersJSON,
+      )
+    }
+
+    p2pTunnelExecutor.execute {
+      try {
+        recordNativeLog("SyncEngine", "P2P tunnel starting target=$targetClientId")
+        val port = Mobiletunnel.startTunnel(
+          startSnapshot.signalingUrl,
+          clientId,
+          targetClientId,
+          startSnapshot.accessToken,
+          pairingToken,
+          startSnapshot.iceServersJSON,
+        ).toInt()
+        var logMessage: String? = null
+        var shouldStopStaleTunnel = false
+        synchronized(p2pTunnelLock) {
+          val shouldCommit = tunnelGeneration == startSnapshot.generation &&
+            signalingUrl == startSnapshot.signalingUrl &&
+            accessToken == startSnapshot.accessToken &&
+            tunnelIceServersJSON == startSnapshot.iceServersJSON
+          if (shouldCommit && port > 0) {
+            tunnelPort = port
+            isTunnelActive = true
+            tunnelStarting = false
+            logMessage = "P2P tunnel active on local port $port"
+          } else if (shouldCommit) {
+            tunnelPort = null
+            isTunnelActive = false
+            tunnelStarting = false
+            logMessage = "P2P tunnel failed to start, fallback to direct LAN"
+          } else if (port > 0) {
+            shouldStopStaleTunnel = true
+          }
+        }
+        if (shouldStopStaleTunnel) {
+          Mobiletunnel.stopTunnel()
+        }
+        if (logMessage != null) {
+          recordNativeLog("SyncEngine", logMessage)
+        }
+      } catch (err: Throwable) {
+        var shouldLog = false
+        synchronized(p2pTunnelLock) {
+          val shouldCommit = tunnelGeneration == startSnapshot.generation &&
+            signalingUrl == startSnapshot.signalingUrl &&
+            accessToken == startSnapshot.accessToken &&
+            tunnelIceServersJSON == startSnapshot.iceServersJSON
+          if (shouldCommit) {
+            tunnelPort = null
+            isTunnelActive = false
+            tunnelStarting = false
+            shouldLog = true
+          }
+        }
+        if (shouldLog) {
+          recordNativeLog(
+            "SyncEngine",
+            "P2P tunnel start failed: ${err.message ?: err.javaClass.simpleName}",
+          )
+        }
+      }
+    }
+  }
+
+  private fun stopP2PTunnel() {
+    synchronized(p2pTunnelLock) {
+      tunnelGeneration += 1
+      tunnelPort = null
+      isTunnelActive = false
+      tunnelStarting = false
+    }
+
+    p2pTunnelExecutor.execute {
+      try {
+        Mobiletunnel.stopTunnel()
+      } catch (err: Throwable) {
+        recordNativeLog(
+          "SyncEngine",
+          "P2P tunnel stop failed: ${err.message ?: err.javaClass.simpleName}",
+        )
+      }
+    }
+  }
+
   private fun sharedFileUrl(kind: String, path: String): URL {
     val binding = loadBinding() ?: throw IllegalStateException("No bound desktop")
     val normalizedPath = path.trim().trim('/')
@@ -2020,7 +2238,14 @@ class NativeSyncEngineModule(
       "thumbnail" -> "/shared/thumbnail/${encodePath(normalizedPath)}"
       else -> throw IllegalArgumentException("Unsupported shared endpoint: $kind")
     }
-    return URL("http", binding.host, DEFAULT_SIDECAR_HTTP_PORT, endpoint)
+    val activeTunnelPort = synchronized(p2pTunnelLock) {
+      if (isTunnelActive) tunnelPort else null
+    }
+    return if (activeTunnelPort != null) {
+      URL("http", "127.0.0.1", activeTunnelPort, endpoint)
+    } else {
+      URL("http", binding.host, DEFAULT_SIDECAR_HTTP_PORT, endpoint)
+    }
   }
 
   private fun encodePath(path: String): String =
@@ -2348,6 +2573,7 @@ class NativeSyncEngineModule(
     if (connectionState == "connected") {
       cancelPresenceRecoveryProbe(reason = reason ?: "state_connected")
       startPresenceHeartbeatTimer(updated)
+      startP2PTunnelIfNeeded(updated)
       wakeManualUploadAfterReconnectIfNeeded(
         previousConnectionState = binding.connectionState,
         updatedBinding = updated,
@@ -2356,10 +2582,13 @@ class NativeSyncEngineModule(
     } else if (connectionState == "offline") {
       cancelPresenceRecoveryProbe(reason = reason ?: "state_offline")
       stopPresenceHeartbeatTimer()
+      stopP2PTunnel()
     } else if (connectionState != "connecting") {
       stopPresenceHeartbeatTimer()
+      stopP2PTunnel()
     } else {
       stopPresenceHeartbeatTimer()
+      stopP2PTunnel()
     }
     return updated
   }
@@ -2455,6 +2684,7 @@ class NativeSyncEngineModule(
           if (syncInProgress) {
             return@scheduleWithFixedDelay
           }
+          startP2PTunnelIfNeeded(current)
           val succeeded = sendPresenceHeartbeat(current, reason = "presence_heartbeat_timer", updateStateOnFailure = false)
           if (!succeeded) {
             startPresenceRecoveryProbeIfNeeded(current)
@@ -4125,6 +4355,13 @@ class NativeSyncEngineModule(
   private class AutoUploadRoundStoppedException(
     val autoUploadState: String,
   ) : Exception("Auto upload stopped: $autoUploadState")
+
+  private data class P2PTunnelStartSnapshot(
+    val generation: Long,
+    val signalingUrl: String,
+    val accessToken: String,
+    val iceServersJSON: String,
+  )
 
   companion object {
     private const val MODULE_NAME = "NativeSyncEngine"

@@ -164,6 +164,12 @@ class NativeSyncEngineModule: RCTEventEmitter {
             "onBindingStateChanged",
             "onPhotoLibraryChanged",
             "onError",
+            // H8 Phase 2 (L805-830): UploadStore.needs_repair surfaced to RN so
+            // the banner + auto-upload gate can react without polling. Flipped
+            // true by BackgroundUploadService.handleAuthRepair and cleared by
+            // SyncEngineManager.persistBinding after a successful re-pair.
+            "onRepairStateChanged",
+            "onSharedFileDownloadProgress",
         ]
     }
 
@@ -210,6 +216,53 @@ class NativeSyncEngineModule: RCTEventEmitter {
 
     func emitPhotoLibraryChanged() {
         sendEventOnMain(withName: "onPhotoLibraryChanged", body: nil)
+    }
+
+    /// H8 Phase 2: push the current (needs_repair, reason) pair to RN. Called
+    /// from `BackgroundUploadService.handleAuthRepair` when the flag flips
+    /// true, and from `SyncEngineManager.persistBinding` after a successful
+    /// re-pair clears it. Payload shape mirrors `getRepairState()` so JS can
+    /// treat it as a single source of truth.
+    func emitRepairStateChanged(needsRepair: Bool, reason: String?) {
+        sendEvent(
+            withName: "onRepairStateChanged",
+            body: [
+                "needsRepair": needsRepair,
+                "reason": reason as Any? ?? NSNull(),
+            ]
+        )
+    }
+
+    func emitSharedFileDownloadProgress(path: String, bytesWritten: Int64, totalBytes: Int64, progress: Double) {
+        sendEventOnMain(
+            withName: "onSharedFileDownloadProgress",
+            body: [
+                "path": path,
+                "bytesWritten": NSNumber(value: bytesWritten),
+                "totalBytes": NSNumber(value: totalBytes),
+                "progress": progress,
+            ]
+        )
+    }
+
+    @objc
+    func setTunnelCredentials(
+        _ signalingUrl: NSString,
+        accessToken: NSString,
+        iceServersJSON: NSString,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        let url = signalingUrl as String
+        let token = accessToken as String
+        let iceJSON = iceServersJSON as String
+
+        SyncEngineManager.shared.setTunnelCredentials(
+            signalingURL: url,
+            accessToken: token,
+            iceServersJSON: iceJSON
+        )
+        resolve(nil)
     }
 
     // MARK: - Bridge Methods
@@ -664,6 +717,23 @@ class NativeSyncEngineModule: RCTEventEmitter {
         } else {
             resolve(NSNull())
         }
+    }
+
+    // MARK: - H8 repair state (Phase 2 L805-830)
+
+    /// Snapshot read of `UploadStore.needs_repair` + reason. Used on RN
+    /// bootstrap so a cold launch with a stale repair flag still shows the
+    /// banner before any event fires. JS receives
+    /// `{ needsRepair: Bool, reason: String? }` — `reason` is the raw string
+    /// persisted by `BackgroundUploadService.handleAuthRepair`; JS classifies
+    /// it via `isAuthRepairRequired` / `AUTH_REPAIR_REASONS`.
+    @objc
+    func getRepairState(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        let state = SyncEngineManager.shared.getRepairStateForBridge()
+        resolve([
+            "needsRepair": state.flag,
+            "reason": state.reason as Any? ?? NSNull(),
+        ])
     }
 
     @objc

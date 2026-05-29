@@ -11,6 +11,8 @@ class BindingService {
     private static let clientDisplayNameKey = "syncflow_client_display_name"
     private static let keychainMigrationDoneKey = "keychain_migration_done_v1"
 
+    weak var uploadStore: UploadStore?
+
     /// The single-key name used before per-device token storage was introduced.
     /// Exposed so callers can detect and fall back to legacy tokens.
     static let legacyPairingTokenKey = pairingTokenKey
@@ -171,6 +173,17 @@ class BindingService {
 
     func clearClientDisplayName() {
         deleteKeychain(key: Self.clientDisplayNameKey)
+    }
+
+    // MARK: - Binding Version
+
+    func currentBindingVersion() -> Int? {
+        return uploadStore?.currentBindingVersion()
+    }
+
+    @discardableResult
+    func bumpBindingVersion() -> Int? {
+        return try? uploadStore?.bumpBindingVersion()
     }
 
     // MARK: - Keychain Helpers

@@ -1,53 +1,42 @@
 import Foundation
-import Network
+import SyncFlowMobileTunnel
 
-/// Light-weight TCP listener running on 127.0.0.1 that pipes local HTTP connection streams
-/// into Yamux multiplexing channels over WebRTC DataChannel.
+/// Swift wrapper that delegates P2P loopback proxying to the Go mobile library (SyncFlowMobileTunnel).
 class LocalTCPProxy {
-    private var listener: NWListener?
-    private var webRTCSession: AnyObject? // Store reference to the active Yamux Session
-    private let port: UInt16
+    private var activePort: Int?
 
-    init(port: UInt16) {
-        self.port = port
-    }
-
-    func start(session: AnyObject) throws {
-        self.webRTCSession = session
-        let parameters = NWParameters.tcp
-        guard let loopback = IPv4Address("127.0.0.1") else {
-            slog("[LocalTCPProxy] failed to create loopback address")
-            return
+    func start(
+        signalingURL: String,
+        clientID: String,
+        targetClientID: String,
+        token: String,
+        pairingToken: String,
+        iceServersJSON: String
+    ) -> Int {
+        slog("[LocalTCPProxy] Starting P2P tunnel connection with signaling: %@", signalingURL)
+        syncDiagnosticsLog("LocalTCPProxy", "starting P2P tunnel signaling=\(signalingURL) target=\(targetClientID)")
+        let port = MobiletunnelStartTunnel(signalingURL, clientID, targetClientID, token, pairingToken, iceServersJSON)
+        if port > 0 {
+            activePort = port
+            slog("[LocalTCPProxy] P2P tunnel started successfully on port %ld", port)
+            syncDiagnosticsLog("LocalTCPProxy", "P2P tunnel active port=\(port)")
+        } else {
+            activePort = nil
+            slog("[LocalTCPProxy] Failed to start P2P tunnel, return code: %ld", port)
+            syncDiagnosticsLog("LocalTCPProxy", "P2P tunnel failed returnCode=\(port)")
         }
-        parameters.requiredLocalEndpoint = NWEndpoint.hostPort(host: .ipv4(loopback), port: NWEndpoint.Port(integerLiteral: port))
-        
-        listener = try NWListener(using: parameters)
-        listener?.stateUpdateHandler = { state in
-            if case .failed(let error) = state {
-                slog("[LocalTCPProxy] listener failed: %@", error.localizedDescription)
-            }
-        }
-        listener?.newConnectionHandler = { [weak self] connection in
-            self?.handleNewConnection(connection)
-        }
-        listener?.start(queue: .global())
-        slog("[LocalTCPProxy] started on port %d", port)
+        return port
     }
 
     func stop() {
-        listener?.cancel()
-        listener = nil
-        webRTCSession = nil
+        guard activePort != nil else { return }
+        slog("[LocalTCPProxy] Stopping P2P tunnel")
+        syncDiagnosticsLog("LocalTCPProxy", "stopping P2P tunnel")
+        MobiletunnelStopTunnel()
+        activePort = nil
     }
 
-    private func handleNewConnection(_ connection: NWConnection) {
-        connection.start(queue: .global())
-        guard let _ = self.webRTCSession else {
-            connection.cancel()
-            return
-        }
-
-        // Swift-native piping to WebRTC DataChannel Yamux Stream.
-        // On new TCP socket connection, open stream on Yamux session and perform two-way piping.
+    func getActivePort() -> Int? {
+        return activePort
     }
 }

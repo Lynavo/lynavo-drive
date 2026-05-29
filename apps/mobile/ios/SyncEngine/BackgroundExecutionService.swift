@@ -16,7 +16,7 @@ class BackgroundExecutionService {
             self.handleMaintenanceTask(task as! BGProcessingTask)
         }
 
-        slog("[BackgroundExec] registered background tasks")
+        NSLog("[BackgroundExec] registered background tasks")
     }
 
     /// Submit continued processing task — call when foreground sync starts
@@ -26,15 +26,15 @@ class BackgroundExecutionService {
         request.requiresExternalPower = false
         do {
             try BGTaskScheduler.shared.submit(request)
-            slog("[BackgroundExec] submitted continued task")
+            NSLog("[BackgroundExec] submitted continued task")
         } catch {
-            slog("[BackgroundExec] failed to submit continued task: %@", "\(error)")
+            NSLog("[BackgroundExec] failed to submit continued task: %@", "\(error)")
         }
     }
 
     func cancelContinuedTask() {
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.continuedTaskId)
-        slog("[BackgroundExec] cancelled continued task")
+        NSLog("[BackgroundExec] cancelled continued task")
     }
 
     /// Submit maintenance task — call when sync ends or continued task expires
@@ -44,16 +44,16 @@ class BackgroundExecutionService {
         request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60) // 15 min from now
         do {
             try BGTaskScheduler.shared.submit(request)
-            slog("[BackgroundExec] submitted maintenance task")
+            NSLog("[BackgroundExec] submitted maintenance task")
         } catch {
-            slog("[BackgroundExec] failed to submit maintenance task: %@", "\(error)")
+            NSLog("[BackgroundExec] failed to submit maintenance task: %@", "\(error)")
         }
     }
 
     /// Begin transition task — call when app moves to background
     func beginTransitionTask() -> UIBackgroundTaskIdentifier {
         return UIApplication.shared.beginBackgroundTask {
-            slog("[BackgroundExec] transition task expired")
+            NSLog("[BackgroundExec] transition task expired")
         }
     }
 
@@ -63,32 +63,133 @@ class BackgroundExecutionService {
 
     // MARK: - Task Handlers
 
+    /// Continued processing task: called while the app is backgrounded and
+    /// the last foreground session still has pending uploads. We DO NOT call
+    /// `startSync()` (that would relight the TCP pipeline in background
+    /// without URLSession's resume-friendly lifecycle). Instead:
+    ///
+    /// 1. incremental photo scan to pick up new assets the library
+    ///    observer missed while the app was suspended
+    /// 2. resolve the live or last-known binding
+    /// 3. enqueue a single URLSession background upload for the current
+    ///    queue head (allowPreparation=true because the foreground loop
+    ///    may not have had a chance to export the file yet)
+    /// 4. classify the EnqueueResult into
+    ///    setTaskCompleted + optional submitMaintenanceTask() per the plan
     private func handleContinuedTask(_ task: BGProcessingTask) {
-        slog("[BackgroundExec] continued task started — resuming sync")
+        NSLog("[BackgroundExec] continued task started")
 
         task.expirationHandler = { [weak self] in
-            slog("[BackgroundExec] continued task expiring — saving checkpoint")
-            SyncEngineManager.shared.handleContinuedBackgroundTaskExpiration()
+            NSLog("[BackgroundExec] continued task expiring")
+            SyncEngineManager.shared.sessionService.transitionTo(.idle)
             self?.submitMaintenanceTask()
         }
 
-        Task {
-            _ = SyncEngineManager.shared.resumeSyncFromContinuedBackgroundTask()
-            task.setTaskCompleted(success: true)
+        Task { [weak self] in
+            guard let self else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            // Best-effort incremental scan; failure here doesn't block the
+            // enqueue attempt — there may still be queued items from the
+            // foreground session.
+            await SyncEngineManager.shared.performIncrementalPhotoScanIfBackgrounded()
+            await self.runBackgroundEnqueue(task: task, allowPreparation: true)
         }
     }
 
     private func handleMaintenanceTask(_ task: BGProcessingTask) {
-        slog("[BackgroundExec] maintenance task started — incremental scan")
+        NSLog("[BackgroundExec] maintenance task started")
 
         task.expirationHandler = {
-            slog("[BackgroundExec] maintenance task expiring")
+            NSLog("[BackgroundExec] maintenance task expiring")
         }
 
-        Task {
-            // Run incremental scan + attempt sync if target device found
-            _ = SyncEngineManager.shared.resumeSyncFromMaintenanceBackgroundTask()
+        Task { [weak self] in
+            guard let self else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            await SyncEngineManager.shared.performIncrementalPhotoScanIfBackgrounded()
+            await self.runBackgroundEnqueue(task: task, allowPreparation: true)
+        }
+    }
+
+    /// Shared body for continued / maintenance task handlers. Resolves the
+    /// binding, hands off to BackgroundUploadService, and decides how to
+    /// complete the task + whether to submit the next maintenance task.
+    private func runBackgroundEnqueue(
+        task: BGProcessingTask,
+        allowPreparation: Bool
+    ) async {
+        guard let binding = resolveBinding() else {
+            NSLog("[BackgroundExec] no binding — completing task without enqueue")
+            handleEnqueueResult(.missingBinding, task: task)
+            return
+        }
+        let clientId = SyncEngineManager.shared.bindingService.getOrCreateClientId()
+
+        let result = await BackgroundUploadService.shared.enqueueNextPendingFileIfIdle(
+            binding: binding,
+            clientId: clientId,
+            allowPreparation: allowPreparation
+        )
+        NSLog("[BackgroundExec] enqueue result=%@", "\(result)")
+        handleEnqueueResult(result, task: task)
+    }
+
+    /// Resolve the binding to use for a background task. Prefers the live
+    /// in-memory `SyncEngineManager.currentBinding`; falls back to
+    /// `last_known_binding` + the keychain-stored pairing token so cold
+    /// relaunches (iOS starts the process purely to deliver URLSession
+    /// events) can still proceed.
+    private func resolveBinding() -> StoredBinding? {
+        if let live = SyncEngineManager.shared.currentBinding,
+           !live.serverId.isEmpty,
+           !live.sidecarHost.isEmpty,
+           !live.pairingTokenKeychainRef.isEmpty {
+            return live
+        }
+        // Fallback — compose from the cache table + keychain. If any piece
+        // is missing we bail so the background task completes as "missing
+        // binding" and iOS doesn't burn our BGProcessing budget.
+        guard let store = SyncEngineManager.shared.uploadStoreForBackground else {
+            return nil
+        }
+        guard let lastKnown = store.getLastKnownBinding() else { return nil }
+        let token = SyncEngineManager.shared.bindingService.getPairingToken(
+            forKey: lastKnown.pairingTokenKeychainRef
+        )
+        guard let token, !token.isEmpty else { return nil }
+        _ = token // validated above; the pairing token itself isn't part of StoredBinding
+        return lastKnown
+    }
+
+    private func handleEnqueueResult(
+        _ result: BackgroundUploadService.EnqueueResult,
+        task: BGProcessingTask
+    ) {
+        switch result {
+        case .enqueued:
             task.setTaskCompleted(success: true)
+            submitMaintenanceTask()
+        case .activeTaskExists:
+            task.setTaskCompleted(success: true)
+            // Don't submit next — the active task's completion delegate
+            // will drive the chain.
+        case .emptyQueue:
+            task.setTaskCompleted(success: true)
+            // Nothing to do, nothing to reschedule for.
+        case .queueHeadNotReady,
+             .missingHost,
+             .exportFailed,
+             .queueHeadNeedsPreparation,
+             .staleTaskCancelled:
+            task.setTaskCompleted(success: true)
+            submitMaintenanceTask()
+        case .missingBinding, .missingPairingToken:
+            // Needs user re-pairing — don't burn BGProcessing budget.
+            task.setTaskCompleted(success: false)
         }
     }
 }
