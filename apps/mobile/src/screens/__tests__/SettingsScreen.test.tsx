@@ -169,6 +169,16 @@ jest.mock('../../constants/features', () => ({
   },
 }));
 
+let mockIsGlobalMarket = false;
+jest.mock('../../markets', () => {
+  const actual = jest.requireActual('../../markets');
+  return {
+    ...actual,
+    isGlobalMarket: () => mockIsGlobalMarket,
+    isChinaMarket: () => !mockIsGlobalMarket,
+  };
+});
+
 import i18n from '../../i18n';
 import { SettingsScreen } from '../SettingsScreen';
 import { NativeModules, NativeEventEmitter } from 'react-native';
@@ -207,6 +217,7 @@ describe('SettingsScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsGlobalMarket = false;
     (AsyncStorage.getItem as jest.Mock).mockResolvedValue(null);
     (AsyncStorage.setItem as jest.Mock).mockResolvedValue(undefined);
     (AsyncStorage.removeItem as jest.Mock).mockResolvedValue(undefined);
@@ -590,6 +601,28 @@ describe('SettingsScreen', () => {
         expect.any(Array),
       );
       expect(mockNavigate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Copyright visibility', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('zh-Hans');
+    });
+
+    test('displays copyright text in China/CN market', async () => {
+      mockIsGlobalMarket = false;
+      const { queryByText } = render(<SettingsScreen />);
+      await waitFor(() => {
+        expect(queryByText(/开云信息/)).toBeTruthy();
+      });
+    });
+
+    test('hides copyright text in global market', async () => {
+      mockIsGlobalMarket = true;
+      const { queryByText } = render(<SettingsScreen />);
+      await waitFor(() => {
+        expect(queryByText(/开云信息|Kaiyun/)).toBeNull();
+      });
     });
   });
 });

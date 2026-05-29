@@ -50,6 +50,7 @@ import { resetCurrentDesktopSidecarIfReachable } from '../services/sidecar-reset
 import { clearUserScopedStorage } from '../utils/clearUserScopedStorage';
 import { maskPhone } from '../utils/phone-validation';
 import { FEATURES } from '../constants/features';
+import { isGlobalMarket } from '../markets';
 import { iapService } from '../services/iap-service';
 import { classifyIapError } from '../services/iap-errors';
 import { markSubscriptionJustActivated } from '../hooks/useExpiryReminder';
@@ -1695,9 +1696,11 @@ export function SettingsScreen() {
           </>
         ) : null}
 
-        <View style={styles.footer}>
-          <Text style={styles.copyrightText}>{t('settings.copyright')}</Text>
-        </View>
+        {!isGlobalMarket() && (
+          <View style={styles.footer}>
+            <Text style={styles.copyrightText}>{t('settings.copyright')}</Text>
+          </View>
+        )}
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
