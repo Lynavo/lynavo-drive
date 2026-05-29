@@ -105,6 +105,12 @@ func (s *Server) handleDashboardDevices(w http.ResponseWriter, _ *http.Request) 
 	}
 
 	result := make([]deviceDTO, 0, len(devices))
+	// Cache one snapshot of live TCP states for the loop below.
+	var liveStates map[string]string
+	if s.clientStates != nil {
+		liveStates = s.clientStates.ConnectedClientStates()
+	}
+
 	for _, d := range devices {
 		ip := ""
 		if d.LastIP != nil {
@@ -133,7 +139,6 @@ func (s *Server) handleDashboardDevices(w http.ResponseWriter, _ *http.Request) 
 		// Derive status: live TCP > HTTP presence > offline
 		status := "offline"
 		if s.clientStates != nil {
-			liveStates := s.clientStates.ConnectedClientStates()
 			if st, ok := liveStates[d.ClientID]; ok {
 				if st == "syncing" {
 					status = "transferring"

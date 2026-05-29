@@ -70,8 +70,15 @@ function shouldPreserveRealtimeTransfer(
     return false;
   }
 
+  // Only preserve transferring when we have real-time evidence of an in-flight
+  // transfer (currentFile set AND progress < 100). If currentFile is missing
+  // the snapshot is the only source of truth, otherwise a stale transferring
+  // state without any currentFile locks the UI indefinitely (see M14).
+  // Fresh BG HTTP transfers populate currentFile via updateDeviceProgress
+  // before the next snapshot arrives, so legitimate in-flight uploads are
+  // still preserved.
   if (!existing.currentFile) {
-    return snapshot.status !== 'transferring';
+    return false;
   }
 
   if (snapshot.status !== 'transferring') {
@@ -245,18 +252,28 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   updateDeviceProgress: (deviceId, fileKey, progress) => {
     if (progress <= 0) return; // ignore zero-progress events
+    // Receiving an upload.progress tick (foreground TCP session or
+    // background HTTP without sessionId) is itself proof that the device is
+    // actively transferring. Promote status so DeviceCard renders the
+    // transferring affordance even when a fresh device.state.changed event
+    // hasn't arrived yet. Also cancel any pending offline-debounce timer
+    // because a progress tick is a definitive liveness signal.
+    clearPendingOfflineStatus(deviceId);
     set((state) => ({
-      devices: state.devices.map((d) =>
-        d.deviceId === deviceId
-          ? {
-              ...d,
-              currentFile: {
-                filename: d.currentFile?.filename ?? fileKey,
-                progress,
-                fileSize: d.currentFile?.fileSize ?? 0,
-              },
-            }
-          : d,
+      devices: sortDevices(
+        state.devices.map((d) =>
+          d.deviceId === deviceId
+            ? {
+                ...d,
+                status: 'transferring',
+                currentFile: {
+                  filename: d.currentFile?.filename ?? fileKey,
+                  progress,
+                  fileSize: d.currentFile?.fileSize ?? 0,
+                },
+              }
+            : d,
+        ),
       ),
     }));
   },
