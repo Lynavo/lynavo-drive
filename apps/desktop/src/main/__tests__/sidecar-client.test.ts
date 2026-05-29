@@ -752,4 +752,255 @@ describe('sidecarClient', () => {
 
     vi.resetModules();
   });
+
+  describe('refreshSession', () => {
+    it('refreshes the session successfully when token is valid', async () => {
+      const { writeFileSync } = require('node:fs');
+      const { join } = require('node:path');
+      const { tmpdir } = require('node:os');
+      const userDataPath = join(tmpdir(), 'vividrop-test-userdata');
+      const sessionFilePath = join(userDataPath, 'session.json');
+
+      const mockData = {
+        accessToken: Buffer.from('old-access-token').toString('base64'),
+        refreshToken: Buffer.from('old-refresh-token').toString('base64'),
+        encrypted: true,
+      };
+      writeFileSync(sessionFilePath, JSON.stringify(mockData, null, 2), 'utf8');
+
+      const httpsRequest = vi.fn((options: RequestOptions, callback: (res: unknown) => void) => {
+        const req = new EventEmitter() as EventEmitter & {
+          on: typeof EventEmitter.prototype.on;
+          write: ReturnType<typeof vi.fn>;
+          end: ReturnType<typeof vi.fn>;
+        };
+        req.write = vi.fn();
+        req.end = vi.fn();
+
+        if (options.path === '/api/v1/auth/refresh') {
+          callback(
+            createResponse(
+              200,
+              JSON.stringify({
+                code: 0,
+                message: 'success',
+                data: {
+                  access_token: 'new-access-token',
+                  refresh_token: 'new-refresh-token',
+                },
+              }),
+            ),
+          );
+        }
+        return req;
+      });
+
+      vi.doMock('node:https', () => ({
+        default: { request: httpsRequest },
+        request: httpsRequest,
+      }));
+
+      vi.resetModules();
+      const { sidecarClient: client } = await import('../sidecar-client');
+
+      const result = await client.refreshSession();
+      expect(result).toBe(true);
+      expect(client.getAuthSession()).toEqual({
+        accessToken: 'new-access-token',
+        refreshToken: 'new-refresh-token',
+      });
+      vi.resetModules();
+    });
+
+    it('clears session when refresh API returns non-zero code', async () => {
+      const { writeFileSync, existsSync } = require('node:fs');
+      const { join } = require('node:path');
+      const { tmpdir } = require('node:os');
+      const userDataPath = join(tmpdir(), 'vividrop-test-userdata');
+      const sessionFilePath = join(userDataPath, 'session.json');
+
+      const mockData = {
+        accessToken: Buffer.from('old-access-token').toString('base64'),
+        refreshToken: Buffer.from('old-refresh-token').toString('base64'),
+        encrypted: true,
+      };
+      writeFileSync(sessionFilePath, JSON.stringify(mockData, null, 2), 'utf8');
+
+      const httpsRequest = vi.fn((options: RequestOptions, callback: (res: unknown) => void) => {
+        const req = new EventEmitter() as EventEmitter & {
+          on: typeof EventEmitter.prototype.on;
+          write: ReturnType<typeof vi.fn>;
+          end: ReturnType<typeof vi.fn>;
+        };
+        req.write = vi.fn();
+        req.end = vi.fn();
+
+        callback(
+          createResponse(
+            200,
+            JSON.stringify({
+              code: 1007,
+              message: 'Refresh token invalid',
+            }),
+          ),
+        );
+        return req;
+      });
+
+      vi.doMock('node:https', () => ({
+        default: { request: httpsRequest },
+        request: httpsRequest,
+      }));
+
+      vi.resetModules();
+      const { sidecarClient: client } = await import('../sidecar-client');
+
+      const result = await client.refreshSession();
+      expect(result).toBe(false);
+      expect(client.getAuthSession()).toBeNull();
+      expect(existsSync(sessionFilePath)).toBe(false);
+      vi.resetModules();
+    });
+
+    it('does not clear session when refresh API throws network/HTTP error', async () => {
+      const { writeFileSync, existsSync } = require('node:fs');
+      const { join } = require('node:path');
+      const { tmpdir } = require('node:os');
+      const userDataPath = join(tmpdir(), 'vividrop-test-userdata');
+      const sessionFilePath = join(userDataPath, 'session.json');
+
+      const mockData = {
+        accessToken: Buffer.from('old-access-token').toString('base64'),
+        refreshToken: Buffer.from('old-refresh-token').toString('base64'),
+        encrypted: true,
+      };
+      writeFileSync(sessionFilePath, JSON.stringify(mockData, null, 2), 'utf8');
+
+      const httpsRequest = vi.fn((options: RequestOptions, callback: (res: unknown) => void) => {
+        const req = new EventEmitter() as EventEmitter & {
+          on: typeof EventEmitter.prototype.on;
+          write: ReturnType<typeof vi.fn>;
+          end: ReturnType<typeof vi.fn>;
+        };
+        req.write = vi.fn();
+        req.end = vi.fn();
+
+        callback(createResponse(500, 'Internal Server Error'));
+        return req;
+      });
+
+      vi.doMock('node:https', () => ({
+        default: { request: httpsRequest },
+        request: httpsRequest,
+      }));
+
+      vi.resetModules();
+      const { sidecarClient: client } = await import('../sidecar-client');
+
+      const result = await client.refreshSession();
+      expect(result).toBe(false);
+      expect(client.getAuthSession()).toEqual({
+        accessToken: 'old-access-token',
+        refreshToken: 'old-refresh-token',
+      });
+      expect(existsSync(sessionFilePath)).toBe(true);
+      vi.resetModules();
+    });
+  });
+
+  describe('syncCredentialsToSidecar with token rotation', () => {
+    it('retries fetchTurnCredentials after a successful refreshSession when initial code is 1006', async () => {
+      const { writeFileSync } = require('node:fs');
+      const { join } = require('node:path');
+      const { tmpdir } = require('node:os');
+      const userDataPath = join(tmpdir(), 'vividrop-test-userdata');
+      const sessionFilePath = join(userDataPath, 'session.json');
+
+      const mockData = {
+        accessToken: Buffer.from('old-access-token').toString('base64'),
+        refreshToken: Buffer.from('old-refresh-token').toString('base64'),
+        encrypted: true,
+      };
+      writeFileSync(sessionFilePath, JSON.stringify(mockData, null, 2), 'utf8');
+
+      const httpRequest = vi.fn((options: RequestOptions, callback: (res: unknown) => void) => {
+        const req = new EventEmitter() as EventEmitter & {
+          on: typeof EventEmitter.prototype.on;
+          write: ReturnType<typeof vi.fn>;
+          end: ReturnType<typeof vi.fn>;
+        };
+        req.write = vi.fn();
+        req.end = vi.fn();
+        callback(createResponse(200, JSON.stringify({ ok: true })));
+        return req;
+      });
+
+      let turnFetchCount = 0;
+      const httpsRequest = vi.fn((options: RequestOptions, callback: (res: unknown) => void) => {
+        const req = new EventEmitter() as EventEmitter & {
+          on: typeof EventEmitter.prototype.on;
+          write: ReturnType<typeof vi.fn>;
+          end: ReturnType<typeof vi.fn>;
+        };
+        req.write = vi.fn();
+        req.end = vi.fn();
+
+        if (options.path?.includes('/tunnel/turn-credentials')) {
+          turnFetchCount++;
+          if (turnFetchCount === 1) {
+            callback(createResponse(200, JSON.stringify({ code: 1006, message: 'Expired' })));
+          } else {
+            callback(
+              createResponse(
+                200,
+                JSON.stringify({
+                  code: 0,
+                  data: {
+                    urls: ['turn:example.com'],
+                    username: 'user',
+                    credential: 'pwd',
+                  },
+                }),
+              ),
+            );
+          }
+        } else if (options.path === '/api/v1/auth/refresh') {
+          callback(
+            createResponse(
+              200,
+              JSON.stringify({
+                code: 0,
+                data: {
+                  access_token: 'new-access-token',
+                  refresh_token: 'new-refresh-token',
+                },
+              }),
+            ),
+          );
+        }
+        return req;
+      });
+
+      vi.doMock('node:http', () => ({
+        default: { request: httpRequest },
+        request: httpRequest,
+      }));
+      vi.doMock('node:https', () => ({
+        default: { request: httpsRequest },
+        request: httpsRequest,
+      }));
+
+      vi.resetModules();
+      const { sidecarClient: client, syncCredentialsToSidecar } = await import('../sidecar-client');
+
+      const result = await syncCredentialsToSidecar();
+      expect(result).toBe(true);
+      expect(turnFetchCount).toBe(2);
+      expect(client.getAuthSession()).toEqual({
+        accessToken: 'new-access-token',
+        refreshToken: 'new-refresh-token',
+      });
+      vi.resetModules();
+    });
+  });
 });
