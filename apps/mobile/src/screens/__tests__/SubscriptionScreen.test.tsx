@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Clipboard, NativeModules, Platform } from 'react-native';
+import { Alert, Clipboard, NativeModules, Platform, Linking } from 'react-native';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import type {
   SubscriptionPlanDto,
@@ -198,6 +198,7 @@ import {
 } from '../../services/subscription-service';
 import { ApiError, ERROR_CODE } from '../../services/api';
 import { mainlandPaymentService } from '../../services/mainland-payment-service';
+import { USER_AGREEMENT_URL, PRIVACY_POLICY_URL } from '../../constants/legal';
 import {
   getGiftCardConfig,
   redeemGiftCard,
@@ -516,6 +517,49 @@ describe('SubscriptionScreen', () => {
 
     // Assert: the small grey footer line announces degraded mode.
     expect(await findByText(/离线模式|離線模式|Offline mode/i)).toBeTruthy();
+  });
+
+  test('renders EULA and privacy policy links when Platform is iOS', async () => {
+    // Arrange
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'ios',
+    });
+    const openURLSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+
+    // Act
+    const { findByText } = renderScreen();
+
+    // Assert: EULA and Privacy Policy links are present
+    const eulaLink = await findByText(/服务协议|服務協議|用户协议|用戶協議|Terms of Service|User Agreement/i);
+    const privacyLink = await findByText(/隐私政策|隱私政策|Privacy Policy/i);
+    expect(eulaLink).toBeTruthy();
+    expect(privacyLink).toBeTruthy();
+
+    // Act: Tap EULA link
+    fireEvent.press(eulaLink);
+    expect(openURLSpy).toHaveBeenCalledWith('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/');
+
+    // Act: Tap Privacy link
+    fireEvent.press(privacyLink);
+    expect(openURLSpy).toHaveBeenCalledWith(PRIVACY_POLICY_URL);
+
+    openURLSpy.mockRestore();
+  });
+
+  test('does not render EULA and privacy policy links when Platform is Android', async () => {
+    // Arrange
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'android',
+    });
+    
+    // Act
+    const { queryByText } = renderScreen();
+
+    // Assert: EULA and Privacy Policy links should not be present
+    expect(queryByText(/服务协议|服務協議|用户协议|用戶協議|Terms of Service|User Agreement/i)).toBeNull();
+    expect(queryByText(/隐私政策|隱私政策|Privacy Policy/i)).toBeNull();
   });
 
   test('subscribe CTA invokes iapService.purchase with the selected product_id', async () => {

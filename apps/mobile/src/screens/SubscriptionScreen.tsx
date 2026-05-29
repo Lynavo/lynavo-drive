@@ -19,6 +19,7 @@ import {
   NativeModules,
   Clipboard,
   Platform,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -68,6 +69,7 @@ import {
 } from '../services/diagnostic-upload-service';
 import { recordDiagnosticsLog } from '../services/diagnostics-log-service';
 import { FEATURES } from '../constants/features';
+import { USER_AGREEMENT_URL, PRIVACY_POLICY_URL } from '../constants/legal';
 import {
   hasGiftCardEntitlement,
   resolveSubscriptionDisplayState,
@@ -78,6 +80,8 @@ import {
   resolveSubscriptionPaymentRoute,
   type MainlandPaymentMethod,
 } from '../utils/subscriptionPaymentRouting';
+
+const APPLE_EULA_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 
 const DARK = '#202022';
 const SCREEN_BG = '#d6ecf8';
@@ -2189,6 +2193,23 @@ export function SubscriptionScreen() {
         ) : null}
 
         <Text style={styles.footerText}>{t('subscription.footer')}</Text>
+        {Platform.OS === 'ios' && (
+          <View style={styles.legalContainer}>
+            <TouchableOpacity
+              onPress={() => Linking.openURL(APPLE_EULA_URL)}
+              accessibilityLabel={t('common.termsOfService')}
+            >
+              <Text style={styles.legalLink}>{t('common.termsOfService')}</Text>
+            </TouchableOpacity>
+            <Text style={styles.legalDivider}>|</Text>
+            <TouchableOpacity
+              onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+              accessibilityLabel={t('common.privacyPolicy')}
+            >
+              <Text style={styles.legalLink}>{t('common.privacyPolicy')}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         {plansSource === 'bootstrap' ? (
           <Text style={styles.offlineNote}>
             {t('subscription.plans.offlineMode')}
@@ -2439,6 +2460,23 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 20,
+  },
+  legalContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  legalLink: {
+    fontSize: 12,
+    color: '#3b82f6',
+    textDecorationLine: 'underline',
+  },
+  legalDivider: {
+    fontSize: 12,
+    color: '#b2bccc',
+    marginHorizontal: 8,
   },
   errorBanner: {
     flexDirection: 'row',
