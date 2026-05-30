@@ -70,6 +70,12 @@ class DiscoveryService {
         browser != nil
     }
 
+    func candidateDevicesSnapshot() -> [DiscoveredDevice] {
+        queue.sync {
+            Array(devices.values)
+        }
+    }
+
     func startBrowsing() {
         slog("[DiscoveryService] startBrowsing called")
         syncDiagnosticsLog("DiscoveryService", "startBrowsing called")

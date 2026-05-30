@@ -153,21 +153,8 @@ private func syncFlowPreferredClientIPv4() -> String? {
     return fallback
 }
 
-private func syncFlowIPv4Octets(_ host: String) -> [Int]? {
-    let parts = host.split(separator: ".")
-    guard parts.count == 4 else { return nil }
-    let octets = parts.compactMap { Int($0) }
-    guard octets.count == 4, octets.allSatisfy({ (0...255).contains($0) }) else {
-        return nil
-    }
-    return octets
-}
-
 private func syncFlowIsPrivateLANIPv4(_ host: String) -> Bool {
-    guard let octets = syncFlowIPv4Octets(host) else { return false }
-    return octets[0] == 10 ||
-        (octets[0] == 172 && (16...31).contains(octets[1])) ||
-        (octets[0] == 192 && octets[1] == 168)
+    SharedFilesRoutePolicy.isPrivateLANIPv4(host)
 }
 
 final class SyncDiagnosticsLogStore {
@@ -355,7 +342,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         label: "com.syncflow.presence-recovery",
         qos: .utility
     )
-    private let presenceRecoveryMaxAttempts = 60
+    private let presenceRecoveryMaxAttempts = 10
     private let presenceRecoveryRetryInterval: TimeInterval = 1
     private let presenceRecoveryLock = NSLock()
     private var presenceRecoveryToken = UUID()
@@ -368,6 +355,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private var p2pTunnelCredentials: P2PTunnelCredentials?
     private var p2pTunnelGeneration = 0
     private var p2pTunnelStarting = false
+    private struct P2PTunnelRouteState {
+        let hasCredentials: Bool
+        let isActive: Bool
+        let port: UInt16?
+    }
+    private let sharedFileTunnelOperationLock = NSLock()
+    private var activeSharedFileTunnelOperations = 0
+    private var lastSharedFileTunnelOperationEndedAt: TimeInterval?
     private let diagnosticsIssueLock = NSLock()
     private var recentRetryDiagnostic: [String: Any]?
     private var recentErrorDiagnostic: [String: Any]?
@@ -1239,6 +1234,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
         if uploadStore?.getBinding() != nil {
             bindingConnectionState = .bound
+            startPresenceHeartbeatTimer()
         }
         refreshCurrentBindingFromStore()
         discoveryService.delegate = self
@@ -1317,6 +1313,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     @objc private func appDidEnterBackground() {
         slog("[SyncEngine] app entered background, isSyncing=\(isSyncing)")
+        if !isSyncing {
+            stopPresenceHeartbeatTimer()
+            cancelPresenceRecoveryProbe(reason: "app_entered_background")
+        }
         guard isSyncing else { return }
         beginBackgroundTransitionIfNeeded(reason: "didEnterBackground")
         isTransitioningToBackground = true
@@ -1485,7 +1485,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         // Validate connection immediately on foreground — the heartbeat timer
         // may not have fired while the app was suspended, leaving a stale
         // .connected state even though the desktop is no longer reachable.
-        if bindingConnectionState == .connected || bindingConnectionState == .bound {
+        if uploadStore?.getBinding() != nil {
             let clientId = bindingService.getOrCreateClientId()
             verifyPresenceWithRecovery(clientId: clientId)
         }
@@ -1630,14 +1630,19 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         emitBindingStateChanged()
 
         // Keep the standalone heartbeat timer in sync with connection state
-        if newState == .connected {
-            cancelPresenceRecoveryProbe(reason: "state_connected")
+        if newState == .connected || newState == .bound {
+            cancelPresenceRecoveryProbe(reason: "state_\(newState.rawValue)")
             startPresenceHeartbeatTimer()
-            startP2PTunnelIfNeeded(reason: "state_connected")
+            if newState == .connected {
+                startP2PTunnelIfNeeded(reason: "state_connected")
+            }
         } else {
             stopPresenceHeartbeatTimer()
-            stopP2PTunnel(reason: "state_\(newState.rawValue)")
+            if newState == .offline {
+                stopP2PTunnel(reason: "state_offline")
+            }
         }
+
     }
 
     private func maintainConnectedBindingState(reason: String) {
@@ -1697,8 +1702,97 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
     }
 
+    private func currentP2PTunnelRouteStateLocked() -> P2PTunnelRouteState {
+        let port = sharedFilesService.tunnelPort
+        return P2PTunnelRouteState(
+            hasCredentials: p2pTunnelCredentials != nil,
+            isActive: sharedFilesService.isTunnelActive && port != nil,
+            port: port
+        )
+    }
+
+    private func p2pTunnelRouteState(startReason: String?) async -> P2PTunnelRouteState {
+        p2pTunnelQueue.sync {
+            if let startReason {
+                startP2PTunnelIfNeededLocked(reason: startReason)
+            }
+            return currentP2PTunnelRouteStateLocked()
+        }
+    }
+
+    private func waitForP2PTunnelActive(
+        reason: String,
+        timeoutNanoseconds: UInt64 = 45_000_000_000
+    ) async -> Bool {
+        let deadline = Date().addingTimeInterval(Double(timeoutNanoseconds) / 1_000_000_000)
+        let pollIntervalNanoseconds: UInt64 = 500_000_000
+        var attempt = 0
+        var didLogWait = false
+
+        while true {
+            let startReason = attempt == 0 ? reason : "\(reason)_retry_\(attempt)"
+            let state = await p2pTunnelRouteState(startReason: startReason)
+            if state.isActive {
+                syncDiagnosticsLog(
+                    "SharedFiles",
+                    "P2P tunnel ready for shared files reason=\(reason) port=\(state.port.map(String.init) ?? "nil") attempts=\(attempt + 1)"
+                )
+                return true
+            }
+
+            guard SharedFilesRoutePolicy.shouldWaitForP2PTunnelRoute(
+                hasTunnelCredentials: state.hasCredentials,
+                isTunnelActive: state.isActive
+            ) else {
+                if !state.hasCredentials {
+                    syncDiagnosticsLog(
+                        "SharedFiles",
+                        "P2P tunnel unavailable for shared files reason=\(reason); credentials missing"
+                    )
+                }
+                return false
+            }
+
+            if Date() >= deadline {
+                break
+            }
+
+            if !didLogWait {
+                didLogWait = true
+                syncDiagnosticsLog(
+                    "SharedFiles",
+                    "waiting for P2P tunnel before shared files route reason=\(reason)"
+                )
+            }
+
+            let remaining = max(0, deadline.timeIntervalSinceNow)
+            let sleepSeconds = min(remaining, Double(pollIntervalNanoseconds) / 1_000_000_000)
+            if sleepSeconds > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(sleepSeconds * 1_000_000_000))
+            }
+            attempt += 1
+        }
+
+        let finalState = await p2pTunnelRouteState(startReason: nil)
+        if finalState.isActive {
+            syncDiagnosticsLog(
+                "SharedFiles",
+                "P2P tunnel became ready at wait deadline reason=\(reason) port=\(finalState.port.map(String.init) ?? "nil")"
+            )
+            return true
+        }
+        syncDiagnosticsLog(
+            "SharedFiles",
+            "P2P tunnel wait timed out for shared files reason=\(reason) hasCredentials=\(finalState.hasCredentials)"
+        )
+        return false
+    }
+
     private func startP2PTunnelIfNeededLocked(reason: String) {
-        guard let credentials = p2pTunnelCredentials else { return }
+        guard let credentials = p2pTunnelCredentials else {
+            syncDiagnosticsLog("SyncEngine", "P2P tunnel skipped: credentials missing (\(reason))")
+            return
+        }
         if p2pTunnelStarting { return }
         if sharedFilesService.isTunnelActive, sharedFilesService.tunnelPort != nil {
             return
@@ -1758,8 +1852,99 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         p2pTunnelStarting = false
         sharedFilesService.tunnelPort = nil
         sharedFilesService.isTunnelActive = false
+        sharedFilesService.useTunnelRoute = false
         localTCPProxy.stop()
         syncDiagnosticsLog("SyncEngine", "P2P tunnel stopped (\(reason))")
+    }
+
+    private func restartP2PTunnel(reason: String) {
+        p2pTunnelQueue.async { [weak self] in
+            guard let self else { return }
+            self.restartP2PTunnelLocked(reason: reason)
+        }
+    }
+
+    private func restartP2PTunnelAndWait(reason: String) async {
+        p2pTunnelQueue.sync {
+            restartP2PTunnelLocked(reason: reason)
+        }
+    }
+
+    private func restartP2PTunnelLocked(reason: String) {
+        syncDiagnosticsLog("SyncEngine", "P2P tunnel restarting (\(reason))")
+        stopP2PTunnelLocked(reason: reason)
+        startP2PTunnelIfNeededLocked(reason: "\(reason)_restart")
+    }
+
+    private func beginSharedFileTunnelOperation(
+        path: String,
+        reason: String,
+        isTunnelRoute: Bool
+    ) -> Bool {
+        guard isTunnelRoute else { return false }
+
+        sharedFileTunnelOperationLock.lock()
+        activeSharedFileTunnelOperations += 1
+        let active = activeSharedFileTunnelOperations
+        sharedFileTunnelOperationLock.unlock()
+
+        syncDiagnosticsLog(
+            "SharedFiles",
+            "shared file tunnel operation began reason=\(reason) path=\(path) active=\(active)"
+        )
+        return true
+    }
+
+    private func endSharedFileTunnelOperation(
+        path: String,
+        reason: String,
+        didBegin: Bool
+    ) {
+        guard didBegin else { return }
+
+        sharedFileTunnelOperationLock.lock()
+        activeSharedFileTunnelOperations = max(0, activeSharedFileTunnelOperations - 1)
+        lastSharedFileTunnelOperationEndedAt = Date().timeIntervalSinceReferenceDate
+        let active = activeSharedFileTunnelOperations
+        sharedFileTunnelOperationLock.unlock()
+
+        syncDiagnosticsLog(
+            "SharedFiles",
+            "shared file tunnel operation ended reason=\(reason) path=\(path) active=\(active)"
+        )
+    }
+
+    private func currentSharedFileTunnelOperationState() -> (
+        activeOperations: Int,
+        secondsSinceLastOperation: TimeInterval?
+    ) {
+        sharedFileTunnelOperationLock.lock()
+        defer { sharedFileTunnelOperationLock.unlock() }
+        let secondsSinceLastOperation = lastSharedFileTunnelOperationEndedAt.map {
+            Date().timeIntervalSinceReferenceDate - $0
+        }
+        return (activeSharedFileTunnelOperations, secondsSinceLastOperation)
+    }
+
+    private func withSharedFileTunnelOperation<T>(
+        path: String,
+        reason: String,
+        isTunnelRoute: Bool,
+        _ operation: () async throws -> T
+    ) async throws -> T {
+        let didBegin = beginSharedFileTunnelOperation(
+            path: path,
+            reason: reason,
+            isTunnelRoute: isTunnelRoute
+        )
+        defer {
+            endSharedFileTunnelOperation(
+                path: path,
+                reason: reason,
+                didBegin: didBegin
+            )
+        }
+        return try await operation()
     }
 
     // MARK: - Standalone Presence Heartbeat Timer
@@ -1771,7 +1956,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         guard uploadStore?.getBinding() != nil else { return }
         let clientId = bindingService.getOrCreateClientId()
         let timer = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
-        timer.schedule(deadline: .now() + 30, repeating: 30, leeway: .seconds(5))
+        timer.schedule(deadline: .now() + 2, repeating: 30, leeway: .seconds(5))
         timer.setEventHandler { [weak self] in
             guard let self = self else { return }
             // Skip if sync pipeline is running — it has its own heartbeat loop
@@ -5946,10 +6131,18 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
               let host = currentPresenceHeartbeatHost() else {
             return
         }
-        let port = 39394
-        // IPv6 link-local needs brackets and zone ID in URL
-        let hostPart = host.contains(":") ? "[\(host)]" : host
-        let urlStr = "http://\(hostPart):\(port)/presence/\(clientId)"
+        let useTunnel = sharedFilesService.isTunnelActive && sharedFilesService.tunnelPort != nil
+        let hostPart: String
+        let portPart: Int
+        if useTunnel, let tPort = sharedFilesService.tunnelPort {
+            hostPart = "127.0.0.1"
+            portPart = Int(tPort)
+        } else {
+            hostPart = host.contains(":") ? "[\(host)]" : host
+            portPart = 39394
+        }
+        let usedTunnelRoute = useTunnel
+        let urlStr = "http://\(hostPart):\(portPart)/presence/\(clientId)"
         guard let url = URL(string: urlStr) else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -5975,6 +6168,29 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             if let error {
                 slog("[Presence] heartbeat failed: %@", "\(error)")
                 syncDiagnosticsLog("Presence", "heartbeat failed host=\(host) reason=\(failureReason) error=\(error)")
+                let sharedFileTunnelState = self.currentSharedFileTunnelOperationState()
+                if SharedFilesRoutePolicy.shouldSuppressPresenceTunnelFailure(
+                    isTunnelRoute: usedTunnelRoute,
+                    activeSharedFileTunnelOperations: sharedFileTunnelState.activeOperations,
+                    secondsSinceLastSharedFileTunnelOperation: sharedFileTunnelState.secondsSinceLastOperation
+                ) {
+                    syncDiagnosticsLog(
+                        "Presence",
+                        "heartbeat failed on tunnel route near shared file tunnel activity; suppressing tunnel restart reason=\(failureReason) active=\(sharedFileTunnelState.activeOperations) secondsSinceLast=\(sharedFileTunnelState.secondsSinceLastOperation.map { String(format: "%.3f", $0) } ?? "nil")"
+                    )
+                    self.maintainConnectedBindingState(
+                        reason: "\(failureReason)_shared_file_tunnel_active"
+                    )
+                    completion?(true)
+                    return
+                }
+                if SharedFilesRoutePolicy.shouldInvalidateTunnelAfterRouteFailure(isTunnelRoute: usedTunnelRoute) {
+                    syncDiagnosticsLog(
+                        "Presence",
+                        "heartbeat failed on tunnel route; restarting P2P tunnel reason=\(failureReason)"
+                    )
+                    self.restartP2PTunnel(reason: "\(failureReason)_tunnel_failed")
+                }
                 if updateStateOnFailure {
                     self.updateBindingConnectionState(.offline, reason: failureReason)
                 }
@@ -6556,8 +6772,236 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     // MARK: - Shared Files
 
+    private func sharedFilesDiscoveryDevice(for binding: BindingRecord) -> DiscoveredDevice? {
+        if let device = discoveredDevices[binding.deviceId] {
+            return device
+        }
+
+        let candidates = discoveryService.candidateDevicesSnapshot()
+        if let exactMatch = candidates.first(where: { $0.deviceId == binding.deviceId }) {
+            syncDiagnosticsLog(
+                "SharedFiles",
+                "using Bonjour candidate for shared files device=\(binding.deviceId) host=\(exactMatch.ip)"
+            )
+            return exactMatch
+        }
+
+        let expectedNames = Set(
+            [binding.deviceName, binding.deviceAlias].compactMap {
+                $0?.trimmingCharacters(in: .whitespacesAndNewlines)
+            }.filter { !$0.isEmpty }
+        )
+        let nameMatches = candidates.filter { expectedNames.contains($0.name) }
+        if nameMatches.count == 1, let matchedDevice = nameMatches.first {
+            syncDiagnosticsLog(
+                "SharedFiles",
+                "using unique Bonjour candidate by name for shared files bindingDevice=\(binding.deviceId) candidateDevice=\(matchedDevice.deviceId) name=\(matchedDevice.name) host=\(matchedDevice.ip)"
+            )
+            return matchedDevice
+        }
+
+        let summary = candidates.map {
+            "\($0.name)/\($0.ip.isEmpty ? "no-ip" : $0.ip)/\($0.deviceId)"
+        }.joined(separator: ", ")
+        syncDiagnosticsLog(
+            "SharedFiles",
+            "no Bonjour candidate for shared files bindingDevice=\(binding.deviceId) candidates=\(summary.isEmpty ? "none" : summary)"
+        )
+        return nil
+    }
+
+    private func freshSharedFilesLANHost(for binding: BindingRecord) -> String? {
+        guard let device = sharedFilesDiscoveryDevice(for: binding) else {
+            return nil
+        }
+        let resolvedHost = preferredSidecarHost(probedHost: device.ip, device: device)
+        guard let host = SharedFilesRoutePolicy.freshLANHost(discoveredHost: resolvedHost) else {
+            syncDiagnosticsLog(
+                "SharedFiles",
+                "ignored discovery host for shared files host=\(resolvedHost ?? "nil") device=\(binding.deviceId)"
+            )
+            return nil
+        }
+
+        if sidecarHost != host {
+            syncDiagnosticsLog(
+                "SharedFiles",
+                "shared files LAN host refreshed \(sidecarHost ?? "nil") -> \(host)"
+            )
+        }
+        sidecarHost = host
+        refreshBoundServerMetadata(
+            expectedDeviceId: binding.deviceId,
+            serverName: device.name,
+            shareName: device.shareName,
+            host: host
+        )
+        return host
+    }
+
+    private func waitForSharedFilesLANHost(
+        binding: BindingRecord,
+        timeoutNanoseconds: UInt64 = 1_000_000_000
+    ) async -> String? {
+        let pollInterval: UInt64 = 100_000_000
+        var elapsed: UInt64 = 0
+        while elapsed < timeoutNanoseconds {
+            if let host = freshSharedFilesLANHost(for: binding) {
+                return host
+            }
+            try? await Task.sleep(nanoseconds: pollInterval)
+            elapsed += pollInterval
+        }
+        return freshSharedFilesLANHost(for: binding)
+    }
+
+    private func canReachSharedFilesLANHost(_ host: String, timeout: TimeInterval = 1.5) async -> Bool {
+        var components = URLComponents()
+        components.scheme = "http"
+        components.host = host
+        components.port = 39394
+        components.path = "/health"
+        guard let url = components.url else {
+            return false
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = timeout
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                syncDiagnosticsLog("SharedFiles", "LAN health probe missing HTTP response host=\(host)")
+                return false
+            }
+            let reachable = (200..<300).contains(httpResponse.statusCode)
+            syncDiagnosticsLog("SharedFiles", "LAN health probe host=\(host) status=\(httpResponse.statusCode) reachable=\(reachable)")
+            return reachable
+        } catch {
+            syncDiagnosticsLog("SharedFiles", "LAN health probe failed host=\(host) error=\(error)")
+            return false
+        }
+    }
+
+    private func prepareSharedFilesRoute(reason: String) async -> (host: String, isTunnel: Bool) {
+        guard let binding = uploadStore?.getBinding() else {
+            sharedFilesService.sidecarHost = nil
+            return ("nil", false)
+        }
+
+        if !discoveryService.isBrowsing {
+            startDiscovery()
+        }
+
+        var unreachableLANHost: String?
+        if let lanHost = freshSharedFilesLANHost(for: binding) {
+            if await canReachSharedFilesLANHost(lanHost) {
+                sharedFilesService.sidecarHost = lanHost
+                sharedFilesService.useTunnelRoute = false
+                return (lanHost, false)
+            }
+            unreachableLANHost = lanHost
+            syncDiagnosticsLog(
+                "SharedFiles",
+                "LAN host unavailable for shared files host=\(lanHost); trying P2P tunnel"
+            )
+        }
+
+        if await waitForP2PTunnelActive(reason: reason) {
+            let port = sharedFilesService.tunnelPort.map { String($0) } ?? "unknown"
+            sharedFilesService.useTunnelRoute = true
+            return ("127.0.0.1:\(port)", true)
+        }
+
+        if let lanHost = await waitForSharedFilesLANHost(binding: binding) {
+            if await canReachSharedFilesLANHost(lanHost) {
+                sharedFilesService.sidecarHost = lanHost
+                sharedFilesService.useTunnelRoute = false
+                return (lanHost, false)
+            }
+            unreachableLANHost = lanHost
+            syncDiagnosticsLog(
+                "SharedFiles",
+                "waited LAN host is still unavailable for shared files host=\(lanHost)"
+            )
+        }
+
+        var fallbackHost = SharedFilesRoutePolicy.fallbackDirectHost(
+            liveHost: sidecarHost,
+            currentBindingHost: currentBinding?.sidecarHost,
+            persistedHost: binding.host
+        )
+        if let unreachableLANHost, fallbackHost == unreachableLANHost {
+            fallbackHost = nil
+        }
+        if let host = fallbackHost,
+           SharedFilesRoutePolicy.isPrivateLANIPv4(host),
+           !(await canReachSharedFilesLANHost(host)) {
+            syncDiagnosticsLog(
+                "SharedFiles",
+                "cached direct host unavailable for shared files host=\(host)"
+            )
+            fallbackHost = nil
+        }
+        sharedFilesService.sidecarHost = fallbackHost
+        sharedFilesService.useTunnelRoute = false
+        syncDiagnosticsLog(
+            "SharedFiles",
+            "shared files falling back to cached direct host=\(fallbackHost ?? "nil") after LAN discovery/tunnel unavailable"
+        )
+        return (fallbackHost ?? "nil", false)
+    }
+
+    private func recoverSharedFilesTunnelAfterRouteFailure(
+        path: String,
+        reason: String,
+        error: Error
+    ) async -> (host: String, isTunnel: Bool) {
+        syncDiagnosticsLog(
+            "SharedFiles",
+            "tunnel route failed path=\(path) reason=\(reason) error=\(error); restarting tunnel"
+        )
+        await restartP2PTunnelAndWait(reason: "\(reason)_tunnel_route_failed")
+        return await prepareSharedFilesRoute(reason: "\(reason)_retry_after_tunnel_restart")
+    }
+
     func browseSharedFiles(path: String) async throws -> [String: Any] {
-        let directory = try await sharedFilesService.listSharedFiles(path: path)
+        var route = await prepareSharedFilesRoute(reason: "browse_shared_files")
+        slog("[SharedFiles] browseSharedFiles path=%@ resolved_host=%@ is_tunnel=%@", path, route.host, String(route.isTunnel))
+        syncDiagnosticsLog("SharedFiles", "browseSharedFiles path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
+
+        let directory: SharedDirectory
+        do {
+            directory = try await withSharedFileTunnelOperation(
+                path: path,
+                reason: "browse_shared_files",
+                isTunnelRoute: route.isTunnel
+            ) {
+                try await sharedFilesService.listSharedFiles(path: path)
+            }
+        } catch {
+            guard SharedFilesRoutePolicy.shouldInvalidateTunnelAfterRouteFailure(isTunnelRoute: route.isTunnel) else {
+                throw error
+            }
+            route = await recoverSharedFilesTunnelAfterRouteFailure(
+                path: path,
+                reason: "browse_shared_files",
+                error: error
+            )
+            slog("[SharedFiles] browseSharedFiles retry path=%@ resolved_host=%@ is_tunnel=%@", path, route.host, String(route.isTunnel))
+            syncDiagnosticsLog("SharedFiles", "browseSharedFiles retry path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
+            directory = try await withSharedFileTunnelOperation(
+                path: path,
+                reason: "browse_shared_files_retry",
+                isTunnelRoute: route.isTunnel
+            ) {
+                try await sharedFilesService.listSharedFiles(path: path)
+            }
+        }
+        if bindingConnectionState != .connected {
+            updateBindingConnectionState(.connected, reason: "browse_shared_files_success")
+        }
         let files: [[String: Any]] = directory.files.map { file in
             var fileDict: [String: Any] = [
                 "name": file.name,
@@ -6584,13 +7028,48 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     }
 
     func downloadSharedFile(path: String) async throws -> [String: Any] {
-        let result = try await sharedFilesService.downloadFile(path: path) { bytesWritten, totalBytes, progress in
+        var route = await prepareSharedFilesRoute(reason: "download_shared_file")
+        slog("[SharedFiles] downloadSharedFile path=%@ resolved_host=%@ is_tunnel=%@", path, route.host, String(route.isTunnel))
+        syncDiagnosticsLog("SharedFiles", "downloadSharedFile path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
+
+        let progressHandler: SharedFileDownloadProgressHandler = { bytesWritten, totalBytes, progress in
             NativeSyncEngineModule.shared?.emitSharedFileDownloadProgress(
                 path: path,
                 bytesWritten: bytesWritten,
                 totalBytes: totalBytes,
                 progress: progress
             )
+        }
+        let result: SharedFilesService.DownloadResult
+        do {
+            result = try await withSharedFileTunnelOperation(
+                path: path,
+                reason: "download_shared_file",
+                isTunnelRoute: route.isTunnel
+            ) {
+                try await sharedFilesService.downloadFile(path: path, onProgress: progressHandler)
+            }
+        } catch {
+            guard SharedFilesRoutePolicy.shouldInvalidateTunnelAfterRouteFailure(isTunnelRoute: route.isTunnel) else {
+                throw error
+            }
+            route = await recoverSharedFilesTunnelAfterRouteFailure(
+                path: path,
+                reason: "download_shared_file",
+                error: error
+            )
+            slog("[SharedFiles] downloadSharedFile retry path=%@ resolved_host=%@ is_tunnel=%@", path, route.host, String(route.isTunnel))
+            syncDiagnosticsLog("SharedFiles", "downloadSharedFile retry path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
+            result = try await withSharedFileTunnelOperation(
+                path: path,
+                reason: "download_shared_file_retry",
+                isTunnelRoute: route.isTunnel
+            ) {
+                try await sharedFilesService.downloadFile(path: path, onProgress: progressHandler)
+            }
+        }
+        if bindingConnectionState != .connected {
+            updateBindingConnectionState(.connected, reason: "download_shared_file_success")
         }
         return [
             "savedToPhotos": result.savedToPhotos,

@@ -20,6 +20,7 @@
 		A02C8AC4F1D2121BB74AD3E9 /* AutoUploadConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D380A808E5707AB54A6BAD29 /* AutoUploadConfigStore.swift */; };
 		BEA438F6884C0C6D0918C25E /* ManualUploadService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42E22EE10B6D2552C83E31BB /* ManualUploadService.swift */; };
 		D4E1C9F62F7A000100000001 /* SyncFlowVersion.generated.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9F52F7A000100000001 /* SyncFlowVersion.generated.swift */; };
+		D4E1C9F82F8B000100000001 /* SharedFilesRoutePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9F72F8B000100000001 /* SharedFilesRoutePolicy.swift */; };
 		DB862C6CA16A33F1996C19AF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		F099B4D807822DF27768C5E5 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 7906572870B674B3935AF6FD /* GoogleService-Info.plist */; };
 		FC3ECC2E2F6F05B5000460F8 /* RNBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC252F6F05B5000460F8 /* RNBridge.m */; };
@@ -70,6 +71,7 @@
 		D2C0A4C610F1EE6DEAF9DAB0 /* SharedFilesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedFilesService.swift; sourceTree = "<group>"; };
 		D380A808E5707AB54A6BAD29 /* AutoUploadConfigStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoUploadConfigStore.swift; sourceTree = "<group>"; };
 		D4E1C9F52F7A000100000001 /* SyncFlowVersion.generated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncFlowVersion.generated.swift; sourceTree = "<group>"; };
+		D4E1C9F72F8B000100000001 /* SharedFilesRoutePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedFilesRoutePolicy.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		FC3ECC1F2F6F05B5000460F8 /* AssetExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetExportService.swift; sourceTree = "<group>"; };
 		FC3ECC202F6F05B5000460F8 /* BackgroundExecutionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundExecutionService.swift; sourceTree = "<group>"; };
@@ -203,6 +205,7 @@ FC3ECC1F2F6F05B5000460F8 /* AssetExportService.swift */,
 				35E00EC8EDE5044F9DE0BFDA /* AlbumBrowserService.swift */,
 				D380A808E5707AB54A6BAD29 /* AutoUploadConfigStore.swift */,
 				42E22EE10B6D2552C83E31BB /* ManualUploadService.swift */,
+				D4E1C9F72F8B000100000001 /* SharedFilesRoutePolicy.swift */,
 				D2C0A4C610F1EE6DEAF9DAB0 /* SharedFilesService.swift */,
 				FC3ECC602F6F0B00000460F8 /* NetworkPathObserver.swift */,
 				FC3ECC702F6F0C00000460F8 /* Log.swift */,
@@ -396,6 +399,7 @@ FC3ECC1F2F6F05B5000460F8 /* AssetExportService.swift */,
 				9AAE6A8410E525480D8CD473 /* AlbumBrowserService.swift in Sources */,
 				A02C8AC4F1D2121BB74AD3E9 /* AutoUploadConfigStore.swift in Sources */,
 				BEA438F6884C0C6D0918C25E /* ManualUploadService.swift in Sources */,
+				D4E1C9F82F8B000100000001 /* SharedFilesRoutePolicy.swift in Sources */,
 				0DAC8ECE3480320FE184A423 /* SharedFilesService.swift in Sources */,
 				FC3ECC612F6F0B00000460F8 /* NetworkPathObserver.swift in Sources */,
 				FC3ECC712F6F0C00000460F8 /* Log.swift in Sources */,

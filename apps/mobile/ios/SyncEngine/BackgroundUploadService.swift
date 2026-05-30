@@ -481,7 +481,8 @@ final class BackgroundUploadService: NSObject {
         )
         let authHex = Self.hmacSHA256Hex(keyPairingToken: pairingToken, canonical: canonical)
 
-        guard let url = URL(string: "http://\(binding.sidecarHost):\(binding.port)\(path)") else {
+        let hostPart = binding.sidecarHost.contains(":") ? "[\(binding.sidecarHost)]" : binding.sidecarHost
+        guard let url = URL(string: "http://\(hostPart):\(binding.port)\(path)") else {
             // Roll back — binding produced an invalid URL; free the row.
             rollbackLocalRowAfterEnqueueFailure(fileKey: fileKey, identity: identity)
             return .missingHost

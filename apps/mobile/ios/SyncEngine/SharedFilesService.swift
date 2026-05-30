@@ -101,13 +101,14 @@ class SharedFilesService {
     var sidecarHost: String?
     var tunnelPort: UInt16?
     var isTunnelActive: Bool = false
+    var useTunnelRoute: Bool = false
 
     private static let sidecarHttpPort = 39394
 
     private lazy var urlSession: URLSession = {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 15
-        config.timeoutIntervalForResource = 300
+        config.timeoutIntervalForRequest = SharedFilesRoutePolicy.sharedFileListRequestTimeout
+        config.timeoutIntervalForResource = SharedFilesRoutePolicy.sharedFileDownloadResourceTimeout
         return URLSession(configuration: config)
     }()
 
@@ -120,7 +121,7 @@ class SharedFilesService {
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.timeoutInterval = 15
+        request.timeoutInterval = SharedFilesRoutePolicy.sharedFileListRequestTimeout
 
         let (data, response) = try await urlSession.data(for: request)
         try validateHTTPResponse(response, path: endpoint)
@@ -143,7 +144,7 @@ class SharedFilesService {
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.timeoutInterval = 300
+        request.timeoutInterval = SharedFilesRoutePolicy.sharedFileDownloadRequestTimeout
 
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("syncflow_shared_downloads_tmp", isDirectory: true)
@@ -151,8 +152,8 @@ class SharedFilesService {
         let tempURL = tempDir.appendingPathComponent(UUID().uuidString)
         let delegate = SharedFileDownloadDelegate(destinationURL: tempURL, onProgress: onProgress)
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 15
-        config.timeoutIntervalForResource = 300
+        config.timeoutIntervalForRequest = SharedFilesRoutePolicy.sharedFileDownloadRequestTimeout
+        config.timeoutIntervalForResource = SharedFilesRoutePolicy.sharedFileDownloadResourceTimeout
         let downloadSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
         defer { downloadSession.finishTasksAndInvalidate() }
 
@@ -234,28 +235,26 @@ class SharedFilesService {
         return try? buildURL(path: "/shared/thumbnail/\(path)")
     }
 
-    // MARK: - Private Helpers
-
     private func buildURL(path: String) throws -> URL {
         var components = URLComponents()
         components.scheme = "http"
+        components.path = path
 
-        if isTunnelActive, let port = tunnelPort {
+        if useTunnelRoute, isTunnelActive, let port = tunnelPort {
             components.host = "127.0.0.1"
             components.port = Int(port)
-        } else if let host = sidecarHost?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !host.isEmpty {
+        } else {
+            guard let host = sidecarHost?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !host.isEmpty else {
+                throw SyncEngineError.networkError("No sidecar host available for shared files")
+            }
             components.host = host
             components.port = Self.sidecarHttpPort
-        } else {
-            throw SyncEngineError.networkError("No sidecar host available for shared files")
         }
-        components.path = path
 
         guard let url = components.url else {
             throw SyncEngineError.networkError("Invalid shared files URL for path: \(path)")
         }
-
         return url
     }
 
