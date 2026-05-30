@@ -1,6 +1,8 @@
 package api
 
 import (
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -8,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/nicksyncflow/sidecar/internal/events"
+	"github.com/nicksyncflow/sidecar/internal/protocol"
 )
 
 type settingsDTO struct {
@@ -184,9 +187,9 @@ func (s *Server) assembleSettingsDTO() (*settingsDTO, error) {
 }
 
 type syncTunnelCredentialsRequest struct {
-	SignalingURL string `json:"signalingUrl"`
-	AccessToken  string `json:"accessToken"`
-	ICEServers   any    `json:"iceServers"`
+	SignalingURL string          `json:"signalingUrl"`
+	AccessToken  string          `json:"accessToken"`
+	ICEServers   json.RawMessage `json:"iceServers"`
 }
 
 func (s *Server) handleSyncTunnelCredentials(w http.ResponseWriter, r *http.Request) {
@@ -196,7 +199,67 @@ func (s *Server) handleSyncTunnelCredentials(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	slog.Info("sync tunnel credentials called", "signalingUrl", req.SignalingURL)
+	signalingURL := strings.TrimSpace(req.SignalingURL)
+	accessToken := strings.TrimSpace(req.AccessToken)
+	if signalingURL == "" || accessToken == "" {
+		s.StopTunnel()
+		slog.Info("sync tunnel credentials cleared")
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "credentials cleared"})
+		return
+	}
+
+	deviceID, err := s.store.GetDeviceID()
+	if err != nil {
+		slog.Error("failed to get desktop device id for p2p tunnel", "err", err)
+		writeError(w, http.StatusInternalServerError, "failed to get device id")
+		return
+	}
+	pairedDevices, err := s.pairedDevicesForSignaling()
+	if err != nil {
+		slog.Error("failed to list paired devices for p2p tunnel", "err", err)
+		writeError(w, http.StatusInternalServerError, "failed to list paired devices")
+		return
+	}
+
+	manager := protocol.NewP2PManagerWithICEServers(
+		deviceID,
+		signalingURL,
+		fmt.Sprintf("127.0.0.1:%d", s.config.HTTPPort),
+		accessToken,
+		protocol.ParseICEServersJSON(string(req.ICEServers)),
+	)
+
+	s.tunnelMu.Lock()
+	if s.tunnel != nil {
+		s.tunnel.Stop()
+	}
+	s.tunnel = manager
+	s.tunnelMu.Unlock()
+
+	manager.Start(pairedDevices)
+	slog.Info("sync tunnel credentials applied",
+		"signalingUrl", signalingURL,
+		"desktopId", deviceID,
+		"pairedDevices", len(pairedDevices),
+	)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "credentials synced"})
 }
 
+func (s *Server) pairedDevicesForSignaling() ([]map[string]string, error) {
+	devices, err := s.store.ListPairedDevices()
+	if err != nil {
+		return nil, err
+	}
+
+	paired := make([]map[string]string, 0, len(devices))
+	for _, device := range devices {
+		if device.RevokedAt != nil || device.ClientID == "" || device.PairingTokenHash == "" {
+			continue
+		}
+		paired = append(paired, map[string]string{
+			"clientId":     device.ClientID,
+			"pairingToken": device.PairingTokenHash,
+		})
+	}
+	return paired, nil
+}

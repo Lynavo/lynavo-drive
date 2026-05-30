@@ -20,20 +20,323 @@ type P2PManager struct {
 	serverURL    string
 	localAddress string
 	authToken    string
+	iceServers   []webrtc.ICEServer
 	signalingCtx context.Context
 	cancel       context.CancelFunc
 }
 
+const DefaultSTUNServer = "stun:stun.cloudflare.com:3478"
+
+type iceServerPayload struct {
+	URLs       []string `json:"urls"`
+	Username   string   `json:"username"`
+	Credential string   `json:"credential"`
+}
+
 func NewP2PManager(desktopID, serverURL, localAddress, authToken string) *P2PManager {
+	return NewP2PManagerWithICEServers(desktopID, serverURL, localAddress, authToken, defaultICEServers())
+}
+
+func NewP2PManagerWithICEServers(desktopID, serverURL, localAddress, authToken string, iceServers []webrtc.ICEServer) *P2PManager {
 	ctx, cancel := context.WithCancel(context.Background())
+	if len(iceServers) == 0 {
+		iceServers = defaultICEServers()
+	}
 	return &P2PManager{
 		desktopID:    desktopID,
 		serverURL:    serverURL,
 		localAddress: localAddress,
 		authToken:    authToken,
+		iceServers:   cloneICEServers(iceServers),
 		signalingCtx: ctx,
 		cancel:       cancel,
 	}
+}
+
+func ParseICEServersJSON(raw string) []webrtc.ICEServer {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || trimmed == "null" {
+		return defaultICEServers()
+	}
+
+	var payloads []iceServerPayload
+	if err := json.Unmarshal([]byte(trimmed), &payloads); err != nil {
+		slog.Warn("failed to parse ICE servers JSON, using default STUN", "err", err)
+		return defaultICEServers()
+	}
+
+	servers := make([]webrtc.ICEServer, 0, len(payloads))
+	for _, payload := range payloads {
+		urls := make([]string, 0, len(payload.URLs))
+		for _, rawURL := range payload.URLs {
+			if url := strings.TrimSpace(rawURL); url != "" {
+				urls = append(urls, url)
+			}
+		}
+		if len(urls) == 0 {
+			continue
+		}
+		servers = append(servers, webrtc.ICEServer{
+			URLs:       urls,
+			Username:   payload.Username,
+			Credential: payload.Credential,
+		})
+	}
+
+	if len(servers) == 0 {
+		return defaultICEServers()
+	}
+	return servers
+}
+
+func defaultICEServers() []webrtc.ICEServer {
+	return []webrtc.ICEServer{{URLs: []string{DefaultSTUNServer}}}
+}
+
+func cloneICEServers(servers []webrtc.ICEServer) []webrtc.ICEServer {
+	cloned := make([]webrtc.ICEServer, 0, len(servers))
+	for _, server := range servers {
+		urls := append([]string(nil), server.URLs...)
+		cloned = append(cloned, webrtc.ICEServer{
+			URLs:           urls,
+			Username:       server.Username,
+			Credential:     server.Credential,
+			CredentialType: server.CredentialType,
+		})
+	}
+	return cloned
+}
+
+func summarizeICEServers(servers []webrtc.ICEServer) ([]string, bool, bool) {
+	urls := make([]string, 0)
+	hasTurn := false
+	hasStun := false
+	for _, server := range servers {
+		for _, rawURL := range server.URLs {
+			url := sanitizeICEURL(rawURL)
+			if url == "" {
+				continue
+			}
+			lower := strings.ToLower(url)
+			hasTurn = hasTurn || strings.HasPrefix(lower, "turn:")
+			hasStun = hasStun || strings.HasPrefix(lower, "stun:")
+			urls = append(urls, url)
+		}
+	}
+	return urls, hasTurn, hasStun
+}
+
+func sanitizeICEURL(rawURL string) string {
+	url := strings.TrimSpace(rawURL)
+	if url == "" {
+		return ""
+	}
+	if idx := strings.Index(url, "?"); idx >= 0 {
+		url = url[:idx]
+	}
+	if schemeEnd := strings.Index(url, ":"); schemeEnd >= 0 {
+		scheme := url[:schemeEnd+1]
+		rest := url[schemeEnd+1:]
+		if at := strings.LastIndex(rest, "@"); at >= 0 {
+			url = scheme + rest[at+1:]
+		}
+	}
+	return url
+}
+
+func registerICELogging(pc *webrtc.PeerConnection, component string, peerKey string, peerID string, iceServers []webrtc.ICEServer) {
+	urls, hasTurn, hasStun := summarizeICEServers(iceServers)
+	slog.Info(component+" ICE config",
+		peerKey, peerID,
+		"iceServerCount", len(iceServers),
+		"iceURLCount", len(urls),
+		"iceURLs", strings.Join(urls, ","),
+		"hasTurn", hasTurn,
+		"hasStun", hasStun,
+	)
+
+	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
+		slog.Info(component+" ICE connection state changed", peerKey, peerID, "state", state.String())
+	})
+	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+		slog.Info(component+" peer connection state changed", peerKey, peerID, "state", state.String())
+	})
+	pc.OnICEGatheringStateChange(func(state webrtc.ICEGatheringState) {
+		slog.Info(component+" ICE gathering state changed", peerKey, peerID, "state", state.String())
+	})
+
+	transport := peerConnectionICETransport(pc)
+	if transport == nil {
+		slog.Warn(component+" ICE transport unavailable for selected pair logging", peerKey, peerID)
+		return
+	}
+	transport.OnSelectedCandidatePairChange(func(pair *webrtc.ICECandidatePair) {
+		logSelectedICECandidatePair(component+" ICE selected candidate pair changed", pair, peerKey, peerID, "reason", "selected_pair_change")
+	})
+}
+
+func peerConnectionICETransport(pc *webrtc.PeerConnection) *webrtc.ICETransport {
+	if pc == nil || pc.SCTP() == nil || pc.SCTP().Transport() == nil {
+		return nil
+	}
+	return pc.SCTP().Transport().ICETransport()
+}
+
+func logCurrentSelectedICECandidatePair(pc *webrtc.PeerConnection, component string, peerKey string, peerID string, reason string) {
+	transport := peerConnectionICETransport(pc)
+	if transport == nil {
+		slog.Warn(component+" ICE selected candidate pair unavailable", peerKey, peerID, "reason", reason, "err", "ice transport unavailable")
+		return
+	}
+	pair, err := transport.GetSelectedCandidatePair()
+	if err != nil {
+		slog.Warn(component+" ICE selected candidate pair unavailable", peerKey, peerID, "reason", reason, "err", err)
+		return
+	}
+	logSelectedICECandidatePair(component+" ICE selected candidate pair", pair, peerKey, peerID, "reason", reason)
+}
+
+func logSelectedICECandidatePair(message string, pair *webrtc.ICECandidatePair, baseArgs ...any) {
+	args := append([]any{}, baseArgs...)
+	args = append(args,
+		"route", selectedICERoute(pair),
+		"localType", iceCandidateType(pairLocal(pair)),
+		"localProtocol", iceCandidateProtocol(pairLocal(pair)),
+		"localAddress", iceCandidateAddress(pairLocal(pair)),
+		"localPort", iceCandidatePort(pairLocal(pair)),
+		"localRelatedAddress", iceCandidateRelatedAddress(pairLocal(pair)),
+		"localRelatedPort", iceCandidateRelatedPort(pairLocal(pair)),
+		"remoteType", iceCandidateType(pairRemote(pair)),
+		"remoteProtocol", iceCandidateProtocol(pairRemote(pair)),
+		"remoteAddress", iceCandidateAddress(pairRemote(pair)),
+		"remotePort", iceCandidatePort(pairRemote(pair)),
+		"remoteRelatedAddress", iceCandidateRelatedAddress(pairRemote(pair)),
+		"remoteRelatedPort", iceCandidateRelatedPort(pairRemote(pair)),
+	)
+	slog.Info(message, args...)
+}
+
+func selectedICERoute(pair *webrtc.ICECandidatePair) string {
+	local := pairLocal(pair)
+	remote := pairRemote(pair)
+	if local == nil || remote == nil {
+		return "unknown"
+	}
+	if local.Typ == webrtc.ICECandidateTypeRelay || remote.Typ == webrtc.ICECandidateTypeRelay {
+		return "turn_relay"
+	}
+	if local.Typ == webrtc.ICECandidateTypeHost && remote.Typ == webrtc.ICECandidateTypeHost {
+		return "direct_host"
+	}
+	return "direct_reflexive"
+}
+
+func pairLocal(pair *webrtc.ICECandidatePair) *webrtc.ICECandidate {
+	if pair == nil {
+		return nil
+	}
+	return pair.Local
+}
+
+func pairRemote(pair *webrtc.ICECandidatePair) *webrtc.ICECandidate {
+	if pair == nil {
+		return nil
+	}
+	return pair.Remote
+}
+
+func iceCandidateType(candidate *webrtc.ICECandidate) string {
+	if candidate == nil {
+		return ""
+	}
+	return candidate.Typ.String()
+}
+
+func iceCandidateProtocol(candidate *webrtc.ICECandidate) string {
+	if candidate == nil {
+		return ""
+	}
+	return candidate.Protocol.String()
+}
+
+func iceCandidateAddress(candidate *webrtc.ICECandidate) string {
+	if candidate == nil {
+		return ""
+	}
+	return candidate.Address
+}
+
+func iceCandidatePort(candidate *webrtc.ICECandidate) uint16 {
+	if candidate == nil {
+		return 0
+	}
+	return candidate.Port
+}
+
+func iceCandidateRelatedAddress(candidate *webrtc.ICECandidate) string {
+	if candidate == nil {
+		return ""
+	}
+	return candidate.RelatedAddress
+}
+
+func iceCandidateRelatedPort(candidate *webrtc.ICECandidate) uint16 {
+	if candidate == nil {
+		return 0
+	}
+	return candidate.RelatedPort
+}
+
+func logLocalICECandidate(component string, peerKey string, peerID string, candidate *webrtc.ICECandidate) {
+	slog.Info(component+" local ICE candidate gathered",
+		peerKey, peerID,
+		"candidateType", iceCandidateType(candidate),
+		"protocol", iceCandidateProtocol(candidate),
+		"address", iceCandidateAddress(candidate),
+		"port", iceCandidatePort(candidate),
+		"relatedAddress", iceCandidateRelatedAddress(candidate),
+		"relatedPort", iceCandidateRelatedPort(candidate),
+	)
+}
+
+func logRemoteICECandidate(component string, peerKey string, peerID string, candidate webrtc.ICECandidateInit) {
+	candidateType, protocol, address, port, relatedAddress, relatedPort := summarizeICECandidateInit(candidate)
+	slog.Info(component+" remote ICE candidate received",
+		peerKey, peerID,
+		"candidateType", candidateType,
+		"protocol", protocol,
+		"address", address,
+		"port", port,
+		"relatedAddress", relatedAddress,
+		"relatedPort", relatedPort,
+		"sdpMid", candidate.SDPMid,
+		"sdpMLineIndex", candidate.SDPMLineIndex,
+	)
+}
+
+func summarizeICECandidateInit(candidate webrtc.ICECandidateInit) (string, string, string, string, string, string) {
+	fields := strings.Fields(candidate.Candidate)
+	if len(fields) < 8 {
+		return "", "", "", "", "", ""
+	}
+
+	protocol := strings.ToLower(fields[2])
+	address := fields[4]
+	port := fields[5]
+	candidateType := ""
+	relatedAddress := ""
+	relatedPort := ""
+	for i := 6; i < len(fields)-1; i += 2 {
+		switch fields[i] {
+		case "typ":
+			candidateType = fields[i+1]
+		case "raddr":
+			relatedAddress = fields[i+1]
+		case "rport":
+			relatedPort = fields[i+1]
+		}
+	}
+	return candidateType, protocol, address, port, relatedAddress, relatedPort
 }
 
 func (m *P2PManager) Start(pairedDevices []map[string]string) {
@@ -45,6 +348,7 @@ func (m *P2PManager) Stop() {
 }
 
 func (m *P2PManager) connectSignaling(paired []map[string]string) {
+	slog.Info("connectSignaling entry point reached", "serverURL", m.serverURL, "desktopID", m.desktopID)
 	dialer := websocket.Dialer{HandshakeTimeout: 10 * time.Second}
 
 	wsURL := m.serverURL
@@ -54,6 +358,7 @@ func (m *P2PManager) connectSignaling(paired []map[string]string) {
 		wsURL = "ws://" + strings.TrimPrefix(wsURL, "http://")
 	}
 	url := wsURL + "/api/v1/tunnel/signaling?role=desktop&clientId=" + m.desktopID + "&token=" + m.authToken
+	slog.Info("connectSignaling constructed dial URL", "url", url)
 
 	backoff := time.Second
 	const maxBackoff = 60 * time.Second
@@ -61,11 +366,14 @@ func (m *P2PManager) connectSignaling(paired []map[string]string) {
 	for {
 		select {
 		case <-m.signalingCtx.Done():
+			slog.Info("connectSignaling context cancelled, exiting loop")
 			return
 		default:
 		}
 
+		slog.Info("connectSignaling calling dialer.Dial")
 		conn, _, err := dialer.Dial(url, nil)
+		slog.Info("connectSignaling dialer.Dial completed", "err", err)
 		if err != nil {
 			slog.Warn("signaling dial failed, retrying", "backoff", backoff, "err", err)
 			select {
@@ -193,6 +501,7 @@ func (m *P2PManager) handleSignalingSession(sConn *safeWriteConn) {
 				slog.Error("failed to unmarshal ice candidate", "err", err, "mobileId", senderID)
 				continue
 			}
+			logRemoteICECandidate("desktop tunnel", "mobileId", senderID, cand)
 			err = pc.AddICECandidate(cand)
 			if err != nil {
 				slog.Error("failed to add ice candidate", "err", err, "mobileId", senderID)
@@ -204,20 +513,20 @@ func (m *P2PManager) handleSignalingSession(sConn *safeWriteConn) {
 
 func (m *P2PManager) createPeerConnection(signalingConn *safeWriteConn, mobileID string) (*webrtc.PeerConnection, error) {
 	config := webrtc.Configuration{
-		ICEServers: []webrtc.ICEServer{
-			{URLs: []string{"stun:stun.cloudflare.com:3478"}},
-		},
+		ICEServers: cloneICEServers(m.iceServers),
 	}
 
 	pc, err := webrtc.NewPeerConnection(config)
 	if err != nil {
 		return nil, err
 	}
+	registerICELogging(pc, "desktop tunnel", "mobileId", mobileID, config.ICEServers)
 
 	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
 		if c == nil {
 			return
 		}
+		logLocalICECandidate("desktop tunnel", "mobileId", mobileID, c)
 		candBytes, err := json.Marshal(c.ToJSON())
 		if err != nil {
 			slog.Error("failed to marshal candidate payload", "err", err, "mobileId", mobileID)
@@ -241,6 +550,11 @@ func (m *P2PManager) createPeerConnection(signalingConn *safeWriteConn, mobileID
 
 	pc.OnDataChannel(func(d *webrtc.DataChannel) {
 		if d.Label() == "yamux-tunnel" {
+			slog.Info("desktop tunnel data channel received", "mobileId", mobileID, "label", d.Label(), "ordered", d.Ordered())
+			logCurrentSelectedICECandidatePair(pc, "desktop tunnel", "mobileId", mobileID, "data_channel_received")
+			d.OnOpen(func() {
+				logCurrentSelectedICECandidatePair(pc, "desktop tunnel", "mobileId", mobileID, "data_channel_open")
+			})
 			// M4: Yamux requires TCP semantics (ordered + reliable)
 			if !d.Ordered() {
 				slog.Warn("yamux-tunnel DataChannel is not ordered, closing", "mobileId", mobileID)
@@ -303,6 +617,8 @@ type DataChannelWrapper struct {
 	reader    *io.PipeReader
 	writer    *io.PipeWriter
 	writeChan chan []byte
+	closedCh  chan struct{}
+	closeOnce sync.Once
 	mu        sync.Mutex
 	closed    bool
 }
@@ -315,13 +631,18 @@ func NewDataChannelWrapper(d *webrtc.DataChannel) *DataChannelWrapper {
 		reader:    r,
 		writer:    w,
 		writeChan: writeChan,
+		closedCh:  make(chan struct{}),
 	}
 
 	go func() {
-		for data := range writeChan {
-			_, err := w.Write(data)
-			if err != nil {
-				break
+		for {
+			select {
+			case data := <-writeChan:
+				if _, err := w.Write(data); err != nil {
+					return
+				}
+			case <-wrapper.closedCh:
+				return
 			}
 		}
 	}()
@@ -332,15 +653,15 @@ func NewDataChannelWrapper(d *webrtc.DataChannel) *DataChannelWrapper {
 		copy(data, msg.Data)
 
 		wrapper.mu.Lock()
-		defer wrapper.mu.Unlock()
 		if wrapper.closed {
+			wrapper.mu.Unlock()
 			return
 		}
+		wrapper.mu.Unlock()
 
 		select {
 		case writeChan <- data:
-		default:
-			slog.Warn("yamux tunnel write buffer overflow, dropping packet")
+		case <-wrapper.closedCh:
 		}
 	})
 
@@ -364,16 +685,16 @@ func (w *DataChannelWrapper) Write(b []byte) (int, error) {
 }
 
 func (w *DataChannelWrapper) Close() error {
-	w.mu.Lock()
-	if !w.closed {
+	w.closeOnce.Do(func() {
+		w.mu.Lock()
 		w.closed = true
-		close(w.writeChan)
-	}
-	w.mu.Unlock()
+		w.mu.Unlock()
 
-	w.d.Close()
-	w.reader.Close()
-	w.writer.Close()
+		close(w.closedCh)
+		w.d.Close()
+		w.reader.Close()
+		w.writer.Close()
+	})
 	return nil
 }
 func (w *DataChannelWrapper) LocalAddr() net.Addr                { return &net.IPAddr{IP: net.IPv6loopback} }

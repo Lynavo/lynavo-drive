@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -439,4 +440,185 @@ func TestP2PManagerPeerConnectionRecycling(t *testing.T) {
 
 	// Sleep to verify it compiles and handles recycling safely without panic
 	time.Sleep(20 * time.Millisecond)
+}
+
+func TestP2PManagerUsesProvidedICEServers(t *testing.T) {
+	m := NewP2PManagerWithICEServers(
+		"desktop-123",
+		"http://signaling.example.com",
+		"127.0.0.1:39394",
+		"test-token",
+		[]webrtc.ICEServer{
+			{
+				URLs:       []string{"turn:review-api.vividrop.cn:3478?transport=udp"},
+				Username:   "turn-user",
+				Credential: "turn-pass",
+			},
+		},
+	)
+	defer m.Stop()
+
+	pc, err := m.createPeerConnection(nil, "mobile-123")
+	if err != nil {
+		t.Fatalf("createPeerConnection: %v", err)
+	}
+	defer pc.Close()
+
+	servers := pc.GetConfiguration().ICEServers
+	if len(servers) != 1 {
+		t.Fatalf("expected 1 ICE server, got %d", len(servers))
+	}
+	if got := servers[0].URLs[0]; got != "turn:review-api.vividrop.cn:3478?transport=udp" {
+		t.Fatalf("unexpected ICE URL: %s", got)
+	}
+	if servers[0].Username != "turn-user" || servers[0].Credential != "turn-pass" {
+		t.Fatalf("unexpected TURN credentials: %#v", servers[0])
+	}
+}
+
+func TestParseICEServersJSONFallsBackToDefaultStun(t *testing.T) {
+	servers := ParseICEServersJSON("")
+
+	if len(servers) != 1 {
+		t.Fatalf("expected default ICE server, got %d", len(servers))
+	}
+	if got := servers[0].URLs[0]; got != DefaultSTUNServer {
+		t.Fatalf("unexpected default ICE URL: %s", got)
+	}
+}
+
+func TestDataChannelWrapperAppliesBackpressureWithoutDroppingMessages(t *testing.T) {
+	offerPC, err := webrtc.NewPeerConnection(webrtc.Configuration{})
+	if err != nil {
+		t.Fatalf("create offer peer: %v", err)
+	}
+	defer offerPC.Close()
+
+	answerPC, err := webrtc.NewPeerConnection(webrtc.Configuration{})
+	if err != nil {
+		t.Fatalf("create answer peer: %v", err)
+	}
+	defer answerPC.Close()
+
+	offerPC.OnICECandidate(func(c *webrtc.ICECandidate) {
+		if c != nil {
+			_ = answerPC.AddICECandidate(c.ToJSON())
+		}
+	})
+	answerPC.OnICECandidate(func(c *webrtc.ICECandidate) {
+		if c != nil {
+			_ = offerPC.AddICECandidate(c.ToJSON())
+		}
+	})
+
+	wrapperReady := make(chan *DataChannelWrapper, 1)
+	answerPC.OnDataChannel(func(d *webrtc.DataChannel) {
+		wrapperReady <- NewDataChannelWrapper(d)
+	})
+
+	ordered := true
+	dc, err := offerPC.CreateDataChannel("yamux-tunnel", &webrtc.DataChannelInit{Ordered: &ordered})
+	if err != nil {
+		t.Fatalf("create data channel: %v", err)
+	}
+	opened := make(chan struct{})
+	dc.OnOpen(func() {
+		close(opened)
+	})
+
+	offer, err := offerPC.CreateOffer(nil)
+	if err != nil {
+		t.Fatalf("create offer: %v", err)
+	}
+	if err := offerPC.SetLocalDescription(offer); err != nil {
+		t.Fatalf("set local offer: %v", err)
+	}
+	if err := answerPC.SetRemoteDescription(offer); err != nil {
+		t.Fatalf("set remote offer: %v", err)
+	}
+	answer, err := answerPC.CreateAnswer(nil)
+	if err != nil {
+		t.Fatalf("create answer: %v", err)
+	}
+	if err := answerPC.SetLocalDescription(answer); err != nil {
+		t.Fatalf("set local answer: %v", err)
+	}
+	if err := offerPC.SetRemoteDescription(answer); err != nil {
+		t.Fatalf("set remote answer: %v", err)
+	}
+
+	var wrapper *DataChannelWrapper
+	select {
+	case wrapper = <-wrapperReady:
+	case <-time.After(15 * time.Second):
+		t.Fatal("timeout waiting for data channel wrapper")
+	}
+	defer wrapper.Close()
+
+	select {
+	case <-opened:
+	case <-time.After(15 * time.Second):
+		t.Fatal("timeout waiting for data channel open")
+	}
+
+	const (
+		messageCount = 1500
+		messageSize  = 32
+	)
+	expected := make([]byte, 0, messageCount*messageSize)
+	for i := range messageCount {
+		payload := bytes.Repeat([]byte{byte(i % 251)}, messageSize)
+		expected = append(expected, payload...)
+	}
+
+	got := make([]byte, len(expected))
+	readDone := make(chan error, 1)
+	go func() {
+		offset := 0
+		buf := make([]byte, messageSize)
+		for offset < len(got) {
+			n, err := wrapper.Read(buf)
+			if err != nil {
+				readDone <- err
+				return
+			}
+			copy(got[offset:], buf[:n])
+			offset += n
+			time.Sleep(100 * time.Microsecond)
+		}
+		readDone <- nil
+	}()
+
+	sendDone := make(chan error, 1)
+	go func() {
+		for offset := 0; offset < len(expected); offset += messageSize {
+			if err := dc.Send(expected[offset : offset+messageSize]); err != nil {
+				sendDone <- err
+				return
+			}
+		}
+		sendDone <- nil
+	}()
+
+	select {
+	case err := <-sendDone:
+		if err != nil {
+			t.Fatalf("send messages: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout sending messages")
+	}
+
+	select {
+	case err := <-readDone:
+		if err != nil {
+			t.Fatalf("read wrapper stream: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for wrapper stream; data was likely dropped")
+	}
+
+	if !bytes.Equal(got, expected) {
+		t.Fatal("wrapper stream did not preserve all inbound data")
+	}
 }

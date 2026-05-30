@@ -2,9 +2,11 @@ package api
 
 import (
 	"net/http"
+	"sync"
 
 	"github.com/nicksyncflow/sidecar/internal/config"
 	"github.com/nicksyncflow/sidecar/internal/events"
+	"github.com/nicksyncflow/sidecar/internal/protocol"
 	"github.com/nicksyncflow/sidecar/internal/store"
 )
 
@@ -20,11 +22,23 @@ type Server struct {
 	hub             *events.Hub
 	clientStates    ClientStateProvider
 	presence        *PresenceTracker
+	tunnelMu        sync.Mutex
+	tunnel          *protocol.P2PManager
 	OnDeviceRenamed func(newName string) // called when device name changes, to restart Bonjour
 }
 
 func (s *Server) PresenceTracker() *PresenceTracker {
 	return s.presence
+}
+
+// StopTunnel stops the desktop P2P signaling listener if it is running.
+func (s *Server) StopTunnel() {
+	s.tunnelMu.Lock()
+	defer s.tunnelMu.Unlock()
+	if s.tunnel != nil {
+		s.tunnel.Stop()
+		s.tunnel = nil
+	}
 }
 
 // NewServer creates a new HTTP handler with all API routes registered.
@@ -61,7 +75,7 @@ func NewServer(s *store.Store, cfg *config.Config, hub *events.Hub, csp ClientSt
 	mux.HandleFunc("GET /shared/stream/{path...}", srv.handleSharedStream)
 	// Transfer state
 	mux.HandleFunc("GET /transfer/active", withJSON(srv.handleTransferActive))
-	// Tunnel credentials sync (mock/stub for P2P signaling credentials)
+	// Tunnel credentials sync for desktop P2P signaling.
 	mux.HandleFunc("POST /tunnel/credentials", withJSON(srv.handleSyncTunnelCredentials))
 	// WebSocket
 	mux.HandleFunc("GET /events/stream", srv.handleEventStream)

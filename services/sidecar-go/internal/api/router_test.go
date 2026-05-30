@@ -1608,3 +1608,83 @@ func TestSyncTunnelCredentials(t *testing.T) {
 	}
 }
 
+func TestSyncTunnelCredentialsStartsDesktopSignaling(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	insertPairedDeviceWithOptionalStableID(t, st, "mobile-123", "iPhone", "iPhone", nil, time.Now().UTC().Format(time.RFC3339))
+
+	registerCh := make(chan map[string]any, 1)
+	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	signalingSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/tunnel/signaling" {
+			http.NotFound(w, r)
+			return
+		}
+		if r.URL.Query().Get("role") != "desktop" {
+			http.Error(w, "unexpected role", http.StatusBadRequest)
+			return
+		}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		var payload map[string]any
+		if err := json.Unmarshal(msg, &payload); err != nil {
+			return
+		}
+		registerCh <- payload
+	}))
+	defer signalingSrv.Close()
+
+	_, handler := api.NewServer(st, cfg, hub, nil)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+	t.Cleanup(func() {
+		_, _ = http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(`{"signalingUrl":"","accessToken":"","iceServers":[]}`))
+	})
+
+	reqBody := `{"signalingUrl":"` + signalingSrv.URL + `","accessToken":"token","iceServers":[]}`
+	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("POST /tunnel/credentials: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	select {
+	case payload := <-registerCh:
+		if payload["type"] != "register_desktop" {
+			t.Fatalf("register type=%v, want register_desktop", payload["type"])
+		}
+		deviceID, err := st.GetDeviceID()
+		if err != nil {
+			t.Fatalf("GetDeviceID: %v", err)
+		}
+		if payload["clientId"] != deviceID {
+			t.Fatalf("clientId=%v, want %s", payload["clientId"], deviceID)
+		}
+		paired, ok := payload["pairedDevices"].([]any)
+		if !ok || len(paired) != 1 {
+			t.Fatalf("pairedDevices=%#v, want one device", payload["pairedDevices"])
+		}
+		first, ok := paired[0].(map[string]any)
+		if !ok {
+			t.Fatalf("pairedDevices[0]=%#v", paired[0])
+		}
+		if first["clientId"] != "mobile-123" {
+			t.Fatalf("paired clientId=%v, want mobile-123", first["clientId"])
+		}
+		if first["pairingToken"] != "hash-mobile-123" {
+			t.Fatalf("pairingToken=%v, want stored hash", first["pairingToken"])
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("desktop signaling registration was not sent")
+	}
+}
