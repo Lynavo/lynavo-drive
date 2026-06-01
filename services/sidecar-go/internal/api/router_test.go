@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -205,6 +206,47 @@ func TestDashboardDevices(t *testing.T) {
 	// Should be an empty array (not null)
 	if body == nil {
 		t.Error("expected empty array, got nil")
+	}
+}
+
+func TestSharedDownloadSupportsRangeRequests(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	sharedDir := cfg.SharedDir()
+	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+		t.Fatalf("mkdir shared dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(sharedDir, "range.txt"), []byte("0123456789"), 0644); err != nil {
+		t.Fatalf("write shared file: %v", err)
+	}
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/shared/download/range.txt", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Range", "bytes=4-")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /shared/download/range.txt: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusPartialContent {
+		t.Fatalf("expected 206, got %d", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Content-Range"); got != "bytes 4-9/10" {
+		t.Fatalf("expected Content-Range bytes 4-9/10, got %q", got)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	if string(body) != "456789" {
+		t.Fatalf("expected resumed body, got %q", string(body))
 	}
 }
 
