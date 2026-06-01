@@ -21,52 +21,122 @@ struct SharedDirectory {
 
 typealias SharedFileDownloadProgressHandler = (_ bytesWritten: Int64, _ totalBytes: Int64, _ progress: Double) -> Void
 
-private final class SharedFileDownloadDelegate: NSObject, URLSessionDownloadDelegate {
+private enum SharedFilePartialDownloadError: Error {
+    case invalidPartial(String)
+}
+
+private final class SharedFileDownloadDelegate: NSObject, URLSessionDataDelegate {
     private let destinationURL: URL
+    private let initialOffset: Int64
     private let onProgress: SharedFileDownloadProgressHandler?
     private var continuation: CheckedContinuation<(URL, URLResponse), Error>?
-    private var downloadError: Error?
     private var response: URLResponse?
+    private var streamError: Error?
+    private var fileHandle: FileHandle?
+    private var receivedBytes: Int64 = 0
+    private var expectedTotalBytes: Int64 = 0
     private var didResume = false
 
-    init(destinationURL: URL, onProgress: SharedFileDownloadProgressHandler?) {
+    init(destinationURL: URL, initialOffset: Int64, onProgress: SharedFileDownloadProgressHandler?) {
         self.destinationURL = destinationURL
+        self.initialOffset = initialOffset
         self.onProgress = onProgress
     }
 
     func start(session: URLSession, request: URLRequest) async throws -> (URL, URLResponse) {
         try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
-            session.downloadTask(with: request).resume()
+            session.dataTask(with: request).resume()
         }
     }
 
     func urlSession(
         _ session: URLSession,
-        downloadTask: URLSessionDownloadTask,
-        didWriteData bytesWritten: Int64,
-        totalBytesWritten: Int64,
-        totalBytesExpectedToWrite: Int64
+        dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
     ) {
-        let totalBytes = totalBytesExpectedToWrite > 0 ? totalBytesExpectedToWrite : 0
-        let progress = totalBytesExpectedToWrite > 0
-            ? min(1, max(0, Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)))
-            : 0
-        onProgress?(totalBytesWritten, totalBytes, progress)
-    }
+        guard let httpResponse = response as? HTTPURLResponse else {
+            streamError = SyncEngineError.networkError("Missing HTTP response for shared file download")
+            completionHandler(.cancel)
+            return
+        }
 
-    func urlSession(
-        _ session: URLSession,
-        downloadTask: URLSessionDownloadTask,
-        didFinishDownloadingTo location: URL
-    ) {
-        response = downloadTask.response
+        if initialOffset > 0, httpResponse.statusCode == 200 || httpResponse.statusCode == 416 {
+            streamError = SharedFilePartialDownloadError.invalidPartial(
+                "Server did not accept shared file Range request status=\(httpResponse.statusCode)"
+            )
+            completionHandler(.cancel)
+            return
+        }
+        if initialOffset > 0 {
+            guard httpResponse.statusCode == 206,
+                  Self.contentRangeStart(from: httpResponse) == initialOffset else {
+                streamError = SharedFilePartialDownloadError.invalidPartial(
+                    "Shared file Range response did not match offset=\(initialOffset)"
+                )
+                completionHandler(.cancel)
+                return
+            }
+        } else if httpResponse.statusCode == 206 {
+            streamError = SharedFilePartialDownloadError.invalidPartial(
+                "Shared file Range response received without a partial download"
+            )
+            completionHandler(.cancel)
+            return
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            streamError = SyncEngineError.networkError(
+                "Sidecar returned HTTP \(httpResponse.statusCode) for shared file download"
+            )
+            completionHandler(.cancel)
+            return
+        }
+
         do {
-            try? FileManager.default.removeItem(at: destinationURL)
-            try FileManager.default.moveItem(at: location, to: destinationURL)
+            if !FileManager.default.fileExists(atPath: destinationURL.path) {
+                FileManager.default.createFile(atPath: destinationURL.path, contents: nil)
+            }
+            let handle = try FileHandle(forWritingTo: destinationURL)
+            if initialOffset > 0 {
+                handle.seekToEndOfFile()
+            } else {
+                handle.truncateFile(atOffset: 0)
+            }
+            fileHandle = handle
         } catch {
-            downloadError = error
+            streamError = error
+            completionHandler(.cancel)
+            return
         }
+
+        self.response = response
+        expectedTotalBytes = Self.expectedTotalBytes(from: httpResponse, initialOffset: initialOffset)
+        completionHandler(.allow)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive data: Data
+    ) {
+        guard streamError == nil else { return }
+        guard let fileHandle else {
+            streamError = SyncEngineError.networkError("Shared file download stream is not open")
+            dataTask.cancel()
+            return
+        }
+
+        fileHandle.write(data)
+        receivedBytes += Int64(data.count)
+        let bytesWritten = SharedFilesRoutePolicy.totalDownloadedBytes(
+            existingBytes: initialOffset,
+            receivedBytes: receivedBytes
+        )
+        let totalBytes = expectedTotalBytes > 0 ? expectedTotalBytes : 0
+        let progress = totalBytes > 0 ? min(1, max(0, Double(bytesWritten) / Double(totalBytes))) : 0
+        onProgress?(bytesWritten, totalBytes, progress)
     }
 
     func urlSession(
@@ -77,10 +147,13 @@ private final class SharedFileDownloadDelegate: NSObject, URLSessionDownloadDele
         guard !didResume else { return }
         didResume = true
 
-        if let error {
+        fileHandle?.closeFile()
+        fileHandle = nil
+
+        if let streamError {
+            continuation?.resume(throwing: streamError)
+        } else if let error {
             continuation?.resume(throwing: error)
-        } else if let downloadError {
-            continuation?.resume(throwing: downloadError)
         } else if let response {
             continuation?.resume(returning: (destinationURL, response))
         } else {
@@ -89,6 +162,32 @@ private final class SharedFileDownloadDelegate: NSObject, URLSessionDownloadDele
             )
         }
         continuation = nil
+    }
+
+    fileprivate static func expectedTotalBytes(from response: HTTPURLResponse, initialOffset: Int64) -> Int64 {
+        if let contentRange = response.value(forHTTPHeaderField: "Content-Range"),
+           let slashIndex = contentRange.lastIndex(of: "/") {
+            let totalPart = contentRange[contentRange.index(after: slashIndex)...]
+            if let total = Int64(totalPart) {
+                return total
+            }
+        }
+        if response.expectedContentLength > 0 {
+            return initialOffset + response.expectedContentLength
+        }
+        return 0
+    }
+
+    private static func contentRangeStart(from response: HTTPURLResponse) -> Int64? {
+        guard let contentRange = response.value(forHTTPHeaderField: "Content-Range") else {
+            return nil
+        }
+        let parts = contentRange.split(separator: " ")
+        guard parts.count == 2,
+              let rangeStart = parts[1].split(separator: "-").first else {
+            return nil
+        }
+        return Int64(rangeStart)
     }
 }
 
@@ -140,22 +239,10 @@ class SharedFilesService {
         onProgress: SharedFileDownloadProgressHandler? = nil
     ) async throws -> DownloadResult {
         let endpoint = "/shared/download/\(path)"
-        let url = try buildURL(path: endpoint)
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.timeoutInterval = SharedFilesRoutePolicy.sharedFileDownloadRequestTimeout
-
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("syncflow_shared_downloads_tmp", isDirectory: true)
-        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        let tempURL = tempDir.appendingPathComponent(UUID().uuidString)
-        let delegate = SharedFileDownloadDelegate(destinationURL: tempURL, onProgress: onProgress)
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = SharedFilesRoutePolicy.sharedFileDownloadRequestTimeout
-        config.timeoutIntervalForResource = SharedFilesRoutePolicy.sharedFileDownloadResourceTimeout
-        let downloadSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
-        defer { downloadSession.finishTasksAndInvalidate() }
+        let partialURL = try partialDownloadURL(path: path)
+        var resumeOffset = SharedFilesRoutePolicy.resumeOffsetForPartialDownload(
+            existingBytes: fileSize(at: partialURL)
+        )
 
         var downloadedURLForCleanup: URL?
         defer {
@@ -164,10 +251,30 @@ class SharedFilesService {
             }
         }
 
-        let (downloadedURL, response) = try await delegate.start(session: downloadSession, request: request)
+        let downloadedURL: URL
+        let response: URLResponse
+        do {
+            (downloadedURL, response) = try await performDownload(
+                endpoint: endpoint,
+                partialURL: partialURL,
+                resumeOffset: resumeOffset,
+                onProgress: onProgress
+            )
+        } catch SharedFilePartialDownloadError.invalidPartial(_) {
+            try? FileManager.default.removeItem(at: partialURL)
+            resumeOffset = 0
+            (downloadedURL, response) = try await performDownload(
+                endpoint: endpoint,
+                partialURL: partialURL,
+                resumeOffset: resumeOffset,
+                onProgress: onProgress
+            )
+        }
+
         downloadedURLForCleanup = downloadedURL
         try validateHTTPResponse(response, path: endpoint)
-        let totalBytes = response.expectedContentLength > 0 ? response.expectedContentLength : 0
+        let totalBytes = fileSize(at: downloadedURL)
+        try validateCompletedDownload(downloadedURL: downloadedURL, response: response)
         onProgress?(totalBytes, totalBytes, 1)
 
         // Move to a stable temp location first
@@ -213,6 +320,76 @@ class SharedFilesService {
             return "video"
         default:
             return "other"
+        }
+    }
+
+    private func performDownload(
+        endpoint: String,
+        partialURL: URL,
+        resumeOffset: Int64,
+        onProgress: SharedFileDownloadProgressHandler?
+    ) async throws -> (URL, URLResponse) {
+        let url = try buildURL(path: endpoint)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = SharedFilesRoutePolicy.sharedFileDownloadRequestTimeout
+        if SharedFilesRoutePolicy.shouldUseRangeRequest(resumeOffset: resumeOffset) {
+            request.setValue("bytes=\(resumeOffset)-", forHTTPHeaderField: "Range")
+        }
+        syncDiagnosticsLog(
+            "SharedFiles",
+            "downloadFile request endpoint=\(endpoint) resume_offset=\(resumeOffset) range=\(SharedFilesRoutePolicy.shouldUseRangeRequest(resumeOffset: resumeOffset))"
+        )
+
+        let delegate = SharedFileDownloadDelegate(
+            destinationURL: partialURL,
+            initialOffset: resumeOffset,
+            onProgress: onProgress
+        )
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = SharedFilesRoutePolicy.sharedFileDownloadRequestTimeout
+        config.timeoutIntervalForResource = SharedFilesRoutePolicy.sharedFileDownloadResourceTimeout
+        let queue = OperationQueue()
+        queue.maxConcurrentOperationCount = 1
+        let downloadSession = URLSession(configuration: config, delegate: delegate, delegateQueue: queue)
+        defer { downloadSession.finishTasksAndInvalidate() }
+
+        return try await delegate.start(session: downloadSession, request: request)
+    }
+
+    private func partialDownloadURL(path: String) throws -> URL {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("syncflow_shared_downloads_tmp", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        let token = Data(path.utf8)
+            .base64EncodedString()
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "=", with: "")
+        return tempDir.appendingPathComponent("\(token).part")
+    }
+
+    private func fileSize(at url: URL) -> Int64 {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        if let size = attributes?[.size] as? NSNumber {
+            return size.int64Value
+        }
+        return 0
+    }
+
+    private func validateCompletedDownload(downloadedURL: URL, response: URLResponse) throws {
+        guard let httpResponse = response as? HTTPURLResponse else { return }
+        let expectedBytes = SharedFileDownloadDelegate.expectedTotalBytes(
+            from: httpResponse,
+            initialOffset: 0
+        )
+        guard expectedBytes > 0 else { return }
+        let actualBytes = fileSize(at: downloadedURL)
+        guard actualBytes == expectedBytes else {
+            throw SyncEngineError.networkError(
+                "Incomplete shared file download expected=\(expectedBytes) actual=\(actualBytes)"
+            )
         }
     }
 

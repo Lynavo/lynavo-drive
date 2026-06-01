@@ -5,6 +5,7 @@ enum SharedFilesRoutePolicy {
     static let sharedFileDownloadRequestTimeout: TimeInterval = 300
     static let sharedFileDownloadResourceTimeout: TimeInterval = 86_400
     static let sharedFileTunnelHeartbeatGracePeriod: TimeInterval = 3
+    static let sharedFileDownloadMaxAttempts = 4
 
     private static func normalizedHost(_ host: String?) -> String? {
         let value = host?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -52,6 +53,22 @@ enum SharedFilesRoutePolicy {
 
     static func shouldInvalidateTunnelAfterRouteFailure(isTunnelRoute: Bool) -> Bool {
         isTunnelRoute
+    }
+
+    static func shouldRetryDownloadOnTunnelAfterFailure(isTunnelRoute: Bool) -> Bool {
+        isTunnelRoute
+    }
+
+    static func resumeOffsetForPartialDownload(existingBytes: Int64) -> Int64 {
+        max(0, existingBytes)
+    }
+
+    static func shouldUseRangeRequest(resumeOffset: Int64) -> Bool {
+        resumeOffset > 0
+    }
+
+    static func totalDownloadedBytes(existingBytes: Int64, receivedBytes: Int64) -> Int64 {
+        max(0, existingBytes) + max(0, receivedBytes)
     }
 
     static func shouldWaitForP2PTunnelRoute(

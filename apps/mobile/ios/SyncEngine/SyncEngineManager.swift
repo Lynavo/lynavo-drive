@@ -6966,6 +6966,30 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         return await prepareSharedFilesRoute(reason: "\(reason)_retry_after_tunnel_restart")
     }
 
+    private func recoverSharedFilesDownloadTunnelAfterRouteFailure(
+        path: String,
+        reason: String,
+        error: Error
+    ) async -> (host: String, isTunnel: Bool) {
+        syncDiagnosticsLog(
+            "SharedFiles",
+            "download tunnel route failed path=\(path) reason=\(reason) error=\(error); restarting tunnel for tunnel retry"
+        )
+        await restartP2PTunnelAndWait(reason: "\(reason)_tunnel_route_failed")
+
+        if await waitForP2PTunnelActive(reason: "\(reason)_retry_tunnel") {
+            let port = sharedFilesService.tunnelPort.map { String($0) } ?? "unknown"
+            sharedFilesService.useTunnelRoute = true
+            return ("127.0.0.1:\(port)", true)
+        }
+
+        syncDiagnosticsLog(
+            "SharedFiles",
+            "P2P tunnel unavailable for download retry path=\(path) reason=\(reason); falling back to route selection"
+        )
+        return await prepareSharedFilesRoute(reason: "\(reason)_retry_after_tunnel_restart")
+    }
+
     func browseSharedFiles(path: String) async throws -> [String: Any] {
         var route = await prepareSharedFilesRoute(reason: "browse_shared_files")
         slog("[SharedFiles] browseSharedFiles path=%@ resolved_host=%@ is_tunnel=%@", path, route.host, String(route.isTunnel))
@@ -7040,33 +7064,51 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 progress: progress
             )
         }
-        let result: SharedFilesService.DownloadResult
-        do {
-            result = try await withSharedFileTunnelOperation(
-                path: path,
-                reason: "download_shared_file",
-                isTunnelRoute: route.isTunnel
-            ) {
-                try await sharedFilesService.downloadFile(path: path, onProgress: progressHandler)
+        var result: SharedFilesService.DownloadResult?
+        var lastError: Error?
+        for attempt in 1...SharedFilesRoutePolicy.sharedFileDownloadMaxAttempts {
+            let reason = attempt == 1 ? "download_shared_file" : "download_shared_file_retry"
+            do {
+                result = try await withSharedFileTunnelOperation(
+                    path: path,
+                    reason: reason,
+                    isTunnelRoute: route.isTunnel
+                ) {
+                    try await sharedFilesService.downloadFile(path: path, onProgress: progressHandler)
+                }
+                syncDiagnosticsLog(
+                    "SharedFiles",
+                    "downloadSharedFile completed path=\(path) attempt=\(attempt) is_tunnel=\(route.isTunnel)"
+                )
+                break
+            } catch {
+                lastError = error
+                syncDiagnosticsLog(
+                    "SharedFiles",
+                    "downloadSharedFile attempt failed path=\(path) attempt=\(attempt) max_attempts=\(SharedFilesRoutePolicy.sharedFileDownloadMaxAttempts) is_tunnel=\(route.isTunnel) error=\(error)"
+                )
+                guard attempt < SharedFilesRoutePolicy.sharedFileDownloadMaxAttempts else {
+                    throw error
+                }
+                if SharedFilesRoutePolicy.shouldRetryDownloadOnTunnelAfterFailure(isTunnelRoute: route.isTunnel) {
+                    route = await recoverSharedFilesDownloadTunnelAfterRouteFailure(
+                        path: path,
+                        reason: reason,
+                        error: error
+                    )
+                } else {
+                    syncDiagnosticsLog(
+                        "SharedFiles",
+                        "download direct route failed path=\(path) reason=\(reason) error=\(error); reselecting route for retry"
+                    )
+                    route = await prepareSharedFilesRoute(reason: "\(reason)_retry_after_direct_route_failure")
+                }
+                slog("[SharedFiles] downloadSharedFile retry path=%@ attempt=%d resolved_host=%@ is_tunnel=%@", path, attempt + 1, route.host, String(route.isTunnel))
+                syncDiagnosticsLog("SharedFiles", "downloadSharedFile retry path=\(path) attempt=\(attempt + 1) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
             }
-        } catch {
-            guard SharedFilesRoutePolicy.shouldInvalidateTunnelAfterRouteFailure(isTunnelRoute: route.isTunnel) else {
-                throw error
-            }
-            route = await recoverSharedFilesTunnelAfterRouteFailure(
-                path: path,
-                reason: "download_shared_file",
-                error: error
-            )
-            slog("[SharedFiles] downloadSharedFile retry path=%@ resolved_host=%@ is_tunnel=%@", path, route.host, String(route.isTunnel))
-            syncDiagnosticsLog("SharedFiles", "downloadSharedFile retry path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
-            result = try await withSharedFileTunnelOperation(
-                path: path,
-                reason: "download_shared_file_retry",
-                isTunnelRoute: route.isTunnel
-            ) {
-                try await sharedFilesService.downloadFile(path: path, onProgress: progressHandler)
-            }
+        }
+        guard let result else {
+            throw lastError ?? SyncEngineError.networkError("Shared file download failed without an error")
         }
         if bindingConnectionState != .connected {
             updateBindingConnectionState(.connected, reason: "download_shared_file_success")

@@ -45,3 +45,43 @@ expect(
     ),
     "presence failures on the tunnel must not be suppressed long after shared-file tunnel activity"
 )
+
+expect(
+    SharedFilesRoutePolicy.shouldRetryDownloadOnTunnelAfterFailure(isTunnelRoute: true),
+    "shared-file downloads that started on the tunnel must retry on a fresh tunnel instead of migrating to LAN"
+)
+
+expect(
+    !SharedFilesRoutePolicy.shouldRetryDownloadOnTunnelAfterFailure(isTunnelRoute: false),
+    "direct LAN shared-file downloads must not force a tunnel retry"
+)
+
+expect(
+    SharedFilesRoutePolicy.sharedFileDownloadMaxAttempts == 4,
+    "shared-file downloads must allow repeated network-switch recovery attempts before failing"
+)
+
+expect(
+    SharedFilesRoutePolicy.resumeOffsetForPartialDownload(existingBytes: 1_024) == 1_024,
+    "shared-file downloads must resume from the existing partial byte count"
+)
+
+expect(
+    SharedFilesRoutePolicy.resumeOffsetForPartialDownload(existingBytes: -1) == 0,
+    "shared-file downloads must not send negative Range offsets"
+)
+
+expect(
+    SharedFilesRoutePolicy.shouldUseRangeRequest(resumeOffset: 1),
+    "shared-file downloads must use HTTP Range when a partial file exists"
+)
+
+expect(
+    !SharedFilesRoutePolicy.shouldUseRangeRequest(resumeOffset: 0),
+    "shared-file downloads must start with a full GET when no partial file exists"
+)
+
+expect(
+    SharedFilesRoutePolicy.totalDownloadedBytes(existingBytes: 1_024, receivedBytes: 2_048) == 3_072,
+    "shared-file progress must include bytes already persisted in the partial file"
+)
