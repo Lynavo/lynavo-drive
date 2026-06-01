@@ -79,6 +79,16 @@ class DiscoveryService {
     func startBrowsing() {
         slog("[DiscoveryService] startBrowsing called")
         syncDiagnosticsLog("DiscoveryService", "startBrowsing called")
+        
+        if browser != nil && browserState.contains("failed") {
+            syncDiagnosticsLog(
+                "DiscoveryService",
+                "startBrowsing: resetting defunct browser with state=\(browserState)"
+            )
+            browser?.cancel()
+            browser = nil
+        }
+
         guard browser == nil else {
             syncDiagnosticsLog(
                 "DiscoveryService",
@@ -113,6 +123,7 @@ class DiscoveryService {
         }
 
         browser?.stateUpdateHandler = { [weak self] state in
+            guard let self else { return }
             slog("[DiscoveryService] state: \(state)")
             // Include the current network path summary alongside the browser
             // state: the two together explain most "why did discovery stop"
@@ -122,7 +133,26 @@ class DiscoveryService {
                 "DiscoveryService",
                 "state: \(state) path=\(pathSnapshot)"
             )
-            self?.browserState = String(describing: state)
+            self.browserState = String(describing: state)
+            
+            if case .failed(let error) = state {
+                slog("[DiscoveryService] browser failed with error: %@", "\(error)")
+                syncDiagnosticsLog(
+                    "DiscoveryService",
+                    "browser failed with error: \(error) — resetting defunct browser instance"
+                )
+                self.browser?.cancel()
+                self.browser = nil
+                
+                // Trigger auto-recovery restart after a short delay (2 seconds) to let network interfaces stabilize
+                self.queue.asyncAfter(deadline: .now() + .seconds(2)) { [weak self] in
+                    guard let self else { return }
+                    if self.browser == nil {
+                        syncDiagnosticsLog("DiscoveryService", "auto-recovery: restarting browser after network failure")
+                        self.startBrowsing()
+                    }
+                }
+            }
         }
 
         browser?.start(queue: queue)
