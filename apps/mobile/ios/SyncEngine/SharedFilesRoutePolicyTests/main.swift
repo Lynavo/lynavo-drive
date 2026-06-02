@@ -13,6 +13,49 @@ expect(
 )
 
 expect(
+    SharedFilesRoutePolicy.shouldWaitForP2PTunnelRoute(
+        hasTunnelCredentials: true,
+        isTunnelActive: false
+    ),
+    "shared files must wait for the P2P tunnel after reconnect when credentials exist but the tunnel is not active"
+)
+
+expect(
+    !SharedFilesRoutePolicy.shouldWaitForP2PTunnelRoute(
+        hasTunnelCredentials: true,
+        isTunnelActive: true
+    ),
+    "shared files must not wait for the P2P tunnel when the tunnel is already active"
+)
+
+expect(
+    !SharedFilesRoutePolicy.shouldWaitForP2PTunnelRoute(
+        hasTunnelCredentials: false,
+        isTunnelActive: false
+    ),
+    "shared files must fall back to direct LAN when no P2P tunnel credentials exist"
+)
+
+expect(
+    SharedFilesRoutePolicy.freshLANHost(discoveredHost: " 192.168.1.20 ") == "192.168.1.20",
+    "shared files should accept a freshly discovered private LAN host after network recovery"
+)
+
+expect(
+    SharedFilesRoutePolicy.freshLANHost(discoveredHost: "8.8.8.8") == nil,
+    "shared files must reject public discovery hosts for LAN recovery"
+)
+
+expect(
+    SharedFilesRoutePolicy.fallbackDirectHost(
+        liveHost: nil,
+        currentBindingHost: "10.0.0.8",
+        persistedHost: "192.168.1.8"
+    ) == "10.0.0.8",
+    "shared files should prefer the current binding host over persisted host when falling back"
+)
+
+expect(
     SharedFilesRoutePolicy.shouldSuppressPresenceTunnelFailure(
         isTunnelRoute: true,
         activeSharedFileTunnelOperations: 1

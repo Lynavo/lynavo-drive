@@ -39,6 +39,38 @@ class AndroidSyncPrimitivesTest {
   }
 
   @Test
+  fun sharedFilesRouteDoesNotUseStaleTunnelPortUntilTunnelIsActive() {
+    val route = AndroidSyncPrimitives.decideSharedFilesRoute(
+      isTunnelActive = false,
+      tunnelPort = 51234,
+      hasTunnelCredentials = true,
+      directHost = "172.20.10.3",
+      directPort = 39394,
+    )
+
+    assertEquals(AndroidSharedFilesRouteMode.WAIT_FOR_TUNNEL, route.mode)
+    assertEquals("", route.host)
+    assertEquals(0, route.port)
+    assertFalse(route.isTunnel)
+  }
+
+  @Test
+  fun sharedFilesRouteFallsBackToDirectLanWhenCredentialsAreMissingEvenWithStaleTunnelPort() {
+    val route = AndroidSyncPrimitives.decideSharedFilesRoute(
+      isTunnelActive = false,
+      tunnelPort = 51234,
+      hasTunnelCredentials = false,
+      directHost = " 172.20.10.3 ",
+      directPort = 39394,
+    )
+
+    assertEquals(AndroidSharedFilesRouteMode.DIRECT_LAN, route.mode)
+    assertEquals("172.20.10.3", route.host)
+    assertEquals(39394, route.port)
+    assertFalse(route.isTunnel)
+  }
+
+  @Test
   fun sharedFilesRouteFallsBackToDirectLanWhenTunnelCredentialsAreMissing() {
     val route = AndroidSyncPrimitives.decideSharedFilesRoute(
       isTunnelActive = false,
