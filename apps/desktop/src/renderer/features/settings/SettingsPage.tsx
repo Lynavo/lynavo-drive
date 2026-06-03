@@ -3,7 +3,6 @@ import { BonjourRuntimeSection } from './BonjourRuntimeSection';
 import { ConnectionCodeSection } from './ConnectionCodeSection';
 import { DeviceNameSection } from './DeviceNameSection';
 import { LanguageSection } from './LanguageSection';
-import { ShareAddressSection } from './ShareAddressSection';
 import { SupportSection } from './SupportSection';
 
 export function SettingsPage() {
@@ -42,16 +41,6 @@ export function SettingsPage() {
             {t('settings.sections.connectionCodeDescription')}
           </p>
           <ConnectionCodeSection />
-        </section>
-
-        <section className="mb-8">
-          <h2 className="mb-1 text-sm font-semibold text-foreground">
-            {t('settings.sections.shareAddress')}
-          </h2>
-          <p className="mb-4 text-xs text-muted-foreground">
-            {t('settings.sections.shareAddressDescription')}
-          </p>
-          <ShareAddressSection />
         </section>
 
         {isWindows && (
