@@ -8,6 +8,7 @@
   "connectionStatus": {
     "lan": "局域网在线",
     "p2p": "P2P 在线",
+    "relay": "中继在线",
     "offline": "离线"
   },
   "emptyState": {

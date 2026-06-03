@@ -8,6 +8,7 @@
   "connectionStatus": {
     "lan": "區域網路在線",
     "p2p": "P2P 在線",
+    "relay": "中繼在線",
     "offline": "離線"
   },
   "emptyState": {

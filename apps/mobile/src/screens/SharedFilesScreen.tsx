@@ -54,7 +54,7 @@ interface SharedFileDownloadProgress {
   progress: number;
 }
 
-type SharedFilesConnectionStatus = 'lan' | 'p2p' | 'offline';
+type SharedFilesConnectionStatus = 'lan' | 'p2p' | 'relay' | 'offline';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -143,6 +143,7 @@ function sharedFilesConnectionStatusFromReachability(
   const route = (value as { route?: unknown }).route;
   if (route === 'lan') return 'lan';
   if (route === 'tunnel') return 'p2p';
+  if (route === 'relay') return 'relay';
   return null;
 }
 
@@ -389,6 +390,14 @@ export function SharedFilesScreen() {
         }
 
         const connState = (state.connectionState as string) || 'bound';
+        if (connState === 'offline') {
+          bindingAvailabilityRef.current = { deviceId, available: false };
+          setSharedFilesConnectionStatus('offline');
+          setErrorKind('device_unavailable');
+          setFiles([]);
+          return;
+        }
+
         const nextSharedFilesConnectionStatus =
           sharedFilesConnectionStatusFromReachability(
             state.sharedFilesReachability,
@@ -812,12 +821,16 @@ export function SharedFilesScreen() {
   const sharedFilesConnectionStatusStyle =
     sharedFilesConnectionStatus === 'lan'
       ? styles.connectionStatusLan
+      : sharedFilesConnectionStatus === 'relay'
+        ? styles.connectionStatusRelay
       : sharedFilesConnectionStatus === 'p2p'
         ? styles.connectionStatusP2P
         : styles.connectionStatusOffline;
   const sharedFilesConnectionTextStyle =
     sharedFilesConnectionStatus === 'offline'
       ? styles.connectionStatusTextOffline
+      : sharedFilesConnectionStatus === 'relay'
+        ? styles.connectionStatusTextRelay
       : sharedFilesConnectionStatus === 'p2p'
         ? styles.connectionStatusTextP2P
         : styles.connectionStatusTextLan;
@@ -965,6 +978,9 @@ const styles = StyleSheet.create({
   connectionStatusP2P: {
     backgroundColor: 'rgba(59,130,246,0.14)',
   },
+  connectionStatusRelay: {
+    backgroundColor: 'rgba(147,51,234,0.14)',
+  },
   connectionStatusOffline: {
     backgroundColor: 'rgba(71,85,105,0.12)',
   },
@@ -977,6 +993,9 @@ const styles = StyleSheet.create({
   },
   connectionStatusTextP2P: {
     color: '#1d4ed8',
+  },
+  connectionStatusTextRelay: {
+    color: '#7e22ce',
   },
   connectionStatusTextOffline: {
     color: '#475569',

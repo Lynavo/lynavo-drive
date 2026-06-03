@@ -194,6 +194,16 @@ describe('SharedFilesScreen download progress', () => {
       });
     });
     expect(getByText('P2P online')).toBeTruthy();
+
+    await act(async () => {
+      nativeListeners.get('onSharedFilesReachabilityChanged')?.({
+        deviceId: 'device-1',
+        state: 'available',
+        route: 'relay',
+        reason: 'browse_shared_files_success',
+      });
+    });
+    expect(getByText('Relay online')).toBeTruthy();
   });
 
   test('coalesces a connected binding event while the current directory load is in flight', async () => {
@@ -403,15 +413,25 @@ describe('SharedFilesScreen download progress', () => {
     }
   });
 
-  test('keeps shared files available when binding is offline but shared files are reachable through tunnel', async () => {
+  test('marks shared files offline when an offline binding event carries stale tunnel reachability', async () => {
     (useAuth as jest.Mock).mockReturnValue({
       subscription: { status: 'trialing' },
       loadSubscription: jest.fn(),
     });
 
-    const { getByTestId, queryByText } = render(<SharedFilesScreen />);
+    const { getByText, getByTestId } = render(<SharedFilesScreen />);
 
     await waitFor(() => getByTestId('shared-file-download-button'));
+
+    await act(async () => {
+      nativeListeners.get('onSharedFilesReachabilityChanged')?.({
+        deviceId: 'device-1',
+        state: 'available',
+        route: 'tunnel',
+        reason: 'browse_shared_files_success',
+      });
+    });
+    expect(getByText('P2P online')).toBeTruthy();
 
     await act(async () => {
       nativeListeners.get('onBindingStateChanged')?.({
@@ -424,8 +444,8 @@ describe('SharedFilesScreen download progress', () => {
       });
     });
 
-    expect(queryByText('Device Unavailable')).toBeNull();
-    expect(getByTestId('shared-file-download-button')).toBeTruthy();
+    expect(getByText('Offline')).toBeTruthy();
+    expect(getByText('Device Unavailable')).toBeTruthy();
   });
 
   test('reloads files when shared files reachability becomes available while binding remains offline', async () => {

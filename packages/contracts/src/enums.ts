@@ -8,7 +8,7 @@ export type SharedFilesReachabilityState =
   | 'unknown' | 'available' | 'unavailable';
 
 export type SharedFilesRouteKind =
-  | 'lan' | 'tunnel';
+  | 'lan' | 'tunnel' | 'relay';
 
 export type UploadState =
   | 'idle' | 'scanning' | 'queued' | 'uploading'
