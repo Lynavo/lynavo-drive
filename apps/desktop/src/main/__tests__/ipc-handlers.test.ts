@@ -106,6 +106,8 @@ vi.mock('../sidecar-client', async () => {
       redeemGiftCard: vi.fn(),
       sendSMSCode: vi.fn(),
       loginWithSMSCode: vi.fn(),
+      getAuthSessionView: vi.fn(),
+      logout: vi.fn(),
       loginWithGoogle: vi.fn(),
       loginWithApple: vi.fn(),
     },
@@ -270,6 +272,22 @@ describe('registerIpcHandlers', () => {
     expect(manager.startCredentialsSyncInterval).toHaveBeenCalledTimes(1);
   });
 
+  it('returns only the sanitized auth session through renderer IPC', async () => {
+    vi.mocked(sidecarClient.getAuthSessionView).mockReturnValue({
+      loggedIn: true,
+      phone: '+8613800138000',
+    });
+
+    registerIpcHandlers({ retryStart: vi.fn() } as never);
+    const handler = handlers.get(IPC.AUTH_GET_SESSION);
+
+    expect(handler?.()).toEqual({
+      loggedIn: true,
+      phone: '+8613800138000',
+    });
+    expect(sidecarClient.getAuthSessionView).toHaveBeenCalledTimes(1);
+  });
+
   it('runs Google OAuth through system browser loopback and syncs credentials', async () => {
     vi.stubEnv('GOOGLE_CLIENT_ID', 'desktop-client.apps.googleusercontent.com');
     vi.mocked(sidecarClient.loginWithGoogle).mockResolvedValue({ ok: true });
@@ -363,14 +381,17 @@ describe('registerIpcHandlers', () => {
     const firstChunk = body.slice(0, 32);
     const secondChunk = body.slice(32);
 
+    const callback = vi.fn();
     electronMockState.getAppleBeforeRequest()?.(
       {
         method: 'POST',
         uploadData: [{ bytes: Buffer.from(firstChunk) }, { bytes: Buffer.from(secondChunk) }],
       },
-      vi.fn(),
+      callback,
     );
 
+    expect(callback).toHaveBeenCalledWith({ cancel: true });
+    expect(electronMockState.browserWindowInstance.destroy).toHaveBeenCalledTimes(1);
     await expect(loginPromise).resolves.toEqual({ ok: true });
     expect(sidecarClient.loginWithApple).toHaveBeenCalledWith({
       identityToken: idToken,

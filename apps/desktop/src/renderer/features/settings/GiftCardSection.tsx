@@ -6,6 +6,7 @@ import { Button } from '@renderer/components/ui/button';
 import { LoginDialog } from '@renderer/components/shared/LoginDialog';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
+import { useAuthStore } from '@renderer/stores/auth-store';
 
 type RedeemResult = {
   ok: boolean;
@@ -41,14 +42,6 @@ type ResultState = {
   text: string;
 };
 
-type RuntimeAuthAPI = Partial<Window['electronAPI']['auth']>;
-
-function getRuntimeAuthAPI(): RuntimeAuthAPI | undefined {
-  return (window as Window & { electronAPI?: Partial<Window['electronAPI']> }).electronAPI?.auth as
-    | RuntimeAuthAPI
-    | undefined;
-}
-
 function extractErrorText(error: unknown, fallback: string): string {
   if (error instanceof Error) {
     return error.message || fallback;
@@ -57,22 +50,6 @@ function extractErrorText(error: unknown, fallback: string): string {
     return error || fallback;
   }
   return fallback;
-}
-
-function decodeJWT(token: string): { phone?: string; email?: string } | null {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join(''),
-    );
-    return JSON.parse(jsonPayload) as { phone?: string; email?: string };
-  } catch {
-    return null;
-  }
 }
 
 function getRedeemErrorMessage(result: RedeemResult, t: (key: string) => string): string {
@@ -101,37 +78,25 @@ export function GiftCardSection() {
   const [lastResult, setLastResult] = useState<ResultState | null>(null);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const [pendingRedeemCode, setPendingRedeemCode] = useState('');
-  const [session, setSession] = useState<{ accessToken: string } | null>(null);
-
-  const checkSession = useCallback(async () => {
-    const auth = getRuntimeAuthAPI();
-    if (auth?.getAuthSession) {
-      try {
-        const sess = await auth.getAuthSession();
-        setSession(sess);
-      } catch (error) {
-        console.error('Failed to get auth session:', error);
-      }
-    }
-  }, []);
+  const session = useAuthStore((state) => state.session);
+  const refreshSession = useAuthStore((state) => state.refreshSession);
+  const logout = useAuthStore((state) => state.logout);
 
   useEffect(() => {
-    void checkSession();
-  }, [checkSession]);
+    void refreshSession();
+  }, [refreshSession]);
 
   const handleLogout = useCallback(async () => {
-    const auth = getRuntimeAuthAPI();
-    if (!auth?.logout) {
+    if (!window.electronAPI?.auth?.logout) {
       toast.error('Auth API unavailable');
       return;
     }
     try {
-      const res = await auth.logout();
+      const res = await logout();
       if (res.ok) {
         toast.success(
           t('settings.giftCard.phoneLogin.logoutSuccess', { defaultValue: '已成功登出' }),
         );
-        setSession(null);
       } else {
         toast.error('Logout failed');
       }
@@ -140,7 +105,7 @@ export function GiftCardSection() {
         description: extractErrorText(error, 'Logout error'),
       });
     }
-  }, [t]);
+  }, [logout, t]);
 
   const performRedeem = useCallback(
     async (trimmedCode: string, openLoginOnAuth: boolean) => {
@@ -209,7 +174,7 @@ export function GiftCardSection() {
   }, [code, performRedeem, t]);
 
   const handleLoginSuccess = useCallback(async () => {
-    await checkSession();
+    await refreshSession();
     if (pendingRedeemCode) {
       setIsSubmitting(true);
       try {
@@ -219,7 +184,7 @@ export function GiftCardSection() {
         setPendingRedeemCode('');
       }
     }
-  }, [pendingRedeemCode, performRedeem, checkSession]);
+  }, [pendingRedeemCode, performRedeem, refreshSession]);
 
   return (
     <>
@@ -246,11 +211,7 @@ export function GiftCardSection() {
               {session ? (
                 <>
                   {t('settings.giftCard.phoneLogin.loggedInAs', { defaultValue: '已登入' })}
-                  {decodeJWT(session.accessToken)?.phone
-                    ? ` (${decodeJWT(session.accessToken)?.phone})`
-                    : decodeJWT(session.accessToken)?.email
-                      ? ` (${decodeJWT(session.accessToken)?.email})`
-                      : ''}
+                  {session.phone ? ` (${session.phone})` : session.email ? ` (${session.email})` : ''}
                 </>
               ) : (
                 t('settings.giftCard.phoneLogin.notLoggedIn', { defaultValue: '尚未登入' })

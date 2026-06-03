@@ -41,6 +41,12 @@ export type AuthLoginResult = {
   merged?: boolean;
 };
 
+export type AuthSessionView = {
+  loggedIn: true;
+  phone?: string;
+  email?: string;
+};
+
 export interface ElectronAPI {
   sidecar: {
     getHealth(): Promise<{ ok: boolean; service: string }>;
@@ -102,11 +108,7 @@ export interface ElectronAPI {
       reason?: 'phone_invalid' | 'sms_too_frequent' | 'sms_send_failed';
     }>;
     loginWithSMSCode(payload: { phone: string; code: string }): Promise<AuthLoginResult>;
-    getAuthSession(): Promise<{
-      accessToken: string;
-      refreshToken: string;
-      baseUrl?: string;
-    } | null>;
+    getAuthSession(): Promise<AuthSessionView | null>;
     logout(): Promise<{ ok: boolean }>;
     loginWithOAuth(payload: { provider: 'google' | 'apple' }): Promise<AuthLoginResult>;
   };

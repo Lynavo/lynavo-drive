@@ -12,6 +12,7 @@ import type {
 } from '@syncflow/contracts';
 import { desktopClientHeaders } from './app-info';
 import { isGlobalMarket } from '../shared/market';
+import { shouldUseReviewOAuthTarget } from './oauth-config';
 
 const BASE = `http://127.0.0.1:${SIDECAR_HTTP_PORT}`;
 const DEFAULT_API_BASE_URL = isGlobalMarket()
@@ -100,10 +101,35 @@ type AuthSession = {
   baseUrl?: string;
 };
 
+export type AuthSessionView = {
+  loggedIn: true;
+  phone?: string;
+  email?: string;
+};
+
 let authSession: AuthSession | null = null;
 let authSessionLoaded = false;
 let refreshSessionInFlight: Promise<boolean> | null = null;
 let preserveSidecarTunnelCredentialsAfterSessionLoss = false;
+const DEFAULT_REMOTE_REQUEST_TIMEOUT_MS = 15_000;
+const DEFAULT_SIDECAR_REQUEST_TIMEOUT_MS = 30_000;
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const REMOTE_REQUEST_TIMEOUT_MS = parsePositiveInteger(
+  process.env.SYNCFLOW_REMOTE_REQUEST_TIMEOUT_MS,
+  DEFAULT_REMOTE_REQUEST_TIMEOUT_MS,
+);
+const SIDECAR_REQUEST_TIMEOUT_MS = parsePositiveInteger(
+  process.env.SYNCFLOW_SIDECAR_REQUEST_TIMEOUT_MS,
+  DEFAULT_SIDECAR_REQUEST_TIMEOUT_MS,
+);
 
 function getSessionFilePath(): string {
   return join(app.getPath('userData'), 'session.json');
@@ -223,6 +249,13 @@ function resolveAuthBaseUrlForPhone(phone: string): string {
   return AUTH_BASE_URL;
 }
 
+function resolveOAuthAuthBaseUrl(): string {
+  if (process.env.SYNCFLOW_AUTH_BASE_URL?.trim()) {
+    return AUTH_BASE_URL;
+  }
+  return shouldUseReviewOAuthTarget(process.env) ? AUTH_REVIEW_BASE_URL : AUTH_BASE_URL;
+}
+
 function getSessionBaseUrl(): string {
   ensureSessionLoaded();
   return authSession?.baseUrl || AUTH_BASE_URL;
@@ -245,6 +278,31 @@ function createAuthSession(
     accessToken,
     refreshToken,
     ...(baseUrl ? { baseUrl } : {}),
+  };
+}
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  const payload = token.split('.')[1];
+  if (!payload) {
+    return null;
+  }
+  try {
+    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function createAuthSessionView(session: AuthSession | null): AuthSessionView | null {
+  if (!session?.accessToken) {
+    return null;
+  }
+
+  const payload = decodeJwtPayload(session.accessToken);
+  return {
+    loggedIn: true,
+    phone: typeof payload?.phone === 'string' ? payload.phone : undefined,
+    email: typeof payload?.email === 'string' ? payload.email : undefined,
   };
 }
 
@@ -419,6 +477,10 @@ function isGiftCardAuthError(error: unknown): boolean {
   );
 }
 
+function requestTimeoutMs(baseUrl: string): number {
+  return baseUrl === BASE ? SIDECAR_REQUEST_TIMEOUT_MS : REMOTE_REQUEST_TIMEOUT_MS;
+}
+
 export interface SidecarHealth {
   ok: boolean;
   service: string;
@@ -462,14 +524,28 @@ async function request<T>(
       },
     };
 
+    let settled = false;
+    const rejectOnce = (error: Error) => {
+      if (!settled) {
+        settled = true;
+        reject(error);
+      }
+    };
+    const resolveOnce = (value: T) => {
+      if (!settled) {
+        settled = true;
+        resolve(value);
+      }
+    };
+
     const req = transport.request(options, (res) => {
       let data = '';
       res.on('data', (chunk) => (data += chunk));
       res.on('end', () => {
         if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(JSON.parse(data) as T);
+          resolveOnce(JSON.parse(data) as T);
         } else {
-          reject(
+          rejectOnce(
             new Error(
               `${method} ${url.origin}${url.pathname}${url.search}: ${res.statusCode} ${data}`,
             ),
@@ -478,7 +554,20 @@ async function request<T>(
       });
     });
 
-    req.on('error', reject);
+    req.on('error', (error) => rejectOnce(error));
+    const timeoutMs = requestTimeoutMs(baseUrl);
+    if (typeof req.setTimeout === 'function') {
+      req.setTimeout(timeoutMs, () => {
+        const error = new Error(
+          `${method} ${url.origin}${url.pathname}${url.search}: request timed out after ${timeoutMs}ms`,
+        );
+        if (typeof req.destroy === 'function') {
+          req.destroy(error);
+        } else {
+          rejectOnce(error);
+        }
+      });
+    }
     if (body) req.write(JSON.stringify(body));
     req.end();
   });
@@ -564,19 +653,21 @@ export const sidecarClient = {
     return persistAuthSession(response, authBaseUrl);
   },
   loginWithGoogle: async (payload: { identityToken: string }) => {
+    const authBaseUrl = resolveOAuthAuthBaseUrl();
     const response = await request<unknown>(
       'POST',
       '/api/v1/auth/google/login',
       { identity_token: payload.identityToken },
-      AUTH_BASE_URL,
+      authBaseUrl,
     );
-    return persistAuthSession(response);
+    return persistAuthSession(response, authBaseUrl);
   },
   loginWithApple: async (payload: {
     identityToken: string;
     authorizationCode?: string;
     fullName?: string;
   }) => {
+    const authBaseUrl = resolveOAuthAuthBaseUrl();
     const response = await request<unknown>(
       'POST',
       '/api/v1/auth/apple/login',
@@ -585,9 +676,9 @@ export const sidecarClient = {
         authorization_code: payload.authorizationCode,
         full_name: payload.fullName,
       },
-      AUTH_BASE_URL,
+      authBaseUrl,
     );
-    return persistAuthSession(response);
+    return persistAuthSession(response, authBaseUrl);
   },
   syncTunnelCredentials: async (payload: {
     signalingUrl: string;
@@ -599,6 +690,10 @@ export const sidecarClient = {
   getAuthSession: () => {
     ensureSessionLoaded();
     return authSession;
+  },
+  getAuthSessionView: () => {
+    ensureSessionLoaded();
+    return createAuthSessionView(authSession);
   },
   fetchTurnCredentials: async () => {
     return request<{

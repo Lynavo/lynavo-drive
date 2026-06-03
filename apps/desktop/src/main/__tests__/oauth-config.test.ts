@@ -165,6 +165,30 @@ describe('resolveAppleOAuthConfig', () => {
     });
   });
 
+  it('uses the review callback when only the review auth base is configured', () => {
+    expect(
+      resolveAppleOAuthConfig({
+        SYNCFLOW_APPLE_SIGN_CONFIG_DIR: writeAppleSignConfig(),
+        SYNCFLOW_AUTH_REVIEW_BASE_URL: 'https://review-api.vividrop.com',
+      }),
+    ).toEqual({
+      clientId: 'com.vividrop.global.signin',
+      redirectUri: 'https://review-api.vividrop.com/auth/apple/callback',
+    });
+  });
+
+  it('uses the review callback for review release profiles', () => {
+    expect(
+      resolveAppleOAuthConfig({
+        SYNCFLOW_APPLE_SIGN_CONFIG_DIR: writeAppleSignConfig(),
+        SYNCFLOW_RELEASE_PROFILE: 'global-review',
+      }),
+    ).toEqual({
+      clientId: 'com.vividrop.global.signin',
+      redirectUri: 'https://review-api.vividrop.com/auth/apple/callback',
+    });
+  });
+
   it('uses packaged global Apple public config fallback for global builds', () => {
     vi.stubEnv('SYNCFLOW_MARKET', 'global');
 

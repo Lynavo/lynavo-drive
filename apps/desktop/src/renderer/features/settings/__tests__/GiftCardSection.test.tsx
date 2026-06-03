@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { GiftCardSection } from '../GiftCardSection';
+import { useAuthStore } from '@renderer/stores/auth-store';
 
 const toastFns = vi.hoisted(() => ({
   error: vi.fn(),
@@ -47,6 +48,7 @@ describe('GiftCardSection', () => {
     toastFns.message.mockReset();
     toastFns.success.mockReset();
     Reflect.deleteProperty(window, 'electronAPI');
+    useAuthStore.setState({ session: null, loading: false });
   });
 
   it('disables redeem when the code is blank', () => {

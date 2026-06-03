@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { DirectoryPage } from '../DirectoryPage';
 import { useDirectoryStore } from '@renderer/stores/directory-store';
 import { useSettingsStore } from '@renderer/stores/settings-store';
+import { useAuthStore } from '@renderer/stores/auth-store';
 import { mockSettings } from '@renderer/mocks/settings';
 import { DirectoryPathCard } from '../DirectoryPathCard';
 import { ReceivedFileList } from '../ReceivedFileList';
@@ -64,6 +65,7 @@ describe('DirectoryPage', () => {
     vi.useRealTimers();
     Reflect.deleteProperty(window, 'electronAPI');
     useDirectoryStore.setState(useDirectoryStore.getInitialState());
+    useAuthStore.setState({ session: null, loading: false });
     useSettingsStore.setState({
       settings: mockSettings,
       shareStatusInfo: {
@@ -130,6 +132,7 @@ describe('DirectoryPathCard', () => {
   beforeEach(() => {
     vi.useRealTimers();
     Reflect.deleteProperty(window, 'electronAPI');
+    useAuthStore.setState({ session: null, loading: false });
     useSettingsStore.setState({
       settings: mockSettings,
       shareStatusInfo: {

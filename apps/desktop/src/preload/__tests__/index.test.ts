@@ -11,6 +11,8 @@ const exposed = vi.hoisted(() => ({
         auth: {
           sendSMSCode(payload: { phone: string }): Promise<unknown>;
           loginWithSMSCode(payload: { phone: string; code: string }): Promise<unknown>;
+          getAuthSession(): Promise<unknown>;
+          logout(): Promise<unknown>;
         };
       },
   invoke: vi.fn(),
@@ -82,5 +84,21 @@ describe('preload electronAPI', () => {
       phone: '13800138000',
       code: '123456',
     });
+  });
+
+  it('maps renderer auth session calls to sanitized session IPC', async () => {
+    exposed.invoke
+      .mockResolvedValueOnce({ loggedIn: true, email: 'ada@example.com' })
+      .mockResolvedValueOnce({ ok: true });
+
+    await import('../index');
+
+    await expect(exposed.api?.auth.getAuthSession()).resolves.toEqual({
+      loggedIn: true,
+      email: 'ada@example.com',
+    });
+    await expect(exposed.api?.auth.logout()).resolves.toEqual({ ok: true });
+    expect(exposed.invoke).toHaveBeenCalledWith('auth:get-session');
+    expect(exposed.invoke).toHaveBeenCalledWith('auth:logout');
   });
 });

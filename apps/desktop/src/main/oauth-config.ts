@@ -181,7 +181,17 @@ function firstAppleSignConfigPath(env: NodeJS.ProcessEnv): string {
   return dirPath ? join(dirPath, 'id.txt') : '';
 }
 
-function shouldUseReviewAppleRedirect(env: NodeJS.ProcessEnv): boolean {
+export function shouldUseReviewOAuthTarget(env: NodeJS.ProcessEnv): boolean {
+  const explicitAuthBase = firstNonEmpty(env.SYNCFLOW_AUTH_BASE_URL).toLowerCase();
+  if (explicitAuthBase) {
+    return explicitAuthBase.includes('review-api') || explicitAuthBase.includes('review.');
+  }
+
+  const releaseProfile = env.SYNCFLOW_RELEASE_PROFILE?.trim().toLowerCase();
+  if (releaseProfile?.endsWith('-review')) {
+    return true;
+  }
+
   const authBase = firstNonEmpty(
     env.SYNCFLOW_AUTH_BASE_URL,
     env.SYNCFLOW_AUTH_REVIEW_BASE_URL,
@@ -196,7 +206,7 @@ function resolveAppleRedirectUri(env: NodeJS.ProcessEnv, fileConfig: AppleSignCo
   if (explicit) {
     return explicit;
   }
-  if (shouldUseReviewAppleRedirect(env)) {
+  if (shouldUseReviewOAuthTarget(env)) {
     return firstNonEmpty(fileConfig.reviewRedirectUri, fileConfig.globalRedirectUri);
   }
   return firstNonEmpty(

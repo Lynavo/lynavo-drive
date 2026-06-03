@@ -51,6 +51,11 @@ function createResponse(statusCode: number, body: string) {
   return res;
 }
 
+function createUnsignedJwt(payload: Record<string, unknown>): string {
+  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  return `${encode({ alg: 'none' })}.${encode(payload)}.`;
+}
+
 const remoteClientHeaders = {
   'X-Client-App': 'vividrop-desktop',
   'X-Client-Platform': process.platform,
@@ -665,6 +670,10 @@ describe('sidecarClient', () => {
 
   it('normalizes Google login user metadata from the auth response envelope', async () => {
     const httpRequest = vi.fn();
+    const accessToken = createUnsignedJwt({
+      phone: '+8613800138000',
+      email: 'ada@example.com',
+    });
     const httpsRequest = vi.fn((options: RequestOptions, callback: (res: unknown) => void) => {
       const req = new EventEmitter() as EventEmitter & {
         on: typeof EventEmitter.prototype.on;
@@ -680,7 +689,7 @@ describe('sidecarClient', () => {
             code: 0,
             message: 'success',
             data: {
-              access_token: 'google-access-token',
+              access_token: accessToken,
               refresh_token: 'google-refresh-token',
               user_id: 77,
               is_new_user: false,
@@ -717,6 +726,81 @@ describe('sidecarClient', () => {
     expect(httpsRequest).toHaveBeenCalledTimes(1);
     const [options] = httpsRequest.mock.calls[0] as [RequestOptions, (res: unknown) => void];
     expect(options.path).toBe('/api/v1/auth/google/login');
+    expect(client.getAuthSessionView()).toEqual({
+      loggedIn: true,
+      phone: '+8613800138000',
+      email: 'ada@example.com',
+    });
+
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('routes OAuth login to the review API when only the review auth base is configured', async () => {
+    const httpRequest = vi.fn();
+    const httpsRequest = vi.fn((options: RequestOptions, callback: (res: unknown) => void) => {
+      const req = new EventEmitter() as EventEmitter & {
+        on: typeof EventEmitter.prototype.on;
+        write: ReturnType<typeof vi.fn>;
+        end: ReturnType<typeof vi.fn>;
+      };
+      req.write = vi.fn();
+      req.end = vi.fn();
+      callback(
+        createResponse(
+          200,
+          JSON.stringify({
+            code: 0,
+            message: 'success',
+            data: {
+              access_token: 'apple-access-token',
+              refresh_token: 'apple-refresh-token',
+              user_id: 88,
+              is_new_user: true,
+              merged: false,
+            },
+          }),
+        ),
+      );
+      return req;
+    });
+
+    vi.doMock('node:http', () => ({
+      default: { request: httpRequest },
+      request: httpRequest,
+    }));
+    vi.doMock('node:https', () => ({
+      default: { request: httpsRequest },
+      request: httpsRequest,
+    }));
+
+    vi.resetModules();
+    vi.stubEnv('SYNCFLOW_AUTH_REVIEW_BASE_URL', 'https://review-api.vividrop.com');
+
+    const { sidecarClient: client } = await import('../sidecar-client');
+
+    await expect(
+      client.loginWithApple({
+        identityToken: 'id-token',
+        authorizationCode: 'auth-code',
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      userId: 88,
+      isNewUser: true,
+      merged: false,
+    });
+
+    expect(httpRequest).not.toHaveBeenCalled();
+    expect(httpsRequest).toHaveBeenCalledTimes(1);
+    const [options] = httpsRequest.mock.calls[0] as [RequestOptions, (res: unknown) => void];
+    expect(options.hostname).toBe('review-api.vividrop.com');
+    expect(options.path).toBe('/api/v1/auth/apple/login');
+    expect(client.getAuthSession()).toEqual({
+      accessToken: 'apple-access-token',
+      refreshToken: 'apple-refresh-token',
+      baseUrl: 'https://review-api.vividrop.com',
+    });
 
     vi.unstubAllEnvs();
     vi.resetModules();

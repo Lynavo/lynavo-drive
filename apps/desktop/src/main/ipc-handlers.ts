@@ -87,6 +87,8 @@ type AuthIpcResult = {
   merged?: boolean;
 };
 
+const OAUTH_TOKEN_EXCHANGE_TIMEOUT_MS = 15_000;
+
 function createOAuthToken(): string {
   return randomBytes(32).toString('base64url');
 }
@@ -240,17 +242,31 @@ async function exchangeGoogleAuthorizationCode(payload: {
   codeVerifier: string;
   redirectUri: string;
 }): Promise<string> {
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: payload.clientId,
-      code: payload.code,
-      code_verifier: payload.codeVerifier,
-      grant_type: 'authorization_code',
-      redirect_uri: payload.redirectUri,
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), OAUTH_TOKEN_EXCHANGE_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      signal: controller.signal,
+      body: new URLSearchParams({
+        client_id: payload.clientId,
+        code: payload.code,
+        code_verifier: payload.codeVerifier,
+        grant_type: 'authorization_code',
+        redirect_uri: payload.redirectUri,
+      }),
+    });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error('Google token exchange timed out');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+
   const body = (await response.json()) as {
     id_token?: string;
     error?: string;
@@ -323,7 +339,7 @@ export function registerIpcHandlers(sidecarManager: SidecarManager): void {
       return res;
     },
   );
-  ipcMain.handle(IPC.AUTH_GET_SESSION, () => sidecarClient.getAuthSession());
+  ipcMain.handle(IPC.AUTH_GET_SESSION, () => sidecarClient.getAuthSessionView());
   ipcMain.handle(IPC.AUTH_LOGOUT, () => sidecarClient.logout());
   ipcMain.handle(
     IPC.AUTH_LOGIN_WITH_OAUTH,
@@ -458,49 +474,52 @@ export function registerIpcHandlers(sidecarManager: SidecarManager): void {
             const session = win.webContents.session;
             session.webRequest.onBeforeRequest(
               { urls: [appleConfig.redirectUri + '*'] },
-              async (details, callback) => {
+              (details, callback) => {
                 if (
                   details.method === 'POST' &&
                   details.uploadData &&
                   details.uploadData.length > 0
                 ) {
                   closingForCallback = true;
-                  win.destroy();
-                  try {
-                    const rawBody = readUploadDataBody(details.uploadData);
-                    const params = new URLSearchParams(rawBody);
-                    if (params.get('state') !== state) {
-                      throw new Error('OAuth state mismatch');
-                    }
-                    const idToken = params.get('id_token');
-                    const code = params.get('code') || undefined;
-                    const userStr = params.get('user');
-                    let fullName = '';
-                    if (userStr) {
-                      const parsedUser = JSON.parse(userStr);
-                      if (parsedUser.name) {
-                        fullName =
-                          `${parsedUser.name.firstName || ''} ${parsedUser.name.lastName || ''}`.trim();
-                      }
-                    }
-
-                    if (!idToken) throw new Error('No id_token returned from Apple');
-                    if (!idTokenHasNonce(idToken, nonce)) {
-                      throw new Error('OAuth nonce mismatch');
-                    }
-                    const res = await sidecarClient.loginWithApple({
-                      identityToken: idToken,
-                      authorizationCode: code,
-                      fullName: fullName || undefined,
-                    });
-                    if (res.ok) {
-                      await syncLoginCredentialsAfterSuccess(sidecarManager, 'Apple');
-                    }
-                    safeResolve(res);
-                  } catch (err) {
-                    safeResolve({ ok: false, message: errorMessage(err) });
-                  }
+                  const rawBody = readUploadDataBody(details.uploadData);
                   callback({ cancel: true });
+                  win.destroy();
+
+                  void (async () => {
+                    try {
+                      const params = new URLSearchParams(rawBody);
+                      if (params.get('state') !== state) {
+                        throw new Error('OAuth state mismatch');
+                      }
+                      const idToken = params.get('id_token');
+                      const code = params.get('code') || undefined;
+                      const userStr = params.get('user');
+                      let fullName = '';
+                      if (userStr) {
+                        const parsedUser = JSON.parse(userStr);
+                        if (parsedUser.name) {
+                          fullName =
+                            `${parsedUser.name.firstName || ''} ${parsedUser.name.lastName || ''}`.trim();
+                        }
+                      }
+
+                      if (!idToken) throw new Error('No id_token returned from Apple');
+                      if (!idTokenHasNonce(idToken, nonce)) {
+                        throw new Error('OAuth nonce mismatch');
+                      }
+                      const res = await sidecarClient.loginWithApple({
+                        identityToken: idToken,
+                        authorizationCode: code,
+                        fullName: fullName || undefined,
+                      });
+                      if (res.ok) {
+                        await syncLoginCredentialsAfterSuccess(sidecarManager, 'Apple');
+                      }
+                      safeResolve(res);
+                    } catch (err) {
+                      safeResolve({ ok: false, message: errorMessage(err) });
+                    }
+                  })();
                 } else {
                   callback({});
                 }

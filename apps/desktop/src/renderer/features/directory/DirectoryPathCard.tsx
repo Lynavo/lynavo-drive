@@ -1,20 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FolderOpen, FolderInput, FolderSymlink, Lock, Loader2 } from 'lucide-react';
+import { FolderOpen, FolderInput, FolderSymlink, Lock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Button } from '@renderer/components/ui/button';
 import { GlassCard } from '@renderer/components/shared/GlassCard';
 import { CopyButton } from '@renderer/components/shared/CopyButton';
 import { useSettingsStore } from '@renderer/stores/settings-store';
-import { Input } from '@renderer/components/ui/input';
-import { Label } from '@renderer/components/ui/label';
 import { LoginDialog } from '@renderer/components/shared/LoginDialog';
-
-type RuntimeAuthAPI = Partial<Window['electronAPI']['auth']>;
-
-function getRuntimeAuthAPI(): RuntimeAuthAPI | undefined {
-  return (window as any).electronAPI?.auth as RuntimeAuthAPI | undefined;
-}
+import { useAuthStore } from '@renderer/stores/auth-store';
 
 function extractErrorText(error: unknown, fallback: string): string {
   if (error instanceof Error) {
@@ -24,22 +17,6 @@ function extractErrorText(error: unknown, fallback: string): string {
     return error || fallback;
   }
   return fallback;
-}
-
-function decodeJWT(token: string): { phone?: string; email?: string } | null {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join(''),
-    );
-    return JSON.parse(jsonPayload) as { phone?: string; email?: string };
-  } catch {
-    return null;
-  }
 }
 
 const colors = {
@@ -58,36 +35,24 @@ export function DirectoryPathCard() {
   const updateSettings = useSettingsStore((s) => s.updateSettings);
   const [saving, setSaving] = useState(false);
   const [transferActive, setTransferActive] = useState(false);
-  const [session, setSession] = useState<{ accessToken: string } | null>(null);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
-
-  const checkSession = useCallback(async () => {
-    const auth = getRuntimeAuthAPI();
-    if (auth?.getAuthSession) {
-      try {
-        const sess = await auth.getAuthSession();
-        setSession(sess);
-      } catch (error) {
-        console.error('Failed to get auth session:', error);
-      }
-    }
-  }, []);
+  const session = useAuthStore((state) => state.session);
+  const refreshSession = useAuthStore((state) => state.refreshSession);
+  const logout = useAuthStore((state) => state.logout);
 
   useEffect(() => {
-    void checkSession();
-  }, [checkSession]);
+    void refreshSession();
+  }, [refreshSession]);
 
   const handleLogout = useCallback(async () => {
-    const auth = getRuntimeAuthAPI();
-    if (!auth?.logout) {
+    if (!window.electronAPI?.auth?.logout) {
       toast.error('Auth API unavailable');
       return;
     }
     try {
-      const res = await auth.logout();
+      const res = await logout();
       if (res.ok) {
         toast.success(t('settings.giftCard.phoneLogin.logoutSuccess'));
-        setSession(null);
       } else {
         toast.error('Logout failed');
       }
@@ -96,7 +61,7 @@ export function DirectoryPathCard() {
         description: extractErrorText(error, 'Logout error'),
       });
     }
-  }, [t]);
+  }, [logout, t]);
 
   const rootPath = settings.rootPath;
   const receivePath = settings.receivePath;
@@ -290,11 +255,7 @@ export function DirectoryPathCard() {
                 {session ? (
                   <>
                     {t('settings.giftCard.phoneLogin.loggedInAs')}
-                    {decodeJWT(session.accessToken)?.phone
-                      ? ` (${decodeJWT(session.accessToken)?.phone})`
-                      : decodeJWT(session.accessToken)?.email
-                        ? ` (${decodeJWT(session.accessToken)?.email})`
-                        : ''}
+                    {session.phone ? ` (${session.phone})` : session.email ? ` (${session.email})` : ''}
                   </>
                 ) : (
                   t('settings.filePath.remoteFeaturePromptDetail', { defaultValue: '登入後可使用遠端同步' })
@@ -327,7 +288,7 @@ export function DirectoryPathCard() {
       <LoginDialog
         open={loginDialogOpen}
         onOpenChange={setLoginDialogOpen}
-        onLoginSuccess={checkSession}
+        onLoginSuccess={refreshSession}
         title={t('settings.filePath.remoteFeaturePrompt')}
         description={t('settings.filePath.remoteFeaturePromptDetail')}
       />
