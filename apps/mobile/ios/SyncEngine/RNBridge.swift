@@ -636,10 +636,10 @@ class NativeSyncEngineModule: RCTEventEmitter {
     // MARK: - Vivi Drop: Shared Files
 
     @objc
-    func browseSharedFiles(_ path: NSString, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    func browseSharedFiles(_ scope: NSString, path: NSString, accessToken: NSString, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         Task {
             do {
-                let result = try await SyncEngineManager.shared.browseSharedFiles(path: path as String)
+                let result = try await SyncEngineManager.shared.browseSharedFiles(scope: scope as String, path: path as String, accessToken: accessToken as String)
                 resolve(result)
             } catch {
                 reject("SHARED_FILES_ERROR", error.localizedDescription, error)
@@ -648,10 +648,10 @@ class NativeSyncEngineModule: RCTEventEmitter {
     }
 
     @objc
-    func downloadSharedFile(_ path: NSString, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    func downloadSharedFile(_ scope: NSString, path: NSString, accessToken: NSString, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         Task {
             do {
-                let result = try await SyncEngineManager.shared.downloadSharedFile(path: path as String)
+                let result = try await SyncEngineManager.shared.downloadSharedFile(scope: scope as String, path: path as String, accessToken: accessToken as String)
                 resolve(result)
             } catch {
                 reject("DOWNLOAD_ERROR", error.localizedDescription, error)
@@ -660,8 +660,8 @@ class NativeSyncEngineModule: RCTEventEmitter {
     }
 
     @objc
-    func getSharedFileStreamUrl(_ path: NSString, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        let url = SyncEngineManager.shared.getSharedFileStreamUrl(path: path as String)
+    func getSharedFileStreamUrl(_ scope: NSString, path: NSString, accessToken: NSString, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        let url = SyncEngineManager.shared.getSharedFileStreamUrl(scope: scope as String, path: path as String, accessToken: accessToken as String)
         resolve(url)
     }
 

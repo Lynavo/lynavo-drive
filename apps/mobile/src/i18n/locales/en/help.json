@@ -48,8 +48,8 @@
       "answer": "New users get a 7-day free trial after registration. After it ends, a subscription is required to continue using Vivi Drop. Go to Settings → Membership to view subscription status or purchase."
     },
     "item5": {
-      "title": "What if the shared directory is empty?",
-      "answer": "Confirm the shared directory path is set in Vivi Drop on the PC, and that the folder contains files. After setting it, pull to refresh on your phone to see the contents."
+      "title": "What if the shared folder is empty?",
+      "answer": "Confirm the shared folder path is available in Vivi Drop on the PC, and that the folder contains files. After setting it, pull to refresh on your phone to see the contents."
     }
   },
   "contact": {

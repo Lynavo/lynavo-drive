@@ -43,7 +43,7 @@ jest.mock('react-i18next', () => ({
         'syncActivity.quickEntry.albumTitle': '相簿',
         'syncActivity.quickEntry.albumDesc': '瀏覽並手動上傳素材',
         'syncActivity.quickEntry.sharedFilesTitle': '共享目錄',
-        'syncActivity.quickEntry.sharedFilesDesc': '瀏覽 PC 設備的共享目錄',
+        'syncActivity.quickEntry.sharedFilesDesc': '瀏覽共享目錄與個人共享目錄',
         'syncActivity.onboarding.skip': '跳過引導',
         'syncActivity.onboarding.previous': '上一步',
         'syncActivity.onboarding.next': `下一步 ${values?.step ?? ''}/${values?.total ?? ''}`,

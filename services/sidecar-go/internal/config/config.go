@@ -21,8 +21,11 @@ type Config struct {
 	TCPPort    int    `yaml:"tcp_port"`
 	DataDir    string `yaml:"data_dir"`
 	ReceiveDir string `yaml:"receive_dir"`
-	LogLevel   string `yaml:"log_level"`
-	DeviceName string `yaml:"device_name"`
+	// PersonalShareDir is the account-scoped directory exposed through /personal/*.
+	// It is independent from RootDir/ReceiveDir so users can share a whole disk.
+	PersonalShareDir string `yaml:"personal_share_dir"`
+	LogLevel         string `yaml:"log_level"`
+	DeviceName       string `yaml:"device_name"`
 	// DeviceIP overrides the IP address advertised in the Bonjour/mDNS TXT
 	// record.  Leave empty to let the sidecar auto-detect the best LAN address.
 	// Useful on multi-homed Windows machines where auto-detection picks the
@@ -60,6 +63,9 @@ func (c *Config) setDefaults() {
 	}
 	if c.ReceiveDir == "" {
 		c.ReceiveDir = filepath.Join(c.DataDir, "received")
+	}
+	if c.PersonalShareDir == "" {
+		c.PersonalShareDir = filepath.Join(c.RootDir(), "personal")
 	}
 	if c.DeviceName == "" {
 		hostname, _ := os.Hostname()
@@ -229,6 +235,9 @@ func (c *Config) DBPath() string {
 
 func (c *Config) StagingDir() string {
 	if c.ReceiveDir != "" {
+		if c.usesManagedReceiveLayout() || c.usesLegacyDataReceiveLayout() {
+			return filepath.Join(c.RootDir(), "staging")
+		}
 		return filepath.Join(filepath.Dir(c.ReceiveDir), "staging")
 	}
 	return filepath.Join(c.DataDir, "staging")
@@ -242,6 +251,49 @@ func (c *Config) LogDir() string {
 	return filepath.Join(c.DataDir, "logs")
 }
 
+func (c *Config) RootDir() string {
+	if c.usesPersonalReceiveLayout() {
+		return filepath.Dir(filepath.Dir(c.ReceiveDir))
+	}
+	if c.usesManagedReceiveLayout() {
+		return filepath.Dir(c.ReceiveDir)
+	}
+	return c.DataDir
+}
+
+func (c *Config) PersonalDir() string {
+	if strings.TrimSpace(c.PersonalShareDir) != "" {
+		return c.PersonalShareDir
+	}
+	return filepath.Join(c.RootDir(), "personal")
+}
+
 func (c *Config) SharedDir() string {
-	return filepath.Join(filepath.Dir(c.ReceiveDir), "shared")
+	return filepath.Join(c.RootDir(), "shared")
+}
+
+func (c *Config) usesCustomReceiveLayout() bool {
+	return c.ReceiveDir != "" && !c.usesManagedReceiveLayout() && !c.usesLegacyDataReceiveLayout()
+}
+
+func (c *Config) usesPersonalReceiveLayout() bool {
+	if c.ReceiveDir == "" {
+		return false
+	}
+	return filepath.Base(c.ReceiveDir) == "received" &&
+		filepath.Base(filepath.Dir(c.ReceiveDir)) == "personal"
+}
+
+func (c *Config) usesManagedReceiveLayout() bool {
+	if c.ReceiveDir == "" {
+		return false
+	}
+	return filepath.Base(c.ReceiveDir) == "received"
+}
+
+func (c *Config) usesLegacyDataReceiveLayout() bool {
+	if c.ReceiveDir == "" || c.DataDir == "" {
+		return false
+	}
+	return filepath.Clean(c.ReceiveDir) == filepath.Join(filepath.Clean(c.DataDir), "received")
 }

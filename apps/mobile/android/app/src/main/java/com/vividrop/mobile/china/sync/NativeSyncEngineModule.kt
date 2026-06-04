@@ -1137,29 +1137,31 @@ class NativeSyncEngineModule(
   }
 
   @ReactMethod
-  fun browseSharedFiles(path: String, promise: Promise) {
+  fun browseSharedFiles(scope: String, path: String, accessToken: String, promise: Promise) {
     runAsync(promise) {
-      promise.resolve(fetchSharedDirectory(path))
+      promise.resolve(fetchSharedDirectory(scope, path, accessToken))
     }
   }
 
   @ReactMethod
-  fun downloadSharedFile(path: String, promise: Promise) {
+  fun downloadSharedFile(scope: String, path: String, accessToken: String, promise: Promise) {
     runAsync(promise) {
-      promise.resolve(downloadSharedFileToLocalStorage(path))
+      promise.resolve(downloadSharedFileToLocalStorage(scope, path, accessToken))
     }
   }
 
   @ReactMethod
-  fun getSharedFileStreamUrl(path: String, promise: Promise) {
+  fun getSharedFileStreamUrl(scope: String, path: String, accessToken: String, promise: Promise) {
     runAsync(promise) {
       val route = resolveSharedFileRoute(
+        scope = scope,
         kind = "stream",
         path = path,
+        requestAccessToken = accessToken,
         reason = "stream_shared_file",
       )
       logSharedFileRoute("getSharedFileStreamUrl", route)
-      promise.resolve(route.url.toString())
+      promise.resolve(sharedFileUrlForRoute("stream", path, route).toString())
     }
   }
 
@@ -1962,27 +1964,31 @@ class NativeSyncEngineModule(
     output.flush()
   }
 
-  private fun fetchSharedDirectory(path: String): WritableMap {
+  private fun fetchSharedDirectory(scope: String, path: String, requestAccessToken: String): WritableMap {
     var route = resolveSharedFileRoute(
+      scope = scope,
       kind = "list",
       path = path,
+      requestAccessToken = requestAccessToken,
       reason = "browse_shared_files",
     )
     logSharedFileRoute("browseSharedFiles", route)
     val json = try {
-      JSONObject(readHttpString(route.url))
+      JSONObject(readHttpString(route))
     } catch (err: Throwable) {
       if (!AndroidSyncPrimitives.shouldRetrySharedFilesRouteAfterFailure(route.isTunnel)) {
         throw err
       }
       route = recoverSharedFileTunnelAfterRouteFailure(
+        scope = scope,
         kind = "list",
         path = path,
+        requestAccessToken = requestAccessToken,
         reason = "browse_shared_files",
         error = err,
       )
       logSharedFileRoute("browseSharedFiles", route, retry = true)
-      JSONObject(readHttpString(route.url))
+      JSONObject(readHttpString(route))
     }
     updateSharedFilesReachability(
       state = "available",
@@ -2011,16 +2017,19 @@ class NativeSyncEngineModule(
       })
     }
     return Arguments.createMap().apply {
+      putString("scope", route.scope)
       putString("path", json.optString("path", path))
       putArray("files", files)
       putInt("totalCount", json.optInt("totalCount", sourceFiles.length()))
     }
   }
 
-  private fun downloadSharedFileToLocalStorage(path: String): WritableMap {
+  private fun downloadSharedFileToLocalStorage(scope: String, path: String, requestAccessToken: String): WritableMap {
     var route = resolveSharedFileRoute(
+      scope = scope,
       kind = "download",
       path = path,
+      requestAccessToken = requestAccessToken,
       reason = "download_shared_file",
     )
     logSharedFileRoute("downloadSharedFile", route)
@@ -2037,8 +2046,10 @@ class NativeSyncEngineModule(
         throw err
       }
       route = recoverSharedFileTunnelAfterRouteFailure(
+        scope = scope,
         kind = "download",
         path = path,
+        requestAccessToken = requestAccessToken,
         reason = "download_shared_file",
         error = err,
       )
@@ -2064,6 +2075,7 @@ class NativeSyncEngineModule(
       connection.requestMethod = "GET"
       connection.connectTimeout = SHARED_HTTP_TIMEOUT_MS
       connection.readTimeout = SHARED_DOWNLOAD_TIMEOUT_MS
+      applySharedDirectoryAuthorization(connection, route)
       if (connection.responseCode !in 200..299) {
         throw IllegalStateException("Sidecar returned HTTP ${connection.responseCode}")
       }
@@ -2201,12 +2213,13 @@ class NativeSyncEngineModule(
     )
   }
 
-  private fun readHttpString(url: URL): String {
-    val connection = url.openConnection() as HttpURLConnection
+  private fun readHttpString(route: SharedFileRoute): String {
+    val connection = route.url.openConnection() as HttpURLConnection
     try {
       connection.requestMethod = "GET"
       connection.connectTimeout = SHARED_HTTP_TIMEOUT_MS
       connection.readTimeout = SHARED_HTTP_TIMEOUT_MS
+      applySharedDirectoryAuthorization(connection, route)
       val statusCode = connection.responseCode
       val body = readResponseBody(connection, statusCode)
       if (statusCode !in 200..299) {
@@ -2328,8 +2341,10 @@ class NativeSyncEngineModule(
   }
 
   private fun resolveSharedFileRoute(
+    scope: String,
     kind: String,
     path: String,
+    requestAccessToken: String,
     reason: String,
     waitForTunnel: Boolean = true,
   ): SharedFileRoute {
@@ -2345,12 +2360,12 @@ class NativeSyncEngineModule(
 
     when (initialDecision.mode) {
       AndroidSharedFilesRouteMode.TUNNEL -> {
-        return sharedFileRoute(kind, path, initialDecision, initialSnapshot)
+        return sharedFileRoute(scope, kind, path, requestAccessToken, initialDecision, initialSnapshot)
       }
 
       AndroidSharedFilesRouteMode.DIRECT_LAN -> {
         recordNativeLog("SharedFiles", "P2P tunnel unavailable for shared files reason=$reason; credentials missing")
-        return sharedFileRoute(kind, path, initialDecision, initialSnapshot)
+        return sharedFileRoute(scope, kind, path, requestAccessToken, initialDecision, initialSnapshot)
       }
 
       AndroidSharedFilesRouteMode.WAIT_FOR_TUNNEL -> {
@@ -2364,7 +2379,7 @@ class NativeSyncEngineModule(
             directPort = DEFAULT_SIDECAR_HTTP_PORT,
           )
           if (readyDecision.mode == AndroidSharedFilesRouteMode.TUNNEL) {
-            return sharedFileRoute(kind, path, readyDecision, readySnapshot)
+            return sharedFileRoute(scope, kind, path, requestAccessToken, readyDecision, readySnapshot)
           }
         }
       }
@@ -2384,23 +2399,28 @@ class NativeSyncEngineModule(
         "P2P tunnel wait timed out for shared files reason=$reason hasCredentials=${fallbackSnapshot.hasCredentials}",
       )
     }
-    return sharedFileRoute(kind, path, fallbackDecision, fallbackSnapshot)
+    return sharedFileRoute(scope, kind, path, requestAccessToken, fallbackDecision, fallbackSnapshot)
   }
 
   private fun sharedFileRoute(
+    scope: String,
     kind: String,
     path: String,
+    requestAccessToken: String,
     decision: AndroidSharedFilesRouteDecision,
     snapshot: P2PTunnelRouteSnapshot,
   ): SharedFileRoute {
-    val endpoint = sharedFileEndpoint(kind, path)
+    val normalizedScope = normalizeSharedDirectoryScope(scope)
+    val endpoint = sharedFileEndpoint(normalizedScope, kind, path)
     val displayHost = if (decision.isTunnel) "${decision.host}:${decision.port}" else decision.host
     return SharedFileRoute(
+      scope = normalizedScope,
       kind = kind,
       path = path,
       url = URL("http", decision.host, decision.port, endpoint),
       urlHost = decision.host,
       port = decision.port,
+      authorizationToken = requestAccessToken.takeIf { normalizedScope == "personal" }?.trim()?.ifBlank { null },
       displayHost = displayHost,
       isTunnel = decision.isTunnel,
       reachabilityRoute = if (decision.isTunnel) currentSharedFilesTunnelReachabilityRoute() else "lan",
@@ -2414,17 +2434,35 @@ class NativeSyncEngineModule(
     if (Mobiletunnel.currentSelectedICERoute() == "turn_relay") "relay" else "tunnel"
 
   private fun sharedFileUrlForRoute(kind: String, path: String, route: SharedFileRoute): URL =
-    URL("http", route.urlHost, route.port, sharedFileEndpoint(kind, path))
+    appendSharedDirectoryAccessToken(
+      URL("http", route.urlHost, route.port, sharedFileEndpoint(route.scope, kind, path)),
+      route,
+    )
 
-  private fun sharedFileEndpoint(kind: String, path: String): String {
+  private fun sharedFileEndpoint(scope: String, kind: String, path: String): String {
     val normalizedPath = path.trim().trim('/')
+    val prefix = if (scope == "personal") "/personal" else "/shared"
     return when (kind) {
-      "list" -> if (normalizedPath.isBlank()) "/shared/list" else "/shared/list/${encodePath(normalizedPath)}"
-      "download" -> "/shared/download/${encodePath(normalizedPath)}"
-      "stream" -> "/shared/stream/${encodePath(normalizedPath)}"
-      "thumbnail" -> "/shared/thumbnail/${encodePath(normalizedPath)}"
+      "list" -> if (normalizedPath.isBlank()) "$prefix/list" else "$prefix/list/${encodePath(normalizedPath)}"
+      "download" -> "$prefix/download/${encodePath(normalizedPath)}"
+      "stream" -> "$prefix/stream/${encodePath(normalizedPath)}"
+      "thumbnail" -> "$prefix/thumbnail/${encodePath(normalizedPath)}"
       else -> throw IllegalArgumentException("Unsupported shared endpoint: $kind")
     }
+  }
+
+  private fun normalizeSharedDirectoryScope(scope: String): String =
+    if (scope.trim().equals("personal", ignoreCase = true)) "personal" else "team"
+
+  private fun applySharedDirectoryAuthorization(connection: HttpURLConnection, route: SharedFileRoute) {
+    val token = route.authorizationToken ?: return
+    connection.setRequestProperty("Authorization", "Bearer $token")
+  }
+
+  private fun appendSharedDirectoryAccessToken(url: URL, route: SharedFileRoute): URL {
+    val token = route.authorizationToken ?: return url
+    val separator = if (url.query.isNullOrBlank()) "?" else "&"
+    return URL("${url}$separator" + "access_token=${URLEncoder.encode(token, "UTF-8")}")
   }
 
   private fun p2pTunnelRouteSnapshot(): P2PTunnelRouteSnapshot =
@@ -2479,8 +2517,10 @@ class NativeSyncEngineModule(
   }
 
   private fun recoverSharedFileTunnelAfterRouteFailure(
+    scope: String,
     kind: String,
     path: String,
+    requestAccessToken: String,
     reason: String,
     error: Throwable,
   ): SharedFileRoute {
@@ -2493,15 +2533,19 @@ class NativeSyncEngineModule(
     stopP2PTunnel()
     return if (waitForP2PTunnelActive(binding, "${reason}_retry_after_tunnel_restart")) {
       resolveSharedFileRoute(
+        scope = scope,
         kind = kind,
         path = path,
+        requestAccessToken = requestAccessToken,
         reason = "${reason}_retry_after_tunnel_restart",
         waitForTunnel = false,
       )
     } else {
       resolveSharedFileRoute(
+        scope = scope,
         kind = kind,
         path = path,
+        requestAccessToken = requestAccessToken,
         reason = "${reason}_direct_fallback_after_tunnel_restart",
         waitForTunnel = false,
       )
@@ -4700,11 +4744,13 @@ class NativeSyncEngineModule(
   )
 
   private data class SharedFileRoute(
+    val scope: String,
     val kind: String,
     val path: String,
     val url: URL,
     val urlHost: String,
     val port: Int,
+    val authorizationToken: String?,
     val displayHost: String,
     val isTunnel: Boolean,
     val reachabilityRoute: String,

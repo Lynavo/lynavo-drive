@@ -26,7 +26,7 @@
       },
       {
         "title": "View shared files on the phone",
-        "description": "Place finished files in the shared folder so the phone can view, preview, and download them"
+        "description": "Place team-ready files in the shared folder so phones can view, preview, and download them from the team shared folder"
       }
     ]
   },
@@ -35,14 +35,18 @@
     "cards": [
       {
         "title": "Received folder (received)",
-        "points": ["Receives original photos, videos, and other media uploaded from phones", "Automatically organized by device name and date", "For desktop-side processing only; not visible on the phone"]
+        "points": ["Lives under the root folder as received and receives original photos, videos, and other media uploaded from LAN phones", "Affected by the root folder path and automatically organized by device name and date", "Acts as the LAN phone-to-computer transfer destination and is not automatically included in the personal shared folder"]
       },
       {
-        "title": "Shared folder (shared)",
-        "points": ["Stores finished content processed on the computer", "Phones can view, preview, stream, and download these files", "Phones have read-only access and cannot modify or delete files"]
+        "title": "Personal shared folder (personal)",
+        "points": ["Can point to any permitted local folder or disk root, such as the whole Macintosh HD, C drive, or D drive", "Visible only to phones and desktops signed in to the same account", "Not affected by the root folder path; use it for content that should not be visible to other LAN users"]
+      },
+      {
+        "title": "Team shared folder (shared)",
+        "points": ["Stores team-ready content processed on the computer", "Connected devices on the LAN can view, preview, stream, and download these files", "Phones have read-only access and cannot modify or delete files"]
       }
     ],
-    "tree": "ViviDrop/\n├── received/  (media uploaded from phones)\n└── shared/    (finished files shared to phones)"
+    "tree": "ViviDrop/\n├── received/      (media uploaded from LAN phones)\n└── shared/        (team files shared to LAN devices)\n\nPersonalShare/    (personal shared folder, independently configurable)"
   },
   "permissions": {
     "title": "🔐 System Permissions",

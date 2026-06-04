@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { DirectoryPage } from '../DirectoryPage';
 import { useDirectoryStore } from '@renderer/stores/directory-store';
 import { useSettingsStore } from '@renderer/stores/settings-store';
@@ -89,7 +89,7 @@ describe('DirectoryPage', () => {
     render(<DirectoryPage />);
     // Tab buttons are within the GlassCard tab bar; use getAllBy to handle label appearing in other places
     const receivedMatches = screen.getAllByText(/接收目录/);
-    const sharedMatches = screen.getAllByText(/共享目录/);
+    const sharedMatches = screen.getAllByText(/团队共享/);
     // At least one of each should be a button element
     expect(receivedMatches.some((el) => el.closest('button'))).toBe(true);
     expect(sharedMatches.some((el) => el.closest('button'))).toBe(true);
@@ -99,7 +99,7 @@ describe('DirectoryPage', () => {
     render(<DirectoryPage />);
 
     // Find the tab button specifically (not the heading in DirectoryPathCard)
-    const sharedButtons = screen.getAllByText(/共享目录/);
+    const sharedButtons = screen.getAllByText(/团队共享/);
     const sharedTabButton = sharedButtons.find((el) => el.tagName === 'BUTTON')!;
     fireEvent.click(sharedTabButton);
 
@@ -163,7 +163,12 @@ describe('DirectoryPathCard', () => {
 
   it('renders shared directory label', () => {
     render(<DirectoryPathCard />);
-    expect(screen.getByText('共享目录')).toBeInTheDocument();
+    expect(screen.getByText('团队共享目录')).toBeInTheDocument();
+  });
+
+  it('renders personal directory label', () => {
+    render(<DirectoryPathCard />);
+    expect(screen.getByText('个人共享目录')).toBeInTheDocument();
   });
 
   it('renders root directory label', () => {
@@ -209,7 +214,9 @@ describe('DirectoryPathCard', () => {
       expect(screen.getByText('正在接收文件，完成后可变更')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: '更改' }));
+    const rootCard = screen.getByText('根目录路径').closest('.rounded-2xl');
+    expect(rootCard).not.toBeNull();
+    fireEvent.click(within(rootCard as HTMLElement).getByRole('button', { name: '更改' }));
 
     expect(selectFolder).not.toHaveBeenCalled();
     expect(updateSettings).not.toHaveBeenCalled();
@@ -315,7 +322,7 @@ describe('SharedFileList', () => {
 
   it('renders empty state when no shared files', () => {
     render(<SharedFileList />);
-    expect(screen.getByText('共享目录暂无文件')).toBeInTheDocument();
+    expect(screen.getByText('团队共享目录暂无文件')).toBeInTheDocument();
   });
 
   it('renders shared file rows when files exist', () => {
@@ -339,7 +346,7 @@ describe('SharedFileList', () => {
 
   it('renders empty state message', () => {
     render(<SharedFileList />);
-    expect(screen.getByText('共享目录暂无文件')).toBeInTheDocument();
+    expect(screen.getByText('团队共享目录暂无文件')).toBeInTheDocument();
   });
 
   it('resolves relative shared paths before opening files', () => {

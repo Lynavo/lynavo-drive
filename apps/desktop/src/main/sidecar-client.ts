@@ -445,6 +445,35 @@ function normalizeAuthResponse(value: unknown): AuthResponse {
   };
 }
 
+function decodeBase64URL(input: string): string {
+  const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=');
+  return Buffer.from(padded, 'base64').toString('utf8');
+}
+
+function accountIDFromAccessToken(accessToken: string): string | undefined {
+  const parts = accessToken.split('.');
+  if (parts.length < 2 || !parts[1]) {
+    return undefined;
+  }
+
+  try {
+    const claims = JSON.parse(decodeBase64URL(parts[1])) as Record<string, unknown>;
+    const value = claims.uid ?? claims.user_id ?? claims.account_id ?? claims.sub;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed ? trimmed : undefined;
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value);
+    }
+  } catch (error) {
+    log.warn('[sidecar-client] Failed to parse account id from access token:', error);
+  }
+
+  return undefined;
+}
+
 function persistAuthSession(value: unknown, baseUrl = AUTH_BASE_URL): AuthResponse {
   const normalized = normalizeAuthResponse(value);
   if (!normalized.ok) {
@@ -728,6 +757,7 @@ export const sidecarClient = {
   syncTunnelCredentials: async (payload: {
     signalingUrl: string;
     accessToken: string;
+    accountId?: string;
     iceServers: ICEServerPayload[];
   }) => {
     return request<{ ok: boolean; message: string }>('POST', '/tunnel/credentials', payload);
@@ -909,6 +939,7 @@ export async function syncCredentialsToSidecar(): Promise<boolean> {
     const res = await sidecarClient.syncTunnelCredentials({
       signalingUrl,
       accessToken: session.accessToken,
+      accountId: accountIDFromAccessToken(session.accessToken),
       iceServers,
     });
     log.info('[sidecar-client] Sidecar tunnel credentials apply request completed.', {

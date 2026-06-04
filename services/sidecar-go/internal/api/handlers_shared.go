@@ -12,8 +12,8 @@ import (
 	"time"
 )
 
-// sharedFileDTO mirrors the SharedFileDTO contract.
-type sharedFileDTO struct {
+// directoryFileDTO mirrors the DirectoryFileDTO contract.
+type directoryFileDTO struct {
 	Name         string  `json:"name"`
 	Path         string  `json:"path"`
 	Type         string  `json:"type"`
@@ -23,34 +23,42 @@ type sharedFileDTO struct {
 	IsDirectory  bool    `json:"isDirectory,omitempty"`
 }
 
-// sharedDirectoryDTO mirrors the SharedDirectoryDTO contract.
-type sharedDirectoryDTO struct {
-	Path       string          `json:"path"`
-	Files      []sharedFileDTO `json:"files"`
-	TotalCount int             `json:"totalCount"`
+// directoryListingDTO mirrors the DirectoryListingDTO contract. Scope is
+// omitted for legacy /shared responses to keep that payload stable.
+type directoryListingDTO struct {
+	Scope      string             `json:"scope,omitempty"`
+	Path       string             `json:"path"`
+	Files      []directoryFileDTO `json:"files"`
+	TotalCount int                `json:"totalCount"`
 }
 
 // resolveSharedPath validates and resolves a relative path within the shared directory.
 // It rejects path traversal attempts (including symlinks that escape the shared root)
 // and returns the absolute, symlink-resolved path.
 func (s *Server) resolveSharedPath(relPath string) (string, error) {
-	sharedDir := s.config.SharedDir()
+	return resolveDirectoryPath(s.config.SharedDir(), relPath, "shared")
+}
 
+func (s *Server) resolvePersonalPath(relPath string) (string, error) {
+	return resolveDirectoryPath(s.config.PersonalDir(), relPath, "personal")
+}
+
+func resolveDirectoryPath(rootDir string, relPath string, scopeLabel string) (string, error) {
 	// Step 1: Lexical reject before filesystem access. Windows treats `\` as a
 	// separator, so normalize both separators here instead of only splitting on `/`.
 	if err := rejectUnsafeSharedRelPath(relPath); err != nil {
 		return "", err
 	}
 
-	lexical := filepath.Clean(filepath.Join(sharedDir, relPath))
-	if !pathWithinDir(sharedDir, lexical) {
-		return "", fmt.Errorf("path escapes shared directory")
+	lexical := filepath.Clean(filepath.Join(rootDir, relPath))
+	if !pathWithinDir(rootDir, lexical) {
+		return "", fmt.Errorf("path escapes %s directory", scopeLabel)
 	}
 
-	// Step 2: Resolve the real shared root (it may itself be a symlink).
-	realSharedDir, err := filepath.EvalSymlinks(sharedDir)
+	// Step 2: Resolve the real root (it may itself be a symlink).
+	realRootDir, err := filepath.EvalSymlinks(rootDir)
 	if err != nil {
-		return "", fmt.Errorf("cannot resolve shared directory: %w", err)
+		return "", fmt.Errorf("cannot resolve %s directory: %w", scopeLabel, err)
 	}
 
 	// Step 3: Resolve the target path through symlinks.
@@ -65,9 +73,9 @@ func (s *Server) resolveSharedPath(relPath string) (string, error) {
 		return "", fmt.Errorf("cannot resolve path: %w", err)
 	}
 
-	// Step 4: Re-verify that the real path is still inside the real shared root.
-	if !pathWithinDir(realSharedDir, realResolved) {
-		return "", fmt.Errorf("path escapes shared directory via symlink")
+	// Step 4: Re-verify that the real path is still inside the real root.
+	if !pathWithinDir(realRootDir, realResolved) {
+		return "", fmt.Errorf("path escapes %s directory via symlink", scopeLabel)
 	}
 
 	return realResolved, nil
@@ -137,7 +145,17 @@ func (s *Server) listSharedDir(w http.ResponseWriter, relPath string) {
 		return
 	}
 
-	resolved, err := s.resolveSharedPath(relPath)
+	s.listDirectory(w, relPath, s.resolveSharedPath, "", "/shared/thumbnail/")
+}
+
+func (s *Server) listDirectory(
+	w http.ResponseWriter,
+	relPath string,
+	resolvePath func(string) (string, error),
+	scope string,
+	thumbnailPrefix string,
+) {
+	resolved, err := resolvePath(relPath)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -165,7 +183,7 @@ func (s *Server) listSharedDir(w http.ResponseWriter, relPath string) {
 		return
 	}
 
-	files := make([]sharedFileDTO, 0, len(entries))
+	files := make([]directoryFileDTO, 0, len(entries))
 	for _, e := range entries {
 		// Skip hidden files
 		if strings.HasPrefix(e.Name(), ".") {
@@ -190,12 +208,12 @@ func (s *Server) listSharedDir(w http.ResponseWriter, relPath string) {
 		}
 
 		var thumbURL *string
-		if fileType == "image" {
-			u := "/shared/thumbnail/" + filePath
+		if fileType == "image" && thumbnailPrefix != "" {
+			u := thumbnailPrefix + filePath
 			thumbURL = &u
 		}
 
-		files = append(files, sharedFileDTO{
+		files = append(files, directoryFileDTO{
 			Name:         e.Name(),
 			Path:         filePath,
 			Type:         fileType,
@@ -206,7 +224,8 @@ func (s *Server) listSharedDir(w http.ResponseWriter, relPath string) {
 		})
 	}
 
-	writeJSON(w, http.StatusOK, sharedDirectoryDTO{
+	writeJSON(w, http.StatusOK, directoryListingDTO{
+		Scope:      scope,
 		Path:       relPath,
 		Files:      files,
 		TotalCount: len(files),
@@ -220,8 +239,25 @@ func (s *Server) handleSharedThumbnail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	subPath := r.PathValue("path")
-	resolved, err := s.resolveSharedPath(subPath)
+	s.serveDirectoryThumbnail(w, r, r.PathValue("path"), s.resolveSharedPath)
+}
+
+// handleSharedDownload serves a file for download with Content-Disposition header.
+func (s *Server) handleSharedDownload(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureStorageDirsForRequest(w, "shared.download") {
+		return
+	}
+
+	s.serveDirectoryDownload(w, r, r.PathValue("path"), s.resolveSharedPath)
+}
+
+func (s *Server) serveDirectoryThumbnail(
+	w http.ResponseWriter,
+	r *http.Request,
+	relPath string,
+	resolvePath func(string) (string, error),
+) {
+	resolved, err := resolvePath(relPath)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -243,14 +279,13 @@ func (s *Server) handleSharedThumbnail(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, resolved)
 }
 
-// handleSharedDownload serves a file for download with Content-Disposition header.
-func (s *Server) handleSharedDownload(w http.ResponseWriter, r *http.Request) {
-	if !s.ensureStorageDirsForRequest(w, "shared.download") {
-		return
-	}
-
-	subPath := r.PathValue("path")
-	resolved, err := s.resolveSharedPath(subPath)
+func (s *Server) serveDirectoryDownload(
+	w http.ResponseWriter,
+	r *http.Request,
+	relPath string,
+	resolvePath func(string) (string, error),
+) {
+	resolved, err := resolvePath(relPath)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -285,8 +320,17 @@ func (s *Server) handleSharedStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	subPath := r.PathValue("path")
-	resolved, err := s.resolveSharedPath(subPath)
+	s.serveDirectoryStream(w, r, r.PathValue("path"), s.resolveSharedPath, "shared")
+}
+
+func (s *Server) serveDirectoryStream(
+	w http.ResponseWriter,
+	r *http.Request,
+	relPath string,
+	resolvePath func(string) (string, error),
+	scopeLabel string,
+) {
+	resolved, err := resolvePath(relPath)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -300,7 +344,7 @@ func (s *Server) handleSharedStream(w http.ResponseWriter, r *http.Request) {
 
 	f, err := os.Open(resolved)
 	if err != nil {
-		slog.Error("open shared file for streaming", "path", resolved, "err", err)
+		slog.Error("open file for streaming", "scope", scopeLabel, "path", resolved, "err", err)
 		writeError(w, http.StatusInternalServerError, "failed to open file")
 		return
 	}

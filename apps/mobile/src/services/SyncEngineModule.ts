@@ -3,6 +3,8 @@ import type {
   AlbumAssetDTO,
   AssetPreviewSourceDTO,
   AutoUploadConfigDTO,
+  DirectoryListingDTO,
+  DirectoryScope,
   SharedDirectoryDTO,
   AutoUploadTimeRangeMode,
 } from '@syncflow/contracts';
@@ -160,8 +162,25 @@ export async function saveAutoUploadConfig(config: {
 export async function browseSharedFiles(
   path?: string,
 ): Promise<SharedDirectoryDTO> {
-  const result = await NativeSyncEngine.browseSharedFiles(path ?? '');
+  const result = await browseDirectory('team', path);
   return result as SharedDirectoryDTO;
+}
+
+function getCurrentAccessToken(): string {
+  const authStore = require('../stores/auth-store') as typeof import('../stores/auth-store');
+  return authStore.getAccessToken() ?? '';
+}
+
+export async function browseDirectory(
+  scope: DirectoryScope,
+  path?: string,
+): Promise<DirectoryListingDTO> {
+  const result = await NativeSyncEngine.browseSharedFiles(
+    scope,
+    path ?? '',
+    scope === 'personal' ? getCurrentAccessToken() : '',
+  );
+  return result as DirectoryListingDTO;
 }
 
 export interface DownloadResult {
@@ -170,16 +189,38 @@ export interface DownloadResult {
   savedLocation?: string | null;
 }
 
-export async function downloadSharedFile(
+export async function downloadDirectoryFile(
+  scope: DirectoryScope,
   path: string,
 ): Promise<DownloadResult> {
-  const result = await NativeSyncEngine.downloadSharedFile(path);
+  const result = await NativeSyncEngine.downloadSharedFile(
+    scope,
+    path,
+    scope === 'personal' ? getCurrentAccessToken() : '',
+  );
   return result as DownloadResult;
 }
 
-export async function getSharedFileStreamUrl(path: string): Promise<string> {
-  const result = await NativeSyncEngine.getSharedFileStreamUrl(path);
+export async function getDirectoryFileStreamUrl(
+  scope: DirectoryScope,
+  path: string,
+): Promise<string> {
+  const result = await NativeSyncEngine.getSharedFileStreamUrl(
+    scope,
+    path,
+    scope === 'personal' ? getCurrentAccessToken() : '',
+  );
   return result as string;
+}
+
+export async function downloadSharedFile(
+  path: string,
+): Promise<DownloadResult> {
+  return downloadDirectoryFile('team', path);
+}
+
+export async function getSharedFileStreamUrl(path: string): Promise<string> {
+  return getDirectoryFileStreamUrl('team', path);
 }
 
 export async function shareFile(localPath: string): Promise<boolean> {

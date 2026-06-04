@@ -1,17 +1,18 @@
 {
   "title": "目录管理",
-  "subtitle": "配置根目录路径并管理接收与共享目录的内容",
+  "subtitle": "配置根目录路径并管理接收、个人共享与团队共享目录的内容",
   "tabs": {
     "received": "接收目录",
-    "shared": "共享目录",
+    "shared": "团队共享",
     "receivedDescription": "接收移动端上传的素材文件，仅供 PC 本地保管使用",
-    "sharedDescription": "共享目录中的文件，可供局域网内其他设备访问"
+    "sharedDescription": "团队共享目录中的文件，可供局域网内其他设备访问"
   },
   "pathCard": {
     "rootPath": "根目录路径",
     "changeLocked": "正在接收文件，完成后可变更",
     "receivedDirectory": "接收目录",
-    "sharedDirectory": "共享目录"
+    "personalDirectory": "个人共享目录",
+    "sharedDirectory": "团队共享目录"
   },
   "list": {
     "stats": "共 {{count}} 个文件  总大小: {{size}}",
@@ -23,6 +24,6 @@
     "actions": "操作",
     "loading": "正在加载文件列表...",
     "emptyReceived": "暂无接收文件",
-    "emptyShared": "共享目录暂无文件"
+    "emptyShared": "团队共享目录暂无文件"
   }
 }

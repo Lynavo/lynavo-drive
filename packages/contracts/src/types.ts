@@ -107,6 +107,7 @@ export interface SettingsDTO {
   connectionCode: string;
   rootPath: string;
   receivePath: string;
+  personalPath: string;
   sharedPath: string;
   shareAddress: string;
   shareStatus: ShareStatus;
@@ -243,8 +244,10 @@ export interface AutoUploadConfigDTO {
   state: AutoUploadState;
 }
 
-/** A single file entry in the shared directory listing */
-export interface SharedFileDTO {
+export type DirectoryScope = 'team' | 'personal';
+
+/** A single file entry in a browseable desktop directory listing */
+export interface DirectoryFileDTO {
   name: string;
   path: string;
   type: 'image' | 'video' | 'document' | 'other';
@@ -255,12 +258,19 @@ export interface SharedFileDTO {
   isDirectory?: boolean;
 }
 
-/** Shared directory listing response */
-export interface SharedDirectoryDTO {
+/** Browseable desktop directory listing response */
+export interface DirectoryListingDTO {
+  scope: DirectoryScope;
   path: string;
-  files: SharedFileDTO[];
+  files: DirectoryFileDTO[];
   totalCount: number;
 }
+
+/** A single file entry in the shared directory listing */
+export type SharedFileDTO = DirectoryFileDTO;
+
+/** Shared directory listing response */
+export type SharedDirectoryDTO = Omit<DirectoryListingDTO, 'scope'>;
 
 /**
  * Platforms the paywall catalog supports. Kept as a string literal union

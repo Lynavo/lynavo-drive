@@ -19,6 +19,20 @@ struct SharedDirectory {
     let totalCount: Int
 }
 
+enum SharedDirectoryScope: String {
+    case team
+    case personal
+
+    var endpointPrefix: String {
+        switch self {
+        case .team:
+            return "/shared"
+        case .personal:
+            return "/personal"
+        }
+    }
+}
+
 typealias SharedFileDownloadProgressHandler = (_ bytesWritten: Int64, _ totalBytes: Int64, _ progress: Double) -> Void
 
 private enum SharedFilePartialDownloadError: Error {
@@ -266,13 +280,18 @@ class SharedFilesService {
     // MARK: - List Shared Files
 
     /// List files in the shared directory at the given path.
-    func listSharedFiles(path: String = "") async throws -> SharedDirectory {
-        let endpoint = path.isEmpty ? "/shared/list" : "/shared/list/\(path)"
+    func listSharedFiles(
+        scope: SharedDirectoryScope = .team,
+        path: String = "",
+        accessToken: String = ""
+    ) async throws -> SharedDirectory {
+        let endpoint = path.isEmpty ? "\(scope.endpointPrefix)/list" : "\(scope.endpointPrefix)/list/\(path)"
         let url = try buildURL(path: endpoint)
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.timeoutInterval = SharedFilesRoutePolicy.sharedFileListRequestTimeout
+        applyAuthorizationIfNeeded(to: &request, scope: scope, accessToken: accessToken)
 
         let (data, response) = try await urlSession.data(for: request)
         try validateHTTPResponse(response, path: endpoint)
@@ -287,10 +306,12 @@ class SharedFilesService {
     /// other file types are saved to a stable temp directory.
     /// Returns a result indicating where the file was saved.
     func downloadFile(
+        scope: SharedDirectoryScope = .team,
         path: String,
+        accessToken: String = "",
         onProgress: SharedFileDownloadProgressHandler? = nil
     ) async throws -> DownloadResult {
-        let endpoint = "/shared/download/\(path)"
+        let endpoint = "\(scope.endpointPrefix)/download/\(path)"
         let partialURL = try partialDownloadURL(path: path)
         let metadataURL = partialMetadataURL(for: partialURL)
         var partialMetadata = readPartialDownloadMetadata(at: metadataURL)
@@ -319,6 +340,8 @@ class SharedFilesService {
         do {
             (downloadedURL, response) = try await performDownload(
                 endpoint: endpoint,
+                scope: scope,
+                accessToken: accessToken,
                 partialURL: partialURL,
                 metadataURL: metadataURL,
                 metadata: partialMetadata,
@@ -331,6 +354,8 @@ class SharedFilesService {
             resumeOffset = 0
             (downloadedURL, response) = try await performDownload(
                 endpoint: endpoint,
+                scope: scope,
+                accessToken: accessToken,
                 partialURL: partialURL,
                 metadataURL: metadataURL,
                 metadata: partialMetadata,
@@ -398,6 +423,8 @@ class SharedFilesService {
 
     private func performDownload(
         endpoint: String,
+        scope: SharedDirectoryScope,
+        accessToken: String,
         partialURL: URL,
         metadataURL: URL,
         metadata: SharedFilePartialDownloadMetadata?,
@@ -409,6 +436,7 @@ class SharedFilesService {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.timeoutInterval = SharedFilesRoutePolicy.sharedFileDownloadRequestTimeout
+        applyAuthorizationIfNeeded(to: &request, scope: scope, accessToken: accessToken)
         if SharedFilesRoutePolicy.shouldUseRangeRequest(resumeOffset: resumeOffset) {
             request.setValue("bytes=\(resumeOffset)-", forHTTPHeaderField: "Range")
             if let validator = metadata?.validator {
@@ -501,15 +529,15 @@ class SharedFilesService {
     // MARK: - Streaming URL
 
     /// Construct the streaming URL for AVPlayer (video playback).
-    func getStreamUrl(path: String) -> URL? {
-        return try? buildURL(path: "/shared/stream/\(path)")
+    func getStreamUrl(scope: SharedDirectoryScope = .team, path: String, accessToken: String = "") -> URL? {
+        return try? buildMediaURL(path: "\(scope.endpointPrefix)/stream/\(path)", scope: scope, accessToken: accessToken)
     }
 
     // MARK: - Thumbnail URL
 
     /// Construct the thumbnail URL for a shared file.
-    func getThumbnailUrl(path: String) -> URL? {
-        return try? buildURL(path: "/shared/thumbnail/\(path)")
+    func getThumbnailUrl(scope: SharedDirectoryScope = .team, path: String, accessToken: String = "") -> URL? {
+        return try? buildMediaURL(path: "\(scope.endpointPrefix)/thumbnail/\(path)", scope: scope, accessToken: accessToken)
     }
 
     private func buildURL(path: String) throws -> URL {
@@ -533,6 +561,33 @@ class SharedFilesService {
             throw SyncEngineError.networkError("Invalid shared files URL for path: \(path)")
         }
         return url
+    }
+
+    private func buildMediaURL(path: String, scope: SharedDirectoryScope, accessToken: String) throws -> URL {
+        let baseURL = try buildURL(path: path)
+        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
+            return baseURL
+        }
+        if scope == .personal {
+            let token = accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !token.isEmpty {
+                components.queryItems = (components.queryItems ?? []) + [
+                    URLQueryItem(name: "access_token", value: token),
+                ]
+            }
+        }
+        return components.url ?? baseURL
+    }
+
+    private func applyAuthorizationIfNeeded(
+        to request: inout URLRequest,
+        scope: SharedDirectoryScope,
+        accessToken: String
+    ) {
+        guard scope == .personal else { return }
+        let token = accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !token.isEmpty else { return }
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
     }
 
     private func validateHTTPResponse(_ response: URLResponse, path: String) throws {

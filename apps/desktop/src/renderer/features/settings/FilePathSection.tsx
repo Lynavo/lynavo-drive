@@ -14,6 +14,7 @@ export function FilePathSection() {
   const refreshShareStatus = useSettingsStore((s) => s.refreshShareStatus);
   const fetchSettings = useSettingsStore((s) => s.fetchSettings);
   const receivePath = settings.receivePath;
+  const personalPath = settings.personalPath ?? '';
   const [saving, setSaving] = useState(false);
   const [transferActive, setTransferActive] = useState(false);
 
@@ -89,6 +90,35 @@ export function FilePathSection() {
     }
   }, [sharedPath, t]);
 
+  const handleOpenPersonalFolder = useCallback(async () => {
+    if (!personalPath) {
+      toast.error(t('errors.settings.noPersonalPathToOpen'));
+      return;
+    }
+    try {
+      await window.electronAPI.files.openFolder(personalPath);
+    } catch {
+      toast.error(t('errors.settings.openPersonalFolderFailed'));
+    }
+  }, [personalPath, t]);
+
+  const handleSelectPersonalFolder = useCallback(async () => {
+    try {
+      const selected = await window.electronAPI.files.selectFolder();
+      if (selected && selected !== personalPath) {
+        setSaving(true);
+        const updated = await window.electronAPI.sidecar.updateSettings({
+          personalPath: selected,
+        });
+        updateSettings(updated);
+      }
+    } catch {
+      toast.error(t('errors.settings.savePersonalPathFailed'));
+    } finally {
+      setSaving(false);
+    }
+  }, [personalPath, t, updateSettings]);
+
   const isLocked = transferActive;
 
   return (
@@ -135,6 +165,43 @@ export function FilePathSection() {
         >
           <FolderOpen className="h-4 w-4" />
           {t('settings.filePath.openReceived')}
+        </Button>
+      </div>
+
+      {/* Personal directory */}
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <label className="mb-2 block text-xs font-medium text-muted-foreground">
+          {t('settings.filePath.personalAddress')}
+        </label>
+        <div className="mb-3 flex items-center gap-2">
+          <Input
+            type="text"
+            value={personalPath}
+            readOnly
+            className="flex-1"
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleSelectPersonalFolder}
+            disabled={saving}
+            aria-label={t('settings.filePath.chooseFolder')}
+          >
+            <FolderOpen className="h-4 w-4" />
+          </Button>
+          <CopyButton
+            text={personalPath}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-secondary hover:text-foreground"
+          />
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleOpenPersonalFolder}
+          disabled={!personalPath}
+        >
+          <FolderOpen className="h-4 w-4" />
+          {t('settings.filePath.openPersonal')}
         </Button>
       </div>
 

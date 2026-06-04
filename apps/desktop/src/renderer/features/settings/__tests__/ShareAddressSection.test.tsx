@@ -27,6 +27,7 @@ describe('ShareAddressSection', () => {
         connectionCode: '',
         rootPath: '',
         receivePath: 'C:\\Users\\Alice\\Vivi Drop\\received',
+        personalPath: 'C:\\Users\\Alice\\Vivi Drop\\personal',
         sharedPath: 'C:\\Users\\Alice\\Vivi Drop\\shared',
         shareAddress: '',
         shareStatus: 'needs_manual_enable',

@@ -1,17 +1,18 @@
 {
   "title": "目錄管理",
-  "subtitle": "設定根目錄路徑並管理接收與共享目錄的內容",
+  "subtitle": "設定根目錄路徑並管理接收、個人共享與團隊共享目錄的內容",
   "tabs": {
     "received": "接收目錄",
-    "shared": "共享目錄",
+    "shared": "團隊共享",
     "receivedDescription": "接收行動端上傳的素材檔案，僅供 PC 本機保管使用",
-    "sharedDescription": "共享目錄中的檔案，可供區域網路內其他裝置存取"
+    "sharedDescription": "團隊共享目錄中的檔案，可供區域網路內其他裝置存取"
   },
   "pathCard": {
     "rootPath": "根目錄路徑",
     "changeLocked": "正在接收檔案，完成後可變更",
     "receivedDirectory": "接收目錄",
-    "sharedDirectory": "共享目錄"
+    "personalDirectory": "個人共享目錄",
+    "sharedDirectory": "團隊共享目錄"
   },
   "list": {
     "stats": "共 {{count}} 個檔案  總大小: {{size}}",
@@ -23,6 +24,6 @@
     "actions": "操作",
     "loading": "正在載入檔案列表...",
     "emptyReceived": "暫無接收檔案",
-    "emptyShared": "共享目錄暫無檔案"
+    "emptyShared": "團隊共享目錄暫無檔案"
   }
 }

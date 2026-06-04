@@ -86,6 +86,91 @@ func TestStagingDirFollowsCustomReceiveDirVolume(t *testing.T) {
 	}
 }
 
+func TestManagedLayoutDirsDeriveFromRoot(t *testing.T) {
+	root := filepath.Join("/tmp", "syncflow-test")
+	cfg := &Config{
+		DataDir:    root,
+		ReceiveDir: filepath.Join(root, "received"),
+	}
+
+	if got := cfg.RootDir(); got != root {
+		t.Errorf("RootDir() = %q, want %q", got, root)
+	}
+	if got := cfg.PersonalDir(); got != filepath.Join(root, "personal") {
+		t.Errorf("PersonalDir() = %q", got)
+	}
+	if got := cfg.SharedDir(); got != filepath.Join(root, "shared") {
+		t.Errorf("SharedDir() = %q", got)
+	}
+	if got := cfg.StagingDir(); got != filepath.Join(root, "staging") {
+		t.Errorf("StagingDir() = %q", got)
+	}
+}
+
+func TestSharedDirUsesRootForManagedReceivePath(t *testing.T) {
+	cfg := &Config{
+		DataDir:    filepath.Join("/tmp", "syncflow-test"),
+		ReceiveDir: filepath.Join("/tmp", "external", "received"),
+	}
+	want := filepath.Join("/tmp", "external", "shared")
+	if got := cfg.SharedDir(); got != want {
+		t.Errorf("SharedDir() = %q, want %q", got, want)
+	}
+}
+
+func TestObsoletePersonalReceiveLayoutDirsDeriveFromOuterRoot(t *testing.T) {
+	root := filepath.Join("/tmp", "syncflow-test")
+	cfg := &Config{
+		DataDir:    root,
+		ReceiveDir: filepath.Join(root, "personal", "received"),
+	}
+
+	if got := cfg.RootDir(); got != root {
+		t.Errorf("RootDir() = %q, want %q", got, root)
+	}
+	if got := cfg.SharedDir(); got != filepath.Join(root, "shared") {
+		t.Errorf("SharedDir() = %q", got)
+	}
+	if got := cfg.StagingDir(); got != filepath.Join(root, "staging") {
+		t.Errorf("StagingDir() = %q", got)
+	}
+}
+
+func TestPersonalDirIsIndependentFromReceiveDir(t *testing.T) {
+	cfg := &Config{
+		DataDir:          filepath.Join("/tmp", "syncflow-test"),
+		ReceiveDir:       filepath.Join("/tmp", "external", "received"),
+		PersonalShareDir: filepath.Join("/tmp", "whole-disk"),
+	}
+	want := filepath.Join("/tmp", "whole-disk")
+	if got := cfg.PersonalDir(); got != want {
+		t.Errorf("PersonalDir() = %q, want %q", got, want)
+	}
+
+	rel, err := filepath.Rel(cfg.PersonalDir(), cfg.ReceiveDir)
+	if err != nil {
+		t.Fatalf("Rel(PersonalDir, ReceiveDir): %v", err)
+	}
+	if rel == "." || (!strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != ".." && !filepath.IsAbs(rel)) {
+		t.Fatalf("ReceiveDir %q should not be implicitly contained in PersonalDir %q", cfg.ReceiveDir, cfg.PersonalDir())
+	}
+}
+
+func TestDefaultPersonalDirDoesNotExposeManagedReceiveSiblings(t *testing.T) {
+	cfg := &Config{
+		DataDir:    filepath.Join("/tmp", "syncflow-test"),
+		ReceiveDir: filepath.Join("/tmp", "external", "received"),
+	}
+	siblingPath := filepath.Join(filepath.Dir(cfg.ReceiveDir), "private.txt")
+	rel, err := filepath.Rel(cfg.PersonalDir(), siblingPath)
+	if err != nil {
+		t.Fatalf("Rel(PersonalDir, sibling): %v", err)
+	}
+	if rel == "." || !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != ".." && !filepath.IsAbs(rel) {
+		t.Fatalf("sibling path %q should not be contained in PersonalDir %q", siblingPath, cfg.PersonalDir())
+	}
+}
+
 func TestLegacyStagingDirReturnsDataDirStaging(t *testing.T) {
 	cfg := &Config{
 		DataDir:    filepath.Join("/tmp", "syncflow-test"),
@@ -117,6 +202,9 @@ func TestSetDefaultsFillsDataDirReceiveDirDeviceName(t *testing.T) {
 	expectedReceiveDir := filepath.Join(expectedDataDir, "received")
 	if cfg.ReceiveDir != expectedReceiveDir {
 		t.Errorf("ReceiveDir = %q, want %q", cfg.ReceiveDir, expectedReceiveDir)
+	}
+	if cfg.PersonalShareDir != filepath.Join(expectedDataDir, "personal") {
+		t.Errorf("PersonalShareDir = %q, want %q", cfg.PersonalShareDir, filepath.Join(expectedDataDir, "personal"))
 	}
 
 	hostname, _ := os.Hostname()

@@ -124,18 +124,20 @@ describe('HelpPage', () => {
     expect(screen.getByText('目录说明', { exact: false })).toBeInTheDocument();
 
     expect(screen.getByText('接收目录 (received)')).toBeInTheDocument();
-    expect(screen.getByText('共享目录 (shared)')).toBeInTheDocument();
+    expect(screen.getByText('个人共享目录 (personal)')).toBeInTheDocument();
+    expect(screen.getByText('团队共享目录 (shared)')).toBeInTheDocument();
 
     // Key content from each card
-    expect(screen.getByText(/用于接收手机上传的原片/, { exact: false })).toBeInTheDocument();
-    expect(screen.getByText(/手机端不可见/, { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(/用于接收局域网手机上传的原片/, { exact: false })).toBeInTheDocument();
+    expect(screen.getAllByText(/只有登入相同账号的手机与桌面/, { exact: false }).length).toBeGreaterThan(0);
     expect(
-      screen.getByText(/手机端可查看、预览、在线播放和下载/, { exact: false }),
+      screen.getByText(/局域网内连接设备可查看、预览、在线播放和下载/, { exact: false }),
     ).toBeInTheDocument();
     expect(screen.getByText(/手机端只读访问/, { exact: false })).toBeInTheDocument();
 
     // Directory tree
-    expect(screen.getByText(/received\/.*接收手机上传/)).toBeInTheDocument();
+    expect(screen.getByText(/received\/.*接收局域网手机上传/)).toBeInTheDocument();
+    expect(screen.getByText(/PersonalShare\/.*个人共享目录/)).toBeInTheDocument();
   });
 
   it('renders system permission guide for both Windows and macOS', () => {

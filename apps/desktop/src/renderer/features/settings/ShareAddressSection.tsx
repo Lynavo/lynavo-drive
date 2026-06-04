@@ -21,7 +21,7 @@ const WINDOWS_SHARING_SETTINGS_URI = 'ms-settings:network-advancedsettings';
 
 export function ShareAddressSection() {
   const { t } = useTranslation();
-  const { receivePath, shareAddress, shareName, shareStatus } = useSettingsStore((s) => s.settings);
+  const { sharedPath, shareAddress, shareName, shareStatus } = useSettingsStore((s) => s.settings);
   const shareStatusInfo = useSettingsStore((s) => s.shareStatusInfo);
   const validatingShare = useSettingsStore((s) => s.validatingShare);
   const refreshShareStatus = useSettingsStore((s) => s.refreshShareStatus);
@@ -154,12 +154,12 @@ export function ShareAddressSection() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => void window.electronAPI?.files.openFolder(receivePath)}
-              disabled={!receivePath}
+              onClick={() => void window.electronAPI?.files.openFolder(sharedPath)}
+              disabled={!sharedPath}
               className="bg-white"
             >
               <FolderOpen className="h-4 w-4" />
-              {t('settings.filePath.openReceived')}
+              {t('settings.filePath.openShared')}
             </Button>
             <Button
               type="button"

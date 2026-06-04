@@ -7,11 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		FC3ECF2C2F6F05B5000460F8 /* LocalTCPProxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECF3C2F6F05B5000460F8 /* LocalTCPProxy.swift */; };
-		FC3ECF3E2F6F0C55000460F8 /* SyncFlowMobileTunnel.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = FC3ECF3F2F6F0D00000460F8 /* SyncFlowMobileTunnel.xcframework */; };
 		0C80B921A6F3F58F76C31292 /* libPods-SyncFlowMobile.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-SyncFlowMobile.a */; };
 		0DAC8ECE3480320FE184A423 /* SharedFilesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2C0A4C610F1EE6DEAF9DAB0 /* SharedFilesService.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		53B4077763B245D0B65F1815 /* BackgroundUploadService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 005CC8CEE5A448A49B965375 /* BackgroundUploadService.swift */; };
 		5A2D2F6B3480DB6500C3A12F /* AuthKeychainCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A2D2F6A3480DB6500C3A12F /* AuthKeychainCleaner.swift */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		79925496FECC53ED57FB261F /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 2A006A30AF22FE10FF0A2871 /* InfoPlist.strings */; };
@@ -34,23 +33,22 @@
 		FC3ECC372F6F05B5000460F8 /* PhotoScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC242F6F05B5000460F8 /* PhotoScanner.swift */; };
 		FC3ECC382F6F05B5000460F8 /* BackgroundExecutionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC202F6F05B5000460F8 /* BackgroundExecutionService.swift */; };
 		FC3ECC392F6F05B5000460F8 /* HistoryLedgerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC232F6F05B5000460F8 /* HistoryLedgerStore.swift */; };
-		53B4077763B245D0B65F1815 /* BackgroundUploadService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 005CC8CEE5A448A49B965375 /* BackgroundUploadService.swift */; };
-		FC3ECCA02F7A0001000460F8 /* HMACAuthHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECCA12F7A0001000460F8 /* HMACAuthHelper.swift */; };
-		FC3ECCB02F8A0001000460F8 /* UploadResetStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECCB12F8A0001000460F8 /* UploadResetStateMachine.swift */; };
-		FC3ECCC02F8A0002000460F8 /* BackgroundTransitionRefCount.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECCC12F8A0002000460F8 /* BackgroundTransitionRefCount.swift */; };
 		FC3ECC3A2F6F05B5000460F8 /* SyncEngineManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC292F6F05B5000460F8 /* SyncEngineManager.swift */; };
 		FC3ECC3B2F6F05B5000460F8 /* SyncEngineError.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC282F6F05B5000460F8 /* SyncEngineError.swift */; };
 		FC3ECC3C2F6F05B5000460F8 /* ProtocolSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC3D2F6F05B5000460F8 /* ProtocolSession.swift */; };
-		FC3ECC512F6F0AAA000460F8 /* SilentAudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC502F6F0AAA000460F8 /* SilentAudioService.swift */; };
 		FC3ECC612F6F0B00000460F8 /* NetworkPathObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC602F6F0B00000460F8 /* NetworkPathObserver.swift */; };
 		FC3ECC712F6F0C00000460F8 /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC702F6F0C00000460F8 /* Log.swift */; };
+		FC3ECCA02F7A0001000460F8 /* HMACAuthHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECCA12F7A0001000460F8 /* HMACAuthHelper.swift */; };
+		FC3ECCB02F8A0001000460F8 /* UploadResetStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECCB12F8A0001000460F8 /* UploadResetStateMachine.swift */; };
+		FC3ECCC02F8A0002000460F8 /* BackgroundTransitionRefCount.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECCC12F8A0002000460F8 /* BackgroundTransitionRefCount.swift */; };
+		FC3ECF2C2F6F05B5000460F8 /* LocalTCPProxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECF3C2F6F05B5000460F8 /* LocalTCPProxy.swift */; };
+		FC3ECF3E2F6F0C55000460F8 /* SyncFlowMobileTunnel.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = FC3ECF3F2F6F0D00000460F8 /* SyncFlowMobileTunnel.xcframework */; };
 		FFFF00000000000000000002 /* AppleAuthModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFFF00000000000000000001 /* AppleAuthModule.swift */; };
 		FFFF00000000000000000004 /* AppleAuthModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = FFFF00000000000000000003 /* AppleAuthModuleBridge.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		FC3ECF3C2F6F05B5000460F8 /* LocalTCPProxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTCPProxy.swift; sourceTree = "<group>"; };
-		FC3ECF3F2F6F0D00000460F8 /* SyncFlowMobileTunnel.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = SyncFlowMobileTunnel.xcframework; path = Frameworks/SyncFlowMobileTunnel.xcframework; sourceTree = "<group>"; };
+		005CC8CEE5A448A49B965375 /* BackgroundUploadService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundUploadService.swift; sourceTree = "<group>"; };
 		0EF759A8AFFF684CCC662C58 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* SyncFlowMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SyncFlowMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = SyncFlowMobile/Images.xcassets; sourceTree = "<group>"; };
@@ -78,10 +76,6 @@
 		FC3ECC212F6F05B5000460F8 /* BindingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BindingService.swift; sourceTree = "<group>"; };
 		FC3ECC222F6F05B5000460F8 /* DiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryService.swift; sourceTree = "<group>"; };
 		FC3ECC232F6F05B5000460F8 /* HistoryLedgerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryLedgerStore.swift; sourceTree = "<group>"; };
-		005CC8CEE5A448A49B965375 /* BackgroundUploadService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundUploadService.swift; sourceTree = "<group>"; };
-		FC3ECCA12F7A0001000460F8 /* HMACAuthHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HMACAuthHelper.swift; sourceTree = "<group>"; };
-		FC3ECCB12F8A0001000460F8 /* UploadResetStateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadResetStateMachine.swift; sourceTree = "<group>"; };
-		FC3ECCC12F8A0002000460F8 /* BackgroundTransitionRefCount.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTransitionRefCount.swift; sourceTree = "<group>"; };
 		FC3ECC242F6F05B5000460F8 /* PhotoScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoScanner.swift; sourceTree = "<group>"; };
 		FC3ECC252F6F05B5000460F8 /* RNBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RNBridge.m; sourceTree = "<group>"; };
 		FC3ECC262F6F05B5000460F8 /* RNBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RNBridge.swift; sourceTree = "<group>"; };
@@ -91,9 +85,13 @@
 		FC3ECC2A2F6F05B5000460F8 /* TcpTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TcpTransport.swift; sourceTree = "<group>"; };
 		FC3ECC2C2F6F05B5000460F8 /* UploadStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadStore.swift; sourceTree = "<group>"; };
 		FC3ECC3D2F6F05B5000460F8 /* ProtocolSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolSession.swift; sourceTree = "<group>"; };
-		FC3ECC502F6F0AAA000460F8 /* SilentAudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SilentAudioService.swift; sourceTree = "<group>"; };
 		FC3ECC602F6F0B00000460F8 /* NetworkPathObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPathObserver.swift; sourceTree = "<group>"; };
 		FC3ECC702F6F0C00000460F8 /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
+		FC3ECCA12F7A0001000460F8 /* HMACAuthHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HMACAuthHelper.swift; sourceTree = "<group>"; };
+		FC3ECCB12F8A0001000460F8 /* UploadResetStateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadResetStateMachine.swift; sourceTree = "<group>"; };
+		FC3ECCC12F8A0002000460F8 /* BackgroundTransitionRefCount.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTransitionRefCount.swift; sourceTree = "<group>"; };
+		FC3ECF3C2F6F05B5000460F8 /* LocalTCPProxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTCPProxy.swift; sourceTree = "<group>"; };
+		FC3ECF3F2F6F0D00000460F8 /* SyncFlowMobileTunnel.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = SyncFlowMobileTunnel.xcframework; path = Frameworks/SyncFlowMobileTunnel.xcframework; sourceTree = "<group>"; };
 		FFFF00000000000000000001 /* AppleAuthModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppleAuthModule.swift; path = SyncFlowMobile/AppleAuthModule.swift; sourceTree = "<group>"; };
 		FFFF00000000000000000003 /* AppleAuthModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = AppleAuthModuleBridge.m; path = SyncFlowMobile/AppleAuthModuleBridge.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -103,8 +101,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-								FC3ECF3E2F6F0C55000460F8 /* SyncFlowMobileTunnel.xcframework in Frameworks */,
-0C80B921A6F3F58F76C31292 /* libPods-SyncFlowMobile.a in Frameworks */,
+				FC3ECF3E2F6F0C55000460F8 /* SyncFlowMobileTunnel.xcframework in Frameworks */,
+				0C80B921A6F3F58F76C31292 /* libPods-SyncFlowMobile.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -129,8 +127,8 @@
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-								FC3ECF3F2F6F0D00000460F8 /* SyncFlowMobileTunnel.xcframework */,
-ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
+				FC3ECF3F2F6F0D00000460F8 /* SyncFlowMobileTunnel.xcframework */,
+				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				5DCACB8F33CDC322A6C60F78 /* libPods-SyncFlowMobile.a */,
 			);
 			name = Frameworks;
@@ -182,8 +180,8 @@ ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 		FC3ECC2D2F6F05B5000460F8 /* SyncEngine */ = {
 			isa = PBXGroup;
 			children = (
-								FC3ECF3C2F6F05B5000460F8 /* LocalTCPProxy.swift */,
-FC3ECC1F2F6F05B5000460F8 /* AssetExportService.swift */,
+				FC3ECF3C2F6F05B5000460F8 /* LocalTCPProxy.swift */,
+				FC3ECC1F2F6F05B5000460F8 /* AssetExportService.swift */,
 				FC3ECC202F6F05B5000460F8 /* BackgroundExecutionService.swift */,
 				005CC8CEE5A448A49B965375 /* BackgroundUploadService.swift */,
 				FC3ECCA12F7A0001000460F8 /* HMACAuthHelper.swift */,
@@ -309,13 +307,9 @@ FC3ECC1F2F6F05B5000460F8 /* AssetExportService.swift */,
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-SyncFlowMobile/Pods-SyncFlowMobile-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-SyncFlowMobile/Pods-SyncFlowMobile-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -352,13 +346,9 @@ FC3ECC1F2F6F05B5000460F8 /* AssetExportService.swift */,
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-SyncFlowMobile/Pods-SyncFlowMobile-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-SyncFlowMobile/Pods-SyncFlowMobile-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -372,8 +362,8 @@ FC3ECC1F2F6F05B5000460F8 /* AssetExportService.swift */,
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-								FC3ECF2C2F6F05B5000460F8 /* LocalTCPProxy.swift in Sources */,
-761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
+				FC3ECF2C2F6F05B5000460F8 /* LocalTCPProxy.swift in Sources */,
+				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
 				5A2D2F6B3480DB6500C3A12F /* AuthKeychainCleaner.swift in Sources */,
 				FFFF00000000000000000002 /* AppleAuthModule.swift in Sources */,
 				FFFF00000000000000000004 /* AppleAuthModuleBridge.m in Sources */,
@@ -425,17 +415,17 @@ FC3ECC1F2F6F05B5000460F8 /* AssetExportService.swift */,
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-SyncFlowMobile.debug.xcconfig */;
 			buildSettings = {
-								FRAMEWORK_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(SRCROOT)/Frameworks",
-				);
-ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = SyncFlowMobile/SyncFlowMobile.entitlements;
 				CURRENT_PROJECT_VERSION = 50;
 				DEVELOPMENT_TEAM = S44ANBLMF9;
 				ENABLE_BITCODE = NO;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Frameworks",
+				);
 				HERMES_CLI_PATH = "${PODS_ROOT}/hermes-engine/destroot/bin/hermesc";
 				INFOPLIST_FILE = SyncFlowMobile/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -468,17 +458,17 @@ ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 42BEBB3566CD1A382D74472A /* Pods-SyncFlowMobile.debugglobal.xcconfig */;
 			buildSettings = {
-								FRAMEWORK_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(SRCROOT)/Frameworks",
-				);
-ASSETCATALOG_COMPILER_APPICON_NAME = AppIconGlobal;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconGlobal;
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = SyncFlowMobile/SyncFlowMobileGlobal.entitlements;
 				CURRENT_PROJECT_VERSION = 50;
 				DEVELOPMENT_TEAM = S44ANBLMF9;
 				ENABLE_BITCODE = NO;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Frameworks",
+				);
 				HERMES_CLI_PATH = "${PODS_ROOT}/hermes-engine/destroot/bin/hermesc";
 				INFOPLIST_FILE = SyncFlowMobile/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -511,16 +501,16 @@ ASSETCATALOG_COMPILER_APPICON_NAME = AppIconGlobal;
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 5709B34CF0A7D63546082F79 /* Pods-SyncFlowMobile.release.xcconfig */;
 			buildSettings = {
-								FRAMEWORK_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(SRCROOT)/Frameworks",
-				);
-ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = SyncFlowMobile/SyncFlowMobile.entitlements;
 				CURRENT_PROJECT_VERSION = 50;
 				DEVELOPMENT_TEAM = S44ANBLMF9;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Frameworks",
+				);
 				HERMES_CLI_PATH = "${PODS_ROOT}/hermes-engine/destroot/bin/hermesc";
 				INFOPLIST_FILE = SyncFlowMobile/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -552,16 +542,16 @@ ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 809544CCC983DF06DAB83157 /* Pods-SyncFlowMobile.releaseglobal.xcconfig */;
 			buildSettings = {
-								FRAMEWORK_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(SRCROOT)/Frameworks",
-				);
-ASSETCATALOG_COMPILER_APPICON_NAME = AppIconGlobal;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconGlobal;
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = SyncFlowMobile/SyncFlowMobileGlobal.entitlements;
 				CURRENT_PROJECT_VERSION = 50;
 				DEVELOPMENT_TEAM = S44ANBLMF9;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Frameworks",
+				);
 				HERMES_CLI_PATH = "${PODS_ROOT}/hermes-engine/destroot/bin/hermesc";
 				INFOPLIST_FILE = SyncFlowMobile/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -667,7 +657,7 @@ ASSETCATALOG_COMPILER_APPICON_NAME = AppIconGlobal;
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
-				USE_HERMES = YES;
+				USE_HERMES = true;
 			};
 			name = Debug;
 		};
@@ -749,7 +739,7 @@ ASSETCATALOG_COMPILER_APPICON_NAME = AppIconGlobal;
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
-				USE_HERMES = YES;
+				USE_HERMES = true;
 			};
 			name = DebugGlobal;
 		};
@@ -822,7 +812,7 @@ ASSETCATALOG_COMPILER_APPICON_NAME = AppIconGlobal;
 				);
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
-				USE_HERMES = YES;
+				USE_HERMES = true;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
@@ -896,7 +886,7 @@ ASSETCATALOG_COMPILER_APPICON_NAME = AppIconGlobal;
 				);
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
-				USE_HERMES = YES;
+				USE_HERMES = true;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = ReleaseGlobal;

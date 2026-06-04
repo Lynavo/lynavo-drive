@@ -105,12 +105,15 @@ func TestEnsureRuntimeDirsDoesNotCreateMissingManagedRootParent(t *testing.T) {
 	}
 }
 
-func TestEnsureStorageDirsRecreatesStorageRootWhenDataDirIsSeparate(t *testing.T) {
+func TestEnsureStorageDirsRecreatesStorageDirsWhenDataDirIsSeparate(t *testing.T) {
 	root := t.TempDir()
 	storageRoot := filepath.Join(root, "StorageRoot")
+	if err := os.MkdirAll(storageRoot, 0o755); err != nil {
+		t.Fatalf("MkdirAll(%q): %v", storageRoot, err)
+	}
 	cfg := &config.Config{
 		DataDir:    filepath.Join(root, "data"),
-		ReceiveDir: filepath.Join(storageRoot, "received"),
+		ReceiveDir: filepath.Join(storageRoot, "personal", "received"),
 	}
 
 	result, err := EnsureStorageDirs(cfg)

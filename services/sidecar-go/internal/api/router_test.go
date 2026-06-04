@@ -1,12 +1,14 @@
 package api_test
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -102,6 +104,55 @@ func (f fakeClientStates) ConnectedClientStates() map[string]string {
 		states[clientID] = state
 	}
 	return states
+}
+
+func fakeAccountJWT(t *testing.T, accountID string) string {
+	t.Helper()
+
+	encode := base64.RawURLEncoding.EncodeToString
+	header := encode([]byte(`{"alg":"none","typ":"JWT"}`))
+	payload := encode([]byte(`{"user_id":"` + accountID + `"}`))
+	return header + "." + payload + ".signature"
+}
+
+func fakePaddedAccountJWT(t *testing.T, accountID string) string {
+	t.Helper()
+
+	encode := base64.URLEncoding.EncodeToString
+	header := encode([]byte(`{"alg":"none","typ":"JWT"}`))
+	payload := encode([]byte(`{"user_id":"` + accountID + `"}`))
+	return header + "." + payload + ".signature"
+}
+
+func profileAuthServer(t *testing.T, accountID string) *httptest.Server {
+	t.Helper()
+
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/user/profile" {
+			http.NotFound(w, r)
+			return
+		}
+		if strings.TrimSpace(r.Header.Get("Authorization")) == "" {
+			http.Error(w, "missing authorization", http.StatusUnauthorized)
+			return
+		}
+		writeTestJSON(t, w, map[string]any{
+			"code":    0,
+			"message": "success",
+			"data": map[string]any{
+				"id": accountID,
+			},
+		})
+	}))
+}
+
+func writeTestJSON(t *testing.T, w http.ResponseWriter, payload any) {
+	t.Helper()
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(payload); err != nil {
+		t.Fatalf("encode json: %v", err)
+	}
 }
 
 func TestHealthEndpoint(t *testing.T) {
@@ -1145,12 +1196,143 @@ func TestGetSettings(t *testing.T) {
 	if _, ok := body["receivePath"]; !ok {
 		t.Error("missing receivePath")
 	}
+	if _, ok := body["personalPath"]; !ok {
+		t.Error("missing personalPath")
+	}
 	if _, ok := body["shareStatus"]; !ok {
 		t.Error("missing shareStatus")
 	}
 }
 
-func TestUpdateSettings(t *testing.T) {
+func TestGetSettingsDerivesManagedLayoutPaths(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	root := t.TempDir()
+	personalRoot := filepath.Join(t.TempDir(), "Personal Share")
+	cfg.ReceiveDir = filepath.Join(root, "received")
+	if err := st.UpdateShareConfig(store.ShareConfig{ReceiveRoot: cfg.ReceiveDir}); err != nil {
+		t.Fatalf("UpdateShareConfig: %v", err)
+	}
+	if err := st.SetSetting("personal_share_root", personalRoot); err != nil {
+		t.Fatalf("SetSetting(personal_share_root): %v", err)
+	}
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/settings")
+	if err != nil {
+		t.Fatalf("GET /settings: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["rootPath"] != root {
+		t.Fatalf("rootPath = %v, want %s", body["rootPath"], root)
+	}
+	if body["personalPath"] != personalRoot {
+		t.Fatalf("personalPath = %v", body["personalPath"])
+	}
+	if body["sharedPath"] != filepath.Join(root, "shared") {
+		t.Fatalf("sharedPath = %v", body["sharedPath"])
+	}
+	if body["receivePath"] != filepath.Join(root, "received") {
+		t.Fatalf("receivePath = %v", body["receivePath"])
+	}
+}
+
+func TestUpdateSettingsRootPathDerivesReceiveAndSharedWithoutChangingPersonalPath(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	personalRoot := filepath.Join(t.TempDir(), "Whole Disk")
+	cfg.PersonalShareDir = personalRoot
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	root := filepath.Join(t.TempDir(), "storage")
+	reqBody := `{"rootPath":` + strconv.Quote(root) + `}`
+	req, _ := http.NewRequest(http.MethodPut, srv.URL+"/settings", strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("PUT /settings: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["rootPath"] != root {
+		t.Fatalf("rootPath = %v, want %s", body["rootPath"], root)
+	}
+	if body["receivePath"] != filepath.Join(root, "received") {
+		t.Fatalf("receivePath = %v", body["receivePath"])
+	}
+	if body["personalPath"] != personalRoot {
+		t.Fatalf("personalPath = %v", body["personalPath"])
+	}
+	if body["sharedPath"] != filepath.Join(root, "shared") {
+		t.Fatalf("sharedPath = %v", body["sharedPath"])
+	}
+}
+
+func TestUpdateSettingsPersonalPathDoesNotChangeRootReceiveOrSharedPath(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	rootPath := cfg.RootDir()
+	receivePath := cfg.ReceiveDir
+	sharedPath := cfg.SharedDir()
+	personalPath := filepath.Join(t.TempDir(), "Personal Share")
+
+	reqBody := `{"personalPath":` + strconv.Quote(personalPath) + `}`
+	req, _ := http.NewRequest(http.MethodPut, srv.URL+"/settings", strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("PUT /settings: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["rootPath"] != rootPath {
+		t.Fatalf("rootPath = %v, want %s", body["rootPath"], rootPath)
+	}
+	if body["receivePath"] != receivePath {
+		t.Fatalf("receivePath = %v, want %s", body["receivePath"], receivePath)
+	}
+	if body["sharedPath"] != sharedPath {
+		t.Fatalf("sharedPath = %v, want %s", body["sharedPath"], sharedPath)
+	}
+	if body["personalPath"] != personalPath {
+		t.Fatalf("personalPath = %v, want %s", body["personalPath"], personalPath)
+	}
+}
+
+func TestUpdateSettingsRejectsReceivePathWithoutRootPath(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
@@ -1166,16 +1348,8 @@ func TestUpdateSettings(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-
-	var body map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if body["receivePath"] != "/tmp/new-receive-path" {
-		t.Errorf("expected updated receivePath, got %v", body["receivePath"])
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
 }
 
@@ -1240,6 +1414,455 @@ func TestSharedListRejectsWindowsPathEscapes(t *testing.T) {
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Fatalf("GET %s status = %d, want 400", path, resp.StatusCode)
 		}
+	}
+}
+
+func TestPersonalListRequiresDesktopAccountIdentity(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/personal/list", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /personal/list: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", resp.StatusCode)
+	}
+}
+
+func TestPersonalListRequiresBearerAccountToken(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	authSrv := profileAuthServer(t, "account-1")
+	defer authSrv.Close()
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1","iceServers":[]}`
+	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("POST /tunnel/credentials: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
+	}
+
+	resp, err = http.Get(srv.URL + "/personal/list")
+	if err != nil {
+		t.Fatalf("GET /personal/list: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", resp.StatusCode)
+	}
+}
+
+func TestPersonalListUsesAccountIDFromPaddedJWTWhenCredentialsOmitAccountID(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cfg.PersonalDir(), "notes.txt"), []byte("personal"), 0o644); err != nil {
+		t.Fatalf("write personal file: %v", err)
+	}
+	authSrv := profileAuthServer(t, "account-1")
+	defer authSrv.Close()
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	desktopToken := fakePaddedAccountJWT(t, "account-1")
+	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"` + desktopToken + `","iceServers":[]}`
+	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("POST /tunnel/credentials: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/personal/list", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
+
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /personal/list: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d body=%s", resp.StatusCode, string(body))
+	}
+}
+
+func TestPersonalListRejectsDifferentAccount(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	authSrv := profileAuthServer(t, "mobile-account")
+	defer authSrv.Close()
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"desktop-account","iceServers":[]}`
+	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("POST /tunnel/credentials: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/personal/list", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "mobile-account"))
+
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /personal/list: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", resp.StatusCode)
+	}
+}
+
+func TestPersonalListRejectsTokenWhenServerValidationFails(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "invalid token", http.StatusUnauthorized)
+	}))
+	defer authSrv.Close()
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1","iceServers":[]}`
+	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("POST /tunnel/credentials: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/personal/list", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
+
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /personal/list: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", resp.StatusCode)
+	}
+}
+
+func TestPersonalListRejectsTokenWhenProfileCodeIsNonZero(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeTestJSON(t, w, map[string]any{
+			"code":    1006,
+			"message": "invalid token",
+			"data":    map[string]any{},
+		})
+	}))
+	defer authSrv.Close()
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1","iceServers":[]}`
+	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("POST /tunnel/credentials: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/personal/list", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
+
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /personal/list: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", resp.StatusCode)
+	}
+}
+
+func TestPersonalListReturnsSameAccountPersonalDirectory(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	cfg.ReceiveDir = filepath.Join(t.TempDir(), "received")
+	cfg.PersonalShareDir = filepath.Join(t.TempDir(), "Personal Share")
+	personalDir := cfg.PersonalDir()
+	if err := os.MkdirAll(personalDir, 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	if err := os.MkdirAll(cfg.ReceiveDir, 0o755); err != nil {
+		t.Fatalf("mkdir receive dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(personalDir, "notes.txt"), []byte("personal"), 0o644); err != nil {
+		t.Fatalf("write personal file: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cfg.ReceiveDir, "IMG_0001.JPG"), []byte("image"), 0o644); err != nil {
+		t.Fatalf("write received file: %v", err)
+	}
+	authSrv := profileAuthServer(t, "account-1")
+	defer authSrv.Close()
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1","iceServers":[]}`
+	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("POST /tunnel/credentials: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/personal/list", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
+
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /personal/list: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var body struct {
+		Scope string `json:"scope"`
+		Path  string `json:"path"`
+		Files []struct {
+			Name         string  `json:"name"`
+			Path         string  `json:"path"`
+			ThumbnailURL *string `json:"thumbnailUrl,omitempty"`
+			IsDirectory  bool    `json:"isDirectory,omitempty"`
+		} `json:"files"`
+		TotalCount int `json:"totalCount"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body.Scope != "personal" {
+		t.Fatalf("scope=%q, want personal", body.Scope)
+	}
+	if body.TotalCount != 1 {
+		t.Fatalf("expected only notes.txt in personal share root, got %d files: %+v", body.TotalCount, body.Files)
+	}
+	paths := map[string]bool{}
+	for _, file := range body.Files {
+		paths[file.Path] = true
+	}
+	if !paths["notes.txt"] || paths["received"] || paths["IMG_0001.JPG"] {
+		t.Fatalf("expected personal root to exclude receive directory contents, got %+v", body.Files)
+	}
+}
+
+func TestPersonalListUsesConfiguredPersonalSharePathInsteadOfReceivePath(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	externalRoot := t.TempDir()
+	personalRoot := filepath.Join(t.TempDir(), "Personal Share")
+	cfg.ReceiveDir = filepath.Join(externalRoot, "received")
+	cfg.PersonalShareDir = personalRoot
+	if err := os.MkdirAll(cfg.ReceiveDir, 0o755); err != nil {
+		t.Fatalf("mkdir custom receive dir: %v", err)
+	}
+	if err := os.MkdirAll(personalRoot, 0o755); err != nil {
+		t.Fatalf("mkdir personal share dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cfg.ReceiveDir, "photo.jpg"), []byte("image"), 0o644); err != nil {
+		t.Fatalf("write personal file: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(personalRoot, "notes.txt"), []byte("personal"), 0o644); err != nil {
+		t.Fatalf("write personal file: %v", err)
+	}
+	authSrv := profileAuthServer(t, "account-1")
+	defer authSrv.Close()
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1","iceServers":[]}`
+	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("POST /tunnel/credentials: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/personal/list", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
+
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /personal/list: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var body struct {
+		Files []struct {
+			Path string `json:"path"`
+		} `json:"files"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	paths := map[string]bool{}
+	for _, file := range body.Files {
+		paths[file.Path] = true
+	}
+	if !paths["notes.txt"] {
+		t.Fatalf("expected configured personal content in personal listing, got %+v", body.Files)
+	}
+	if paths["photo.jpg"] || paths["received"] {
+		t.Fatalf("personal listing exposed receive path entries: %+v", body.Files)
+	}
+}
+
+func TestPersonalListRejectsEscapes(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	personalDir := cfg.PersonalDir()
+	if err := os.MkdirAll(personalDir, 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	authSrv := profileAuthServer(t, "account-1")
+	defer authSrv.Close()
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1","iceServers":[]}`
+	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("POST /tunnel/credentials: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
+	}
+
+	tests := []string{
+		"/personal/list/..%5Coutside",
+		"/personal/list/C:%5CWindows",
+	}
+	for _, path := range tests {
+		req, err := http.NewRequest(http.MethodGet, srv.URL+path, nil)
+		if err != nil {
+			t.Fatalf("new request %s: %v", path, err)
+		}
+		req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("GET %s: %v", path, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("GET %s status = %d, want 400", path, resp.StatusCode)
+		}
+	}
+}
+
+func TestSharedListStaysAccessibleWithoutAccountToken(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	sharedDir := cfg.SharedDir()
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
+		t.Fatalf("mkdir shared dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(sharedDir, "team.txt"), []byte("team"), 0o644); err != nil {
+		t.Fatalf("write shared file: %v", err)
+	}
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/shared/list")
+	if err != nil {
+		t.Fatalf("GET /shared/list: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
 }
 

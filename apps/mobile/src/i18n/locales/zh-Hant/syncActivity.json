@@ -53,7 +53,7 @@
   },
   "offline": {
     "title": "當前設備已離線",
-    "subtitle": "請檢查電腦是否在線並連接同一局域網，恢復後可繼續上傳或存取共享目錄",
+    "subtitle": "請檢查電腦是否在線並連接同一局域網，恢復後可繼續上傳或存取共享目錄與個人共享目錄",
     "switchDevice": "切換設備",
     "reconnect": "重新連接"
   },
@@ -93,7 +93,7 @@
     "albumTitle": "相簿",
     "albumDesc": "瀏覽並手動上傳素材",
     "sharedFilesTitle": "共享目錄",
-    "sharedFilesDesc": "瀏覽 PC 設備的共享目錄"
+    "sharedFilesDesc": "瀏覽共享目錄與個人共享目錄"
   },
   "trialUpgrade": {
     "entry": "免費試用剩餘 {{days}} 天，點擊升級 Pro 解鎖全部功能"

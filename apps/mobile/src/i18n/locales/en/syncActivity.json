@@ -53,7 +53,7 @@
   },
   "offline": {
     "title": "Device Is Offline",
-    "subtitle": "Make sure your computer is on and on the same network. Once it's back, uploads and shared files will resume.",
+    "subtitle": "Make sure your computer is on and on the same network. Once it's back, uploads and shared folder access will resume.",
     "switchDevice": "Switch Device",
     "reconnect": "Reconnect"
   },
@@ -92,8 +92,8 @@
     "title": "Quick Actions",
     "albumTitle": "Album",
     "albumDesc": "Browse and upload photos manually",
-    "sharedFilesTitle": "Shared Files",
-    "sharedFilesDesc": "Browse shared files on your PC"
+    "sharedFilesTitle": "Shared Folder",
+    "sharedFilesDesc": "Browse shared folder and personal shared folder"
   },
   "trialUpgrade": {
     "entry": "{{days}} days left in your free trial. Upgrade to Pro to unlock everything."

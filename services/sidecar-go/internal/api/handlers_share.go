@@ -3,6 +3,7 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/nicksyncflow/sidecar/internal/share"
@@ -45,7 +46,11 @@ func (s *Server) handleShareValidate(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
-	result := share.Detect(cfg.ReceiveRoot, cfg.ShareName)
+	pathConfig := *s.config
+	if strings.TrimSpace(cfg.ReceiveRoot) != "" {
+		pathConfig.ReceiveDir = cfg.ReceiveRoot
+	}
+	result := share.Detect(pathConfig.SharedDir(), cfg.ShareName)
 
 	// Persist the detection result.
 	now := time.Now().UTC().Format(time.RFC3339)
