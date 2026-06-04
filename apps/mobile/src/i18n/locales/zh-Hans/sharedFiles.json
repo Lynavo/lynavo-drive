@@ -1,5 +1,11 @@
 {
   "defaultFolderName": "共享目录",
+  "teamFolderName": "共享目录",
+  "personalFolderName": "个人共享目录",
+  "scopes": {
+    "team": "共享目录",
+    "personal": "个人共享目录"
+  },
   "loading": "加载中...",
   "files": {
     "folder": "文件夹",
@@ -12,7 +18,7 @@
     "offline": "离线"
   },
   "emptyState": {
-    "title": "共享目录暂无内容",
+    "title": "目前没有内容",
     "message": "同步完成后，文件将显示在这里"
   },
   "deviceUnavailable": {
@@ -21,7 +27,7 @@
     "recheck": "重新检查"
   },
   "directoryInaccessible": {
-    "title": "共享目录不可访问",
+    "title": "目录不可访问",
     "message": "请检查电脑端设置"
   },
   "networkError": {

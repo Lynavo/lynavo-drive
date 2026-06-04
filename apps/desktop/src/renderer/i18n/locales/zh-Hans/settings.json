@@ -8,7 +8,7 @@
     "connectionCode": "连接码管理",
     "connectionCodeDescription": "重新生成后，旧手机需要重新配对",
     "shareAddress": "局域网共享",
-    "shareAddressDescription": "检测这台电脑的 SMB 共享状态，供手机读取共享目录",
+    "shareAddressDescription": "检测这台电脑的 SMB 共享状态，供手机读取团队共享目录",
     "giftCard": "礼品卡",
     "giftCardDescription": "兑换礼品卡可提升额度、功能或同步时长",
     "bonjour": "Windows Bonjour 广播",
@@ -57,10 +57,12 @@
   },
   "filePath": {
     "receiveAddress": "接收目录",
-    "sharedAddress": "共享目录",
+    "personalAddress": "个人共享目录",
+    "sharedAddress": "团队共享目录",
     "chooseFolder": "选择文件夹",
     "openReceived": "打开接收目录",
-    "openShared": "打开共享目录",
+    "openPersonal": "打开个人共享目录",
+    "openShared": "打开团队共享目录",
     "remoteFeaturePrompt": "远端同步与传输",
     "remoteFeaturePromptDetail": "登入后可使用 P2P 远端同步功能"
   },
@@ -73,17 +75,17 @@
     "ready": "共享已就绪",
     "readyDetail": "{{shareName}} 可以被同一局域网内的设备访问。",
     "needsManualEnable": "需要手动开启共享",
-    "needsManualEnableDetailMac": "请在系统设置中开启文件共享，并允许 Vivi Drop 访问接收目录。",
+    "needsManualEnableDetailMac": "请在系统设置中开启文件共享，并允许 Vivi Drop 访问团队共享目录。",
     "needsManualEnableDetailWindows": "请开启 Windows 高级共享，并确认网络发现可用。",
-    "shareRegistered": "共享目录已登记",
+    "shareRegistered": "团队共享目录已登记",
     "shareRegisteredDetailMac": "系统共享可能需要一点时间刷新，请保持文件共享开启。",
-    "shareRegisteredDetailWindows": "共享目录已登记，请确认 Windows 防火墙允许文件共享。",
+    "shareRegisteredDetailWindows": "团队共享目录已登记，请确认 Windows 防火墙允许文件共享。",
     "error": "共享检测失败",
     "errorDetail": "请检查系统共享设置后重试。",
     "unknown": "共享状态未知",
     "unknownDetail": "背景服务尚未回报共享状态。",
     "refresh": "重新检测",
-    "windowsManualHint": "Windows 需要开启高级共享后，手机才能读取共享目录。",
+    "windowsManualHint": "Windows 需要开启高级共享后，手机才能读取团队共享目录。",
     "windowsQuickConfig": "Windows 快速配置",
     "windowsQuickConfigDescription": "打开系统高级共享设置，确认网络发现和文件共享已启用。",
     "openAdvancedSharing": "打开高级共享",
@@ -107,14 +109,14 @@
   },
   "systemGuide": {
     "macTitle": "macOS 文件共享",
-    "macSubtitle": "确认文件共享和接收目录权限已开启。",
+    "macSubtitle": "确认文件共享和团队共享目录权限已开启。",
     "windowsTitle": "Windows 文件共享",
-    "windowsDescription": "开启网络发现、文件和打印机共享，并允许接收目录共享。",
+    "windowsDescription": "开启网络发现、文件和打印机共享，并允许团队共享目录共享。",
     "steps": [
       "打开高级共享设置",
       "启用网络发现",
       "启用文件和打印机共享",
-      "确认接收目录允许当前用户写入"
+      "确认团队共享目录允许当前用户读取"
     ]
   },
   "support": {

@@ -10,7 +10,7 @@ const WINDOWS_SHARING_SETTINGS_URI = 'ms-settings:network-advancedsettings';
 
 export function SystemGuideSection() {
   const { t } = useTranslation();
-  const receivePath = useSettingsStore((s) => s.settings.receivePath);
+  const sharedPath = useSettingsStore((s) => s.settings.sharedPath);
   const isWindows = window.electronAPI?.platform.isWindows?.() ?? false;
   const handleOpen = useCallback(() => {
     void window.electronAPI?.files.openExternal(MAC_SHARING_GUIDE_URL);
@@ -61,11 +61,11 @@ export function SystemGuideSection() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => void window.electronAPI?.files.openFolder(receivePath)}
-              disabled={!receivePath}
+              onClick={() => void window.electronAPI?.files.openFolder(sharedPath)}
+              disabled={!sharedPath}
             >
               <FolderOpen className="h-4 w-4" />
-              {t('settings.filePath.openReceived')}
+              {t('settings.filePath.openShared')}
             </Button>
           </div>
         ) : null}

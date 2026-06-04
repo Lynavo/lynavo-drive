@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FolderOpen, FolderInput, FolderSymlink, Lock, Loader2 } from 'lucide-react';
+import {
+  FolderOpen,
+  FolderInput,
+  FolderSymlink,
+  Lock,
+  UserRound,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Button } from '@renderer/components/ui/button';
 import { GlassCard } from '@renderer/components/shared/GlassCard';
 import { CopyButton } from '@renderer/components/shared/CopyButton';
 import { useSettingsStore } from '@renderer/stores/settings-store';
-import { Input } from '@renderer/components/ui/input';
-import { Label } from '@renderer/components/ui/label';
 import { LoginDialog } from '@renderer/components/shared/LoginDialog';
 
 type RuntimeAuthAPI = Partial<Window['electronAPI']['auth']>;
@@ -47,8 +51,10 @@ const colors = {
   pathText: '#1a2a3a',
   pathBg: 'rgba(0,0,0,0.03)',
   iconReceived: '#3b82f6',
+  iconPersonal: '#0f766e',
   iconShared: '#a855f7',
   iconReceivedBg: 'rgba(59,130,246,0.09)',
+  iconPersonalBg: 'rgba(15,118,110,0.09)',
   iconSharedBg: 'rgba(168,85,247,0.09)',
 } as const;
 
@@ -100,6 +106,7 @@ export function DirectoryPathCard() {
 
   const rootPath = settings.rootPath;
   const receivePath = settings.receivePath;
+  const personalPath = settings.personalPath;
   const sharedPath = settings.sharedPath;
 
   useEffect(() => {
@@ -160,6 +167,36 @@ export function DirectoryPathCard() {
     }
   }, [rootPath, t, transferActive, updateSettings]);
 
+  const handleChangePersonal = useCallback(async () => {
+    const api = window.electronAPI;
+    if (!api) return;
+    try {
+      const selected = await api.files.selectFolder();
+      if (selected && selected !== personalPath) {
+        setSaving(true);
+        const updated = await api.sidecar.updateSettings({
+          personalPath: selected,
+        });
+        updateSettings(updated);
+      }
+    } catch (err: unknown) {
+      const body = err instanceof Error ? err.message : '';
+      if (
+        body.includes('cannot create') ||
+        body.includes('not writable') ||
+        body.includes('read-only')
+      ) {
+        toast.error(t('errors.directory.locationNotWritable'));
+      } else if (body.includes('must not be empty') || body.includes('absolute')) {
+        toast.error(t('errors.directory.selectValidDirectory'));
+      } else {
+        toast.error(t('errors.directory.directoryUnavailable'));
+      }
+    } finally {
+      setSaving(false);
+    }
+  }, [personalPath, t, updateSettings]);
+
   const handleOpenFolder = useCallback(async (path: string) => {
     const api = window.electronAPI;
     if (!api || !path) {
@@ -214,7 +251,7 @@ export function DirectoryPathCard() {
       </GlassCard>
 
       {/* Sub-directory cards */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Received directory */}
         <GlassCard className="p-4">
           <div className="flex items-center gap-3">
@@ -248,36 +285,45 @@ export function DirectoryPathCard() {
           </div>
         </GlassCard>
 
-        {/* Shared directory */}
+        {/* Personal directory */}
         <GlassCard className="flex flex-col justify-between p-4">
           <div className="flex items-center gap-3">
             <div
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-              style={{ background: colors.iconSharedBg }}
+              style={{ background: colors.iconPersonalBg }}
             >
-              <FolderSymlink className="h-4.5 w-4.5" style={{ color: colors.iconShared }} />
+              <UserRound className="h-4.5 w-4.5" style={{ color: colors.iconPersonal }} />
             </div>
             <div className="min-w-0 flex-1">
               <h4 className="text-sm font-semibold" style={{ color: colors.title }}>
-                {t('directory.pathCard.sharedDirectory')}
+                {t('directory.pathCard.personalDirectory')}
               </h4>
               <code
                 className="mt-0.5 block truncate text-xs font-mono text-muted-foreground"
-                title={sharedPath}
+                title={personalPath}
               >
-                {sharedPath || '--'}
+                {personalPath || '--'}
               </code>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleOpenFolder(sharedPath)}
-              disabled={!sharedPath}
-              className="shrink-0"
-            >
-              <FolderOpen className="mr-1 h-3.5 w-3.5" />
-              {t('common.actions.open')}
-            </Button>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleOpenFolder(personalPath)}
+                disabled={!personalPath}
+              >
+                <FolderOpen className="mr-1 h-3.5 w-3.5" />
+                {t('common.actions.open')}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleChangePersonal}
+                disabled={saving}
+              >
+                {t('common.actions.change')}
+              </Button>
+            </div>
           </div>
 
           {/* Remote Sync Promotion / Account Panel */}
@@ -320,6 +366,39 @@ export function DirectoryPathCard() {
                 {t('settings.giftCard.phoneLogin.login')}
               </Button>
             )}
+          </div>
+        </GlassCard>
+
+        {/* Shared directory */}
+        <GlassCard className="p-4">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+              style={{ background: colors.iconSharedBg }}
+            >
+              <FolderSymlink className="h-4.5 w-4.5" style={{ color: colors.iconShared }} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-sm font-semibold" style={{ color: colors.title }}>
+                {t('directory.pathCard.sharedDirectory')}
+              </h4>
+              <code
+                className="mt-0.5 block truncate text-xs font-mono text-muted-foreground"
+                title={sharedPath}
+              >
+                {sharedPath || '--'}
+              </code>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleOpenFolder(sharedPath)}
+              disabled={!sharedPath}
+              className="shrink-0"
+            >
+              <FolderOpen className="mr-1 h-3.5 w-3.5" />
+              {t('common.actions.open')}
+            </Button>
           </div>
         </GlassCard>
       </div>

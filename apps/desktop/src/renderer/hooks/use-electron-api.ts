@@ -8,6 +8,7 @@ const defaultSettings: SettingsDTO = {
   connectionCode: '000000',
   rootPath: '',
   receivePath: '',
+  personalPath: '',
   sharedPath: '',
   shareAddress: '',
   shareStatus: 'unknown',

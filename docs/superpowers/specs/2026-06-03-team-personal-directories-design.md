@@ -1,20 +1,20 @@
-# Team Shared And Personal Directories Design
+# Team Shared, Receive, And Personal Shared Directories Design
 
 ## Background
 
 Vivi Drop currently treats the desktop `shared/` directory as the only browseable directory for mobile clients. The intended product model is different:
 
 - Team shared directory: visible to all connected local-network users/devices.
-- Personal directory: visible only when the mobile and desktop are signed in to the same account.
-- Receive directory: part of the personal directory, because received mobile uploads are private to the account owner.
+- Receive directory: the local-network mobile-to-desktop upload destination.
+- Personal shared directory: visible only when the mobile and desktop are signed in to the same account.
 
-The current implementation already fits the team-shared meaning for `shared/`: sidecar exposes `/shared/*`, desktop displays the shared path, and mobile browses/downloads shared files through direct LAN or P2P routes. It does not yet have a personal directory or an account-authenticated sidecar file API.
+The current implementation already fits the team-shared meaning for `shared/`: sidecar exposes `/shared/*`, desktop displays the shared path, and mobile browses/downloads shared files through direct LAN or P2P routes. The receive directory should remain a root-derived LAN upload destination, while the personal shared directory is independently configured and account-gated.
 
 ## Goals
 
 1. Preserve the existing `shared/` directory as the team shared directory.
-2. Add a personal directory that is account-scoped.
-3. Move the receive directory under the personal directory in the effective directory model.
+2. Preserve the receive directory as a root-derived upload destination.
+3. Add a personal shared directory that is account-scoped and independent from the root path.
 4. Prevent personal directory access unless mobile and desktop belong to the same server account.
 5. Keep existing upload queue semantics unchanged: read-only queue, automatic incremental sync, and one-file-at-a-time upload per phone.
 6. Keep renderer access mediated through preload/main/sidecar; renderer must not touch sidecar, filesystem, or SQLite directly.
@@ -29,37 +29,38 @@ The current implementation already fits the team-shared meaning for `shared/`: s
 
 ## Directory Model
 
-For a root path `<root>`, the effective layout becomes:
+For a root path `<root>`, the effective root-bound layout becomes:
 
 ```text
 <root>/
-  shared/              # Team shared directory
-  personal/            # Personal directory
-    received/          # Receive directory
+  received/            # Receive directory for LAN mobile uploads
+  shared/              # Team shared directory for LAN users/devices
   staging/             # Runtime staging directory
+
+<personalPath>/        # Personal shared directory, independently configured
 ```
 
 `shared/` remains the path behind the existing shared-file behavior. It is intentionally not account-gated by sidecar because its product meaning is team/local-network sharing.
 
-`personal/` is a new private browseable root. `personal/received/` is the receive root used by uploads, dashboard history, device details, and file existence checks.
+`received/` remains the root-derived upload destination used by uploads, dashboard history, device details, and file existence checks. It is not automatically included in the personal shared directory.
+
+`personalPath` is a new private browseable root. It may point to a whole disk or volume root, such as `C:\`, `D:\`, or `Macintosh HD`, when the desktop app has permission. It is not affected by `rootPath` changes.
 
 ## Migration Strategy
 
 For new installs or when the user changes the root path:
 
-- `receivePath` is derived as `<root>/personal/received`.
-- `personalPath` is derived as `<root>/personal`.
+- `receivePath` is derived as `<root>/received`.
 - `sharedPath` stays `<root>/shared`.
+- `personalPath` keeps its existing independently configured value.
 
-For existing installs currently using `<root>/received`:
+For existing installs:
 
-1. Detect whether `receivePath` is exactly `<root>/received`.
-2. If no transfer is active, create `<root>/personal/received`.
-3. Move existing received files into `<root>/personal/received` when the target does not already contain conflicting paths.
-4. Update persisted `receive_root` to the new path.
-5. If a transfer is active, defer migration and keep the current path until a safe retry.
-
-If a user has explicitly configured a custom receive path that is not root-derived, preserve it until the user changes the root path. The settings DTO still exposes `personalPath`, but `receivePath` may remain outside it for that legacy custom case. This avoids silent data moves for custom storage.
+1. Keep `<root>/received` as the managed receive directory.
+2. Create `<root>/received` and `<root>/shared` when needed.
+3. Do not move received files into the personal shared directory.
+4. When the user changes `rootPath`, update only root-derived paths (`receivePath` and `sharedPath`).
+5. When the user changes `personalPath`, update only the personal shared directory path.
 
 ## Contracts
 
@@ -118,7 +119,7 @@ Desktop UI changes:
 
 - Rename visible "shared directory" copy to "team shared directory".
 - Add a personal directory row/card in path settings.
-- Show receive directory as nested under personal directory.
+- Show receive directory, team shared directory, and personal shared directory as separate path concepts.
 - Directory page tabs should become:
   - Received
   - Team Shared
@@ -183,7 +184,7 @@ This server layer establishes the account boundary used by personal directory di
 - Path traversal or symlink escape: `400`.
 - Missing directory/file: `404`.
 - Storage path unavailable: existing storage-unavailable error path.
-- Migration conflict: leave source untouched, report/log conflict, and keep the current receive path until user intervention.
+- Personal path unavailable or permission denied: report the existing storage-unavailable style error without changing root-derived receive/team paths.
 
 ## Testing
 
@@ -193,7 +194,8 @@ Client:
 - Go sidecar tests for:
   - `PersonalDir()` and `SharedDir()` layout.
   - settings derivation.
-  - legacy `<root>/received` migration.
+  - `rootPath` updates change receive/team paths but not personal path.
+  - `personalPath` updates change only personal path.
   - personal path traversal and symlink escape rejection.
   - personal route `401`/`403`/success.
   - shared route remains accessible.

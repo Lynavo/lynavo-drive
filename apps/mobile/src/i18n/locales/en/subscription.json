@@ -18,8 +18,8 @@
   "features": {
     "autoUpload": "Auto-upload new photos and videos from your library",
     "customTime": "Custom start time for auto upload, down to seconds",
-    "sharedDir": "Browse and download the shared directory on your connected computer",
-    "preview": "Preview images and videos in the shared directory",
+    "sharedDir": "Browse and download shared folders and personal shared folders on your connected computer",
+    "preview": "Preview images and videos in shared folders and personal shared folders",
     "multiDevice": "Connect and switch between multiple devices",
     "unlimited": "Unlimited media uploads"
   },
@@ -116,7 +116,7 @@
   },
   "gate": {
     "downloadTitle": "Subscription required",
-    "downloadBody": "Downloads from the shared folder need an active subscription.",
+    "downloadBody": "Downloads from shared folders and personal shared folders need an active subscription.",
     "goSubscribe": "View Plans",
     "cancel": "Not now"
   },

@@ -20,14 +20,18 @@ import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { TFunction } from 'i18next';
-import type { SharedFileDTO, SharedFilesReachabilityDTO } from '@syncflow/contracts';
+import type {
+  DirectoryScope,
+  SharedFileDTO,
+  SharedFilesReachabilityDTO,
+} from '@syncflow/contracts';
 import { FEATURES } from '../constants/features';
 import { useAuth, isFeatureAccessAllowed } from '../stores/auth-store';
 import { Icon } from '../components/Icon';
 import {
-  browseSharedFiles,
-  downloadSharedFile,
-  getSharedFileStreamUrl,
+  browseDirectory,
+  downloadDirectoryFile,
+  getDirectoryFileStreamUrl,
 } from '../services/SyncEngineModule';
 import { formatBytes } from '../utils/format';
 
@@ -35,7 +39,10 @@ import { formatBytes } from '../utils/format';
 // Types
 // ---------------------------------------------------------------------------
 
-type ErrorKind = 'device_unavailable' | 'directory_inaccessible' | 'network_error';
+type ErrorKind =
+  | 'device_unavailable'
+  | 'directory_inaccessible'
+  | 'network_error';
 
 interface DeviceAvailability {
   available: boolean;
@@ -66,7 +73,8 @@ const DARK = '#1a3a5c';
 const BLUE = '#3b9fd8';
 const SHARED_FILES_RECOVERY_RETRY_MS = 3000;
 const SHARED_FILES_COMPLETED_DOWNLOADS_STORAGE_PREFIX =
-  '@syncflow/shared-files/completed-downloads/v1';
+  '@syncflow/shared-files/completed-downloads/v2';
+const DIRECTORY_SCOPES: DirectoryScope[] = ['team', 'personal'];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -74,7 +82,8 @@ const SHARED_FILES_COMPLETED_DOWNLOADS_STORAGE_PREFIX =
 
 function fileTypeIcon(file: SharedFileDTO): { name: string; color: string } {
   if (file.isDirectory) return { name: 'folder-outline', color: '#f59e0b' };
-  if (file.type === 'video') return { name: 'videocam-outline', color: '#3b82f6' };
+  if (file.type === 'video')
+    return { name: 'videocam-outline', color: '#3b82f6' };
   if (file.type === 'image') return { name: 'image-outline', color: '#06b6d4' };
   return { name: 'document-outline', color: '#8b5cf6' };
 }
@@ -92,12 +101,22 @@ function formatDownloadPercent(value: number): string {
   return `${Math.round(clampDownloadProgress(value) * 100)}%`;
 }
 
-function sharedFilesCompletedDownloadsStorageKey(deviceId: string): string {
-  return `${SHARED_FILES_COMPLETED_DOWNLOADS_STORAGE_PREFIX}:${deviceId}`;
+function sharedFilesCompletedDownloadsStorageKey(
+  deviceId: string,
+  scope: DirectoryScope,
+): string {
+  return `${SHARED_FILES_COMPLETED_DOWNLOADS_STORAGE_PREFIX}:${deviceId}:${scope}`;
 }
 
-function sharedFileCompletedDownloadId(file: SharedFileDTO): string {
-  return JSON.stringify([file.path, file.size, file.modifiedAt]);
+function sharedFileCompletedDownloadId(
+  scope: DirectoryScope,
+  file: SharedFileDTO,
+): string {
+  return JSON.stringify([scope, file.path, file.size, file.modifiedAt]);
+}
+
+function sharedFileOperationId(scope: DirectoryScope, path: string): string {
+  return `${scope}:${path}`;
 }
 
 function completedDownloadsFromIds(ids: string[]): Record<string, true> {
@@ -162,7 +181,9 @@ function fallbackSavedLocation(
       if (file.type === 'video') return 'Movies/Vivi Drop';
       if (file.type === 'image') return 'Pictures/Vivi Drop';
     }
-    return t('sharedFiles.dialogs.savedLocationPhotos', { defaultValue: 'Photos' });
+    return t('sharedFiles.dialogs.savedLocationPhotos', {
+      defaultValue: 'Photos',
+    });
   }
 
   if (result.savedLocation) {
@@ -173,9 +194,13 @@ function fallbackSavedLocation(
   }
 
   if (Platform.OS === 'ios') {
-    return t('sharedFiles.dialogs.savedLocationDocuments', { defaultValue: 'Files App -> Vivi Drop' });
+    return t('sharedFiles.dialogs.savedLocationDocuments', {
+      defaultValue: 'Files App -> Vivi Drop',
+    });
   } else {
-    return t('sharedFiles.dialogs.savedLocationDownloads', { defaultValue: 'Download/Vivi Drop' });
+    return t('sharedFiles.dialogs.savedLocationDownloads', {
+      defaultValue: 'Download/Vivi Drop',
+    });
   }
 }
 
@@ -184,7 +209,8 @@ async function getDeviceAvailability(): Promise<DeviceAvailability> {
     const { NativeSyncEngine } = NativeModules;
     if (!NativeSyncEngine) return { available: false, deviceId: null };
     const binding = await NativeSyncEngine.getBindingState();
-    const deviceId = typeof binding?.deviceId === 'string' ? binding.deviceId : null;
+    const deviceId =
+      typeof binding?.deviceId === 'string' ? binding.deviceId : null;
     // For P2P / IPv6 WAN connections, mDNS multicast auto-discovery does not run,
     // so connectionState might be cached as 'offline'.
     // If a device is paired (has deviceId), we should allow trying to fetch the files anyway.
@@ -202,6 +228,8 @@ export function SharedFilesScreen() {
   const navigation = useNavigation();
   const { t } = useTranslation();
   const { subscription } = useAuth();
+  const [activeDirectoryScope, setActiveDirectoryScope] =
+    useState<DirectoryScope>('team');
   const [loading, setLoading] = useState(true);
   const [files, setFiles] = useState<SharedFileDTO[]>([]);
   const [currentPath, setCurrentPath] = useState('');
@@ -211,16 +239,31 @@ export function SharedFilesScreen() {
   const [sharedFilesConnectionStatus, setSharedFilesConnectionStatus] =
     useState<SharedFilesConnectionStatus>('offline');
   const downloadingRef = useRef<string | null>(null);
-  const activeLoadRef = useRef<{ path: string; promise: Promise<void> } | null>(null);
-  const recoveryRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const completedDownloadsDeviceIdRef = useRef<string | null>(null);
+  const activeLoadRef = useRef<{
+    scope: DirectoryScope;
+    path: string;
+    promise: Promise<void>;
+  } | null>(null);
+  const loadRequestSeqRef = useRef(0);
+  const previewRequestSeqRef = useRef(0);
+  const recoveryRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const completedDownloadsStorageRef = useRef<{
+    deviceId: string | null;
+    scope: DirectoryScope;
+  }>({ deviceId: null, scope: 'team' });
   const completedDownloadsRef = useRef<Record<string, true>>({});
   const bindingAvailabilityRef = useRef<{
     deviceId: string | null;
     available: boolean | null;
   }>({ deviceId: null, available: null });
-  const [downloadProgress, setDownloadProgress] = useState<Record<string, SharedFileDownloadProgress>>({});
-  const [completedDownloads, setCompletedDownloads] = useState<Record<string, true>>({});
+  const [downloadProgress, setDownloadProgress] = useState<
+    Record<string, SharedFileDownloadProgress>
+  >({});
+  const [completedDownloads, setCompletedDownloads] = useState<
+    Record<string, true>
+  >({});
 
   // Preview state
   const [previewFile, setPreviewFile] = useState<SharedFileDTO | null>(null);
@@ -242,68 +285,96 @@ export function SharedFilesScreen() {
     }
   }, []);
 
-  const loadFiles = useCallback((path: string): Promise<void> => {
-    const activeLoad = activeLoadRef.current;
-    if (activeLoad?.path === path) return activeLoad.promise;
-
-    const loadPromise = (async () => {
-      setLoading(true);
-      setErrorKind(null);
-
-      // P1#3: Pre-check device availability
-      const availability = await getDeviceAvailability();
-      if (!availability.available) {
-        bindingAvailabilityRef.current = { deviceId: null, available: false };
-        setActiveDeviceId(null);
-        setSharedFilesConnectionStatus('offline');
-        setErrorKind('device_unavailable');
-        setFiles([]);
-        setLoading(false);
-        return;
+  const loadFiles = useCallback(
+    (path: string): Promise<void> => {
+      const activeLoad = activeLoadRef.current;
+      if (
+        activeLoad?.scope === activeDirectoryScope &&
+        activeLoad.path === path
+      ) {
+        return activeLoad.promise;
       }
 
-      bindingAvailabilityRef.current = {
-        deviceId: availability.deviceId,
-        available: true,
-      };
-      setActiveDeviceId(availability.deviceId);
+      const loadScope = activeDirectoryScope;
+      const loadRequestSeq = loadRequestSeqRef.current + 1;
+      loadRequestSeqRef.current = loadRequestSeq;
+      const isCurrentLoad = () => loadRequestSeqRef.current === loadRequestSeq;
 
-      try {
-        const result = await browseSharedFiles(path);
-        setFiles(result.files ?? []);
+      const loadPromise = (async () => {
+        setLoading(true);
         setErrorKind(null);
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        // 404 / 403 → directory genuinely missing or access denied.
-        // 400 is intentionally excluded: sidecar returns 400 for path
-        // traversal rejects, "not a directory", and resolve failures —
-        // none of which mean "shared directory inaccessible".
-        if (
-          msg.includes('403') ||
-          msg.includes('404') ||
-          msg.includes('not found')
-        ) {
-          setErrorKind('directory_inaccessible');
-        } else {
-          setErrorKind('network_error');
+
+        // P1#3: Pre-check device availability
+        const availability = await getDeviceAvailability();
+        if (!isCurrentLoad()) {
+          return;
         }
-        setFiles([]);
-        console.warn('[SharedFiles] loadFiles error:', e);
-      } finally {
-        setLoading(false);
-      }
-    })();
+        if (!availability.available) {
+          bindingAvailabilityRef.current = { deviceId: null, available: false };
+          setActiveDeviceId(null);
+          setSharedFilesConnectionStatus('offline');
+          setErrorKind('device_unavailable');
+          setFiles([]);
+          setLoading(false);
+          return;
+        }
 
-    activeLoadRef.current = { path, promise: loadPromise };
-    const clearActiveLoad = () => {
-      if (activeLoadRef.current?.promise === loadPromise) {
-        activeLoadRef.current = null;
-      }
-    };
-    void loadPromise.then(clearActiveLoad, clearActiveLoad);
+        bindingAvailabilityRef.current = {
+          deviceId: availability.deviceId,
+          available: true,
+        };
+        setActiveDeviceId(availability.deviceId);
 
-    return loadPromise;
-  }, []);
+        try {
+          const result = await browseDirectory(loadScope, path);
+          if (!isCurrentLoad()) {
+            return;
+          }
+          setFiles(result.files ?? []);
+          setErrorKind(null);
+        } catch (e: unknown) {
+          if (!isCurrentLoad()) {
+            return;
+          }
+          const msg = e instanceof Error ? e.message : String(e);
+          // 404 / 403 → directory genuinely missing or access denied.
+          // 400 is intentionally excluded: sidecar returns 400 for path
+          // traversal rejects, "not a directory", and resolve failures —
+          // none of which mean the active directory scope is inaccessible.
+          if (
+            msg.includes('403') ||
+            msg.includes('404') ||
+            msg.includes('not found')
+          ) {
+            setErrorKind('directory_inaccessible');
+          } else {
+            setErrorKind('network_error');
+          }
+          setFiles([]);
+          console.warn('[SharedFiles] loadFiles error:', e);
+        } finally {
+          if (isCurrentLoad()) {
+            setLoading(false);
+          }
+        }
+      })();
+
+      activeLoadRef.current = {
+        scope: loadScope,
+        path,
+        promise: loadPromise,
+      };
+      const clearActiveLoad = () => {
+        if (activeLoadRef.current?.promise === loadPromise) {
+          activeLoadRef.current = null;
+        }
+      };
+      void loadPromise.then(clearActiveLoad, clearActiveLoad);
+
+      return loadPromise;
+    },
+    [activeDirectoryScope],
+  );
 
   // ---------------------------------------------------------------------------
   // Initial load
@@ -314,7 +385,10 @@ export function SharedFilesScreen() {
   }, [currentPath, loadFiles]);
 
   useEffect(() => {
-    completedDownloadsDeviceIdRef.current = activeDeviceId;
+    completedDownloadsStorageRef.current = {
+      deviceId: activeDeviceId,
+      scope: activeDirectoryScope,
+    };
     if (!activeDeviceId) {
       updateCompletedDownloads({});
       return;
@@ -325,11 +399,15 @@ export function SharedFilesScreen() {
     void (async () => {
       try {
         const raw = await AsyncStorage.getItem(
-          sharedFilesCompletedDownloadsStorageKey(activeDeviceId),
+          sharedFilesCompletedDownloadsStorageKey(
+            activeDeviceId,
+            activeDirectoryScope,
+          ),
         );
         if (
           cancelled ||
-          completedDownloadsDeviceIdRef.current !== activeDeviceId
+          completedDownloadsStorageRef.current.deviceId !== activeDeviceId ||
+          completedDownloadsStorageRef.current.scope !== activeDirectoryScope
         ) {
           return;
         }
@@ -346,7 +424,7 @@ export function SharedFilesScreen() {
     return () => {
       cancelled = true;
     };
-  }, [activeDeviceId, updateCompletedDownloads]);
+  }, [activeDeviceId, activeDirectoryScope, updateCompletedDownloads]);
 
   useEffect(() => {
     const shouldRetry =
@@ -356,7 +434,10 @@ export function SharedFilesScreen() {
       return;
     }
 
-    if (!bindingAvailabilityRef.current.deviceId || recoveryRetryTimerRef.current) {
+    if (
+      !bindingAvailabilityRef.current.deviceId ||
+      recoveryRetryTimerRef.current
+    ) {
       return;
     }
 
@@ -380,7 +461,8 @@ export function SharedFilesScreen() {
     const sub = emitter.addListener(
       'onBindingStateChanged',
       (state: BindingStatePayload | null) => {
-        const deviceId = typeof state?.deviceId === 'string' ? state.deviceId : null;
+        const deviceId =
+          typeof state?.deviceId === 'string' ? state.deviceId : null;
         if (!state || !deviceId) {
           bindingAvailabilityRef.current = { deviceId: null, available: false };
           setActiveDeviceId(null);
@@ -409,7 +491,11 @@ export function SharedFilesScreen() {
         const sharedFilesAvailable = isSharedFilesReachabilityAvailable(
           state.sharedFilesReachability,
         );
-        if (connState === 'connected' || connState === 'bound' || sharedFilesAvailable) {
+        if (
+          connState === 'connected' ||
+          connState === 'bound' ||
+          sharedFilesAvailable
+        ) {
           const previousAvailability = bindingAvailabilityRef.current;
           const shouldReload =
             previousAvailability.available === false ||
@@ -489,9 +575,10 @@ export function SharedFilesScreen() {
       'onSharedFileDownloadProgress',
       (progress: SharedFileDownloadProgress | null) => {
         if (!progress?.path) return;
-        setDownloadProgress((previous) => ({
+        const progressKey = downloadingRef.current ?? progress.path;
+        setDownloadProgress(previous => ({
           ...previous,
-          [progress.path]: {
+          [progressKey]: {
             ...progress,
             progress: clampDownloadProgress(progress.progress),
           },
@@ -516,101 +603,159 @@ export function SharedFilesScreen() {
     setCurrentPath(parts.join('/'));
   }, [currentPath]);
 
+  const selectDirectoryScope = useCallback(
+    (scope: DirectoryScope) => {
+      if (scope === activeDirectoryScope) return;
+      if (downloadingRef.current) return;
+      loadRequestSeqRef.current += 1;
+      previewRequestSeqRef.current += 1;
+      activeLoadRef.current = null;
+      setActiveDirectoryScope(scope);
+      setCurrentPath('');
+      setFiles([]);
+      setErrorKind(null);
+      setPreviewFile(null);
+      setPreviewUrl(null);
+    },
+    [activeDirectoryScope],
+  );
+
   // ---------------------------------------------------------------------------
   // Download handler
   // ---------------------------------------------------------------------------
 
-  const handleDownload = useCallback(async (file: SharedFileDTO) => {
-    if (downloadingRef.current) return;
+  const handleDownload = useCallback(
+    async (file: SharedFileDTO) => {
+      if (downloadingRef.current) return;
 
-    // --- PRD §7.1 — downloads require active subscription ---
-    if (!FEATURES.SUBSCRIPTION_ENFORCEMENT) {
-      // Soft-off: skip the gate until enforcement is globally enabled.
-    } else if (!isFeatureAccessAllowed(subscription?.status)) {
-      Alert.alert(
-        t('subscription.gate.downloadTitle'),
-        t('subscription.gate.downloadBody'),
-        [
-          { text: t('subscription.gate.cancel'), style: 'cancel' },
-          {
-            text: t('subscription.gate.goSubscribe'),
-            onPress: () => navigation.navigate('Subscription' as never),
-          },
-        ],
+      // --- PRD §7.1 — downloads require active subscription ---
+      if (!FEATURES.SUBSCRIPTION_ENFORCEMENT) {
+        // Soft-off: skip the gate until enforcement is globally enabled.
+      } else if (!isFeatureAccessAllowed(subscription?.status)) {
+        Alert.alert(
+          t('subscription.gate.downloadTitle'),
+          t('subscription.gate.downloadBody'),
+          [
+            { text: t('subscription.gate.cancel'), style: 'cancel' },
+            {
+              text: t('subscription.gate.goSubscribe'),
+              onPress: () => navigation.navigate('Subscription' as never),
+            },
+          ],
+        );
+        return;
+      }
+
+      const downloadOperationId = sharedFileOperationId(
+        activeDirectoryScope,
+        file.path,
       );
-      return;
-    }
-
-    downloadingRef.current = file.path;
-    setDownloading(file.path);
-    setDownloadProgress((previous) => {
-      const next = { ...previous };
-      delete next[file.path];
-      return next;
-    });
-    try {
-      const result = await downloadSharedFile(file.path);
-      const savedLocation = fallbackSavedLocation(file, result, t);
-      const completedDownloadId = sharedFileCompletedDownloadId(file);
-      const nextCompletedDownloads: Record<string, true> = {
-        ...completedDownloadsRef.current,
-        [completedDownloadId]: true as const,
-      };
-      updateCompletedDownloads(nextCompletedDownloads);
-      const deviceId = activeDeviceId ?? bindingAvailabilityRef.current.deviceId;
-      if (deviceId) {
-        void AsyncStorage.setItem(
-          sharedFilesCompletedDownloadsStorageKey(deviceId),
-          serializeCompletedDownloads(nextCompletedDownloads),
-        ).catch((e) => {
-          console.warn('[SharedFiles] persist completed download failed:', e);
-        });
-      }
-      if (result.savedToPhotos) {
-        Alert.alert(
-          t('sharedFiles.dialogs.downloadComplete'),
-          t('sharedFiles.dialogs.downloadSavedToPhotos', {
-            name: file.name,
-            location: savedLocation,
-          }),
-        );
-      } else if (savedLocation) {
-        Alert.alert(
-          t('sharedFiles.dialogs.downloadComplete'),
-          t('sharedFiles.dialogs.downloadSaved', {
-            name: file.name,
-            location: savedLocation,
-          }),
-        );
-      }
-    } catch (e) {
-      Alert.alert(t('sharedFiles.dialogs.downloadFailed'), t('sharedFiles.dialogs.downloadFailedMessage'));
-      console.warn('[SharedFiles] download error:', e);
-    } finally {
-      downloadingRef.current = null;
-      setDownloading(null);
-      setDownloadProgress((previous) => {
+      downloadingRef.current = downloadOperationId;
+      setDownloading(downloadOperationId);
+      setDownloadProgress(previous => {
         const next = { ...previous };
-        delete next[file.path];
+        delete next[downloadOperationId];
         return next;
       });
-    }
-  }, [activeDeviceId, subscription?.status, t, navigation, updateCompletedDownloads]);
+      try {
+        const result = await downloadDirectoryFile(
+          activeDirectoryScope,
+          file.path,
+        );
+        const savedLocation = fallbackSavedLocation(file, result, t);
+        const completedDownloadId = sharedFileCompletedDownloadId(
+          activeDirectoryScope,
+          file,
+        );
+        const nextCompletedDownloads: Record<string, true> = {
+          ...completedDownloadsRef.current,
+          [completedDownloadId]: true as const,
+        };
+        updateCompletedDownloads(nextCompletedDownloads);
+        const deviceId =
+          activeDeviceId ?? bindingAvailabilityRef.current.deviceId;
+        if (deviceId) {
+          void AsyncStorage.setItem(
+            sharedFilesCompletedDownloadsStorageKey(
+              deviceId,
+              activeDirectoryScope,
+            ),
+            serializeCompletedDownloads(nextCompletedDownloads),
+          ).catch(e => {
+            console.warn('[SharedFiles] persist completed download failed:', e);
+          });
+        }
+        if (result.savedToPhotos) {
+          Alert.alert(
+            t('sharedFiles.dialogs.downloadComplete'),
+            t('sharedFiles.dialogs.downloadSavedToPhotos', {
+              name: file.name,
+              location: savedLocation,
+            }),
+          );
+        } else if (savedLocation) {
+          Alert.alert(
+            t('sharedFiles.dialogs.downloadComplete'),
+            t('sharedFiles.dialogs.downloadSaved', {
+              name: file.name,
+              location: savedLocation,
+            }),
+          );
+        }
+      } catch (e) {
+        Alert.alert(
+          t('sharedFiles.dialogs.downloadFailed'),
+          t('sharedFiles.dialogs.downloadFailedMessage'),
+        );
+        console.warn('[SharedFiles] download error:', e);
+      } finally {
+        downloadingRef.current = null;
+        setDownloading(null);
+        setDownloadProgress(previous => {
+          const next = { ...previous };
+          delete next[downloadOperationId];
+          return next;
+        });
+      }
+    },
+    [
+      activeDeviceId,
+      activeDirectoryScope,
+      subscription?.status,
+      t,
+      navigation,
+      updateCompletedDownloads,
+    ],
+  );
 
   // ---------------------------------------------------------------------------
   // Preview handler
   // ---------------------------------------------------------------------------
 
-  const handlePreview = useCallback(async (file: SharedFileDTO) => {
-    try {
-      const url = await getSharedFileStreamUrl(file.path);
-      setPreviewFile(file);
-      setPreviewUrl(url);
-    } catch (e) {
-      Alert.alert(t('sharedFiles.dialogs.previewFailed'), t('sharedFiles.dialogs.previewFailedMessage'));
-      console.warn('[SharedFiles] getStreamUrl error:', e);
-    }
-  }, []);
+  const handlePreview = useCallback(
+    async (file: SharedFileDTO) => {
+      const previewRequestSeq = previewRequestSeqRef.current + 1;
+      previewRequestSeqRef.current = previewRequestSeq;
+      const previewScope = activeDirectoryScope;
+      try {
+        const url = await getDirectoryFileStreamUrl(
+          previewScope,
+          file.path,
+        );
+        if (previewRequestSeqRef.current !== previewRequestSeq) return;
+        setPreviewFile(file);
+        setPreviewUrl(url);
+      } catch (e) {
+        if (previewRequestSeqRef.current !== previewRequestSeq) return;
+        Alert.alert(
+          t('sharedFiles.dialogs.previewFailed'),
+          t('sharedFiles.dialogs.previewFailedMessage'),
+        );
+        console.warn('[SharedFiles] getStreamUrl error:', e);
+      }
+    },
+    [activeDirectoryScope, t],
+  );
 
   const closePreview = useCallback(() => {
     setPreviewFile(null);
@@ -624,11 +769,17 @@ export function SharedFilesScreen() {
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<SharedFileDTO>) => {
       const icon = fileTypeIcon(item);
-      const isDownloading = downloading === item.path;
+      const operationId = sharedFileOperationId(
+        activeDirectoryScope,
+        item.path,
+      );
+      const isDownloading = downloading === operationId;
       const isDownloadDisabled = downloading !== null;
       const isDownloaded =
-        completedDownloads[sharedFileCompletedDownloadId(item)] === true;
-      const progress = downloadProgress[item.path]?.progress ?? 0;
+        completedDownloads[
+          sharedFileCompletedDownloadId(activeDirectoryScope, item)
+        ] === true;
+      const progress = downloadProgress[operationId]?.progress ?? 0;
       let fileMeta = formatBytes(item.size);
       if (isDownloading) {
         fileMeta = formatDownloadPercent(progress);
@@ -691,7 +842,9 @@ export function SharedFilesScreen() {
               style={[
                 styles.downloadBtn,
                 isDownloaded ? styles.downloadBtnCompleted : null,
-                isDownloadDisabled && !isDownloading ? styles.downloadBtnDisabled : null,
+                isDownloadDisabled && !isDownloading
+                  ? styles.downloadBtnDisabled
+                  : null,
               ]}
               activeOpacity={0.7}
               disabled={isDownloadDisabled}
@@ -714,6 +867,8 @@ export function SharedFilesScreen() {
       completedDownloads,
       downloading,
       downloadProgress,
+      activeDirectoryScope,
+      t,
       navigateIntoDir,
       handlePreview,
       handleDownload,
@@ -741,15 +896,21 @@ export function SharedFilesScreen() {
         <View style={styles.stateIconCircle}>
           <Icon name="desktop-outline" size={32} color="#9ab8cc" />
         </View>
-        <Text style={styles.stateTitle}>{t('sharedFiles.deviceUnavailable.title')}</Text>
-        <Text style={styles.stateMessage}>{t('sharedFiles.deviceUnavailable.message')}</Text>
+        <Text style={styles.stateTitle}>
+          {t('sharedFiles.deviceUnavailable.title')}
+        </Text>
+        <Text style={styles.stateMessage}>
+          {t('sharedFiles.deviceUnavailable.message')}
+        </Text>
         <TouchableOpacity
           style={styles.retryButton}
           activeOpacity={0.7}
           onPress={() => void loadFiles(currentPath)}
         >
           <Icon name="refresh-outline" size={16} color="#fff" />
-          <Text style={styles.retryButtonText}>{t('sharedFiles.deviceUnavailable.recheck')}</Text>
+          <Text style={styles.retryButtonText}>
+            {t('sharedFiles.deviceUnavailable.recheck')}
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -759,8 +920,12 @@ export function SharedFilesScreen() {
         <View style={styles.stateIconCircle}>
           <Icon name="folder-outline" size={32} color="#9ab8cc" />
         </View>
-        <Text style={styles.stateTitle}>{t('sharedFiles.directoryInaccessible.title')}</Text>
-        <Text style={styles.stateMessage}>{t('sharedFiles.directoryInaccessible.message')}</Text>
+        <Text style={styles.stateTitle}>
+          {t('sharedFiles.directoryInaccessible.title')}
+        </Text>
+        <Text style={styles.stateMessage}>
+          {t('sharedFiles.directoryInaccessible.message')}
+        </Text>
         <TouchableOpacity
           style={styles.retryButton}
           activeOpacity={0.7}
@@ -777,8 +942,12 @@ export function SharedFilesScreen() {
         <View style={styles.stateIconCircle}>
           <Icon name="alert-circle-outline" size={32} color="#9ab8cc" />
         </View>
-        <Text style={styles.stateTitle}>{t('sharedFiles.networkError.title')}</Text>
-        <Text style={styles.stateMessage}>{t('sharedFiles.networkError.message')}</Text>
+        <Text style={styles.stateTitle}>
+          {t('sharedFiles.networkError.title')}
+        </Text>
+        <Text style={styles.stateMessage}>
+          {t('sharedFiles.networkError.message')}
+        </Text>
         <TouchableOpacity
           style={styles.retryButton}
           activeOpacity={0.7}
@@ -795,8 +964,12 @@ export function SharedFilesScreen() {
         <View style={styles.stateIconCircle}>
           <Icon name="folder-outline" size={32} color="#9ab8cc" />
         </View>
-        <Text style={styles.stateTitle}>{t('sharedFiles.emptyState.title')}</Text>
-        <Text style={styles.stateMessage}>{t('sharedFiles.emptyState.message')}</Text>
+        <Text style={styles.stateTitle}>
+          {t('sharedFiles.emptyState.title')}
+        </Text>
+        <Text style={styles.stateMessage}>
+          {t('sharedFiles.emptyState.message')}
+        </Text>
       </View>
     );
   } else {
@@ -814,8 +987,11 @@ export function SharedFilesScreen() {
 
   // Current folder name for header
   const folderName = currentPath
-    ? currentPath.split('/').filter(Boolean).pop() ?? t('sharedFiles.defaultFolderName')
-    : t('sharedFiles.defaultFolderName');
+    ? (currentPath.split('/').filter(Boolean).pop() ??
+      t('sharedFiles.defaultFolderName'))
+    : activeDirectoryScope === 'personal'
+      ? t('sharedFiles.personalFolderName')
+      : t('sharedFiles.teamFolderName');
   const sharedFilesConnectionLabel = t(
     `sharedFiles.connectionStatus.${sharedFilesConnectionStatus}`,
   );
@@ -824,17 +1000,17 @@ export function SharedFilesScreen() {
       ? styles.connectionStatusLan
       : sharedFilesConnectionStatus === 'relay'
         ? styles.connectionStatusRelay
-      : sharedFilesConnectionStatus === 'p2p'
-        ? styles.connectionStatusP2P
-        : styles.connectionStatusOffline;
+        : sharedFilesConnectionStatus === 'p2p'
+          ? styles.connectionStatusP2P
+          : styles.connectionStatusOffline;
   const sharedFilesConnectionTextStyle =
     sharedFilesConnectionStatus === 'offline'
       ? styles.connectionStatusTextOffline
       : sharedFilesConnectionStatus === 'relay'
         ? styles.connectionStatusTextRelay
-      : sharedFilesConnectionStatus === 'p2p'
-        ? styles.connectionStatusTextP2P
-        : styles.connectionStatusTextLan;
+        : sharedFilesConnectionStatus === 'p2p'
+          ? styles.connectionStatusTextP2P
+          : styles.connectionStatusTextLan;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -844,7 +1020,9 @@ export function SharedFilesScreen() {
           <TouchableOpacity
             style={styles.backButton}
             activeOpacity={0.7}
-            onPress={currentPath !== '' ? navigateBack : () => navigation.goBack()}
+            onPress={
+              currentPath !== '' ? navigateBack : () => navigation.goBack()
+            }
           >
             <Icon name="chevron-back" size={18} color={DARK} />
           </TouchableOpacity>
@@ -875,6 +1053,39 @@ export function SharedFilesScreen() {
           >
             <Icon name="refresh-outline" size={18} color={DARK} />
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.scopeTabs} testID="shared-files-scope-tabs">
+          {DIRECTORY_SCOPES.map(scope => {
+            const isActive = scope === activeDirectoryScope;
+            const isDisabled = downloading !== null;
+            return (
+              <TouchableOpacity
+                key={scope}
+                style={[
+                  styles.scopeTab,
+                  isActive ? styles.scopeTabActive : null,
+                  isDisabled ? styles.scopeTabDisabled : null,
+                ]}
+                activeOpacity={0.75}
+                disabled={isDisabled}
+                onPress={() => selectDirectoryScope(scope)}
+              >
+                <Text
+                  style={[
+                    styles.scopeTabText,
+                    isActive ? styles.scopeTabTextActive : null,
+                    isDisabled && !isActive
+                      ? styles.scopeTabTextDisabled
+                      : null,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {t(`sharedFiles.scopes.${scope}`)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {content}
@@ -918,7 +1129,9 @@ export function SharedFilesScreen() {
                   onPress={() => void Linking.openURL(previewUrl)}
                 >
                   <Icon name="play-circle-outline" size={64} color="#fff" />
-                  <Text style={styles.videoPlayText}>{t('sharedFiles.preview.playVideo')}</Text>
+                  <Text style={styles.videoPlayText}>
+                    {t('sharedFiles.preview.playVideo')}
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -1008,6 +1221,39 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  scopeTabs: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.56)',
+    gap: 4,
+  },
+  scopeTab: {
+    flex: 1,
+    height: 34,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scopeTabActive: {
+    backgroundColor: '#fff',
+  },
+  scopeTabDisabled: {
+    opacity: 0.72,
+  },
+  scopeTabText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#6f91a6',
+  },
+  scopeTabTextActive: {
+    color: DARK,
+  },
+  scopeTabTextDisabled: {
+    color: '#9ab8cc',
   },
 
   // List

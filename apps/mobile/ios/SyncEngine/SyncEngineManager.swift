@@ -7168,10 +7168,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         return await prepareSharedFilesRoute(reason: "\(reason)_retry_after_tunnel_restart")
     }
 
-    func browseSharedFiles(path: String) async throws -> [String: Any] {
+    func browseSharedFiles(scope scopeRaw: String, path: String, accessToken: String) async throws -> [String: Any] {
+        let scope = SharedDirectoryScope(rawValue: scopeRaw) ?? .team
         var route = await prepareSharedFilesRoute(reason: "browse_shared_files")
-        slog("[SharedFiles] browseSharedFiles path=%@ resolved_host=%@ is_tunnel=%@", path, route.host, String(route.isTunnel))
-        syncDiagnosticsLog("SharedFiles", "browseSharedFiles path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
+        slog("[SharedFiles] browseSharedFiles scope=%@ path=%@ resolved_host=%@ is_tunnel=%@", scope.rawValue, path, route.host, String(route.isTunnel))
+        syncDiagnosticsLog("SharedFiles", "browseSharedFiles scope=\(scope.rawValue) path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
 
         let directory: SharedDirectory
         do {
@@ -7180,7 +7181,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 reason: "browse_shared_files",
                 isTunnelRoute: route.isTunnel
             ) {
-                try await sharedFilesService.listSharedFiles(path: path)
+                try await sharedFilesService.listSharedFiles(scope: scope, path: path, accessToken: accessToken)
             }
         } catch {
             guard SharedFilesRoutePolicy.shouldInvalidateTunnelAfterRouteFailure(isTunnelRoute: route.isTunnel) else {
@@ -7191,14 +7192,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 reason: "browse_shared_files",
                 error: error
             )
-            slog("[SharedFiles] browseSharedFiles retry path=%@ resolved_host=%@ is_tunnel=%@", path, route.host, String(route.isTunnel))
-            syncDiagnosticsLog("SharedFiles", "browseSharedFiles retry path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
+            slog("[SharedFiles] browseSharedFiles retry scope=%@ path=%@ resolved_host=%@ is_tunnel=%@", scope.rawValue, path, route.host, String(route.isTunnel))
+            syncDiagnosticsLog("SharedFiles", "browseSharedFiles retry scope=\(scope.rawValue) path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
             directory = try await withSharedFileTunnelOperation(
                 path: path,
                 reason: "browse_shared_files_retry",
                 isTunnelRoute: route.isTunnel
             ) {
-                try await sharedFilesService.listSharedFiles(path: path)
+                try await sharedFilesService.listSharedFiles(scope: scope, path: path, accessToken: accessToken)
             }
         }
         let reachabilityRoute: SharedFilesReachabilityRoute = route.isTunnel ? currentSharedFilesTunnelReachabilityRoute() : .lan
@@ -7220,25 +7221,27 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 "isDirectory": file.isDirectory,
             ]
             // Build absolute URLs for thumbnails and video streams
-            if file.type == "image", let thumbUrl = sharedFilesService.getThumbnailUrl(path: file.path) {
+            if file.type == "image", let thumbUrl = sharedFilesService.getThumbnailUrl(scope: scope, path: file.path, accessToken: accessToken) {
                 fileDict["thumbnailUrl"] = thumbUrl.absoluteString
             }
-            if file.type == "video", let streamUrl = sharedFilesService.getStreamUrl(path: file.path) {
+            if file.type == "video", let streamUrl = sharedFilesService.getStreamUrl(scope: scope, path: file.path, accessToken: accessToken) {
                 fileDict["streamUrl"] = streamUrl.absoluteString
             }
             return fileDict
         }
         return [
+            "scope": scope.rawValue,
             "path": directory.path,
             "files": files,
             "totalCount": directory.totalCount,
         ]
     }
 
-    func downloadSharedFile(path: String) async throws -> [String: Any] {
+    func downloadSharedFile(scope scopeRaw: String, path: String, accessToken: String) async throws -> [String: Any] {
+        let scope = SharedDirectoryScope(rawValue: scopeRaw) ?? .team
         var route = await prepareSharedFilesRoute(reason: "download_shared_file")
-        slog("[SharedFiles] downloadSharedFile path=%@ resolved_host=%@ is_tunnel=%@", path, route.host, String(route.isTunnel))
-        syncDiagnosticsLog("SharedFiles", "downloadSharedFile path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
+        slog("[SharedFiles] downloadSharedFile scope=%@ path=%@ resolved_host=%@ is_tunnel=%@", scope.rawValue, path, route.host, String(route.isTunnel))
+        syncDiagnosticsLog("SharedFiles", "downloadSharedFile scope=\(scope.rawValue) path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
 
         let progressHandler: SharedFileDownloadProgressHandler = { bytesWritten, totalBytes, progress in
             NativeSyncEngineModule.shared?.emitSharedFileDownloadProgress(
@@ -7258,7 +7261,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     reason: reason,
                     isTunnelRoute: route.isTunnel
                 ) {
-                    try await sharedFilesService.downloadFile(path: path, onProgress: progressHandler)
+                    try await sharedFilesService.downloadFile(scope: scope, path: path, accessToken: accessToken, onProgress: progressHandler)
                 }
                 syncDiagnosticsLog(
                     "SharedFiles",
@@ -7315,8 +7318,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         ]
     }
 
-    func getSharedFileStreamUrl(path: String) -> String? {
-        return sharedFilesService.getStreamUrl(path: path)?.absoluteString
+    func getSharedFileStreamUrl(scope scopeRaw: String, path: String, accessToken: String) -> String? {
+        let scope = SharedDirectoryScope(rawValue: scopeRaw) ?? .team
+        return sharedFilesService.getStreamUrl(scope: scope, path: path, accessToken: accessToken)?.absoluteString
     }
 
     // MARK: - Settings

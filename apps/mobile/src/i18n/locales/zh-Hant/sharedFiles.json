@@ -1,5 +1,11 @@
 {
   "defaultFolderName": "共享目錄",
+  "teamFolderName": "共享目錄",
+  "personalFolderName": "個人共享目錄",
+  "scopes": {
+    "team": "共享目錄",
+    "personal": "個人共享目錄"
+  },
   "loading": "載入中...",
   "files": {
     "folder": "資料夾",
@@ -12,7 +18,7 @@
     "offline": "離線"
   },
   "emptyState": {
-    "title": "共享目錄暫無內容",
+    "title": "目前沒有內容",
     "message": "同步完成後，檔案將顯示在這裡"
   },
   "deviceUnavailable": {
@@ -21,7 +27,7 @@
     "recheck": "重新檢查"
   },
   "directoryInaccessible": {
-    "title": "共享目錄不可存取",
+    "title": "目錄不可存取",
     "message": "請檢查電腦端設定"
   },
   "networkError": {

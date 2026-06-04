@@ -5,6 +5,8 @@ import type {
   DiscoveredDeviceDTO,
   HistoryLedgerCardDTO,
   ReadOnlyQueueItemDTO,
+  DirectoryListingDTO,
+  DirectoryScope,
   SharedFilesReachabilityDTO,
   SyncSummaryDTO,
 } from '@syncflow/contracts';
@@ -32,6 +34,25 @@ export interface Spec extends TurboModule {
   ): Promise<{ items: HistoryLedgerCardDTO[]; nextCursor: string | null }>;
   getAppInfo(): Promise<{ appName: string; version: string; build: string }>;
   exportDiagnostics(): Promise<string>;
+  browseSharedFiles(
+    scope: DirectoryScope,
+    path: string,
+    accessToken: string,
+  ): Promise<DirectoryListingDTO>;
+  downloadSharedFile(
+    scope: DirectoryScope,
+    path: string,
+    accessToken: string,
+  ): Promise<{
+    savedToPhotos: boolean;
+    localPath: string | null;
+    savedLocation?: string | null;
+  }>;
+  getSharedFileStreamUrl(
+    scope: DirectoryScope,
+    path: string,
+    accessToken: string,
+  ): Promise<string>;
   recordDiagnosticsLog(category: string, message: string): void;
   getClientDisplayName(): Promise<string>;
   setClientDisplayName(name: string): Promise<void>;

@@ -32,6 +32,7 @@ const initialSettings: SettingsDTO = {
   connectionCode: '',
   rootPath: '',
   receivePath: '',
+  personalPath: '',
   sharedPath: '',
   shareAddress: '',
   shareStatus: 'unknown' as const,

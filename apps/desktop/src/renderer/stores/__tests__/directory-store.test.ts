@@ -209,7 +209,7 @@ describe('directory-store', () => {
     await useDirectoryStore.getState().fetchSharedFiles();
 
     expect(useDirectoryStore.getState().sharedFiles).toEqual([]);
-    expect(useDirectoryStore.getState().sharedError).toBe('加载共享文件列表失败');
+    expect(useDirectoryStore.getState().sharedError).toBe('加载团队共享文件列表失败');
   });
 
   it('fetchSharedFiles uses storage unavailable copy when the directory is missing', async () => {
@@ -225,7 +225,7 @@ describe('directory-store', () => {
 
     expect(useDirectoryStore.getState().sharedFiles).toEqual([]);
     expect(useDirectoryStore.getState().sharedError).toBe(
-      '共享目录不可用，请重新选择或恢复文件夹',
+      '团队共享目录不可用，请重新选择或恢复文件夹',
     );
   });
 

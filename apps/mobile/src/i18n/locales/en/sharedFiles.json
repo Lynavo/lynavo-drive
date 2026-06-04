@@ -1,5 +1,11 @@
 {
-  "defaultFolderName": "Shared Files",
+  "defaultFolderName": "Shared Folder",
+  "teamFolderName": "Shared Folder",
+  "personalFolderName": "Personal Shared Folder",
+  "scopes": {
+    "team": "Shared Folder",
+    "personal": "Personal Shared Folder"
+  },
   "loading": "Loading...",
   "files": {
     "folder": "Folder",
@@ -12,7 +18,7 @@
     "offline": "Offline"
   },
   "emptyState": {
-    "title": "Shared Directory Is Empty",
+    "title": "No Content Yet",
     "message": "Files will appear here once syncing is complete."
   },
   "deviceUnavailable": {
@@ -21,7 +27,7 @@
     "recheck": "Check Again"
   },
   "directoryInaccessible": {
-    "title": "Shared Directory Inaccessible",
+    "title": "Directory Inaccessible",
     "message": "Please check the desktop app settings."
   },
   "networkError": {

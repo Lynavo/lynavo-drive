@@ -33,6 +33,7 @@ func EnsureRuntimeDirs(cfg *config.Config) (EnsureResult, error) {
 	dirs := []string{
 		cfg.DataDir,
 		cfg.ReceiveDir,
+		cfg.PersonalDir(),
 		cfg.SharedDir(),
 		cfg.StagingDir(),
 		cfg.LogDir(),
@@ -80,6 +81,20 @@ func EnsureStorageDirs(cfg *config.Config) (EnsureResult, error) {
 	})
 }
 
+// EnsurePersonalDir recreates only the account-scoped personal shared
+// directory. It is deliberately separate from EnsureStorageDirs because an
+// unavailable personal disk should not block LAN receive/team shared flows.
+func EnsurePersonalDir(cfg *config.Config) (EnsureResult, error) {
+	personalDir := cfg.PersonalDir()
+	if personalDir == "" {
+		return EnsureResult{}, fmt.Errorf("personal dir is not configured")
+	}
+	if err := validateUserDirParent(personalDir); err != nil {
+		return EnsureResult{}, err
+	}
+	return ensureDirs([]string{personalDir})
+}
+
 func validateManagedRootParent(cfg *config.Config) error {
 	if cfg.ReceiveDir == "" {
 		return nil
@@ -101,6 +116,28 @@ func validateManagedRootParent(cfg *config.Config) error {
 		return fmt.Errorf("managed root parent unavailable %q: %w", parent, err)
 	} else if !info.IsDir() {
 		return fmt.Errorf("managed root parent is not a directory %q", parent)
+	}
+	return nil
+}
+
+func validateUserDirParent(dir string) error {
+	cleanDir := filepath.Clean(dir)
+	parent := filepath.Clean(filepath.Dir(cleanDir))
+	if isDarwinVolumeMountRoot(cleanDir, parent) {
+		if info, err := os.Stat(cleanDir); os.IsNotExist(err) {
+			return fmt.Errorf("user directory volume unavailable %q: %w", cleanDir, err)
+		} else if err != nil {
+			return fmt.Errorf("stat user directory volume %q: %w", cleanDir, err)
+		} else if !info.IsDir() {
+			return fmt.Errorf("user directory volume is not a directory %q", cleanDir)
+		}
+		return nil
+	}
+
+	if info, err := os.Stat(parent); err != nil {
+		return fmt.Errorf("user directory parent unavailable %q: %w", parent, err)
+	} else if !info.IsDir() {
+		return fmt.Errorf("user directory parent is not a directory %q", parent)
 	}
 	return nil
 }

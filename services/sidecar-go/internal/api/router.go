@@ -24,6 +24,9 @@ type Server struct {
 	presence             *PresenceTracker
 	tunnelMu             sync.Mutex
 	tunnel               *protocol.P2PManager
+	accountMu            sync.RWMutex
+	desktopAccountID     string
+	authBaseURL          string
 	OnDeviceRenamed      func(newName string) // called when device name changes, to restart Bonjour
 	OnShareStatusChanged func()               // called when share status changes, to restart Bonjour
 }
@@ -74,6 +77,13 @@ func NewServer(s *store.Store, cfg *config.Config, hub *events.Hub, csp ClientSt
 	mux.HandleFunc("GET /shared/thumbnail/{path...}", srv.handleSharedThumbnail)
 	mux.HandleFunc("GET /shared/download/{path...}", srv.handleSharedDownload)
 	mux.HandleFunc("GET /shared/stream/{path...}", srv.handleSharedStream)
+	// Personal files are account-scoped and require the mobile bearer token to
+	// match the desktop account currently synced through tunnel credentials.
+	mux.HandleFunc("GET /personal/list", withJSON(srv.handlePersonalList))
+	mux.HandleFunc("GET /personal/list/{path...}", withJSON(srv.handlePersonalListPath))
+	mux.HandleFunc("GET /personal/thumbnail/{path...}", srv.handlePersonalThumbnail)
+	mux.HandleFunc("GET /personal/download/{path...}", srv.handlePersonalDownload)
+	mux.HandleFunc("GET /personal/stream/{path...}", srv.handlePersonalStream)
 	// Transfer state
 	mux.HandleFunc("GET /transfer/active", withJSON(srv.handleTransferActive))
 	// Tunnel credentials sync for desktop P2P signaling.

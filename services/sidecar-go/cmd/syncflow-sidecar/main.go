@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
@@ -288,17 +290,36 @@ func bootstrapReconciliation(st *store.Store, cfg *config.Config) {
 			} else {
 				slog.Info("bootstrap: set receive_root", "path", cfg.ReceiveDir)
 			}
-		} else if shouldRewriteLegacyReceiveRoot(cfg, receiveRoot) {
+		} else if rewriteTarget, ok := receiveRootRewriteTarget(cfg, receiveRoot); ok {
 			previousRoot := receiveRoot
-			shareConfig.ReceiveRoot = cfg.ReceiveDir
-			if err := st.UpdateShareConfig(*shareConfig); err != nil {
-				slog.Warn("bootstrap: failed to rewrite legacy receive_root", "from", previousRoot, "to", cfg.ReceiveDir, "err", err)
+			if err := migrateReceiveRootIfSafe(previousRoot, rewriteTarget); err != nil {
+				cfg.ReceiveDir = receiveRoot
+				slog.Warn("bootstrap: kept legacy receive_root because migration was unsafe", "from", previousRoot, "to", cfg.ReceiveDir, "err", err)
 			} else {
-				slog.Info("bootstrap: rewrote legacy receive_root", "from", previousRoot, "to", cfg.ReceiveDir)
+				cfg.ReceiveDir = rewriteTarget
+				shareConfig.ReceiveRoot = rewriteTarget
+				if err := st.UpdateShareConfig(*shareConfig); err != nil {
+					slog.Warn("bootstrap: failed to rewrite legacy receive_root", "from", previousRoot, "to", rewriteTarget, "err", err)
+				} else {
+					slog.Info("bootstrap: rewrote legacy receive_root", "from", previousRoot, "to", rewriteTarget)
+				}
 			}
 		} else {
 			cfg.ReceiveDir = receiveRoot
 			slog.Info("bootstrap: hydrated receive_dir from store", "path", cfg.ReceiveDir)
+		}
+	}
+
+	if personalRoot, err := st.GetSetting("personal_share_root"); err == nil {
+		if strings.TrimSpace(personalRoot) != "" {
+			cfg.PersonalShareDir = personalRoot
+			slog.Info("bootstrap: hydrated personal_share_root from store", "path", cfg.PersonalShareDir)
+		}
+	} else if errors.Is(err, sql.ErrNoRows) {
+		if err := st.SetSetting("personal_share_root", cfg.PersonalDir()); err != nil {
+			slog.Warn("bootstrap: failed to set personal_share_root", "err", err)
+		} else {
+			slog.Info("bootstrap: set personal_share_root", "path", cfg.PersonalDir())
 		}
 	}
 
@@ -431,12 +452,79 @@ func cleanupLegacyStagingDir(cfg *config.Config) error {
 	return nil
 }
 
-func shouldRewriteLegacyReceiveRoot(cfg *config.Config, currentReceiveRoot string) bool {
-	if filepath.Base(cfg.DataDir) != "Vivi Drop" {
-		return false
+func receiveRootRewriteTarget(cfg *config.Config, currentReceiveRoot string) (string, bool) {
+	currentReceiveRoot = filepath.Clean(currentReceiveRoot)
+	if isObsoletePersonalReceiveRoot(currentReceiveRoot) {
+		target := filepath.Join(filepath.Dir(filepath.Dir(currentReceiveRoot)), "received")
+		return target, filepath.Clean(target) != currentReceiveRoot
 	}
 
-	legacyReceiveRoot := filepath.Join(filepath.Dir(cfg.DataDir), "小豹闪传", "received")
-	return filepath.Clean(currentReceiveRoot) == filepath.Clean(legacyReceiveRoot) &&
-		filepath.Clean(cfg.ReceiveDir) != filepath.Clean(legacyReceiveRoot)
+	if filepath.Base(cfg.DataDir) != "Vivi Drop" {
+		return "", false
+	}
+
+	legacyBrandReceiveRoot := filepath.Join(filepath.Dir(cfg.DataDir), "小豹闪传", "received")
+	currentBrandLegacyReceiveRoot := filepath.Join(cfg.DataDir, "received")
+	if currentReceiveRoot == filepath.Clean(legacyBrandReceiveRoot) ||
+		currentReceiveRoot == filepath.Clean(currentBrandLegacyReceiveRoot) {
+		return cfg.ReceiveDir, filepath.Clean(cfg.ReceiveDir) != currentReceiveRoot
+	}
+
+	return "", false
+}
+
+func isObsoletePersonalReceiveRoot(receiveRoot string) bool {
+	return filepath.Base(receiveRoot) == "received" &&
+		filepath.Base(filepath.Dir(receiveRoot)) == "personal"
+}
+
+func migrateReceiveRootIfSafe(from string, to string) error {
+	from = filepath.Clean(from)
+	to = filepath.Clean(to)
+	if from == to {
+		return nil
+	}
+
+	if _, err := os.Stat(from); os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("stat legacy receive root: %w", err)
+	}
+
+	if _, err := os.Stat(to); os.IsNotExist(err) {
+		if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+			return fmt.Errorf("create receive parent: %w", err)
+		}
+		if err := os.Rename(from, to); err != nil {
+			return fmt.Errorf("move legacy receive root: %w", err)
+		}
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("stat personal receive root: %w", err)
+	}
+
+	entries, err := os.ReadDir(from)
+	if err != nil {
+		return fmt.Errorf("read legacy receive root: %w", err)
+	}
+	if err := os.MkdirAll(to, 0o755); err != nil {
+		return fmt.Errorf("create receive root: %w", err)
+	}
+	for _, entry := range entries {
+		target := filepath.Join(to, entry.Name())
+		if _, err := os.Stat(target); err == nil {
+			return fmt.Errorf("target already exists: %s", target)
+		} else if !os.IsNotExist(err) {
+			return fmt.Errorf("stat target: %w", err)
+		}
+	}
+	for _, entry := range entries {
+		if err := os.Rename(filepath.Join(from, entry.Name()), filepath.Join(to, entry.Name())); err != nil {
+			return fmt.Errorf("move legacy entry %q: %w", entry.Name(), err)
+		}
+	}
+	if err := os.Remove(from); err != nil {
+		return fmt.Errorf("remove empty legacy receive root: %w", err)
+	}
+	return nil
 }

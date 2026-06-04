@@ -18,8 +18,8 @@
   "features": {
     "autoUpload": "自动上传相册新增素材",
     "customTime": "自定义自动上传起始时间，支持精确到时分秒",
-    "sharedDir": "访问并下载当前连接电脑的共享目录内容",
-    "preview": "预览共享目录中的图片与视频",
+    "sharedDir": "访问并下载当前连接电脑的共享目录与个人共享目录内容",
+    "preview": "预览共享目录与个人共享目录中的图片与视频",
     "multiDevice": "多设备连接与切换使用",
     "unlimited": "无限量上传素材"
   },
@@ -116,7 +116,7 @@
   },
   "gate": {
     "downloadTitle": "需要订阅",
-    "downloadBody": "下载共享目录的内容需要有效的订阅。",
+    "downloadBody": "下载共享目录与个人共享目录内容需要有效的订阅。",
     "goSubscribe": "查看方案",
     "cancel": "暂不"
   },

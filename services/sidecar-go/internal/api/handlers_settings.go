@@ -1,7 +1,9 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -18,6 +20,7 @@ type settingsDTO struct {
 	ConnectionCode string `json:"connectionCode"`
 	RootPath       string `json:"rootPath"`
 	ReceivePath    string `json:"receivePath"`
+	PersonalPath   string `json:"personalPath"`
 	SharedPath     string `json:"sharedPath"`
 	ShareAddress   string `json:"shareAddress"`
 	ShareStatus    string `json:"shareStatus"`
@@ -25,10 +28,13 @@ type settingsDTO struct {
 }
 
 type updateSettingsRequest struct {
-	DeviceName  *string `json:"deviceName,omitempty"`
-	RootPath    *string `json:"rootPath,omitempty"`
-	ReceivePath *string `json:"receivePath,omitempty"`
+	DeviceName   *string `json:"deviceName,omitempty"`
+	RootPath     *string `json:"rootPath,omitempty"`
+	ReceivePath  *string `json:"receivePath,omitempty"`
+	PersonalPath *string `json:"personalPath,omitempty"`
 }
+
+const personalShareRootSettingKey = "personal_share_root"
 
 func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 	dto, err := s.assembleSettingsDTO()
@@ -58,9 +64,9 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Resolve the effective receive path: rootPath takes precedence over
-	// legacy receivePath.  When rootPath is provided the receive directory
-	// is always <rootPath>/received so the model stays consistent.
+	// rootPath is the only supported write entry for root-derived directories.
+	// The receive directory is <rootPath>/received and the team shared directory
+	// is <rootPath>/shared.
 	var newReceivePath *string
 	if req.RootPath != nil {
 		root := strings.TrimSpace(*req.RootPath)
@@ -75,8 +81,8 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		derived := filepath.Join(root, "received")
 		newReceivePath = &derived
 	} else if req.ReceivePath != nil {
-		trimmed := strings.TrimSpace(*req.ReceivePath)
-		newReceivePath = &trimmed
+		writeError(w, http.StatusBadRequest, "receive path updates are no longer supported; use rootPath")
+		return
 	}
 
 	if newReceivePath != nil {
@@ -98,8 +104,13 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		pathConfig := *s.config
+		pathConfig.ReceiveDir = newPath
+		if req.RootPath != nil && strings.TrimSpace(pathConfig.PersonalShareDir) == "" {
+			pathConfig.PersonalShareDir = s.config.PersonalDir()
+		}
 		// Validate: receive path and shared path must not collide.
-		newSharedPath := filepath.Join(filepath.Dir(newPath), "shared")
+		newSharedPath := pathConfig.SharedDir()
 		cleanReceive := filepath.Clean(newPath)
 		cleanShared := filepath.Clean(newSharedPath)
 		if cleanReceive == cleanShared {
@@ -108,7 +119,7 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Validate: directories must be creatable AND writable before committing.
-		for _, dir := range []string{newPath, newSharedPath} {
+		for _, dir := range []string{newPath, newSharedPath, pathConfig.StagingDir()} {
 			if err := os.MkdirAll(dir, 0o755); err != nil {
 				slog.Error("cannot create directory for new path", "path", dir, "err", err)
 				writeError(w, http.StatusBadRequest, "cannot create directory: "+dir)
@@ -142,11 +153,49 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		// Hot-reload: update the in-memory config so all runtime paths
 		// (file writes, dashboard, shared dir) converge immediately.
 		s.config.ReceiveDir = newPath
+		if req.RootPath != nil && strings.TrimSpace(s.config.PersonalShareDir) == "" {
+			s.config.PersonalShareDir = pathConfig.PersonalShareDir
+		}
 		slog.Info("receive path hot-reloaded", "newPath", newPath)
 		s.hub.Broadcast(events.Event{
 			Type:    "shared.directory.changed",
 			Payload: map[string]any{"path": s.config.SharedDir()},
 		})
+	}
+
+	if req.PersonalPath != nil {
+		newPersonalPath := strings.TrimSpace(*req.PersonalPath)
+		if newPersonalPath == "" {
+			writeError(w, http.StatusBadRequest, "personal path must not be empty")
+			return
+		}
+		if !filepath.IsAbs(newPersonalPath) {
+			writeError(w, http.StatusBadRequest, "personal path must be an absolute path")
+			return
+		}
+
+		if err := os.MkdirAll(newPersonalPath, 0o755); err != nil {
+			slog.Error("cannot create personal directory", "path", newPersonalPath, "err", err)
+			writeError(w, http.StatusBadRequest, "cannot create directory: "+newPersonalPath)
+			return
+		}
+		f, err := os.CreateTemp(newPersonalPath, ".syncflow_probe_*")
+		if err != nil {
+			slog.Error("personal directory not writable", "path", newPersonalPath, "err", err)
+			writeError(w, http.StatusBadRequest, "directory is not writable: "+newPersonalPath)
+			return
+		}
+		probePath := f.Name()
+		f.Close()
+		os.Remove(probePath)
+
+		if err := s.store.SetSetting(personalShareRootSettingKey, newPersonalPath); err != nil {
+			slog.Error("update personal share root", "err", err)
+			writeError(w, http.StatusInternalServerError, "failed to update settings")
+			return
+		}
+		s.config.PersonalShareDir = newPersonalPath
+		slog.Info("personal share path hot-reloaded", "newPath", newPersonalPath)
 	}
 
 	dto, err := s.assembleSettingsDTO()
@@ -174,12 +223,25 @@ func (s *Server) assembleSettingsDTO() (*settingsDTO, error) {
 		return nil, err
 	}
 
+	pathConfig := *s.config
+	if strings.TrimSpace(shareConfig.ReceiveRoot) != "" {
+		pathConfig.ReceiveDir = shareConfig.ReceiveRoot
+	}
+	if personalRoot, err := s.store.GetSetting(personalShareRootSettingKey); err == nil {
+		if strings.TrimSpace(personalRoot) != "" {
+			pathConfig.PersonalShareDir = personalRoot
+		}
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+
 	return &settingsDTO{
 		DeviceName:     deviceName,
 		ConnectionCode: code,
-		RootPath:       filepath.Dir(shareConfig.ReceiveRoot),
-		ReceivePath:    shareConfig.ReceiveRoot,
-		SharedPath:     s.config.SharedDir(),
+		RootPath:       pathConfig.RootDir(),
+		ReceivePath:    pathConfig.ReceiveDir,
+		PersonalPath:   pathConfig.PersonalDir(),
+		SharedPath:     pathConfig.SharedDir(),
 		ShareAddress:   shareConfig.ShareURL,
 		ShareStatus:    shareConfig.ShareStatus,
 		ShareName:      shareConfig.ShareName,
@@ -189,6 +251,7 @@ func (s *Server) assembleSettingsDTO() (*settingsDTO, error) {
 type syncTunnelCredentialsRequest struct {
 	SignalingURL string          `json:"signalingUrl"`
 	AccessToken  string          `json:"accessToken"`
+	AccountID    string          `json:"accountId,omitempty"`
 	ICEServers   json.RawMessage `json:"iceServers"`
 }
 
@@ -203,9 +266,17 @@ func (s *Server) handleSyncTunnelCredentials(w http.ResponseWriter, r *http.Requ
 	accessToken := strings.TrimSpace(req.AccessToken)
 	if signalingURL == "" || accessToken == "" {
 		s.StopTunnel()
+		s.setDesktopAuthContext("", "")
 		slog.Info("sync tunnel credentials cleared")
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "credentials cleared"})
 		return
+	}
+
+	accountID := strings.TrimSpace(req.AccountID)
+	if accountID == "" {
+		if parsedAccountID, err := accountIDFromJWT(accessToken); err == nil {
+			accountID = parsedAccountID
+		}
 	}
 
 	deviceID, err := s.store.GetDeviceID()
@@ -235,11 +306,13 @@ func (s *Server) handleSyncTunnelCredentials(w http.ResponseWriter, r *http.Requ
 	}
 	s.tunnel = manager
 	s.tunnelMu.Unlock()
+	s.setDesktopAuthContext(accountID, signalingURL)
 
 	manager.Start(pairedDevices)
 	slog.Info("sync tunnel credentials applied",
 		"signalingUrl", signalingURL,
 		"desktopId", deviceID,
+		"hasAccountId", accountID != "",
 		"pairedDevices", len(pairedDevices),
 	)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "credentials synced"})

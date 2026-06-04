@@ -8,7 +8,7 @@
     "connectionCode": "Pairing code",
     "connectionCodeDescription": "After regeneration, old phones need to pair again",
     "shareAddress": "LAN sharing",
-    "shareAddressDescription": "Checks this computer's SMB sharing status for mobile access to the shared folder",
+    "shareAddressDescription": "Checks this computer's SMB sharing status for mobile access to the team shared folder",
     "giftCard": "Gift card",
     "giftCardDescription": "Redeem your gift card to unlock more features or storage capacity",
     "bonjour": "Windows Bonjour broadcast",
@@ -57,10 +57,12 @@
   },
   "filePath": {
     "receiveAddress": "Receive folder",
-    "sharedAddress": "Shared folder",
+    "personalAddress": "Personal shared folder",
+    "sharedAddress": "Team shared folder",
     "chooseFolder": "Choose folder",
     "openReceived": "Open receive folder",
-    "openShared": "Open shared folder",
+    "openPersonal": "Open personal shared folder",
+    "openShared": "Open team shared folder",
     "remoteFeaturePrompt": "Remote Sync & Share",
     "remoteFeaturePromptDetail": "Sign in to enable P2P remote syncing"
   },
@@ -73,17 +75,17 @@
     "ready": "Sharing is ready",
     "readyDetail": "{{shareName}} is accessible to devices on the same LAN.",
     "needsManualEnable": "Manual sharing setup required",
-    "needsManualEnableDetailMac": "Enable File Sharing in System Settings and allow Vivi Drop to access the receive folder.",
+    "needsManualEnableDetailMac": "Enable File Sharing in System Settings and allow Vivi Drop to access the team shared folder.",
     "needsManualEnableDetailWindows": "Enable Windows advanced sharing and confirm network discovery is available.",
-    "shareRegistered": "Share folder registered",
+    "shareRegistered": "Team shared folder registered",
     "shareRegisteredDetailMac": "System sharing may take a moment to refresh. Keep File Sharing enabled.",
-    "shareRegisteredDetailWindows": "The share folder is registered. Confirm Windows Firewall allows file sharing.",
+    "shareRegisteredDetailWindows": "The team shared folder is registered. Confirm Windows Firewall allows file sharing.",
     "error": "Sharing check failed",
     "errorDetail": "Check system sharing settings and retry.",
     "unknown": "Sharing status unknown",
     "unknownDetail": "The background service has not reported sharing status yet.",
     "refresh": "Check again",
-    "windowsManualHint": "Windows must enable advanced sharing before phones can read the shared folder.",
+    "windowsManualHint": "Windows must enable advanced sharing before phones can read the team shared folder.",
     "windowsQuickConfig": "Windows quick setup",
     "windowsQuickConfigDescription": "Open advanced sharing settings and confirm network discovery and file sharing are enabled.",
     "openAdvancedSharing": "Open advanced sharing",
@@ -107,14 +109,14 @@
   },
   "systemGuide": {
     "macTitle": "macOS File Sharing",
-    "macSubtitle": "Confirm File Sharing and receive folder permissions are enabled.",
+    "macSubtitle": "Confirm File Sharing and team shared folder permissions are enabled.",
     "windowsTitle": "Windows File Sharing",
-    "windowsDescription": "Enable network discovery, file and printer sharing, and sharing for the receive folder.",
+    "windowsDescription": "Enable network discovery, file and printer sharing, and sharing for the team shared folder.",
     "steps": [
       "Open advanced sharing settings",
       "Enable network discovery",
       "Enable file and printer sharing",
-      "Confirm the receive folder is writable by the current user"
+      "Confirm the team shared folder is readable by the current user"
     ]
   },
   "support": {

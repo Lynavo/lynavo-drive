@@ -53,7 +53,7 @@
   },
   "offline": {
     "title": "当前设备已离线",
-    "subtitle": "请检查电脑是否在线并连接同一局域网，恢复后可继续上传或访问共享目录",
+    "subtitle": "请检查电脑是否在线并连接同一局域网，恢复后可继续上传或访问共享目录与个人共享目录",
     "switchDevice": "切换设备",
     "reconnect": "重新连接"
   },
@@ -93,7 +93,7 @@
     "albumTitle": "相册",
     "albumDesc": "浏览和手动上传素材",
     "sharedFilesTitle": "共享目录",
-    "sharedFilesDesc": "浏览PC设备的共享目录"
+    "sharedFilesDesc": "浏览共享目录与个人共享目录"
   },
   "trialUpgrade": {
     "entry": "免费试用剩余 {{days}} 天，点击升级 Pro 解锁全部功能"

@@ -53,6 +53,112 @@ func TestBootstrapReconciliationUpdatesLegacyDefaultReceiveRoot(t *testing.T) {
 	}
 }
 
+func TestBootstrapReconciliationKeepsCurrentBrandDefaultReceiveRoot(t *testing.T) {
+	dir := t.TempDir()
+	dataDir := filepath.Join(dir, "Vivi Drop")
+	dbPath := filepath.Join(dataDir, "sidecar.db")
+	currentReceiveRoot := filepath.Join(dataDir, "received")
+
+	if err := os.MkdirAll(currentReceiveRoot, 0o755); err != nil {
+		t.Fatalf("MkdirAll(currentReceiveRoot): %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(currentReceiveRoot, "old.txt"), []byte("old"), 0o644); err != nil {
+		t.Fatalf("WriteFile current receive file: %v", err)
+	}
+
+	st, err := store.New(dbPath)
+	if err != nil {
+		t.Fatalf("store.New: %v", err)
+	}
+	defer st.Close()
+
+	cfg, err := st.GetShareConfig()
+	if err != nil {
+		t.Fatalf("GetShareConfig: %v", err)
+	}
+	cfg.ReceiveRoot = currentReceiveRoot
+	if err := st.UpdateShareConfig(*cfg); err != nil {
+		t.Fatalf("UpdateShareConfig: %v", err)
+	}
+
+	runtimeConfig := &config.Config{
+		DataDir:    dataDir,
+		ReceiveDir: currentReceiveRoot,
+		DeviceName: "test-device",
+	}
+
+	bootstrapReconciliation(st, runtimeConfig)
+
+	updated, err := st.GetShareConfig()
+	if err != nil {
+		t.Fatalf("GetShareConfig(updated): %v", err)
+	}
+	if updated.ReceiveRoot != currentReceiveRoot {
+		t.Fatalf("ReceiveRoot = %q, want %q", updated.ReceiveRoot, currentReceiveRoot)
+	}
+	if runtimeConfig.ReceiveDir != currentReceiveRoot {
+		t.Fatalf("runtime ReceiveDir = %q, want %q", runtimeConfig.ReceiveDir, currentReceiveRoot)
+	}
+	if _, err := os.Stat(filepath.Join(currentReceiveRoot, "old.txt")); err != nil {
+		t.Fatalf("expected receive file to remain in current receive root: %v", err)
+	}
+}
+
+func TestBootstrapReconciliationMovesObsoletePersonalReceiveRoot(t *testing.T) {
+	dir := t.TempDir()
+	dataDir := filepath.Join(dir, "Vivi Drop")
+	dbPath := filepath.Join(dataDir, "sidecar.db")
+	obsoleteReceiveRoot := filepath.Join(dataDir, "personal", "received")
+	currentReceiveRoot := filepath.Join(dataDir, "received")
+
+	if err := os.MkdirAll(obsoleteReceiveRoot, 0o755); err != nil {
+		t.Fatalf("MkdirAll(obsoleteReceiveRoot): %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(obsoleteReceiveRoot, "old.txt"), []byte("old"), 0o644); err != nil {
+		t.Fatalf("WriteFile obsolete receive file: %v", err)
+	}
+
+	st, err := store.New(dbPath)
+	if err != nil {
+		t.Fatalf("store.New: %v", err)
+	}
+	defer st.Close()
+
+	cfg, err := st.GetShareConfig()
+	if err != nil {
+		t.Fatalf("GetShareConfig: %v", err)
+	}
+	cfg.ReceiveRoot = obsoleteReceiveRoot
+	if err := st.UpdateShareConfig(*cfg); err != nil {
+		t.Fatalf("UpdateShareConfig: %v", err)
+	}
+
+	runtimeConfig := &config.Config{
+		DataDir:    dataDir,
+		ReceiveDir: currentReceiveRoot,
+		DeviceName: "test-device",
+	}
+
+	bootstrapReconciliation(st, runtimeConfig)
+
+	updated, err := st.GetShareConfig()
+	if err != nil {
+		t.Fatalf("GetShareConfig(updated): %v", err)
+	}
+	if updated.ReceiveRoot != currentReceiveRoot {
+		t.Fatalf("ReceiveRoot = %q, want %q", updated.ReceiveRoot, currentReceiveRoot)
+	}
+	if runtimeConfig.ReceiveDir != currentReceiveRoot {
+		t.Fatalf("runtime ReceiveDir = %q, want %q", runtimeConfig.ReceiveDir, currentReceiveRoot)
+	}
+	if _, err := os.Stat(filepath.Join(currentReceiveRoot, "old.txt")); err != nil {
+		t.Fatalf("expected receive file to move into current receive root: %v", err)
+	}
+	if _, err := os.Stat(obsoleteReceiveRoot); !os.IsNotExist(err) {
+		t.Fatalf("expected obsolete receive root to be removed, err=%v", err)
+	}
+}
+
 func TestBootstrapReconciliationKeepsCustomReceiveRoot(t *testing.T) {
 	dir := t.TempDir()
 	dataDir := filepath.Join(dir, "Vivi Drop")
@@ -112,6 +218,7 @@ func TestEnsureRuntimeDirsCreatesSharedDirAtStartup(t *testing.T) {
 	for _, path := range []string{
 		cfg.DataDir,
 		cfg.ReceiveDir,
+		cfg.PersonalDir(),
 		cfg.SharedDir(),
 		cfg.StagingDir(),
 		cfg.LogDir(),

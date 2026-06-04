@@ -63,16 +63,18 @@ jest.mock('../../stores/auth-store', () => {
 // Mock NativeEventEmitter to avoid "not a native module" errors
 jest.mock('react-native/Libraries/EventEmitter/NativeEventEmitter');
 
-// Mock SyncEngineModule — browseSharedFiles returns one file so the list
+// Mock SyncEngineModule — browseDirectory returns one file so the list
 // renders and the download button with testID is visible.
-const mockBrowseSharedFiles = jest.fn();
-const mockDownloadSharedFile = jest.fn();
-const mockGetSharedFileStreamUrl = jest.fn();
+const mockBrowseDirectory = jest.fn();
+const mockDownloadDirectoryFile = jest.fn();
+const mockGetDirectoryFileStreamUrl = jest.fn();
 
 jest.mock('../../services/SyncEngineModule', () => ({
-  browseSharedFiles: (...args: unknown[]) => mockBrowseSharedFiles(...args),
-  downloadSharedFile: (...args: unknown[]) => mockDownloadSharedFile(...args),
-  getSharedFileStreamUrl: (...args: unknown[]) => mockGetSharedFileStreamUrl(...args),
+  browseDirectory: (...args: unknown[]) => mockBrowseDirectory(...args),
+  downloadDirectoryFile: (...args: unknown[]) =>
+    mockDownloadDirectoryFile(...args),
+  getDirectoryFileStreamUrl: (...args: unknown[]) =>
+    mockGetDirectoryFileStreamUrl(...args),
 }));
 
 import i18n from '../../i18n';
@@ -103,6 +105,7 @@ const FAKE_OTHER_FILE = {
 };
 
 const FAKE_FILE_DOWNLOAD_ID = JSON.stringify([
+  'team',
   FAKE_FILE.path,
   FAKE_FILE.size,
   FAKE_FILE.modifiedAt,
@@ -141,8 +144,15 @@ beforeEach(() => {
   }));
 
   // Return one non-directory file so the FlatList renders the download button.
-  mockBrowseSharedFiles.mockResolvedValue({ files: [FAKE_FILE] });
-  mockDownloadSharedFile.mockResolvedValue({ savedToPhotos: true, localPath: null });
+  mockBrowseDirectory.mockResolvedValue({
+    scope: 'team',
+    path: '',
+    files: [FAKE_FILE],
+  });
+  mockDownloadDirectoryFile.mockResolvedValue({
+    savedToPhotos: true,
+    localPath: null,
+  });
 
   alertSpy.mockImplementation((_t, _b, buttons) => {
     // Simulate tap on the first non-cancel button.
@@ -206,22 +216,114 @@ describe('SharedFilesScreen download progress', () => {
     expect(getByText('Relay online')).toBeTruthy();
   });
 
+  test('switches to the personal directory scope from the root', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      subscription: { status: 'trialing' },
+      loadSubscription: jest.fn(),
+    });
+
+    const { getByText, getByTestId } = render(<SharedFilesScreen />);
+
+    await waitFor(() => getByTestId('shared-file-download-button'));
+    expect(mockBrowseDirectory).toHaveBeenCalledWith('team', '');
+
+    mockBrowseDirectory.mockClear();
+    mockBrowseDirectory.mockResolvedValueOnce({
+      scope: 'personal',
+      path: '',
+      files: [FAKE_OTHER_FILE],
+    });
+
+    await act(async () => {
+      fireEvent.press(getByText('Personal Shared Folder'));
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(mockBrowseDirectory).toHaveBeenCalledWith('personal', ''),
+    );
+    expect(getByText('clip.mp4')).toBeTruthy();
+  });
+
+  test('ignores stale team load results after switching to personal scope', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      subscription: { status: 'trialing' },
+      loadSubscription: jest.fn(),
+    });
+
+    let resolveTeamBrowse: (value: {
+      scope: string;
+      path: string;
+      files: Array<typeof FAKE_FILE>;
+    }) => void = () => undefined;
+    let resolvePersonalBrowse: (value: {
+      scope: string;
+      path: string;
+      files: Array<typeof FAKE_OTHER_FILE>;
+    }) => void = () => undefined;
+    mockBrowseDirectory.mockImplementation((scope: string) => {
+      if (scope === 'team') {
+        return new Promise(resolve => {
+          resolveTeamBrowse = resolve;
+        });
+      }
+      return new Promise(resolve => {
+        resolvePersonalBrowse = resolve;
+      });
+    });
+
+    const { getByText, queryByText } = render(<SharedFilesScreen />);
+
+    await waitFor(() =>
+      expect(mockBrowseDirectory).toHaveBeenCalledWith('team', ''),
+    );
+
+    await act(async () => {
+      fireEvent.press(getByText('Personal Shared Folder'));
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(mockBrowseDirectory).toHaveBeenCalledWith('personal', ''),
+    );
+
+    await act(async () => {
+      resolvePersonalBrowse({
+        scope: 'personal',
+        path: '',
+        files: [FAKE_OTHER_FILE],
+      });
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(getByText('clip.mp4')).toBeTruthy());
+
+    await act(async () => {
+      resolveTeamBrowse({ scope: 'team', path: '', files: [FAKE_FILE] });
+      await Promise.resolve();
+    });
+
+    expect(getByText('clip.mp4')).toBeTruthy();
+    expect(queryByText('photo.jpg')).toBeNull();
+  });
+
   test('coalesces a connected binding event while the current directory load is in flight', async () => {
     (useAuth as jest.Mock).mockReturnValue({
       subscription: { status: 'trialing' },
       loadSubscription: jest.fn(),
     });
-    let resolveBrowse: (value: { files: Array<typeof FAKE_FILE> }) => void = () => undefined;
-    mockBrowseSharedFiles.mockImplementation(
+    let resolveBrowse: (value: {
+      files: Array<typeof FAKE_FILE>;
+    }) => void = () => undefined;
+    mockBrowseDirectory.mockImplementation(
       () =>
-        new Promise((resolve) => {
+        new Promise(resolve => {
           resolveBrowse = resolve;
         }),
     );
 
     render(<SharedFilesScreen />);
 
-    await waitFor(() => expect(mockBrowseSharedFiles).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockBrowseDirectory).toHaveBeenCalledTimes(1));
 
     await act(async () => {
       nativeListeners.get('onBindingStateChanged')?.({
@@ -232,7 +334,7 @@ describe('SharedFilesScreen download progress', () => {
       await Promise.resolve();
     });
 
-    expect(mockBrowseSharedFiles).toHaveBeenCalledTimes(1);
+    expect(mockBrowseDirectory).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       resolveBrowse({ files: [FAKE_FILE] });
@@ -248,7 +350,7 @@ describe('SharedFilesScreen download progress', () => {
     const { getByTestId } = render(<SharedFilesScreen />);
 
     await waitFor(() => getByTestId('shared-file-download-button'));
-    expect(mockBrowseSharedFiles).toHaveBeenCalledTimes(1);
+    expect(mockBrowseDirectory).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       nativeListeners.get('onBindingStateChanged')?.({
@@ -263,7 +365,7 @@ describe('SharedFilesScreen download progress', () => {
       await Promise.resolve();
     });
 
-    expect(mockBrowseSharedFiles).toHaveBeenCalledTimes(1);
+    expect(mockBrowseDirectory).toHaveBeenCalledTimes(1);
   });
 
   test('renders native download progress for the active file', async () => {
@@ -271,11 +373,13 @@ describe('SharedFilesScreen download progress', () => {
       subscription: { status: 'trialing' },
       loadSubscription: jest.fn(),
     });
-    let resolveDownload: (value: { savedToPhotos: boolean; localPath: string | null }) => void =
-      () => undefined;
-    mockDownloadSharedFile.mockImplementation(
+    let resolveDownload: (value: {
+      savedToPhotos: boolean;
+      localPath: string | null;
+    }) => void = () => undefined;
+    mockDownloadDirectoryFile.mockImplementation(
       () =>
-        new Promise((resolve) => {
+        new Promise(resolve => {
           resolveDownload = resolve;
         }),
     );
@@ -311,9 +415,13 @@ describe('SharedFilesScreen download progress', () => {
       subscription: { status: 'trialing' },
       loadSubscription: jest.fn(),
     });
-    mockDownloadSharedFile.mockImplementation(() => new Promise(() => undefined));
+    mockDownloadDirectoryFile.mockImplementation(
+      () => new Promise(() => undefined),
+    );
 
-    const { getByTestId, getByText, queryByText } = render(<SharedFilesScreen />);
+    const { getByTestId, getByText, queryByText } = render(
+      <SharedFilesScreen />,
+    );
 
     await waitFor(() => getByTestId('shared-file-download-button'));
 
@@ -349,7 +457,7 @@ describe('SharedFilesScreen download progress', () => {
     const { getByTestId, getByText } = render(<SharedFilesScreen />);
 
     await waitFor(() => getByTestId('shared-file-download-button'));
-    mockBrowseSharedFiles.mockClear();
+    mockBrowseDirectory.mockClear();
 
     await act(async () => {
       nativeListeners.get('onBindingStateChanged')?.({
@@ -365,7 +473,7 @@ describe('SharedFilesScreen download progress', () => {
         connectionState: 'connecting',
       });
     });
-    expect(mockBrowseSharedFiles).not.toHaveBeenCalled();
+    expect(mockBrowseDirectory).not.toHaveBeenCalled();
 
     await act(async () => {
       nativeListeners.get('onBindingStateChanged')?.({
@@ -375,7 +483,7 @@ describe('SharedFilesScreen download progress', () => {
       await Promise.resolve();
     });
 
-    await waitFor(() => expect(mockBrowseSharedFiles).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockBrowseDirectory).toHaveBeenCalledTimes(1));
   });
 
   test('auto retries while unavailable when the paired device still exists', async () => {
@@ -387,8 +495,12 @@ describe('SharedFilesScreen download progress', () => {
     const { getByTestId, getByText } = render(<SharedFilesScreen />);
 
     await waitFor(() => getByTestId('shared-file-download-button'));
-    mockBrowseSharedFiles.mockClear();
-    mockBrowseSharedFiles.mockResolvedValueOnce({ files: [FAKE_OTHER_FILE] });
+    mockBrowseDirectory.mockClear();
+    mockBrowseDirectory.mockResolvedValueOnce({
+      scope: 'team',
+      path: '',
+      files: [FAKE_OTHER_FILE],
+    });
 
     jest.useFakeTimers();
     try {
@@ -406,7 +518,7 @@ describe('SharedFilesScreen download progress', () => {
         await Promise.resolve();
       });
 
-      await waitFor(() => expect(mockBrowseSharedFiles).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(mockBrowseDirectory).toHaveBeenCalledTimes(1));
       expect(getByText('clip.mp4')).toBeTruthy();
     } finally {
       jest.useRealTimers();
@@ -457,8 +569,12 @@ describe('SharedFilesScreen download progress', () => {
     const { getByTestId, getByText } = render(<SharedFilesScreen />);
 
     await waitFor(() => getByTestId('shared-file-download-button'));
-    mockBrowseSharedFiles.mockClear();
-    mockBrowseSharedFiles.mockResolvedValueOnce({ files: [FAKE_OTHER_FILE] });
+    mockBrowseDirectory.mockClear();
+    mockBrowseDirectory.mockResolvedValueOnce({
+      scope: 'team',
+      path: '',
+      files: [FAKE_OTHER_FILE],
+    });
 
     await act(async () => {
       nativeListeners.get('onBindingStateChanged')?.({
@@ -478,7 +594,7 @@ describe('SharedFilesScreen download progress', () => {
       await Promise.resolve();
     });
 
-    await waitFor(() => expect(mockBrowseSharedFiles).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockBrowseDirectory).toHaveBeenCalledTimes(1));
     expect(getByText('clip.mp4')).toBeTruthy();
   });
 
@@ -487,7 +603,7 @@ describe('SharedFilesScreen download progress', () => {
       subscription: { status: 'trialing' },
       loadSubscription: jest.fn(),
     });
-    mockDownloadSharedFile.mockResolvedValue({
+    mockDownloadDirectoryFile.mockResolvedValue({
       savedToPhotos: false,
       localPath: '/tmp/syncflow_shared_downloads/photo.jpg',
     });
@@ -513,7 +629,7 @@ describe('SharedFilesScreen download progress', () => {
       subscription: { status: 'trialing' },
       loadSubscription: jest.fn(),
     });
-    mockDownloadSharedFile.mockResolvedValue({
+    mockDownloadDirectoryFile.mockResolvedValue({
       savedToPhotos: false,
       localPath: '/tmp/syncflow_shared_downloads/photo.jpg',
     });
@@ -534,7 +650,7 @@ describe('SharedFilesScreen download progress', () => {
       subscription: { status: 'trialing' },
       loadSubscription: jest.fn(),
     });
-    mockDownloadSharedFile.mockResolvedValue({
+    mockDownloadDirectoryFile.mockResolvedValue({
       savedToPhotos: false,
       localPath: '/tmp/syncflow_shared_downloads/photo.jpg',
     });
@@ -570,7 +686,7 @@ describe('SharedFilesScreen download progress', () => {
       subscription: { status: 'trialing' },
       loadSubscription: jest.fn(),
     });
-    mockDownloadSharedFile.mockResolvedValue({
+    mockDownloadDirectoryFile.mockResolvedValue({
       savedToPhotos: false,
       localPath: null,
       savedLocation: 'Documents/Vivi Drop/photo.jpg',
@@ -597,14 +713,20 @@ describe('SharedFilesScreen download progress', () => {
       subscription: { status: 'trialing' },
       loadSubscription: jest.fn(),
     });
-    mockBrowseSharedFiles.mockResolvedValue({
+    mockBrowseDirectory.mockResolvedValue({
+      scope: 'team',
+      path: '',
       files: [FAKE_FILE, FAKE_OTHER_FILE],
     });
-    mockDownloadSharedFile.mockImplementation(() => new Promise(() => undefined));
+    mockDownloadDirectoryFile.mockImplementation(
+      () => new Promise(() => undefined),
+    );
 
     const { getAllByTestId } = render(<SharedFilesScreen />);
 
-    await waitFor(() => expect(getAllByTestId('shared-file-download-button')).toHaveLength(2));
+    await waitFor(() =>
+      expect(getAllByTestId('shared-file-download-button')).toHaveLength(2),
+    );
 
     await act(async () => {
       fireEvent.press(getAllByTestId('shared-file-download-button')[0]);
@@ -613,8 +735,11 @@ describe('SharedFilesScreen download progress', () => {
       fireEvent.press(getAllByTestId('shared-file-download-button')[1]);
     });
 
-    expect(mockDownloadSharedFile).toHaveBeenCalledTimes(1);
-    expect(mockDownloadSharedFile).toHaveBeenCalledWith(FAKE_FILE.path);
+    expect(mockDownloadDirectoryFile).toHaveBeenCalledTimes(1);
+    expect(mockDownloadDirectoryFile).toHaveBeenCalledWith(
+      'team',
+      FAKE_FILE.path,
+    );
   });
 
   test('ignores repeated presses before the active download re-renders disabled state', async () => {
@@ -622,7 +747,9 @@ describe('SharedFilesScreen download progress', () => {
       subscription: { status: 'trialing' },
       loadSubscription: jest.fn(),
     });
-    mockDownloadSharedFile.mockImplementation(() => new Promise(() => undefined));
+    mockDownloadDirectoryFile.mockImplementation(
+      () => new Promise(() => undefined),
+    );
 
     const { getByTestId } = render(<SharedFilesScreen />);
 
@@ -634,8 +761,11 @@ describe('SharedFilesScreen download progress', () => {
       fireEvent.press(button);
     });
 
-    expect(mockDownloadSharedFile).toHaveBeenCalledTimes(1);
-    expect(mockDownloadSharedFile).toHaveBeenCalledWith(FAKE_FILE.path);
+    expect(mockDownloadDirectoryFile).toHaveBeenCalledTimes(1);
+    expect(mockDownloadDirectoryFile).toHaveBeenCalledWith(
+      'team',
+      FAKE_FILE.path,
+    );
   });
 });
 
