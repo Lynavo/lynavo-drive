@@ -42,6 +42,7 @@ import { formatBytes } from '../utils/format';
 type ErrorKind =
   | 'device_unavailable'
   | 'directory_inaccessible'
+  | 'personal_unauthorized'
   | 'network_error';
 
 interface DeviceAvailability {
@@ -122,6 +123,17 @@ function sharedFileCompletedDownloadId(
 
 function sharedFileOperationId(scope: DirectoryScope, path: string): string {
   return `${scope}:${path}`;
+}
+
+function isPersonalUnauthorizedError(
+  scope: DirectoryScope,
+  message: string,
+): boolean {
+  if (scope !== 'personal') return false;
+  return (
+    message.includes('401') ||
+    message.toLowerCase().includes('unauthorized')
+  );
 }
 
 function completedDownloadsFromIds(ids: string[]): Record<string, true> {
@@ -347,7 +359,9 @@ export function SharedFilesScreen() {
           // 400 is intentionally excluded: sidecar returns 400 for path
           // traversal rejects, "not a directory", and resolve failures —
           // none of which mean the active directory scope is inaccessible.
-          if (
+          if (isPersonalUnauthorizedError(loadScope, msg)) {
+            setErrorKind('personal_unauthorized');
+          } else if (
             msg.includes('403') ||
             msg.includes('404') ||
             msg.includes('not found')
@@ -939,6 +953,28 @@ export function SharedFilesScreen() {
         </Text>
         <Text style={styles.stateMessage}>
           {t('sharedFiles.directoryInaccessible.message')}
+        </Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          activeOpacity={0.7}
+          onPress={() => void loadFiles(currentPath)}
+        >
+          <Icon name="refresh-outline" size={16} color="#fff" />
+          <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  } else if (errorKind === 'personal_unauthorized') {
+    content = (
+      <View style={styles.stateContainer}>
+        <View style={styles.stateIconCircle}>
+          <Icon name="person-circle-outline" size={32} color="#9ab8cc" />
+        </View>
+        <Text style={styles.stateTitle}>
+          {t('sharedFiles.personalUnauthorized.title')}
+        </Text>
+        <Text style={styles.stateMessage}>
+          {t('sharedFiles.personalUnauthorized.message')}
         </Text>
         <TouchableOpacity
           style={styles.retryButton}

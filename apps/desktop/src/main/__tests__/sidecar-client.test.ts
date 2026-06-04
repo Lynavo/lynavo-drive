@@ -1609,6 +1609,12 @@ describe('sidecarClient', () => {
 
       expect(sidecarPayloads).toEqual([
         expect.objectContaining({
+          authBaseUrl: 'https://api.vividrop.cn',
+          accessToken,
+          accountId: '42',
+        }),
+        expect.objectContaining({
+          signalingUrl: 'https://api.vividrop.cn',
           accessToken,
           accountId: '42',
         }),
@@ -1716,8 +1722,26 @@ describe('sidecarClient', () => {
         accessToken: 'new-access-token',
         refreshToken: 'new-refresh-token',
       });
-      expect(sidecarPayloads).toHaveLength(2);
-      expect(sidecarPayloads).toEqual([
+      expect(sidecarPayloads).toHaveLength(4);
+      expect(
+        sidecarPayloads.filter(
+          (payload) => 'authBaseUrl' in (payload as Record<string, unknown>),
+        ),
+      ).toEqual([
+        expect.objectContaining({
+          authBaseUrl: 'https://review-api.vividrop.cn',
+          accessToken: 'new-access-token',
+        }),
+        expect.objectContaining({
+          authBaseUrl: 'https://review-api.vividrop.cn',
+          accessToken: 'new-access-token',
+        }),
+      ]);
+      expect(
+        sidecarPayloads.filter(
+          (payload) => 'signalingUrl' in (payload as Record<string, unknown>),
+        ),
+      ).toEqual([
         expect.objectContaining({
           signalingUrl: 'https://review-api.vividrop.cn',
           accessToken: 'new-access-token',
@@ -1904,7 +1928,7 @@ describe('sidecarClient', () => {
       vi.resetModules();
     });
 
-    it('logs why sidecar tunnel credentials are cleared when no auth session is available', async () => {
+    it('logs why sidecar account context and tunnel credentials are cleared when no auth session is available', async () => {
       const sidecarPayloads: unknown[] = [];
       const httpRequest = vi.fn((options: RequestOptions, callback: (res: unknown) => void) => {
         const req = new EventEmitter() as EventEmitter & {
@@ -1937,16 +1961,27 @@ describe('sidecarClient', () => {
 
       expect(sidecarPayloads).toEqual([
         {
+          authBaseUrl: '',
+          accessToken: '',
+        },
+        {
           signalingUrl: '',
           accessToken: '',
           iceServers: [],
         },
       ]);
       expect(logWarnMock).toHaveBeenCalledWith(
-        '[sidecar-client] Clearing sidecar tunnel credentials: no active auth session or access token.',
+        '[sidecar-client] Clearing sidecar account context and tunnel credentials: no active auth session or access token.',
         {
           hasSession: false,
           hasAccessToken: false,
+        },
+      );
+      expect(logInfoMock).toHaveBeenCalledWith(
+        '[sidecar-client] Sidecar account context clear request completed.',
+        {
+          ok: true,
+          message: 'credentials cleared',
         },
       );
       expect(logInfoMock).toHaveBeenCalledWith(
@@ -2032,6 +2067,10 @@ describe('sidecarClient', () => {
       expect(turnOptions.hostname).toBe('review-api.vividrop.cn');
       expect(turnOptions.path).toBe('/api/v1/tunnel/turn-credentials');
       expect(sidecarPayloads).toEqual([
+        expect.objectContaining({
+          authBaseUrl: 'https://review-api.vividrop.cn',
+          accessToken: 'review-access-token',
+        }),
         expect.objectContaining({
           signalingUrl: 'https://review-api.vividrop.cn',
           accessToken: 'review-access-token',

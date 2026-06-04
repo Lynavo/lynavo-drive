@@ -51,6 +51,12 @@ enum SharedFilesRoutePolicy {
         hasReachableLANHost
     }
 
+    static func shouldProbeFallbackDirectLANBeforeP2P(
+        hasFreshLANHost: Bool
+    ) -> Bool {
+        !hasFreshLANHost
+    }
+
     static func shouldPublishP2PReachabilityFromTunnel(
         hasActiveTunnel: Bool,
         hasReachableLANHost: Bool

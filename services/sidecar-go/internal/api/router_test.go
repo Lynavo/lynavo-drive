@@ -1444,6 +1444,97 @@ func TestPersonalListRequiresDesktopAccountIdentity(t *testing.T) {
 	}
 }
 
+func TestPersonalListUsesAccountContextWithoutTunnelCredentials(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cfg.PersonalDir(), "notes.txt"), []byte("personal"), 0o644); err != nil {
+		t.Fatalf("write personal file: %v", err)
+	}
+	authSrv := profileAuthServer(t, "account-1")
+	defer authSrv.Close()
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	reqBody := `{"authBaseUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1"}`
+	resp, err := http.Post(srv.URL+"/account/context", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("POST /account/context: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected account context sync 200, got %d", resp.StatusCode)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/personal/list", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
+
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /personal/list: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d body=%s", resp.StatusCode, string(body))
+	}
+}
+
+func TestAccountContextClearDisablesPersonalList(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	authSrv := profileAuthServer(t, "account-1")
+	defer authSrv.Close()
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	reqBody := `{"authBaseUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1"}`
+	resp, err := http.Post(srv.URL+"/account/context", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("POST /account/context: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected account context sync 200, got %d", resp.StatusCode)
+	}
+
+	resp, err = http.Post(srv.URL+"/account/context", "application/json", strings.NewReader(`{"authBaseUrl":"","accessToken":""}`))
+	if err != nil {
+		t.Fatalf("POST /account/context clear: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected account context clear 200, got %d", resp.StatusCode)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/personal/list", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
+
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /personal/list: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", resp.StatusCode)
+	}
+}
+
 func TestPersonalListRequiresBearerAccountToken(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {

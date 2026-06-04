@@ -31,6 +31,10 @@
     "title": "目錄不可存取",
     "message": "請檢查電腦端設定"
   },
+  "personalUnauthorized": {
+    "title": "個人共享目錄無法存取",
+    "message": "請確認手機與電腦端已登入相同帳號，並在電腦端完成個人共享目錄設定"
+  },
   "networkError": {
     "title": "載入失敗",
     "message": "請稍後重試"

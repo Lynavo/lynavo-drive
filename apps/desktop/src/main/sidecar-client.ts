@@ -762,6 +762,13 @@ export const sidecarClient = {
   }) => {
     return request<{ ok: boolean; message: string }>('POST', '/tunnel/credentials', payload);
   },
+  syncAccountContext: async (payload: {
+    authBaseUrl: string;
+    accessToken: string;
+    accountId?: string;
+  }) => {
+    return request<{ ok: boolean; message: string }>('POST', '/account/context', payload);
+  },
   getAuthSession: () => {
     ensureSessionLoaded();
     return authSession;
@@ -870,12 +877,20 @@ export async function syncCredentialsToSidecar(): Promise<boolean> {
         return false;
       }
       log.warn(
-        '[sidecar-client] Clearing sidecar tunnel credentials: no active auth session or access token.',
+        '[sidecar-client] Clearing sidecar account context and tunnel credentials: no active auth session or access token.',
         {
           hasSession: Boolean(session),
           hasAccessToken: Boolean(session?.accessToken),
         },
       );
+      const contextRes = await sidecarClient.syncAccountContext({
+        authBaseUrl: '',
+        accessToken: '',
+      });
+      log.info('[sidecar-client] Sidecar account context clear request completed.', {
+        ok: contextRes.ok,
+        message: contextRes.message,
+      });
       const res = await sidecarClient.syncTunnelCredentials({
         signalingUrl: '',
         accessToken: '',
@@ -888,11 +903,38 @@ export async function syncCredentialsToSidecar(): Promise<boolean> {
       return true;
     }
 
+    const syncActiveAccountContext = async () => {
+      const activeSession = sidecarClient.getAuthSession();
+      if (!activeSession || !activeSession.accessToken) {
+        return false;
+      }
+      const accountBaseUrl = sidecarClient.getApiBaseUrl();
+      const accountId = accountIDFromAccessToken(activeSession.accessToken);
+      const accountRes = await sidecarClient.syncAccountContext({
+        authBaseUrl: accountBaseUrl,
+        accessToken: activeSession.accessToken,
+        accountId,
+      });
+      log.info('[sidecar-client] Sidecar account context sync request completed.', {
+        ok: accountRes.ok,
+        message: accountRes.message,
+        baseUrl: accountBaseUrl,
+        hasAccountId: Boolean(accountId),
+      });
+      return accountRes.ok;
+    };
+
     const turnBaseUrl = sidecarClient.getApiBaseUrl();
     log.info('[sidecar-client] Fetching TURN credentials for sidecar tunnel.', {
       baseUrl: turnBaseUrl,
     });
-    let turnRes = await sidecarClient.fetchTurnCredentials();
+    let turnRes: Awaited<ReturnType<typeof sidecarClient.fetchTurnCredentials>>;
+    try {
+      turnRes = await sidecarClient.fetchTurnCredentials();
+    } catch (error) {
+      await syncActiveAccountContext();
+      throw error;
+    }
     if (turnRes && turnRes.code === 1006) {
       log.info(
         '[sidecar-client] Fetch TURN credentials returned 1006 (token expired). Attempting token refresh...',
@@ -907,15 +949,22 @@ export async function syncCredentialsToSidecar(): Promise<boolean> {
       }
       if (refreshed) {
         log.info('[sidecar-client] Token refresh succeeded. Retrying fetch TURN credentials...');
-        turnRes = await sidecarClient.fetchTurnCredentials();
+        try {
+          turnRes = await sidecarClient.fetchTurnCredentials();
+        } catch (error) {
+          await syncActiveAccountContext();
+          throw error;
+        }
       } else {
         log.warn('[sidecar-client] Token refresh failed.');
       }
     }
 
     if (!turnRes || turnRes.code !== 0 || !turnRes.data) {
+      await syncActiveAccountContext();
       throw new Error(`Fetch TURN credentials failed with code: ${turnRes?.code}`);
     }
+    await syncActiveAccountContext();
     log.info('[sidecar-client] TURN credentials fetched for sidecar tunnel.', {
       baseUrl: sidecarClient.getApiBaseUrl(),
       urlsCount: turnRes.data.urls.length,

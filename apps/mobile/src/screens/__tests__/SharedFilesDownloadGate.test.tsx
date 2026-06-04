@@ -245,6 +245,48 @@ describe('SharedFilesScreen download progress', () => {
     expect(getByText('clip.mp4')).toBeTruthy();
   });
 
+  test('shows personal unauthorized state without auto retrying on HTTP 401', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      subscription: { status: 'trialing' },
+      loadSubscription: jest.fn(),
+    });
+
+    const { getByText, getByTestId, queryByText } = render(
+      <SharedFilesScreen />,
+    );
+
+    await waitFor(() => getByTestId('shared-file-download-button'));
+    mockBrowseDirectory.mockClear();
+    mockBrowseDirectory.mockRejectedValueOnce(
+      new Error('Sidecar returned HTTP 401 for /personal/list'),
+    );
+
+    jest.useFakeTimers();
+    try {
+      await act(async () => {
+        fireEvent.press(getByText('Personal Shared Folder'));
+        await Promise.resolve();
+      });
+
+      await waitFor(() =>
+        expect(getByText('Personal Shared Folder Unavailable')).toBeTruthy(),
+      );
+      expect(queryByText('Loading...')).toBeNull();
+      expect(mockBrowseDirectory).toHaveBeenCalledTimes(1);
+      expect(mockBrowseDirectory).toHaveBeenCalledWith('personal', '');
+
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(mockBrowseDirectory).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test('ignores stale team load results after switching to personal scope', async () => {
     (useAuth as jest.Mock).mockReturnValue({
       subscription: { status: 'trialing' },

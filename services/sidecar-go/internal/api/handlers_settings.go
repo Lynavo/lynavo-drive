@@ -255,6 +255,48 @@ type syncTunnelCredentialsRequest struct {
 	ICEServers   json.RawMessage `json:"iceServers"`
 }
 
+type syncAccountContextRequest struct {
+	AuthBaseURL string `json:"authBaseUrl"`
+	AccessToken string `json:"accessToken"`
+	AccountID   string `json:"accountId,omitempty"`
+}
+
+func (req syncAccountContextRequest) resolvedAccountID() string {
+	accountID := strings.TrimSpace(req.AccountID)
+	if accountID != "" {
+		return accountID
+	}
+	if parsedAccountID, err := accountIDFromJWT(strings.TrimSpace(req.AccessToken)); err == nil {
+		return parsedAccountID
+	}
+	return ""
+}
+
+func (s *Server) handleSyncAccountContext(w http.ResponseWriter, r *http.Request) {
+	var req syncAccountContextRequest
+	if err := readJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	authBaseURL := strings.TrimSpace(req.AuthBaseURL)
+	accessToken := strings.TrimSpace(req.AccessToken)
+	if authBaseURL == "" || accessToken == "" {
+		s.setDesktopAuthContext("", "")
+		slog.Info("sync account context cleared")
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "account context cleared"})
+		return
+	}
+
+	accountID := req.resolvedAccountID()
+	s.setDesktopAuthContext(accountID, authBaseURL)
+	slog.Info("sync account context applied",
+		"authBaseUrl", authBaseURL,
+		"hasAccountId", accountID != "",
+	)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "account context synced"})
+}
+
 func (s *Server) handleSyncTunnelCredentials(w http.ResponseWriter, r *http.Request) {
 	var req syncTunnelCredentialsRequest
 	if err := readJSON(r, &req); err != nil {
@@ -272,12 +314,11 @@ func (s *Server) handleSyncTunnelCredentials(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	accountID := strings.TrimSpace(req.AccountID)
-	if accountID == "" {
-		if parsedAccountID, err := accountIDFromJWT(accessToken); err == nil {
-			accountID = parsedAccountID
-		}
-	}
+	accountID := syncAccountContextRequest{
+		AuthBaseURL: signalingURL,
+		AccessToken: accessToken,
+		AccountID:   req.AccountID,
+	}.resolvedAccountID()
 
 	deviceID, err := s.store.GetDeviceID()
 	if err != nil {

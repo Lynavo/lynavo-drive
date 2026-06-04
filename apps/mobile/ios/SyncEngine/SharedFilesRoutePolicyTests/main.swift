@@ -77,6 +77,20 @@ expect(
 )
 
 expect(
+    SharedFilesRoutePolicy.shouldProbeFallbackDirectLANBeforeP2P(
+        hasFreshLANHost: false
+    ),
+    "shared files should probe the cached direct LAN route before waiting for P2P when Bonjour has no fresh host"
+)
+
+expect(
+    !SharedFilesRoutePolicy.shouldProbeFallbackDirectLANBeforeP2P(
+        hasFreshLANHost: true
+    ),
+    "shared files should not prefer stale cached direct LAN before P2P when Bonjour has already provided a fresh LAN host"
+)
+
+expect(
     SharedFilesRoutePolicy.shouldPublishP2PReachabilityFromTunnel(
         hasActiveTunnel: true,
         hasReachableLANHost: false

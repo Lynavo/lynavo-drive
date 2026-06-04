@@ -31,6 +31,10 @@
     "title": "Directory Inaccessible",
     "message": "Please check the desktop app settings."
   },
+  "personalUnauthorized": {
+    "title": "Personal Shared Folder Unavailable",
+    "message": "Make sure the phone and desktop app are signed in to the same account, then configure the personal shared folder on desktop."
+  },
   "networkError": {
     "title": "Failed to Load",
     "message": "Please try again later."

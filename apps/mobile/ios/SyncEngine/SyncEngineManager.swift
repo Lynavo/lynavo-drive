@@ -7002,6 +7002,41 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         return nil
     }
 
+    private func fallbackDirectSharedFilesHost(
+        for binding: BindingRecord,
+        excluding excludedHost: String?
+    ) -> String? {
+        var fallbackHost = SharedFilesRoutePolicy.fallbackDirectHost(
+            liveHost: sidecarHost,
+            currentBindingHost: currentBinding?.sidecarHost,
+            persistedHost: binding.host
+        )
+        if let excludedHost, fallbackHost == excludedHost {
+            fallbackHost = nil
+        }
+        return fallbackHost
+    }
+
+    private func reachableFallbackDirectSharedFilesHost(
+        for binding: BindingRecord,
+        excluding excludedHost: String?,
+        probeTimeout: TimeInterval = 1.0
+    ) async -> String? {
+        guard let host = fallbackDirectSharedFilesHost(for: binding, excluding: excludedHost),
+              SharedFilesRoutePolicy.isPrivateLANIPv4(host)
+        else {
+            return nil
+        }
+        if await canReachSharedFilesLANHost(host, timeout: probeTimeout) {
+            return host
+        }
+        syncDiagnosticsLog(
+            "SharedFiles",
+            "cached direct host unavailable for shared files host=\(host)"
+        )
+        return nil
+    }
+
     private func publishSharedFilesLANReachabilityFromDiscovery(
         binding: BindingRecord,
         host: String,
@@ -7074,6 +7109,21 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             )
         }
 
+        if SharedFilesRoutePolicy.shouldProbeFallbackDirectLANBeforeP2P(
+            hasFreshLANHost: unreachableLANHost != nil
+        ),
+           let fallbackHost = await reachableFallbackDirectSharedFilesHost(for: binding, excluding: unreachableLANHost)
+        {
+            syncDiagnosticsLog(
+                "SharedFiles",
+                "using cached direct LAN host before P2P wait host=\(fallbackHost) reason=\(reason)"
+            )
+            sidecarHost = fallbackHost
+            sharedFilesService.sidecarHost = fallbackHost
+            sharedFilesService.useTunnelRoute = false
+            return (fallbackHost, false)
+        }
+
         if await waitForP2PTunnelActive(reason: reason) {
             let port = sharedFilesService.tunnelPort.map { String($0) } ?? "unknown"
             sharedFilesService.useTunnelRoute = true
@@ -7093,14 +7143,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             )
         }
 
-        var fallbackHost = SharedFilesRoutePolicy.fallbackDirectHost(
-            liveHost: sidecarHost,
-            currentBindingHost: currentBinding?.sidecarHost,
-            persistedHost: binding.host
-        )
-        if let unreachableLANHost, fallbackHost == unreachableLANHost {
-            fallbackHost = nil
-        }
+        var fallbackHost = fallbackDirectSharedFilesHost(for: binding, excluding: unreachableLANHost)
         if let host = fallbackHost,
            SharedFilesRoutePolicy.isPrivateLANIPv4(host),
            !(await canReachSharedFilesLANHost(host)) {

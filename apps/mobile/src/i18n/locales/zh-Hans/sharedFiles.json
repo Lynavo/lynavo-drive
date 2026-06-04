@@ -31,6 +31,10 @@
     "title": "目录不可访问",
     "message": "请检查电脑端设置"
   },
+  "personalUnauthorized": {
+    "title": "个人共享目录无法访问",
+    "message": "请确认手机与电脑端已登录相同账号，并在电脑端完成个人共享目录设置"
+  },
   "networkError": {
     "title": "加载失败",
     "message": "请稍后重试"

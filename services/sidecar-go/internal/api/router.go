@@ -78,7 +78,7 @@ func NewServer(s *store.Store, cfg *config.Config, hub *events.Hub, csp ClientSt
 	mux.HandleFunc("GET /shared/download/{path...}", srv.handleSharedDownload)
 	mux.HandleFunc("GET /shared/stream/{path...}", srv.handleSharedStream)
 	// Personal files are account-scoped and require the mobile bearer token to
-	// match the desktop account currently synced through tunnel credentials.
+	// match the desktop account currently synced by the desktop app.
 	mux.HandleFunc("GET /personal/list", withJSON(srv.handlePersonalList))
 	mux.HandleFunc("GET /personal/list/{path...}", withJSON(srv.handlePersonalListPath))
 	mux.HandleFunc("GET /personal/thumbnail/{path...}", srv.handlePersonalThumbnail)
@@ -86,6 +86,8 @@ func NewServer(s *store.Store, cfg *config.Config, hub *events.Hub, csp ClientSt
 	mux.HandleFunc("GET /personal/stream/{path...}", srv.handlePersonalStream)
 	// Transfer state
 	mux.HandleFunc("GET /transfer/active", withJSON(srv.handleTransferActive))
+	// Account context sync for LAN personal sharing authorization.
+	mux.HandleFunc("POST /account/context", withJSON(srv.handleSyncAccountContext))
 	// Tunnel credentials sync for desktop P2P signaling.
 	mux.HandleFunc("POST /tunnel/credentials", withJSON(srv.handleSyncTunnelCredentials))
 	// WebSocket
