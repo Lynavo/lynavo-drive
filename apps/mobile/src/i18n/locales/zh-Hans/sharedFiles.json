@@ -9,6 +9,7 @@
     "lan": "局域网在线",
     "p2p": "P2P 在线",
     "relay": "中继在线",
+    "unavailable": "远端不可用",
     "offline": "离线"
   },
   "emptyState": {

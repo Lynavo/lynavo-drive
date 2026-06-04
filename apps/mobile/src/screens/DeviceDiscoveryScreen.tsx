@@ -48,7 +48,7 @@ import {
 } from '../utils/onboardingStorage';
 import { buildManualPairDevice } from './deviceDiscoveryManualPairing';
 import { shouldKeepCachedDevicesVisible } from './deviceDiscoveryRefresh';
-import { isChinaMarket } from '../markets';
+import { marketConfig } from '../markets';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,6 +58,10 @@ type DiscoveredDevice = Pick<
   DiscoveredDeviceDTO,
   'deviceId' | 'name' | 'ip' | 'type' | 'port'
 >;
+
+const desktopDownloadHost = marketConfig.downloadUrl
+  .replace(/^https?:\/\//, '')
+  .replace(/\/$/, '');
 
 function deviceDiscoveryDebugSummary(devices: DiscoveredDevice[]): string {
   if (devices.length === 0) {
@@ -616,8 +620,8 @@ export function DeviceDiscoveryScreen() {
           <View style={styles.troubleshootingBullet} />
           <Text style={styles.troubleshootingText}>
             {t('deviceDiscovery.troubleshooting.desktopApp').replace(
-              'vividrop.cn',
-              isChinaMarket() ? 'vividrop.cn' : 'vividrop.com',
+              'www.vividrop.cn',
+              desktopDownloadHost,
             )}
           </Text>
         </View>

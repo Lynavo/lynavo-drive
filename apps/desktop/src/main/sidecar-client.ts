@@ -4,7 +4,13 @@ import log from 'electron-log';
 import { app, safeStorage } from 'electron';
 import { writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { APP_COMPATIBILITY_VERSION, SIDECAR_HTTP_PORT } from '@syncflow/contracts';
+import {
+  APP_COMPATIBILITY_VERSION,
+  SIDECAR_HTTP_PORT,
+  VIVIDROP_API_BASE_URL,
+  VIVIDROP_GLOBAL_API_BASE_URL,
+  VIVIDROP_REVIEW_API_BASE_URL,
+} from '@syncflow/contracts';
 import type {
   DeviceFileLedgerPageDTO,
   DeviceFileSortField,
@@ -16,11 +22,9 @@ import { shouldUseReviewOAuthTarget } from './oauth-config';
 
 const BASE = `http://127.0.0.1:${SIDECAR_HTTP_PORT}`;
 const DEFAULT_API_BASE_URL = isGlobalMarket()
-  ? 'https://global-api.vividrop.com'
-  : 'https://api.vividrop.cn';
-const DEFAULT_REVIEW_API_BASE_URL = isGlobalMarket()
-  ? 'https://review-api.vividrop.com'
-  : 'https://review-api.vividrop.cn';
+  ? VIVIDROP_GLOBAL_API_BASE_URL
+  : VIVIDROP_API_BASE_URL;
+const DEFAULT_REVIEW_API_BASE_URL = VIVIDROP_REVIEW_API_BASE_URL;
 const API_BASE =
   process.env.VIVIDROP_API_BASE_URL?.trim() ||
   process.env.SYNCFLOW_API_BASE_URL?.trim() ||
@@ -287,7 +291,10 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
     return null;
   }
   try {
-    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<string, unknown>;
+    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<
+      string,
+      unknown
+    >;
   } catch {
     return null;
   }
@@ -481,6 +488,29 @@ function requestTimeoutMs(baseUrl: string): number {
   return baseUrl === BASE ? SIDECAR_REQUEST_TIMEOUT_MS : REMOTE_REQUEST_TIMEOUT_MS;
 }
 
+function errorDiagnostics(error: Error): Record<string, unknown> {
+  const diagnostics: Record<string, unknown> = {
+    name: error.name,
+    message: error.message,
+  };
+  const record = error as Error & {
+    code?: unknown;
+    cause?: unknown;
+  };
+  if (record.code) {
+    diagnostics.code = record.code;
+  }
+  if (record.cause instanceof Error) {
+    diagnostics.cause = {
+      name: record.cause.name,
+      message: record.cause.message,
+    };
+  } else if (record.cause) {
+    diagnostics.cause = String(record.cause);
+  }
+  return diagnostics;
+}
+
 export interface SidecarHealth {
   ok: boolean;
   service: string;
@@ -528,6 +558,13 @@ async function request<T>(
     const rejectOnce = (error: Error) => {
       if (!settled) {
         settled = true;
+        if (baseUrl !== BASE) {
+          log.error('[sidecar-client] Remote API request failed.', {
+            method,
+            url: `${url.origin}${url.pathname}${url.search}`,
+            ...errorDiagnostics(error),
+          });
+        }
         reject(error);
       }
     };
@@ -654,6 +691,10 @@ export const sidecarClient = {
   },
   loginWithGoogle: async (payload: { identityToken: string }) => {
     const authBaseUrl = resolveOAuthAuthBaseUrl();
+    log.info('[sidecar-client] Starting Google auth login.', {
+      baseUrl: authBaseUrl,
+      path: '/api/v1/auth/google/login',
+    });
     const response = await request<unknown>(
       'POST',
       '/api/v1/auth/google/login',
@@ -668,6 +709,10 @@ export const sidecarClient = {
     fullName?: string;
   }) => {
     const authBaseUrl = resolveOAuthAuthBaseUrl();
+    log.info('[sidecar-client] Starting Apple auth login.', {
+      baseUrl: authBaseUrl,
+      path: '/api/v1/auth/apple/login',
+    });
     const response = await request<unknown>(
       'POST',
       '/api/v1/auth/apple/login',

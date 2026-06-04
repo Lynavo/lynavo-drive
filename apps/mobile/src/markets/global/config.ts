@@ -1,14 +1,20 @@
+import {
+  VIVIDROP_GLOBAL_API_BASE_URL,
+  VIVIDROP_REVIEW_API_BASE_URL,
+  VIVIDROP_SUPPORT_EMAIL,
+  VIVIDROP_WEB_BASE_URL,
+} from '@syncflow/contracts';
 import type { MobileMarketConfig } from '../types';
 
 export const globalMarketConfig: MobileMarketConfig = {
   market: 'global',
   appName: 'Vivi Drop',
   bundleId: 'com.vividrop.mobile.global',
-  apiBaseUrl: 'https://global-api.vividrop.cn',
-  reviewApiBaseUrl: 'https://review-api.vividrop.cn',
+  apiBaseUrl: VIVIDROP_GLOBAL_API_BASE_URL,
+  reviewApiBaseUrl: VIVIDROP_REVIEW_API_BASE_URL,
   appReviewPhone: '17000000002',
-  privacyUrl: 'https://www.vividrop.cn/privacy',
-  termsUrl: 'https://www.vividrop.cn/terms',
+  privacyUrl: `${VIVIDROP_WEB_BASE_URL}/privacy`,
+  termsUrl: `${VIVIDROP_WEB_BASE_URL}/terms`,
   loginProviders: ['apple', 'google'],
   theme: {
     primary: '#3f5fdb',
@@ -17,6 +23,6 @@ export const globalMarketConfig: MobileMarketConfig = {
     foreground: '#172033',
     accent: '#18a999',
   },
-  downloadUrl: 'https://www.vividrop.com',
-  supportEmail: 'support@vividrop.com',
+  downloadUrl: VIVIDROP_WEB_BASE_URL,
+  supportEmail: VIVIDROP_SUPPORT_EMAIL,
 };

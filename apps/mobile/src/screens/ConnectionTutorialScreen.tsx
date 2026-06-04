@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '../components/Icon';
-import { isChinaMarket, marketConfig } from '../markets';
+import { marketConfig } from '../markets';
 
 type TutorialTabId = 'lan' | 'qr' | 'code' | 'ip';
 
@@ -32,6 +32,9 @@ interface TutorialCard {
 }
 
 const TAB_IDS: TutorialTabId[] = ['lan', 'qr', 'code', 'ip'];
+const desktopDownloadHost = marketConfig.downloadUrl
+  .replace(/^https?:\/\//, '')
+  .replace(/\/$/, '');
 
 function LanVisual() {
   return (
@@ -158,8 +161,8 @@ export function ConnectionTutorialScreen() {
           t('connectionTutorial.cards.lan.steps.2'),
         ],
         warning: t('connectionTutorial.cards.lan.warning').replace(
-          'vividrop.cn',
-          isChinaMarket() ? 'vividrop.cn' : 'vividrop.com',
+          'www.vividrop.cn',
+          desktopDownloadHost,
         ),
       },
       qr: {

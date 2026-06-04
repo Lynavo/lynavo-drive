@@ -55,7 +55,12 @@ interface SharedFileDownloadProgress {
   progress: number;
 }
 
-type SharedFilesConnectionStatus = 'lan' | 'p2p' | 'relay' | 'offline';
+type SharedFilesConnectionStatus =
+  | 'lan'
+  | 'p2p'
+  | 'relay'
+  | 'unavailable'
+  | 'offline';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -140,6 +145,7 @@ function sharedFilesConnectionStatusFromReachability(
 ): SharedFilesConnectionStatus | null {
   if (typeof value !== 'object' || value === null) return 'offline';
   const state = (value as { state?: unknown }).state;
+  if (state === 'unavailable') return 'unavailable';
   if (state !== 'available') return 'offline';
   const route = (value as { route?: unknown }).route;
   if (route === 'lan') return 'lan';
@@ -285,6 +291,7 @@ export function SharedFilesScreen() {
         ) {
           setErrorKind('directory_inaccessible');
         } else {
+          setSharedFilesConnectionStatus('unavailable');
           setErrorKind('network_error');
         }
         setFiles([]);
@@ -393,8 +400,9 @@ export function SharedFilesScreen() {
         const connState = (state.connectionState as string) || 'bound';
         if (connState === 'offline') {
           bindingAvailabilityRef.current = { deviceId, available: false };
-          setSharedFilesConnectionStatus('offline');
-          setErrorKind('device_unavailable');
+          setActiveDeviceId(deviceId);
+          setSharedFilesConnectionStatus('unavailable');
+          setErrorKind('network_error');
           setFiles([]);
           return;
         }
@@ -452,7 +460,13 @@ export function SharedFilesScreen() {
       (state: SharedFilesReachabilityDTO | null) => {
         const nextSharedFilesConnectionStatus =
           sharedFilesConnectionStatusFromReachability(state);
-        if (nextSharedFilesConnectionStatus) {
+        if (nextSharedFilesConnectionStatus === 'offline') {
+          if (bindingAvailabilityRef.current.deviceId) {
+            setSharedFilesConnectionStatus('unavailable');
+          } else {
+            setSharedFilesConnectionStatus('offline');
+          }
+        } else if (nextSharedFilesConnectionStatus) {
           setSharedFilesConnectionStatus(nextSharedFilesConnectionStatus);
         }
 
@@ -826,10 +840,14 @@ export function SharedFilesScreen() {
         ? styles.connectionStatusRelay
       : sharedFilesConnectionStatus === 'p2p'
         ? styles.connectionStatusP2P
+      : sharedFilesConnectionStatus === 'unavailable'
+        ? styles.connectionStatusUnavailable
         : styles.connectionStatusOffline;
   const sharedFilesConnectionTextStyle =
     sharedFilesConnectionStatus === 'offline'
       ? styles.connectionStatusTextOffline
+      : sharedFilesConnectionStatus === 'unavailable'
+        ? styles.connectionStatusTextUnavailable
       : sharedFilesConnectionStatus === 'relay'
         ? styles.connectionStatusTextRelay
       : sharedFilesConnectionStatus === 'p2p'
@@ -982,6 +1000,9 @@ const styles = StyleSheet.create({
   connectionStatusRelay: {
     backgroundColor: 'rgba(147,51,234,0.14)',
   },
+  connectionStatusUnavailable: {
+    backgroundColor: 'rgba(245,158,11,0.16)',
+  },
   connectionStatusOffline: {
     backgroundColor: 'rgba(71,85,105,0.12)',
   },
@@ -997,6 +1018,9 @@ const styles = StyleSheet.create({
   },
   connectionStatusTextRelay: {
     color: '#7e22ce',
+  },
+  connectionStatusTextUnavailable: {
+    color: '#92400e',
   },
   connectionStatusTextOffline: {
     color: '#475569',

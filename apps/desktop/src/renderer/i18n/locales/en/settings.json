@@ -67,6 +67,7 @@
       "loginRequired": "Sign in with your phone number to continue redeeming the gift card",
       "codeSent": "SMS code sent",
       "loginSuccess": "Signed in. Continuing redeem",
+      "loginSuccessGeneric": "Signed in successfully",
       "logoutSuccess": "Signed out successfully",
       "accountStatus": "Account Status",
       "loggedInAs": "Signed in",

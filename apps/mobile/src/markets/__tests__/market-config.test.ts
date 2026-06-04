@@ -28,7 +28,7 @@ describe('mobile market configs', () => {
       'https://www.vividrop.cn/privacy',
     );
     expect(globalMarketConfig.termsUrl).toBe('https://www.vividrop.cn/terms');
-    expect(globalMarketConfig.downloadUrl).toBe('https://www.vividrop.com');
-    expect(globalMarketConfig.supportEmail).toBe('support@vividrop.com');
+    expect(globalMarketConfig.downloadUrl).toBe('https://www.vividrop.cn');
+    expect(globalMarketConfig.supportEmail).toBe('support@vividrop.cn');
   });
 });

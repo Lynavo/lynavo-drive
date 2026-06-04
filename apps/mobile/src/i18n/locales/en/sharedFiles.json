@@ -9,6 +9,7 @@
     "lan": "LAN online",
     "p2p": "P2P online",
     "relay": "Relay online",
+    "unavailable": "Remote unavailable",
     "offline": "Offline"
   },
   "emptyState": {

@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow, net } from 'electron';
 import log from 'electron-log';
 import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
@@ -120,6 +120,32 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function errorDiagnostics(error: unknown): Record<string, unknown> {
+  if (!(error instanceof Error)) {
+    return { message: String(error) };
+  }
+  const diagnostics: Record<string, unknown> = {
+    name: error.name,
+    message: error.message,
+  };
+  const record = error as Error & {
+    code?: unknown;
+    cause?: unknown;
+  };
+  if (record.code) {
+    diagnostics.code = record.code;
+  }
+  if (record.cause instanceof Error) {
+    diagnostics.cause = {
+      name: record.cause.name,
+      message: record.cause.message,
+    };
+  } else if (record.cause) {
+    diagnostics.cause = String(record.cause);
+  }
+  return diagnostics;
+}
+
 function createOAuthCallbackParams(targetUrl: string): URLSearchParams {
   const url = new URL(targetUrl);
   const params = new URLSearchParams(url.search);
@@ -238,6 +264,7 @@ async function startGoogleOAuthLoopback(
 
 async function exchangeGoogleAuthorizationCode(payload: {
   clientId: string;
+  clientSecret?: string;
   code: string;
   codeVerifier: string;
   redirectUri: string;
@@ -245,23 +272,28 @@ async function exchangeGoogleAuthorizationCode(payload: {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), OAUTH_TOKEN_EXCHANGE_TIMEOUT_MS);
   let response: Response;
+  const tokenRequestBody = new URLSearchParams({
+    client_id: payload.clientId,
+    code: payload.code,
+    code_verifier: payload.codeVerifier,
+    grant_type: 'authorization_code',
+    redirect_uri: payload.redirectUri,
+  });
+  if (payload.clientSecret) {
+    tokenRequestBody.set('client_secret', payload.clientSecret);
+  }
   try {
-    response = await fetch('https://oauth2.googleapis.com/token', {
+    response = await net.fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       signal: controller.signal,
-      body: new URLSearchParams({
-        client_id: payload.clientId,
-        code: payload.code,
-        code_verifier: payload.codeVerifier,
-        grant_type: 'authorization_code',
-        redirect_uri: payload.redirectUri,
-      }),
+      body: tokenRequestBody,
     });
   } catch (error) {
     if (controller.signal.aborted) {
       throw new Error('Google token exchange timed out');
     }
+    log.error('[auth] Google token exchange request failed.', errorDiagnostics(error));
     throw error;
   } finally {
     clearTimeout(timeout);
@@ -401,6 +433,7 @@ export function registerIpcHandlers(sidecarManager: SidecarManager): void {
               const code = await loopback.waitForCode;
               const idToken = await exchangeGoogleAuthorizationCode({
                 clientId: googleConfig.clientId,
+                clientSecret: googleConfig.clientSecret,
                 code,
                 codeVerifier,
                 redirectUri: loopback.redirectUri,

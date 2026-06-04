@@ -173,6 +173,11 @@ export function GiftCardSection() {
     }
   }, [code, performRedeem, t]);
 
+  const openAccountLogin = useCallback(() => {
+    setPendingRedeemCode('');
+    setLoginDialogOpen(true);
+  }, []);
+
   const handleLoginSuccess = useCallback(async () => {
     await refreshSession();
     if (pendingRedeemCode) {
@@ -227,7 +232,7 @@ export function GiftCardSection() {
               type="button"
               variant="secondary"
               size="sm"
-              onClick={() => setLoginDialogOpen(true)}
+              onClick={openAccountLogin}
             >
               {t('settings.giftCard.phoneLogin.login', { defaultValue: '登入' })}
             </Button>
@@ -277,6 +282,9 @@ export function GiftCardSection() {
         open={loginDialogOpen}
         onOpenChange={setLoginDialogOpen}
         onLoginSuccess={handleLoginSuccess}
+        successMessage={
+          pendingRedeemCode ? t('settings.giftCard.phoneLogin.loginSuccess') : undefined
+        }
       />
     </>
   );

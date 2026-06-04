@@ -1,5 +1,11 @@
 const { spawn, spawnSync } = require('node:child_process');
+const { existsSync } = require('node:fs');
 const path = require('node:path');
+const { VIVIDROP_REVIEW_API_BASE_URL } = require('@syncflow/contracts');
+const {
+  resolveDefaultAppleSignConfigDir,
+  resolveDefaultGoogleClientConfigDir,
+} = require('./run-electron-vite-config.cjs');
 
 const command = process.argv[2];
 const extraArgs = process.argv.slice(3);
@@ -13,7 +19,7 @@ const projectRoot = path.resolve(__dirname, '..');
 const binName = process.platform === 'win32' ? 'electron-vite.cmd' : 'electron-vite';
 const binPath = path.join(projectRoot, 'node_modules', '.bin', binName);
 const env = { ...process.env };
-const reviewApiBaseUrl = 'https://review-api.vividrop.cn';
+const reviewApiBaseUrl = VIVIDROP_REVIEW_API_BASE_URL;
 
 if (command === 'dev' && !env.SYNCFLOW_API_BASE_URL && !env.VIVIDROP_API_BASE_URL) {
   env.SYNCFLOW_API_BASE_URL = reviewApiBaseUrl;
@@ -21,6 +27,26 @@ if (command === 'dev' && !env.SYNCFLOW_API_BASE_URL && !env.VIVIDROP_API_BASE_UR
 
 if (command === 'dev' && !env.SYNCFLOW_GIFTCARD_REDEEM_BASE_URL) {
   env.SYNCFLOW_GIFTCARD_REDEEM_BASE_URL = reviewApiBaseUrl;
+}
+
+const googleClientConfigDir = resolveDefaultGoogleClientConfigDir({
+  command,
+  env,
+  existsSync,
+  projectRoot,
+});
+if (googleClientConfigDir) {
+  env.SYNCFLOW_GOOGLE_CLIENT_CONFIG_DIR = googleClientConfigDir;
+}
+
+const appleSignConfigDir = resolveDefaultAppleSignConfigDir({
+  command,
+  env,
+  existsSync,
+  projectRoot,
+});
+if (appleSignConfigDir) {
+  env.SYNCFLOW_APPLE_SIGN_CONFIG_DIR = appleSignConfigDir;
 }
 
 if (process.platform === 'win32') {

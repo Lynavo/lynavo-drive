@@ -289,7 +289,7 @@ describe('sidecarClient', () => {
     expect(httpRequest).not.toHaveBeenCalled();
     expect(httpsRequest).toHaveBeenCalledTimes(1);
     const [options] = httpsRequest.mock.calls[0] as [RequestOptions, (res: unknown) => void];
-    expect(options.hostname).toBe('global-api.vividrop.com');
+    expect(options.hostname).toBe('global-api.vividrop.cn');
     expect(options.path).toBe('/api/v1/gift-cards/redeem');
 
     vi.unstubAllEnvs();
@@ -790,7 +790,7 @@ describe('sidecarClient', () => {
     }));
 
     vi.resetModules();
-    vi.stubEnv('SYNCFLOW_AUTH_REVIEW_BASE_URL', 'https://review-api.vividrop.com');
+    vi.stubEnv('SYNCFLOW_AUTH_REVIEW_BASE_URL', 'https://review-api.vividrop.cn');
 
     const { sidecarClient: client } = await import('../sidecar-client');
 
@@ -809,12 +809,133 @@ describe('sidecarClient', () => {
     expect(httpRequest).not.toHaveBeenCalled();
     expect(httpsRequest).toHaveBeenCalledTimes(1);
     const [options] = httpsRequest.mock.calls[0] as [RequestOptions, (res: unknown) => void];
-    expect(options.hostname).toBe('review-api.vividrop.com');
+    expect(options.hostname).toBe('review-api.vividrop.cn');
     expect(options.path).toBe('/api/v1/auth/apple/login');
     expect(client.getAuthSession()).toEqual({
       accessToken: 'apple-access-token',
       refreshToken: 'apple-refresh-token',
-      baseUrl: 'https://review-api.vividrop.com',
+      baseUrl: 'https://review-api.vividrop.cn',
+    });
+
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('routes global dev OAuth login to the configured review API base URL', async () => {
+    const httpRequest = vi.fn();
+    const httpsRequest = vi.fn((options: RequestOptions, callback: (res: unknown) => void) => {
+      const req = new EventEmitter() as EventEmitter & {
+        on: typeof EventEmitter.prototype.on;
+        write: ReturnType<typeof vi.fn>;
+        end: ReturnType<typeof vi.fn>;
+      };
+      req.write = vi.fn();
+      req.end = vi.fn();
+      callback(
+        createResponse(
+          200,
+          JSON.stringify({
+            code: 0,
+            message: 'success',
+            data: {
+              access_token: 'google-access-token',
+              refresh_token: 'google-refresh-token',
+              user_id: 77,
+              is_new_user: false,
+              merged: false,
+            },
+          }),
+        ),
+      );
+      return req;
+    });
+
+    vi.doMock('node:http', () => ({
+      default: { request: httpRequest },
+      request: httpRequest,
+    }));
+    vi.doMock('node:https', () => ({
+      default: { request: httpsRequest },
+      request: httpsRequest,
+    }));
+
+    vi.resetModules();
+    vi.stubEnv('SYNCFLOW_MARKET', 'global');
+    vi.stubEnv('SYNCFLOW_API_BASE_URL', 'https://review-api.vividrop.cn');
+    vi.stubEnv('SYNCFLOW_GIFTCARD_REDEEM_BASE_URL', 'https://review-api.vividrop.cn');
+
+    const { sidecarClient: client } = await import('../sidecar-client');
+
+    await expect(client.loginWithGoogle({ identityToken: 'id-token' })).resolves.toEqual({
+      ok: true,
+      userId: 77,
+      isNewUser: false,
+      merged: false,
+    });
+
+    expect(httpRequest).not.toHaveBeenCalled();
+    expect(httpsRequest).toHaveBeenCalledTimes(1);
+    const [options] = httpsRequest.mock.calls[0] as [RequestOptions, (res: unknown) => void];
+    expect(options.hostname).toBe('review-api.vividrop.cn');
+    expect(options.path).toBe('/api/v1/auth/google/login');
+    expect(client.getAuthSession()).toEqual({
+      accessToken: 'google-access-token',
+      refreshToken: 'google-refresh-token',
+      baseUrl: 'https://review-api.vividrop.cn',
+    });
+
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('logs the selected Google auth API target and network failure diagnostics', async () => {
+    const httpRequest = vi.fn();
+    const networkError = Object.assign(
+      new Error('getaddrinfo ENOTFOUND review-api.vividrop.cn'),
+      { code: 'ENOTFOUND' },
+    );
+    const httpsRequest = vi.fn(() => {
+      const req = new EventEmitter() as EventEmitter & {
+        on: typeof EventEmitter.prototype.on;
+        write: ReturnType<typeof vi.fn>;
+        end: ReturnType<typeof vi.fn>;
+      };
+      req.write = vi.fn();
+      req.end = vi.fn(() => {
+        queueMicrotask(() => req.emit('error', networkError));
+      });
+      return req;
+    });
+
+    vi.doMock('node:http', () => ({
+      default: { request: httpRequest },
+      request: httpRequest,
+    }));
+    vi.doMock('node:https', () => ({
+      default: { request: httpsRequest },
+      request: httpsRequest,
+    }));
+
+    vi.resetModules();
+    vi.stubEnv('SYNCFLOW_MARKET', 'global');
+    vi.stubEnv('SYNCFLOW_API_BASE_URL', 'https://review-api.vividrop.cn');
+
+    const { sidecarClient: client } = await import('../sidecar-client');
+
+    await expect(client.loginWithGoogle({ identityToken: 'id-token' })).rejects.toThrow(
+      'getaddrinfo ENOTFOUND review-api.vividrop.cn',
+    );
+
+    expect(logInfoMock).toHaveBeenCalledWith('[sidecar-client] Starting Google auth login.', {
+      baseUrl: 'https://review-api.vividrop.cn',
+      path: '/api/v1/auth/google/login',
+    });
+    expect(logErrorMock).toHaveBeenCalledWith('[sidecar-client] Remote API request failed.', {
+      method: 'POST',
+      url: 'https://review-api.vividrop.cn/api/v1/auth/google/login',
+      name: 'Error',
+      message: 'getaddrinfo ENOTFOUND review-api.vividrop.cn',
+      code: 'ENOTFOUND',
     });
 
     vi.unstubAllEnvs();

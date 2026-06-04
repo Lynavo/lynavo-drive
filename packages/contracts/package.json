@@ -6,13 +6,18 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.js"
+    },
+    "./countries": {
+      "types": "./dist/countries.d.ts",
+      "import": "./dist/esm/countries.js",
+      "require": "./dist/countries.js"
     }
   },
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b && tsc -p tsconfig.esm.json",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",

@@ -13,10 +13,12 @@ describe('resolveGoogleOAuthConfig', () => {
     expect(
       resolveGoogleOAuthConfig({
         SYNCFLOW_GOOGLE_CLIENT_ID: 'desktop-client.apps.googleusercontent.com',
+        SYNCFLOW_GOOGLE_CLIENT_SECRET: 'desktop-secret',
         SYNCFLOW_GOOGLE_REDIRECT_URI: 'http://localhost/explicit',
       }),
     ).toEqual({
       clientId: 'desktop-client.apps.googleusercontent.com',
+      clientSecret: 'desktop-secret',
       redirectUri: 'http://localhost/explicit',
     });
   });
@@ -29,6 +31,7 @@ describe('resolveGoogleOAuthConfig', () => {
       JSON.stringify({
         installed: {
           client_id: 'installed-client.apps.googleusercontent.com',
+          client_secret: 'installed-secret',
           redirect_uris: ['http://localhost'],
         },
       }),
@@ -36,6 +39,7 @@ describe('resolveGoogleOAuthConfig', () => {
 
     expect(resolveGoogleOAuthConfig({ SYNCFLOW_GOOGLE_CLIENT_CONFIG_FILE: configPath })).toEqual({
       clientId: 'installed-client.apps.googleusercontent.com',
+      clientSecret: 'installed-secret',
       redirectUri: 'http://localhost',
     });
   });
@@ -55,6 +59,7 @@ describe('resolveGoogleOAuthConfig', () => {
       JSON.stringify({
         installed: {
           client_id: 'desktop-client.apps.googleusercontent.com',
+          client_secret: 'desktop-secret',
           redirect_uris: ['http://localhost'],
         },
       }),
@@ -70,6 +75,7 @@ describe('resolveGoogleOAuthConfig', () => {
 
     expect(resolveGoogleOAuthConfig({ SYNCFLOW_GOOGLE_CLIENT_CONFIG_DIR: dir })).toEqual({
       clientId: 'desktop-client.apps.googleusercontent.com',
+      clientSecret: 'desktop-secret',
       redirectUri: 'http://localhost',
     });
   });
@@ -123,8 +129,8 @@ describe('resolveAppleOAuthConfig', () => {
         'Key ID:R6CSMNCJAM',
         'Team ID: S44ANBLMF9',
         'Client ID (Services ID): com.vividrop.global.signin',
-        '测试环境(Review Server)：https://review-api.vividrop.com/auth/apple/callback',
-        '正式环境(Global Product Server)：https://global-api.vividrop.com/auth/apple/callback',
+        '测试环境(Review Server)：https://review-api.vividrop.cn/auth/apple/callback',
+        '正式环境(Global Product Server)：https://global-api.vividrop.cn/auth/apple/callback',
       ].join('\n'),
     );
     return dir;
@@ -149,7 +155,7 @@ describe('resolveAppleOAuthConfig', () => {
       }),
     ).toEqual({
       clientId: 'com.vividrop.global.signin',
-      redirectUri: 'https://global-api.vividrop.com/auth/apple/callback',
+      redirectUri: 'https://global-api.vividrop.cn/auth/apple/callback',
     });
   });
 
@@ -157,11 +163,23 @@ describe('resolveAppleOAuthConfig', () => {
     expect(
       resolveAppleOAuthConfig({
         SYNCFLOW_APPLE_SIGN_CONFIG_DIR: writeAppleSignConfig(),
-        SYNCFLOW_AUTH_BASE_URL: 'https://review-api.vividrop.com',
+        SYNCFLOW_AUTH_BASE_URL: 'https://review-api.vividrop.cn',
       }),
     ).toEqual({
       clientId: 'com.vividrop.global.signin',
-      redirectUri: 'https://review-api.vividrop.com/auth/apple/callback',
+      redirectUri: 'https://review-api.vividrop.cn/auth/apple/callback',
+    });
+  });
+
+  it('uses the review callback when the desktop API base is pointed at the review API', () => {
+    expect(
+      resolveAppleOAuthConfig({
+        SYNCFLOW_APPLE_SIGN_CONFIG_DIR: writeAppleSignConfig(),
+        SYNCFLOW_API_BASE_URL: 'https://review-api.vividrop.cn',
+      }),
+    ).toEqual({
+      clientId: 'com.vividrop.global.signin',
+      redirectUri: 'https://review-api.vividrop.cn/auth/apple/callback',
     });
   });
 
@@ -169,11 +187,11 @@ describe('resolveAppleOAuthConfig', () => {
     expect(
       resolveAppleOAuthConfig({
         SYNCFLOW_APPLE_SIGN_CONFIG_DIR: writeAppleSignConfig(),
-        SYNCFLOW_AUTH_REVIEW_BASE_URL: 'https://review-api.vividrop.com',
+        SYNCFLOW_AUTH_REVIEW_BASE_URL: 'https://review-api.vividrop.cn',
       }),
     ).toEqual({
       clientId: 'com.vividrop.global.signin',
-      redirectUri: 'https://review-api.vividrop.com/auth/apple/callback',
+      redirectUri: 'https://review-api.vividrop.cn/auth/apple/callback',
     });
   });
 
@@ -185,7 +203,7 @@ describe('resolveAppleOAuthConfig', () => {
       }),
     ).toEqual({
       clientId: 'com.vividrop.global.signin',
-      redirectUri: 'https://review-api.vividrop.com/auth/apple/callback',
+      redirectUri: 'https://review-api.vividrop.cn/auth/apple/callback',
     });
   });
 
@@ -194,7 +212,7 @@ describe('resolveAppleOAuthConfig', () => {
 
     expect(resolveAppleOAuthConfig()).toEqual({
       clientId: 'com.vividrop.global.signin',
-      redirectUri: 'https://global-api.vividrop.com/auth/apple/callback',
+      redirectUri: 'https://global-api.vividrop.cn/auth/apple/callback',
     });
   });
 });

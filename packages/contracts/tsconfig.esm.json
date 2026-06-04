@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist/esm",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "tsBuildInfoFile": "dist/esm/tsconfig.esm.tsbuildinfo"
+  },
+  "include": ["src/countries.ts"]
+}

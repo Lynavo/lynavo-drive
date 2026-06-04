@@ -3,7 +3,8 @@ import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
-import { COUNTRY_CODES, type CountryCodeInfo } from '@syncflow/contracts';
+import * as countryContracts from '@syncflow/contracts/countries';
+import type { CountryCodeInfo } from '@syncflow/contracts';
 import { isGlobalMarket } from '@renderer/../shared/market';
 import { Button } from '@renderer/components/ui/button';
 import { Input } from '@renderer/components/ui/input';
@@ -67,6 +68,34 @@ type OAuthProvider = 'google' | 'apple';
 
 const COUNTRY_CODE_STORAGE_KEY = 'syncflow.desktop.login.countryCode';
 const DEFAULT_COUNTRY_ISO = 'CN';
+
+type ContractsRuntime = {
+  COUNTRY_CODES?: readonly CountryCodeInfo[];
+  default?: unknown;
+};
+
+function findCountryCodesExport(value: unknown, depth = 0): readonly CountryCodeInfo[] | null {
+  if ((!value || (typeof value !== 'object' && typeof value !== 'function')) || depth > 4) {
+    return null;
+  }
+
+  const runtime = value as ContractsRuntime;
+  if (Array.isArray(runtime.COUNTRY_CODES)) {
+    return runtime.COUNTRY_CODES;
+  }
+
+  return findCountryCodesExport(runtime.default, depth + 1);
+}
+
+function getCountryCodes(): readonly CountryCodeInfo[] {
+  const countryCodes = findCountryCodesExport(countryContracts);
+  if (!countryCodes) {
+    throw new Error('COUNTRY_CODES is unavailable from @syncflow/contracts');
+  }
+  return countryCodes;
+}
+
+const COUNTRY_CODES = getCountryCodes();
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -258,6 +287,7 @@ type LoginDialogProps = {
   onLoginSuccess: () => void;
   title?: string;
   description?: string;
+  successMessage?: string;
 };
 
 export function LoginDialog({
@@ -266,6 +296,7 @@ export function LoginDialog({
   onLoginSuccess,
   title,
   description,
+  successMessage,
 }: LoginDialogProps) {
   const { t, i18n } = useTranslation();
   const isGlobal = isGlobalMarket();
@@ -394,7 +425,7 @@ export function LoginDialog({
         code: trimmedSMSCode,
       });
       if (result.ok) {
-        toast.success(t('settings.giftCard.phoneLogin.loginSuccess'));
+        toast.success(successMessage || t('settings.giftCard.phoneLogin.loginSuccessGeneric'));
         onOpenChange(false);
         setSMSCode('');
         onLoginSuccess();
@@ -408,7 +439,7 @@ export function LoginDialog({
     } finally {
       setIsLoggingIn(false);
     }
-  }, [phone, smsCode, getFormattedPhone, onOpenChange, onLoginSuccess, t]);
+  }, [phone, smsCode, getFormattedPhone, onOpenChange, onLoginSuccess, successMessage, t]);
 
   const handleOAuthLogin = useCallback(
     async (provider: OAuthProvider) => {
@@ -422,7 +453,7 @@ export function LoginDialog({
       try {
         const result: AuthResult = await auth.loginWithOAuth({ provider });
         if (result.ok) {
-          toast.success(t('settings.giftCard.phoneLogin.loginSuccess'));
+          toast.success(successMessage || t('settings.giftCard.phoneLogin.loginSuccessGeneric'));
           onOpenChange(false);
           onLoginSuccess();
         } else {
@@ -439,7 +470,7 @@ export function LoginDialog({
         setIsLoggingIn(false);
       }
     },
-    [onOpenChange, onLoginSuccess, t],
+    [onOpenChange, onLoginSuccess, successMessage, t],
   );
 
   return (

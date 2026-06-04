@@ -71,6 +71,7 @@ vi.mock('electron', () => ({
       handlers.set(channel, handler);
     }),
   },
+  net: { fetch: vi.fn() },
   shell: { openExternal: vi.fn(), openPath: vi.fn() },
 }));
 
@@ -290,9 +291,9 @@ describe('registerIpcHandlers', () => {
 
   it('runs Google OAuth through system browser loopback and syncs credentials', async () => {
     vi.stubEnv('GOOGLE_CLIENT_ID', 'desktop-client.apps.googleusercontent.com');
+    vi.stubEnv('GOOGLE_CLIENT_SECRET', 'desktop-secret');
     vi.mocked(sidecarClient.loginWithGoogle).mockResolvedValue({ ok: true });
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
+    const fetchMock = vi.mocked((await import('electron')).net.fetch);
 
     const manager = {
       retryStart: vi.fn(),
@@ -324,7 +325,7 @@ describe('registerIpcHandlers', () => {
       json: vi.fn().mockResolvedValue({
         id_token: idToken,
       }),
-    });
+    } as unknown as Response);
     await requestLocalUrl(`${redirectUri}?code=google-code&state=${state}`);
 
     await expect(loginPromise).resolves.toEqual({ ok: true });
@@ -337,6 +338,7 @@ describe('registerIpcHandlers', () => {
     const tokenRequest = fetchMock.mock.calls[0]?.[1] as { body: URLSearchParams };
     expect(tokenRequest.body.get('grant_type')).toBe('authorization_code');
     expect(tokenRequest.body.get('code')).toBe('google-code');
+    expect(tokenRequest.body.get('client_secret')).toBe('desktop-secret');
     expect(sidecarClient.loginWithGoogle).toHaveBeenCalledWith({
       identityToken: idToken,
     });
@@ -346,10 +348,7 @@ describe('registerIpcHandlers', () => {
 
   it('runs Apple OAuth form_post through BrowserWindow and syncs credentials', async () => {
     vi.stubEnv('SYNCFLOW_APPLE_CLIENT_ID', 'com.vividrop.global.signin');
-    vi.stubEnv(
-      'SYNCFLOW_APPLE_REDIRECT_URI',
-      'https://global-api.vividrop.com/auth/apple/callback',
-    );
+    vi.stubEnv('SYNCFLOW_APPLE_REDIRECT_URI', 'https://global-api.vividrop.cn/auth/apple/callback');
     vi.mocked(sidecarClient.loginWithApple).mockResolvedValue({ ok: true });
 
     const manager = {

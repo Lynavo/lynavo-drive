@@ -67,6 +67,7 @@
       "loginRequired": "请先用手机号登入后继续兑换礼品卡",
       "codeSent": "验证码已发送",
       "loginSuccess": "登入成功，正在继续兑换",
+      "loginSuccessGeneric": "登入成功",
       "logoutSuccess": "已成功登出",
       "accountStatus": "账号状态",
       "loggedInAs": "已登入",

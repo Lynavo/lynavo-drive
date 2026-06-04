@@ -6,6 +6,7 @@ import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs
 import { hostname, networkInterfaces, release, tmpdir, type } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
+import { VIVIDROP_API_BASE_URL, VIVIDROP_REVIEW_API_BASE_URL } from '@syncflow/contracts';
 import { desktopClientHeaders, getAppInfo, type AppInfo } from './app-info';
 import { sidecarClient } from './sidecar-client';
 import type { SidecarManager } from './sidecar-manager';
@@ -377,7 +378,7 @@ async function listDesktopLogFiles(activeLogPath: string): Promise<string[]> {
 }
 
 function defaultApiBaseUrl(): string {
-  return app.isPackaged ? 'https://api.vividrop.cn' : 'https://review-api.vividrop.cn';
+  return app.isPackaged ? VIVIDROP_API_BASE_URL : VIVIDROP_REVIEW_API_BASE_URL;
 }
 
 function configuredApiBase(): { baseUrl: string; source: string } {

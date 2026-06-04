@@ -357,7 +357,8 @@ describe('SharedFilesScreen download progress', () => {
         connectionState: 'offline',
       });
     });
-    expect(getByText('Device Unavailable')).toBeTruthy();
+    expect(getByText('Remote unavailable')).toBeTruthy();
+    expect(getByText('Failed to Load')).toBeTruthy();
 
     await act(async () => {
       nativeListeners.get('onBindingStateChanged')?.({
@@ -398,7 +399,8 @@ describe('SharedFilesScreen download progress', () => {
           connectionState: 'offline',
         });
       });
-      expect(getByText('Device Unavailable')).toBeTruthy();
+      expect(getByText('Remote unavailable')).toBeTruthy();
+      expect(getByText('Failed to Load')).toBeTruthy();
 
       await act(async () => {
         jest.runOnlyPendingTimers();
@@ -413,7 +415,7 @@ describe('SharedFilesScreen download progress', () => {
     }
   });
 
-  test('marks shared files offline when an offline binding event carries stale tunnel reachability', async () => {
+  test('marks shared files remote unavailable when an offline binding event carries stale tunnel reachability', async () => {
     (useAuth as jest.Mock).mockReturnValue({
       subscription: { status: 'trialing' },
       loadSubscription: jest.fn(),
@@ -444,8 +446,30 @@ describe('SharedFilesScreen download progress', () => {
       });
     });
 
-    expect(getByText('Offline')).toBeTruthy();
-    expect(getByText('Device Unavailable')).toBeTruthy();
+    expect(getByText('Remote unavailable')).toBeTruthy();
+    expect(getByText('Failed to Load')).toBeTruthy();
+  });
+
+  test('shows remote unavailable instead of offline when a paired device loses LAN reachability', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      subscription: { status: 'trialing' },
+      loadSubscription: jest.fn(),
+    });
+
+    const { getByText, getByTestId, queryByText } = render(<SharedFilesScreen />);
+
+    await waitFor(() => getByTestId('shared-file-download-button'));
+
+    await act(async () => {
+      nativeListeners.get('onBindingStateChanged')?.({
+        deviceId: 'device-1',
+        connectionState: 'offline',
+      });
+    });
+
+    expect(getByText('Remote unavailable')).toBeTruthy();
+    expect(queryByText('Offline')).toBeNull();
+    expect(getByText('Failed to Load')).toBeTruthy();
   });
 
   test('reloads files when shared files reachability becomes available while binding remains offline', async () => {
@@ -466,7 +490,8 @@ describe('SharedFilesScreen download progress', () => {
         connectionState: 'offline',
       });
     });
-    expect(getByText('Device Unavailable')).toBeTruthy();
+    expect(getByText('Remote unavailable')).toBeTruthy();
+    expect(getByText('Failed to Load')).toBeTruthy();
 
     await act(async () => {
       nativeListeners.get('onSharedFilesReachabilityChanged')?.({

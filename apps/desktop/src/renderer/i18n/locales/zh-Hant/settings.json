@@ -67,6 +67,7 @@
       "loginRequired": "請先用手機號碼登入後繼續兌換禮品卡",
       "codeSent": "驗證碼已傳送",
       "loginSuccess": "登入成功，正在繼續兌換",
+      "loginSuccessGeneric": "登入成功",
       "logoutSuccess": "已成功登出",
       "accountStatus": "帳號狀態",
       "loggedInAs": "已登入",

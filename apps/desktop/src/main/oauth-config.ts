@@ -1,9 +1,11 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { VIVIDROP_APPLE_GLOBAL_REDIRECT_URI } from '@syncflow/contracts';
 import { isGlobalMarket } from '../shared/market';
 
 export type GoogleOAuthConfig = {
   clientId: string;
+  clientSecret?: string;
   redirectUri: string;
 };
 
@@ -15,10 +17,12 @@ export type AppleOAuthConfig = {
 type GoogleClientFile = {
   installed?: {
     client_id?: string;
+    client_secret?: string;
     redirect_uris?: string[];
   };
   web?: {
     client_id?: string;
+    client_secret?: string;
     redirect_uris?: string[];
   };
 };
@@ -38,7 +42,7 @@ const DEFAULT_GOOGLE_REDIRECT_URI = 'http://localhost';
 const GLOBAL_GOOGLE_DESKTOP_CLIENT_ID =
   '318131526906-9iivkqid8imviaa3gj0i6kmer54tn5n5.apps.googleusercontent.com';
 const GLOBAL_APPLE_CLIENT_ID = 'com.vividrop.global.signin';
-const GLOBAL_APPLE_REDIRECT_URI = 'https://global-api.vividrop.com/auth/apple/callback';
+const GLOBAL_APPLE_REDIRECT_URI = VIVIDROP_APPLE_GLOBAL_REDIRECT_URI;
 
 function firstNonEmpty(...values: Array<string | undefined>): string {
   for (const value of values) {
@@ -55,6 +59,7 @@ function readGoogleClientFile(path: string): Partial<GoogleOAuthConfig> {
   const client = parsed.installed ?? parsed.web;
   return {
     clientId: client?.client_id?.trim(),
+    clientSecret: client?.client_secret?.trim(),
     redirectUri: client?.redirect_uris?.find((uri) => uri.trim())?.trim(),
   };
 }
@@ -233,6 +238,12 @@ export function resolveGoogleOAuthConfig(env: NodeJS.ProcessEnv = process.env): 
       fileConfig.clientId,
       isGlobalMarket() ? GLOBAL_GOOGLE_DESKTOP_CLIENT_ID : undefined,
     ),
+    clientSecret:
+      firstNonEmpty(
+        env.SYNCFLOW_GOOGLE_CLIENT_SECRET,
+        env.GOOGLE_CLIENT_SECRET,
+        fileConfig.clientSecret,
+      ) || undefined,
     redirectUri: firstNonEmpty(
       env.SYNCFLOW_GOOGLE_REDIRECT_URI,
       env.GOOGLE_REDIRECT_URI,

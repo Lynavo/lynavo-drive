@@ -151,6 +151,52 @@ describe('LoginDialog', () => {
     });
   });
 
+  it('shows the generic success message by default', async () => {
+    const loginWithSMSCode = vi.fn().mockResolvedValue({ ok: true });
+    setAuthAPI({ loginWithSMSCode });
+
+    renderLoginDialog();
+
+    fireEvent.change(screen.getByLabelText('手机号'), {
+      target: { value: '13800138000' },
+    });
+    fireEvent.change(screen.getByLabelText('验证码'), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '登入' }));
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('登入成功');
+    });
+    expect(toast.success).not.toHaveBeenCalledWith('登入成功，正在继续兑换');
+  });
+
+  it('uses a custom success message for contextual login flows', async () => {
+    const loginWithSMSCode = vi.fn().mockResolvedValue({ ok: true });
+    setAuthAPI({ loginWithSMSCode });
+
+    render(
+      <LoginDialog
+        open
+        onOpenChange={vi.fn()}
+        onLoginSuccess={vi.fn()}
+        successMessage="登入成功，正在继续兑换"
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('手机号'), {
+      target: { value: '13800138000' },
+    });
+    fireEvent.change(screen.getByLabelText('验证码'), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '登入' }));
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('登入成功，正在继续兑换');
+    });
+  });
+
   it('uses i18n for OAuth fallback errors', async () => {
     vi.stubEnv('SYNCFLOW_MARKET', 'global');
     await i18n.changeLanguage('zh-Hant');

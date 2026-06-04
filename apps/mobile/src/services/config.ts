@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { VIVIDROP_REVIEW_API_BASE_URL } from '@syncflow/contracts';
 
 import { marketConfig } from '../markets';
 import { releaseApiBaseUrl } from '../release-profile';
@@ -36,7 +37,7 @@ export const APP_REVIEW_PHONE = marketConfig.appReviewPhone;
 
 // Default backend for normal debug sessions. Use setDebugBaseUrlOverride() for
 // temporary per-device overrides without changing this shared default.
-export const DEV_API_BASE_URL: string = 'https://review-api.vividrop.cn';
+export const DEV_API_BASE_URL: string = VIVIDROP_REVIEW_API_BASE_URL;
 
 const DEBUG_OVERRIDE_STORAGE_KEY = '@vividrop/debug/api_base_url';
 const SESSION_BASE_URL_STORAGE_KEY = '@vividrop/auth/api_base_url';

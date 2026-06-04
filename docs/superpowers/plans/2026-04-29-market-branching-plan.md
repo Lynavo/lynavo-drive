@@ -48,11 +48,11 @@ Global market:
   MARKET=global
   Mobile bundle/application id: com.vividrop.mobile.global
   Desktop appId: com.vividrop.desktop.global
-  API base URL: https://api.vividrop.com
-  Review API base URL: https://review-api.vividrop.com
+  API base URL: https://api.vividrop.cn
+  Review API base URL: https://review-api.vividrop.cn
   Legal URLs:
-    https://www.vividrop.com/terms
-    https://www.vividrop.com/privacy
+    https://www.vividrop.cn/terms
+    https://www.vividrop.cn/privacy
   Login providers: apple, google
 ```
 
@@ -205,10 +205,10 @@ describe('mobile market configs', () => {
   it('keeps global build on Apple and Google login with global endpoints', () => {
     expect(globalMarketConfig.market).toBe('global');
     expect(globalMarketConfig.loginProviders).toEqual(['apple', 'google']);
-    expect(globalMarketConfig.apiBaseUrl).toBe('https://api.vividrop.com');
-    expect(globalMarketConfig.reviewApiBaseUrl).toBe('https://review-api.vividrop.com');
-    expect(globalMarketConfig.privacyUrl).toBe('https://www.vividrop.com/privacy');
-    expect(globalMarketConfig.termsUrl).toBe('https://www.vividrop.com/terms');
+    expect(globalMarketConfig.apiBaseUrl).toBe('https://api.vividrop.cn');
+    expect(globalMarketConfig.reviewApiBaseUrl).toBe('https://review-api.vividrop.cn');
+    expect(globalMarketConfig.privacyUrl).toBe('https://www.vividrop.cn/privacy');
+    expect(globalMarketConfig.termsUrl).toBe('https://www.vividrop.cn/terms');
   });
 });
 ```
@@ -297,11 +297,11 @@ export const globalMarketConfig: MobileMarketConfig = {
   market: 'global',
   appName: 'Vivi Drop',
   bundleId: 'com.vividrop.mobile.global',
-  apiBaseUrl: 'https://api.vividrop.com',
-  reviewApiBaseUrl: 'https://review-api.vividrop.com',
+  apiBaseUrl: 'https://api.vividrop.cn',
+  reviewApiBaseUrl: 'https://review-api.vividrop.cn',
   appReviewPhone: '17000000002',
-  privacyUrl: 'https://www.vividrop.com/privacy',
-  termsUrl: 'https://www.vividrop.com/terms',
+  privacyUrl: 'https://www.vividrop.cn/privacy',
+  termsUrl: 'https://www.vividrop.cn/terms',
   loginProviders: ['apple', 'google'],
   theme: {
     primary: '#3f5fdb',
@@ -867,8 +867,8 @@ Global config:
 export const globalDesktopMarketConfig = {
   market: 'global',
   appName: 'Vivi Drop',
-  privacyUrl: 'https://www.vividrop.com/privacy',
-  termsUrl: 'https://www.vividrop.com/terms',
+  privacyUrl: 'https://www.vividrop.cn/privacy',
+  termsUrl: 'https://www.vividrop.cn/terms',
 } as const;
 ```
 
