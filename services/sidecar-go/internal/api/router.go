@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log/slog"
 	"net/http"
 	"sync"
 
@@ -43,6 +44,28 @@ func (s *Server) StopTunnel() {
 		s.tunnel.Stop()
 		s.tunnel = nil
 	}
+}
+
+func (s *Server) RefreshTunnelPairings(reason string) {
+	pairedDevices, err := s.pairedDevicesForSignaling()
+	if err != nil {
+		slog.Error("failed to refresh paired devices for p2p tunnel", "reason", reason, "err", err)
+		return
+	}
+
+	s.tunnelMu.Lock()
+	tunnel := s.tunnel
+	s.tunnelMu.Unlock()
+
+	if tunnel == nil {
+		slog.Debug("sync tunnel paired devices refresh skipped; tunnel not running", "reason", reason, "pairedDevices", len(pairedDevices))
+		return
+	}
+	if err := tunnel.UpdatePairedDevices(pairedDevices); err != nil {
+		slog.Warn("sync tunnel paired devices refresh failed", "reason", reason, "pairedDevices", len(pairedDevices), "err", err)
+		return
+	}
+	slog.Info("sync tunnel paired devices refreshed", "reason", reason, "pairedDevices", len(pairedDevices))
 }
 
 // NewServer creates a new HTTP handler with all API routes registered.

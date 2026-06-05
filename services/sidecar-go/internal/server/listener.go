@@ -26,6 +26,8 @@ type TCPServer struct {
 
 	mu               sync.RWMutex
 	connectedClients map[string]string // clientID → state ("authenticated"|"syncing")
+
+	OnPairedDevicesChanged func(reason string)
 }
 
 type PresenceStateProvider interface {

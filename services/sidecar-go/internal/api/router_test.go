@@ -2535,3 +2535,77 @@ func TestSyncTunnelCredentialsStartsDesktopSignaling(t *testing.T) {
 		t.Fatal("desktop signaling registration was not sent")
 	}
 }
+
+func TestRefreshTunnelPairingsResendsDesktopRegistration(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	insertPairedDeviceWithOptionalStableID(t, st, "mobile-1", "iPhone", "iPhone", nil, time.Now().UTC().Format(time.RFC3339))
+
+	registerCh := make(chan map[string]any, 2)
+	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	signalingSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/tunnel/signaling" {
+			http.NotFound(w, r)
+			return
+		}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+
+		for {
+			_, msg, err := conn.ReadMessage()
+			if err != nil {
+				return
+			}
+			var payload map[string]any
+			if err := json.Unmarshal(msg, &payload); err != nil {
+				continue
+			}
+			if payload["type"] == "register_desktop" {
+				registerCh <- payload
+			}
+		}
+	}))
+	defer signalingSrv.Close()
+
+	apiSrv, handler := api.NewServer(st, cfg, hub, nil)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+	t.Cleanup(func() {
+		_, _ = http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(`{"signalingUrl":"","accessToken":"","iceServers":[]}`))
+	})
+
+	reqBody := `{"signalingUrl":"` + signalingSrv.URL + `","accessToken":"token","iceServers":[]}`
+	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("POST /tunnel/credentials: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	select {
+	case payload := <-registerCh:
+		paired, ok := payload["pairedDevices"].([]any)
+		if !ok || len(paired) != 1 {
+			t.Fatalf("initial pairedDevices=%#v, want one device", payload["pairedDevices"])
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("initial desktop registration was not sent")
+	}
+
+	insertPairedDeviceWithOptionalStableID(t, st, "mobile-2", "iPad", "iPad", nil, time.Now().UTC().Format(time.RFC3339))
+	apiSrv.RefreshTunnelPairings("test")
+
+	select {
+	case payload := <-registerCh:
+		paired, ok := payload["pairedDevices"].([]any)
+		if !ok || len(paired) != 2 {
+			t.Fatalf("refreshed pairedDevices=%#v, want two devices", payload["pairedDevices"])
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("refreshed desktop registration was not sent")
+	}
+}

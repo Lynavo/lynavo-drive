@@ -244,6 +244,72 @@ func TestP2PEndToEndYamuxTunnel(t *testing.T) {
 	readLoopWG.Wait()
 }
 
+func TestP2PManagerUpdatePairedDevicesRefreshesActiveRegistration(t *testing.T) {
+	registrations := make(chan map[string]any, 2)
+	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	signalingSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+
+		for {
+			_, msgBytes, err := conn.ReadMessage()
+			if err != nil {
+				return
+			}
+			var payload map[string]any
+			if err := json.Unmarshal(msgBytes, &payload); err != nil {
+				continue
+			}
+			if payload["type"] == "register_desktop" {
+				registrations <- payload
+			}
+		}
+	}))
+	defer signalingSrv.Close()
+
+	m := NewP2PManager("desktop-123", signalingSrv.URL, "127.0.0.1:39394", "test-token")
+	m.Start(nil)
+	defer m.Stop()
+
+	select {
+	case payload := <-registrations:
+		if paired, ok := payload["pairedDevices"].([]any); !ok || len(paired) != 0 {
+			t.Fatalf("initial pairedDevices=%#v, want empty list", payload["pairedDevices"])
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("initial desktop registration was not sent")
+	}
+
+	if err := m.UpdatePairedDevices([]map[string]string{
+		{"clientId": "mobile-123", "pairingToken": "hash-mobile-123"},
+	}); err != nil {
+		t.Fatalf("UpdatePairedDevices: %v", err)
+	}
+
+	select {
+	case payload := <-registrations:
+		paired, ok := payload["pairedDevices"].([]any)
+		if !ok || len(paired) != 1 {
+			t.Fatalf("refreshed pairedDevices=%#v, want one device", payload["pairedDevices"])
+		}
+		first, ok := paired[0].(map[string]any)
+		if !ok {
+			t.Fatalf("refreshed pairedDevices[0]=%#v", paired[0])
+		}
+		if first["clientId"] != "mobile-123" {
+			t.Fatalf("refreshed clientId=%v, want mobile-123", first["clientId"])
+		}
+		if first["pairingToken"] != "hash-mobile-123" {
+			t.Fatalf("refreshed pairingToken=%v, want stored hash", first["pairingToken"])
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("refreshed desktop registration was not sent")
+	}
+}
+
 func TestP2PManagerReplacesPeerConnectionOnRepeatedOffer(t *testing.T) {
 	mockLocalHTTPSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

@@ -12,6 +12,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/yamux"
+	"github.com/nicksyncflow/sidecar/internal/wsdial"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -23,6 +24,10 @@ type P2PManager struct {
 	iceServers   []webrtc.ICEServer
 	signalingCtx context.Context
 	cancel       context.CancelFunc
+
+	mu            sync.Mutex
+	pairedDevices []map[string]string
+	signalingConn *safeWriteConn
 }
 
 const DefaultSTUNServer = "stun:stun.cloudflare.com:3478"
@@ -346,14 +351,36 @@ func summarizeICECandidateInit(candidate webrtc.ICECandidateInit) (string, strin
 }
 
 func (m *P2PManager) Start(pairedDevices []map[string]string) {
-	go m.connectSignaling(pairedDevices)
+	m.mu.Lock()
+	m.pairedDevices = clonePairedDevices(pairedDevices)
+	m.mu.Unlock()
+	go m.connectSignaling()
 }
 
 func (m *P2PManager) Stop() {
 	m.cancel()
 }
 
-func (m *P2PManager) connectSignaling(paired []map[string]string) {
+func (m *P2PManager) UpdatePairedDevices(pairedDevices []map[string]string) error {
+	paired := clonePairedDevices(pairedDevices)
+
+	m.mu.Lock()
+	m.pairedDevices = paired
+	conn := m.signalingConn
+	m.mu.Unlock()
+
+	if conn == nil {
+		return nil
+	}
+	if err := m.sendDesktopRegistration(conn, paired); err != nil {
+		slog.Warn("failed to refresh desktop signaling paired devices", "pairedDevices", len(paired), "err", err)
+		return err
+	}
+	slog.Info("desktop signaling paired devices refreshed", "pairedDevices", len(paired))
+	return nil
+}
+
+func (m *P2PManager) connectSignaling() {
 	slog.Info("connectSignaling entry point reached", "serverURL", m.serverURL, "desktopID", m.desktopID)
 	dialer := websocket.Dialer{HandshakeTimeout: 10 * time.Second}
 
@@ -364,7 +391,7 @@ func (m *P2PManager) connectSignaling(paired []map[string]string) {
 		wsURL = "ws://" + strings.TrimPrefix(wsURL, "http://")
 	}
 	url := wsURL + "/api/v1/tunnel/signaling?role=desktop&clientId=" + m.desktopID + "&token=" + m.authToken
-	slog.Info("connectSignaling constructed dial URL", "url", url)
+	slog.Info("connectSignaling constructed dial URL", "serverURL", wsURL, "clientId", m.desktopID, "hasToken", m.authToken != "")
 
 	backoff := time.Second
 	const maxBackoff = 60 * time.Second
@@ -378,10 +405,11 @@ func (m *P2PManager) connectSignaling(paired []map[string]string) {
 		}
 
 		slog.Info("connectSignaling calling dialer.Dial")
-		conn, _, err := dialer.Dial(url, nil)
-		slog.Info("connectSignaling dialer.Dial completed", "err", err)
+		conn, resp, err := dialer.Dial(url, nil)
+		dialErr := wsdial.DescribeDialFailure(err, resp)
+		slog.Info("connectSignaling dialer.Dial completed", "err", dialErr)
 		if err != nil {
-			slog.Warn("signaling dial failed, retrying", "backoff", backoff, "err", err)
+			slog.Warn("signaling dial failed, retrying", "backoff", backoff, "err", dialErr)
 			select {
 			case <-time.After(backoff):
 			case <-m.signalingCtx.Done():
@@ -393,17 +421,17 @@ func (m *P2PManager) connectSignaling(paired []map[string]string) {
 		backoff = time.Second // reset on successful connect
 
 		sConn := &safeWriteConn{conn: conn}
+		m.setActiveSignalingConn(sConn)
 
-		// Report pairing list
-		regPayload := map[string]interface{}{
-			"type":          "register_desktop",
-			"clientId":      m.desktopID,
-			"pairedDevices": paired,
+		if err := m.sendDesktopRegistration(sConn, m.currentPairedDevices()); err != nil {
+			slog.Warn("failed to register desktop signaling session", "err", err)
+			conn.Close()
+			m.clearActiveSignalingConn(sConn)
+			continue
 		}
-		regBytes, _ := json.Marshal(regPayload)
-		sConn.WriteMessage(websocket.TextMessage, regBytes)
 
 		m.handleSignalingSession(sConn)
+		m.clearActiveSignalingConn(sConn)
 		conn.Close()
 
 		// Brief pause before reconnecting after a clean session end
@@ -413,6 +441,51 @@ func (m *P2PManager) connectSignaling(paired []map[string]string) {
 			return
 		}
 	}
+}
+
+func (m *P2PManager) currentPairedDevices() []map[string]string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return clonePairedDevices(m.pairedDevices)
+}
+
+func (m *P2PManager) setActiveSignalingConn(conn *safeWriteConn) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.signalingConn = conn
+}
+
+func (m *P2PManager) clearActiveSignalingConn(conn *safeWriteConn) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.signalingConn == conn {
+		m.signalingConn = nil
+	}
+}
+
+func (m *P2PManager) sendDesktopRegistration(conn *safeWriteConn, paired []map[string]string) error {
+	regPayload := map[string]interface{}{
+		"type":          "register_desktop",
+		"clientId":      m.desktopID,
+		"pairedDevices": paired,
+	}
+	regBytes, err := json.Marshal(regPayload)
+	if err != nil {
+		return err
+	}
+	return conn.WriteMessage(websocket.TextMessage, regBytes)
+}
+
+func clonePairedDevices(devices []map[string]string) []map[string]string {
+	cloned := make([]map[string]string, 0, len(devices))
+	for _, device := range devices {
+		next := make(map[string]string, len(device))
+		for key, value := range device {
+			next[key] = value
+		}
+		cloned = append(cloned, next)
+	}
+	return cloned
 }
 
 func (m *P2PManager) handleSignalingSession(sConn *safeWriteConn) {

@@ -374,6 +374,9 @@ func (c *connection) handlePair(body []byte) error {
 	c.state = stateAuthenticated
 	if c.server != nil {
 		c.server.SetClientState(c.clientID, "connected")
+		if onPairedDevicesChanged := c.server.OnPairedDevicesChanged; onPairedDevicesChanged != nil {
+			go onPairedDevicesChanged("device_paired")
+		}
 	}
 	return nil
 }

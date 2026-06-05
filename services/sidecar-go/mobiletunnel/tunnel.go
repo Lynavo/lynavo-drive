@@ -14,6 +14,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/yamux"
 	"github.com/nicksyncflow/sidecar/internal/protocol"
+	"github.com/nicksyncflow/sidecar/internal/wsdial"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -463,9 +464,9 @@ func (t *Tunnel) runSignalingAndBridge(signalingURL, clientID, targetClientID, t
 		default:
 		}
 
-		conn, _, err := dialer.Dial(url, nil)
+		conn, resp, err := dialer.Dial(url, nil)
 		if err != nil {
-			tunnelWarn("mobile signaling dial failed, retrying in 5s", "err", err)
+			tunnelWarn("mobile signaling dial failed, retrying in 5s", "err", wsdial.DescribeDialFailure(err, resp))
 			select {
 			case <-time.After(5 * time.Second):
 				continue
