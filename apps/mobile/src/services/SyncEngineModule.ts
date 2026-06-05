@@ -167,7 +167,8 @@ export async function browseSharedFiles(
 }
 
 function getCurrentAccessToken(): string {
-  const authStore = require('../stores/auth-store') as typeof import('../stores/auth-store');
+  const authStore =
+    require('../stores/auth-store') as typeof import('../stores/auth-store');
   return authStore.getAccessToken() ?? '';
 }
 
@@ -206,6 +207,18 @@ export async function getDirectoryFileStreamUrl(
   path: string,
 ): Promise<string> {
   const result = await NativeSyncEngine.getSharedFileStreamUrl(
+    scope,
+    path,
+    scope === 'personal' ? getCurrentAccessToken() : '',
+  );
+  return result as string;
+}
+
+export async function prepareDirectoryFilePreview(
+  scope: DirectoryScope,
+  path: string,
+): Promise<string> {
+  const result = await NativeSyncEngine.prepareSharedFilePreview(
     scope,
     path,
     scope === 'personal' ? getCurrentAccessToken() : '',

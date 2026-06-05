@@ -7401,6 +7401,75 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         return sharedFilesService.getStreamUrl(scope: scope, path: path, accessToken: accessToken)?.absoluteString
     }
 
+    func prepareSharedFilePreview(scope scopeRaw: String, path: String, accessToken: String) async throws -> String {
+        let scope = SharedDirectoryScope(rawValue: scopeRaw) ?? .team
+        var route = await prepareSharedFilesRoute(reason: "preview_shared_file")
+        slog("[SharedFiles] prepareSharedFilePreview scope=%@ path=%@ resolved_host=%@ is_tunnel=%@", scope.rawValue, path, route.host, String(route.isTunnel))
+        syncDiagnosticsLog("SharedFiles", "prepareSharedFilePreview scope=\(scope.rawValue) path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
+
+        var previewURL: URL?
+        var lastError: Error?
+        for attempt in 1...SharedFilesRoutePolicy.sharedFileDownloadMaxAttempts {
+            let reason = attempt == 1 ? "preview_shared_file" : "preview_shared_file_retry"
+            do {
+                previewURL = try await withSharedFileTunnelOperation(
+                    path: path,
+                    reason: reason,
+                    isTunnelRoute: route.isTunnel
+                ) {
+                    try await sharedFilesService.downloadFileForPreview(scope: scope, path: path, accessToken: accessToken)
+                }
+                syncDiagnosticsLog(
+                    "SharedFiles",
+                    "prepareSharedFilePreview completed path=\(path) attempt=\(attempt) is_tunnel=\(route.isTunnel)"
+                )
+                break
+            } catch {
+                lastError = error
+                syncDiagnosticsLog(
+                    "SharedFiles",
+                    "prepareSharedFilePreview attempt failed path=\(path) attempt=\(attempt) max_attempts=\(SharedFilesRoutePolicy.sharedFileDownloadMaxAttempts) is_tunnel=\(route.isTunnel) error=\(error)"
+                )
+                guard SharedFilesRoutePolicy.shouldRetrySharedFileDownloadFailure(
+                    isLocalSaveFailure: error is SharedFileLocalSaveError
+                ) else {
+                    throw error
+                }
+                guard attempt < SharedFilesRoutePolicy.sharedFileDownloadMaxAttempts else {
+                    throw error
+                }
+                if SharedFilesRoutePolicy.shouldRetryDownloadOnTunnelAfterFailure(isTunnelRoute: route.isTunnel) {
+                    route = await recoverSharedFilesDownloadTunnelAfterRouteFailure(
+                        path: path,
+                        reason: reason,
+                        error: error
+                    )
+                } else {
+                    syncDiagnosticsLog(
+                        "SharedFiles",
+                        "preview direct route failed path=\(path) reason=\(reason) error=\(error); reselecting route for retry"
+                    )
+                    route = await prepareSharedFilesRoute(reason: "\(reason)_retry_after_direct_route_failure")
+                }
+                slog("[SharedFiles] prepareSharedFilePreview retry path=%@ attempt=%d resolved_host=%@ is_tunnel=%@", path, attempt + 1, route.host, String(route.isTunnel))
+                syncDiagnosticsLog("SharedFiles", "prepareSharedFilePreview retry path=\(path) attempt=\(attempt + 1) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
+            }
+        }
+        guard let previewURL else {
+            throw lastError ?? SyncEngineError.networkError("Shared file preview failed without an error")
+        }
+        let reachabilityRoute: SharedFilesReachabilityRoute = route.isTunnel ? currentSharedFilesTunnelReachabilityRoute() : .lan
+        updateSharedFilesReachability(
+            .available,
+            route: reachabilityRoute,
+            reason: "preview_shared_file_success"
+        )
+        if !route.isTunnel && bindingConnectionState != .connected {
+            updateBindingConnectionState(.connected, reason: "preview_shared_file_success")
+        }
+        return previewURL.absoluteString
+    }
+
     // MARK: - Settings
 
     func renameBoundDeviceAlias(alias: String) async throws {

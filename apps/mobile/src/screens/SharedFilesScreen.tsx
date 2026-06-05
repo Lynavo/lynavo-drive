@@ -8,13 +8,14 @@ import {
   Image,
   Alert,
   ActivityIndicator,
-  Linking,
   NativeModules,
   NativeEventEmitter,
   Modal,
   Platform,
   type ListRenderItemInfo,
 } from 'react-native';
+import { viewDocument } from '@react-native-documents/viewer';
+import Video from 'react-native-video';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
@@ -32,6 +33,7 @@ import {
   browseDirectory,
   downloadDirectoryFile,
   getDirectoryFileStreamUrl,
+  prepareDirectoryFilePreview,
 } from '../services/SyncEngineModule';
 import { formatBytes } from '../utils/format';
 
@@ -98,8 +100,33 @@ function fileTypeIcon(file: SharedFileDTO): { name: string; color: string } {
   return { name: 'document-outline', color: '#8b5cf6' };
 }
 
-function hasPreview(file: SharedFileDTO): boolean {
-  return file.type === 'image' || file.type === 'video';
+function documentMimeType(file: SharedFileDTO): string | undefined {
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'pdf':
+      return 'application/pdf';
+    case 'txt':
+    case 'log':
+      return 'text/plain';
+    case 'csv':
+      return 'text/csv';
+    case 'doc':
+      return 'application/msword';
+    case 'docx':
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    case 'xls':
+      return 'application/vnd.ms-excel';
+    case 'xlsx':
+      return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    case 'ppt':
+      return 'application/vnd.ms-powerpoint';
+    case 'pptx':
+      return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    case 'zip':
+      return 'application/zip';
+    default:
+      return undefined;
+  }
 }
 
 function clampDownloadProgress(value: number): number {
@@ -112,7 +139,10 @@ function formatDownloadPercent(value: number): string {
 }
 
 export function normalizeDirectoryPath(path: string): string {
-  return path.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  return path
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\/+|\/+$/g, '');
 }
 
 export function parentDirectoryPath(path: string): string {
@@ -148,8 +178,7 @@ function isPersonalUnauthorizedError(
 ): boolean {
   if (scope !== 'personal') return false;
   return (
-    message.includes('401') ||
-    message.toLowerCase().includes('unauthorized')
+    message.includes('401') || message.toLowerCase().includes('unauthorized')
   );
 }
 
@@ -801,13 +830,26 @@ export function SharedFilesScreen() {
       previewRequestSeqRef.current = previewRequestSeq;
       const previewScope = activeDirectoryScope;
       try {
-        const url = await getDirectoryFileStreamUrl(
-          previewScope,
-          file.path,
-        );
+        if (file.type === 'image' || file.type === 'video') {
+          const url =
+            file.streamUrl ??
+            (await getDirectoryFileStreamUrl(previewScope, file.path));
+          if (previewRequestSeqRef.current !== previewRequestSeq) return;
+          setPreviewFile(file);
+          setPreviewUrl(url);
+          return;
+        }
+        const documentUrl =
+          Platform.OS === 'ios'
+            ? await prepareDirectoryFilePreview(previewScope, file.path)
+            : (file.streamUrl ??
+              (await getDirectoryFileStreamUrl(previewScope, file.path)));
         if (previewRequestSeqRef.current !== previewRequestSeq) return;
-        setPreviewFile(file);
-        setPreviewUrl(url);
+        await viewDocument({
+          uri: documentUrl,
+          headerTitle: file.name,
+          mimeType: documentMimeType(file),
+        });
       } catch (e) {
         if (previewRequestSeqRef.current !== previewRequestSeq) return;
         Alert.alert(
@@ -859,7 +901,7 @@ export function SharedFilesScreen() {
           onPress={() => {
             if (item.isDirectory) {
               navigateIntoDir(item.path);
-            } else if (hasPreview(item)) {
+            } else {
               void handlePreview(item);
             }
           }}
@@ -1119,21 +1161,21 @@ export function SharedFilesScreen() {
       ? styles.connectionStatusLan
       : sharedFilesConnectionStatus === 'relay'
         ? styles.connectionStatusRelay
-      : sharedFilesConnectionStatus === 'p2p'
-        ? styles.connectionStatusP2P
-      : sharedFilesConnectionStatus === 'unavailable'
-        ? styles.connectionStatusUnavailable
-        : styles.connectionStatusOffline;
+        : sharedFilesConnectionStatus === 'p2p'
+          ? styles.connectionStatusP2P
+          : sharedFilesConnectionStatus === 'unavailable'
+            ? styles.connectionStatusUnavailable
+            : styles.connectionStatusOffline;
   const sharedFilesConnectionTextStyle =
     sharedFilesConnectionStatus === 'offline'
       ? styles.connectionStatusTextOffline
       : sharedFilesConnectionStatus === 'unavailable'
         ? styles.connectionStatusTextUnavailable
-      : sharedFilesConnectionStatus === 'relay'
-        ? styles.connectionStatusTextRelay
-        : sharedFilesConnectionStatus === 'p2p'
-          ? styles.connectionStatusTextP2P
-          : styles.connectionStatusTextLan;
+        : sharedFilesConnectionStatus === 'relay'
+          ? styles.connectionStatusTextRelay
+          : sharedFilesConnectionStatus === 'p2p'
+            ? styles.connectionStatusTextP2P
+            : styles.connectionStatusTextLan;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -1245,18 +1287,27 @@ export function SharedFilesScreen() {
                   source={{ uri: previewUrl }}
                   style={styles.previewImage}
                   resizeMode="contain"
+                  testID="shared-file-image-preview"
+                />
+              ) : previewFile.type === 'video' ? (
+                <Video
+                  source={{ uri: previewUrl }}
+                  style={styles.previewImage}
+                  controls
+                  resizeMode="contain"
+                  playInBackground
+                  playWhenInactive
+                  enterPictureInPictureOnLeave
+                  ignoreSilentSwitch="ignore"
+                  testID="shared-file-video-preview"
                 />
               ) : (
-                <TouchableOpacity
-                  style={styles.videoPlayButton}
-                  activeOpacity={0.7}
-                  onPress={() => void Linking.openURL(previewUrl)}
-                >
-                  <Icon name="play-circle-outline" size={64} color="#fff" />
-                  <Text style={styles.videoPlayText}>
-                    {t('sharedFiles.preview.playVideo')}
+                <View style={styles.filePreviewFallback}>
+                  <Icon name="document-outline" size={48} color="#fff" />
+                  <Text style={styles.filePreviewFallbackText}>
+                    {previewFile.name}
                   </Text>
-                </TouchableOpacity>
+                </View>
               )}
             </View>
           </View>
@@ -1548,12 +1599,14 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  videoPlayButton: {
+  filePreviewFallback: {
     alignItems: 'center',
     gap: 12,
+    paddingHorizontal: 32,
   },
-  videoPlayText: {
+  filePreviewFallbackText: {
     fontSize: 14,
     color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
   },
 });

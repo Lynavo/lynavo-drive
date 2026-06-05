@@ -666,6 +666,18 @@ class NativeSyncEngineModule: RCTEventEmitter {
     }
 
     @objc
+    func prepareSharedFilePreview(_ scope: NSString, path: NSString, accessToken: NSString, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        Task {
+            do {
+                let result = try await SyncEngineManager.shared.prepareSharedFilePreview(scope: scope as String, path: path as String, accessToken: accessToken as String)
+                resolve(result)
+            } catch {
+                reject("PREVIEW_ERROR", error.localizedDescription, error)
+            }
+        }
+    }
+
+    @objc
     func shareFile(_ localPath: NSString, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         let fileURL = URL(fileURLWithPath: localPath as String)
         guard FileManager.default.fileExists(atPath: fileURL.path) else {

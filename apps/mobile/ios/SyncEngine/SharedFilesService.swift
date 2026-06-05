@@ -406,10 +406,99 @@ class SharedFilesService {
         }
     }
 
+    /// Download a shared file to an app-owned temporary preview cache.
+    /// This is used by QLPreviewController, which needs a local file URL.
+    func downloadFileForPreview(
+        scope: SharedDirectoryScope = .team,
+        path: String,
+        accessToken: String = ""
+    ) async throws -> URL {
+        let endpoint = "\(scope.endpointPrefix)/download/\(SharedFilesRoutePolicy.encodedSharedFilePath(path))"
+        let partialURL = try partialDownloadURL(path: "preview:\(scope.rawValue):\(path)")
+        let metadataURL = partialMetadataURL(for: partialURL)
+        var partialMetadata = readPartialDownloadMetadata(at: metadataURL)
+        var resumeOffset = SharedFilesRoutePolicy.resumeOffsetForPartialDownload(
+            existingBytes: fileSize(at: partialURL)
+        )
+        if !SharedFilesRoutePolicy.canResumePartialDownload(
+            existingBytes: resumeOffset,
+            validator: partialMetadata?.validator,
+            expectedBytes: partialMetadata?.expectedBytes
+        ) {
+            removePartialDownload(partialURL: partialURL, metadataURL: metadataURL)
+            partialMetadata = nil
+            resumeOffset = 0
+        }
+
+        var downloadedURLForCleanup: URL?
+        defer {
+            if let downloadedURLForCleanup {
+                try? FileManager.default.removeItem(at: downloadedURLForCleanup)
+            }
+        }
+
+        let downloadedURL: URL
+        let response: URLResponse
+        do {
+            (downloadedURL, response) = try await performDownload(
+                endpoint: endpoint,
+                scope: scope,
+                accessToken: accessToken,
+                partialURL: partialURL,
+                metadataURL: metadataURL,
+                metadata: partialMetadata,
+                resumeOffset: resumeOffset,
+                onProgress: nil
+            )
+        } catch SharedFilePartialDownloadError.invalidPartial(_) {
+            removePartialDownload(partialURL: partialURL, metadataURL: metadataURL)
+            partialMetadata = nil
+            resumeOffset = 0
+            (downloadedURL, response) = try await performDownload(
+                endpoint: endpoint,
+                scope: scope,
+                accessToken: accessToken,
+                partialURL: partialURL,
+                metadataURL: metadataURL,
+                metadata: partialMetadata,
+                resumeOffset: resumeOffset,
+                onProgress: nil
+            )
+        }
+
+        downloadedURLForCleanup = downloadedURL
+        try validateHTTPResponse(response, path: endpoint)
+        try validateCompletedDownload(downloadedURL: downloadedURL, response: response)
+
+        let previewDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("syncflow_shared_previews", isDirectory: true)
+        try FileManager.default.createDirectory(at: previewDir, withIntermediateDirectories: true)
+        let previewURL = previewDir.appendingPathComponent(previewFilename(scope: scope, path: path))
+        try? FileManager.default.removeItem(at: previewURL)
+        try FileManager.default.moveItem(at: downloadedURL, to: previewURL)
+        downloadedURLForCleanup = nil
+        try? FileManager.default.removeItem(at: metadataURL)
+        return previewURL
+    }
+
     struct DownloadResult {
         let localPath: String?
         let savedToPhotos: Bool
         let savedLocation: String?
+    }
+
+    private func previewFilename(scope: SharedDirectoryScope, path: String) -> String {
+        let filename = (path as NSString).lastPathComponent
+        let ext = (filename as NSString).pathExtension
+        let token = Data("\(scope.rawValue):\(path)".utf8)
+            .base64EncodedString()
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "=", with: "")
+        if ext.isEmpty {
+            return token
+        }
+        return "\(token).\(ext)"
     }
 
     private func classifyLocalFileType(filename: String) -> String {

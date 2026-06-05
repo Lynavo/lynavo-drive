@@ -1,6 +1,11 @@
 import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
-import { Alert, NativeModules, NativeEventEmitter } from 'react-native';
+import {
+  Alert,
+  Linking,
+  NativeModules,
+  NativeEventEmitter,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Must mock react-native-localize before i18n import
@@ -26,6 +31,13 @@ jest.mock('../../components/Icon', () => ({
     const { Text: MockText } = require('react-native');
     return ReactInner.createElement(MockText, null, name);
   },
+}));
+
+jest.mock('react-native-video', () => 'Video');
+
+jest.mock('@react-native-documents/viewer', () => ({
+  __esModule: true,
+  viewDocument: jest.fn(),
 }));
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -68,6 +80,7 @@ jest.mock('react-native/Libraries/EventEmitter/NativeEventEmitter');
 const mockBrowseDirectory = jest.fn();
 const mockDownloadDirectoryFile = jest.fn();
 const mockGetDirectoryFileStreamUrl = jest.fn();
+const mockPrepareDirectoryFilePreview = jest.fn();
 
 jest.mock('../../services/SyncEngineModule', () => ({
   browseDirectory: (...args: unknown[]) => mockBrowseDirectory(...args),
@@ -75,6 +88,8 @@ jest.mock('../../services/SyncEngineModule', () => ({
     mockDownloadDirectoryFile(...args),
   getDirectoryFileStreamUrl: (...args: unknown[]) =>
     mockGetDirectoryFileStreamUrl(...args),
+  prepareDirectoryFilePreview: (...args: unknown[]) =>
+    mockPrepareDirectoryFilePreview(...args),
 }));
 
 import i18n from '../../i18n';
@@ -84,8 +99,13 @@ import {
   parentDirectoryPath,
 } from '../SharedFilesScreen';
 import { useAuth } from '../../stores/auth-store';
+import { viewDocument } from '@react-native-documents/viewer';
 
 const alertSpy = jest.spyOn(Alert, 'alert');
+const openUrlSpy = jest.spyOn(Linking, 'openURL');
+const mockViewDocument = viewDocument as jest.MockedFunction<
+  typeof viewDocument
+>;
 const nativeListeners = new Map<string, (payload: unknown) => void>();
 
 const FAKE_FILE = {
@@ -104,6 +124,16 @@ const FAKE_OTHER_FILE = {
   size: 2048,
   modifiedAt: '2026-06-02T03:05:00.000Z',
   type: 'video',
+  isDirectory: false,
+  thumbnailUrl: null,
+};
+
+const FAKE_DOCUMENT_FILE = {
+  name: 'report.pdf',
+  path: '/shared/report.pdf',
+  size: 4096,
+  modifiedAt: '2026-06-02T03:08:00.000Z',
+  type: 'document',
   isDirectory: false,
   thumbnailUrl: null,
 };
@@ -177,12 +207,22 @@ beforeEach(() => {
     savedToPhotos: true,
     localPath: null,
   });
+  mockGetDirectoryFileStreamUrl.mockImplementation(
+    (_scope: string, path: string) =>
+      Promise.resolve(`http://127.0.0.1:39394/stream${path}`),
+  );
+  mockPrepareDirectoryFilePreview.mockImplementation(
+    (_scope: string, path: string) =>
+      Promise.resolve(`file:///tmp/shared-preview${path}`),
+  );
 
   alertSpy.mockImplementation((_t, _b, buttons) => {
     // Simulate tap on the first non-cancel button.
     const go = buttons?.find((b: { style?: string }) => b.style !== 'cancel');
     go?.onPress?.();
   });
+  openUrlSpy.mockResolvedValue(undefined);
+  mockViewDocument.mockResolvedValue(null);
 });
 
 describe('SharedFilesScreen directory navigation helpers', () => {
@@ -201,6 +241,71 @@ describe('SharedFilesScreen directory navigation helpers', () => {
 });
 
 describe('SharedFilesScreen download progress', () => {
+  test('opens an inline video preview when tapping a video file', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      subscription: { status: 'trialing' },
+      loadSubscription: jest.fn(),
+    });
+    mockBrowseDirectory.mockResolvedValue({
+      scope: 'team',
+      path: '',
+      files: [FAKE_OTHER_FILE],
+    });
+
+    const { getByText, getByTestId } = render(<SharedFilesScreen />);
+
+    await waitFor(() => getByText('clip.mp4'));
+
+    await act(async () => {
+      fireEvent.press(getByText('clip.mp4'));
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(mockGetDirectoryFileStreamUrl).toHaveBeenCalledWith(
+        'team',
+        FAKE_OTHER_FILE.path,
+      ),
+    );
+    expect(getByTestId('shared-file-video-preview')).toBeTruthy();
+    expect(openUrlSpy).not.toHaveBeenCalled();
+  });
+
+  test('opens a document preview with the platform viewer when tapping a document file', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      subscription: { status: 'trialing' },
+      loadSubscription: jest.fn(),
+    });
+    mockBrowseDirectory.mockResolvedValue({
+      scope: 'team',
+      path: '',
+      files: [FAKE_DOCUMENT_FILE],
+    });
+
+    const { getByText } = render(<SharedFilesScreen />);
+
+    await waitFor(() => getByText('report.pdf'));
+
+    await act(async () => {
+      fireEvent.press(getByText('report.pdf'));
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(mockPrepareDirectoryFilePreview).toHaveBeenCalledWith(
+        'team',
+        FAKE_DOCUMENT_FILE.path,
+      ),
+    );
+    expect(mockViewDocument).toHaveBeenCalledWith({
+      uri: 'file:///tmp/shared-preview/shared/report.pdf',
+      headerTitle: 'report.pdf',
+      mimeType: 'application/pdf',
+    });
+    expect(mockGetDirectoryFileStreamUrl).not.toHaveBeenCalled();
+    expect(openUrlSpy).not.toHaveBeenCalled();
+  });
+
   test('shows offline shared-list status without reusing connected binding state', async () => {
     (useAuth as jest.Mock).mockReturnValue({
       subscription: { status: 'trialing' },
@@ -340,10 +445,7 @@ describe('SharedFilesScreen download progress', () => {
       await Promise.resolve();
     });
     await waitFor(() =>
-      expect(mockBrowseDirectory).toHaveBeenCalledWith(
-        'team',
-        'Projects/June',
-      ),
+      expect(mockBrowseDirectory).toHaveBeenCalledWith('team', 'Projects/June'),
     );
     expect(getByText('Parent Folder')).toBeTruthy();
 
@@ -860,7 +962,9 @@ describe('SharedFilesScreen download progress', () => {
       loadSubscription: jest.fn(),
     });
 
-    const { getByText, getByTestId, queryByText } = render(<SharedFilesScreen />);
+    const { getByText, getByTestId, queryByText } = render(
+      <SharedFilesScreen />,
+    );
 
     await waitFor(() => getByTestId('shared-file-download-button'));
 
