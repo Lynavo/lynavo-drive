@@ -274,7 +274,7 @@ describe('registerIpcHandlers', () => {
   });
 
   it('returns only the sanitized auth session through renderer IPC', async () => {
-    vi.mocked(sidecarClient.getAuthSessionView).mockReturnValue({
+    vi.mocked(sidecarClient.getAuthSessionView).mockResolvedValue({
       loggedIn: true,
       phone: '+8613800138000',
     });
@@ -282,7 +282,7 @@ describe('registerIpcHandlers', () => {
     registerIpcHandlers({ retryStart: vi.fn() } as never);
     const handler = handlers.get(IPC.AUTH_GET_SESSION);
 
-    expect(handler?.()).toEqual({
+    await expect(handler?.()).resolves.toEqual({
       loggedIn: true,
       phone: '+8613800138000',
     });

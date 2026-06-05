@@ -10,6 +10,7 @@
     "login": "Sign in",
     "logout": "Sign out",
     "signedIn": "Signed in",
+    "connected": "Account connected",
     "dialogTitle": "Sign in",
     "dialogDescription": "Sign in to use remote transfer."
   },

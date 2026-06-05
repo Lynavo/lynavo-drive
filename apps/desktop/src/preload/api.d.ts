@@ -45,6 +45,7 @@ export type AuthSessionView = {
   loggedIn: true;
   phone?: string;
   email?: string;
+  accountLabel?: string;
 };
 
 export interface ElectronAPI {

@@ -10,6 +10,7 @@
     "login": "登入",
     "logout": "登出",
     "signedIn": "已登入",
+    "connected": "帳號已連線",
     "dialogTitle": "登入帳號",
     "dialogDescription": "登入後可使用遠端傳輸。"
   },

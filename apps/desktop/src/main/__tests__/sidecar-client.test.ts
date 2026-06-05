@@ -687,6 +687,158 @@ describe('sidecarClient', () => {
     vi.resetModules();
   });
 
+  it('shows the submitted phone when an SMS login token omits identity claims', async () => {
+    const httpRequest = vi.fn();
+    const accessToken = createUnsignedJwt({ uid: '42' });
+    const httpsRequest = vi.fn((options: RequestOptions, callback: (res: unknown) => void) => {
+      const req = new EventEmitter() as EventEmitter & {
+        on: typeof EventEmitter.prototype.on;
+        write: ReturnType<typeof vi.fn>;
+        end: ReturnType<typeof vi.fn>;
+      };
+      req.write = vi.fn();
+      req.end = vi.fn();
+      callback(
+        createResponse(
+          200,
+          JSON.stringify({
+            code: 0,
+            message: 'success',
+            data: {
+              access_token: accessToken,
+              refresh_token: 'sms-refresh-token',
+              user_id: 42,
+              is_new_user: false,
+              merged: false,
+            },
+          }),
+        ),
+      );
+      return req;
+    });
+
+    vi.doMock('node:http', () => ({
+      default: { request: httpRequest },
+      request: httpRequest,
+    }));
+    vi.doMock('node:https', () => ({
+      default: { request: httpsRequest },
+      request: httpsRequest,
+    }));
+
+    vi.resetModules();
+    vi.stubEnv('SYNCFLOW_AUTH_BASE_URL', 'https://auth.example.test');
+
+    const { sidecarClient: client } = await import('../sidecar-client');
+
+    await expect(
+      client.loginWithSMSCode({ phone: '+8613800138000', code: '123456' }),
+    ).resolves.toEqual({
+      ok: true,
+      userId: 42,
+      isNewUser: false,
+      merged: false,
+    });
+
+    await expect(client.getAuthSessionView()).resolves.toEqual({
+      loggedIn: true,
+      phone: '+8613800138000',
+      accountLabel: '+8613800138000',
+    });
+
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('loads the account display from the user profile when the token omits identity claims', async () => {
+    const httpRequest = vi.fn();
+    const accessToken = createUnsignedJwt({ uid: '77' });
+    const httpsRequest = vi.fn((options: RequestOptions, callback: (res: unknown) => void) => {
+      const req = new EventEmitter() as EventEmitter & {
+        on: typeof EventEmitter.prototype.on;
+        write: ReturnType<typeof vi.fn>;
+        end: ReturnType<typeof vi.fn>;
+      };
+      req.write = vi.fn();
+      req.end = vi.fn();
+
+      if (options.path === '/api/v1/auth/google/login') {
+        callback(
+          createResponse(
+            200,
+            JSON.stringify({
+              code: 0,
+              message: 'success',
+              data: {
+                access_token: accessToken,
+                refresh_token: 'google-refresh-token',
+                user_id: 77,
+                is_new_user: false,
+                merged: true,
+              },
+            }),
+          ),
+        );
+        return req;
+      }
+
+      callback(
+        createResponse(
+          200,
+          JSON.stringify({
+            code: 0,
+            message: 'success',
+            data: {
+              id: 77,
+              primary_identity: {
+                type: 'email',
+                display: 'ada@example.com',
+              },
+              identities: [],
+            },
+          }),
+        ),
+      );
+      return req;
+    });
+
+    vi.doMock('node:http', () => ({
+      default: { request: httpRequest },
+      request: httpRequest,
+    }));
+    vi.doMock('node:https', () => ({
+      default: { request: httpsRequest },
+      request: httpsRequest,
+    }));
+
+    vi.resetModules();
+    vi.stubEnv('SYNCFLOW_AUTH_BASE_URL', 'https://auth.example.test');
+
+    const { sidecarClient: client } = await import('../sidecar-client');
+
+    await expect(client.loginWithGoogle({ identityToken: 'id-token' })).resolves.toEqual({
+      ok: true,
+      userId: 77,
+      isNewUser: false,
+      merged: true,
+    });
+
+    await expect(client.getAuthSessionView()).resolves.toEqual({
+      loggedIn: true,
+      email: 'ada@example.com',
+      accountLabel: 'ada@example.com',
+    });
+
+    expect(httpsRequest).toHaveBeenCalledTimes(2);
+    const [, profileCall] = httpsRequest.mock.calls;
+    const [profileOptions] = profileCall as [RequestOptions, (res: unknown) => void];
+    expect(profileOptions.path).toBe('/api/v1/user/profile');
+    expect(profileOptions.headers?.Authorization).toBe(`Bearer ${accessToken}`);
+
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
   it('normalizes Google login user metadata from the auth response envelope', async () => {
     const httpRequest = vi.fn();
     const accessToken = createUnsignedJwt({
@@ -745,10 +897,11 @@ describe('sidecarClient', () => {
     expect(httpsRequest).toHaveBeenCalledTimes(1);
     const [options] = httpsRequest.mock.calls[0] as [RequestOptions, (res: unknown) => void];
     expect(options.path).toBe('/api/v1/auth/google/login');
-    expect(client.getAuthSessionView()).toEqual({
+    await expect(client.getAuthSessionView()).resolves.toEqual({
       loggedIn: true,
       phone: '+8613800138000',
       email: 'ada@example.com',
+      accountLabel: '+8613800138000',
     });
 
     vi.unstubAllEnvs();
@@ -1178,6 +1331,7 @@ describe('sidecarClient', () => {
       accessToken: 'review-access-token',
       refreshToken: 'review-refresh-token',
       baseUrl: 'https://review-api.vividrop.cn',
+      phone: '+8617000000002',
     });
     const [options] = httpsRequest.mock.calls[0] as [RequestOptions, (res: unknown) => void];
     expect(options.hostname).toBe('review-api.vividrop.cn');

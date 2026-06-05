@@ -44,6 +44,7 @@ const APP_REVIEW_PHONE =
   '17000000002';
 const AUTH_SMS_SEND_PATH = process.env.SYNCFLOW_AUTH_SMS_SEND_PATH ?? '/api/v1/auth/sms/send';
 const AUTH_SMS_LOGIN_PATH = process.env.SYNCFLOW_AUTH_SMS_LOGIN_PATH ?? '/api/v1/auth/sms/login';
+const USER_PROFILE_PATH = process.env.SYNCFLOW_USER_PROFILE_PATH ?? '/api/v1/user/profile';
 
 type GiftCardRedeemPayload = {
   code: string;
@@ -103,12 +104,16 @@ type AuthSession = {
   accessToken: string;
   refreshToken: string;
   baseUrl?: string;
+  phone?: string;
+  email?: string;
+  accountLabel?: string;
 };
 
 export type AuthSessionView = {
   loggedIn: true;
   phone?: string;
   email?: string;
+  accountLabel?: string;
 };
 
 let authSession: AuthSession | null = null;
@@ -167,6 +172,9 @@ function saveSession(session: AuthSession | null): void {
       accessToken: accessTokenStr,
       refreshToken: refreshTokenStr,
       baseUrl: session.baseUrl,
+      phone: session.phone,
+      email: session.email,
+      accountLabel: session.accountLabel,
       encrypted,
     };
 
@@ -199,7 +207,12 @@ function loadSession(): AuthSession | null {
 
     const baseUrl =
       typeof data.baseUrl === 'string' && isHttpUrl(data.baseUrl) ? data.baseUrl : undefined;
-    return createAuthSession(accessToken, refreshToken, baseUrl);
+    return createAuthSession(accessToken, refreshToken, {
+      baseUrl,
+      phone: typeof data.phone === 'string' ? data.phone : undefined,
+      email: typeof data.email === 'string' ? data.email : undefined,
+      accountLabel: typeof data.accountLabel === 'string' ? data.accountLabel : undefined,
+    });
   } catch (error) {
     log.error('[sidecar-client] Failed to load auth session:', error);
     return null;
@@ -276,12 +289,15 @@ function getGiftCardRedeemBaseUrl(): string {
 function createAuthSession(
   accessToken: string,
   refreshToken: string,
-  baseUrl?: string,
+  metadata: { baseUrl?: string; phone?: string; email?: string; accountLabel?: string } = {},
 ): AuthSession {
   return {
     accessToken,
     refreshToken,
-    ...(baseUrl ? { baseUrl } : {}),
+    ...(metadata.baseUrl ? { baseUrl: metadata.baseUrl } : {}),
+    ...(metadata.phone ? { phone: metadata.phone } : {}),
+    ...(metadata.email ? { email: metadata.email } : {}),
+    ...(metadata.accountLabel ? { accountLabel: metadata.accountLabel } : {}),
   };
 }
 
@@ -300,17 +316,175 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
+function firstStringPayloadValue(
+  payload: Record<string, unknown> | null,
+  keys: readonly string[],
+): string | undefined {
+  if (!payload) {
+    return undefined;
+  }
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+  return undefined;
+}
+
+function identityLabelFromValue(value: string | undefined): {
+  phone?: string;
+  email?: string;
+  accountLabel?: string;
+} {
+  const normalized = value?.trim();
+  if (!normalized) {
+    return {};
+  }
+  if (normalized.includes('@')) {
+    return { email: normalized, accountLabel: normalized };
+  }
+  if (/^\+?[\d\s().-]{6,}$/.test(normalized)) {
+    return { phone: normalized, accountLabel: normalized };
+  }
+  return { accountLabel: normalized };
+}
+
+function valueAsRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function normalizeProfileIdentity(value: unknown): {
+  phone?: string;
+  email?: string;
+  accountLabel?: string;
+} {
+  const identity = valueAsRecord(value);
+  if (!identity) {
+    return {};
+  }
+
+  const type = typeof identity.type === 'string' ? identity.type.toLowerCase() : '';
+  const identifier =
+    typeof identity.identifier === 'string' && identity.identifier.trim()
+      ? identity.identifier.trim()
+      : undefined;
+  const display =
+    typeof identity.display === 'string' && identity.display.trim()
+      ? identity.display.trim()
+      : undefined;
+  const label = identifier || display;
+  if (!label) {
+    return {};
+  }
+  if (type.includes('email') || label.includes('@')) {
+    return { email: label, accountLabel: label };
+  }
+  if (type.includes('phone')) {
+    return { phone: label, accountLabel: label };
+  }
+  return identityLabelFromValue(label);
+}
+
+function normalizeProfileAccountLabel(value: unknown): {
+  phone?: string;
+  email?: string;
+  accountLabel?: string;
+} {
+  const envelope = valueAsRecord(value);
+  const data = valueAsRecord(envelope?.data) || envelope;
+  if (!data) {
+    return {};
+  }
+
+  const primaryIdentity = normalizeProfileIdentity(data.primary_identity);
+  if (primaryIdentity.accountLabel) {
+    return primaryIdentity;
+  }
+
+  const identities = data.identities;
+  if (Array.isArray(identities)) {
+    for (const identity of identities) {
+      const normalized = normalizeProfileIdentity(identity);
+      if (normalized.accountLabel) {
+        return normalized;
+      }
+    }
+  }
+
+  return {};
+}
+
 function createAuthSessionView(session: AuthSession | null): AuthSessionView | null {
   if (!session?.accessToken) {
     return null;
   }
 
   const payload = decodeJwtPayload(session.accessToken);
+  const phone =
+    session.phone ||
+    firstStringPayloadValue(payload, [
+      'phone',
+      'phone_number',
+      'mobile',
+      'mobile_phone',
+      'phoneNumber',
+    ]);
+  const email = session.email || firstStringPayloadValue(payload, ['email']);
+  const payloadLabel = identityLabelFromValue(
+    firstStringPayloadValue(payload, ['preferred_username', 'username', 'name']),
+  );
+  const accountLabel = session.accountLabel || phone || email || payloadLabel.accountLabel;
   return {
     loggedIn: true,
-    phone: typeof payload?.phone === 'string' ? payload.phone : undefined,
-    email: typeof payload?.email === 'string' ? payload.email : undefined,
+    phone: phone || payloadLabel.phone,
+    email: email || payloadLabel.email,
+    accountLabel,
   };
+}
+
+async function createAuthSessionViewWithProfile(
+  session: AuthSession | null,
+): Promise<AuthSessionView | null> {
+  const view = createAuthSessionView(session);
+  if (!session || !view || view.accountLabel) {
+    return view;
+  }
+
+  try {
+    const response = await request<unknown>(
+      'GET',
+      USER_PROFILE_PATH,
+      undefined,
+      getSessionBaseUrl(),
+      apiAuthHeaders(),
+    );
+    const profileIdentity = normalizeProfileAccountLabel(response);
+    if (!profileIdentity.accountLabel) {
+      return view;
+    }
+
+    authSession = {
+      ...session,
+      phone: session.phone || profileIdentity.phone,
+      email: session.email || profileIdentity.email,
+      accountLabel: profileIdentity.accountLabel,
+    };
+    authSessionLoaded = true;
+    saveSession(authSession);
+    return {
+      ...view,
+      phone: view.phone || profileIdentity.phone,
+      email: view.email || profileIdentity.email,
+      accountLabel: profileIdentity.accountLabel,
+    };
+  } catch (error) {
+    log.warn('[sidecar-client] Failed to load auth profile for session view:', error);
+    return view;
+  }
 }
 
 function mapGiftCardRedeemFailureReason(code: number): GiftCardRedeemFailureReason | undefined {
@@ -474,7 +648,10 @@ function accountIDFromAccessToken(accessToken: string): string | undefined {
   return undefined;
 }
 
-function persistAuthSession(value: unknown, baseUrl = AUTH_BASE_URL): AuthResponse {
+function persistAuthSession(
+  value: unknown,
+  metadata: { baseUrl?: string; phone?: string; email?: string; accountLabel?: string } = {},
+): AuthResponse {
   const normalized = normalizeAuthResponse(value);
   if (!normalized.ok) {
     authSession = null;
@@ -494,7 +671,12 @@ function persistAuthSession(value: unknown, baseUrl = AUTH_BASE_URL): AuthRespon
     throw new Error('Invalid auth response');
   }
 
-  authSession = createAuthSession(authData.access_token, authData.refresh_token, baseUrl);
+  authSession = createAuthSession(authData.access_token, authData.refresh_token, {
+    baseUrl: metadata.baseUrl || AUTH_BASE_URL,
+    phone: metadata.phone,
+    email: metadata.email,
+    accountLabel: metadata.accountLabel,
+  });
   authSessionLoaded = true;
   preserveSidecarTunnelCredentialsAfterSessionLoss = false;
   saveSession(authSession);
@@ -716,7 +898,7 @@ export const sidecarClient = {
   loginWithSMSCode: async (payload: PhoneLoginPayload) => {
     const authBaseUrl = resolveAuthBaseUrlForPhone(payload.phone);
     const response = await request<unknown>('POST', AUTH_SMS_LOGIN_PATH, payload, authBaseUrl);
-    return persistAuthSession(response, authBaseUrl);
+    return persistAuthSession(response, { baseUrl: authBaseUrl, phone: payload.phone });
   },
   loginWithGoogle: async (payload: { identityToken: string }) => {
     const authBaseUrl = resolveOAuthAuthBaseUrl();
@@ -730,7 +912,7 @@ export const sidecarClient = {
       { identity_token: payload.identityToken },
       authBaseUrl,
     );
-    return persistAuthSession(response, authBaseUrl);
+    return persistAuthSession(response, { baseUrl: authBaseUrl });
   },
   loginWithApple: async (payload: {
     identityToken: string;
@@ -752,7 +934,7 @@ export const sidecarClient = {
       },
       authBaseUrl,
     );
-    return persistAuthSession(response, authBaseUrl);
+    return persistAuthSession(response, { baseUrl: authBaseUrl });
   },
   syncTunnelCredentials: async (payload: {
     signalingUrl: string;
@@ -773,9 +955,9 @@ export const sidecarClient = {
     ensureSessionLoaded();
     return authSession;
   },
-  getAuthSessionView: () => {
+  getAuthSessionView: async () => {
     ensureSessionLoaded();
-    return createAuthSessionView(authSession);
+    return createAuthSessionViewWithProfile(authSession);
   },
   fetchTurnCredentials: async () => {
     return request<{
@@ -831,7 +1013,12 @@ export const sidecarClient = {
         authSession = createAuthSession(
           authData.access_token,
           authData.refresh_token,
-          authSession.baseUrl,
+          {
+            baseUrl: authSession.baseUrl,
+            phone: authSession.phone,
+            email: authSession.email,
+            accountLabel: authSession.accountLabel,
+          },
         );
         authSessionLoaded = true;
         preserveSidecarTunnelCredentialsAfterSessionLoss = false;

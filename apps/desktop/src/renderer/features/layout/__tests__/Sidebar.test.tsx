@@ -52,7 +52,7 @@ describe('Sidebar', () => {
     render(<Sidebar />);
 
     await waitFor(() => {
-      expect(screen.getByText('远端同步与传输需要登录')).toBeInTheDocument();
+      expect(screen.getByText('登录后可使用远端传输。')).toBeInTheDocument();
     });
     expect(getAuthSession).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: '登录' })).toBeInTheDocument();
@@ -66,7 +66,7 @@ describe('Sidebar', () => {
     fireEvent.click(await screen.findByRole('button', { name: '登录' }));
 
     expect(screen.getByTestId('login-dialog')).toBeInTheDocument();
-    expect(screen.getByText('登录后可使用远端同步与传输。')).toBeInTheDocument();
+    expect(screen.getAllByText('登录后可使用远端传输。')).toHaveLength(2);
   });
 
   it('shows the authenticated account instead of the sign-in prompt', async () => {
@@ -78,7 +78,34 @@ describe('Sidebar', () => {
       expect(screen.getByText('已登录')).toBeInTheDocument();
     });
     expect(screen.getByText('+8613800138000')).toBeInTheDocument();
-    expect(screen.queryByText('远端同步与传输需要登录')).not.toBeInTheDocument();
+    expect(screen.queryByText('登录后可使用远端传输。')).not.toBeInTheDocument();
+  });
+
+  it('shows the authenticated email when it is available', async () => {
+    setAuthSession({ loggedIn: true, email: 'ada@example.com' });
+
+    render(<Sidebar />);
+
+    expect(await screen.findByText('ada@example.com')).toBeInTheDocument();
+    expect(screen.queryByText('登录后可使用远端传输。')).not.toBeInTheDocument();
+  });
+
+  it('shows the authenticated account label when it is provided by the session view', async () => {
+    setAuthSession({ loggedIn: true, accountLabel: 'ada@example.com' });
+
+    render(<Sidebar />);
+
+    expect(await screen.findByText('ada@example.com')).toBeInTheDocument();
+    expect(screen.queryByText('登录后可使用远端传输。')).not.toBeInTheDocument();
+  });
+
+  it('does not repeat the signed-in label when the session has no account identifier', async () => {
+    setAuthSession({ loggedIn: true });
+
+    render(<Sidebar />);
+
+    expect(await screen.findByText('账号已连接')).toBeInTheDocument();
+    expect(screen.getAllByText('已登录')).toHaveLength(1);
   });
 
   it('signs out from the authenticated account card', async () => {

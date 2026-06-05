@@ -60,7 +60,9 @@ export function Sidebar() {
     void logout();
   }, [logout]);
 
-  const accountLabel = session?.phone || session?.email || t('layout.account.signedIn');
+  const accountIdentifier =
+    session?.phone?.trim() || session?.email?.trim() || session?.accountLabel?.trim();
+  const accountLabel = accountIdentifier || t('layout.account.connected');
 
   return (
     <>
