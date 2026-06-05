@@ -158,6 +158,50 @@ expect(
 )
 
 expect(
+    SharedFilesRoutePolicy.shouldRetainSharedFilesTunnelReachabilityOnBindingOffline(
+        reason: "presence_recovery_exhausted",
+        reachabilityState: "available",
+        reachabilityRoute: "tunnel",
+        isTunnelActive: true,
+        isTunnelStarting: false
+    ),
+    "presence recovery exhaustion must not clear shared-files tunnel reachability while the tunnel is active"
+)
+
+expect(
+    SharedFilesRoutePolicy.shouldRetainSharedFilesTunnelReachabilityOnBindingOffline(
+        reason: "presence_recovery_exhausted",
+        reachabilityState: "available",
+        reachabilityRoute: "relay",
+        isTunnelActive: false,
+        isTunnelStarting: true
+    ),
+    "presence recovery exhaustion must not clear shared-files relay reachability while the tunnel is reconnecting"
+)
+
+expect(
+    !SharedFilesRoutePolicy.shouldRetainSharedFilesTunnelReachabilityOnBindingOffline(
+        reason: "pipeline_failed",
+        reachabilityState: "available",
+        reachabilityRoute: "tunnel",
+        isTunnelActive: true,
+        isTunnelStarting: false
+    ),
+    "non-presence offline transitions must still clear shared-files tunnel reachability"
+)
+
+expect(
+    !SharedFilesRoutePolicy.shouldRetainSharedFilesTunnelReachabilityOnBindingOffline(
+        reason: "presence_recovery_exhausted",
+        reachabilityState: "available",
+        reachabilityRoute: "lan",
+        isTunnelActive: true,
+        isTunnelStarting: false
+    ),
+    "LAN reachability must not be retained when presence recovery is exhausted"
+)
+
+expect(
     SharedFilesRoutePolicy.shouldRetryDownloadOnTunnelAfterFailure(isTunnelRoute: true),
     "shared-file downloads that started on the tunnel must retry on a fresh tunnel instead of migrating to LAN"
 )

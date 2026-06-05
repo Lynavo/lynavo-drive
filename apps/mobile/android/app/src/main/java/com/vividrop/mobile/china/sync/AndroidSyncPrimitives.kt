@@ -385,6 +385,25 @@ object AndroidSyncPrimitives {
     return connectionState.trim() == "offline" && reason == "presence_recovery_exhausted"
   }
 
+  fun shouldRetainSharedFilesTunnelReachabilityOnBindingOffline(
+    reason: String?,
+    reachabilityState: String?,
+    reachabilityRoute: String?,
+    isTunnelActive: Boolean,
+    isTunnelStarting: Boolean,
+  ): Boolean {
+    if (reason != "presence_recovery_exhausted") {
+      return false
+    }
+    if (reachabilityState != "available") {
+      return false
+    }
+    if (reachabilityRoute != "tunnel" && reachabilityRoute != "relay") {
+      return false
+    }
+    return isTunnelActive || isTunnelStarting
+  }
+
   fun shouldRefreshBoundDiscoveryAfterNetworkAvailable(
     bindingDeviceId: String,
     syncInProgress: Boolean,

@@ -2753,6 +2753,33 @@ class NativeSyncEngineModule(
     emitEvent("onSharedFilesReachabilityChanged", null)
   }
 
+  private fun retainSharedFilesTunnelReachabilityForBindingOffline(reason: String?): Boolean {
+    val reachability = sharedFilesReachability ?: return false
+    val snapshot = p2pTunnelRouteSnapshot()
+    if (!AndroidSyncPrimitives.shouldRetainSharedFilesTunnelReachabilityOnBindingOffline(
+        reason = reason,
+        reachabilityState = reachability.state,
+        reachabilityRoute = reachability.route,
+        isTunnelActive = snapshot.isActive,
+        isTunnelStarting = snapshot.isStarting,
+      )
+    ) {
+      return false
+    }
+
+    val next = reachability.copy(
+      reason = "${reason}_tunnel_retained",
+      updatedAt = isoNow(),
+    )
+    sharedFilesReachability = next
+    recordNativeLog(
+      "SharedFiles",
+      "reachability ${reachability.state}/${reachability.route ?: "nil"} -> ${next.state}/${next.route ?: "nil"} (${next.reason})",
+    )
+    emitEvent("onSharedFilesReachabilityChanged", next.toWritableMap())
+    return true
+  }
+
   private fun StoredBinding.toWritableMapWithSharedFilesReachability(): WritableMap {
     val map = toWritableMap()
     val reachability = sharedFilesReachability
@@ -2923,7 +2950,9 @@ class NativeSyncEngineModule(
     )
     val updated = binding.copy(connectionState = connectionState)
     saveBinding(updated)
-    if (connectionState == "offline") {
+    val retainSharedFilesTunnel = connectionState == "offline" &&
+      retainSharedFilesTunnelReachabilityForBindingOffline(reason)
+    if (connectionState == "offline" && !retainSharedFilesTunnel) {
       clearSharedFilesReachability(reason = "binding_state_offline")
     }
     emitBindingStateChanged(updated)
@@ -2939,7 +2968,11 @@ class NativeSyncEngineModule(
     } else if (connectionState == "offline") {
       cancelPresenceRecoveryProbe(reason = reason ?: "state_offline")
       stopPresenceHeartbeatTimer()
-      stopP2PTunnel()
+      if (retainSharedFilesTunnel) {
+        recordNativeLog("SharedFiles", "retained P2P tunnel while binding offline (${reason ?: "state_offline"})")
+      } else {
+        stopP2PTunnel()
+      }
     } else if (connectionState != "connecting") {
       stopPresenceHeartbeatTimer()
       stopP2PTunnel()

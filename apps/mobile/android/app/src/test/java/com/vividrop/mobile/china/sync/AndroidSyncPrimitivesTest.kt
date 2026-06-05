@@ -475,6 +475,46 @@ class AndroidSyncPrimitivesTest {
   }
 
   @Test
+  fun exhaustedPresenceRecoveryRetainsActiveSharedFilesTunnelReachability() {
+    assertTrue(
+      AndroidSyncPrimitives.shouldRetainSharedFilesTunnelReachabilityOnBindingOffline(
+        reason = "presence_recovery_exhausted",
+        reachabilityState = "available",
+        reachabilityRoute = "tunnel",
+        isTunnelActive = true,
+        isTunnelStarting = false,
+      ),
+    )
+    assertTrue(
+      AndroidSyncPrimitives.shouldRetainSharedFilesTunnelReachabilityOnBindingOffline(
+        reason = "presence_recovery_exhausted",
+        reachabilityState = "available",
+        reachabilityRoute = "relay",
+        isTunnelActive = false,
+        isTunnelStarting = true,
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldRetainSharedFilesTunnelReachabilityOnBindingOffline(
+        reason = "pipeline_failed",
+        reachabilityState = "available",
+        reachabilityRoute = "tunnel",
+        isTunnelActive = true,
+        isTunnelStarting = false,
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldRetainSharedFilesTunnelReachabilityOnBindingOffline(
+        reason = "presence_recovery_exhausted",
+        reachabilityState = "available",
+        reachabilityRoute = "lan",
+        isTunnelActive = true,
+        isTunnelStarting = false,
+      ),
+    )
+  }
+
+  @Test
   fun networkAvailabilityRefreshesDiscoveryOnlyAfterBoundLanTransition() {
     assertTrue(
       AndroidSyncPrimitives.shouldRefreshBoundDiscoveryAfterNetworkAvailable(

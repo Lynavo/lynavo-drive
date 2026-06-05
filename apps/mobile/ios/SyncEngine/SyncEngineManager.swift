@@ -371,6 +371,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private struct P2PTunnelRouteState {
         let hasCredentials: Bool
         let isActive: Bool
+        let isStarting: Bool
         let port: UInt16?
     }
     private let sharedFileTunnelOperationLock = NSLock()
@@ -1675,13 +1676,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     private func updateBindingConnectionState(_ newState: BindingConnectionState, reason: String) {
         guard bindingConnectionState != newState else { return }
+        let retainSharedFilesTunnel = newState == .offline &&
+            retainSharedFilesTunnelReachabilityForBindingOffline(reason: reason)
         slog("[SyncEngine] binding connection state %@ -> %@ (%@)",
               bindingConnectionState.rawValue,
               newState.rawValue,
               reason)
         syncDiagnosticsLog("SyncEngine", "binding connection state \(bindingConnectionState.rawValue) -> \(newState.rawValue) (\(reason))")
         bindingConnectionState = newState
-        if newState == .offline {
+        if newState == .offline && !retainSharedFilesTunnel {
             clearSharedFilesReachability(reason: "binding_state_offline")
         }
         emitBindingStateChanged()
@@ -1696,10 +1699,41 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         } else {
             stopPresenceHeartbeatTimer()
             if newState == .offline {
-                stopP2PTunnel(reason: "state_offline")
+                if retainSharedFilesTunnel {
+                    syncDiagnosticsLog(
+                        "SharedFiles",
+                        "retained P2P tunnel while binding offline (\(reason))"
+                    )
+                } else {
+                    stopP2PTunnel(reason: "state_offline")
+                }
             }
         }
 
+    }
+
+    private func retainSharedFilesTunnelReachabilityForBindingOffline(reason: String) -> Bool {
+        let routeState = p2pTunnelQueue.sync {
+            currentP2PTunnelRouteStateLocked()
+        }
+        let reachabilityState = sharedFilesReachabilityPayload?["state"] as? String
+        let reachabilityRoute = sharedFilesReachabilityPayload?["route"] as? String
+        guard SharedFilesRoutePolicy.shouldRetainSharedFilesTunnelReachabilityOnBindingOffline(
+            reason: reason,
+            reachabilityState: reachabilityState,
+            reachabilityRoute: reachabilityRoute,
+            isTunnelActive: routeState.isActive,
+            isTunnelStarting: routeState.isStarting
+        ) else {
+            return false
+        }
+        let route = SharedFilesReachabilityRoute(rawValue: reachabilityRoute ?? "") ?? .tunnel
+        updateSharedFilesReachability(
+            .available,
+            route: route,
+            reason: "\(reason)_tunnel_retained"
+        )
+        return true
     }
 
     private func maintainConnectedBindingState(reason: String) {
@@ -1764,6 +1798,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         return P2PTunnelRouteState(
             hasCredentials: p2pTunnelCredentials != nil,
             isActive: sharedFilesService.isTunnelActive && port != nil,
+            isStarting: p2pTunnelStarting,
             port: port
         )
     }

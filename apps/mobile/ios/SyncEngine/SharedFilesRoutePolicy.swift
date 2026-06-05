@@ -139,4 +139,17 @@ enum SharedFilesRoutePolicy {
         return secondsSinceLastSharedFileTunnelOperation >= 0 &&
             secondsSinceLastSharedFileTunnelOperation <= sharedFileTunnelHeartbeatGracePeriod
     }
+
+    static func shouldRetainSharedFilesTunnelReachabilityOnBindingOffline(
+        reason: String,
+        reachabilityState: String?,
+        reachabilityRoute: String?,
+        isTunnelActive: Bool,
+        isTunnelStarting: Bool
+    ) -> Bool {
+        guard reason == "presence_recovery_exhausted" else { return false }
+        guard reachabilityState == "available" else { return false }
+        guard reachabilityRoute == "tunnel" || reachabilityRoute == "relay" else { return false }
+        return isTunnelActive || isTunnelStarting
+    }
 }
