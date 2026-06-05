@@ -659,20 +659,18 @@ export function DeviceDiscoveryScreen() {
                 <Icon name="chevron-back" size={20} color="#3b9fd8" />
               </TouchableOpacity>
             ) : (
-              <>
-                <View style={styles.wifiIconBox}>
-                  <Icon name="wifi" size={24} color="#3b9fd8" />
-                </View>
-                <TouchableOpacity
-                  style={styles.scanButton}
-                  activeOpacity={0.8}
-                  onPress={() => setShowPairingMenu(true)}
-                >
-                  <Icon name="settings-outline" size={16} color="#3b9fd8" />
-                  <Text style={styles.scanButtonText}>{t('deviceDiscovery.actions.manualPair')}</Text>
-                </TouchableOpacity>
-              </>
+              <View style={styles.wifiIconBox}>
+                <Icon name="wifi" size={24} color="#3b9fd8" />
+              </View>
             )}
+            <TouchableOpacity
+              style={styles.scanButton}
+              activeOpacity={0.8}
+              onPress={() => setShowPairingMenu(true)}
+            >
+              <Icon name="settings-outline" size={16} color="#3b9fd8" />
+              <Text style={styles.scanButtonText}>{t('deviceDiscovery.actions.manualPair')}</Text>
+            </TouchableOpacity>
           </View>
           <Text style={styles.title}>
             {mode === 'switch' ? t('deviceDiscovery.switch.title') : t('deviceDiscovery.title')}

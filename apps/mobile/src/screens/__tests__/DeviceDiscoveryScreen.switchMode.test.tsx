@@ -113,11 +113,18 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
     });
   });
 
-  it('shows back button instead of manual-pair button', async () => {
-    const { queryByText } = render(<DeviceDiscoveryScreen />);
+  it('shows back button and keeps manual pairing options available', async () => {
+    const { getByText, queryByText } = render(<DeviceDiscoveryScreen />);
     await waitFor(() => {
-      expect(queryByText('手動配對')).toBeNull();
+      expect(getByText('手動配對')).toBeTruthy();
       expect(queryByText('chevron-back')).toBeTruthy();
+    });
+
+    fireEvent.press(getByText('手動配對'));
+
+    await waitFor(() => {
+      expect(getByText('手動輸入 IP')).toBeTruthy();
+      expect(getByText('掃碼配對')).toBeTruthy();
     });
   });
 
