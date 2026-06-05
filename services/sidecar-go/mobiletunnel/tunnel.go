@@ -97,11 +97,32 @@ func parseICEServersJSON(raw string) []webrtc.ICEServer {
 	if len(servers) == 0 {
 		return defaultICEServers()
 	}
-	return servers
+	return withDefaultSTUNServer(servers)
 }
 
 func defaultICEServers() []webrtc.ICEServer {
 	return []webrtc.ICEServer{{URLs: []string{defaultSTUNServer}}}
+}
+
+func withDefaultSTUNServer(servers []webrtc.ICEServer) []webrtc.ICEServer {
+	if len(servers) == 0 {
+		return defaultICEServers()
+	}
+	if hasSTUNServer(servers) {
+		return servers
+	}
+	return append(defaultICEServers(), servers...)
+}
+
+func hasSTUNServer(servers []webrtc.ICEServer) bool {
+	for _, server := range servers {
+		for _, rawURL := range server.URLs {
+			if strings.HasPrefix(strings.ToLower(strings.TrimSpace(rawURL)), "stun:") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func summarizeICEServers(servers []webrtc.ICEServer) ([]string, bool, bool) {
@@ -152,11 +173,46 @@ func registerICELogging(pc *webrtc.PeerConnection, component string, peerKey str
 		"hasStun", hasStun,
 	)
 
+	var mu sync.Mutex
+	lastICEState := webrtc.ICEConnectionStateNew
+	lastPeerState := webrtc.PeerConnectionStateNew
+	var iceConnectedAt time.Time
+	var peerConnectedAt time.Time
+	lastSelectedPair := selectedPairSnapshot(nil, time.Time{})
+
 	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
-		tunnelInfo(component+" ICE connection state changed", peerKey, peerID, "state", state.String())
+		now := time.Now()
+		mu.Lock()
+		args := appendConnectionStateDiagnosticArgs(
+			[]any{peerKey, peerID, "state", state.String()},
+			lastICEState.String(),
+			iceConnectedAt,
+			lastSelectedPair,
+			now,
+		)
+		if state == webrtc.ICEConnectionStateConnected {
+			iceConnectedAt = now
+		}
+		lastICEState = state
+		mu.Unlock()
+		tunnelInfo(component+" ICE connection state changed", args...)
 	})
 	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
-		tunnelInfo(component+" peer connection state changed", peerKey, peerID, "state", state.String())
+		now := time.Now()
+		mu.Lock()
+		args := appendConnectionStateDiagnosticArgs(
+			[]any{peerKey, peerID, "state", state.String()},
+			lastPeerState.String(),
+			peerConnectedAt,
+			lastSelectedPair,
+			now,
+		)
+		if state == webrtc.PeerConnectionStateConnected {
+			peerConnectedAt = now
+		}
+		lastPeerState = state
+		mu.Unlock()
+		tunnelInfo(component+" peer connection state changed", args...)
 	})
 	pc.OnICEGatheringStateChange(func(state webrtc.ICEGatheringState) {
 		tunnelInfo(component+" ICE gathering state changed", peerKey, peerID, "state", state.String())
@@ -168,6 +224,10 @@ func registerICELogging(pc *webrtc.PeerConnection, component string, peerKey str
 		return
 	}
 	transport.OnSelectedCandidatePairChange(func(pair *webrtc.ICECandidatePair) {
+		now := time.Now()
+		mu.Lock()
+		lastSelectedPair = selectedPairSnapshot(pair, now)
+		mu.Unlock()
 		logSelectedICECandidatePair(component+" ICE selected candidate pair changed", pair, peerKey, peerID, "reason", "selected_pair_change")
 	})
 }
@@ -213,6 +273,64 @@ func logSelectedICECandidatePair(message string, pair *webrtc.ICECandidatePair, 
 		"remoteRelatedPort", iceCandidateRelatedPort(pairRemote(pair)),
 	)
 	tunnelInfo(message, args...)
+}
+
+type icePairSnapshot struct {
+	route          string
+	localType      string
+	localProtocol  string
+	localAddress   string
+	localPort      uint16
+	remoteType     string
+	remoteProtocol string
+	remoteAddress  string
+	remotePort     uint16
+	selectedAt     time.Time
+}
+
+func selectedPairSnapshot(pair *webrtc.ICECandidatePair, selectedAt time.Time) icePairSnapshot {
+	return icePairSnapshot{
+		route:          selectedICERoute(pair),
+		localType:      iceCandidateType(pairLocal(pair)),
+		localProtocol:  iceCandidateProtocol(pairLocal(pair)),
+		localAddress:   iceCandidateAddress(pairLocal(pair)),
+		localPort:      iceCandidatePort(pairLocal(pair)),
+		remoteType:     iceCandidateType(pairRemote(pair)),
+		remoteProtocol: iceCandidateProtocol(pairRemote(pair)),
+		remoteAddress:  iceCandidateAddress(pairRemote(pair)),
+		remotePort:     iceCandidatePort(pairRemote(pair)),
+		selectedAt:     selectedAt,
+	}
+}
+
+func appendConnectionStateDiagnosticArgs(args []any, previousState string, connectedAt time.Time, pair icePairSnapshot, now time.Time) []any {
+	args = append(args,
+		"previousState", previousState,
+		"connectedForMs", elapsedMilliseconds(connectedAt, now),
+	)
+	return appendSelectedPairSnapshotArgs(args, pair, now)
+}
+
+func appendSelectedPairSnapshotArgs(args []any, pair icePairSnapshot, now time.Time) []any {
+	return append(args,
+		"lastSelectedRoute", pair.route,
+		"lastSelectedLocalType", pair.localType,
+		"lastSelectedLocalProtocol", pair.localProtocol,
+		"lastSelectedLocalAddress", pair.localAddress,
+		"lastSelectedLocalPort", pair.localPort,
+		"lastSelectedRemoteType", pair.remoteType,
+		"lastSelectedRemoteProtocol", pair.remoteProtocol,
+		"lastSelectedRemoteAddress", pair.remoteAddress,
+		"lastSelectedRemotePort", pair.remotePort,
+		"selectedPairAgeMs", elapsedMilliseconds(pair.selectedAt, now),
+	)
+}
+
+func elapsedMilliseconds(start time.Time, now time.Time) int64 {
+	if start.IsZero() || now.Before(start) {
+		return -1
+	}
+	return now.Sub(start).Milliseconds()
 }
 
 // CurrentSelectedICERoute returns the active tunnel's selected ICE route.
@@ -759,9 +877,17 @@ func (t *Tunnel) establishWebRTCTunnel(wsConn *websocket.Conn, clientID, targetC
 	// Channel to signal tunnel completion or failure
 	tunnelErrChan := make(chan error, 1)
 
+	dc.OnError(func(err error) {
+		tunnelError("mobile tunnel data channel error", "targetClientId", targetClientID, "label", dc.Label(), "err", err)
+		logCurrentSelectedICECandidatePair(pc, "mobile tunnel", "targetClientId", targetClientID, "data_channel_error")
+	})
+
 	dc.OnOpen(func() {
 		logCurrentSelectedICECandidatePair(pc, "mobile tunnel", "targetClientId", targetClientID, "data_channel_open")
-		wrapper := protocol.NewDataChannelWrapper(dc)
+		wrapper := protocol.NewDataChannelWrapperWithCloseHandler(dc, func() {
+			tunnelInfo("mobile tunnel data channel closed", "targetClientId", targetClientID, "label", dc.Label())
+			logCurrentSelectedICECandidatePair(pc, "mobile tunnel", "targetClientId", targetClientID, "data_channel_close")
+		})
 		session, err := yamux.Client(wrapper, nil)
 		if err != nil {
 			tunnelErrChan <- err

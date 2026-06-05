@@ -531,14 +531,17 @@ func TestP2PManagerUsesProvidedICEServers(t *testing.T) {
 	defer pc.Close()
 
 	servers := pc.GetConfiguration().ICEServers
-	if len(servers) != 1 {
-		t.Fatalf("expected 1 ICE server, got %d", len(servers))
+	if len(servers) != 2 {
+		t.Fatalf("expected STUN plus TURN ICE servers, got %d", len(servers))
 	}
-	if got := servers[0].URLs[0]; got != "turn:review-api.vividrop.cn:3478?transport=udp" {
+	if got := servers[0].URLs[0]; got != DefaultSTUNServer {
+		t.Fatalf("expected default STUN first, got %s", got)
+	}
+	if got := servers[1].URLs[0]; got != "turn:review-api.vividrop.cn:3478?transport=udp" {
 		t.Fatalf("unexpected ICE URL: %s", got)
 	}
-	if servers[0].Username != "turn-user" || servers[0].Credential != "turn-pass" {
-		t.Fatalf("unexpected TURN credentials: %#v", servers[0])
+	if servers[1].Username != "turn-user" || servers[1].Credential != "turn-pass" {
+		t.Fatalf("unexpected TURN credentials: %#v", servers[1])
 	}
 }
 
@@ -551,6 +554,97 @@ func TestParseICEServersJSONFallsBackToDefaultStun(t *testing.T) {
 	if got := servers[0].URLs[0]; got != DefaultSTUNServer {
 		t.Fatalf("unexpected default ICE URL: %s", got)
 	}
+}
+
+func TestParseICEServersJSONPrependsDefaultStunToTurnOnlyConfig(t *testing.T) {
+	servers := ParseICEServersJSON(`[{"urls":["turn:review-api.vividrop.cn:3478?transport=udp"],"username":"turn-user","credential":"turn-pass"}]`)
+
+	if len(servers) != 2 {
+		t.Fatalf("expected STUN plus TURN ICE servers, got %d", len(servers))
+	}
+	if got := servers[0].URLs[0]; got != DefaultSTUNServer {
+		t.Fatalf("expected default STUN first, got %s", got)
+	}
+	if got := servers[1].URLs[0]; got != "turn:review-api.vividrop.cn:3478?transport=udp" {
+		t.Fatalf("unexpected ICE URL: %s", got)
+	}
+	if servers[1].Username != "turn-user" || servers[1].Credential != "turn-pass" {
+		t.Fatalf("unexpected TURN credentials: %#v", servers[1])
+	}
+}
+
+func TestParseICEServersJSONDoesNotDuplicateDefaultStun(t *testing.T) {
+	servers := ParseICEServersJSON(`[{"urls":["stun:stun.cloudflare.com:3478"]},{"urls":["turn:review-api.vividrop.cn:3478?transport=udp"],"username":"turn-user","credential":"turn-pass"}]`)
+
+	if len(servers) != 2 {
+		t.Fatalf("expected existing STUN plus TURN ICE servers, got %d", len(servers))
+	}
+	if got := servers[0].URLs[0]; got != DefaultSTUNServer {
+		t.Fatalf("expected existing default STUN first, got %s", got)
+	}
+	if got := servers[1].URLs[0]; got != "turn:review-api.vividrop.cn:3478?transport=udp" {
+		t.Fatalf("unexpected ICE URL: %s", got)
+	}
+}
+
+func TestAppendConnectionStateDiagnosticArgsIncludesSelectedPairSnapshot(t *testing.T) {
+	selectedAt := time.Date(2026, 6, 5, 16, 50, 58, 0, time.UTC)
+	now := selectedAt.Add(8*time.Second + 250*time.Millisecond)
+	connectedAt := selectedAt.Add(-2 * time.Second)
+	pair := &webrtc.ICECandidatePair{
+		Local: &webrtc.ICECandidate{
+			Typ:      webrtc.ICECandidateTypeHost,
+			Protocol: webrtc.ICEProtocolUDP,
+			Address:  "fe80::1",
+			Port:     50123,
+		},
+		Remote: &webrtc.ICECandidate{
+			Typ:      webrtc.ICECandidateTypeSrflx,
+			Protocol: webrtc.ICEProtocolUDP,
+			Address:  "fe80::2",
+			Port:     49876,
+		},
+	}
+
+	args := appendConnectionStateDiagnosticArgs(
+		nil,
+		"connected",
+		connectedAt,
+		selectedPairSnapshot(pair, selectedAt),
+		now,
+	)
+	values := argsToMap(args)
+
+	if values["previousState"] != "connected" {
+		t.Fatalf("expected previousState connected, got %#v", values["previousState"])
+	}
+	if values["connectedForMs"] != int64(10250) {
+		t.Fatalf("expected connectedForMs 10250, got %#v", values["connectedForMs"])
+	}
+	if values["lastSelectedRoute"] != "direct_reflexive" {
+		t.Fatalf("expected direct_reflexive route, got %#v", values["lastSelectedRoute"])
+	}
+	if values["lastSelectedLocalType"] != "host" || values["lastSelectedRemoteType"] != "srflx" {
+		t.Fatalf("unexpected candidate types: %#v", values)
+	}
+	if values["lastSelectedLocalAddress"] != "fe80::1" || values["lastSelectedRemoteAddress"] != "fe80::2" {
+		t.Fatalf("unexpected candidate addresses: %#v", values)
+	}
+	if values["selectedPairAgeMs"] != int64(8250) {
+		t.Fatalf("expected selectedPairAgeMs 8250, got %#v", values["selectedPairAgeMs"])
+	}
+}
+
+func argsToMap(args []any) map[string]any {
+	values := make(map[string]any, len(args)/2)
+	for i := 0; i+1 < len(args); i += 2 {
+		key, ok := args[i].(string)
+		if !ok {
+			continue
+		}
+		values[key] = args[i+1]
+	}
+	return values
 }
 
 func TestDataChannelWrapperAppliesBackpressureWithoutDroppingMessages(t *testing.T) {
@@ -686,5 +780,93 @@ func TestDataChannelWrapperAppliesBackpressureWithoutDroppingMessages(t *testing
 
 	if !bytes.Equal(got, expected) {
 		t.Fatal("wrapper stream did not preserve all inbound data")
+	}
+}
+
+func TestDataChannelWrapperCloseHandlerRunsOnDataChannelClose(t *testing.T) {
+	offerPC, err := webrtc.NewPeerConnection(webrtc.Configuration{})
+	if err != nil {
+		t.Fatalf("create offer peer: %v", err)
+	}
+	defer offerPC.Close()
+
+	answerPC, err := webrtc.NewPeerConnection(webrtc.Configuration{})
+	if err != nil {
+		t.Fatalf("create answer peer: %v", err)
+	}
+	defer answerPC.Close()
+
+	offerPC.OnICECandidate(func(c *webrtc.ICECandidate) {
+		if c != nil {
+			_ = answerPC.AddICECandidate(c.ToJSON())
+		}
+	})
+	answerPC.OnICECandidate(func(c *webrtc.ICECandidate) {
+		if c != nil {
+			_ = offerPC.AddICECandidate(c.ToJSON())
+		}
+	})
+
+	closeObserved := make(chan struct{}, 1)
+	wrapperReady := make(chan *DataChannelWrapper, 1)
+	answerPC.OnDataChannel(func(d *webrtc.DataChannel) {
+		wrapperReady <- NewDataChannelWrapperWithCloseHandler(d, func() {
+			closeObserved <- struct{}{}
+		})
+	})
+
+	ordered := true
+	dc, err := offerPC.CreateDataChannel("yamux-tunnel", &webrtc.DataChannelInit{Ordered: &ordered})
+	if err != nil {
+		t.Fatalf("create data channel: %v", err)
+	}
+	opened := make(chan struct{})
+	dc.OnOpen(func() {
+		close(opened)
+	})
+
+	offer, err := offerPC.CreateOffer(nil)
+	if err != nil {
+		t.Fatalf("create offer: %v", err)
+	}
+	if err := offerPC.SetLocalDescription(offer); err != nil {
+		t.Fatalf("set local offer: %v", err)
+	}
+	if err := answerPC.SetRemoteDescription(offer); err != nil {
+		t.Fatalf("set remote offer: %v", err)
+	}
+	answer, err := answerPC.CreateAnswer(nil)
+	if err != nil {
+		t.Fatalf("create answer: %v", err)
+	}
+	if err := answerPC.SetLocalDescription(answer); err != nil {
+		t.Fatalf("set local answer: %v", err)
+	}
+	if err := offerPC.SetRemoteDescription(answer); err != nil {
+		t.Fatalf("set remote answer: %v", err)
+	}
+
+	var wrapper *DataChannelWrapper
+	select {
+	case wrapper = <-wrapperReady:
+	case <-time.After(15 * time.Second):
+		t.Fatal("timeout waiting for data channel wrapper")
+	}
+	defer wrapper.Close()
+
+	select {
+	case <-opened:
+	case <-time.After(15 * time.Second):
+		t.Fatal("timeout waiting for data channel open")
+	}
+
+	if err := dc.Close(); err != nil {
+		t.Fatalf("close data channel: %v", err)
+	}
+
+	select {
+	case <-closeObserved:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for data channel close handler")
 	}
 }
