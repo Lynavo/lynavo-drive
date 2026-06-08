@@ -1,5 +1,10 @@
 import { useEffect } from 'react';
-import { StatusBar, StyleSheet, useColorScheme } from 'react-native';
+import {
+  AppState,
+  StatusBar,
+  StyleSheet,
+  useColorScheme,
+} from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -8,6 +13,7 @@ import * as RNLocalize from 'react-native-localize';
 import { AuthProvider } from './stores/auth-store';
 import { RootNavigator } from './navigation/RootNavigator';
 import { loadDebugBaseUrlOverride } from './services/config';
+import { refreshNativeAppFeatureSettings } from './services/app-config-service';
 import i18n from './i18n';
 import {
   loadStoredLanguagePreference,
@@ -21,7 +27,34 @@ export function App() {
   // mounts and triggers its first request — see services/config.ts for the
   // real-device debug instructions.
   useEffect(() => {
-    void loadDebugBaseUrlOverride();
+    let isDisposed = false;
+    let refreshInFlight = false;
+    const refreshFeatureSettings = async () => {
+      if (refreshInFlight) return;
+      refreshInFlight = true;
+      try {
+        await refreshNativeAppFeatureSettings();
+      } catch (error) {
+        console.warn('[App] failed to refresh native feature settings:', error);
+      } finally {
+        refreshInFlight = false;
+      }
+    };
+
+    void (async () => {
+      await loadDebugBaseUrlOverride();
+      if (!isDisposed) {
+        await refreshFeatureSettings();
+      }
+    })();
+    const appStateSubscription = AppState.addEventListener(
+      'change',
+      nextState => {
+        if (nextState === 'active') {
+          void refreshFeatureSettings();
+        }
+      },
+    );
     void loadStoredLanguagePreference().then(preference => {
       const language = resolveLanguagePreference(
         preference,
@@ -31,6 +64,10 @@ export function App() {
         void i18n.changeLanguage(language);
       }
     });
+    return () => {
+      isDisposed = true;
+      appStateSubscription.remove();
+    };
   }, []);
 
   return (

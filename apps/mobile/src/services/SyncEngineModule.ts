@@ -241,6 +241,18 @@ export async function shareFile(localPath: string): Promise<boolean> {
   return result as boolean;
 }
 
+export async function setBackgroundSilentAudioEnabled(
+  enabled: boolean,
+): Promise<void> {
+  if (Platform.OS !== 'ios') {
+    return;
+  }
+  if (typeof NativeSyncEngine.setBackgroundSilentAudioEnabled !== 'function') {
+    return;
+  }
+  await NativeSyncEngine.setBackgroundSilentAudioEnabled(enabled);
+}
+
 // ---------------------------------------------------------------------------
 // Photo library permission helpers
 // ---------------------------------------------------------------------------

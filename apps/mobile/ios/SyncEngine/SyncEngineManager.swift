@@ -253,6 +253,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     /// upload loop observes this between files and breaks out so the
     /// BackgroundUploadService can take over.
     var isTransitioningToBackground = false
+    private let backgroundSilentAudioFeatureLock = NSLock()
+    private var backgroundSilentAudioFeatureEnabled = false
     let backgroundUploadService = BackgroundUploadService.shared
     /// Timeout / poll tuning for `transitionToBackgroundUpload`. Expressed as
     /// private static lets so unit-level reasoning sees concrete numbers.
@@ -1325,13 +1327,48 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     // MARK: - App State Transitions
 
+    func setBackgroundSilentAudioEnabled(_ enabled: Bool) {
+        backgroundSilentAudioFeatureLock.lock()
+        backgroundSilentAudioFeatureEnabled = enabled
+        backgroundSilentAudioFeatureLock.unlock()
+        if !enabled {
+            SilentAudioService.shared.stop()
+        }
+        slog("[SilentAudio] feature %@", enabled ? "enabled" : "disabled")
+        syncDiagnosticsLog("SilentAudio", "feature \(enabled ? "enabled" : "disabled")")
+    }
+
+    private func isBackgroundSilentAudioEnabled() -> Bool {
+        backgroundSilentAudioFeatureLock.lock()
+        defer { backgroundSilentAudioFeatureLock.unlock() }
+        return backgroundSilentAudioFeatureEnabled
+    }
+
     @objc private func appDidEnterBackground() {
         slog("[SyncEngine] app entered background, isSyncing=\(isSyncing)")
+        let silentAudioStarted: Bool
+        if isBackgroundSilentAudioEnabled() {
+            silentAudioStarted = SilentAudioService.shared.start()
+            if !silentAudioStarted {
+                syncDiagnosticsLog("SilentAudio", "background audio failed to start; falling back to background handoff")
+            }
+        } else {
+            silentAudioStarted = false
+            SilentAudioService.shared.stop()
+            syncDiagnosticsLog("SilentAudio", "background audio skipped — feature disabled")
+        }
         if !isSyncing {
             stopPresenceHeartbeatTimer()
             cancelPresenceRecoveryProbe(reason: "app_entered_background")
         }
         guard isSyncing else { return }
+        if silentAudioStarted {
+            if sessionService.state == .syncingForeground {
+                sessionService.transitionTo(.syncingBackground)
+            }
+            syncDiagnosticsLog("SyncPipeline", "continuing TCP pipeline in background with silent audio")
+            return
+        }
         beginBackgroundTransitionIfNeeded(reason: "didEnterBackground")
         isTransitioningToBackground = true
         if sessionService.state == .syncingForeground {
@@ -1449,8 +1486,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             BackgroundUploadService.backgroundTransitionPreparationBudgetSeconds == 0,
             "M7: transitionToBackgroundUpload assumes zero preparation budget — re-evaluate allowPreparation before raising the constant"
         )
-        guard let binding = currentBinding else {
-            NSLog("[SyncEngine] background handoff skipped — no current binding")
+        guard let binding = BackgroundHandoffPolicy.resolveBinding(
+            live: currentBinding,
+            persisted: uploadStore?.getBinding()
+        ) else {
+            NSLog("[SyncEngine] background handoff skipped — no binding")
+            syncDiagnosticsLog("SyncEngine", "background handoff skipped — no binding")
             return
         }
         let clientId = bindingService.getOrCreateClientId()
@@ -1468,6 +1509,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     @objc private func appWillEnterForeground() {
         slog("[SyncEngine] app entering foreground")
+        SilentAudioService.shared.stop()
         isTransitioningToBackground = false
         backgroundUploadService.requestForegroundResumeAfterBackgroundTask()
         endBackgroundTransitionIfNeeded(reason: "willEnterForeground")
@@ -3772,6 +3814,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     )
                     uploaded = true
                     photoLibraryChanged = false // reset after round
+                    if !BackgroundHandoffPolicy.shouldContinueForegroundPipeline(
+                        isTransitioningToBackground: isTransitioningToBackground,
+                        isSilentAudioPlaying: SilentAudioService.shared.isPlaying
+                    ) {
+                        slog("[SyncPipeline] foreground pipeline paused for background handoff")
+                        syncDiagnosticsLog("SyncPipeline", "foreground pipeline paused for background handoff")
+                        return
+                    }
                 } catch {
                     if Task.isCancelled {
                         throw CancellationError()
@@ -4096,11 +4146,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
 
         for (index, asset) in assets.enumerated() {
-            // File boundary: if the app transitioned to background, yield
-            // the TCP loop so BackgroundUploadService can take over via
-            // URLSession. We also wake any armed transition continuation so
-            // `transitionToBackgroundUpload()` can proceed to hand off.
-            if isTransitioningToBackground {
+            // File boundary: normally yield the TCP loop after a background
+            // transition so BackgroundUploadService can take over via
+            // URLSession. During the silent-audio keepalive experiment, keep
+            // the foreground TCP queue running while the audio session is
+            // active.
+            if !BackgroundHandoffPolicy.shouldContinueForegroundPipeline(
+                isTransitioningToBackground: isTransitioningToBackground,
+                isSilentAudioPlaying: SilentAudioService.shared.isPlaying
+            ) {
                 slog("[SyncPipeline] breaking TCP loop — app backgrounded")
                 syncDiagnosticsLog("SyncPipeline", "breaking TCP loop — app backgrounded")
                 resumeWatchLoopIfNeeded()

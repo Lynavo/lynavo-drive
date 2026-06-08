@@ -18,8 +18,10 @@
 		9AAE6A8410E525480D8CD473 /* AlbumBrowserService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35E00EC8EDE5044F9DE0BFDA /* AlbumBrowserService.swift */; };
 		A02C8AC4F1D2121BB74AD3E9 /* AutoUploadConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D380A808E5707AB54A6BAD29 /* AutoUploadConfigStore.swift */; };
 		BEA438F6884C0C6D0918C25E /* ManualUploadService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42E22EE10B6D2552C83E31BB /* ManualUploadService.swift */; };
+		D4E1C9F42F92000100000001 /* BackgroundHandoffPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9F32F92000100000001 /* BackgroundHandoffPolicy.swift */; };
 		D4E1C9F62F7A000100000001 /* SyncFlowVersion.generated.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9F52F7A000100000001 /* SyncFlowVersion.generated.swift */; };
 		D4E1C9F82F8B000100000001 /* SharedFilesRoutePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9F72F8B000100000001 /* SharedFilesRoutePolicy.swift */; };
+		D4E1CA012F91000100000001 /* SilentAudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1CA002F91000100000001 /* SilentAudioService.swift */; };
 		DB862C6CA16A33F1996C19AF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		F099B4D807822DF27768C5E5 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 7906572870B674B3935AF6FD /* GoogleService-Info.plist */; };
 		FC3ECC2E2F6F05B5000460F8 /* RNBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC252F6F05B5000460F8 /* RNBridge.m */; };
@@ -68,8 +70,10 @@
 		BF03A37DF229F642E8356F03 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		D2C0A4C610F1EE6DEAF9DAB0 /* SharedFilesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedFilesService.swift; sourceTree = "<group>"; };
 		D380A808E5707AB54A6BAD29 /* AutoUploadConfigStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoUploadConfigStore.swift; sourceTree = "<group>"; };
+		D4E1C9F32F92000100000001 /* BackgroundHandoffPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundHandoffPolicy.swift; sourceTree = "<group>"; };
 		D4E1C9F52F7A000100000001 /* SyncFlowVersion.generated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncFlowVersion.generated.swift; sourceTree = "<group>"; };
 		D4E1C9F72F8B000100000001 /* SharedFilesRoutePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedFilesRoutePolicy.swift; sourceTree = "<group>"; };
+		D4E1CA002F91000100000001 /* SilentAudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SilentAudioService.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		FC3ECC1F2F6F05B5000460F8 /* AssetExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetExportService.swift; sourceTree = "<group>"; };
 		FC3ECC202F6F05B5000460F8 /* BackgroundExecutionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundExecutionService.swift; sourceTree = "<group>"; };
@@ -183,6 +187,7 @@
 				FC3ECF3C2F6F05B5000460F8 /* LocalTCPProxy.swift */,
 				FC3ECC1F2F6F05B5000460F8 /* AssetExportService.swift */,
 				FC3ECC202F6F05B5000460F8 /* BackgroundExecutionService.swift */,
+				D4E1C9F32F92000100000001 /* BackgroundHandoffPolicy.swift */,
 				005CC8CEE5A448A49B965375 /* BackgroundUploadService.swift */,
 				FC3ECCA12F7A0001000460F8 /* HMACAuthHelper.swift */,
 				FC3ECCB12F8A0001000460F8 /* UploadResetStateMachine.swift */,
@@ -195,6 +200,7 @@
 				FC3ECC252F6F05B5000460F8 /* RNBridge.m */,
 				FC3ECC262F6F05B5000460F8 /* RNBridge.swift */,
 				FC3ECC272F6F05B5000460F8 /* SessionService.swift */,
+				D4E1CA002F91000100000001 /* SilentAudioService.swift */,
 				FC3ECC282F6F05B5000460F8 /* SyncEngineError.swift */,
 				FC3ECC292F6F05B5000460F8 /* SyncEngineManager.swift */,
 				D4E1C9F52F7A000100000001 /* SyncFlowVersion.generated.swift */,
@@ -377,6 +383,7 @@
 				FC3ECC362F6F05B5000460F8 /* DiscoveryService.swift in Sources */,
 				FC3ECC372F6F05B5000460F8 /* PhotoScanner.swift in Sources */,
 				FC3ECC382F6F05B5000460F8 /* BackgroundExecutionService.swift in Sources */,
+				D4E1C9F42F92000100000001 /* BackgroundHandoffPolicy.swift in Sources */,
 				53B4077763B245D0B65F1815 /* BackgroundUploadService.swift in Sources */,
 				FC3ECCA02F7A0001000460F8 /* HMACAuthHelper.swift in Sources */,
 				FC3ECCB02F8A0001000460F8 /* UploadResetStateMachine.swift in Sources */,
@@ -386,6 +393,7 @@
 				FC3ECC3B2F6F05B5000460F8 /* SyncEngineError.swift in Sources */,
 				FC3ECC3C2F6F05B5000460F8 /* ProtocolSession.swift in Sources */,
 				D4E1C9F62F7A000100000001 /* SyncFlowVersion.generated.swift in Sources */,
+				D4E1CA012F91000100000001 /* SilentAudioService.swift in Sources */,
 				9AAE6A8410E525480D8CD473 /* AlbumBrowserService.swift in Sources */,
 				A02C8AC4F1D2121BB74AD3E9 /* AutoUploadConfigStore.swift in Sources */,
 				BEA438F6884C0C6D0918C25E /* ManualUploadService.swift in Sources */,
@@ -419,7 +427,7 @@
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = SyncFlowMobile/SyncFlowMobile.entitlements;
-				CURRENT_PROJECT_VERSION = 52;
+				CURRENT_PROJECT_VERSION = 53;
 				DEVELOPMENT_TEAM = S44ANBLMF9;
 				ENABLE_BITCODE = NO;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -462,7 +470,7 @@
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = SyncFlowMobile/SyncFlowMobileGlobal.entitlements;
-				CURRENT_PROJECT_VERSION = 52;
+				CURRENT_PROJECT_VERSION = 53;
 				DEVELOPMENT_TEAM = S44ANBLMF9;
 				ENABLE_BITCODE = NO;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -505,7 +513,7 @@
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = SyncFlowMobile/SyncFlowMobile.entitlements;
-				CURRENT_PROJECT_VERSION = 52;
+				CURRENT_PROJECT_VERSION = 53;
 				DEVELOPMENT_TEAM = S44ANBLMF9;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -546,7 +554,7 @@
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = SyncFlowMobile/SyncFlowMobileGlobal.entitlements;
-				CURRENT_PROJECT_VERSION = 52;
+				CURRENT_PROJECT_VERSION = 53;
 				DEVELOPMENT_TEAM = S44ANBLMF9;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",

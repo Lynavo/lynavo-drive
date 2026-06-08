@@ -1,18 +1,29 @@
 import Foundation
 import AVFoundation
 
-/// Plays inaudible audio to keep the app alive in the background.
-/// Start when sync pipeline begins, stop only when app is terminated.
+/// Plays inaudible audio so we can test whether the audio background mode
+/// keeps the app process alive after the app moves to the background.
 class SilentAudioService {
     static let shared = SilentAudioService()
 
     private var audioPlayer: AVAudioPlayer?
-    private var isPlaying = false
+    private var _isPlaying = false
+    private let stateLock = NSLock()
+
+    var isPlaying: Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return _isPlaying
+    }
 
     private init() {}
 
-    func start() {
-        guard !isPlaying else { return }
+    @discardableResult
+    func start() -> Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+
+        guard !_isPlaying else { return true }
 
         do {
             // Configure audio session for background playback
@@ -20,11 +31,13 @@ class SilentAudioService {
             try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
             try session.setActive(true)
 
-            // Generate a tiny silent WAV in memory (1 second, mono, 8kHz, 8-bit)
+            // Generate a tiny silent WAV in memory (1 second, mono, 8kHz, 16-bit signed PCM).
             let sampleRate: Int = 8000
             let duration: Int = 1
+            let bytesPerSample: Int = 2
+            let channelCount: Int = 1
             let numSamples = sampleRate * duration
-            let silence = Data(count: numSamples) // all zeros = silence
+            let silence = Data(count: numSamples * bytesPerSample)
 
             var wavData = Data()
             // WAV header
@@ -36,29 +49,42 @@ class SilentAudioService {
             wavData.append(uint16LE: 1)               // PCM
             wavData.append(uint16LE: 1)               // mono
             wavData.append(uint32LE: UInt32(sampleRate))
-            wavData.append(uint32LE: UInt32(sampleRate)) // byte rate
-            wavData.append(uint16LE: 1)               // block align
-            wavData.append(uint16LE: 8)               // bits per sample
+            wavData.append(uint32LE: UInt32(sampleRate * channelCount * bytesPerSample)) // byte rate
+            wavData.append(uint16LE: UInt16(channelCount * bytesPerSample)) // block align
+            wavData.append(uint16LE: UInt16(bytesPerSample * 8)) // bits per sample
             wavData.append(contentsOf: "data".utf8)
             wavData.append(uint32LE: UInt32(silence.count))
             wavData.append(silence)
 
             audioPlayer = try AVAudioPlayer(data: wavData)
             audioPlayer?.numberOfLoops = -1 // loop forever
-            audioPlayer?.volume = 0.0
-            audioPlayer?.play()
-            isPlaying = true
+            audioPlayer?.volume = 1.0
+            guard audioPlayer?.play() == true else {
+                audioPlayer = nil
+                try? session.setActive(false, options: .notifyOthersOnDeactivation)
+                slog("[SilentAudio] failed to start: AVAudioPlayer refused playback")
+                return false
+            }
+            _isPlaying = true
             slog("[SilentAudio] started background audio")
+            return true
         } catch {
+            audioPlayer = nil
+            _isPlaying = false
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             slog("[SilentAudio] failed to start: %@", "\(error)")
+            return false
         }
     }
 
     func stop() {
-        guard isPlaying else { return }
+        stateLock.lock()
+        defer { stateLock.unlock() }
+
+        guard _isPlaying else { return }
         audioPlayer?.stop()
         audioPlayer = nil
-        isPlaying = false
+        _isPlaying = false
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         slog("[SilentAudio] stopped")
     }

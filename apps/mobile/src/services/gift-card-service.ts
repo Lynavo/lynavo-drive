@@ -1,4 +1,5 @@
-import { apiGet, apiPost } from './api';
+import { apiPost } from './api';
+import { getAppConfig } from './app-config-service';
 
 export interface GiftCardConfig {
   enabled: boolean;
@@ -14,14 +15,6 @@ export interface GiftCardRedeemResult {
   status: string;
 }
 
-interface GiftCardConfigResponse {
-  features?: {
-    gift_card?: {
-      enabled?: boolean;
-    };
-  };
-}
-
 interface GiftCardRedeemResponse {
   plan: string;
   gift_card_id: number;
@@ -33,10 +26,8 @@ interface GiftCardRedeemResponse {
 }
 
 export async function getGiftCardConfig(): Promise<GiftCardConfig> {
-  const data = await apiGet<GiftCardConfigResponse>('/config', {
-    skipAuth: true,
-  });
-  return { enabled: data.features?.gift_card?.enabled === true };
+  const config = await getAppConfig();
+  return config.giftCard;
 }
 
 export async function redeemGiftCard(

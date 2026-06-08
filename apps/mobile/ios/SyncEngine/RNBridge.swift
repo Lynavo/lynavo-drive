@@ -633,6 +633,16 @@ class NativeSyncEngineModule: RCTEventEmitter {
         }
     }
 
+    @objc
+    func setBackgroundSilentAudioEnabled(
+        _ enabled: Bool,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        SyncEngineManager.shared.setBackgroundSilentAudioEnabled(enabled)
+        resolve(nil)
+    }
+
     // MARK: - Vivi Drop: Shared Files
 
     @objc
