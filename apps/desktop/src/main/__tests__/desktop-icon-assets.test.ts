@@ -101,7 +101,7 @@ function readPngAlpha(filePath: string): {
 }
 
 describe('desktop app icon assets', () => {
-  it('keeps macOS app icons rounded with transparent outer corners for the Dock', () => {
+  it('keeps macOS app icons rounded with transparent outer padding for the Dock', () => {
     const iconFiles = [
       'icon-1024.png',
       'icon.iconset/icon_16x16.png',
@@ -123,6 +123,10 @@ describe('desktop app icon assets', () => {
       expect(png.getAlpha(png.width - 1, 0)).toBe(0);
       expect(png.getAlpha(0, png.height - 1)).toBe(0);
       expect(png.getAlpha(png.width - 1, png.height - 1)).toBe(0);
+      expect(png.getAlpha(Math.floor(png.width / 2), 0)).toBe(0);
+      expect(png.getAlpha(Math.floor(png.width / 2), png.height - 1)).toBe(0);
+      expect(png.getAlpha(0, Math.floor(png.height / 2))).toBe(0);
+      expect(png.getAlpha(png.width - 1, Math.floor(png.height / 2))).toBe(0);
       expect(png.getAlpha(Math.floor(png.width / 2), Math.floor(png.height / 2))).toBe(255);
     }
   });
