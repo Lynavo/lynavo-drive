@@ -3,16 +3,33 @@ const mockResumeAutoUpload = jest.fn();
 const mockDisableAutoUpload = jest.fn();
 const mockGetAlbumStats = jest.fn();
 const mockRequestPhotoPermission = jest.fn();
+const mockNotificationPermissionCheck = jest.fn();
+const mockNotificationPermissionRequest = jest.fn();
 const mockAsyncStorageGetItem = jest.fn();
 const mockAsyncStorageSetItem = jest.fn();
 const mockAsyncStorageRemoveItem = jest.fn();
 let mockPlatformOS = 'ios';
+let mockPlatformVersion: string | number = '17.0';
 
 jest.mock('react-native', () => ({
   Platform: {
     get OS() {
       return mockPlatformOS;
     },
+    get Version() {
+      return mockPlatformVersion;
+    },
+  },
+  PermissionsAndroid: {
+    PERMISSIONS: {
+      POST_NOTIFICATIONS: 'android.permission.POST_NOTIFICATIONS',
+    },
+    RESULTS: {
+      GRANTED: 'granted',
+    },
+    check: (...args: unknown[]) => mockNotificationPermissionCheck(...args),
+    request: (...args: unknown[]) =>
+      mockNotificationPermissionRequest(...args),
   },
   NativeModules: {
     NativeSyncEngine: {
@@ -46,6 +63,7 @@ describe('SyncEngineModule auto upload session baseline', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     mockPlatformOS = 'ios';
+    mockPlatformVersion = '17.0';
     mockGetAutoUploadConfig.mockResolvedValue({
       enabled: false,
       state: 'disabled',
@@ -63,6 +81,8 @@ describe('SyncEngineModule auto upload session baseline', () => {
     mockAsyncStorageGetItem.mockResolvedValue(null);
     mockAsyncStorageSetItem.mockResolvedValue(undefined);
     mockAsyncStorageRemoveItem.mockResolvedValue(undefined);
+    mockNotificationPermissionCheck.mockResolvedValue(true);
+    mockNotificationPermissionRequest.mockResolvedValue('granted');
     await clearAutoUploadSessionForTest();
     clearRememberedAutoUploadRoundProgressForTest();
     jest.clearAllMocks();
@@ -86,14 +106,22 @@ describe('SyncEngineModule auto upload session baseline', () => {
 
   it('requests Android photo permission before enabling native auto upload', async () => {
     mockPlatformOS = 'android';
+    mockPlatformVersion = 33;
+    mockNotificationPermissionCheck.mockResolvedValueOnce(false);
 
     await expect(enableAutoUpload()).resolves.toBeUndefined();
 
     expect(mockRequestPhotoPermission).toHaveBeenCalledTimes(1);
+    expect(mockNotificationPermissionRequest).toHaveBeenCalledWith(
+      'android.permission.POST_NOTIFICATIONS',
+    );
     expect(mockResumeAutoUpload).toHaveBeenCalledTimes(1);
     expect(mockRequestPhotoPermission.mock.invocationCallOrder[0]).toBeLessThan(
       mockResumeAutoUpload.mock.invocationCallOrder[0],
     );
+    expect(
+      mockNotificationPermissionRequest.mock.invocationCallOrder[0],
+    ).toBeLessThan(mockResumeAutoUpload.mock.invocationCallOrder[0]);
   });
 
   it('does not enable native auto upload when Android photo permission is denied', async () => {
@@ -102,6 +130,19 @@ describe('SyncEngineModule auto upload session baseline', () => {
 
     await expect(enableAutoUpload()).rejects.toThrow(
       'Android photo library access is required for auto upload',
+    );
+
+    expect(mockResumeAutoUpload).not.toHaveBeenCalled();
+  });
+
+  it('does not enable native auto upload when Android notification permission is denied', async () => {
+    mockPlatformOS = 'android';
+    mockPlatformVersion = 33;
+    mockNotificationPermissionCheck.mockResolvedValueOnce(false);
+    mockNotificationPermissionRequest.mockResolvedValueOnce('denied');
+
+    await expect(enableAutoUpload()).rejects.toThrow(
+      'Android notification permission is required for background sync',
     );
 
     expect(mockResumeAutoUpload).not.toHaveBeenCalled();

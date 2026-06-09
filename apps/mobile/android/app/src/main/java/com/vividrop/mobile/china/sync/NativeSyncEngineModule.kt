@@ -18,6 +18,8 @@ import android.os.SystemClock
 import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Log
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.FileProvider
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -28,7 +30,6 @@ import com.facebook.react.bridge.WritableArray
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.facebook.react.modules.core.PermissionAwareActivity
-import androidx.core.content.FileProvider
 import mobiletunnel.Mobiletunnel
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -91,6 +92,10 @@ class NativeSyncEngineModule(
   private var pendingDiscoveryPermissionPromise: Promise? = null
   private val uploadStore by lazy { AndroidUploadStore(reactApplicationContext) }
   private val mediaStoreRepository by lazy { AndroidMediaStoreRepository(reactApplicationContext) }
+  @Volatile private var foregroundSyncStopRequested = false
+  private val foregroundSyncStopHandler: () -> Unit = {
+    requestForegroundSyncStopInternal()
+  }
   private val p2pTunnelLock = Any()
   private val p2pTunnelExecutor = Executors.newSingleThreadExecutor { runnable ->
     Thread(runnable, "ViviP2PTunnel").apply { isDaemon = true }
@@ -105,6 +110,7 @@ class NativeSyncEngineModule(
   @Volatile private var sharedFilesReachability: SharedFilesReachability? = null
 
   init {
+    foregroundSyncStopCallback = foregroundSyncStopHandler
     registerNetworkAvailabilityMonitor()
     resumePresenceHeartbeatFromStoredBinding(reason = "module_initialized")
   }
@@ -117,6 +123,9 @@ class NativeSyncEngineModule(
     stopPresenceHeartbeatTimer()
     stopP2PTunnel()
     unregisterNetworkAvailabilityMonitor()
+    if (foregroundSyncStopCallback === foregroundSyncStopHandler) {
+      foregroundSyncStopCallback = null
+    }
     super.invalidate()
   }
 
@@ -816,17 +825,39 @@ class NativeSyncEngineModule(
   @ReactMethod
   fun triggerSync(promise: Promise) {
     recordNativeLog("Sync", "triggerSync requested")
-    thread(name = "NativeSyncEngineSync", isDaemon = true) {
-      performSyncRound(reason = "manual_trigger")
-    }
+    startForegroundSyncRound(reason = "manual_trigger", threadName = "NativeSyncEngineSync")
     promise.resolve(null)
   }
 
   private fun startAutoUploadSyncRound(reason: String) {
     recordDiagnosticsLog("AutoUpload", "starting sync round reason=$reason")
-    thread(name = "NativeSyncEngineAutoUpload", isDaemon = true) {
-      performSyncRound(reason = reason)
+    startForegroundSyncRound(reason = reason, threadName = "NativeSyncEngineAutoUpload")
+  }
+
+  @ReactMethod
+  fun startBackgroundSyncService(reason: String, promise: Promise) {
+    try {
+      if (!startForegroundSyncService(reason.ifBlank { "manual_trigger" })) {
+        promise.reject(
+          "ANDROID_BACKGROUND_SYNC_SERVICE_UNAVAILABLE",
+          "無法啟動 Android 背景同步服務。",
+        )
+        return
+      }
+      promise.resolve(null)
+    } catch (error: Throwable) {
+      promise.reject("ANDROID_BACKGROUND_SYNC_SERVICE_FAILED", error.message, error)
     }
+  }
+
+  @ReactMethod
+  fun stopBackgroundSyncService(promise: Promise) {
+    requestForegroundSyncStopInternal()
+    val shouldFinishService = synchronized(syncRunLock) { !syncInProgress }
+    if (shouldFinishService) {
+      stopForegroundSyncService()
+    }
+    promise.resolve(null)
   }
 
   @ReactMethod
@@ -993,9 +1024,10 @@ class NativeSyncEngineModule(
       }
       promise.resolve(result)
       if (queued.isNotEmpty()) {
-        thread(name = "NativeSyncEngineManualUpload", isDaemon = true) {
-          runCatching { performSyncRound(reason = "manual_upload") }
-        }
+        startForegroundSyncRound(
+          reason = "manual_upload",
+          threadName = "NativeSyncEngineManualUpload",
+        )
       }
     }
   }
@@ -1223,6 +1255,55 @@ class NativeSyncEngineModule(
     }
   }
 
+  private fun startForegroundSyncRound(
+    reason: String,
+    threadName: String,
+    notificationReason: String = reason,
+  ) {
+    thread(name = threadName, isDaemon = true) {
+      performSyncRound(reason = reason, notificationReason = notificationReason)
+    }
+  }
+
+  private fun startForegroundSyncService(reason: String): Boolean {
+    if (!NotificationManagerCompat.from(reactApplicationContext).areNotificationsEnabled()) {
+      recordNativeLog(
+        "BackgroundSync",
+        "foreground service notification is not allowed",
+        Log.WARN,
+      )
+      return false
+    }
+
+    return runCatching {
+      AndroidForegroundSyncService.start(reactApplicationContext, reason)
+      true
+    }.onFailure { error ->
+      recordNativeLog(
+        "BackgroundSync",
+        "failed to start foreground service: ${error.message ?: error.javaClass.simpleName}",
+        Log.WARN,
+      )
+    }.getOrDefault(false)
+  }
+
+  private fun stopForegroundSyncService() {
+    runCatching {
+      AndroidForegroundSyncService.finish(reactApplicationContext)
+    }.onFailure { error ->
+      recordNativeLog(
+        "BackgroundSync",
+        "failed to stop foreground service: ${error.message ?: error.javaClass.simpleName}",
+        Log.WARN,
+      )
+    }
+  }
+
+  private fun requestForegroundSyncStopInternal() {
+    foregroundSyncStopRequested = true
+    recordDiagnosticsLog("BackgroundSync", "foreground sync stop requested")
+  }
+
   private fun pairingTokenForKnownDevice(deviceId: String): String? {
     val normalizedDeviceId = deviceId.trim()
     if (normalizedDeviceId.isBlank()) {
@@ -1362,13 +1443,27 @@ class NativeSyncEngineModule(
     }
   }
 
-  private fun performSyncRound(reason: String) {
+  private fun performSyncRound(reason: String, notificationReason: String = reason) {
     synchronized(syncRunLock) {
       if (syncInProgress) {
         recordDiagnosticsLog("Sync", "round skipped reason=$reason syncInProgress=true")
         return
       }
       syncInProgress = true
+      foregroundSyncStopRequested = false
+    }
+    if (!startForegroundSyncService(notificationReason)) {
+      synchronized(syncRunLock) {
+        syncInProgress = false
+      }
+      foregroundSyncStopRequested = false
+      recordDiagnosticsLog("BackgroundSync", "round aborted reason=$reason foregroundServiceAvailable=false")
+      emitError(
+        code = "ANDROID_BACKGROUND_SYNC_SERVICE_UNAVAILABLE",
+        message = "無法啟動 Android 背景同步服務，已保留佇列。",
+      )
+      emitIdleSyncState(loadBinding())
+      return
     }
     try {
       var binding = loadBinding()
@@ -1453,6 +1548,13 @@ class NativeSyncEngineModule(
         var completedBytes = 0L
         var lastCompletedTaskSource: String? = null
         for ((index, item) in pending.withIndex()) {
+          if (foregroundSyncStopRequested) {
+            recordDiagnosticsLog(
+              "BackgroundSync",
+              "round stopped before next item reason=$reason completed=$completedCount/${pending.size}",
+            )
+            break
+          }
           val current = uploadStore.getItemByAssetId(item.assetLocalId) ?: item
           val currentAutoState = loadAutoUploadConfig().state
           if (!AndroidSyncPrimitives.shouldContinueAutoUploadRound(reason, current.source, currentAutoState)) {
@@ -1521,6 +1623,12 @@ class NativeSyncEngineModule(
         emitIdleSyncState(loadBinding())
         return
       }
+      if (error is ForegroundSyncStoppedException) {
+        recordDiagnosticsLog("BackgroundSync", "round stopped by foreground notification action")
+        emitQueueUpdated(uploadStore.queueToWritableArray(uploadStore.getPendingItems(limit = 100)))
+        emitIdleSyncState(loadBinding())
+        return
+      }
       val message = error.message ?: "Android sync failed"
       recordDiagnosticsLog("Sync", "sync failed: $message")
       emitError("ANDROID_SYNC_FAILED", message)
@@ -1541,6 +1649,8 @@ class NativeSyncEngineModule(
           sendPresenceHeartbeatAsync(it, reason = "sync_round_finished", recoverOnFailure = true)
           startPresenceHeartbeatTimer(it)
         }
+      foregroundSyncStopRequested = false
+      stopForegroundSyncService()
     }
   }
 
@@ -1746,6 +1856,15 @@ class NativeSyncEngineModule(
       var speedLastCheckElapsedMs = SystemClock.elapsedRealtime()
       var currentSpeedMbps = 0.0
       while (offset < item.fileSize) {
+        if (foregroundSyncStopRequested) {
+          uploadStore.updateStatus(item.fileKey, "queued", isoNow())
+          uploadStore.updateOffset(item.fileKey, offset, isoNow())
+          recordDiagnosticsLog(
+            "BackgroundSync",
+            "current item stopped by notification action fileKey=${item.fileKey} ackedOffset=$offset",
+          )
+          throw ForegroundSyncStoppedException()
+        }
         val currentAutoState = loadAutoUploadConfig().state
         if (!AndroidSyncPrimitives.shouldContinueAutoUploadRound(roundReason, item.source, currentAutoState)) {
           uploadStore.updateStatus(item.fileKey, "cancelled", isoNow())
@@ -3032,9 +3151,11 @@ class NativeSyncEngineModule(
   }
 
   private fun resumePendingManualQueueAfterReconnect() {
-    thread(name = "NativeSyncEngineManualReconnect", isDaemon = true) {
-      performSyncRound(reason = "manual_upload")
-    }
+    startForegroundSyncRound(
+      reason = "manual_upload",
+      threadName = "NativeSyncEngineManualReconnect",
+      notificationReason = "manual_reconnect",
+    )
   }
 
   private fun sendPresenceHeartbeatAsync(
@@ -4769,6 +4890,8 @@ class NativeSyncEngineModule(
     val autoUploadState: String,
   ) : Exception("Auto upload stopped: $autoUploadState")
 
+  private class ForegroundSyncStoppedException : Exception("Foreground sync stopped")
+
   private data class P2PTunnelStartSnapshot(
     val generation: Long,
     val signalingUrl: String,
@@ -4801,6 +4924,7 @@ class NativeSyncEngineModule(
 
   companion object {
     private const val MODULE_NAME = "NativeSyncEngine"
+    @Volatile private var foregroundSyncStopCallback: (() -> Unit)? = null
     private const val MAX_DIAGNOSTICS_LOG_LINES = 2_000
     private const val PHOTO_PERMISSION_REQUEST_CODE = 39_394
     private const val DISCOVERY_PERMISSION_REQUEST_CODE = 39_395
@@ -4953,6 +5077,10 @@ class NativeSyncEngineModule(
         if (removed) "cleared auth keychain prefs ($AUTH_KEYCHAIN_PREFS_NAME)"
         else "no auth keychain prefs to clear ($AUTH_KEYCHAIN_PREFS_NAME)",
       )
+    }
+
+    fun requestForegroundSyncStop() {
+      foregroundSyncStopCallback?.invoke()
     }
   }
 }
