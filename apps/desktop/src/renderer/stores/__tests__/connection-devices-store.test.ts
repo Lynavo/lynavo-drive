@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConnectionDevicesSettingsDTO } from '@syncflow/contracts';
 import { useConnectionDevicesStore } from '../connection-devices-store';
 
@@ -52,6 +52,12 @@ describe('connection devices store', () => {
         clearBlockedClient: vi.fn().mockResolvedValue({ ok: true }),
       },
     } as unknown as Window['electronAPI'];
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(window, 'electronAPI');
+    useConnectionDevicesStore.setState(useConnectionDevicesStore.getInitialState());
+    vi.restoreAllMocks();
   });
 
   it('loads connection devices from preload API', async () => {
