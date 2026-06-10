@@ -144,6 +144,14 @@ func recvJSON(t *testing.T, conn net.Conn, expectedType uint16, v any) {
 	}
 }
 
+func assertNoExtraFrame(t *testing.T, conn net.Conn) {
+	t.Helper()
+	conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+	if hdr, _, err := protocol.ReadFrame(conn); err == nil {
+		t.Fatalf("unexpected extra frame type=0x%04x", hdr.Type)
+	}
+}
+
 // sendFileData constructs and sends a FILE_DATA binary frame.
 func sendFileData(t *testing.T, conn net.Conn, fileKey string, offset int64, data []byte) {
 	t.Helper()
@@ -397,6 +405,7 @@ func TestWrongConnectionCodeBlocksOnFifthAttempt(t *testing.T) {
 		if pairRes.ErrorMeta.MaxAttempts != 5 {
 			t.Fatalf("attempt %d maxAttempts=%d, want 5", attempt, pairRes.ErrorMeta.MaxAttempts)
 		}
+		assertNoExtraFrame(t, attemptClient)
 
 		attemptClient.Close()
 		attemptCleanup()
@@ -440,6 +449,10 @@ func TestBlockedClientRejectedAtHelloBeforePairReq(t *testing.T) {
 	if errMsg.Code != "PAIRING_CLIENT_BLOCKED" {
 		t.Fatalf("error code=%q, want PAIRING_CLIENT_BLOCKED", errMsg.Code)
 	}
+	if errMsg.Meta == nil {
+		t.Fatal("expected blocked error metadata")
+	}
+	assertNoExtraFrame(t, client)
 
 	attempts, err := st.ListRecentPairingAttempts(1)
 	if err != nil {
@@ -534,6 +547,65 @@ func TestRevokedDeviceCannotUseOldTokenButCanRepairWithCorrectCode(t *testing.T)
 	if repairPair.PairingToken == oldToken {
 		t.Fatal("repair pairing token should differ from old token")
 	}
+}
+
+func TestAuthBlockedAfterNonceDoesNotSendExtraProtocolError(t *testing.T) {
+	client, st, cfg, cleanup := setupTestConnection(t)
+	defer cleanup()
+	if err := st.SetSetting("device_id", "desktop-1"); err != nil {
+		t.Fatalf("SetSetting(device_id): %v", err)
+	}
+
+	pairingToken := pairClientWithCode(t, client, "phone-a", testConnCode)
+	if !pairingToken.OK {
+		t.Fatalf("initial pairing failed: errorCode=%q error=%q", pairingToken.ErrorCode, pairingToken.Error)
+	}
+	client.Close()
+	time.Sleep(50 * time.Millisecond)
+
+	client2, cleanup2 := setupTestConnectionWithStore(t, st, cfg)
+	defer cleanup2()
+	sendJSON(t, client2, protocol.TypeHelloReq, protocol.HelloReq{
+		ClientID:                "phone-a",
+		ClientName:              testClientName,
+		ClientPlatform:          "ios",
+		AppVersion:              "1.0.0",
+		AppCompatibilityVersion: protocol.AppCompatibilityVersion,
+		PairingToken:            pairingToken.PairingToken,
+		AppState:                "active",
+		DeviceAlias:             "Nick iPhone",
+		StableDeviceID:          "phone-a-stable",
+	})
+
+	var helloRes protocol.HelloRes
+	recvJSON(t, client2, protocol.TypeHelloRes, &helloRes)
+	if helloRes.AuthRequired {
+		t.Fatal("expected authRequired=false before auth block race")
+	}
+	if helloRes.Nonce == "" {
+		t.Fatal("nonce is empty")
+	}
+
+	for i := 0; i < 5; i++ {
+		if _, err := st.RecordPairingFailure(pairingTestMeta("phone-a", "desktop-1"), 5); err != nil {
+			t.Fatalf("RecordPairingFailure: %v", err)
+		}
+	}
+
+	sendJSON(t, client2, protocol.TypeAuthReq, protocol.AuthReq{
+		ClientID: "phone-a",
+		Auth:     computeHMAC(t, pairingToken.PairingToken, helloRes.Nonce),
+	})
+
+	var errMsg protocol.ErrorMsg
+	recvJSON(t, client2, protocol.TypeError, &errMsg)
+	if errMsg.Code != "PAIRING_CLIENT_BLOCKED" {
+		t.Fatalf("error code=%q, want PAIRING_CLIENT_BLOCKED", errMsg.Code)
+	}
+	if errMsg.Meta == nil {
+		t.Fatal("expected blocked error metadata")
+	}
+	assertNoExtraFrame(t, client2)
 }
 
 func TestHelloResponseAdvertisesWakeCapability(t *testing.T) {

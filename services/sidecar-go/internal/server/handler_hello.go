@@ -61,7 +61,7 @@ func (c *connection) handleHello(body []byte) error {
 	if block, err := c.store.GetActivePairingBlock(meta.ClientID, meta.DesktopDeviceID); err != nil {
 		return fmt.Errorf("check active pairing block: %w", err)
 	} else if block != nil {
-		return c.rejectPairingBlocked(meta)
+		return c.rejectPairingBlocked(meta, block)
 	}
 
 	if req.AppCompatibilityVersion != protocol.AppCompatibilityVersion {
@@ -257,10 +257,21 @@ func pairingErrorMeta(result store.PairingFailureResult) *protocol.PairingErrorM
 	}
 }
 
-func (c *connection) rejectPairingBlocked(meta store.PairingClientMetadata) error {
+func (c *connection) rejectPairingBlocked(meta store.PairingClientMetadata, block *store.BlockedPairingClient) error {
 	_ = c.store.RecordPairingAttempt(meta, store.PairingAttemptBlocked, errorPairingClientBlocked)
 	_ = c.store.TouchActivePairingBlock(meta)
-	return c.rejectWithError(errorPairingClientBlocked, "This mobile client is blocked on this desktop")
+	if err := c.sendJSON(protocol.TypeError, protocol.ErrorMsg{
+		Code:    errorPairingClientBlocked,
+		Message: "This mobile client is blocked on this desktop",
+		Meta: &protocol.PairingErrorMetadata{
+			FailedAttempts:    block.FailedAttempts,
+			RemainingAttempts: 0,
+			MaxAttempts:       pairingMaxWrongCodeAttempts,
+		},
+	}); err != nil {
+		return err
+	}
+	return errProtocolErrorAlreadySent
 }
 
 func desktopAppVersion() string {
@@ -307,8 +318,18 @@ func (c *connection) handleAuth(body []byte) error {
 		}
 		_ = c.store.RecordPairingAttempt(meta, store.PairingAttemptBlocked, errorPairingClientBlocked)
 		_ = c.store.TouchActivePairingBlock(meta)
-		_ = c.sendError(errorPairingClientBlocked, "This mobile client is blocked on this desktop")
-		return fmt.Errorf("blocked client attempted auth %s failedAttempts=%d", c.clientID, block.FailedAttempts)
+		if err := c.sendJSON(protocol.TypeError, protocol.ErrorMsg{
+			Code:    errorPairingClientBlocked,
+			Message: "This mobile client is blocked on this desktop",
+			Meta: &protocol.PairingErrorMetadata{
+				FailedAttempts:    block.FailedAttempts,
+				RemainingAttempts: 0,
+				MaxAttempts:       pairingMaxWrongCodeAttempts,
+			},
+		}); err != nil {
+			return err
+		}
+		return errProtocolErrorAlreadySent
 	}
 
 	// Compute expected HMAC: HMAC-SHA256(pairing_token_hash_bytes, nonce_bytes)
@@ -326,8 +347,10 @@ func (c *connection) handleAuth(body []byte) error {
 	expected := hex.EncodeToString(mac.Sum(nil))
 
 	if !hmac.Equal([]byte(expected), []byte(req.Auth)) {
-		_ = c.sendError(errorPairTokenInvalid, "HMAC verification failed")
-		return fmt.Errorf("HMAC mismatch for client %s", c.clientID)
+		if err := c.sendError(errorPairTokenInvalid, "HMAC verification failed"); err != nil {
+			return err
+		}
+		return errProtocolErrorAlreadySent
 	}
 
 	slog.Info("client authenticated via HMAC", "clientID", c.clientID)
@@ -373,7 +396,7 @@ func (c *connection) handlePair(body []byte) error {
 	} else if block != nil {
 		_ = c.store.RecordPairingAttempt(meta, store.PairingAttemptBlocked, errorPairingClientBlocked)
 		_ = c.store.TouchActivePairingBlock(meta)
-		_ = c.sendJSON(protocol.TypePairRes, protocol.PairRes{
+		if err := c.sendJSON(protocol.TypePairRes, protocol.PairRes{
 			OK:        false,
 			Error:     "client blocked",
 			ErrorCode: errorPairingClientBlocked,
@@ -382,8 +405,10 @@ func (c *connection) handlePair(body []byte) error {
 				RemainingAttempts: 0,
 				MaxAttempts:       pairingMaxWrongCodeAttempts,
 			},
-		})
-		return fmt.Errorf("blocked pairing client %s", req.ClientID)
+		}); err != nil {
+			return err
+		}
+		return errProtocolErrorAlreadySent
 	}
 
 	// Verify connection code
@@ -404,13 +429,15 @@ func (c *connection) handlePair(body []byte) error {
 			code = errorPairingClientBlocked
 			message = "client blocked"
 		}
-		_ = c.sendJSON(protocol.TypePairRes, protocol.PairRes{
+		if err := c.sendJSON(protocol.TypePairRes, protocol.PairRes{
 			OK:        false,
 			Error:     message,
 			ErrorCode: code,
 			ErrorMeta: pairingErrorMeta(result),
-		})
-		return fmt.Errorf("invalid connection code from %s", req.ClientID)
+		}); err != nil {
+			return err
+		}
+		return errProtocolErrorAlreadySent
 	}
 
 	// Generate pairing credentials
