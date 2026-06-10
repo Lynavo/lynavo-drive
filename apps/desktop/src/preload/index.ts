@@ -15,6 +15,9 @@ const IPC = {
   SIDECAR_SETTINGS: 'sidecar:settings',
   SIDECAR_UPDATE_SETTINGS: 'sidecar:update-settings',
   SIDECAR_RESET_STATE: 'sidecar:reset-state',
+  SIDECAR_CONNECTION_DEVICES: 'sidecar:connection-devices',
+  SIDECAR_REVOKE_CONNECTION_DEVICE: 'sidecar:revoke-connection-device',
+  SIDECAR_CLEAR_BLOCKED_CLIENT: 'sidecar:clear-blocked-client',
   SIDECAR_CLIENT_CONFIG: 'sidecar:client-config',
   SIDECAR_REDEEM_GIFT_CARD: 'sidecar:redeem-gift-card',
   AUTH_SEND_SMS_CODE: 'auth:send-sms-code',
@@ -62,6 +65,11 @@ const electronAPI: ElectronAPI = {
     getSettings: () => ipcRenderer.invoke(IPC.SIDECAR_SETTINGS),
     updateSettings: (settings) => ipcRenderer.invoke(IPC.SIDECAR_UPDATE_SETTINGS, settings),
     resetState: () => ipcRenderer.invoke(IPC.SIDECAR_RESET_STATE),
+    getConnectionDevices: () => ipcRenderer.invoke(IPC.SIDECAR_CONNECTION_DEVICES),
+    revokeConnectionDevice: (clientId: string) =>
+      ipcRenderer.invoke(IPC.SIDECAR_REVOKE_CONNECTION_DEVICE, clientId),
+    clearBlockedClient: (clientId: string) =>
+      ipcRenderer.invoke(IPC.SIDECAR_CLEAR_BLOCKED_CLIENT, clientId),
     getClientConfig: () => ipcRenderer.invoke(IPC.SIDECAR_CLIENT_CONFIG),
     redeemGiftCard: (payload: { code: string }) =>
       ipcRenderer.invoke(IPC.SIDECAR_REDEEM_GIFT_CARD, payload),

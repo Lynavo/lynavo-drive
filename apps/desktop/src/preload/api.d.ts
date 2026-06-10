@@ -1,4 +1,5 @@
 import type {
+  ConnectionDevicesSettingsDTO,
   DashboardSummaryDTO,
   DashboardDeviceDTO,
   DeviceFileLedgerPageDTO,
@@ -73,6 +74,9 @@ export interface ElectronAPI {
     getSettings(): Promise<SettingsDTO>;
     updateSettings(settings: Partial<SettingsDTO>): Promise<SettingsDTO>;
     resetState(): Promise<{ ok: boolean }>;
+    getConnectionDevices(): Promise<ConnectionDevicesSettingsDTO>;
+    revokeConnectionDevice(clientId: string): Promise<{ ok: boolean }>;
+    clearBlockedClient(clientId: string): Promise<{ ok: boolean }>;
     getClientConfig(): Promise<{
       features: {
         giftCard: {

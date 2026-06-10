@@ -12,6 +12,7 @@ import {
   VIVIDROP_REVIEW_API_BASE_URL,
 } from '@syncflow/contracts';
 import type {
+  ConnectionDevicesSettingsDTO,
   DeviceFileLedgerPageDTO,
   DeviceFileSortField,
   SortDirection,
@@ -861,6 +862,20 @@ export const sidecarClient = {
   updateSettings: (s: Partial<import('@syncflow/contracts').SettingsDTO>) =>
     request<import('@syncflow/contracts').SettingsDTO>('PUT', '/settings', s),
   resetState: () => request<{ ok: boolean }>('POST', '/settings/reset-state', {}),
+  getConnectionDevices: () =>
+    request<ConnectionDevicesSettingsDTO>('GET', '/settings/connection-devices'),
+  revokeConnectionDevice: (clientId: string) =>
+    request<{ ok: boolean }>(
+      'POST',
+      `/settings/connection-devices/${encodeURIComponent(clientId)}/revoke`,
+      {},
+    ),
+  clearBlockedClient: (clientId: string) =>
+    request<{ ok: boolean }>(
+      'POST',
+      `/settings/blocked-clients/${encodeURIComponent(clientId)}/clear`,
+      {},
+    ),
   regenerateConnectionCode: () => request<{ code: string }>('POST', '/connection-code/regenerate'),
   getShareStatus: () =>
     request<import('@syncflow/contracts').ShareStatusDTO>('GET', '/share/status'),

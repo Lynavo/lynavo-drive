@@ -103,6 +103,9 @@ vi.mock('../sidecar-client', async () => {
       validateShare: vi.fn(),
       getTransferActive: vi.fn(),
       getSharedList: vi.fn(),
+      getConnectionDevices: vi.fn(),
+      revokeConnectionDevice: vi.fn(),
+      clearBlockedClient: vi.fn(),
       getClientConfig: vi.fn(),
       redeemGiftCard: vi.fn(),
       sendSMSCode: vi.fn(),
@@ -241,6 +244,33 @@ describe('registerIpcHandlers', () => {
       features: { giftCard: { enabled: true } },
     });
     expect(sidecarClient.getClientConfig).toHaveBeenCalledTimes(1);
+  });
+
+  it('registers connection device management IPC handlers', async () => {
+    vi.mocked(sidecarClient.getConnectionDevices).mockResolvedValue({
+      authorizedDevices: [],
+      blockedClients: [],
+      recentAttempts: [],
+    });
+    vi.mocked(sidecarClient.revokeConnectionDevice).mockResolvedValue({ ok: true });
+    vi.mocked(sidecarClient.clearBlockedClient).mockResolvedValue({ ok: true });
+
+    registerIpcHandlers({ retryStart: vi.fn() } as never);
+    const connectionDevicesHandler = handlers.get(IPC.SIDECAR_CONNECTION_DEVICES);
+    const revokeHandler = handlers.get(IPC.SIDECAR_REVOKE_CONNECTION_DEVICE);
+    const clearHandler = handlers.get(IPC.SIDECAR_CLEAR_BLOCKED_CLIENT);
+
+    await expect(connectionDevicesHandler?.(undefined)).resolves.toEqual({
+      authorizedDevices: [],
+      blockedClients: [],
+      recentAttempts: [],
+    });
+    await expect(revokeHandler?.(undefined, 'phone-a')).resolves.toEqual({ ok: true });
+    await expect(clearHandler?.(undefined, 'phone-a')).resolves.toEqual({ ok: true });
+
+    expect(sidecarClient.getConnectionDevices).toHaveBeenCalledTimes(1);
+    expect(sidecarClient.revokeConnectionDevice).toHaveBeenCalledWith('phone-a');
+    expect(sidecarClient.clearBlockedClient).toHaveBeenCalledWith('phone-a');
   });
 
   it('registers phone auth IPC for SMS send and login', async () => {

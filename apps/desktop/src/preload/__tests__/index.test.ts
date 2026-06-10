@@ -7,6 +7,9 @@ const exposed = vi.hoisted(() => ({
         sidecar: {
           getClientConfig(): Promise<unknown>;
           redeemGiftCard(payload: { code: string }): Promise<unknown>;
+          getConnectionDevices(): Promise<unknown>;
+          revokeConnectionDevice(clientId: string): Promise<unknown>;
+          clearBlockedClient(clientId: string): Promise<unknown>;
         };
         auth: {
           sendSMSCode(payload: { phone: string }): Promise<unknown>;
@@ -68,6 +71,23 @@ describe('preload electronAPI', () => {
       features: { giftCard: { enabled: true } },
     });
     expect(exposed.invoke).toHaveBeenCalledWith('sidecar:client-config');
+  });
+
+  it('maps connection device management calls to IPC channels', async () => {
+    exposed.invoke.mockResolvedValue({ ok: true });
+
+    await import('../index');
+
+    await exposed.api?.sidecar.getConnectionDevices();
+    await exposed.api?.sidecar.revokeConnectionDevice('phone-a');
+    await exposed.api?.sidecar.clearBlockedClient('phone-a');
+
+    expect(exposed.invoke).toHaveBeenCalledWith('sidecar:connection-devices');
+    expect(exposed.invoke).toHaveBeenCalledWith(
+      'sidecar:revoke-connection-device',
+      'phone-a',
+    );
+    expect(exposed.invoke).toHaveBeenCalledWith('sidecar:clear-blocked-client', 'phone-a');
   });
 
   it('maps phone auth calls to IPC channels', async () => {

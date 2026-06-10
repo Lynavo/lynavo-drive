@@ -36,6 +36,9 @@ export const IPC = {
   SIDECAR_SETTINGS: 'sidecar:settings',
   SIDECAR_UPDATE_SETTINGS: 'sidecar:update-settings',
   SIDECAR_RESET_STATE: 'sidecar:reset-state',
+  SIDECAR_CONNECTION_DEVICES: 'sidecar:connection-devices',
+  SIDECAR_REVOKE_CONNECTION_DEVICE: 'sidecar:revoke-connection-device',
+  SIDECAR_CLEAR_BLOCKED_CLIENT: 'sidecar:clear-blocked-client',
   SIDECAR_CLIENT_CONFIG: 'sidecar:client-config',
   SIDECAR_REDEEM_GIFT_CARD: 'sidecar:redeem-gift-card',
   AUTH_SEND_SMS_CODE: 'auth:send-sms-code',
@@ -369,6 +372,13 @@ export function registerIpcHandlers(
     sidecarClient.updateSettings(partial),
   );
   ipcMain.handle(IPC.SIDECAR_RESET_STATE, () => sidecarClient.resetState());
+  ipcMain.handle(IPC.SIDECAR_CONNECTION_DEVICES, () => sidecarClient.getConnectionDevices());
+  ipcMain.handle(IPC.SIDECAR_REVOKE_CONNECTION_DEVICE, (_e, clientId: string) =>
+    sidecarClient.revokeConnectionDevice(clientId),
+  );
+  ipcMain.handle(IPC.SIDECAR_CLEAR_BLOCKED_CLIENT, (_e, clientId: string) =>
+    sidecarClient.clearBlockedClient(clientId),
+  );
   ipcMain.handle(IPC.SIDECAR_CLIENT_CONFIG, () => sidecarClient.getClientConfig());
   ipcMain.handle(IPC.SIDECAR_REDEEM_GIFT_CARD, (_e, payload: { code: string }) =>
     sidecarClient.redeemGiftCard(payload),

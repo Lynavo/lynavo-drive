@@ -186,6 +186,59 @@ describe('sidecarClient', () => {
     expect(options.path).toBe('/shared/list/%E7%9B%B8%E7%B0%BF%20A/IMG%20%231%25.jpg');
   });
 
+  it('calls connection device management endpoints', async () => {
+    const requests: Array<{ method: string | undefined; url: string | undefined }> = [];
+    const httpRequest = vi.fn((options: RequestOptions, callback: (res: unknown) => void) => {
+      requests.push({ method: options.method, url: options.path });
+      const req = new EventEmitter() as EventEmitter & {
+        on: typeof EventEmitter.prototype.on;
+        write: ReturnType<typeof vi.fn>;
+        end: ReturnType<typeof vi.fn>;
+      };
+      req.write = vi.fn();
+      req.end = vi.fn();
+
+      const body =
+        options.path === '/settings/connection-devices'
+          ? { authorizedDevices: [], blockedClients: [], recentAttempts: [] }
+          : { ok: true };
+      callback(createResponse(200, JSON.stringify(body)));
+      return req;
+    });
+    const httpsRequest = vi.fn();
+
+    vi.doMock('node:http', () => ({
+      default: { request: httpRequest },
+      request: httpRequest,
+    }));
+    vi.doMock('node:https', () => ({
+      default: { request: httpsRequest },
+      request: httpsRequest,
+    }));
+
+    vi.resetModules();
+
+    const { sidecarClient: client } = await import('../sidecar-client');
+
+    await expect(client.getConnectionDevices()).resolves.toEqual({
+      authorizedDevices: [],
+      blockedClients: [],
+      recentAttempts: [],
+    });
+    await expect(client.revokeConnectionDevice('phone-a')).resolves.toEqual({ ok: true });
+    await expect(client.clearBlockedClient('phone-a')).resolves.toEqual({ ok: true });
+
+    expect(requests.map((request) => `${request.method} ${request.url}`)).toContain(
+      'GET /settings/connection-devices',
+    );
+    expect(requests.map((request) => `${request.method} ${request.url}`)).toContain(
+      'POST /settings/connection-devices/phone-a/revoke',
+    );
+    expect(requests.map((request) => `${request.method} ${request.url}`)).toContain(
+      'POST /settings/blocked-clients/phone-a/clear',
+    );
+  });
+
   it('uses https transport when the redeem base url is https', async () => {
     const httpRequest = vi.fn();
     const httpsRequest = vi.fn((options: RequestOptions, callback: (res: unknown) => void) => {
