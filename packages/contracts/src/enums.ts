@@ -5,7 +5,12 @@ export type ConnectionState =
   | 'discovering' | 'bound' | 'connecting' | 'connected' | 'offline';
 
 export type SharedFilesReachabilityState =
-  | 'unknown' | 'available' | 'unavailable';
+  | 'unknown'
+  | 'available'
+  | 'unavailable'
+  | 'waking'
+  | 'wake_setup_required'
+  | 'wake_unavailable';
 
 export type SharedFilesRouteKind =
   | 'lan' | 'tunnel' | 'relay';

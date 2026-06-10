@@ -48,7 +48,7 @@ export class PowerSaveManager {
     const shouldBlock = this.enabled && this.transferActive;
 
     if (shouldBlock && this.blockerId === null) {
-      this.blockerId = this.blocker.start('prevent-app-suspension');
+      this.blockerId = this.blocker.start('prevent-display-sleep');
       return;
     }
 

@@ -27,6 +27,30 @@ func (f fakePresenceStateProvider) IsAlive(clientID string, window time.Duration
 	return f.alive
 }
 
+type fixedWakeProvider struct {
+	capability *protocol.WakeCapability
+}
+
+func (f fixedWakeProvider) WakeCapability() *protocol.WakeCapability {
+	return f.capability
+}
+
+func testWakeCapability() *protocol.WakeCapability {
+	return &protocol.WakeCapability{
+		Supported: true,
+		UpdatedAt: "2026-06-09T03:00:00Z",
+		Targets: []protocol.WakeTarget{
+			{
+				InterfaceName:    "en0",
+				MACAddress:       "aa:bb:cc:dd:ee:ff",
+				IPv4Address:      "192.168.1.20",
+				BroadcastAddress: "192.168.1.255",
+				Ports:            []int{9, 7},
+			},
+		},
+	}
+}
+
 const (
 	testClientID    = "test-iphone-001"
 	testClientName  = "Test iPhone"
@@ -275,6 +299,62 @@ func TestHelloRejectsIncompatibleAppVersion(t *testing.T) {
 	recvJSON(t, client, protocol.TypeError, &errMsg)
 	if errMsg.Code != "APP_VERSION_INCOMPATIBLE" {
 		t.Fatalf("error code=%q, want APP_VERSION_INCOMPATIBLE", errMsg.Code)
+	}
+}
+
+func TestHelloResponseAdvertisesWakeCapability(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := &config.Config{
+		HTTPPort:              39394,
+		TCPPort:               39393,
+		DataDir:               tmpDir,
+		ReceiveDir:            filepath.Join(tmpDir, "received"),
+		DeviceName:            "test-mac",
+		LowDiskThresholdBytes: 500 * 1024 * 1024,
+	}
+	os.MkdirAll(cfg.ReceiveDir, 0o755)
+	os.MkdirAll(cfg.StagingDir(), 0o755)
+
+	st, err := store.New(filepath.Join(tmpDir, "test.db"))
+	if err != nil {
+		t.Fatalf("store.New: %v", err)
+	}
+	defer st.Close()
+	if err := st.SetConnectionCode(testConnCode); err != nil {
+		t.Fatalf("SetConnectionCode: %v", err)
+	}
+	if err := st.SetDeviceName("test-mac"); err != nil {
+		t.Fatalf("SetDeviceName: %v", err)
+	}
+
+	hub := events.NewHub()
+	tcpSrv := NewTCPServer(st, cfg, hub)
+	tcpSrv.SetWakeProvider(fixedWakeProvider{capability: testWakeCapability()})
+	client, server := net.Pipe()
+	conn := newConnection(server, st, cfg, hub, tcpSrv)
+	go conn.handle()
+	defer client.Close()
+
+	sendJSON(t, client, protocol.TypeHelloReq, protocol.HelloReq{
+		ClientID:                testClientID,
+		ClientName:              testClientName,
+		ClientPlatform:          "ios",
+		AppVersion:              "1.0.0",
+		AppCompatibilityVersion: protocol.AppCompatibilityVersion,
+		AppState:                "active",
+	})
+
+	var helloRes protocol.HelloRes
+	recvJSON(t, client, protocol.TypeHelloRes, &helloRes)
+	wake := helloRes.ServerCapabilities.Wake
+	if wake == nil || !wake.Supported {
+		t.Fatalf("expected supported wake capability, got %+v", wake)
+	}
+	if len(wake.Targets) != 1 {
+		t.Fatalf("wake target len = %d, want 1", len(wake.Targets))
+	}
+	if wake.Targets[0].BroadcastAddress != "192.168.1.255" {
+		t.Fatalf("broadcast = %q, want 192.168.1.255", wake.Targets[0].BroadcastAddress)
 	}
 }
 

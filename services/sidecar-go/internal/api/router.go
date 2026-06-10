@@ -9,11 +9,22 @@ import (
 	"github.com/nicksyncflow/sidecar/internal/events"
 	"github.com/nicksyncflow/sidecar/internal/protocol"
 	"github.com/nicksyncflow/sidecar/internal/store"
+	"github.com/nicksyncflow/sidecar/internal/wake"
 )
 
 // ClientStateProvider returns live TCP connection states per clientID.
 type ClientStateProvider interface {
 	ConnectedClientStates() map[string]string
+}
+
+type WakeProvider interface {
+	WakeCapability() *protocol.WakeCapability
+}
+
+type defaultWakeProvider struct{}
+
+func (defaultWakeProvider) WakeCapability() *protocol.WakeCapability {
+	return wake.Metadata()
 }
 
 // Server holds the dependencies for the HTTP API handlers.
@@ -23,6 +34,7 @@ type Server struct {
 	hub                  *events.Hub
 	clientStates         ClientStateProvider
 	presence             *PresenceTracker
+	wakeProvider         WakeProvider
 	tunnelMu             sync.Mutex
 	tunnel               *protocol.P2PManager
 	accountMu            sync.RWMutex
@@ -34,6 +46,17 @@ type Server struct {
 
 func (s *Server) PresenceTracker() *PresenceTracker {
 	return s.presence
+}
+
+func (s *Server) SetWakeProvider(provider WakeProvider) {
+	s.wakeProvider = provider
+}
+
+func (s *Server) wakeCapability() *protocol.WakeCapability {
+	if s.wakeProvider == nil {
+		return nil
+	}
+	return s.wakeProvider.WakeCapability()
 }
 
 // StopTunnel stops the desktop P2P signaling listener if it is running.
@@ -70,7 +93,14 @@ func (s *Server) RefreshTunnelPairings(reason string) {
 
 // NewServer creates a new HTTP handler with all API routes registered.
 func NewServer(s *store.Store, cfg *config.Config, hub *events.Hub, csp ClientStateProvider) (*Server, http.Handler) {
-	srv := &Server{store: s, config: cfg, hub: hub, clientStates: csp, presence: NewPresenceTracker()}
+	srv := &Server{
+		store:        s,
+		config:       cfg,
+		hub:          hub,
+		clientStates: csp,
+		presence:     NewPresenceTracker(),
+		wakeProvider: defaultWakeProvider{},
+	}
 	mux := http.NewServeMux()
 
 	// Presence (mobile heartbeat)

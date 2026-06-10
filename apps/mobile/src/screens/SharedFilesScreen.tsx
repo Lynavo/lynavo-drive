@@ -70,6 +70,7 @@ type SharedFilesConnectionStatus =
   | 'lan'
   | 'p2p'
   | 'relay'
+  | 'waking'
   | 'unavailable'
   | 'offline';
 
@@ -245,6 +246,7 @@ function sharedFilesConnectionStatusFromReachability(
 ): SharedFilesConnectionStatus | null {
   if (typeof value !== 'object' || value === null) return 'offline';
   const state = (value as { state?: unknown }).state;
+  if (state === 'waking') return 'waking';
   if (state === 'unavailable') return 'unavailable';
   if (state !== 'available') return 'offline';
   const route = (value as { route?: unknown }).route;
@@ -1189,19 +1191,23 @@ export function SharedFilesScreen() {
         ? styles.connectionStatusRelay
         : sharedFilesConnectionStatus === 'p2p'
           ? styles.connectionStatusP2P
-          : sharedFilesConnectionStatus === 'unavailable'
-            ? styles.connectionStatusUnavailable
-            : styles.connectionStatusOffline;
+          : sharedFilesConnectionStatus === 'waking'
+            ? styles.connectionStatusWaking
+            : sharedFilesConnectionStatus === 'unavailable'
+              ? styles.connectionStatusUnavailable
+              : styles.connectionStatusOffline;
   const sharedFilesConnectionTextStyle =
     sharedFilesConnectionStatus === 'offline'
       ? styles.connectionStatusTextOffline
       : sharedFilesConnectionStatus === 'unavailable'
         ? styles.connectionStatusTextUnavailable
-        : sharedFilesConnectionStatus === 'relay'
-          ? styles.connectionStatusTextRelay
-          : sharedFilesConnectionStatus === 'p2p'
-            ? styles.connectionStatusTextP2P
-            : styles.connectionStatusTextLan;
+        : sharedFilesConnectionStatus === 'waking'
+          ? styles.connectionStatusTextWaking
+          : sharedFilesConnectionStatus === 'relay'
+            ? styles.connectionStatusTextRelay
+            : sharedFilesConnectionStatus === 'p2p'
+              ? styles.connectionStatusTextP2P
+              : styles.connectionStatusTextLan;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -1398,6 +1404,9 @@ const styles = StyleSheet.create({
   connectionStatusRelay: {
     backgroundColor: 'rgba(147,51,234,0.14)',
   },
+  connectionStatusWaking: {
+    backgroundColor: 'rgba(14,165,233,0.14)',
+  },
   connectionStatusUnavailable: {
     backgroundColor: 'rgba(245,158,11,0.16)',
   },
@@ -1416,6 +1425,9 @@ const styles = StyleSheet.create({
   },
   connectionStatusTextRelay: {
     color: '#7e22ce',
+  },
+  connectionStatusTextWaking: {
+    color: '#0369a1',
   },
   connectionStatusTextUnavailable: {
     color: '#92400e',

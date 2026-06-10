@@ -33,7 +33,7 @@
     },
     "item1": {
       "title": "Why does auto upload pause?",
-      "answer": "Auto upload pauses after Wi-Fi changes or when the computer sleeps. Reconnect the device and return to the home screen to resume. It can also pause when background permissions are limited; check that Vivi Drop has background refresh permission in system settings."
+      "answer": "Auto upload pauses after Wi-Fi changes or when the computer sleeps. After the computer wakes and the network returns, Vivi Drop keeps completed files and resumes unfinished queued tasks automatically. It can also pause when background permissions are limited; check that Vivi Drop has background refresh permission in system settings."
     },
     "item2": {
       "title": "What should I do if an upload fails?",

@@ -38,11 +38,28 @@ type ResumeInfo struct {
 	ResumeOffset  int64  `json:"resumeOffset"`
 }
 
+// WakeTarget describes one LAN interface target for Wake-on-LAN packets.
+type WakeTarget struct {
+	InterfaceName    string `json:"interfaceName"`
+	MACAddress       string `json:"macAddress"`
+	IPv4Address      string `json:"ipv4Address"`
+	BroadcastAddress string `json:"broadcastAddress"`
+	Ports            []int  `json:"ports"`
+}
+
+// WakeCapability is advertised while the sidecar is awake and cached by mobile.
+type WakeCapability struct {
+	Supported bool         `json:"supported"`
+	Targets   []WakeTarget `json:"targets"`
+	UpdatedAt string       `json:"updatedAt"`
+}
+
 // ServerCapabilities advertises feature flags to the client.
 type ServerCapabilities struct {
-	ShareEnabled        bool   `json:"shareEnabled"`
-	ShareName           string `json:"shareName"`
-	LowDiskPauseEnabled bool   `json:"lowDiskPauseEnabled"`
+	ShareEnabled        bool            `json:"shareEnabled"`
+	ShareName           string          `json:"shareName"`
+	LowDiskPauseEnabled bool            `json:"lowDiskPauseEnabled"`
+	Wake                *WakeCapability `json:"wake,omitempty"`
 }
 
 // AuthReq is sent by a returning (already-paired) client after receiving

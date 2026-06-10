@@ -106,6 +106,30 @@ func (f fakeClientStates) ConnectedClientStates() map[string]string {
 	return states
 }
 
+type fixedWakeProvider struct {
+	capability *protocol.WakeCapability
+}
+
+func (f fixedWakeProvider) WakeCapability() *protocol.WakeCapability {
+	return f.capability
+}
+
+func testWakeCapability() *protocol.WakeCapability {
+	return &protocol.WakeCapability{
+		Supported: true,
+		UpdatedAt: "2026-06-09T03:00:00Z",
+		Targets: []protocol.WakeTarget{
+			{
+				InterfaceName:    "en0",
+				MACAddress:       "aa:bb:cc:dd:ee:ff",
+				IPv4Address:      "192.168.1.20",
+				BroadcastAddress: "192.168.1.255",
+				Ports:            []int{9, 7},
+			},
+		},
+	}
+}
+
 func fakeAccountJWT(t *testing.T, accountID string) string {
 	t.Helper()
 
@@ -157,7 +181,11 @@ func writeTestJSON(t *testing.T, w http.ResponseWriter, payload any) {
 
 func TestHealthEndpoint(t *testing.T) {
 	st, cfg, hub := testEnv(t)
-	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	handler := func() http.Handler {
+		srv, h := api.NewServer(st, cfg, hub, nil)
+		srv.SetWakeProvider(fixedWakeProvider{capability: testWakeCapability()})
+		return h
+	}()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -197,6 +225,76 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 	if capabilities["revokesPairingsOnCodeRotation"] != true {
 		t.Errorf("expected revokesPairingsOnCodeRotation=true, got %v", capabilities["revokesPairingsOnCodeRotation"])
+	}
+	if capabilities["wakeOnLanSupported"] != true {
+		t.Errorf("expected wakeOnLanSupported=true, got %v", capabilities["wakeOnLanSupported"])
+	}
+	if _, ok := capabilities["wake"]; ok {
+		t.Fatal("health must not expose full wake metadata")
+	}
+}
+
+func TestPresenceIncludesWakeMetadataOnlyForPairedClient(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	insertPairedDeviceWithStableID(
+		t,
+		st,
+		"client-1",
+		"iPhone",
+		"iphone",
+		"stable-1",
+		time.Now().UTC().Format(time.RFC3339),
+	)
+	handler := func() http.Handler {
+		srv, h := api.NewServer(st, cfg, hub, nil)
+		srv.SetWakeProvider(fixedWakeProvider{capability: testWakeCapability()})
+		return h
+	}()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/presence/client-1", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatalf("new paired request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST paired presence: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var pairedBody map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&pairedBody); err != nil {
+		t.Fatalf("decode paired presence: %v", err)
+	}
+	wake, ok := pairedBody["wake"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected paired presence wake object, got %T", pairedBody["wake"])
+	}
+	targets := wake["targets"].([]any)
+	target := targets[0].(map[string]any)
+	if target["macAddress"] != "aa:bb:cc:dd:ee:ff" {
+		t.Fatalf("macAddress = %v, want aa:bb:cc:dd:ee:ff", target["macAddress"])
+	}
+
+	req, err = http.NewRequest(http.MethodPost, srv.URL+"/presence/unpaired", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatalf("new unpaired request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST unpaired presence: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var unpairedBody map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&unpairedBody); err != nil {
+		t.Fatalf("decode unpaired presence: %v", err)
+	}
+	if _, ok := unpairedBody["wake"]; ok {
+		t.Fatal("unpaired presence must not expose full wake metadata")
 	}
 }
 

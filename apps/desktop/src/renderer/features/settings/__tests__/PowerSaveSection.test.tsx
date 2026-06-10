@@ -45,7 +45,7 @@ describe('PowerSaveSection', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByTestId('power-save-switch-thumb')).toHaveClass('translate-x-[18px]');
     expect(
-      screen.getByText('仅在手机正在同步时保持电脑唤醒，传输结束后自动恢复系统待机设置。'),
+      screen.getByText('手机同步期间保持电脑唤醒；传输时屏幕可能保持亮起，结束后会恢复系统待机设置。'),
     ).toBeInTheDocument();
   });
 

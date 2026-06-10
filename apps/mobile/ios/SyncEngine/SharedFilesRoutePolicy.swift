@@ -145,6 +145,20 @@ enum SharedFilesRoutePolicy {
         hasTunnelCredentials && !isTunnelActive
     }
 
+    static func shouldAttemptWake(
+        scope: String,
+        path: String,
+        operation: String
+    ) -> Bool {
+        let normalizedScope = scope.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedOperation = operation.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return normalizedScope == "personal" &&
+            normalizedOperation == "list" &&
+            normalizedPath.isEmpty
+    }
+
     static func shouldSuppressPresenceTunnelFailure(
         isTunnelRoute: Bool,
         activeSharedFileTunnelOperations: Int,

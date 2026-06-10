@@ -18,6 +18,7 @@
     "lan": "LAN online",
     "p2p": "P2P online",
     "relay": "Relay online",
+    "waking": "Waking desktop...",
     "unavailable": "Desktop unreachable",
     "offline": "Offline"
   },

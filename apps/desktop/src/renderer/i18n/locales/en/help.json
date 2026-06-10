@@ -215,7 +215,7 @@
       },
       {
         "question": "Will transfer stop if the computer sleeps?",
-        "answer": "Yes. When the computer sleeps, network connections are interrupted and transfer pauses. After wake, the phone reconnects automatically. Completed files are unaffected, and incomplete queued files continue."
+        "answer": "Yes. When the computer sleeps, network connections are interrupted and transfer pauses. Enable \"Prevent computer sleep during sync\" in Settings to reduce interruptions. After the computer wakes, the phone reconnects automatically and continues unfinished queued tasks. Completed files are unaffected."
       }
     ]
   },
@@ -232,7 +232,7 @@
       },
       {
         "title": "Device interrupted",
-        "description": "Tasks pause when the device goes offline, the computer sleeps, or the network is interrupted. They can continue after reconnection."
+        "description": "Tasks pause when the device goes offline, the computer sleeps, or the network is interrupted. They can continue after the computer wakes and reconnects."
       },
       {
         "title": "Upload interrupted",

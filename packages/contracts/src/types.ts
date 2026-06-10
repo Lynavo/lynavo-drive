@@ -169,6 +169,29 @@ export interface ReadOnlyQueueItemDTO {
 
 // ── Mobile Binding State ──
 
+export interface WakeTargetDTO {
+  interfaceName: string;
+  macAddress: string;
+  ipv4Address: string;
+  broadcastAddress: string;
+  ports: number[];
+}
+
+export interface PublicWakeTargetDTO {
+  kind: 'router_wan_udp';
+  host: string;
+  port: number;
+  enabled: boolean;
+  updatedAt: string;
+}
+
+export interface WakeCapabilityDTO {
+  supported: boolean;
+  targets: WakeTargetDTO[];
+  publicTarget?: PublicWakeTargetDTO | null;
+  updatedAt: string;
+}
+
 export interface BindingStateDTO {
   deviceId: string;
   deviceName: string;
@@ -182,6 +205,7 @@ export interface BindingStateDTO {
   shareName?: string;
   lastBoundAt: string;
   sharedFilesReachability?: SharedFilesReachabilityDTO | null;
+  wake?: WakeCapabilityDTO | null;
 }
 
 export interface SharedFilesReachabilityDTO {

@@ -13,7 +13,7 @@ describe('PowerSaveManager', () => {
     vi.clearAllMocks();
   });
 
-  it('starts app suspension blocker only when enabled and transfer is active', () => {
+  it('starts display sleep blocker only when enabled and transfer is active', () => {
     const blocker = createBlocker();
     const manager = new PowerSaveManager(blocker);
 
@@ -22,7 +22,7 @@ describe('PowerSaveManager', () => {
 
     manager.setTransferActive(true);
 
-    expect(blocker.start).toHaveBeenCalledWith('prevent-app-suspension');
+    expect(blocker.start).toHaveBeenCalledWith('prevent-display-sleep');
     expect(blocker.start).toHaveBeenCalledTimes(1);
   });
 

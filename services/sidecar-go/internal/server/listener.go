@@ -8,7 +8,9 @@ import (
 
 	"github.com/nicksyncflow/sidecar/internal/config"
 	"github.com/nicksyncflow/sidecar/internal/events"
+	"github.com/nicksyncflow/sidecar/internal/protocol"
 	"github.com/nicksyncflow/sidecar/internal/store"
+	"github.com/nicksyncflow/sidecar/internal/wake"
 )
 
 const (
@@ -23,6 +25,7 @@ type TCPServer struct {
 	config   *config.Config
 	hub      *events.Hub
 	presence PresenceStateProvider
+	wake     WakeProvider
 
 	mu               sync.RWMutex
 	connectedClients map[string]string // clientID → state ("authenticated"|"syncing")
@@ -34,15 +37,47 @@ type PresenceStateProvider interface {
 	IsAlive(clientID string, window time.Duration) bool
 }
 
+type WakeProvider interface {
+	WakeCapability() *protocol.WakeCapability
+}
+
+type defaultWakeProvider struct{}
+
+func (defaultWakeProvider) WakeCapability() *protocol.WakeCapability {
+	return wake.Metadata()
+}
+
 // NewTCPServer creates a new TCPServer backed by the given store, config, and event hub.
 func NewTCPServer(s *store.Store, cfg *config.Config, hub *events.Hub) *TCPServer {
-	return &TCPServer{store: s, config: cfg, hub: hub, connectedClients: make(map[string]string)}
+	return &TCPServer{
+		store:            s,
+		config:           cfg,
+		hub:              hub,
+		wake:             defaultWakeProvider{},
+		connectedClients: make(map[string]string),
+	}
 }
 
 func (s *TCPServer) SetPresenceProvider(presence PresenceStateProvider) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.presence = presence
+}
+
+func (s *TCPServer) SetWakeProvider(provider WakeProvider) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.wake = provider
+}
+
+func (s *TCPServer) WakeCapability() *protocol.WakeCapability {
+	s.mu.RLock()
+	provider := s.wake
+	s.mu.RUnlock()
+	if provider == nil {
+		return nil
+	}
+	return provider.WakeCapability()
 }
 
 func (s *TCPServer) DisconnectBroadcastStatus(clientID string) string {

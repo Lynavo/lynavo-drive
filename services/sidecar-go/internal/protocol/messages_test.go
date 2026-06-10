@@ -102,6 +102,61 @@ func TestHelloResWithResume(t *testing.T) {
 	}
 }
 
+func TestHelloResWithWakeCapability(t *testing.T) {
+	msg := HelloRes{
+		ServerID:     "server-1",
+		ServerName:   "My Mac",
+		ServerType:   "mac",
+		ProtoVersion: 2,
+		ServerCapabilities: ServerCapabilities{
+			ShareEnabled:        true,
+			ShareName:           "My Computer",
+			LowDiskPauseEnabled: true,
+			Wake: &WakeCapability{
+				Supported: true,
+				UpdatedAt: "2026-06-09T03:00:00Z",
+				Targets: []WakeTarget{
+					{
+						InterfaceName:    "en0",
+						MACAddress:       "aa:bb:cc:dd:ee:ff",
+						IPv4Address:      "192.168.1.20",
+						BroadcastAddress: "192.168.1.255",
+						Ports:            []int{9, 7},
+					},
+				},
+			},
+		},
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(data, &body); err != nil {
+		t.Fatalf("Unmarshal map: %v", err)
+	}
+	caps := body["serverCapabilities"].(map[string]any)
+	wake := caps["wake"].(map[string]any)
+	if wake["supported"] != true {
+		t.Fatalf("wake.supported = %v, want true", wake["supported"])
+	}
+	targets := wake["targets"].([]any)
+	target := targets[0].(map[string]any)
+	if target["broadcastAddress"] != "192.168.1.255" {
+		t.Fatalf("broadcastAddress = %v, want 192.168.1.255", target["broadcastAddress"])
+	}
+
+	var got HelloRes
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if got.ServerCapabilities.Wake == nil || !got.ServerCapabilities.Wake.Supported {
+		t.Fatal("expected wake capability to roundtrip")
+	}
+}
+
 func TestHelloResNilResume(t *testing.T) {
 	msg := HelloRes{
 		ServerID:     "server-1",

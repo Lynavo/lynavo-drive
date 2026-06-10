@@ -18,6 +18,7 @@
     "lan": "區域網路在線",
     "p2p": "P2P 在線",
     "relay": "中繼在線",
+    "waking": "正在喚醒電腦端",
     "unavailable": "電腦端不可達",
     "offline": "離線"
   },

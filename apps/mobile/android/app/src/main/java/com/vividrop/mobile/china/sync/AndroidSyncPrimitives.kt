@@ -115,6 +115,14 @@ data class AndroidSharedFilesRouteDecision(
   val isTunnel: Boolean,
 )
 
+data class AndroidWakeTarget(
+  val interfaceName: String,
+  val macAddress: String,
+  val ipv4Address: String,
+  val broadcastAddress: String,
+  val ports: List<Int>,
+)
+
 object AndroidSyncPrimitives {
   fun decideSharedFilesRoute(
     isTunnelActive: Boolean,
@@ -150,6 +158,31 @@ object AndroidSyncPrimitives {
   }
 
   fun shouldRetrySharedFilesRouteAfterFailure(isTunnelRoute: Boolean): Boolean = isTunnelRoute
+
+  fun buildWakeOnLanMagicPacket(macAddress: String): ByteArray {
+    val mac = parseMacAddress(macAddress)
+    return ByteArray(WAKE_MAGIC_PACKET_SIZE) { index ->
+      if (index < WAKE_SYNC_STREAM_SIZE) 0xff.toByte() else mac[(index - WAKE_SYNC_STREAM_SIZE) % mac.size]
+    }
+  }
+
+  fun validWakeTargets(targets: List<AndroidWakeTarget>): List<AndroidWakeTarget> =
+    targets.filter { target ->
+      parseMacAddressOrNull(target.macAddress) != null &&
+        target.broadcastAddress.trim().isNotBlank() &&
+        target.ports.any { it in 1..65_535 }
+    }
+
+  fun shouldAttemptSharedFilesWake(
+    scope: String,
+    path: String,
+    operation: String,
+  ): Boolean {
+    val normalizedPath = path.trim().trim('/')
+    return scope.trim() == "personal" &&
+      operation.trim() == "list" &&
+      normalizedPath.isBlank()
+  }
 
   fun normalizePairingConnectionCode(rawCode: String?): String {
     val trimmed = rawCode?.trim().orEmpty()
@@ -639,6 +672,26 @@ object AndroidSyncPrimitives {
     }
   }
 
+  private fun parseMacAddress(macAddress: String): ByteArray =
+    parseMacAddressOrNull(macAddress) ?: throw IllegalArgumentException("Invalid MAC address")
+
+  private fun parseMacAddressOrNull(macAddress: String): ByteArray? {
+    val normalized = macAddress.trim().replace("-", ":").lowercase()
+    val parts = normalized.split(":")
+    if (parts.size != WAKE_MAC_BYTES) {
+      return null
+    }
+    val bytes = ByteArray(WAKE_MAC_BYTES)
+    for ((index, part) in parts.withIndex()) {
+      if (part.length != 2) {
+        return null
+      }
+      val value = part.toIntOrNull(16) ?: return null
+      bytes[index] = value.toByte()
+    }
+    return bytes.takeUnless { candidate -> candidate.all { it == 0.toByte() } }
+  }
+
   private fun ByteArray.toHex(): String = joinToString(separator = "") { byte ->
     "%02x".format(byte)
   }
@@ -662,5 +715,8 @@ object AndroidSyncPrimitives {
   private const val CONNECTION_CODE_LENGTH = 6
   private const val ANDROID_13_API = 33
   private const val IPV4_MASK = 0xffffffffL
+  private const val WAKE_SYNC_STREAM_SIZE = 6
+  private const val WAKE_MAC_BYTES = 6
+  private const val WAKE_MAGIC_PACKET_SIZE = WAKE_SYNC_STREAM_SIZE + WAKE_MAC_BYTES * 16
   private val LIVE_BINDING_STATES = setOf("connected", "bound")
 }

@@ -70,6 +70,9 @@ func (c *connection) handleHello(body []byte) error {
 	caps := protocol.ServerCapabilities{
 		LowDiskPauseEnabled: true,
 	}
+	if c.server != nil {
+		caps.Wake = c.server.WakeCapability()
+	}
 	if shareConfig != nil {
 		caps.ShareEnabled = share.IsAccessibleConfig(shareConfig.ShareStatus, shareConfig.ShareURL)
 		caps.ShareName = shareConfig.ShareName

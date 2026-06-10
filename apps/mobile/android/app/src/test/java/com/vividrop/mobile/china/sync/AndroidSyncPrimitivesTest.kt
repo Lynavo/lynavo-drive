@@ -93,6 +93,104 @@ class AndroidSyncPrimitivesTest {
   }
 
   @Test
+  fun buildWakeOnLanMagicPacketRepeatsMacSixteenTimesAfterSyncStream() {
+    val packet = AndroidSyncPrimitives.buildWakeOnLanMagicPacket("aa:bb:cc:dd:ee:ff")
+
+    assertEquals(102, packet.size)
+    assertTrue(packet.take(6).all { it == 0xff.toByte() })
+    val mac = byteArrayOf(
+      0xaa.toByte(),
+      0xbb.toByte(),
+      0xcc.toByte(),
+      0xdd.toByte(),
+      0xee.toByte(),
+      0xff.toByte(),
+    )
+    for (index in 0 until 16) {
+      val offset = 6 + index * 6
+      assertTrue(mac.contentEquals(packet.copyOfRange(offset, offset + 6)))
+    }
+  }
+
+  @Test
+  fun validWakeTargetsRequireMacBroadcastAndPort() {
+    val targets = listOf(
+      AndroidWakeTarget(
+        interfaceName = "wlan0",
+        macAddress = "aa:bb:cc:dd:ee:ff",
+        ipv4Address = "192.168.1.20",
+        broadcastAddress = "192.168.1.255",
+        ports = listOf(9, 7),
+      ),
+      AndroidWakeTarget(
+        interfaceName = "rmnet0",
+        macAddress = "00:00:00:00:00:00",
+        ipv4Address = "10.0.0.4",
+        broadcastAddress = "10.0.0.255",
+        ports = listOf(9),
+      ),
+      AndroidWakeTarget(
+        interfaceName = "wlan1",
+        macAddress = "aa-bb-cc-dd-ee-11",
+        ipv4Address = "192.168.2.20",
+        broadcastAddress = " ",
+        ports = listOf(9),
+      ),
+      AndroidWakeTarget(
+        interfaceName = "wlan2",
+        macAddress = "aa-bb-cc-dd-ee-22",
+        ipv4Address = "192.168.3.20",
+        broadcastAddress = "192.168.3.255",
+        ports = listOf(0, 70_000),
+      ),
+    )
+
+    val valid = AndroidSyncPrimitives.validWakeTargets(targets)
+
+    assertEquals(1, valid.size)
+    assertEquals("wlan0", valid.single().interfaceName)
+  }
+
+  @Test
+  fun wakeAttemptIsScopedToPersonalRootListingOnly() {
+    assertTrue(
+      AndroidSyncPrimitives.shouldAttemptSharedFilesWake(
+        scope = "personal",
+        path = "",
+        operation = "list",
+      ),
+    )
+    assertTrue(
+      AndroidSyncPrimitives.shouldAttemptSharedFilesWake(
+        scope = " personal ",
+        path = " / ",
+        operation = " list ",
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldAttemptSharedFilesWake(
+        scope = "team",
+        path = "",
+        operation = "list",
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldAttemptSharedFilesWake(
+        scope = "personal",
+        path = "Photos",
+        operation = "list",
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldAttemptSharedFilesWake(
+        scope = "personal",
+        path = "",
+        operation = "download",
+      ),
+    )
+  }
+
+  @Test
   fun normalizePairingConnectionCodeAllowsKnownDeviceReconnectWithoutCode() {
     val code = AndroidSyncPrimitives.normalizePairingConnectionCode("  ")
 

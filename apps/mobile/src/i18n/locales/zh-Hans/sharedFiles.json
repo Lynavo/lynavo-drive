@@ -18,6 +18,7 @@
     "lan": "局域网在线",
     "p2p": "P2P 在线",
     "relay": "中继在线",
+    "waking": "正在唤醒电脑端",
     "unavailable": "电脑端不可达",
     "offline": "离线"
   },

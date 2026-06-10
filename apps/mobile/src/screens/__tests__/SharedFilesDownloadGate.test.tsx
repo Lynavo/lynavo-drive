@@ -368,6 +368,30 @@ describe('SharedFilesScreen download progress', () => {
     expect(getByText('Relay online')).toBeTruthy();
   });
 
+  test('shows waking status while shared files wake is in progress', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      subscription: { status: 'trialing' },
+      loadSubscription: jest.fn(),
+    });
+
+    const { getByText, getByTestId } = render(<SharedFilesScreen />);
+
+    await waitFor(() => getByTestId('shared-file-download-button'));
+    mockBrowseDirectory.mockClear();
+
+    await act(async () => {
+      nativeListeners.get('onSharedFilesReachabilityChanged')?.({
+        deviceId: 'device-1',
+        state: 'waking',
+        route: 'lan',
+        reason: 'wake_packet_sent',
+      });
+    });
+
+    expect(getByText('Waking desktop...')).toBeTruthy();
+    expect(mockBrowseDirectory).not.toHaveBeenCalled();
+  });
+
   test('does not show LAN online for a bound binding before shared files reachability is verified', async () => {
     (useAuth as jest.Mock).mockReturnValue({
       subscription: { status: 'trialing' },

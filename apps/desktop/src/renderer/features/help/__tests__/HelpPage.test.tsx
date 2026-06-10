@@ -215,6 +215,13 @@ describe('HelpPage', () => {
     expect(accordionItems).toHaveLength(7);
   });
 
+  it('explains sleep interruption and automatic resume behavior', () => {
+    render(<HelpPage />);
+
+    expect(screen.getByText(/开启「同步时防止电脑睡眠」/)).toBeInTheDocument();
+    expect(screen.getByText(/电脑唤醒后手机会自动重连并继续未完成任务/)).toBeInTheDocument();
+  });
+
   it('renders error handling cards', () => {
     render(<HelpPage />);
 
@@ -229,7 +236,8 @@ describe('HelpPage', () => {
     // Verify descriptions
     expect(screen.getByText(/检查电脑和手机是否在同一局域网/)).toBeInTheDocument();
     expect(screen.getByText(/剩余空间低于 500MB/)).toBeInTheDocument();
-    expect(screen.getByText(/设备离线、电脑休眠或网络中断/)).toBeInTheDocument();
+    expect(screen.getByText(/设备离线、电脑睡眠或网络中断/)).toBeInTheDocument();
+    expect(screen.getByText(/电脑唤醒并恢复连接后可继续传输/)).toBeInTheDocument();
     expect(screen.getByText(/未完成的任务可在恢复连接后自动重试/)).toBeInTheDocument();
   });
 });

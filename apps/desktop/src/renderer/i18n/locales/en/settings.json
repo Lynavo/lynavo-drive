@@ -32,7 +32,7 @@
   },
   "powerSave": {
     "preventSleepTitle": "Prevent computer sleep during sync",
-    "preventSleepDescription": "Keeps this computer awake only while a phone is syncing, then restores normal sleep behavior.",
+    "preventSleepDescription": "Keeps this computer awake while a phone is syncing. The display may stay awake during transfer, then normal sleep behavior is restored.",
     "blockingSleep": "Keeping awake",
     "idle": "Waiting for sync"
   },

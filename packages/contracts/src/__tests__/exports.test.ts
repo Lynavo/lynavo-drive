@@ -1,5 +1,23 @@
 import { describe, it, expect } from 'vitest';
 import * as contracts from '../index';
+import type {
+  BindingStateDTO,
+  SharedFilesReachabilityDTO,
+  WakeCapabilityDTO,
+  WakeTargetDTO,
+} from '../types';
+
+function expectWakeTypes(
+  target: WakeTargetDTO,
+  wake: WakeCapabilityDTO,
+  binding: BindingStateDTO,
+  reachability: SharedFilesReachabilityDTO,
+): void {
+  expect(target.macAddress).toBe('aa:bb:cc:dd:ee:ff');
+  expect(wake.targets[0]?.broadcastAddress).toBe('192.168.1.255');
+  expect(binding.wake?.supported).toBe(true);
+  expect(reachability.state).toBe('waking');
+}
 
 describe('@syncflow/contracts exports', () => {
   it('exports PROTOCOL_VERSION', () => {
@@ -43,5 +61,54 @@ describe('@syncflow/contracts exports', () => {
     expect(JSON.stringify(contracts.VIVIDROP_SERVICE_ENDPOINTS)).not.toContain(
       ['vividrop', 'com'].join('.'),
     );
+  });
+
+  it('exports wake metadata DTOs and wake reachability states', () => {
+    const target: WakeTargetDTO = {
+      interfaceName: 'en0',
+      macAddress: 'aa:bb:cc:dd:ee:ff',
+      ipv4Address: '192.168.1.20',
+      broadcastAddress: '192.168.1.255',
+      ports: [9, 7],
+    };
+    const wake: WakeCapabilityDTO = {
+      supported: true,
+      targets: [target],
+      updatedAt: '2026-06-09T03:00:00.000Z',
+    };
+    const binding: BindingStateDTO = {
+      deviceId: 'desktop-1',
+      deviceName: 'Studio Mac',
+      deviceAlias: 'Studio Mac',
+      host: '192.168.1.20',
+      port: 39393,
+      connectionState: 'offline',
+      pairingId: 'pair-1',
+      shareEnabled: true,
+      shareName: 'My Computer',
+      lastBoundAt: '2026-06-09T03:00:00.000Z',
+      wake,
+    };
+    const reachability: SharedFilesReachabilityDTO = {
+      deviceId: 'desktop-1',
+      state: 'waking',
+      route: null,
+      reason: 'wake_attempt_started',
+      updatedAt: '2026-06-09T03:00:01.000Z',
+    };
+    const setupRequired: SharedFilesReachabilityDTO = {
+      ...reachability,
+      state: 'wake_setup_required',
+      reason: 'public_wake_requires_setup',
+    };
+    const unavailable: SharedFilesReachabilityDTO = {
+      ...reachability,
+      state: 'wake_unavailable',
+      reason: 'wake_metadata_missing',
+    };
+
+    expectWakeTypes(target, wake, binding, reachability);
+    expect(setupRequired.state).toBe('wake_setup_required');
+    expect(unavailable.state).toBe('wake_unavailable');
   });
 });

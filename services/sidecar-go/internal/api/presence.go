@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 	"sync"
 	"time"
@@ -53,12 +54,12 @@ func (s *Server) handlePresence(w http.ResponseWriter, r *http.Request) {
 	}
 
 	serverName, err := s.store.GetDeviceName()
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		writeError(w, http.StatusInternalServerError, "failed to get device name")
 		return
 	}
 	serverID, err := s.store.GetDeviceID()
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		writeError(w, http.StatusInternalServerError, "failed to get device id")
 		return
 	}
@@ -73,10 +74,22 @@ func (s *Server) handlePresence(w http.ResponseWriter, r *http.Request) {
 		shareName = shareConfig.ShareName
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	body := map[string]any{
 		"ok":         true,
 		"serverId":   serverID,
 		"serverName": serverName,
 		"shareName":  shareName,
-	})
+	}
+	device, err := s.store.GetPairedDevice(clientID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		writeError(w, http.StatusInternalServerError, "failed to get paired device")
+		return
+	}
+	if device != nil && device.RevokedAt == nil {
+		if capability := s.wakeCapability(); capability != nil {
+			body["wake"] = capability
+		}
+	}
+
+	writeJSON(w, http.StatusOK, body)
 }
