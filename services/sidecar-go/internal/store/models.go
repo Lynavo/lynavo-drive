@@ -105,3 +105,61 @@ type DashboardDeviceResult struct {
 	CurrentFileSize int64   `json:"currentFileSize,omitempty"`
 	SessionState    *string `json:"sessionState,omitempty"`
 }
+
+type PairingAttemptResult string
+
+const (
+	PairingAttemptSuccess               PairingAttemptResult = "success"
+	PairingAttemptWrongCode             PairingAttemptResult = "wrong_code"
+	PairingAttemptBlocked               PairingAttemptResult = "blocked"
+	PairingAttemptIncompatible          PairingAttemptResult = "incompatible"
+	PairingAttemptMalformed             PairingAttemptResult = "malformed"
+	PairingAttemptRevokedRepairRequired PairingAttemptResult = "revoked_repair_required"
+)
+
+type PairingClientMetadata struct {
+	ClientID        string
+	DesktopDeviceID string
+	ClientName      string
+	DeviceAlias     string
+	Platform        string
+	StableDeviceID  string
+	IP              string
+}
+
+type PairingAttempt struct {
+	ID              int64                `json:"id"`
+	ClientID        string               `json:"clientId"`
+	DesktopDeviceID string               `json:"desktopDeviceId"`
+	ClientName      *string              `json:"clientName,omitempty"`
+	DeviceAlias     *string              `json:"deviceAlias,omitempty"`
+	Platform        *string              `json:"platform,omitempty"`
+	StableDeviceID  *string              `json:"stableDeviceId,omitempty"`
+	IP              *string              `json:"ip,omitempty"`
+	Result          PairingAttemptResult `json:"result"`
+	FailureReason   *string              `json:"failureReason,omitempty"`
+	CreatedAt       string               `json:"createdAt"`
+}
+
+type PairingFailureResult struct {
+	FailedAttempts    int
+	RemainingAttempts int
+	MaxAttempts       int
+	Blocked           bool
+}
+
+type BlockedPairingClient struct {
+	ClientID        string  `json:"clientId"`
+	DesktopDeviceID string  `json:"desktopDeviceId"`
+	ClientName      *string `json:"clientName,omitempty"`
+	DeviceAlias     *string `json:"deviceAlias,omitempty"`
+	Platform        *string `json:"platform,omitempty"`
+	StableDeviceID  *string `json:"stableDeviceId,omitempty"`
+	LastIP          *string `json:"lastIp,omitempty"`
+	FailedAttempts  int     `json:"failedAttempts"`
+	BlockedAt       string  `json:"blockedAt"`
+	LastAttemptAt   string  `json:"lastAttemptAt"`
+	Reason          string  `json:"reason"`
+	ClearedAt       *string `json:"clearedAt,omitempty"`
+	ClearedBy       *string `json:"clearedBy,omitempty"`
+}
