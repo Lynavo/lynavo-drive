@@ -64,6 +64,8 @@ func (s *Store) migrate() error {
 	// Migration 004: add stable_device_id column to paired_devices (idempotent — ignore if exists)
 	_, _ = s.db.Exec(migration004SQL)
 	// Migration 005: add local pairing attempt, rate-limit, and block tables.
-	_, _ = s.db.Exec(migration005SQL)
+	if _, err := s.db.Exec(migration005SQL); err != nil {
+		return err
+	}
 	return nil
 }
