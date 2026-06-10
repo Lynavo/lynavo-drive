@@ -149,13 +149,14 @@ describe('CodeVerifyScreen', () => {
         'PAIRING_CODE_INVALID',
         'Pairing code invalid',
         {
+          failedAttempts: 3,
           remainingAttempts: 2,
           maxAttempts: 5,
         },
       ),
     );
 
-    expect(getByText('連接碼錯誤，請重新輸入（剩餘 2/5 次）')).toBeTruthy();
+    expect(getByText('連接碼錯誤，還可嘗試 2 次')).toBeTruthy();
   });
 
   it('shows permanent blocked guidance when pairDevice rejects with PAIRING_CLIENT_BLOCKED', async () => {
@@ -173,7 +174,7 @@ describe('CodeVerifyScreen', () => {
 
     expect(
       getByText(
-        '這支手機已被此電腦封鎖。請聯絡電腦端擁有者，到桌面端設定解除封鎖後再試。',
+        '這台手機已被此電腦封鎖，請在電腦端解除後再試',
       ),
     ).toBeTruthy();
   });
@@ -190,8 +191,8 @@ describe('CodeVerifyScreen', () => {
       ),
     );
 
-    expect(getByText('連線授權已失效，請重新輸入桌面端連接碼。')).toBeTruthy();
-    expect(queryByText('連接碼錯誤，請重新輸入（剩餘 2/5 次）')).toBeNull();
+    expect(getByText('連接已失效，請重新輸入電腦端連接碼')).toBeTruthy();
+    expect(queryByText('連接碼錯誤，還可嘗試 2 次')).toBeNull();
   });
 
   it('triggers Alert.alert when pairDevice throws APP_VERSION_INCOMPATIBLE', async () => {

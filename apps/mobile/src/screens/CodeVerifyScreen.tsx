@@ -165,14 +165,10 @@ export function CodeVerifyScreen() {
           );
           setErrorMsg(t('errors.pairingVersionMismatchMessage'));
         } else if (errorCode === ErrorCode.PAIRING_CODE_INVALID) {
-          if (
-            metadata?.remainingAttempts !== undefined &&
-            metadata.maxAttempts !== undefined
-          ) {
+          if (metadata?.remainingAttempts !== undefined) {
             setErrorMsg(
-              t('errors.pairingWrongCodeWithAttempts', {
+              t('errors.pairingWrongCodeWithRemaining', {
                 remainingAttempts: metadata.remainingAttempts,
-                maxAttempts: metadata.maxAttempts,
               }),
             );
           } else {
