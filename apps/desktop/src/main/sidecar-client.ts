@@ -738,18 +738,19 @@ export interface SidecarHealth {
   service: string;
   appCompatibilityVersion?: number;
   capabilities?: {
-    revokesPairingsOnCodeRotation?: boolean;
+    connectionDeviceManagement?: boolean;
+    wakeOnLanSupported?: boolean;
   };
 }
 
-export function supportsPairingRevocationOnCodeRotation(
+export function supportsConnectionDeviceManagement(
   health: SidecarHealth | null | undefined,
 ): boolean {
   return (
     health?.ok === true &&
     health.service === 'syncflow-sidecar' &&
     health.appCompatibilityVersion === APP_COMPATIBILITY_VERSION &&
-    health.capabilities?.revokesPairingsOnCodeRotation === true
+    health.capabilities?.connectionDeviceManagement === true
   );
 }
 

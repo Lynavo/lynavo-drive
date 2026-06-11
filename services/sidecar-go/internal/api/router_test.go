@@ -223,8 +223,11 @@ func TestHealthEndpoint(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected capabilities object, got %T", body["capabilities"])
 	}
-	if capabilities["revokesPairingsOnCodeRotation"] != true {
-		t.Errorf("expected revokesPairingsOnCodeRotation=true, got %v", capabilities["revokesPairingsOnCodeRotation"])
+	if capabilities["revokesPairingsOnCodeRotation"] == true {
+		t.Fatal("health must not advertise revocation on code rotation")
+	}
+	if capabilities["connectionDeviceManagement"] != true {
+		t.Fatalf("expected connectionDeviceManagement=true, got %v", capabilities["connectionDeviceManagement"])
 	}
 	if capabilities["wakeOnLanSupported"] != true {
 		t.Errorf("expected wakeOnLanSupported=true, got %v", capabilities["wakeOnLanSupported"])

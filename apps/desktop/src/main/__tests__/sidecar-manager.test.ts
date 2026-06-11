@@ -52,7 +52,7 @@ vi.mock('../sidecar-client', async () => {
   };
 });
 
-function compatibleHealth(capabilities?: { revokesPairingsOnCodeRotation?: boolean }) {
+function compatibleHealth(capabilities?: { connectionDeviceManagement?: boolean }) {
   return {
     ok: true,
     service: 'syncflow-sidecar',
@@ -110,12 +110,12 @@ describe('SidecarManager', () => {
 
   it('restarts with a managed sidecar when a reused external sidecar becomes unhealthy', async () => {
     vi.mocked(sidecarClient.getHealth).mockResolvedValueOnce(
-      compatibleHealth({ revokesPairingsOnCodeRotation: true }),
+      compatibleHealth({ connectionDeviceManagement: true }),
     );
     vi.mocked(sidecarClient.getHealth).mockRejectedValueOnce(new Error('ECONNREFUSED'));
     vi.mocked(sidecarClient.getHealth).mockRejectedValueOnce(new Error('ECONNREFUSED'));
     vi.mocked(sidecarClient.getHealth).mockResolvedValue(
-      compatibleHealth({ revokesPairingsOnCodeRotation: true }),
+      compatibleHealth({ connectionDeviceManagement: true }),
     );
 
     const manager = new SidecarManager();
@@ -198,14 +198,14 @@ describe('SidecarManager', () => {
     expect(vi.getTimerCount()).toBe(1);
   });
 
-  it('does not reuse an external sidecar without pairing-revocation capability', async () => {
+  it('does not reuse an external sidecar without connection device management capability', async () => {
     vi.mocked(sidecarClient.getHealth)
       .mockResolvedValueOnce({
         ok: true,
         service: 'syncflow-sidecar',
       })
       .mockResolvedValue({
-        ...compatibleHealth({ revokesPairingsOnCodeRotation: true }),
+        ...compatibleHealth({ connectionDeviceManagement: true }),
       });
 
     const manager = new SidecarManager();

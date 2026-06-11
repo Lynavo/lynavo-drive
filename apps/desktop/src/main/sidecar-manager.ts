@@ -8,7 +8,7 @@ import log from 'electron-log';
 import { APP_COMPATIBILITY_VERSION, SIDECAR_HTTP_PORT } from '@syncflow/contracts';
 import {
   sidecarClient,
-  supportsPairingRevocationOnCodeRotation,
+  supportsConnectionDeviceManagement,
   syncCredentialsToSidecar,
 } from './sidecar-client';
 import type { SidecarHealth } from './sidecar-client';
@@ -433,7 +433,7 @@ export class SidecarManager extends EventEmitter {
   }
 
   private canReuseExistingSidecar(health: SidecarHealth): boolean {
-    return supportsPairingRevocationOnCodeRotation(health);
+    return supportsConnectionDeviceManagement(health);
   }
 
   private async isSidecarReachable(): Promise<boolean> {

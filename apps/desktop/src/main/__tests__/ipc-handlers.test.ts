@@ -118,7 +118,7 @@ vi.mock('../sidecar-client', async () => {
   };
 });
 
-function compatibleHealth(capabilities?: { revokesPairingsOnCodeRotation?: boolean }) {
+function compatibleHealth(capabilities?: { connectionDeviceManagement?: boolean }) {
   return {
     ok: true,
     service: 'syncflow-sidecar',
@@ -170,27 +170,13 @@ describe('registerIpcHandlers', () => {
     return { handler, manager };
   }
 
-  it('regenerates the connection code directly when the sidecar supports pair revocation', async () => {
-    vi.mocked(sidecarClient.getHealth).mockResolvedValue({
-      ...compatibleHealth({ revokesPairingsOnCodeRotation: true }),
-    });
+  it('regenerates connection code without revocation compatibility restart', async () => {
     vi.mocked(sidecarClient.regenerateConnectionCode).mockResolvedValue({ code: '123456' });
 
     const { handler, manager } = registerWithManager();
 
     await expect(handler()).resolves.toEqual({ code: '123456' });
     expect(manager.retryStart).not.toHaveBeenCalled();
-    expect(sidecarClient.regenerateConnectionCode).toHaveBeenCalledTimes(1);
-  });
-
-  it('restarts a stale sidecar before regenerating the connection code', async () => {
-    vi.mocked(sidecarClient.getHealth).mockResolvedValue(compatibleHealth());
-    vi.mocked(sidecarClient.regenerateConnectionCode).mockResolvedValue({ code: '654321' });
-
-    const { handler, manager } = registerWithManager();
-
-    await expect(handler()).resolves.toEqual({ code: '654321' });
-    expect(manager.retryStart).toHaveBeenCalledTimes(1);
     expect(sidecarClient.regenerateConnectionCode).toHaveBeenCalledTimes(1);
   });
 
