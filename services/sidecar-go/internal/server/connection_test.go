@@ -1025,7 +1025,7 @@ func TestReturningHelloIgnoresDesktopNameAsClientAlias(t *testing.T) {
 	}
 }
 
-func TestConnectionCodeRotationForcesReturningDeviceToRePair(t *testing.T) {
+func TestConnectionCodeRotationKeepsReturningDeviceAuthorized(t *testing.T) {
 	client, st, cfg, cleanup := setupTestConnection(t)
 	defer cleanup()
 
@@ -1033,12 +1033,8 @@ func TestConnectionCodeRotationForcesReturningDeviceToRePair(t *testing.T) {
 	client.Close()
 	time.Sleep(50 * time.Millisecond)
 
-	revokedCount, err := st.SetConnectionCodeAndRevokePairedDevices("654321")
-	if err != nil {
-		t.Fatalf("SetConnectionCodeAndRevokePairedDevices: %v", err)
-	}
-	if revokedCount != 1 {
-		t.Fatalf("expected 1 revoked device, got %d", revokedCount)
+	if err := st.SetConnectionCode("654321"); err != nil {
+		t.Fatalf("SetConnectionCode: %v", err)
 	}
 
 	client2, cleanup2 := setupTestConnectionWithStore(t, st, cfg)
@@ -1056,11 +1052,26 @@ func TestConnectionCodeRotationForcesReturningDeviceToRePair(t *testing.T) {
 
 	var helloRes protocol.HelloRes
 	recvJSON(t, client2, protocol.TypeHelloRes, &helloRes)
-	if !helloRes.AuthRequired {
-		t.Fatal("expected authRequired=true after connection code rotation revoked old token")
+	if helloRes.AuthRequired {
+		t.Fatal("expected authRequired=false after connection code rotation")
 	}
-	if helloRes.Bound {
-		t.Fatal("expected bound=false after connection code rotation revoked old token")
+	if !helloRes.Bound {
+		t.Fatal("expected bound=true after connection code rotation")
+	}
+	if helloRes.Nonce == "" {
+		t.Fatal("nonce is empty for returning device after connection code rotation")
+	}
+
+	authHMAC := computeHMAC(t, pairingToken, helloRes.Nonce)
+	sendJSON(t, client2, protocol.TypeAuthReq, protocol.AuthReq{
+		ClientID: testClientID,
+		Auth:     authHMAC,
+	})
+
+	var authRes map[string]any
+	recvJSON(t, client2, protocol.TypeAuthRes, &authRes)
+	if authRes["ok"] != true {
+		t.Fatal("expected auth to succeed after connection code rotation")
 	}
 }
 

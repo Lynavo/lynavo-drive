@@ -131,6 +131,30 @@ func TestRevokePairedDevice(t *testing.T) {
 	}
 }
 
+func TestRevokePairedDeviceAlreadyRevokedReturnsNotFoundAndKeepsOriginalTimestamp(t *testing.T) {
+	s := newTestStore(t)
+	d := sampleDevice("already-revoked")
+	revokedAt := "2026-06-10T08:09:10Z"
+	d.RevokedAt = &revokedAt
+
+	if err := s.UpsertPairedDevice(d); err != nil {
+		t.Fatalf("UpsertPairedDevice: %v", err)
+	}
+
+	err := s.RevokePairedDevice("already-revoked")
+	if !errors.Is(err, ErrNoRows) {
+		t.Fatalf("expected ErrNoRows, got %v", err)
+	}
+
+	got, err := s.GetPairedDevice("already-revoked")
+	if err != nil {
+		t.Fatalf("GetPairedDevice: %v", err)
+	}
+	if got.RevokedAt == nil || *got.RevokedAt != revokedAt {
+		t.Fatalf("expected revoked_at to remain %q, got %v", revokedAt, got.RevokedAt)
+	}
+}
+
 func TestRevokePairedDevice_NotFound(t *testing.T) {
 	s := newTestStore(t)
 

@@ -77,7 +77,7 @@ func TestSetConnectionCode(t *testing.T) {
 	}
 }
 
-func TestSetConnectionCodeAndRevokePairedDevices(t *testing.T) {
+func TestSetConnectionCodeKeepsAuthorizedDevices(t *testing.T) {
 	s := newTestStore(t)
 	for _, id := range []string{"client-a", "client-b"} {
 		if err := s.UpsertPairedDevice(sampleDevice(id)); err != nil {
@@ -85,12 +85,8 @@ func TestSetConnectionCodeAndRevokePairedDevices(t *testing.T) {
 		}
 	}
 
-	revokedCount, err := s.SetConnectionCodeAndRevokePairedDevices("654321")
-	if err != nil {
-		t.Fatalf("SetConnectionCodeAndRevokePairedDevices: %v", err)
-	}
-	if revokedCount != 2 {
-		t.Fatalf("expected 2 revoked devices, got %d", revokedCount)
+	if err := s.SetConnectionCode("654321"); err != nil {
+		t.Fatalf("SetConnectionCode: %v", err)
 	}
 
 	code, err := s.GetConnectionCode()
@@ -106,8 +102,8 @@ func TestSetConnectionCodeAndRevokePairedDevices(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetPairedDevice %q: %v", id, err)
 		}
-		if got.RevokedAt == nil {
-			t.Fatalf("expected %q to be revoked", id)
+		if got.RevokedAt != nil {
+			t.Fatalf("expected %q to remain authorized, revoked_at=%q", id, *got.RevokedAt)
 		}
 	}
 }

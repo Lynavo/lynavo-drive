@@ -88,7 +88,7 @@ func (s *Store) ListPairedDevices() ([]PairedDevice, error) {
 func (s *Store) RevokePairedDevice(clientID string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	result, err := s.db.Exec(
-		"UPDATE paired_devices SET revoked_at = ? WHERE client_id = ?",
+		"UPDATE paired_devices SET revoked_at = ? WHERE client_id = ? AND revoked_at IS NULL",
 		now, clientID,
 	)
 	if err != nil {
