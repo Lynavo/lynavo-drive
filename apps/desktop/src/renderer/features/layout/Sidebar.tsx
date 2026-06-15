@@ -31,8 +31,9 @@ const navItems: { key: AppView; labelKey: string; icon: typeof LayoutDashboard }
 const dragRegionStyle = { WebkitAppRegion: 'drag' } as CSSProperties;
 const noDragRegionStyle = { WebkitAppRegion: 'no-drag' } as CSSProperties;
 const activeNavStyle = {
-  background: 'rgba(255,255,255,0.85)',
-  boxShadow: '0 2px 12px rgba(59,130,246,0.10)',
+  background: 'rgba(238,234,255,0.7)',
+  boxShadow: '0 12px 28px rgba(126,116,190,0.12)',
+  border: '1px solid rgba(216,210,255,0.6)',
   WebkitAppRegion: 'no-drag',
 } as CSSProperties;
 
@@ -73,12 +74,10 @@ export function Sidebar() {
   return (
     <>
       <aside
-        className="z-10 flex w-56 flex-col pt-8"
+        className="z-10 flex w-[238px] shrink-0 flex-col pt-6 m-3 mr-0 rounded-2xl border border-white/70 shadow-[0_24px_70px_rgba(70,96,138,0.14)]"
         style={{
-          background: glass.sidebar.background,
-          backdropFilter: `blur(${glass.sidebar.blur})`,
-          borderRight: '1px solid rgba(255,255,255,0.7)',
-          boxShadow: elevation.sidebar,
+          background: 'rgba(255,255,255,0.52)',
+          backdropFilter: 'blur(20px)',
         }}
       >
         {/* Logo */}
@@ -87,52 +86,55 @@ export function Sidebar() {
             src={syncflowLogo}
             alt={getProductName()}
             draggable={false}
-            className="h-9 w-9 object-contain"
+            className="h-7 w-auto object-contain"
           />
-          <span className="text-base font-bold" style={{ color: '#1a2a3a' }}>
-            {getProductName()}
+          <span className="text-[15px] font-semibold leading-none" style={{ color: '#17191c' }}>
+            {getProductName().replace(' ', '')}
           </span>
         </div>
 
         {authInitialized ? (
           <div className="px-3 pb-2" style={noDragRegionStyle}>
             {session ? (
-              <div className="flex items-center gap-2 rounded-lg border border-emerald-500/15 bg-emerald-500/10 px-3 py-2">
-                <UserRound className="h-4 w-4 shrink-0 text-emerald-700" />
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="group flex w-full items-center gap-3 rounded-lg border border-white/60 bg-white/45 p-2.5 text-left transition hover:bg-white/65 hover:shadow-sm"
+                title={t('layout.account.logout')}
+                aria-label={t('layout.account.logout')}
+              >
+                <div className="relative h-8 w-8 shrink-0 rounded-full bg-gradient-to-tr from-[#c8dffa] to-[#d6c7ff] flex items-center justify-center font-bold text-xs text-[#527094] border border-white/80 shadow-[0_4px_10px_rgba(126,116,190,0.1)]">
+                  {accountLabel.substring(0, 2).toUpperCase()}
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-emerald-800">
+                  <p className="flex items-center gap-1 text-[11px] font-bold leading-none text-[#17191c]">
                     {t('layout.account.signedIn')}
+                    <span className="flex h-3 w-3 items-center justify-center rounded-full bg-[#fde047] text-[#854d0e] scale-90">
+                      <UserRound className="h-2 w-2" />
+                    </span>
                   </p>
-                  <p className="truncate text-[11px] text-emerald-700/80" title={accountLabel}>
+                  <p className="mt-0.5 truncate text-[12px] leading-tight text-[#327db3]" title={accountLabel}>
                     {accountLabel}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-emerald-700/80 transition-[background-color,color,transform] duration-150 ease-out hover:bg-white/70 hover:text-emerald-800 active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600/25 focus-visible:ring-offset-2"
-                  aria-label={t('layout.account.logout')}
-                  title={t('layout.account.logout')}
-                  onClick={handleLogout}
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                </button>
-              </div>
+                <LogOut className="h-4 w-4 shrink-0 text-[#327db3] transition group-hover:text-[#185f9a]" />
+              </button>
             ) : (
-              <div className="rounded-lg border border-blue-500/15 bg-white/65 px-3 py-3 shadow-sm">
+              <div className="rounded-lg border border-white/70 bg-white/45 p-3 shadow-sm">
                 <div className="mb-2 flex items-start gap-2">
-                  <LogIn className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                  <LogIn className="mt-0.5 h-4 w-4 shrink-0 text-[#746aa8]" />
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-[#1a2a3a]">
                       {t('layout.account.promptTitle')}
                     </p>
-                    <p className="mt-0.5 text-[11px] leading-4 text-[#6b7a8d]">
+                    <p className="mt-0.5 text-[11px] leading-4 text-[#5f6671]">
                       {t('layout.account.dialogDescription')}
                     </p>
                   </div>
                 </div>
                 <button
                   type="button"
-                  className="flex h-8 w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white transition-[background-color,transform] duration-150 ease-out hover:bg-blue-700 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-2"
+                  className="flex h-8 w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-[#746aa8] px-3 text-xs font-semibold text-white transition-[background-color,transform] duration-150 ease-out hover:bg-[#5f5592] active:scale-[0.985] focus-visible:outline-none"
                   onClick={() => setLoginDialogOpen(true)}
                 >
                   <LogIn className="h-3.5 w-3.5" />
@@ -144,7 +146,7 @@ export function Sidebar() {
         ) : null}
 
         {/* Navigation */}
-        <nav className="flex flex-1 flex-col gap-1 px-3 py-2">
+        <nav className="flex flex-1 flex-col gap-1 px-3 py-5">
           {navItems.map(({ key, labelKey, icon: Icon }) => {
             const active =
               currentView === key || (key === 'dashboard' && currentView === 'device-detail');
@@ -152,13 +154,13 @@ export function Sidebar() {
               <button
                 key={key}
                 onClick={() => setView(key)}
-                className={`flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-[color,background-color,box-shadow,transform] duration-150 ease-out active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-2 ${
-                  active ? 'text-primary' : 'text-[#6b7a8d] hover:bg-white/70 hover:text-[#1a2a3a]'
+                className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold transition-[color,background-color,box-shadow,transform] duration-150 ease-out active:scale-[0.985] focus-visible:outline-none ${
+                  active ? 'text-[#4d4961]' : 'text-[#5f6671] hover:bg-white/55 hover:text-[#17191c]'
                 }`}
                 style={active ? activeNavStyle : noDragRegionStyle}
               >
-                <Icon className="h-4 w-4" />
-                {t(labelKey)}
+                <Icon className={`h-4 w-4 shrink-0 transition-colors ${active ? 'text-[#746aa8]' : 'text-[#858b96]'}`} />
+                <span>{t(labelKey)}</span>
               </button>
             );
           })}
@@ -168,15 +170,15 @@ export function Sidebar() {
         <div className="px-3 pb-4">
           <button
             onClick={() => setView('help')}
-            className={`flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-[color,background-color,box-shadow,transform] duration-150 ease-out active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-2 ${
+            className={`flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold transition-[color,background-color,box-shadow,transform] duration-150 ease-out active:scale-[0.985] focus-visible:outline-none ${
               currentView === 'help'
-                ? 'text-primary'
-                : 'text-[#6b7a8d] hover:bg-white/70 hover:text-[#1a2a3a]'
+                ? 'text-[#4d4961]'
+                : 'text-[#5f6671] hover:bg-white/55 hover:text-[#17191c]'
             }`}
             style={currentView === 'help' ? activeNavStyle : noDragRegionStyle}
           >
-            <HelpCircle className="h-4 w-4" />
-            {t('layout.nav.help')}
+            <HelpCircle className={`h-4 w-4 shrink-0 transition-colors ${currentView === 'help' ? 'text-[#746aa8]' : 'text-[#858b96]'}`} />
+            <span>{t('layout.nav.help')}</span>
           </button>
         </div>
       </aside>

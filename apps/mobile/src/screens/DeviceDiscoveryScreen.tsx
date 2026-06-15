@@ -49,6 +49,9 @@ import {
 import { buildManualPairDevice } from './deviceDiscoveryManualPairing';
 import { shouldKeepCachedDevicesVisible } from './deviceDiscoveryRefresh';
 import { marketConfig } from '../markets';
+import { useRecentDesktops } from '../stores/recent-desktops-store';
+import type { RecentDesktopDTO } from '@syncflow/contracts';
+
 
 // ---------------------------------------------------------------------------
 // Types
@@ -169,6 +172,7 @@ export function DeviceDiscoveryScreen() {
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   const [scanning, setScanning] = useState(true);
   const [devices, setDevices] = useState<DiscoveredDevice[]>([]);
+  const { recentDesktops, addDesktop } = useRecentDesktops();
   const [manualHost, setManualHost] = useState('');
   const [manualHostError, setManualHostError] = useState<string | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -420,6 +424,13 @@ export function DeviceDiscoveryScreen() {
             port: device.port,
             connectionCode: '',
           });
+          await addDesktop({
+            desktopDeviceId: device.deviceId,
+            desktopName: device.name,
+            host: device.ip,
+            port: device.port,
+            authorizationStatus: 'authorized',
+          });
           navigation.dispatch(
             CommonActions.reset({
               index: 0,
@@ -442,8 +453,66 @@ export function DeviceDiscoveryScreen() {
         deviceName: device.name,
       });
     },
-    [mode, navigation, currentDeviceId, knownDeviceIds, t],
+    [mode, navigation, currentDeviceId, knownDeviceIds, t, addDesktop],
   );
+
+  const handleRecentDevicePress = useCallback(
+    async (recent: RecentDesktopDTO) => {
+      const discovered = devices.find(d => d.deviceId === recent.desktopDeviceId);
+      const host = discovered ? discovered.ip : recent.host;
+      const port = discovered ? discovered.port : recent.port;
+      const deviceId = recent.desktopDeviceId;
+      const deviceName = recent.desktopName;
+
+      if (mode === 'switch' && deviceId === currentDeviceId) {
+        Alert.alert(t('deviceDiscovery.switch.toast.alreadyCurrent'));
+        return;
+      }
+
+      try {
+        const { NativeSyncEngine } = NativeModules;
+        if (!NativeSyncEngine) {
+          throw new Error('NativeSyncEngine unavailable');
+        }
+        await NativeSyncEngine.pairDevice({
+          deviceId,
+          host,
+          port,
+          connectionCode: '',
+        });
+
+        await addDesktop({
+          desktopDeviceId: deviceId,
+          desktopName: deviceName,
+          host,
+          port,
+          authorizationStatus: 'authorized',
+        });
+
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'SyncActivity' }],
+          }),
+        );
+        return;
+      } catch (error) {
+        console.warn(
+          '[DiscoveryScreen] recent device direct reconnect failed, requiring code verification',
+          error,
+        );
+      }
+
+      navigation.navigate('CodeVerify', {
+        deviceId,
+        host,
+        port,
+        deviceName,
+      });
+    },
+    [devices, mode, currentDeviceId, addDesktop, navigation, t]
+  );
+
 
   const handleManualPair = useCallback(() => {
     console.log('[DiscoveryScreen] handleManualPair submitted', manualHost);
@@ -639,6 +708,93 @@ export function DeviceDiscoveryScreen() {
   );
 
 
+  type ListEntry =
+    | { type: 'header'; key: string; title: string }
+    | { type: 'discovered'; key: string; device: DiscoveredDevice }
+    | { type: 'recent'; key: string; desktop: RecentDesktopDTO };
+
+  const listData: ListEntry[] = [];
+  if (devices.length > 0) {
+    listData.push({
+      type: 'header',
+      key: 'header-discovered',
+      title: t('deviceDiscovery.sections.discovered'),
+    });
+    for (const dev of devices) {
+      listData.push({
+        type: 'discovered',
+        key: `dev-${dev.deviceId}`,
+        device: dev,
+      });
+    }
+  }
+  if (recentDesktops.length > 0) {
+    listData.push({
+      type: 'header',
+      key: 'header-recent',
+      title: t('deviceDiscovery.sections.recent'),
+    });
+    for (const recent of recentDesktops) {
+      listData.push({
+        type: 'recent',
+        key: `recent-${recent.desktopDeviceId}`,
+        desktop: recent,
+      });
+    }
+  }
+
+  const renderListEntry = useCallback(
+    ({ item }: ListRenderItemInfo<ListEntry>) => {
+      if (item.type === 'header') {
+        return <Text style={styles.sectionHeader}>{item.title}</Text>;
+      }
+      if (item.type === 'discovered') {
+        return renderDevice({ item: item.device } as any);
+      }
+      const recent = item.desktop;
+      const isCurrentDevice = mode === 'switch' && recent.desktopDeviceId === currentDeviceId;
+      const isKnownDevice =
+        mode === 'switch' && !isCurrentDevice && knownDeviceIds.has(recent.desktopDeviceId);
+      return (
+        <TouchableOpacity
+          style={styles.deviceCard}
+          activeOpacity={0.7}
+          onPress={() => handleRecentDevicePress(recent)}
+        >
+          <View style={styles.deviceIconWrapper}>
+            <Icon name="desktop-outline" size={20} color="#fff" />
+          </View>
+          <View style={styles.deviceInfo}>
+            <Text style={styles.deviceName}>{recent.desktopName}</Text>
+            <Text style={styles.deviceMeta}>
+              {recent.host}:{recent.port}
+            </Text>
+          </View>
+          {isCurrentDevice && (
+            <View style={styles.badgeCurrent}>
+              <Text style={styles.badgeCurrentText}>
+                {t('deviceDiscovery.switch.badge.current')}
+              </Text>
+            </View>
+          )}
+          {isKnownDevice && (
+            <View style={styles.badgeKnown}>
+              <Text style={styles.badgeKnownText}>
+                {t('deviceDiscovery.switch.badge.known')}
+              </Text>
+            </View>
+          )}
+          {!isCurrentDevice && !isKnownDevice && (
+            <Icon name="chevron-forward" size={20} color="#b0c8da" />
+          )}
+        </TouchableOpacity>
+      );
+    },
+    [renderDevice, handleRecentDevicePress, mode, currentDeviceId, knownDeviceIds, t]
+  );
+
+  const entryKeyExtractor = useCallback((item: ListEntry) => item.key, []);
+
   const manualDockBottom =
     keyboardHeight > 0 ? Math.max(12, keyboardHeight - insets.bottom) : 0;
   const listBottomInset =
@@ -683,7 +839,7 @@ export function DeviceDiscoveryScreen() {
         </View>
 
         {/* Scanning animation */}
-        {scanning && devices.length === 0 && (
+        {scanning && devices.length === 0 && recentDesktops.length === 0 && (
           <View style={styles.scanningSection}>
             <PulseRings />
             <Text style={styles.scanningText}>{t('deviceDiscovery.scanning.text')}</Text>
@@ -691,16 +847,11 @@ export function DeviceDiscoveryScreen() {
         )}
 
         {/* Device list */}
-        {(devices.length > 0 || !scanning) && (
+        {(devices.length > 0 || recentDesktops.length > 0 || !scanning) && (
           <View
             style={[styles.listSection, { paddingBottom: listBottomInset }]}
           >
-            {devices.length > 0 && (
-              <Text style={styles.deviceCount}>
-                {t('deviceDiscovery.devices.foundCount', { count: devices.length })}
-              </Text>
-            )}
-            {devices.length === 0 ? (
+            {devices.length === 0 && recentDesktops.length === 0 ? (
               <View style={styles.emptySection}>
                 <Text style={styles.emptyText}>
                   {isAndroid
@@ -710,9 +861,9 @@ export function DeviceDiscoveryScreen() {
               </View>
             ) : (
               <FlatList
-                data={devices}
-                renderItem={renderDevice}
-                keyExtractor={keyExtractor}
+                data={listData}
+                renderItem={renderListEntry}
+                keyExtractor={entryKeyExtractor}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
@@ -1093,6 +1244,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#6a96b8',
     marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#5a7a96',
+    marginTop: 18,
+    marginBottom: 6,
     paddingHorizontal: 4,
   },
   listContent: {

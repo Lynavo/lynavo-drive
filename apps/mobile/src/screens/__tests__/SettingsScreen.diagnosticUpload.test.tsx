@@ -159,6 +159,16 @@ jest.mock('../../stores/auth-store', () => ({
   getTrialRemainingDays: jest.fn().mockReturnValue(0),
 }));
 
+jest.mock('../../stores/recent-desktops-store', () => ({
+  useRecentDesktops: () => ({
+    recentDesktops: [],
+    isLoading: false,
+    addDesktop: jest.fn(),
+    forgetDesktop: jest.fn(),
+    updateAuthStatus: jest.fn(),
+  }),
+}));
+
 jest.mock('../../constants/features', () => ({
   FEATURES: {
     IAP_ENABLED: false,

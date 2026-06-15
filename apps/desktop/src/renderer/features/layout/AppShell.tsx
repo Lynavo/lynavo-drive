@@ -6,6 +6,7 @@ import { useAppStore } from '@renderer/stores/app-store';
 import { useDashboardStore } from '@renderer/stores/dashboard-store';
 import { useSettingsStore } from '@renderer/stores/settings-store';
 import { useSidecarRuntimeStore } from '@renderer/stores/sidecar-runtime-store';
+import { useResourcesStore } from '@renderer/stores/resources-store';
 import { ErrorBoundary } from '@renderer/components/shared/ErrorBoundary';
 import { Sidebar } from './Sidebar';
 import { SidecarStatusBanner } from './SidecarStatusBanner';
@@ -40,20 +41,19 @@ const RecordsPage = lazy(() =>
     default: m.RecordsPage,
   })),
 );
+const SharedResourcesPage = lazy(() =>
+  import('@renderer/features/shared/SharedResourcesPage').then((m) => ({
+    default: m.SharedResourcesPage,
+  })),
+);
+const ReceivedLibraryPage = lazy(() =>
+  import('@renderer/features/library/ReceivedLibraryPage').then((m) => ({
+    default: m.ReceivedLibraryPage,
+  })),
+);
 
 function PageFallback() {
   return <Skeleton className="flex-1" />;
-}
-
-function DesktopLocalPlaceholder({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="flex-1 overflow-auto px-6 py-8">
-      <GlassCard className="mx-auto max-w-3xl p-8">
-        <h1 className="text-xl font-semibold text-foreground">{title}</h1>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">{description}</p>
-      </GlassCard>
-    </div>
-  );
 }
 
 export function AppShell() {
@@ -70,6 +70,8 @@ export function AppShell() {
       if (runtime.status === 'healthy') {
         useDashboardStore.getState().fetchDashboard();
         useSettingsStore.getState().fetchSettings();
+        void useResourcesStore.getState().loadSharedResources();
+        void useResourcesStore.getState().loadReceivedLibrary();
       }
     });
 
@@ -78,6 +80,8 @@ export function AppShell() {
       if (runtime.status === 'healthy') {
         useDashboardStore.getState().fetchDashboard();
         useSettingsStore.getState().fetchSettings();
+        void useResourcesStore.getState().loadSharedResources();
+        void useResourcesStore.getState().loadReceivedLibrary();
       }
     });
 
@@ -140,15 +144,23 @@ export function AppShell() {
 
   return (
     <div
-      className="flex h-screen overflow-hidden"
+      className="flex h-screen overflow-hidden text-[#17191c]"
       style={{
-        background: 'linear-gradient(135deg, #daeef8 0%, #e8f5fb 40%, #f0f8fd 70%, #f8fbff 100%)',
+        backgroundColor: '#f7fbff',
+        backgroundImage:
+          'linear-gradient(135deg, rgba(255,252,247,0.98) 0%, rgba(247,252,255,0.92) 38%, rgba(239,248,255,0.92) 68%, rgba(255,248,220,0.72) 100%), repeating-linear-gradient(0deg, rgba(23,25,28,0.024) 0 1px, transparent 1px 3px)',
+        backgroundBlendMode: 'normal, overlay',
       }}
     >
       <Sidebar />
 
       {/* Content area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <main
+        className="m-3 min-w-0 flex-1 overflow-hidden flex flex-col rounded-2xl border border-white/60 bg-white/35 shadow-[0_30px_90px_rgba(70,96,138,0.12)]"
+        style={{
+          backdropFilter: 'blur(20px)',
+        }}
+      >
         <div
           className="shrink-0 px-6 pt-2 pb-2"
           style={{ WebkitAppRegion: 'drag' } as CSSProperties}
@@ -158,18 +170,8 @@ export function AppShell() {
           {currentView === 'dashboard' && <Dashboard />}
           {currentView === 'device-detail' && <DeviceDetailPage />}
           {currentView === 'devices' && <DevicesPage />}
-          {currentView === 'shared' && (
-            <DesktopLocalPlaceholder
-              title={t('layout.placeholders.shared.title')}
-              description={t('layout.placeholders.shared.description')}
-            />
-          )}
-          {currentView === 'library' && (
-            <DesktopLocalPlaceholder
-              title={t('layout.placeholders.library.title')}
-              description={t('layout.placeholders.library.description')}
-            />
-          )}
+          {currentView === 'shared' && <SharedResourcesPage />}
+          {currentView === 'library' && <ReceivedLibraryPage />}
           {currentView === 'records' && <RecordsPage />}
           {currentView === 'settings' && <SettingsPage />}
           {currentView === 'help' && (
@@ -178,7 +180,8 @@ export function AppShell() {
             </ErrorBoundary>
           )}
         </Suspense>
-      </div>
+      </main>
     </div>
   );
 }
+

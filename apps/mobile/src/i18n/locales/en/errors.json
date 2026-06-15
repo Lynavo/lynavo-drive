@@ -26,5 +26,7 @@
   "profileLoadTitle": "Unable to Load Account Info",
   "accountDeleteFailed": "Could not delete your account. Please try again later.",
   "pairingVersionMismatchTitle": "Version Incompatible",
-  "pairingVersionMismatchMessage": "The app versions on your mobile device and computer are incompatible. Please update the desktop app to the latest version and try again."
+  "pairingVersionMismatchMessage": "The app versions on your mobile device and computer are incompatible. Please update the desktop app to the latest version and try again.",
+  "pairingBlocked": "Pairing blocked. Please click 'Unblock Device' in desktop settings, or generate a new connection code and try again.",
+  "pairingWrongCodeWithAttempts": "Incorrect connection code. Remaining attempts: {{count}}."
 }

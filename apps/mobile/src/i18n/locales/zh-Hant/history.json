@@ -13,5 +13,9 @@
     "yesterday": "昨天",
     "monthDay": "{{month}}月{{day}}日"
   },
-  "liveLabel": "即時同步中"
+  "liveLabel": "即時同步中",
+  "status": {
+    "completed": "同步成功",
+    "failed": "同步失敗"
+  }
 }

@@ -29,6 +29,10 @@ if (command === 'dev' && !env.SYNCFLOW_GIFTCARD_REDEEM_BASE_URL) {
   env.SYNCFLOW_GIFTCARD_REDEEM_BASE_URL = reviewApiBaseUrl;
 }
 
+if (command === 'dev' && !env.SYNCFLOW_MARKET) {
+  env.SYNCFLOW_MARKET = 'global';
+}
+
 const googleClientConfigDir = resolveDefaultGoogleClientConfigDir({
   command,
   env,

@@ -91,6 +91,16 @@ jest.mock('../../utils/onboardingStorage', () => ({
   markUnconnectedGuideSeen: () => mockMarkUnconnectedGuideSeen(),
 }));
 
+jest.mock('../../stores/recent-desktops-store', () => ({
+  useRecentDesktops: () => ({
+    recentDesktops: [],
+    isLoading: false,
+    addDesktop: jest.fn(),
+    forgetDesktop: jest.fn(),
+    updateAuthStatus: jest.fn(),
+  }),
+}));
+
 import { DeviceDiscoveryScreen } from '../DeviceDiscoveryScreen';
 
 const mockNativeSyncEngine = {

@@ -5,7 +5,9 @@
   "globalPersonalFolderName": "My Computer",
   "scopes": {
     "team": "Shared Folder",
-    "personal": "Personal Shared Folder"
+    "personal": "Personal Shared Folder",
+    "shared": "Shared Resources",
+    "received": "Received Files"
   },
   "loading": "Loading...",
   "files": {

@@ -13,6 +13,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as RNLocalize from 'react-native-localize';
 
 import { AuthProvider } from './stores/auth-store';
+import { RecentDesktopsProvider } from './stores/recent-desktops-store';
 import { RootNavigator } from './navigation/RootNavigator';
 import { loadDebugBaseUrlOverride } from './services/config';
 import { refreshNativeAppFeatureSettings } from './services/app-config-service';
@@ -115,16 +116,18 @@ export function App() {
 
   return (
     <AuthProvider>
-      <GestureHandlerRootView style={styles.root}>
-        <SafeAreaProvider>
-          <NavigationContainer>
-            <StatusBar
-              barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-            />
-            <RootNavigator />
-          </NavigationContainer>
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
+      <RecentDesktopsProvider>
+        <GestureHandlerRootView style={styles.root}>
+          <SafeAreaProvider>
+            <NavigationContainer>
+              <StatusBar
+                barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+              />
+              <RootNavigator />
+            </NavigationContainer>
+          </SafeAreaProvider>
+        </GestureHandlerRootView>
+      </RecentDesktopsProvider>
     </AuthProvider>
   );
 }

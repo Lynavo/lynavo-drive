@@ -24,3 +24,19 @@ NativeModules.AppleAuthModule = {
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
+
+// Mock NativeSyncEngine NativeModule
+NativeModules.NativeSyncEngine = {
+  pairDevice: jest.fn(),
+  getBindingState: jest.fn().mockResolvedValue({
+    deviceId: 'desktop-device-id',
+    host: '192.168.1.100',
+    connectionState: 'connected',
+  }),
+  getClientId: jest.fn().mockResolvedValue('mock-client-id'),
+  getClientDisplayName: jest.fn().mockResolvedValue('mock-client-name'),
+  wipeSyncIdentity: jest.fn(),
+  getPhotoAuthorizationStatus: jest.fn().mockResolvedValue('authorized'),
+  requestPhotoPermission: jest.fn().mockResolvedValue('authorized'),
+};
+

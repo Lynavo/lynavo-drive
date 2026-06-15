@@ -14,5 +14,18 @@
     "recent": "最近 {{date}}",
     "today": "今日",
     "preparing": "准备传输中…"
+  },
+  "statusPanel": {
+    "sidecarStatus": "背景服务",
+    "pairingCode": "本机配对码",
+    "activeDevices": "活动中设备",
+    "copySuccess": "配对码已复制到剪贴簿",
+    "clickToCopy": "点击复制",
+    "status": {
+      "healthy": "运行中",
+      "starting": "启动中",
+      "failed": "启动失败",
+      "stopped": "已停止"
+    }
   }
 }

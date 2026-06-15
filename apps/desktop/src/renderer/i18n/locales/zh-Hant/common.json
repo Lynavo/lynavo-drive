@@ -43,5 +43,39 @@
   },
   "units": {
     "files": "個檔案"
+  },
+  "shared": {
+    "addFile": "共享檔案",
+    "addFolder": "共享資料夾",
+    "tableName": "名稱",
+    "tableKind": "類型",
+    "tableSize": "大小",
+    "tableStatus": "狀態",
+    "tableDownloads": "下載次數",
+    "tableLastAccessed": "最後存取",
+    "tableAddedAt": "新增時間",
+    "tableActions": "操作",
+    "statusAvailable": "可用",
+    "statusMissing": "檔案不存在",
+    "statusRemoved": "已移除",
+    "kindFile": "本機檔案",
+    "kindFolder": "本機資料夾",
+    "kindReceived": "已接收",
+    "noData": "尚無共享資源",
+    "remove": "取消共享"
+  },
+  "library": {
+    "tableName": "名稱",
+    "tableMediaType": "格式",
+    "tableSize": "大小",
+    "tableSource": "來源裝置",
+    "tableCompletedAt": "傳輸時間",
+    "tableShareStatus": "共享狀態",
+    "tableActions": "操作",
+    "addToShared": "加入共享",
+    "statusShared": "已共享",
+    "statusNotShared": "未共享",
+    "statusMissing": "遺失",
+    "noData": "尚無接收資料"
   }
 }

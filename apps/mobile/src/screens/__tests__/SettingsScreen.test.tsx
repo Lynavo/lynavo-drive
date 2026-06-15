@@ -1,5 +1,48 @@
 import React from 'react';
 import { Alert, AppState, Platform } from 'react-native';
+
+let mockNativeSyncEngine: any;
+jest.mock('react-native', () => {
+  const rn = jest.requireActual('react-native');
+  mockNativeSyncEngine = {
+    getBindingState: jest.fn().mockResolvedValue(null),
+    getClientDisplayName: jest.fn().mockResolvedValue('我的 iPhone'),
+    getAppInfo: jest.fn().mockResolvedValue({ version: '1.0.0', build: '1' }),
+    getHistoryDays: jest.fn().mockResolvedValue({ items: [] }),
+    getSyncOverview: jest.fn().mockResolvedValue({
+      progressPercent: 0,
+      transferredBytes: 0,
+      currentFile: null,
+      currentFileConfirmedBytes: 0,
+      uploadState: 'idle',
+    }),
+    getAutoUploadConfig: jest.fn().mockResolvedValue({
+      enabled: true,
+      timeRangeMode: 'all',
+      state: 'active',
+    }),
+    setClientDisplayName: jest.fn().mockResolvedValue(undefined),
+    disconnectAndUnbind: jest.fn().mockResolvedValue(undefined),
+    wipeSyncIdentity: jest.fn().mockResolvedValue(undefined),
+    resetAllStatus: jest.fn().mockResolvedValue(undefined),
+    savePublicWakeTarget: jest.fn().mockResolvedValue(undefined),
+    getKnownDeviceIds: jest.fn().mockResolvedValue([]),
+    getAndroidBackgroundKeepaliveStatus: jest.fn().mockResolvedValue({
+      backgroundKeepaliveStrategy:
+        'android_cn_foreground_service_battery_whitelist',
+      foregroundServiceActive: false,
+      foregroundServiceStopRequested: false,
+      batteryOptimizationIgnored: false,
+      postNotificationsGranted: true,
+      lastBackgroundStopReason: null,
+    }),
+    requestIgnoreBatteryOptimizations: jest.fn().mockResolvedValue(true),
+    addListener: jest.fn(),
+    removeListeners: jest.fn(),
+  };
+  rn.NativeModules.NativeSyncEngine = mockNativeSyncEngine;
+  return rn;
+});
 import type { AppStateStatus } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -174,6 +217,17 @@ jest.mock('../../constants/features', () => ({
   },
 }));
 
+const mockForgetDesktop = jest.fn();
+jest.mock('../../stores/recent-desktops-store', () => ({
+  useRecentDesktops: () => ({
+    recentDesktops: [],
+    isLoading: false,
+    addDesktop: jest.fn(),
+    forgetDesktop: mockForgetDesktop,
+    updateAuthStatus: jest.fn(),
+  }),
+}));
+
 let mockIsGlobalMarket = false;
 jest.mock('../../markets', () => {
   const actual = jest.requireActual('../../markets');
@@ -196,41 +250,7 @@ import { getSuggestedPublicWakeHost } from '../../services/public-wake-service';
 import { iapService } from '../../services/iap-service';
 import { LANGUAGE_PREFERENCE_STORAGE_KEY } from '../../i18n/language-preference';
 
-const mockNativeSyncEngine = {
-  getBindingState: jest.fn().mockResolvedValue(null),
-  getClientDisplayName: jest.fn().mockResolvedValue('我的 iPhone'),
-  getAppInfo: jest.fn().mockResolvedValue({ version: '1.0.0', build: '1' }),
-  getHistoryDays: jest.fn().mockResolvedValue({ items: [] }),
-  getSyncOverview: jest.fn().mockResolvedValue({
-    progressPercent: 0,
-    transferredBytes: 0,
-    currentFile: null,
-    currentFileConfirmedBytes: 0,
-    uploadState: 'idle',
-  }),
-  getAutoUploadConfig: jest.fn().mockResolvedValue({
-    enabled: true,
-    timeRangeMode: 'all',
-    state: 'active',
-  }),
-  setClientDisplayName: jest.fn().mockResolvedValue(undefined),
-  disconnectAndUnbind: jest.fn().mockResolvedValue(undefined),
-  resetAllStatus: jest.fn().mockResolvedValue(undefined),
-  savePublicWakeTarget: jest.fn().mockResolvedValue(undefined),
-  getKnownDeviceIds: jest.fn().mockResolvedValue([]),
-  getAndroidBackgroundKeepaliveStatus: jest.fn().mockResolvedValue({
-    backgroundKeepaliveStrategy:
-      'android_cn_foreground_service_battery_whitelist',
-    foregroundServiceActive: false,
-    foregroundServiceStopRequested: false,
-    batteryOptimizationIgnored: false,
-    postNotificationsGranted: true,
-    lastBackgroundStopReason: null,
-  }),
-  requestIgnoreBatteryOptimizations: jest.fn().mockResolvedValue(true),
-  addListener: jest.fn(),
-  removeListeners: jest.fn(),
-};
+// mockNativeSyncEngine is declared and populated in jest.mock('react-native') above
 
 describe('SettingsScreen', () => {
   beforeAll(async () => {
@@ -925,6 +945,50 @@ describe('SettingsScreen', () => {
         expect.any(Array),
       );
       expect(mockNavigate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Forget Device button', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('zh-Hant');
+    });
+
+    it('shows forget confirmation dialog and triggers forget + wipeSyncIdentity on confirm', async () => {
+      mockNativeSyncEngine.getBindingState.mockResolvedValueOnce({
+        deviceId: 'desktop-123',
+        deviceName: 'Test Mac Studio',
+        host: '192.168.1.100',
+        port: 39393,
+        connectionState: 'connected',
+      });
+
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((title, body, buttons) => {
+        const confirmButton = buttons?.find(b => b.style === 'destructive');
+        if (confirmButton?.onPress) {
+          confirmButton.onPress();
+        }
+      });
+
+      const { getByText, getByTestId } = render(<SettingsScreen />);
+
+      await waitFor(() => {
+        expect(getByText('遺忘此電腦')).toBeTruthy();
+      });
+
+      fireEvent.press(getByTestId('settings-forget-desktop-button'));
+
+      expect(alertSpy).toHaveBeenCalledWith(
+        '遺忘此電腦',
+        expect.stringContaining('Test Mac Studio'),
+        expect.any(Array),
+      );
+
+      await waitFor(() => {
+        expect(mockForgetDesktop).toHaveBeenCalledWith('desktop-123');
+        expect(mockNativeSyncEngine.wipeSyncIdentity).toHaveBeenCalled();
+      });
+
+      alertSpy.mockRestore();
     });
   });
 

@@ -471,3 +471,71 @@ export async function setTunnelCredentials(
     iceServersJSON,
   );
 }
+
+export class PairingError extends Error {
+  code: 'wrong_code' | 'blocked' | 'version_incompatible' | 'unknown';
+  remainingAttempts?: number;
+  blocked?: boolean;
+
+  constructor(
+    message: string,
+    code: 'wrong_code' | 'blocked' | 'version_incompatible' | 'unknown',
+    remainingAttempts?: number,
+    blocked?: boolean
+  ) {
+    super(message);
+    this.name = 'PairingError';
+    this.code = code;
+    this.remainingAttempts = remainingAttempts;
+    this.blocked = blocked;
+  }
+}
+
+export async function pairDevice(params: {
+  deviceId: string;
+  host: string;
+  port: number;
+  connectionCode: string;
+}): Promise<void> {
+  try {
+    await NativeSyncEngine.pairDevice(params);
+  } catch (err: any) {
+    const errMsg = err?.message || 'Unknown pairing error';
+    let code: 'wrong_code' | 'blocked' | 'version_incompatible' | 'unknown' = 'unknown';
+    
+    const rawCode = err?.code || '';
+    if (
+      rawCode === 'WRONG_CODE' ||
+      rawCode === 'wrong_code' ||
+      errMsg.includes('wrong_code') ||
+      errMsg.includes('Pairing rejected')
+    ) {
+      code = 'wrong_code';
+    } else if (
+      rawCode === 'BLOCKED' ||
+      rawCode === 'blocked' ||
+      errMsg.includes('blocked')
+    ) {
+      code = 'blocked';
+    } else if (
+      rawCode === 'APP_VERSION_INCOMPATIBLE' ||
+      rawCode === 'version_incompatible' ||
+      errMsg.includes('版本不相容') ||
+      errMsg.includes('APP_VERSION_INCOMPATIBLE') ||
+      errMsg.includes('版本不兼容')
+    ) {
+      code = 'version_incompatible';
+    }
+
+    const remainingAttempts = err?.remainingAttempts !== undefined
+      ? Number(err.remainingAttempts)
+      : (err?.userInfo?.remainingAttempts !== undefined ? Number(err.userInfo.remainingAttempts) : undefined);
+
+    const blocked = err?.blocked !== undefined
+      ? Boolean(err.blocked)
+      : (err?.userInfo?.blocked !== undefined ? Boolean(err.userInfo.blocked) : undefined);
+
+    throw new PairingError(errMsg, code, remainingAttempts, blocked || (code === 'blocked'));
+  }
+}
+

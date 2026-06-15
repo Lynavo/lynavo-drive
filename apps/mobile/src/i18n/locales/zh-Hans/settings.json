@@ -119,7 +119,8 @@
     "logout": "退出登录",
     "switch": "切换",
     "deleteAccount": "删除帐号",
-    "deletingAccount": "删除中…"
+    "deletingAccount": "删除中…",
+    "forgetDesktop": "遗忘此电脑"
   },
   "status": {
     "noRecord": "暂无记录",
@@ -141,6 +142,11 @@
       "title": "重置所有同步状态",
       "body": "将清除所有同步记录并断开当前设备连接，需要重新输入连接码配对。手机和电脑上的照片不会被删除。",
       "confirm": "确定重置"
+    },
+    "forgetDesktop": {
+      "title": "遗忘此电脑",
+      "body": "确定要遗忘并中断与电脑“{{name}}”的连接吗？这将会清除本地的连接记录与绑定状态。",
+      "confirm": "确定遗忘"
     },
     "logout": {
       "title": "退出登录",

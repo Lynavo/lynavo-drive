@@ -78,5 +78,9 @@
     "toast": {
       "alreadyCurrent": "Already connected to this device"
     }
+  },
+  "sections": {
+    "discovered": "Discovered Desktops",
+    "recent": "Recent Connected Desktops"
   }
 }

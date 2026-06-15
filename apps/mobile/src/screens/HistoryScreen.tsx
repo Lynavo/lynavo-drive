@@ -22,6 +22,9 @@ import { colors } from '../theme/colors';
 import { formatBytes, formatDuration } from '../utils/format';
 import { formatLocalDateKey, formatLocalYesterdayDateKey } from '../utils/localDateKey';
 import { Icon } from '../components/Icon';
+import { listHistory } from '../services/desktop-local-service';
+import type { DesktopSyncRecordDTO } from '@syncflow/contracts';
+
 
 // ---------------------------------------------------------------------------
 // Types
@@ -189,42 +192,29 @@ export function HistoryScreen() {
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    let historySub: { remove: () => void } | undefined;
-
     const loadHistory = async () => {
       try {
         const { NativeSyncEngine } = NativeModules;
         if (!NativeSyncEngine) return;
 
-        const result = await NativeSyncEngine.getHistoryDays('');
-        if (result && result.items) {
-          const grouped = groupByDate(result.items, t);
-          setSections(grouped);
+        const binding = await NativeSyncEngine.getBindingState();
+        if (!binding || !binding.host) {
+          setSections([]);
+          return;
         }
 
-        // Subscribe to live updates
-        const emitter = new NativeEventEmitter(NativeSyncEngine);
-        historySub = emitter.addListener('onHistoryUpdated', async () => {
-          try {
-            const updated = await NativeSyncEngine.getHistoryDays('');
-            if (updated && updated.items) {
-              setSections(groupByDate(updated.items, t));
-            }
-          } catch {
-            // keep current data
-          }
-        });
+        const desktop = { host: binding.host, port: 39394 };
+        const result = await listHistory(desktop);
+        const grouped = groupRecordsByDate(result, t);
+        setSections(grouped);
       } catch (e) {
-        console.warn('Native module not available for History');
+        console.warn('Failed to load history scoped by current desktop:', e);
       }
     };
 
     loadHistory();
-
-    return () => {
-      historySub?.remove();
-    };
   }, []);
+
 
   const renderSectionHeader = ({
     section,
@@ -316,25 +306,30 @@ interface LedgerItem {
   activeTransmissionMs?: number;
 }
 
-function groupByDate(items: LedgerItem[], t: TFunction): HistorySection[] {
+function groupRecordsByDate(items: DesktopSyncRecordDTO[], t: TFunction): HistorySection[] {
   const map = new Map<string, SessionCard[]>();
 
   for (const item of items) {
-    const date = item.ledgerDate || item.dateKey || 'unknown';
+    const rawDate = item.completedAt || item.failedAt || new Date().toISOString();
+    const date = rawDate.split('T')[0];
     if (!map.has(date)) {
       map.set(date, []);
     }
     map.get(date)!.push({
-      id: `${date}-${item.deviceId}`,
-      deviceName: item.deviceName || item.deviceNameSnapshot || 'Unknown',
-      deviceIp: item.deviceIp || item.deviceIpSnapshot || '',
-      fileCount: item.fileCount,
-      totalSize: formatBytes(item.totalBytes),
-      duration: formatDuration(item.transmissionMs || item.activeTransmissionMs || 0),
+      id: item.recordId,
+      deviceName: item.filename,
+      deviceIp:
+        item.status === 'completed'
+          ? t('history.status.completed') || '同步成功'
+          : t('history.status.failed') || '同步失敗',
+      fileCount: 1,
+      totalSize: formatBytes(item.fileSize),
+      duration: rawDate
+        ? new Date(rawDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : '',
     });
   }
 
-  // Sort dates descending and build sections
   return Array.from(map.keys())
     .sort((a, b) => b.localeCompare(a))
     .map(date => ({

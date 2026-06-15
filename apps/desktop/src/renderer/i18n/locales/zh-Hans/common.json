@@ -43,5 +43,39 @@
   },
   "units": {
     "files": "个文件"
+  },
+  "shared": {
+    "addFile": "共享文件",
+    "addFolder": "共享文件夹",
+    "tableName": "名称",
+    "tableKind": "类型",
+    "tableSize": "大小",
+    "tableStatus": "状态",
+    "tableDownloads": "下载次数",
+    "tableLastAccessed": "最后访问",
+    "tableAddedAt": "添加时间",
+    "tableActions": "操作",
+    "statusAvailable": "可用",
+    "statusMissing": "文件不存在",
+    "statusRemoved": "已移除",
+    "kindFile": "本地文件",
+    "kindFolder": "本地文件夹",
+    "kindReceived": "已接收",
+    "noData": "暂无共享资源",
+    "remove": "取消共享"
+  },
+  "library": {
+    "tableName": "名称",
+    "tableMediaType": "格式",
+    "tableSize": "大小",
+    "tableSource": "来源设备",
+    "tableCompletedAt": "传输时间",
+    "tableShareStatus": "共享状态",
+    "tableActions": "操作",
+    "addToShared": "加入共享",
+    "statusShared": "已共享",
+    "statusNotShared": "未共享",
+    "statusMissing": "遗失",
+    "noData": "暂无接收数据"
   }
 }

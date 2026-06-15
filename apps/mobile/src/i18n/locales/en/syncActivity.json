@@ -183,5 +183,8 @@
   },
   "performance": {
     "thermalThrottled": "Device is running hot — transfer throttled."
+  },
+  "queue": {
+    "title": "Pending Sync Queue"
   }
 }

@@ -37,6 +37,7 @@ import {
   getSubscriptionStatusIconTone,
 } from '../components/SubscriptionStatusIcon';
 import { useAuth } from '../stores/auth-store';
+import { useRecentDesktops } from '../stores/recent-desktops-store';
 import {
   logout as serverLogout,
   deleteAccount,
@@ -422,8 +423,11 @@ export function SettingsScreen() {
   const { t, i18n } = useTranslation();
   const auth = useAuth();
   const { setSubscription } = auth;
+  const { forgetDesktop } = useRecentDesktops();
   const [deviceName, setDeviceName] = useState('');
   const [deviceIp, setDeviceIp] = useState('');
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [devicePort, setDevicePort] = useState<number | null>(null);
   const [connectionState, setConnectionState] =
     useState<MobileConnectionState>('offline');
   const [syncOverviewState, setSyncOverviewState] =
@@ -645,6 +649,8 @@ export function SettingsScreen() {
       if (!state || !state.deviceId) {
         setDeviceName('');
         setDeviceIp('');
+        setDeviceId(null);
+        setDevicePort(null);
         setConnectionState('offline');
         setHasLanWakeCached(false);
         setHasEnabledPublicWake(false);
@@ -659,6 +665,8 @@ export function SettingsScreen() {
         (state.deviceAlias as string) || (state.deviceName as string) || '',
       );
       setDeviceIp((state.host as string) || '');
+      setDeviceId((state.deviceId as string) || null);
+      setDevicePort(state.port ? Number(state.port) : null);
       const nextConnectionState =
         (state.connectionState as typeof connectionState) || 'bound';
       const nextHost = (state.host as string) || '';
@@ -976,6 +984,37 @@ export function SettingsScreen() {
       navigation.navigate('DeviceDiscovery', { mode: 'switch' });
     }
   }, [navigation, syncOverviewState, t]);
+
+  const handleForgetDesktop = useCallback(() => {
+    if (!deviceName) return;
+
+    Alert.alert(
+      t('settings.dialogs.forgetDesktop.title'),
+      t('settings.dialogs.forgetDesktop.body', { name: deviceName }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('settings.dialogs.forgetDesktop.confirm'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (deviceId) {
+                await forgetDesktop(deviceId);
+              }
+              await wipeSyncIdentity();
+              setDeviceName('');
+              setDeviceIp('');
+              setDeviceId(null);
+              setDevicePort(null);
+              setConnectionState('offline');
+            } catch (e) {
+              console.warn('[settings] Failed to forget desktop:', e);
+            }
+          },
+        },
+      ],
+    );
+  }, [deviceId, deviceName, forgetDesktop, t]);
 
   const startDiagnosticUpload = useCallback(
     (rawNote?: string): void => {
@@ -1678,7 +1717,9 @@ export function SettingsScreen() {
               {deviceName || t('settings.connection.notConnected')}
             </Text>
             {deviceIp ? (
-              <Text style={styles.topCardSubtext}>{deviceIp}</Text>
+              <Text style={styles.topCardSubtext}>
+                {devicePort ? `${deviceIp}:${devicePort}` : deviceIp}
+              </Text>
             ) : null}
             <View style={styles.topCardBottomRow}>
               <View style={styles.statusBadge}>
@@ -2324,6 +2365,25 @@ export function SettingsScreen() {
             </View>
             <Icon name="chevron-forward" size={16} color={ROW_CHEVRON} />
           </TouchableOpacity>
+          {deviceName ? (
+            <>
+              <View style={styles.listSep} />
+              <TouchableOpacity
+                testID="settings-forget-desktop-button"
+                style={styles.actionRow}
+                activeOpacity={0.6}
+                onPress={handleForgetDesktop}
+              >
+                <View style={styles.actionRowLeft}>
+                  <Icon name="trash-outline" size={18} color={DANGER_RED} />
+                  <Text style={styles.dangerRowText}>
+                    {t('settings.actions.forgetDesktop')}
+                  </Text>
+                </View>
+                <Icon name="chevron-forward" size={16} color={ROW_CHEVRON} />
+              </TouchableOpacity>
+            </>
+          ) : null}
         </View>
 
         {/* ============================================================= */}

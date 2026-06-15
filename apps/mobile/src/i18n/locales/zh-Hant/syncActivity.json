@@ -183,5 +183,8 @@
   },
   "performance": {
     "thermalThrottled": "設備溫度較高，已降低傳輸強度"
+  },
+  "queue": {
+    "title": "待同步佇列"
   }
 }

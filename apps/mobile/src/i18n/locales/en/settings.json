@@ -119,7 +119,8 @@
     "logout": "Log Out",
     "switch": "Switch",
     "deleteAccount": "Delete account",
-    "deletingAccount": "Deleting…"
+    "deletingAccount": "Deleting…",
+    "forgetDesktop": "Forget Desktop"
   },
   "status": {
     "noRecord": "No records yet",
@@ -141,6 +142,11 @@
       "title": "Reset All Sync State",
       "body": "This clears all sync records and disconnects the current device. You will need to re-enter a pairing code. Photos on your phone and Mac will not be deleted.",
       "confirm": "Confirm Reset"
+    },
+    "forgetDesktop": {
+      "title": "Forget Desktop",
+      "body": "Are you sure you want to forget and disconnect from the desktop \"{{name}}\"? This will clear local connection records and binding state.",
+      "confirm": "Forget"
     },
     "logout": {
       "title": "Log Out",

@@ -183,5 +183,8 @@
   },
   "performance": {
     "thermalThrottled": "设备温度较高，已降低传输强度"
+  },
+  "queue": {
+    "title": "待同步队列"
   }
 }

@@ -31,6 +31,7 @@ AuthKey_*.p8
 .gemini/
 .antigravitycli/
 .agent/
+.superpowers/
 
 
 # Locale resource files must remain trackable even if a developer has a broad

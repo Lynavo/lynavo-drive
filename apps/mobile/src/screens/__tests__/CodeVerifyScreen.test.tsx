@@ -1,5 +1,35 @@
 import React from 'react';
+import { NativeModules } from 'react-native';
+
+jest.mock('../../services/SyncEngineModule', () => {
+  class MockPairingError extends Error {
+    code: string;
+    remainingAttempts?: number;
+    blocked?: boolean;
+    constructor(
+      message: string,
+      code: 'wrong_code' | 'blocked' | 'version_incompatible' | 'unknown',
+      remainingAttempts?: number,
+      blocked?: boolean
+    ) {
+      super(message);
+      this.name = 'PairingError';
+      this.code = code;
+      this.remainingAttempts = remainingAttempts;
+      this.blocked = blocked;
+    }
+  }
+  return {
+    pairDevice: jest.fn(),
+    PairingError: MockPairingError,
+    getClientId: jest.fn().mockResolvedValue('mock-client-id'),
+  };
+});
+
 import { fireEvent, render, act } from '@testing-library/react-native';
+import { pairDevice } from '../../services/SyncEngineModule';
+
+const mockPairDevice = pairDevice as jest.Mock;
 
 const mockNavigate = jest.fn();
 
@@ -36,6 +66,15 @@ jest.mock('@react-navigation/native', () => ({
 }));
 
 jest.mock('@react-navigation/stack', () => ({}));
+jest.mock('../../stores/recent-desktops-store', () => ({
+  useRecentDesktops: () => ({
+    recentDesktops: [],
+    isLoading: false,
+    addDesktop: jest.fn(),
+    forgetDesktop: jest.fn(),
+    updateAuthStatus: jest.fn(),
+  }),
+}));
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
 }));
@@ -90,15 +129,13 @@ describe('CodeVerifyScreen', () => {
   });
 
   it('triggers Alert.alert when pairDevice throws APP_VERSION_INCOMPATIBLE', async () => {
-    const { Alert, NativeModules } = require('react-native');
+    const { Alert } = require('react-native');
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 
-    const mockPairDevice = jest.fn().mockRejectedValueOnce(
+    mockPairDevice.mockReset();
+    mockPairDevice.mockRejectedValueOnce(
       new Error('APP_VERSION_INCOMPATIBLE: version mismatch')
     );
-    NativeModules.NativeSyncEngine = {
-      pairDevice: mockPairDevice,
-    };
 
     const nav = require('@react-navigation/native');
     jest.spyOn(nav, 'useRoute').mockReturnValue({

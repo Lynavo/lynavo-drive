@@ -76,6 +76,16 @@ jest.mock('../../utils/onboardingStorage', () => ({
   markUnconnectedGuideSeen: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../../stores/recent-desktops-store', () => ({
+  useRecentDesktops: () => ({
+    recentDesktops: [],
+    isLoading: false,
+    addDesktop: jest.fn(),
+    forgetDesktop: jest.fn(),
+    updateAuthStatus: jest.fn(),
+  }),
+}));
+
 import i18n from '../../i18n';
 import { DeviceDiscoveryScreen } from '../DeviceDiscoveryScreen';
 

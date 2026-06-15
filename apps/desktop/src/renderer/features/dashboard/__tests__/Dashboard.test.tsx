@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { Dashboard } from '../Dashboard';
 import { useDashboardStore } from '@renderer/stores/dashboard-store';
+import { useSettingsStore } from '@renderer/stores/settings-store';
+import { useSidecarRuntimeStore } from '@renderer/stores/sidecar-runtime-store';
 import { mockDashboardSummary } from '@renderer/mocks/dashboard';
 import { mockDevices } from '@renderer/mocks/devices';
 
@@ -13,6 +15,39 @@ describe('Dashboard', () => {
       devices: mockDevices,
       diskWarningDismissed: false,
     });
+    useSettingsStore.setState({
+      settings: {
+        deviceName: 'Test PC',
+        connectionCode: '998877',
+        rootPath: '/tmp',
+        receivePath: '/tmp/received',
+        personalPath: '/tmp/personal',
+        sharedPath: '/tmp/shared',
+        shareAddress: '',
+        shareStatus: 'unknown',
+        shareName: '',
+      },
+    });
+    useSidecarRuntimeStore.setState({
+      runtime: {
+        status: 'healthy',
+        message: null,
+        messageCode: null,
+        messageArgs: null,
+        restartCount: 0,
+        maxRestarts: 3,
+        lastExitCode: null,
+        bonjour: {
+          status: 'native',
+          source: 'system',
+          message: null,
+          messageCode: null,
+          messageArgs: null,
+          path: null,
+          advertisedIP: '192.168.1.10',
+        },
+      },
+    });
   });
 
   afterEach(() => {
@@ -22,6 +57,45 @@ describe('Dashboard', () => {
   it('renders the "所有设备" heading', () => {
     render(<Dashboard />);
     expect(screen.getByText('所有设备')).toBeInTheDocument();
+  });
+
+  it('renders status panel with sidecar status, pairing code, and active devices', () => {
+    render(<Dashboard />);
+    // Sidecar status healthy translates to "运行中"
+    expect(screen.getByText('背景服务')).toBeInTheDocument();
+    expect(screen.getByText('运行中')).toBeInTheDocument();
+
+    // Pairing code
+    expect(screen.getByText('本机配对码')).toBeInTheDocument();
+    expect(screen.getByText('998877')).toBeInTheDocument();
+
+    // Active devices count. mockDevices has 5 devices: 3 active, 2 offline.
+    // So active should be 3, total 5.
+    expect(screen.getByText('活动中设备')).toBeInTheDocument();
+    expect(
+      screen.getByText((content, element) => {
+        const text = element?.textContent?.replace(/\s+/g, ' ').trim();
+        return text === '3 / 5';
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('triggers copy to clipboard when copy button is clicked', async () => {
+    const copyToClipboard = vi.fn().mockResolvedValue(undefined);
+    (window as any).electronAPI = {
+      files: {
+        copyToClipboard,
+      },
+    };
+
+    render(<Dashboard />);
+    const copyBtn = screen.getByRole('button', { name: '复制' });
+    fireEvent.click(copyBtn);
+
+    expect(copyToClipboard).toHaveBeenCalledWith('998877');
+    await waitFor(() => {
+      expect(screen.getByText('复制...')).toBeInTheDocument();
+    });
   });
 
   it('renders 3 stat cards', () => {

@@ -14,5 +14,18 @@
     "recent": "最近 {{date}}",
     "today": "今日",
     "preparing": "準備傳輸中…"
+  },
+  "statusPanel": {
+    "sidecarStatus": "背景服務",
+    "pairingCode": "本機配對碼",
+    "activeDevices": "作用中裝置",
+    "copySuccess": "配對碼已複製到剪貼簿",
+    "clickToCopy": "點擊複製",
+    "status": {
+      "healthy": "運作中",
+      "starting": "啟動中",
+      "failed": "啟動失敗",
+      "stopped": "已停止"
+    }
   }
 }

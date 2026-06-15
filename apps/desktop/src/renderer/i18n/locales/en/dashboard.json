@@ -14,5 +14,18 @@
     "recent": "Recent {{date}}",
     "today": "Today",
     "preparing": "Preparing transfer..."
+  },
+  "statusPanel": {
+    "sidecarStatus": "Sidecar Status",
+    "pairingCode": "Pairing Code",
+    "activeDevices": "Active Devices",
+    "copySuccess": "Pairing code copied to clipboard",
+    "clickToCopy": "Click to copy",
+    "status": {
+      "healthy": "Running",
+      "starting": "Starting",
+      "failed": "Failed",
+      "stopped": "Stopped"
+    }
   }
 }

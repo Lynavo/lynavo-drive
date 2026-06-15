@@ -76,7 +76,11 @@
       "current": "當前"
     },
     "toast": {
-      "alreadyCurrent": "已是當前連接設備"
+      "alreadyCurrent": "已是當前連線設備"
     }
+  },
+  "sections": {
+    "discovered": "已偵測的電腦",
+    "recent": "最近連線的電腦"
   }
 }

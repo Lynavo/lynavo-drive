@@ -26,6 +26,9 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/colors';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '../components/Icon';
+import { pairDevice, PairingError } from '../services/SyncEngineModule';
+import { useRecentDesktops } from '../stores/recent-desktops-store';
+
 
 const DARK = '#1a3a5c';
 
@@ -58,6 +61,7 @@ export function CodeVerifyScreen() {
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { addDesktop, updateAuthStatus } = useRecentDesktops();
   const filledCount = code.filter(Boolean).length;
 
   const inputRefs = useRef<(TextInput | null)[]>([]);
@@ -82,46 +86,90 @@ export function CodeVerifyScreen() {
       setErrorMsg(null);
 
       try {
-        const { NativeSyncEngine } = NativeModules;
-        if (NativeSyncEngine) {
-          await NativeSyncEngine.pairDevice({
-            deviceId,
-            host,
-            port,
-            connectionCode: fullCode,
-          });
-          setVerifying(false);
-          navigation.dispatch(
-            CommonActions.reset({
-              index: 0,
-              routes: [{ name: 'SyncActivity' }],
-            }),
-          );
-          return;
-        }
+        await pairDevice({
+          deviceId: deviceId || '',
+          host: host || '',
+          port: port || 39393,
+          connectionCode: fullCode,
+        });
+
+        await addDesktop({
+          desktopDeviceId: deviceId || '',
+          desktopName: deviceName || 'Desktop',
+          host: host || '',
+          port: port || 39393,
+          authorizationStatus: 'authorized',
+        });
+
+        setVerifying(false);
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'SyncActivity' }],
+          }),
+        );
+        return;
       } catch (e: any) {
         console.error('Native pairing failed:', e);
-        // Native module threw a pairing error — show error state
         setVerifying(false);
         setError(true);
-        // Include actual error message so the user knows if it's a network timeout vs incorrect code
-        const msg = e?.message || '';
-        if (
-          msg.includes('版本不相容') ||
-          msg.includes('APP_VERSION_INCOMPATIBLE') ||
-          msg.includes('版本不兼容')
-        ) {
-          Alert.alert(
-            t('errors.pairingVersionMismatchTitle'),
-            t('errors.pairingVersionMismatchMessage'),
-            [{ text: t('common.ok') }]
-          );
-          setErrorMsg(t('errors.pairingVersionMismatchMessage'));
-        } else if (msg.includes('Pairing rejected')) {
-          setErrorMsg(t('errors.pairingWrongCode'));
+
+        if (e instanceof PairingError) {
+          if (e.blocked || e.code === 'blocked') {
+            await updateAuthStatus(deviceId || '', 'blocked');
+            setErrorMsg(
+              t('errors.pairingBlocked') ||
+                '配對已被鎖定。請在電腦端「設定」中點擊「解除封鎖此裝置」，或重新產生連接碼後再試。'
+            );
+          } else if (e.code === 'wrong_code') {
+            await updateAuthStatus(deviceId || '', 'requires_code');
+            if (e.remainingAttempts !== undefined && e.remainingAttempts > 0) {
+              setErrorMsg(
+                t('errors.pairingWrongCodeWithAttempts', {
+                  count: e.remainingAttempts,
+                }) || `連接碼錯誤。剩餘嘗試次數：${e.remainingAttempts} 次。`
+              );
+            } else {
+              setErrorMsg(t('errors.pairingWrongCode') || '連接碼錯誤，請重新確認。');
+            }
+          } else if (e.code === 'version_incompatible') {
+            Alert.alert(
+              t('errors.pairingVersionMismatchTitle') || '版本不相容',
+              t('errors.pairingVersionMismatchMessage') ||
+                '手機與電腦端的版本不相容，請將電腦端（桌面端）App 更新至最新版本後再試。',
+              [{ text: t('common.ok') || '好' }]
+            );
+            setErrorMsg(
+              t('errors.pairingVersionMismatchMessage') ||
+                '手機與電腦端的版本不相容，請將電腦端（桌面端）App 更新至最新版本後再試。'
+            );
+          } else {
+            setErrorMsg(t('errors.pairingConnectFailed', { msg: e.message }));
+          }
         } else {
-          setErrorMsg(t('errors.pairingConnectFailed', { msg }));
+          const msg = e?.message || '';
+          if (
+            msg.includes('版本不相容') ||
+            msg.includes('APP_VERSION_INCOMPATIBLE') ||
+            msg.includes('版本不兼容')
+          ) {
+            Alert.alert(
+              t('errors.pairingVersionMismatchTitle') || '版本不相容',
+              t('errors.pairingVersionMismatchMessage') ||
+                '手機與電腦端的版本不相容，請將電腦端（桌面端）App 更新至最新版本後再試。',
+              [{ text: t('common.ok') || '好' }]
+            );
+            setErrorMsg(
+              t('errors.pairingVersionMismatchMessage') ||
+                '手機與電腦端的版本不相容，請將電腦端（桌面端）App 更新至最新版本後再試。'
+            );
+          } else if (msg.includes('Pairing rejected')) {
+            setErrorMsg(t('errors.pairingWrongCode') || '連接碼錯誤，請重新確認。');
+          } else {
+            setErrorMsg(t('errors.pairingConnectFailed', { msg }));
+          }
         }
+
         setCode(Array(CODE_LENGTH).fill(''));
         Vibration.vibrate(300);
         inputRefs.current[0]?.focus();

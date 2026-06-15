@@ -43,5 +43,39 @@
   },
   "units": {
     "files": "files"
+  },
+  "shared": {
+    "addFile": "Share File",
+    "addFolder": "Share Folder",
+    "tableName": "Name",
+    "tableKind": "Type",
+    "tableSize": "Size",
+    "tableStatus": "Status",
+    "tableDownloads": "Downloads",
+    "tableLastAccessed": "Last Accessed",
+    "tableAddedAt": "Added At",
+    "tableActions": "Actions",
+    "statusAvailable": "Available",
+    "statusMissing": "File Missing",
+    "statusRemoved": "Removed",
+    "kindFile": "Local File",
+    "kindFolder": "Local Folder",
+    "kindReceived": "Received File",
+    "noData": "No shared resources",
+    "remove": "Unshare"
+  },
+  "library": {
+    "tableName": "Name",
+    "tableMediaType": "Format",
+    "tableSize": "Size",
+    "tableSource": "Source Device",
+    "tableCompletedAt": "Completed At",
+    "tableShareStatus": "Share Status",
+    "tableActions": "Actions",
+    "addToShared": "Add to Shared",
+    "statusShared": "Shared",
+    "statusNotShared": "Not Shared",
+    "statusMissing": "Missing",
+    "noData": "No received items"
   }
 }

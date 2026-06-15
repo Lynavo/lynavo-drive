@@ -39,6 +39,14 @@ vi.mock('@renderer/features/records/RecordsPage', () => ({
   RecordsPage: () => <main>RecordsPage</main>,
 }));
 
+vi.mock('@renderer/features/shared/SharedResourcesPage', () => ({
+  SharedResourcesPage: () => <main>SharedResourcesPage</main>,
+}));
+
+vi.mock('@renderer/features/library/ReceivedLibraryPage', () => ({
+  ReceivedLibraryPage: () => <main>ReceivedLibraryPage</main>,
+}));
+
 vi.mock('@renderer/features/directory/DirectoryPage', () => ({
   DirectoryPage: () => <main data-testid="legacy-directory-page">DirectoryPage</main>,
 }));
@@ -89,22 +97,11 @@ describe('AppShell', () => {
   });
 
   it.each([
-    ['shared', '共享管理', '电脑端本机共享资源与访问范围将在这里配置。'],
-    ['library', '资料库', '接收素材、归档位置与本机资料库状态将在这里汇总。'],
-  ] as const)('renders the %s desktop-local placeholder', (view, title, description) => {
-    installElectronAPI();
-    useAppStore.setState({ currentView: view });
-
-    render(<AppShell />);
-
-    expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
-    expect(screen.getByText(description)).toBeInTheDocument();
-  });
-
-  it.each([
+    ['shared', 'SharedResourcesPage'],
+    ['library', 'ReceivedLibraryPage'],
     ['devices', 'DevicesPage'],
     ['records', 'RecordsPage'],
-  ] as const)('renders the %s desktop-local page', async (view, pageText) => {
+  ] as const)('renders the %s page', async (view, pageText) => {
     installElectronAPI();
     useAppStore.setState({ currentView: view });
 

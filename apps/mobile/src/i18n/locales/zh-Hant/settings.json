@@ -119,7 +119,8 @@
     "logout": "登出",
     "switch": "切換",
     "deleteAccount": "刪除帳號",
-    "deletingAccount": "刪除中…"
+    "deletingAccount": "刪除中…",
+    "forgetDesktop": "遺忘此電腦"
   },
   "status": {
     "noRecord": "暫無記錄",
@@ -141,6 +142,11 @@
       "title": "重置所有同步狀態",
       "body": "將清除所有同步記錄並斷開當前設備連接，需要重新輸入連接碼配對。手機和電腦上的照片不會被刪除。",
       "confirm": "確定重置"
+    },
+    "forgetDesktop": {
+      "title": "遺忘此電腦",
+      "body": "確定要遺忘並中斷與電腦「{{name}}」的連接嗎？這將會清除本地的連接紀錄與綁定狀態。",
+      "confirm": "確定遺忘"
     },
     "logout": {
       "title": "登出",

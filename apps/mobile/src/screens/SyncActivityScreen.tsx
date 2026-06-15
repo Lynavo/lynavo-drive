@@ -107,6 +107,18 @@ interface SyncOverview {
   scannedCount?: number;
 }
 
+interface QueueItem {
+  id: string;
+  name: string;
+  fileKey: string;
+  rawFileSize: number;
+  ackedOffset: number;
+  type: 'image' | 'video';
+  status: 'queued' | 'preparing' | 'uploading' | 'completed' | 'failed' | 'cloud_downloading';
+  isCloudAsset: boolean;
+}
+
+
 interface BindingState {
   deviceId: string;
   deviceName: string;
@@ -576,6 +588,38 @@ export function SyncActivityScreen() {
   });
   const [initialLoading, setInitialLoading] = useState(true);
   const [cancellingBatch, setCancellingBatch] = useState(false);
+  const [queue, setQueue] = useState<QueueItem[]>([]);
+
+  const refreshQueue = useCallback(async () => {
+    try {
+      const { NativeSyncEngine } = NativeModules;
+      if (!NativeSyncEngine) return;
+      const queueData = await NativeSyncEngine.getReadOnlyQueue();
+      if (queueData) {
+        setQueue(
+          queueData.map((item: any, index: number) => ({
+            id: String(item.id ?? index),
+            name: (item.originalFilename as string) || 'Unknown',
+            fileKey: (item.fileKey as string) || '',
+            rawFileSize: (item.fileSize as number) ?? 0,
+            ackedOffset: (item.ackedOffset as number) ?? 0,
+            type: (item.mediaType as string) === 'video' ? 'video' : 'image',
+            status: ((item.status as string) ?? 'queued') as any,
+            isCloudAsset: Boolean(item.isCloudAsset),
+          }))
+        );
+      }
+    } catch (e) {
+      console.warn('[SyncActivity] Failed to get read-only queue:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isScreenFocused) {
+      void refreshQueue();
+    }
+  }, [isScreenFocused, refreshQueue]);
+
   const [showSyncActivityTour, setShowSyncActivityTour] = useState(false);
   const [syncActivityTourChecked, setSyncActivityTourChecked] = useState(false);
   const [syncActivityTourTargetLayouts, setSyncActivityTourTargetLayouts] =
@@ -786,6 +830,7 @@ export function SyncActivityScreen() {
               rememberAutoUploadRoundProgress(next);
               return next;
             });
+            void refreshQueue();
             if (state.uploadState === 'completed') {
               void loadTodayStats();
             }
@@ -800,6 +845,7 @@ export function SyncActivityScreen() {
         applyBindingState(binding);
 
         await loadTodayStats(NativeSyncEngine);
+        await refreshQueue();
 
         const syncData = await NativeSyncEngine.getSyncOverview();
         if (syncData) {
@@ -2087,6 +2133,98 @@ export function SyncActivityScreen() {
           )}
         </View>
 
+        {queue.length > 0 && (
+          <View style={styles.queueSection}>
+            <Text style={styles.sectionLabel}>
+              {t('syncActivity.queue.title') || '待同步佇列'} ({queue.length})
+            </Text>
+            <View style={styles.queueList}>
+              {queue.map((item, index) => {
+                const isActive =
+                  item.status === 'uploading' ||
+                  (item.fileKey.length > 0 && item.fileKey === overview.currentFile);
+                const showItemProgress = isActive && overview.currentFileTotalBytes > 0;
+                const progressPercent = showItemProgress
+                  ? Math.round((overview.currentFileConfirmedBytes / overview.currentFileTotalBytes) * 100)
+                  : 0;
+
+                return (
+                  <View
+                    key={item.id}
+                    style={[
+                      styles.queueRow,
+                      index !== queue.length - 1 && styles.queueRowBorder,
+                      isActive && styles.queueRowUploading,
+                    ]}
+                  >
+                    <View style={styles.queueIcon}>
+                      <Icon
+                        name={item.type === 'video' ? 'videocam-outline' : 'image-outline'}
+                        size={18}
+                        color={BLUE}
+                      />
+                    </View>
+                    <View style={styles.queueInfo}>
+                      <Text style={styles.queueFileName} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      <View style={styles.queueFileMeta}>
+                        <Text style={styles.queueFileSize}>
+                          {formatBytes(item.rawFileSize)}
+                        </Text>
+                        {isActive && (
+                          <View style={styles.uploadingBadge}>
+                            <View style={styles.uploadingDot} />
+                            <Text style={styles.uploadingLabel}>
+                              {t('syncStatus.queue.itemStatus.transferring', { percent: progressPercent }) || `傳輸中 ${progressPercent}%`}
+                            </Text>
+                          </View>
+                        )}
+                        {item.status === 'cloud_downloading' && (
+                          <View style={styles.uploadingBadge}>
+                            <View style={styles.uploadingDot} />
+                            <Text style={styles.uploadingLabel}>
+                              {t('syncStatus.queue.itemStatus.cloudDownloading') || 'iCloud 下載中'}
+                            </Text>
+                          </View>
+                        )}
+                        {item.status === 'preparing' && (
+                          <View style={styles.uploadingBadge}>
+                            <View style={styles.uploadingDot} />
+                            <Text style={styles.uploadingLabel}>
+                              {t('syncStatus.queue.itemStatus.preparing') || '準備中'}
+                            </Text>
+                          </View>
+                        )}
+                        {item.isCloudAsset && (
+                          <View style={styles.cloudAssetBadge}>
+                            <Icon name="cloud-outline" size={11} color={BLUE} />
+                            <Text style={styles.cloudAssetLabel}>{'iCloud'}</Text>
+                          </View>
+                        )}
+                      </View>
+                      {showItemProgress && (
+                        <View style={styles.itemProgressGroup}>
+                          <View style={styles.itemProgressTrack}>
+                            <View
+                              style={[
+                                styles.itemProgressFill,
+                                {
+                                  width: `${progressPercent}%`,
+                                },
+                              ]}
+                            />
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
         {/* Quick entry cards */}
         <View style={styles.quickEntrySection}>
           <Text style={styles.sectionLabel}>
@@ -2996,4 +3134,102 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: MUTED_TEXT,
   },
+  queueSection: {
+    paddingHorizontal: 20,
+    marginTop: 20,
+  },
+  queueList: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(187, 214, 233, 0.72)',
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  queueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  queueRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  queueRowUploading: {
+    backgroundColor: 'rgba(59, 159, 216, 0.05)',
+    marginHorizontal: -16,
+    paddingHorizontal: 16,
+  },
+  queueIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#eaf4fb',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  queueInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  queueFileName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a3a5c',
+  },
+  queueFileMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  queueFileSize: {
+    fontSize: 12,
+    color: '#94a3b8',
+  },
+  uploadingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(59, 159, 216, 0.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  uploadingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#3b9fd8',
+  },
+  uploadingLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#3b9fd8',
+  },
+  cloudAssetBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  cloudAssetLabel: {
+    fontSize: 11,
+    color: '#3b9fd8',
+  },
+  itemProgressGroup: {
+    marginTop: 8,
+  },
+  itemProgressTrack: {
+    height: 4,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  itemProgressFill: {
+    height: '100%',
+    backgroundColor: '#3b9fd8',
+    borderRadius: 2,
+  },
 });
+

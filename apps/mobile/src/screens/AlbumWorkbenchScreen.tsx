@@ -1093,10 +1093,9 @@ export function AlbumWorkbenchScreen() {
 
   const shouldCaptureGridSelectionGesture = useCallback(
     (asset: AlbumAssetDTO, event: GestureResponderEvent) => {
-      if (isAutoUploadActive || asset.isTransferred) return false;
-      return isGridSelectionControlPoint(event);
+      return false;
     },
-    [isAutoUploadActive, isGridSelectionControlPoint],
+    [],
   );
 
   const selectableIds = useMemo(
@@ -1547,17 +1546,7 @@ export function AlbumWorkbenchScreen() {
                 <Icon name="play-circle-outline" size={16} color="#fff" />
               </View>
             )}
-            {!item.isTransferred && (
-              <View
-                pointerEvents="none"
-                style={[
-                  styles.selectionCircle,
-                  isSelected && styles.selectionCircleActive,
-                ]}
-              >
-                {isSelected && <Icon name="checkmark" size={14} color="#fff" />}
-              </View>
-            )}
+
           </TouchableOpacity>
         </View>
       );
@@ -1617,18 +1606,7 @@ export function AlbumWorkbenchScreen() {
               )}
             </View>
           </View>
-          {!item.isTransferred && (
-            <TouchableOpacity
-              style={[
-                styles.listCheckbox,
-                isSelected && styles.listCheckboxActive,
-              ]}
-              hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
-              onPress={() => handleToggleSelect(item.assetLocalId)}
-            >
-              {isSelected && <Icon name="checkmark" size={14} color="#fff" />}
-            </TouchableOpacity>
-          )}
+
         </TouchableOpacity>
       );
     },
@@ -1935,13 +1913,7 @@ export function AlbumWorkbenchScreen() {
               {t('albumWorkbench.stats.total')}
             </Text>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{selectedIds.size}</Text>
-            <Text style={styles.statLabel}>
-              {t('albumWorkbench.stats.selected')}
-            </Text>
-          </View>
+
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: '#22c55e' }]}>
@@ -2164,60 +2136,7 @@ export function AlbumWorkbenchScreen() {
         />
       )}
 
-      {/* Bottom bar — always visible, button disabled when auto-upload active / offline */}
-      <View style={styles.uploadBar}>
-        <Text
-          style={[
-            styles.uploadBarText,
-            selectedIds.size > 0 &&
-              !isAutoUploadActive &&
-              styles.uploadBarTextActive,
-          ]}
-        >
-          {isAutoUploadActive
-            ? t('albumWorkbench.selectionHint.autoActiveLock')
-            : selectedIds.size > 0
-            ? t('albumWorkbench.selectedCount', {
-                count: selectedIds.size,
-              })
-            : t('albumWorkbench.selectionHint.none')}
-        </Text>
-        <View style={styles.uploadBarRight}>
-          {!deviceConnected && !isAutoUploadActive && (
-            <View style={styles.deviceOfflineBadge}>
-              <Text style={styles.deviceOfflineText}>
-                {t('albumWorkbench.deviceDisconnected')}
-              </Text>
-            </View>
-          )}
-          <TouchableOpacity
-            style={[
-              styles.uploadButton,
-              (uploading ||
-                selectedIds.size === 0 ||
-                !deviceConnected ||
-                isAutoUploadActive) &&
-                styles.uploadButtonDisabled,
-            ]}
-            activeOpacity={0.7}
-            onPress={() => void handleUpload()}
-            disabled={
-              uploading ||
-              selectedIds.size === 0 ||
-              !deviceConnected ||
-              isAutoUploadActive
-            }
-          >
-            {uploading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.uploadButtonText}>
-                {t('albumWorkbench.actions.startUpload')}
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
+
       {/* Date/time picker modal for custom time range */}
       <Modal
         visible={showDatePicker}

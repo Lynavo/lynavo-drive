@@ -78,5 +78,9 @@
     "toast": {
       "alreadyCurrent": "已是当前连接设备"
     }
+  },
+  "sections": {
+    "discovered": "已发现的电脑",
+    "recent": "最近连接的电脑"
   }
 }

@@ -5,7 +5,9 @@
   "globalPersonalFolderName": "我的電腦",
   "scopes": {
     "team": "共享目錄",
-    "personal": "個人共享目錄"
+    "personal": "個人共享目錄",
+    "shared": "已分享的資源",
+    "received": "已接收的檔案"
   },
   "loading": "載入中...",
   "files": {
