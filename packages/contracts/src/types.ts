@@ -100,6 +100,127 @@ export interface DeviceFileLedgerPageDTO {
   totalActiveTransmissionMs: number;
 }
 
+// ── Desktop Local Management ──
+
+export type DesktopDeviceAuthorizationStatus = 'authorized' | 'revoked';
+export type DesktopDeviceBlockStatus = 'active' | 'none';
+export type DesktopResourceKind = 'shared_file' | 'shared_folder' | 'received_file';
+export type DesktopResourceStatus = 'available' | 'missing' | 'removed';
+export type DesktopAccessAction = 'list' | 'view' | 'download' | 'error';
+export type DesktopRecordResult = 'ok' | 'denied' | 'missing' | 'error';
+
+export interface DesktopManagedDeviceDTO {
+  desktopDeviceId: string;
+  clientId: string;
+  clientIdShort: string;
+  displayName: string;
+  platform: string;
+  stableDeviceId?: string;
+  lastIp?: string;
+  authorizedAt?: string;
+  lastSeenAt?: string;
+  authorizationStatus: DesktopDeviceAuthorizationStatus;
+  blockStatus: DesktopDeviceBlockStatus;
+  failedAttemptCount: number;
+  blockedAt?: string;
+  blockReason?: string;
+  todayFileCount: number;
+  todayBytes: number;
+  totalFileCount: number;
+  totalBytes: number;
+}
+
+export interface DesktopConnectionAttemptDTO {
+  desktopDeviceId: string;
+  clientId: string;
+  displayName?: string;
+  result: 'success' | 'wrong_code' | 'blocked';
+  failureReason?: string;
+  attemptedAt: string;
+  remainingAttempts?: number;
+}
+
+export interface DesktopBlockStateDTO {
+  desktopDeviceId: string;
+  clientId: string;
+  blocked: boolean;
+  failedAttemptCount: number;
+  remainingAttempts: number;
+  blockedAt?: string;
+  reason?: string;
+}
+
+export interface DesktopSyncRecordDTO {
+  recordId: string;
+  desktopDeviceId: string;
+  clientId: string;
+  displayName: string;
+  fileKey: string;
+  filename: string;
+  mediaType: string;
+  fileSize: number;
+  status: 'completed' | 'failed';
+  completedAt?: string;
+  failedAt?: string;
+  errorSummary?: string;
+}
+
+export interface DesktopAccessRecordDTO {
+  recordId: string;
+  desktopDeviceId: string;
+  clientId: string;
+  displayName: string;
+  resourceId: string;
+  resourceKind: DesktopResourceKind;
+  resourceName: string;
+  action: DesktopAccessAction;
+  result: DesktopRecordResult;
+  accessedAt: string;
+}
+
+export interface DesktopSharedResourceDTO {
+  resourceId: string;
+  desktopDeviceId: string;
+  kind: DesktopResourceKind;
+  displayName: string;
+  status: DesktopResourceStatus;
+  fileSize?: number;
+  mediaType?: string;
+  addedAt: string;
+  removedAt?: string;
+  lastAccessedAt?: string;
+  downloadCount: number;
+}
+
+export interface ReceivedLibraryItemDTO {
+  resourceId: string;
+  desktopDeviceId: string;
+  clientId: string;
+  displayName: string;
+  fileKey: string;
+  filename: string;
+  mediaType: string;
+  fileSize: number;
+  completedAt: string;
+  shareStatus: 'not_shared' | 'shared' | 'missing';
+}
+
+export interface RecentDesktopDTO {
+  desktopDeviceId: string;
+  desktopName: string;
+  host: string;
+  port: number;
+  lastConnectedAt: string;
+  authorizationStatus?: 'unknown' | 'authorized' | 'requires_code' | 'blocked';
+}
+
+export interface PairingFailureDTO {
+  code: 'wrong_code' | 'blocked' | 'version_incompatible' | 'unknown';
+  message: string;
+  remainingAttempts?: number;
+  blocked?: boolean;
+}
+
 // ── Desktop Settings ──
 
 export interface SettingsDTO {

@@ -5,6 +5,14 @@ import type {
   SyncSummaryDTO,
 } from './types';
 
+export const SIDECAR_EVENT_TYPES = {
+  DEVICE_STATE_CHANGED: 'device.state.changed',
+  DASHBOARD_UPDATED: 'dashboard.updated',
+  DEVICE_MANAGEMENT_UPDATED: 'device.management.updated',
+  SHARED_RESOURCES_UPDATED: 'shared.resources.updated',
+  ACCESS_RECORDS_UPDATED: 'access.records.updated',
+} as const;
+
 export type SidecarEvent =
   | { type: 'dashboard.updated'; payload: DashboardSummaryDTO }
   | { type: 'device.state.changed'; payload: { deviceId: string; status: DeviceDashboardStatus } }

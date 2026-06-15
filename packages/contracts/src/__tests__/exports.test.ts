@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import * as contracts from '../index';
+import {
+  SIDECAR_EVENT_TYPES,
+  type DesktopManagedDeviceDTO,
+  type DesktopSharedResourceDTO,
+  type DesktopAccessRecordDTO,
+  type DesktopSyncRecordDTO,
+  type ReceivedLibraryItemDTO,
+  type RecentDesktopDTO,
+} from '../index';
 import type {
   BindingStateDTO,
   SharedFilesReachabilityDTO,
@@ -17,6 +26,17 @@ function expectWakeTypes(
   expect(wake.targets[0]?.broadcastAddress).toBe('192.168.1.255');
   expect(binding.wake?.supported).toBe(true);
   expect(reachability.state).toBe('waking');
+}
+
+function assertTypeExports(
+  _device: DesktopManagedDeviceDTO,
+  _shared: DesktopSharedResourceDTO,
+  _access: DesktopAccessRecordDTO,
+  _sync: DesktopSyncRecordDTO,
+  _library: ReceivedLibraryItemDTO,
+  _recent: RecentDesktopDTO,
+) {
+  return true;
 }
 
 describe('@syncflow/contracts exports', () => {
@@ -110,5 +130,13 @@ describe('@syncflow/contracts exports', () => {
     expectWakeTypes(target, wake, binding, reachability);
     expect(setupRequired.state).toBe('wake_setup_required');
     expect(unavailable.state).toBe('wake_unavailable');
+  });
+});
+
+describe('desktop-local product exports', () => {
+  it('exports management event constants', () => {
+    expect(SIDECAR_EVENT_TYPES.DEVICE_MANAGEMENT_UPDATED).toBe('device.management.updated');
+    expect(SIDECAR_EVENT_TYPES.SHARED_RESOURCES_UPDATED).toBe('shared.resources.updated');
+    expect(SIDECAR_EVENT_TYPES.ACCESS_RECORDS_UPDATED).toBe('access.records.updated');
   });
 });
