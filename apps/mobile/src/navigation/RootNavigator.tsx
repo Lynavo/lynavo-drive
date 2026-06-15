@@ -32,6 +32,7 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { HelpScreen } from '../screens/HelpScreen';
 import { QRScannerScreen } from '../screens/QRScannerScreen';
 import { SubscriptionScreen } from '../screens/SubscriptionScreen';
+import { AutoUploadSettingsScreen } from '../screens/AutoUploadSettingsScreen';
 import {
   AUTH_COLORS,
   AuthScreenShell,
@@ -64,6 +65,7 @@ export type RootStackParamList = {
   Settings: undefined;
   Help: undefined;
   Subscription: { isNewUser?: boolean } | undefined;
+  AutoUploadSettings: undefined;
 };
 
 // ---------------------------------------------------------------------------
@@ -365,6 +367,10 @@ function AuthedStack({
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="Help" component={HelpScreen} />
         <Stack.Screen name="Subscription" component={SubscriptionScreen} />
+        <Stack.Screen
+          name="AutoUploadSettings"
+          component={AutoUploadSettingsScreen}
+        />
       </Stack.Navigator>
     </>
   );

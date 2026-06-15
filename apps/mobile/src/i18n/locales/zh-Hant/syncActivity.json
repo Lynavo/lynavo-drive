@@ -5,6 +5,32 @@
     "history": "同步歷史",
     "settings": "設定"
   },
+  "home": {
+    "autoSyncTitle": "自動同步",
+    "disableAuto": "關閉",
+    "enableAuto": "開啟",
+    "autoEnabled": "已開啟，新增素材會自動同步",
+    "autoDisabled": "尚未開啟自動同步",
+    "uploadedCount": "已上傳 {{completed}} / {{total}} 個",
+    "latestSyncTime": "最近同步：{{label}}",
+    "latestSyncTimeEmpty": "尚無同步記錄",
+    "recentDownloadPhoto": "照片",
+    "recentDownloadVideo": "影片",
+    "recentDownloadFile": "檔案",
+    "recentDownloadsTitle": "最近下載",
+    "syncRecordsTitle": "同步記錄",
+    "currentPhoneStatus": "當前手機狀態",
+    "currentTransferProgress": "當前傳輸進度",
+    "remainingTime": "剩餘時間",
+    "remainingTimeUnknown": "計算中",
+    "syncRecordTotal": "總計 {{size}}",
+    "today": "今天",
+    "todayStats": "{{count}} 個，{{size}}",
+    "todaySyncRecord": "今日同步摘要",
+    "syncing": "同步中",
+    "synced": "已同步",
+    "uploadFiles": "上傳檔案"
+  },
   "phases": {
     "discoveringTitle": "正在搜尋電腦…",
     "reconcilingTitle": "正在同步歷史記錄…",
@@ -186,5 +212,40 @@
   },
   "queue": {
     "title": "待同步佇列"
+  },
+  "autoUploadSettings": {
+    "title": "自動上傳",
+    "sourcesTitle": "選擇同步來源",
+    "sourceAlbumTitle": "1. 從相簿同步",
+    "sourceAlbumDesc": "照片或影片",
+    "sourceFileTitle": "2. 從檔案同步",
+    "sourceFileDescEmpty": "從系統檔案中選擇需要上傳的檔案",
+    "sourceFileDescSelected": "已選擇 {{count}} 個檔案",
+    "addFile": "新增檔案",
+    "clearFiles": "清空",
+    "addedFilesSummary": "已新增 {{count}} 個檔案",
+    "addedFilesMore": "另有 {{count}} 個檔案",
+    "rangeTitle": "上傳範圍",
+    "rangeAllTitle": "全部",
+    "rangeAllDesc": "上傳現有所有照片和影片",
+    "rangeNowTitle": "從現在開始",
+    "rangeNowDesc": "僅同步從現在開始的新照片和影片",
+    "rangeCustomTitle": "自定義範圍",
+    "rangeCustomDesc": "選擇特定日期範圍",
+    "customPickerSave": "儲存",
+    "infoAlbumAndFileAll": "所有照片、影片和已選擇的 {{count}} 個檔案將上傳到您的電腦。",
+    "infoAlbumAndFileNow": "從現在開始，新的照片、影片和已選擇的 {{count}} 個檔案將同步。",
+    "infoAlbumAndFileCustom": "所選範圍內地照片、影片和已選擇的 {{count}} 個檔案將上傳到您的電腦。",
+    "infoAlbumAll": "相簿中的所有照片和影片將上傳到您的電腦。",
+    "infoAlbumNow": "從現在開始，新的相簿照片和影片將同步。",
+    "infoAlbumCustom": "所選範圍內的相簿照片和影片將上傳到您的電腦。",
+    "infoFileAll": "已選擇的 {{count}} 個檔案將上傳到您的電腦。",
+    "infoFileNow": "從現在開始，已選擇的 {{count}} 個檔案將同步。",
+    "infoFileCustom": "所選範圍內已選擇的 {{count}} 個檔案將上傳到您的電腦。",
+    "infoEmpty": "請至少選擇一個同步來源。"
+  },
+  "recentDownload": {
+    "title": "最近下載",
+    "viewAll": "查看全部"
   }
 }

@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   NativeModules,
   NativeEventEmitter,
   Alert,
@@ -23,10 +22,22 @@ import {
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import type { UploadTaskSource, AutoUploadState } from '@syncflow/contracts';
+import type {
+  UploadTaskSource,
+  AutoUploadState,
+  DesktopSyncRecordDTO,
+} from '@syncflow/contracts';
 import { colors } from '../theme/colors';
 import { Icon } from '../components/Icon';
 import { SubscriptionStatusIcon } from '../components/SubscriptionStatusIcon';
+import { GradientBackground } from '../components/GradientBackground';
+import { BottomTabBar } from '../components/BottomTabBar';
+import { listHistory } from '../services/desktop-local-service';
+import {
+  RecentDownloadsSection,
+  SyncRecordSummarySection,
+  type RecentDownloadPlaceholder,
+} from './components/SyncActivityHomeSections';
 import {
   SyncActivityTour,
   isValidTourTargetLayout,
@@ -34,9 +45,7 @@ import {
   type TourTargetLayout,
 } from '../components/onboarding/SyncActivityTour';
 import {
-  cancelAllManualUploads,
   disableAutoUpload,
-  enableAutoUpload,
   retryLanReconnect,
 } from '../services/SyncEngineModule';
 import {
@@ -49,7 +58,6 @@ import {
   buildSyncConnectionEvidence,
   getConnectionBadgeState,
 } from '../utils/effectiveConnectionState';
-import { formatQueueCountDisplay } from '../utils/queueCountDisplay';
 import { hasPendingManualWork } from '../utils/manualUploadState';
 import { rememberAutoUploadRoundProgress } from '../utils/autoUploadRoundProgress';
 import {
@@ -115,10 +123,15 @@ interface QueueItem {
   rawFileSize: number;
   ackedOffset: number;
   type: 'image' | 'video';
-  status: 'queued' | 'preparing' | 'uploading' | 'completed' | 'failed' | 'cloud_downloading';
+  status:
+    | 'queued'
+    | 'preparing'
+    | 'uploading'
+    | 'completed'
+    | 'failed'
+    | 'cloud_downloading';
   isCloudAsset: boolean;
 }
-
 
 interface BindingState {
   deviceId: string;
@@ -151,10 +164,7 @@ interface AutoRoundDisplayBaseline {
 
 const BLUE = colors.accent;
 const DARK = colors.primary;
-const SCREEN_BG = colors.background;
-const CARD_BG = colors.card;
-const CARD_BORDER = colors.border;
-const ICON_SURFACE = 'rgba(59, 159, 216, 0.08)';
+const SCREEN_BG = 'transparent';
 const HEADER_ICON = colors.secondaryForeground;
 const PRIMARY_NAVY = colors.primary;
 const PRIMARY_NAVY_PRESSED = '#163352';
@@ -588,8 +598,10 @@ export function SyncActivityScreen() {
     latestUpdatedAt: undefined,
   });
   const [initialLoading, setInitialLoading] = useState(true);
-  const [cancellingBatch, setCancellingBatch] = useState(false);
   const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [historyRecords, setHistoryRecords] = useState<DesktopSyncRecordDTO[]>(
+    [],
+  );
 
   const refreshQueue = useCallback(async () => {
     try {
@@ -607,7 +619,7 @@ export function SyncActivityScreen() {
             type: (item.mediaType as string) === 'video' ? 'video' : 'image',
             status: ((item.status as string) ?? 'queued') as any,
             isCloudAsset: Boolean(item.isCloudAsset),
-          }))
+          })),
         );
       }
     } catch (e) {
@@ -615,11 +627,29 @@ export function SyncActivityScreen() {
     }
   }, []);
 
+  const loadHistory = useCallback(async () => {
+    try {
+      const { NativeSyncEngine } = NativeModules;
+      if (!NativeSyncEngine) return;
+      const binding = await NativeSyncEngine.getBindingState();
+      if (!binding || !binding.host) {
+        setHistoryRecords([]);
+        return;
+      }
+      const desktop = { host: binding.host, port: 39394 };
+      const result = await listHistory(desktop);
+      setHistoryRecords(result || []);
+    } catch (e) {
+      console.warn('[SyncActivityScreen] Failed to load history:', e);
+    }
+  }, []);
+
   useEffect(() => {
     if (isScreenFocused) {
       void refreshQueue();
+      void loadHistory();
     }
-  }, [isScreenFocused, refreshQueue]);
+  }, [isScreenFocused, refreshQueue, loadHistory]);
 
   const [showSyncActivityTour, setShowSyncActivityTour] = useState(false);
   const [syncActivityTourChecked, setSyncActivityTourChecked] = useState(false);
@@ -834,6 +864,7 @@ export function SyncActivityScreen() {
             void refreshQueue();
             if (state.uploadState === 'completed') {
               void loadTodayStats();
+              void loadHistory();
             }
           },
         );
@@ -1037,37 +1068,6 @@ export function SyncActivityScreen() {
     finish();
   }, []);
 
-  const handleCancelManualBatch = useCallback(() => {
-    Alert.alert(
-      t('syncActivity.dialogs.cancelManual.title'),
-      t('syncActivity.dialogs.cancelManual.body'),
-      [
-        {
-          text: t('syncActivity.dialogs.cancelManual.rethink'),
-          style: 'cancel',
-        },
-        {
-          text: t('syncActivity.dialogs.cancelManual.confirm'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setCancellingBatch(true);
-              await cancelAllManualUploads();
-            } catch (e) {
-              console.warn('[SyncActivity] cancelAllManualUploads error:', e);
-              Alert.alert(
-                t('syncActivity.dialogs.cancelManualFailed.title'),
-                t('syncActivity.dialogs.cancelManualFailed.body'),
-              );
-            } finally {
-              setCancellingBatch(false);
-            }
-          },
-        },
-      ],
-    );
-  }, [t]);
-
   const handleCloseAutoUpload = useCallback(() => {
     Alert.alert(
       t('syncActivity.dialogs.closeAuto.title'),
@@ -1139,79 +1139,9 @@ export function SyncActivityScreen() {
     );
   }, [navigation, t]);
 
-  const handleEnableAutoUpload = useCallback(async () => {
-    // Check device connection first
-    try {
-      const binding = await NativeModules.NativeSyncEngine?.getBindingState();
-      if (
-        !binding?.deviceId ||
-        (binding.connectionState !== 'connected' &&
-          binding.connectionState !== 'bound')
-      ) {
-        Alert.alert(
-          t('syncActivity.dialogs.enableAutoBlocked.title'),
-          t('syncActivity.dialogs.enableAutoBlocked.body'),
-        );
-        return;
-      }
-    } catch {
-      Alert.alert(
-        t('syncActivity.dialogs.enableAutoBlocked.title'),
-        t('syncActivity.dialogs.enableAutoBlocked.body'),
-      );
-      return;
-    }
-    try {
-      const syncData = await NativeModules.NativeSyncEngine?.getSyncOverview();
-      if (hasPendingManualWork(syncData)) {
-        Alert.alert(
-          t('syncActivity.dialogs.switchUploadMode.title'),
-          t('syncActivity.dialogs.switchUploadMode.body'),
-          [
-            { text: t('common.cancel'), style: 'cancel' },
-            {
-              text: t('syncActivity.dialogs.switchUploadMode.confirm'),
-              onPress: async () => {
-                startAutoUploadPreparing();
-                try {
-                  await cancelAllManualUploads();
-                  await enableAutoUpload();
-                  const nextSyncData =
-                    await NativeModules.NativeSyncEngine?.getSyncOverview();
-                  if (nextSyncData) {
-                    setOverview(prev => buildOverview(nextSyncData, prev));
-                  }
-                } catch (e) {
-                  console.warn('[SyncActivity] enableAutoUpload error:', e);
-                  clearAutoUploadPreparing();
-                  Alert.alert(
-                    t('syncActivity.dialogs.enableAutoFailed.title'),
-                    t('syncActivity.dialogs.enableAutoFailed.body'),
-                  );
-                }
-              },
-            },
-          ],
-        );
-        return;
-      }
-
-      startAutoUploadPreparing();
-      await enableAutoUpload();
-      const nextSyncData =
-        await NativeModules.NativeSyncEngine?.getSyncOverview();
-      if (nextSyncData) {
-        setOverview(prev => buildOverview(nextSyncData, prev));
-      }
-    } catch (e) {
-      console.warn('[SyncActivity] enableAutoUpload error:', e);
-      clearAutoUploadPreparing();
-      Alert.alert(
-        t('syncActivity.dialogs.enableAutoFailed.title'),
-        t('syncActivity.dialogs.enableAutoFailed.body'),
-      );
-    }
-  }, [t, startAutoUploadPreparing, clearAutoUploadPreparing]);
+  const handleEnableAutoUpload = useCallback(() => {
+    navigation.navigate('AutoUploadSettings');
+  }, [navigation]);
 
   const handleDismissSyncActivityTour = useCallback(() => {
     void markSyncActivityTourSeen();
@@ -1274,9 +1204,6 @@ export function SyncActivityScreen() {
     manualPending: overview.manualPending,
     currentTaskSource,
   });
-  const totalPending =
-    (overview.manualPending ?? 0) + (overview.autoPending ?? 0);
-  const totalPendingDisplay = formatQueueCountDisplay(totalPending);
 
   // ---------------------------------------------------------------------------
   // Card state determination
@@ -1350,6 +1277,43 @@ export function SyncActivityScreen() {
   const latestSyncLabel = todayStats.latestUpdatedAt
     ? formatDateTimeLabel(todayStats.latestUpdatedAt, t)
     : undefined;
+  const autoUploadEnabledForDisplay =
+    isAutoUploadActive ||
+    autoUploadPreparing ||
+    mainCardState === 'running' ||
+    mainCardState === 'standby' ||
+    mainCardState === 'auto_completed';
+  const recentDownloadItems = historyRecords.slice(0, 4);
+  const recentDownloadPlaceholders: RecentDownloadPlaceholder[] = [
+    {
+      key: 'photo',
+      label: t('syncActivity.home.recentDownloadPhoto'),
+      iconName: 'image-outline',
+      iconColor: BLUE,
+      iconBackground: '#B8DDF8',
+    },
+    {
+      key: 'video',
+      label: t('syncActivity.home.recentDownloadVideo'),
+      iconName: 'play-circle-outline',
+      iconColor: '#ffffff',
+      iconBackground: '#AAB7FF',
+    },
+    {
+      key: 'file-1',
+      label: t('syncActivity.home.recentDownloadFile'),
+      iconName: 'document-outline',
+      iconColor: '#315E8C',
+      iconBackground: '#EEF3FA',
+    },
+    {
+      key: 'file-2',
+      label: t('syncActivity.home.recentDownloadFile'),
+      iconName: 'document-outline',
+      iconColor: '#315E8C',
+      iconBackground: '#EEF3FA',
+    },
+  ];
   const showSubscriptionExpiredOverlay = shouldShowSubscriptionExpiredOverlay({
     subscriptionEnforcement: FEATURES.SUBSCRIPTION_ENFORCEMENT,
     isFocused: isScreenFocused,
@@ -1457,907 +1421,775 @@ export function SyncActivityScreen() {
   // ---------------------------------------------------------------------------
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>{t('syncActivity.title')}</Text>
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              ref={helpHeaderActionRef}
-              testID="sync-activity-tour-target-help"
-              style={styles.headerActionButton}
-              accessibilityRole="button"
-              accessibilityLabel={t('syncActivity.header.help')}
-              activeOpacity={0.7}
-              onLayout={() =>
-                measureSyncActivityTourTarget('help', helpHeaderActionRef)
-              }
-              onPress={() => navigation.navigate('Help')}
-            >
-              <Icon name="help-circle-outline" size={22} color={HEADER_ICON} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              ref={historyHeaderActionRef}
-              testID="sync-activity-tour-target-history"
-              style={styles.headerActionButton}
-              accessibilityRole="button"
-              accessibilityLabel={t('syncActivity.header.history')}
-              activeOpacity={0.7}
-              onLayout={() =>
-                measureSyncActivityTourTarget('history', historyHeaderActionRef)
-              }
-              onPress={() => navigation.navigate('History')}
-            >
-              <Icon name="time-outline" size={22} color={HEADER_ICON} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              ref={settingsHeaderActionRef}
-              testID="sync-activity-tour-target-settings"
-              style={styles.headerActionButton}
-              accessibilityRole="button"
-              accessibilityLabel={t('syncActivity.header.settings')}
-              activeOpacity={0.7}
-              onLayout={() =>
-                measureSyncActivityTourTarget(
-                  'settings',
-                  settingsHeaderActionRef,
-                )
-              }
-              onPress={() => navigation.navigate('Settings')}
-            >
-              <Icon name="settings-outline" size={22} color={HEADER_ICON} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Unified main card */}
-        <View
-          ref={mainCardRef}
-          testID="sync-activity-tour-target-panel"
-          style={styles.mainCard}
-          onLayout={() => measureSyncActivityTourTarget('panel', mainCardRef)}
+    <GradientBackground>
+      <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          {/* Device info row — always shown at top of card */}
-          <View style={styles.deviceRow}>
-            <View style={styles.deviceIconBox}>
-              <Icon name="desktop-outline" size={22} color={BLUE} />
-            </View>
-            <View style={styles.deviceInfo}>
-              <Text style={styles.deviceName}>{boundDeviceName}</Text>
-              <View style={styles.deviceStatusRow}>
-                <View
-                  style={[
-                    styles.statusDot,
-                    connectionBadgeState === 'offline'
-                      ? styles.statusDotOffline
-                      : connectionBadgeState === 'connecting'
-                        ? styles.statusDotConnecting
-                        : styles.statusDotOnline,
-                  ]}
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>{t('syncActivity.title')}</Text>
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                ref={helpHeaderActionRef}
+                testID="sync-activity-tour-target-help"
+                style={styles.headerActionButton}
+                accessibilityRole="button"
+                accessibilityLabel={t('syncActivity.header.help')}
+                activeOpacity={0.7}
+                onLayout={() =>
+                  measureSyncActivityTourTarget('help', helpHeaderActionRef)
+                }
+                onPress={() => navigation.navigate('Help')}
+              >
+                <Icon
+                  name="help-circle-outline"
+                  size={24}
+                  color={HEADER_ICON}
                 />
-                <Text
-                  style={[
-                    styles.statusText,
-                    connectionBadgeState === 'offline'
-                      ? styles.statusTextOffline
-                      : connectionBadgeState === 'connecting'
-                        ? styles.statusTextConnecting
-                        : styles.statusTextOnline,
-                  ]}
-                >
-                  {connectionBadgeState === 'offline'
-                    ? t('settings.connection.offline')
-                    : isConnecting
-                      ? t('settings.connection.connecting')
-                      : t('settings.connection.online')}
-                </Text>
-              </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                ref={historyHeaderActionRef}
+                testID="sync-activity-tour-target-history"
+                style={styles.headerActionButton}
+                accessibilityRole="button"
+                accessibilityLabel={t('syncActivity.header.history')}
+                activeOpacity={0.7}
+                onLayout={() =>
+                  measureSyncActivityTourTarget(
+                    'history',
+                    historyHeaderActionRef,
+                  )
+                }
+                onPress={() => navigation.navigate('History')}
+              >
+                <Icon name="time-outline" size={24} color={HEADER_ICON} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                ref={settingsHeaderActionRef}
+                testID="sync-activity-tour-target-settings"
+                style={styles.headerActionButton}
+                accessibilityRole="button"
+                accessibilityLabel={t('syncActivity.header.settings')}
+                activeOpacity={0.7}
+                onLayout={() =>
+                  measureSyncActivityTourTarget(
+                    'settings',
+                    settingsHeaderActionRef,
+                  )
+                }
+                onPress={() => navigation.navigate('Settings')}
+              >
+                <Icon name="settings-outline" size={24} color={HEADER_ICON} />
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* ---- State 1: Upload Running (auto or manual) ---- */}
-          {mainCardState === 'running' && (
-            <View style={styles.cardBody}>
-              {/* Badge row — dynamic based on upload source */}
-              <View style={styles.badgeRow}>
-                <View
-                  style={
-                    isManualUploading ? styles.manualBadge : styles.autoBadge
-                  }
-                >
+          {/* Unified main card */}
+          <View
+            ref={mainCardRef}
+            testID="sync-activity-tour-target-panel"
+            style={styles.mainCard}
+            onLayout={() => measureSyncActivityTourTarget('panel', mainCardRef)}
+          >
+            <View testID="sync-activity-device-row" style={styles.deviceRow}>
+              <View style={styles.deviceIconBox}>
+                <Icon name="desktop-outline" size={22} color={BLUE} />
+              </View>
+              <View style={styles.deviceInfo}>
+                <Text style={styles.deviceName} numberOfLines={1}>
+                  {boundDeviceName}
+                </Text>
+                <View style={styles.deviceStatusRow}>
+                  <View
+                    style={[
+                      styles.statusDot,
+                      connectionBadgeState === 'offline'
+                        ? styles.statusDotOffline
+                        : connectionBadgeState === 'connecting'
+                          ? styles.statusDotConnecting
+                          : styles.statusDotOnline,
+                    ]}
+                  />
                   <Text
-                    style={
-                      isManualUploading
-                        ? styles.manualBadgeText
-                        : styles.autoBadgeText
-                    }
+                    style={[
+                      styles.statusText,
+                      connectionBadgeState === 'offline'
+                        ? styles.statusTextOffline
+                        : connectionBadgeState === 'connecting'
+                          ? styles.statusTextConnecting
+                          : styles.statusTextOnline,
+                    ]}
                   >
-                    {isManualUploading
-                      ? t('syncActivity.badges.manual')
-                      : t('syncActivity.badges.auto')}
+                    {connectionBadgeState === 'offline'
+                      ? t('settings.connection.offline')
+                      : isConnecting
+                        ? t('settings.connection.connecting')
+                        : t('settings.connection.online')}
                   </Text>
                 </View>
-                <Text style={styles.badgeLabel}>
-                  {isManualUploading
-                    ? t('syncActivity.badges.manualUploading')
-                    : t('syncActivity.badges.autoEnabled')}
-                </Text>
-              </View>
-
-              {shouldRenderPreparationPhase ? (
-                <View style={styles.preparationBody}>
-                  <ActivityIndicator size="small" color={BLUE} />
-                  <Text style={styles.preparationTitle}>
-                    {autoUploadPreparing &&
-                    !isPreparationPhase(overview.uploadState)
-                      ? t('syncActivity.phases.autoPreparingTitle')
-                      : getPreparationTitle(overview.uploadState, t)}
-                  </Text>
-                  <Text style={styles.preparationSubtitle}>
-                    {autoUploadPreparing &&
-                    !isPreparationPhase(overview.uploadState)
-                      ? t('syncActivity.phases.autoPreparingSubtitle')
-                      : getPreparationSubtitle(overview, t)}
-                  </Text>
-                </View>
-              ) : shouldRenderUploadProgress ? (
-                <>
-                  {/* Title row with percentage */}
-                  <View style={styles.runningTitleRow}>
-                    <Text style={styles.runningTitle}>
-                      {isManualUploading
-                        ? t('syncActivity.running.manualTitle')
-                        : t('syncActivity.running.autoTitle')}
-                    </Text>
-                    <Text style={styles.runningPercent}>
-                      {displayProgressPercent}%
-                    </Text>
-                  </View>
-
-                  {/* Progress bar */}
-                  <View style={styles.progressBarTrack}>
-                    <View
-                      style={[
-                        styles.progressBarFill,
-                        { width: `${Math.min(100, displayProgressPercent)}%` },
-                      ]}
-                    />
-                  </View>
-
-                  {/* Current file */}
-                  {displayCurrentFilename ? (
-                    <Text style={styles.currentFileName} numberOfLines={1}>
-                      {displayCurrentFilename}
-                    </Text>
-                  ) : null}
-
-                  {/* Stats row */}
-                  <View style={styles.statsRow}>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statLabel}>
-                        {t('syncActivity.stats.speed')}
-                      </Text>
-                      <Text style={styles.statValue}>
-                        {formatSpeedMbps(displayCurrentSpeedMbps)}
-                      </Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                      <Text style={styles.statLabel}>
-                        {t('syncActivity.stats.progress')}
-                      </Text>
-                      <Text style={styles.statValue}>
-                        {`${displayCompletedCount} / ${displayTotalCount}`}
-                      </Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                      <Text style={styles.statLabel}>
-                        {t('syncActivity.stats.transferred')}
-                      </Text>
-                      <Text style={styles.statValue}>
-                        {formatBytes(displayCompletedBytes)}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Queue info */}
-                  {totalPending > 0 && (
-                    <Text style={styles.queueInfoText}>
-                      {t('syncActivity.running.queueInfo', {
-                        queued: totalPendingDisplay,
-                      })}
-                    </Text>
-                  )}
-                </>
-              ) : isManualUploading ? (
-                <>
-                  {/* Manual batch in flight but pipeline is in a transient gap
-                      (e.g. Wi-Fi flip, backoff). Show manual-context copy and
-                      fall through to the manual cancel button below — NEVER
-                      the auto-running fallback, which produced a Frankenstein
-                      UI mixing manual badge with "自動上傳執行中" text. */}
-                  <Text style={styles.runningTitle}>
-                    {t('syncActivity.running.manualTitle')}
-                  </Text>
-                  <Text style={styles.idleSubtitle}>
-                    {t('syncActivity.phases.preparingSubtitle')}
-                  </Text>
-                  {displayCompletedCount > 0 && (
-                    <View style={styles.statsRow}>
-                      <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>
-                          {t('syncActivity.stats.transferred')}
-                        </Text>
-                        <Text style={styles.statValue}>
-                          {t('syncActivity.stats.transferredCount', {
-                            count: displayCompletedCount,
-                          })}
-                        </Text>
-                      </View>
-                      <View style={styles.statDivider} />
-                      <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>
-                          {t('syncActivity.stats.dataAmount')}
-                        </Text>
-                        <Text style={styles.statValue}>
-                          {formatBytes(displayCompletedBytes)}
-                        </Text>
-                      </View>
-                    </View>
-                  )}
-                </>
-              ) : (
-                <>
-                  {/* Active but idle — auto upload watching for new photos */}
-                  <Text style={styles.runningTitle}>
-                    {t('syncActivity.running.autoRunningTitle')}
-                  </Text>
-                  <Text style={styles.idleSubtitle}>
-                    {t('syncActivity.running.autoRunningSubtitle')}
-                  </Text>
-                  {displayCompletedCount > 0 && (
-                    <View style={styles.statsRow}>
-                      <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>
-                          {t('syncActivity.stats.transferred')}
-                        </Text>
-                        <Text style={styles.statValue}>
-                          {t('syncActivity.stats.transferredCount', {
-                            count: displayCompletedCount,
-                          })}
-                        </Text>
-                      </View>
-                      <View style={styles.statDivider} />
-                      <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>
-                          {t('syncActivity.stats.dataAmount')}
-                        </Text>
-                        <Text style={styles.statValue}>
-                          {formatBytes(displayCompletedBytes)}
-                        </Text>
-                      </View>
-                    </View>
-                  )}
-                </>
-              )}
-
-              {/* Action button — only one visible at a time per PRD */}
-              {hasManualUploadWork ? (
-                <TouchableOpacity
-                  style={[styles.outlinedButton, styles.dangerButton]}
-                  activeOpacity={0.7}
-                  onPress={handleCancelManualBatch}
-                  disabled={cancellingBatch}
-                >
-                  <Text style={styles.dangerButtonText}>
-                    {cancellingBatch
-                      ? t('syncActivity.actions.cancelling')
-                      : t('syncActivity.actions.cancelManualBatch')}
-                  </Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={styles.outlinedButton}
-                  activeOpacity={0.7}
-                  onPress={handleCloseAutoUpload}
-                >
-                  <Text style={styles.outlinedButtonText}>
-                    {t('syncActivity.actions.closeAutoUpload')}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-
-          {/* ---- State 2: Auto Upload Completed ---- */}
-          {mainCardState === 'auto_completed' && (
-            <View style={styles.cardBody}>
-              <View style={styles.badgeRow}>
-                <View style={styles.autoBadge}>
-                  <Text style={styles.autoBadgeText}>
-                    {t('syncActivity.badges.auto')}
-                  </Text>
-                </View>
-                <Text style={styles.badgeLabel}>
-                  {t('syncActivity.badges.autoEnabled')}
-                </Text>
-              </View>
-
-              <View style={styles.runningTitleRow}>
-                <Text style={styles.runningTitle}>
-                  {t('syncActivity.completed.auto.title')}
-                </Text>
-                <Text style={[styles.runningPercent, styles.completionPercent]}>
-                  100%
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.progressBarTrack,
-                  styles.progressBarTrackComplete,
-                ]}
-              >
-                <View
-                  style={[
-                    styles.progressBarFill,
-                    styles.progressBarFillComplete,
-                  ]}
-                />
-              </View>
-
-              <Text style={styles.completionSubtitle}>
-                {t('syncActivity.completed.auto.subtitle', {
-                  count: displayCompletedCount,
-                })}
-              </Text>
-
-              <View style={styles.completionStatsRow}>
-                <CompletionStatCard
-                  label={t('syncActivity.stats.speed')}
-                  value={t('syncActivity.completed.speedIdle')}
-                />
-                <CompletionStatCard
-                  label={t('syncActivity.completed.auto.fileCountLabel')}
-                  value={t('syncActivity.completed.auto.fileCountValue', {
-                    count: displayCompletedCount,
-                  })}
-                />
-                <CompletionStatCard
-                  label={t('syncActivity.stats.transferred')}
-                  value={formatBytes(displayCompletedBytes)}
-                />
-              </View>
-
-              {latestSyncLabel ? (
-                <Text style={styles.completionMetaText}>
-                  {t('syncActivity.completed.auto.latestSync', {
-                    label: latestSyncLabel,
-                  })}
-                </Text>
-              ) : null}
-
-              <View style={styles.twoButtonRowCompact}>
-                <TouchableOpacity
-                  style={[styles.rowButton, styles.rowButtonOutlined]}
-                  activeOpacity={0.7}
-                  onPress={() => navigation.navigate('AlbumWorkbench')}
-                >
-                  <Text style={styles.rowButtonOutlinedText}>
-                    {t('syncActivity.completed.auto.goToAlbum')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.rowButton,
-                    styles.rowButtonOutlined,
-                    styles.completionDangerButton,
-                  ]}
-                  activeOpacity={0.7}
-                  onPress={handleCloseAutoUpload}
-                >
-                  <Text style={styles.completionDangerButtonText}>
-                    {t('syncActivity.actions.closeAutoUpload')}
-                  </Text>
-                </TouchableOpacity>
               </View>
             </View>
-          )}
 
-          {/* ---- State 3: Manual Upload Completed ---- */}
-          {mainCardState === 'manual_completed' && (
-            <View style={styles.cardBody}>
-              <View style={styles.badgeRow}>
-                <View style={styles.manualBadge}>
-                  <Text style={styles.manualBadgeText}>
-                    {t('syncActivity.badges.manual')}
+            {mainCardState === 'offline' ? (
+              <View style={styles.cardBodyCentered}>
+                <View style={styles.offlineIconCircle}>
+                  <Icon
+                    name="cloud-offline-outline"
+                    size={32}
+                    color={EMPTY_OFFLINE_ICON}
+                  />
+                </View>
+                <Text style={styles.centeredTitle}>
+                  {t('syncActivity.offline.title')}
+                </Text>
+                <Text style={styles.centeredSubtitle}>
+                  {t('syncActivity.offline.subtitle')}
+                </Text>
+                <View style={styles.twoButtonRow}>
+                  <TouchableOpacity
+                    style={[styles.rowButton, styles.rowButtonOutlined]}
+                    activeOpacity={0.75}
+                    onPress={handleSwitchDevice}
+                  >
+                    <Text style={styles.rowButtonOutlinedText}>
+                      {t('syncActivity.offline.switchDevice')}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.rowButton, styles.rowButtonPrimary]}
+                    activeOpacity={0.75}
+                    onPress={handleReconnect}
+                  >
+                    <Text style={styles.rowButtonPrimaryText}>
+                      {t('syncActivity.offline.reconnect')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : mainCardState === 'not_started' ? (
+              <View style={styles.cardBodyCentered}>
+                <View style={styles.notStartedIconCircle}>
+                  <Icon
+                    name="information-circle-outline"
+                    size={32}
+                    color={EMPTY_INFO_ICON}
+                  />
+                </View>
+                <Text style={styles.centeredTitle}>
+                  {t('syncActivity.notStarted.title')}
+                </Text>
+                <Text style={styles.centeredSubtitle}>
+                  {t('syncActivity.notStarted.subtitle')}
+                </Text>
+                <View style={styles.twoButtonRow}>
+                  <TouchableOpacity
+                    style={[styles.rowButton, styles.rowButtonOutlined]}
+                    activeOpacity={0.75}
+                    onPress={() => navigation.navigate('AlbumWorkbench')}
+                  >
+                    <Text style={styles.rowButtonOutlinedText}>
+                      {t('syncActivity.notStarted.goToAlbum')}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.rowButton, styles.rowButtonPrimary]}
+                    activeOpacity={0.75}
+                    onPress={handleEnableAutoUpload}
+                  >
+                    <Text style={styles.rowButtonPrimaryText}>
+                      {t('syncActivity.notStarted.enableAuto')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : mainCardState === 'auto_interrupted' ? (
+              <View style={styles.cardBodyCentered}>
+                <View style={styles.offlineIconCircle}>
+                  <Icon
+                    name="pause-circle-outline"
+                    size={32}
+                    color={EMPTY_OFFLINE_ICON}
+                  />
+                </View>
+                <Text style={styles.centeredTitle}>
+                  {t('syncActivity.interrupted.title')}
+                </Text>
+                <Text style={styles.centeredSubtitle}>
+                  {t('syncActivity.interrupted.subtitle')}
+                </Text>
+                <View style={styles.twoButtonRow}>
+                  <TouchableOpacity
+                    style={[styles.rowButton, styles.rowButtonOutlined]}
+                    activeOpacity={0.75}
+                    onPress={() => navigation.navigate('AlbumWorkbench')}
+                  >
+                    <Text style={styles.rowButtonOutlinedText}>
+                      {t('syncActivity.interrupted.goToAlbum')}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.rowButton, styles.rowButtonPrimary]}
+                    activeOpacity={0.75}
+                    onPress={handleEnableAutoUpload}
+                  >
+                    <Text style={styles.rowButtonPrimaryText}>
+                      {t('syncActivity.interrupted.resumeAuto')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : mainCardState === 'manual_completed' ? (
+              <View style={styles.cardBody}>
+                <View style={styles.badgeRow}>
+                  <View style={styles.manualBadge}>
+                    <Text style={styles.manualBadgeText}>
+                      {t('syncActivity.badges.manual')}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.runningTitleRow}>
+                  <Text style={styles.runningTitle}>
+                    {t('syncActivity.completed.manual.title')}
+                  </Text>
+                  <Text
+                    style={[styles.runningPercent, styles.completionPercent]}
+                  >
+                    100%
                   </Text>
                 </View>
-                <Text style={styles.badgeLabel}>
-                  {t('syncActivity.badges.manualUploading')}
-                </Text>
-              </View>
-
-              <View style={styles.runningTitleRow}>
-                <Text style={styles.runningTitle}>
-                  {t('syncActivity.completed.manual.title')}
-                </Text>
-                <Text style={[styles.runningPercent, styles.completionPercent]}>
-                  100%
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.progressBarTrack,
-                  styles.progressBarTrackComplete,
-                ]}
-              >
                 <View
                   style={[
-                    styles.progressBarFill,
-                    styles.progressBarFillComplete,
+                    styles.progressBarTrack,
+                    styles.progressBarTrackComplete,
                   ]}
-                />
-              </View>
-
-              <Text style={styles.completionSubtitle}>
-                {t('syncActivity.completed.manual.subtitle', {
-                  completed: overview.completedCount,
-                  total: completedProgressTotal,
-                })}
-              </Text>
-
-              <View style={styles.completionStatsRow}>
-                <CompletionStatCard
-                  label={t('syncActivity.stats.speed')}
-                  value={t('syncActivity.completed.speedIdle')}
-                />
-                <CompletionStatCard
-                  label={t('syncActivity.stats.progress')}
-                  value={t('syncActivity.completed.manual.progressValue', {
-                    completed: overview.completedCount,
+                >
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      styles.progressBarFillComplete,
+                    ]}
+                  />
+                </View>
+                <Text style={styles.completionSubtitle}>
+                  {t('syncActivity.completed.manual.subtitle', {
+                    completed: displayCompletedCount,
                     total: completedProgressTotal,
                   })}
-                />
-                <CompletionStatCard
-                  label={t('syncActivity.stats.transferred')}
-                  value={formatBytes(overview.completedBytes)}
-                />
+                </Text>
+                <View style={styles.completionStatsRow}>
+                  <CompletionStatCard
+                    label={t('syncActivity.stats.speed')}
+                    value={t('syncActivity.completed.speedIdle')}
+                  />
+                  <CompletionStatCard
+                    label={t('syncActivity.stats.progress')}
+                    value={t('syncActivity.completed.manual.progressValue', {
+                      completed: displayCompletedCount,
+                      total: completedProgressTotal,
+                    })}
+                  />
+                  <CompletionStatCard
+                    label={t('syncActivity.stats.transferred')}
+                    value={formatBytes(displayCompletedBytes)}
+                  />
+                </View>
+                <Text style={styles.completionHintText}>
+                  {t('syncActivity.completed.manual.hint')}
+                </Text>
+                <View style={styles.twoButtonRowCompact}>
+                  <TouchableOpacity
+                    style={[styles.rowButton, styles.rowButtonOutlined]}
+                    activeOpacity={0.75}
+                    onPress={() => navigation.navigate('AlbumWorkbench')}
+                  >
+                    <Text style={styles.rowButtonOutlinedText}>
+                      {t('syncActivity.completed.manual.goToAlbum')}
+                    </Text>
+                  </TouchableOpacity>
+                  {!autoUploadEnabledForDisplay && (
+                    <TouchableOpacity
+                      style={[styles.rowButton, styles.rowButtonPrimary]}
+                      activeOpacity={0.75}
+                      onPress={handleEnableAutoUpload}
+                    >
+                      <Text style={styles.rowButtonPrimaryText}>
+                        {t('syncActivity.completed.manual.enableAuto')}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
-
-              <Text style={styles.completionHintText}>
-                {t('syncActivity.completed.manual.hint')}
-              </Text>
-
-              <View style={styles.twoButtonRowCompact}>
-                <TouchableOpacity
-                  style={[styles.rowButton, styles.rowButtonOutlined]}
-                  activeOpacity={0.7}
-                  onPress={() => navigation.navigate('AlbumWorkbench')}
-                >
-                  <Text style={styles.rowButtonOutlinedText}>
-                    {t('syncActivity.completed.manual.goToAlbum')}
+            ) : mainCardState === 'auto_completed' ? (
+              <View style={styles.cardBody}>
+                <View style={styles.badgeRow}>
+                  <View style={styles.autoBadge}>
+                    <Text style={styles.autoBadgeText}>
+                      {t('syncActivity.badges.auto')}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.runningTitleRow}>
+                  <Text style={styles.runningTitle}>
+                    {t('syncActivity.completed.auto.title')}
                   </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.rowButton, styles.rowButtonPrimary]}
-                  activeOpacity={0.7}
-                  onPress={() => void handleEnableAutoUpload()}
-                >
-                  <Text style={styles.rowButtonPrimaryText}>
-                    {t('syncActivity.completed.manual.enableAuto')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* ---- State 4: Auto Upload Standby ---- */}
-          {mainCardState === 'standby' && (
-            <View style={styles.cardBody}>
-              <View style={styles.badgeRow}>
-                <View style={styles.autoBadge}>
-                  <Text style={styles.autoBadgeText}>
-                    {t('syncActivity.badges.auto')}
+                  <Text
+                    style={[styles.runningPercent, styles.completionPercent]}
+                  >
+                    100%
                   </Text>
                 </View>
-                <Text style={styles.badgeLabel}>
-                  {t('syncActivity.badges.autoEnabled')}
+                <View
+                  style={[
+                    styles.progressBarTrack,
+                    styles.progressBarTrackComplete,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      styles.progressBarFillComplete,
+                    ]}
+                  />
+                </View>
+                <Text style={styles.completionSubtitle}>
+                  {t('syncActivity.completed.auto.subtitle', {
+                    count: displayCompletedCount,
+                  })}
                 </Text>
+                <View style={styles.completionStatsRow}>
+                  <CompletionStatCard
+                    label={t('syncActivity.stats.speed')}
+                    value={t('syncActivity.completed.speedIdle')}
+                  />
+                  <CompletionStatCard
+                    label={t('syncActivity.completed.auto.fileCountLabel')}
+                    value={t('syncActivity.completed.auto.fileCountValue', {
+                      count: displayCompletedCount,
+                    })}
+                  />
+                  <CompletionStatCard
+                    label={t('syncActivity.stats.transferred')}
+                    value={formatBytes(displayCompletedBytes)}
+                  />
+                </View>
+                {latestSyncLabel ? (
+                  <Text style={styles.completionMetaText}>
+                    {t('syncActivity.completed.auto.latestSync', {
+                      label: latestSyncLabel,
+                    })}
+                  </Text>
+                ) : null}
+                <View style={styles.twoButtonRowCompact}>
+                  <TouchableOpacity
+                    style={[styles.rowButton, styles.rowButtonOutlined]}
+                    activeOpacity={0.75}
+                    onPress={() => navigation.navigate('AlbumWorkbench')}
+                  >
+                    <Text style={styles.rowButtonOutlinedText}>
+                      {t('syncActivity.completed.auto.goToAlbum')}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.rowButton,
+                      styles.rowButtonOutlined,
+                      styles.completionDangerButton,
+                    ]}
+                    activeOpacity={0.75}
+                    onPress={handleCloseAutoUpload}
+                  >
+                    <Text style={styles.completionDangerButtonText}>
+                      {t('syncActivity.actions.closeAutoUpload')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-
-              <Text style={styles.runningTitle}>
-                {t('syncActivity.standby.title')}
-              </Text>
-              <Text style={styles.idleSubtitle}>
-                {t('syncActivity.standby.subtitle')}
-              </Text>
-
-              {displayCompletedCount > 0 && (
+            ) : (
+              <View style={styles.cardBody}>
+                <View style={styles.badgeRow}>
+                  <View
+                    style={
+                      isManualUploading ? styles.manualBadge : styles.autoBadge
+                    }
+                  >
+                    <Text
+                      style={
+                        isManualUploading
+                          ? styles.manualBadgeText
+                          : styles.autoBadgeText
+                      }
+                    >
+                      {isManualUploading
+                        ? t('syncActivity.badges.manual')
+                        : t('syncActivity.badges.auto')}
+                    </Text>
+                  </View>
+                  {!isManualUploading && (
+                    <Text style={styles.badgeLabel}>
+                      {t('syncActivity.badges.autoEnabled')}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.runningTitleRow}>
+                  <Text style={styles.runningTitle}>
+                    {shouldRenderPreparationPhase
+                      ? getPreparationTitle(overview.uploadState, t)
+                      : mainCardState === 'standby'
+                        ? t('syncActivity.standby.title')
+                        : isManualUploading
+                          ? t('syncActivity.running.manualTitle')
+                          : t('syncActivity.running.autoTitle')}
+                  </Text>
+                  <Text style={styles.runningPercent}>
+                    {displayProgressPercent}%
+                  </Text>
+                </View>
+                <View style={styles.progressBarTrack}>
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      {
+                        width: `${Math.min(100, displayProgressPercent)}%`,
+                      },
+                    ]}
+                  />
+                </View>
+                {displayCurrentFilename ? (
+                  <Text style={styles.currentFileName} numberOfLines={1}>
+                    {displayCurrentFilename}
+                  </Text>
+                ) : shouldRenderPreparationPhase ? (
+                  <Text style={styles.currentFileName}>
+                    {getPreparationSubtitle(overview, t)}
+                  </Text>
+                ) : mainCardState === 'standby' ? (
+                  <Text style={styles.currentFileName}>
+                    {t('syncActivity.standby.subtitle')}
+                  </Text>
+                ) : null}
                 <View style={styles.statsRow}>
                   <View style={styles.statItem}>
                     <Text style={styles.statLabel}>
-                      {t('syncActivity.stats.transferred')}
+                      {t('syncActivity.stats.speed')}
                     </Text>
                     <Text style={styles.statValue}>
-                      {t('syncActivity.stats.transferredCount', {
-                        count: displayCompletedCount,
-                      })}
+                      {formatSpeedMbps(displayCurrentSpeedMbps)}
                     </Text>
                   </View>
                   <View style={styles.statDivider} />
                   <View style={styles.statItem}>
                     <Text style={styles.statLabel}>
-                      {t('syncActivity.stats.dataAmount')}
+                      {t('syncActivity.stats.progress')}
+                    </Text>
+                    <Text style={styles.statValue}>
+                      {`${displayCompletedCount} / ${Math.max(
+                        displayTotalCount,
+                        displayCompletedCount,
+                      )}`}
+                    </Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>
+                      {t('syncActivity.stats.transferred')}
                     </Text>
                     <Text style={styles.statValue}>
                       {formatBytes(displayCompletedBytes)}
                     </Text>
                   </View>
                 </View>
-              )}
-
-              <TouchableOpacity
-                style={styles.outlinedButton}
-                activeOpacity={0.7}
-                onPress={handleCloseAutoUpload}
-              >
-                <Text style={styles.outlinedButtonText}>
-                  {t('syncActivity.actions.closeAutoUpload')}
+                <Text style={styles.queueInfoText}>
+                  {t('syncActivity.running.queueInfo', {
+                    queued: Math.max(
+                      queue.length,
+                      overview.manualPending ?? 0,
+                      overview.autoPending ?? 0,
+                    ),
+                  })}
                 </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* ---- State 5: Auto Upload Interrupted ---- */}
-          {mainCardState === 'auto_interrupted' && (
-            <View style={styles.cardBodyCentered}>
-              <View style={styles.notStartedIconCircle}>
-                <Icon
-                  name="alert-circle-outline"
-                  size={38}
-                  color={EMPTY_INFO_ICON}
-                />
-              </View>
-              <Text style={styles.centeredTitle}>
-                {t('syncActivity.interrupted.title')}
-              </Text>
-              <Text style={styles.centeredSubtitle}>
-                {t('syncActivity.interrupted.subtitle')}
-              </Text>
-              <View style={styles.twoButtonRow}>
-                <TouchableOpacity
-                  style={[styles.rowButton, styles.rowButtonOutlined]}
-                  activeOpacity={0.7}
-                  onPress={() => navigation.navigate('AlbumWorkbench')}
-                >
-                  <Text style={styles.rowButtonOutlinedText}>
-                    {t('syncActivity.interrupted.goToAlbum')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.rowButton, styles.rowButtonPrimary]}
-                  activeOpacity={0.7}
-                  onPress={() => void handleEnableAutoUpload()}
-                >
-                  <Text style={styles.rowButtonPrimaryText}>
-                    {t('syncActivity.interrupted.resumeAuto')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* ---- State 6: Auto Upload Not Started ---- */}
-          {mainCardState === 'not_started' && (
-            <View style={styles.cardBodyCentered}>
-              <View style={styles.notStartedIconCircle}>
-                <Icon
-                  name="alert-circle-outline"
-                  size={38}
-                  color={EMPTY_INFO_ICON}
-                />
-              </View>
-              <Text style={styles.centeredTitle}>
-                {t('syncActivity.notStarted.title')}
-              </Text>
-              <Text style={styles.centeredSubtitle}>
-                {t('syncActivity.notStarted.subtitle')}
-              </Text>
-              <View style={styles.twoButtonRow}>
-                <TouchableOpacity
-                  style={[styles.rowButton, styles.rowButtonOutlined]}
-                  activeOpacity={0.7}
-                  onPress={() => navigation.navigate('AlbumWorkbench')}
-                >
-                  <Text style={styles.rowButtonOutlinedText}>
-                    {t('syncActivity.notStarted.goToAlbum')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.rowButton, styles.rowButtonPrimary]}
-                  activeOpacity={0.7}
-                  onPress={() => void handleEnableAutoUpload()}
-                >
-                  <Text style={styles.rowButtonPrimaryText}>
-                    {t('syncActivity.notStarted.enableAuto')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* ---- State 7: Device Offline ---- */}
-          {mainCardState === 'offline' && (
-            <View style={styles.cardBodyCentered}>
-              <View style={styles.offlineIconCircle}>
-                <Icon
-                  name="alert-circle-outline"
-                  size={38}
-                  color={EMPTY_OFFLINE_ICON}
-                />
-              </View>
-              <Text style={styles.centeredTitle}>
-                {t('syncActivity.offline.title')}
-              </Text>
-              <Text style={styles.centeredSubtitle}>
-                {t('syncActivity.offline.subtitle')}
-              </Text>
-              <View style={styles.twoButtonRow}>
-                <TouchableOpacity
-                  style={[styles.rowButton, styles.offlineButtonOutlined]}
-                  activeOpacity={0.7}
-                  onPress={handleSwitchDevice}
-                >
-                  <Text style={styles.offlineButtonOutlinedText}>
-                    {t('syncActivity.offline.switchDevice')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.rowButton, styles.offlineButtonPrimary]}
-                  activeOpacity={0.7}
-                  onPress={handleReconnect}
-                >
-                  <Text style={styles.rowButtonPrimaryText}>
-                    {t('syncActivity.offline.reconnect')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-        </View>
-
-        {queue.length > 0 && (
-          <View style={styles.queueSection}>
-            <Text style={styles.sectionLabel}>
-              {t('syncActivity.queue.title') || '待同步佇列'} ({queue.length})
-            </Text>
-            <View style={styles.queueList}>
-              {queue.map((item, index) => {
-                const isActive =
-                  item.status === 'uploading' ||
-                  (item.fileKey.length > 0 && item.fileKey === overview.currentFile);
-                const showItemProgress = isActive && overview.currentFileTotalBytes > 0;
-                const progressPercent = showItemProgress
-                  ? Math.round((overview.currentFileConfirmedBytes / overview.currentFileTotalBytes) * 100)
-                  : 0;
-
-                return (
-                  <View
-                    key={item.id}
-                    style={[
-                      styles.queueRow,
-                      index !== queue.length - 1 && styles.queueRowBorder,
-                      isActive && styles.queueRowUploading,
-                    ]}
+                {!isManualUploading && (
+                  <TouchableOpacity
+                    style={styles.outlinedButton}
+                    activeOpacity={0.75}
+                    onPress={handleCloseAutoUpload}
                   >
-                    <View style={styles.queueIcon}>
-                      <Icon
-                        name={item.type === 'video' ? 'videocam-outline' : 'image-outline'}
-                        size={18}
-                        color={BLUE}
-                      />
-                    </View>
-                    <View style={styles.queueInfo}>
-                      <Text style={styles.queueFileName} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                      <View style={styles.queueFileMeta}>
-                        <Text style={styles.queueFileSize}>
-                          {formatBytes(item.rawFileSize)}
+                    <Text style={styles.outlinedButtonText}>
+                      {t('syncActivity.actions.closeAutoUpload')}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
+
+          {queue.length > 0 && (
+            <View style={styles.queueSection}>
+              <Text style={styles.sectionLabel}>
+                {t('syncActivity.queue.title') || '待同步佇列'} ({queue.length})
+              </Text>
+              <View style={styles.queueList}>
+                {queue.map((item, index) => {
+                  const isActive =
+                    item.status === 'uploading' ||
+                    (item.fileKey.length > 0 &&
+                      item.fileKey === overview.currentFile);
+                  const showItemProgress =
+                    isActive && overview.currentFileTotalBytes > 0;
+                  const progressPercent = showItemProgress
+                    ? Math.round(
+                        (overview.currentFileConfirmedBytes /
+                          overview.currentFileTotalBytes) *
+                          100,
+                      )
+                    : 0;
+
+                  return (
+                    <View
+                      key={item.id}
+                      style={[
+                        styles.queueRow,
+                        index !== queue.length - 1 && styles.queueRowBorder,
+                        isActive && styles.queueRowUploading,
+                      ]}
+                    >
+                      <View style={styles.queueIcon}>
+                        <Icon
+                          name={
+                            item.type === 'video'
+                              ? 'videocam-outline'
+                              : 'image-outline'
+                          }
+                          size={18}
+                          color={BLUE}
+                        />
+                      </View>
+                      <View style={styles.queueInfo}>
+                        <Text style={styles.queueFileName} numberOfLines={1}>
+                          {item.name}
                         </Text>
-                        {isActive && (
-                          <View style={styles.uploadingBadge}>
-                            <View style={styles.uploadingDot} />
-                            <Text style={styles.uploadingLabel}>
-                              {t('syncStatus.queue.itemStatus.transferring', { percent: progressPercent }) || `傳輸中 ${progressPercent}%`}
-                            </Text>
-                          </View>
-                        )}
-                        {item.status === 'cloud_downloading' && (
-                          <View style={styles.uploadingBadge}>
-                            <View style={styles.uploadingDot} />
-                            <Text style={styles.uploadingLabel}>
-                              {t('syncStatus.queue.itemStatus.cloudDownloading') || 'iCloud 下載中'}
-                            </Text>
-                          </View>
-                        )}
-                        {item.status === 'preparing' && (
-                          <View style={styles.uploadingBadge}>
-                            <View style={styles.uploadingDot} />
-                            <Text style={styles.uploadingLabel}>
-                              {t('syncStatus.queue.itemStatus.preparing') || '準備中'}
-                            </Text>
-                          </View>
-                        )}
-                        {item.isCloudAsset && (
-                          <View style={styles.cloudAssetBadge}>
-                            <Icon name="cloud-outline" size={11} color={BLUE} />
-                            <Text style={styles.cloudAssetLabel}>{'iCloud'}</Text>
+                        <View style={styles.queueFileMeta}>
+                          <Text style={styles.queueFileSize}>
+                            {formatBytes(item.rawFileSize)}
+                          </Text>
+                          {isActive && (
+                            <View style={styles.uploadingBadge}>
+                              <View style={styles.uploadingDot} />
+                              <Text style={styles.uploadingLabel}>
+                                {t('syncStatus.queue.itemStatus.transferring', {
+                                  percent: progressPercent,
+                                }) || `傳輸中 ${progressPercent}%`}
+                              </Text>
+                            </View>
+                          )}
+                          {item.status === 'cloud_downloading' && (
+                            <View style={styles.uploadingBadge}>
+                              <View style={styles.uploadingDot} />
+                              <Text style={styles.uploadingLabel}>
+                                {t(
+                                  'syncStatus.queue.itemStatus.cloudDownloading',
+                                ) || 'iCloud 下載中'}
+                              </Text>
+                            </View>
+                          )}
+                          {item.status === 'preparing' && (
+                            <View style={styles.uploadingBadge}>
+                              <View style={styles.uploadingDot} />
+                              <Text style={styles.uploadingLabel}>
+                                {t('syncStatus.queue.itemStatus.preparing') ||
+                                  '準備中'}
+                              </Text>
+                            </View>
+                          )}
+                          {item.isCloudAsset && (
+                            <View style={styles.cloudAssetBadge}>
+                              <Icon
+                                name="cloud-outline"
+                                size={11}
+                                color={BLUE}
+                              />
+                              <Text style={styles.cloudAssetLabel}>
+                                {'iCloud'}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                        {showItemProgress && (
+                          <View style={styles.itemProgressGroup}>
+                            <View style={styles.itemProgressTrack}>
+                              <View
+                                style={[
+                                  styles.itemProgressFill,
+                                  {
+                                    width: `${progressPercent}%`,
+                                  },
+                                ]}
+                              />
+                            </View>
                           </View>
                         )}
                       </View>
-                      {showItemProgress && (
-                        <View style={styles.itemProgressGroup}>
-                          <View style={styles.itemProgressTrack}>
-                            <View
-                              style={[
-                                styles.itemProgressFill,
-                                {
-                                  width: `${progressPercent}%`,
-                                },
-                              ]}
-                            />
-                          </View>
-                        </View>
-                      )}
                     </View>
-                  </View>
-                );
-              })}
+                  );
+                })}
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        {/* Quick entry cards */}
-        <View style={styles.quickEntrySection}>
-          <Text style={styles.sectionLabel}>
-            {t('syncActivity.quickEntry.title')}
-          </Text>
-          <View style={styles.quickEntryRow}>
-            <View
-              ref={albumQuickEntryTargetRef}
-              collapsable={false}
-              testID="sync-activity-tour-target-album"
-              style={styles.quickEntryTarget}
-              onLayout={() =>
-                measureSyncActivityTourTarget('album', albumQuickEntryTargetRef)
-              }
-            >
+          {/* Quick entry cards */}
+          <View style={styles.quickEntrySection}>
+            <Text style={styles.sectionLabel}>
+              {t('syncActivity.quickEntry.title')}
+            </Text>
+            <View style={styles.quickEntryRow}>
+              <View
+                ref={albumQuickEntryTargetRef}
+                collapsable={false}
+                testID="sync-activity-tour-target-album"
+                style={styles.quickEntryTarget}
+                onLayout={() =>
+                  measureSyncActivityTourTarget(
+                    'album',
+                    albumQuickEntryTargetRef,
+                  )
+                }
+              >
+                <TouchableOpacity
+                  style={styles.quickEntryCard}
+                  activeOpacity={0.7}
+                  onPress={() => navigation.navigate('AlbumWorkbench')}
+                >
+                  <View
+                    style={[
+                      styles.quickEntryIcon,
+                      { backgroundColor: 'rgba(59,159,216,0.12)' },
+                    ]}
+                  >
+                    <Icon name="albums-outline" size={22} color={BLUE} />
+                  </View>
+                  <Text style={styles.quickEntryTitle}>
+                    {t('syncActivity.quickEntry.albumTitle')}
+                  </Text>
+                  <Text style={styles.quickEntryDesc}>
+                    {t('syncActivity.quickEntry.albumDesc')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <TouchableOpacity
                 style={styles.quickEntryCard}
                 activeOpacity={0.7}
-                onPress={() => navigation.navigate('AlbumWorkbench')}
+                onPress={() => navigation.navigate('SharedFiles')}
               >
                 <View
                   style={[
                     styles.quickEntryIcon,
-                    { backgroundColor: 'rgba(59,159,216,0.12)' },
+                    { backgroundColor: 'rgba(34,197,94,0.12)' },
                   ]}
                 >
-                  <Icon name="albums-outline" size={22} color={BLUE} />
+                  <Icon name="folder-outline" size={22} color="#22c55e" />
                 </View>
                 <Text style={styles.quickEntryTitle}>
-                  {t('syncActivity.quickEntry.albumTitle')}
+                  {t(
+                    isGlobalBuild
+                      ? 'syncActivity.quickEntry.globalSharedFilesTitle'
+                      : 'syncActivity.quickEntry.sharedFilesTitle',
+                  )}
                 </Text>
                 <Text style={styles.quickEntryDesc}>
-                  {t('syncActivity.quickEntry.albumDesc')}
+                  {t(
+                    isGlobalBuild
+                      ? 'syncActivity.quickEntry.globalSharedFilesDesc'
+                      : 'syncActivity.quickEntry.sharedFilesDesc',
+                  )}
                 </Text>
               </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              style={styles.quickEntryCard}
-              activeOpacity={0.7}
-              onPress={() => navigation.navigate('SharedFiles')}
-            >
-              <View
-                style={[
-                  styles.quickEntryIcon,
-                  { backgroundColor: 'rgba(34,197,94,0.12)' },
-                ]}
-              >
-                <Icon name="folder-outline" size={22} color="#22c55e" />
-              </View>
-              <Text style={styles.quickEntryTitle}>
-                {t(
-                  isGlobalBuild
-                    ? 'syncActivity.quickEntry.globalSharedFilesTitle'
-                    : 'syncActivity.quickEntry.sharedFilesTitle',
-                )}
-              </Text>
-              <Text style={styles.quickEntryDesc}>
-                {t(
-                  isGlobalBuild
-                    ? 'syncActivity.quickEntry.globalSharedFilesDesc'
-                    : 'syncActivity.quickEntry.sharedFilesDesc',
-                )}
-              </Text>
-            </TouchableOpacity>
           </View>
-        </View>
 
-        {trialUpgradeEntryDays > 0 && (
-          <TouchableOpacity
-            style={styles.trialUpgradeEntry}
-            activeOpacity={0.75}
-            onPress={() => navigation.navigate('Subscription')}
-          >
-            <View style={styles.trialUpgradeIcon}>
-              <SubscriptionStatusIcon tone="trial" size={22} />
-            </View>
-            <Text style={styles.trialUpgradeText}>
-              {t('syncActivity.trialUpgrade.entry', {
-                days: trialUpgradeEntryDays,
-              })}
-            </Text>
-            <Icon name="chevron-forward" size={18} color="#d97706" />
-          </TouchableOpacity>
-        )}
-      </ScrollView>
+          <RecentDownloadsSection
+            records={recentDownloadItems}
+            placeholders={recentDownloadPlaceholders}
+            t={t}
+            onPressViewAll={() => navigation.navigate('History')}
+          />
 
-      {/* Trial / Subscription expired overlay — gated by FEATURES until real
+          <SyncRecordSummarySection
+            boundDeviceName={boundDeviceName}
+            fileCount={todayStats.fileCount}
+            isSyncing={mainCardState === 'running'}
+            t={t}
+            totalBytes={todayStats.totalBytes}
+          />
+
+          {trialUpgradeEntryDays > 0 && (
+            <TouchableOpacity
+              style={styles.trialUpgradeEntry}
+              activeOpacity={0.75}
+              onPress={() => navigation.navigate('Subscription')}
+            >
+              <View style={styles.trialUpgradeIcon}>
+                <SubscriptionStatusIcon tone="trial" size={22} />
+              </View>
+              <Text style={styles.trialUpgradeText}>
+                {t('syncActivity.trialUpgrade.entry', {
+                  days: trialUpgradeEntryDays,
+                })}
+              </Text>
+              <Icon name="chevron-forward" size={18} color="#d97706" />
+            </TouchableOpacity>
+          )}
+        </ScrollView>
+
+        {/* Trial / Subscription expired overlay — gated by FEATURES until real
           IAP is wired (otherwise the overlay sends users to a dead-end
           subscription screen with no working purchase flow). */}
-      {showSubscriptionExpiredOverlay && (
-        <Modal visible transparent animationType="fade" statusBarTranslucent>
-          <View style={styles.expiredOverlay}>
-            <View style={styles.expiredCard}>
-              <View style={styles.expiredIconCircle}>
-                <SubscriptionStatusIcon tone="expired" size={34} />
+        {showSubscriptionExpiredOverlay && (
+          <Modal visible transparent animationType="fade" statusBarTranslucent>
+            <View style={styles.expiredOverlay}>
+              <View style={styles.expiredCard}>
+                <View style={styles.expiredIconCircle}>
+                  <SubscriptionStatusIcon tone="expired" size={34} />
+                </View>
+                <Text style={styles.expiredTitle}>
+                  {t('syncActivity.expired.title')}
+                </Text>
+                <Text style={styles.expiredSubtitle}>
+                  {t('syncActivity.expired.subtitle')}
+                </Text>
+                <TouchableOpacity
+                  style={styles.expiredPrimaryButton}
+                  activeOpacity={0.7}
+                  onPress={() => navigation.navigate('Subscription')}
+                >
+                  <Text style={styles.expiredPrimaryButtonText}>
+                    {t('syncActivity.expired.subscribeCta')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.6}
+                  onPress={() => navigation.navigate('Help')}
+                >
+                  <Text style={styles.expiredSecondaryText}>
+                    {t('syncActivity.expired.viewHelp')}
+                  </Text>
+                </TouchableOpacity>
               </View>
-              <Text style={styles.expiredTitle}>
-                {t('syncActivity.expired.title')}
-              </Text>
-              <Text style={styles.expiredSubtitle}>
-                {t('syncActivity.expired.subtitle')}
-              </Text>
-              <TouchableOpacity
-                style={styles.expiredPrimaryButton}
-                activeOpacity={0.7}
-                onPress={() => navigation.navigate('Subscription')}
-              >
-                <Text style={styles.expiredPrimaryButtonText}>
-                  {t('syncActivity.expired.subscribeCta')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.6}
-                onPress={() => navigation.navigate('Help')}
-              >
-                <Text style={styles.expiredSecondaryText}>
-                  {t('syncActivity.expired.viewHelp')}
-                </Text>
-              </TouchableOpacity>
             </View>
-          </View>
-        </Modal>
-      )}
-      <SyncActivityTour
-        visible={showSyncActivityTour}
-        onSkip={() => void handleDismissSyncActivityTour()}
-        onFinish={() => void handleDismissSyncActivityTour()}
-        targetLayouts={syncActivityTourTargetLayouts}
-        targetFallbackMode="ratio"
-      />
-    </SafeAreaView>
+          </Modal>
+        )}
+        <SyncActivityTour
+          visible={showSyncActivityTour}
+          onSkip={() => void handleDismissSyncActivityTour()}
+          onFinish={() => void handleDismissSyncActivityTour()}
+          targetLayouts={syncActivityTourTargetLayouts}
+          targetFallbackMode="ratio"
+        />
+      </SafeAreaView>
+      <BottomTabBar activeTab="home" />
+    </GradientBackground>
   );
 }
 
@@ -2598,35 +2430,32 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   headerActionButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     color: DARK,
   },
 
   // Unified main card
   mainCard: {
-    marginHorizontal: 20,
-    marginBottom: 12,
-    borderRadius: 20,
-    paddingTop: 18,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    backgroundColor: CARD_BG,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
-    shadowColor: '#4f8fbc',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 28,
+    marginHorizontal: 16,
+    marginBottom: 0,
+    borderRadius: 24,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    shadowColor: '#3b82d2',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
     elevation: 4,
   },
 
@@ -2635,17 +2464,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#d6e7f4',
+    borderBottomColor: '#f0f6fb',
   },
   deviceIconBox: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: ICON_SURFACE,
+    backgroundColor: '#e8f4fc',
   },
   deviceInfo: {
     flex: 1,
@@ -2653,7 +2484,7 @@ const styles = StyleSheet.create({
   },
   deviceName: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
     color: DARK,
   },
   deviceStatusRow: {
@@ -2692,7 +2523,9 @@ const styles = StyleSheet.create({
 
   // Card body for state 1 (running)
   cardBody: {
-    marginTop: 16,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
   },
   badgeRow: {
     flexDirection: 'row',
@@ -2733,9 +2566,10 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   runningTitle: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '700',
     color: DARK,
+    lineHeight: 27,
   },
   idleSubtitle: {
     fontSize: 14,
@@ -2764,8 +2598,8 @@ const styles = StyleSheet.create({
     color: BLUE,
   },
   progressBarTrack: {
-    height: 6,
-    borderRadius: 3,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: 'rgba(59,159,216,0.16)',
     overflow: 'hidden',
     marginBottom: 10,
@@ -2793,22 +2627,27 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
+    gap: 8,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
     marginBottom: 12,
   },
   statItem: {
     flex: 1,
+    minHeight: 58,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(240,248,255,0.8)',
+    borderWidth: 1,
+    borderColor: 'rgba(59,159,216,0.10)',
   },
   statDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: 'rgba(118, 153, 184, 0.18)',
+    display: 'none',
   },
   statLabel: {
     fontSize: 10,
@@ -2906,35 +2745,37 @@ const styles = StyleSheet.create({
 
   // Card body for state 2 & 3 (centered content)
   cardBodyCentered: {
-    marginTop: 20,
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 16,
     alignItems: 'center',
   },
   emptyIconBox: {
     marginBottom: 14,
   },
   notStartedIconCircle: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: EMPTY_INFO_BG,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   offlineIconCircle: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: EMPTY_OFFLINE_BG,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   centeredTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: DARK,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   centeredSubtitle: {
     fontSize: 13,
@@ -2997,8 +2838,8 @@ const styles = StyleSheet.create({
 
   // Quick entry section
   quickEntrySection: {
-    paddingHorizontal: 20,
-    marginTop: 8,
+    paddingHorizontal: 16,
+    marginTop: 12,
   },
   sectionLabel: {
     fontSize: 15,
@@ -3015,16 +2856,14 @@ const styles = StyleSheet.create({
   },
   quickEntryCard: {
     flex: 1,
-    borderRadius: 18,
+    borderRadius: 16,
     paddingVertical: 18,
     paddingHorizontal: 16,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#4f8fbc',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    shadowColor: '#3b82d2',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
     elevation: 2,
   },
   quickEntryIcon: {
@@ -3235,4 +3074,3 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 });
-

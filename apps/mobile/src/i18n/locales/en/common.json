@@ -12,5 +12,10 @@
     "default": "Computer",
     "windows": "Windows PC"
   },
-  "diagnosticsArchiveTitle": "Vivi Drop Diagnostics"
+  "diagnosticsArchiveTitle": "Vivi Drop Diagnostics",
+  "tabs": {
+    "home": "Home",
+    "files": "Files",
+    "settings": "Me"
+  }
 }

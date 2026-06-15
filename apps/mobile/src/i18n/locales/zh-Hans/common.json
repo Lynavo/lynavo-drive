@@ -12,5 +12,10 @@
     "default": "电脑",
     "windows": "Windows 电脑"
   },
-  "diagnosticsArchiveTitle": "Vivi Drop 诊断包"
+  "diagnosticsArchiveTitle": "Vivi Drop 诊断包",
+  "tabs": {
+    "home": "首页",
+    "files": "远程资源",
+    "settings": "我的"
+  }
 }

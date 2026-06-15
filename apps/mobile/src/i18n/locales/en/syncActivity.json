@@ -5,6 +5,32 @@
     "history": "Sync History",
     "settings": "Settings"
   },
+  "home": {
+    "autoSyncTitle": "Auto Sync",
+    "disableAuto": "Off",
+    "enableAuto": "On",
+    "autoEnabled": "Enabled. New media will sync automatically.",
+    "autoDisabled": "Auto sync is not enabled.",
+    "uploadedCount": "Uploaded {{completed}} / {{total}}",
+    "latestSyncTime": "Latest sync: {{label}}",
+    "latestSyncTimeEmpty": "No sync records yet",
+    "recentDownloadPhoto": "Photo",
+    "recentDownloadVideo": "Video",
+    "recentDownloadFile": "File",
+    "recentDownloadsTitle": "Recent Downloads",
+    "syncRecordsTitle": "Sync Records",
+    "currentPhoneStatus": "Current Phone Status",
+    "currentTransferProgress": "Current Transfer Progress",
+    "remainingTime": "Time Remaining",
+    "remainingTimeUnknown": "Calculating",
+    "syncRecordTotal": "Total {{size}}",
+    "today": "Today",
+    "todayStats": "{{count}} files, {{size}}",
+    "todaySyncRecord": "Today's sync summary",
+    "syncing": "Syncing",
+    "synced": "Synced",
+    "uploadFiles": "Uploaded Files"
+  },
   "phases": {
     "discoveringTitle": "Searching for your computer...",
     "reconcilingTitle": "Syncing history...",
@@ -186,5 +212,40 @@
   },
   "queue": {
     "title": "Pending Sync Queue"
+  },
+  "autoUploadSettings": {
+    "title": "Auto Upload",
+    "sourcesTitle": "Select Sync Sources",
+    "sourceAlbumTitle": "1. Sync from Album",
+    "sourceAlbumDesc": "Photos or videos",
+    "sourceFileTitle": "2. Sync from Files",
+    "sourceFileDescEmpty": "Choose files from system to upload",
+    "sourceFileDescSelected": "{{count}} files selected",
+    "addFile": "Add Files",
+    "clearFiles": "Clear",
+    "addedFilesSummary": "{{count}} files added",
+    "addedFilesMore": "{{count}} more files",
+    "rangeTitle": "Upload Range",
+    "rangeAllTitle": "All",
+    "rangeAllDesc": "Upload all existing photos and videos",
+    "rangeNowTitle": "From Now On",
+    "rangeNowDesc": "Only sync new photos and videos from now on",
+    "rangeCustomTitle": "Custom Range",
+    "rangeCustomDesc": "Select specific date range",
+    "customPickerSave": "Save",
+    "infoAlbumAndFileAll": "All photos, videos, and selected {{count}} files will upload to your computer.",
+    "infoAlbumAndFileNow": "From now on, new photos, videos, and selected {{count}} files will sync.",
+    "infoAlbumAndFileCustom": "Photos, videos, and selected {{count}} files within the selected range will upload to your computer.",
+    "infoAlbumAll": "All photos and videos in your album will upload to your computer.",
+    "infoAlbumNow": "From now on, new album photos and videos will sync.",
+    "infoAlbumCustom": "Album photos and videos within the selected range will upload to your computer.",
+    "infoFileAll": "Selected {{count}} files will upload to your computer.",
+    "infoFileNow": "From now on, selected {{count}} files will sync.",
+    "infoFileCustom": "Selected {{count}} files within the selected range will upload to your computer.",
+    "infoEmpty": "Please select at least one sync source."
+  },
+  "recentDownload": {
+    "title": "Recent Downloads",
+    "viewAll": "View All"
   }
 }
