@@ -2,7 +2,9 @@ package store
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -101,6 +103,9 @@ func TestDeviceBlockLifecycle(t *testing.T) {
 	if got.FailedAttemptCount != 0 {
 		t.Fatalf("expected unblock to reset failed count, got %d", got.FailedAttemptCount)
 	}
+	if got.Reason != nil {
+		t.Fatalf("expected unblock to clear stale reason, got %q", *got.Reason)
+	}
 	payload, err := json.Marshal(got)
 	if err != nil {
 		t.Fatalf("Marshal DeviceBlockState: %v", err)
@@ -143,5 +148,62 @@ func TestDeviceBlockDesktopIsolation(t *testing.T) {
 	}
 	if desktopTwo.FailedAttemptCount != 0 {
 		t.Fatalf("expected desktop-2 failed count 0, got %d", desktopTwo.FailedAttemptCount)
+	}
+}
+
+func TestConcurrentWrongCodeAttemptsReachBlockThreshold(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "test.db")
+	seed, err := New(dbPath)
+	if err != nil {
+		t.Fatalf("New seed store: %v", err)
+	}
+	t.Cleanup(func() { seed.Close() })
+
+	const attempts = maxWrongConnectionCodeAttempts
+	start := make(chan struct{})
+	errs := make(chan error, attempts)
+	var wg sync.WaitGroup
+	for i := 0; i < attempts; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			s, err := New(dbPath)
+			if err != nil {
+				errs <- err
+				return
+			}
+			defer s.Close()
+
+			<-start
+			_, err = s.RecordConnectionAttempt(ConnectionAttempt{
+				DesktopDeviceID: "desktop-1",
+				ClientID:        "client-1",
+				Result:          "wrong_code",
+				FailureReason:   stringPtr("invalid_code"),
+				AttemptedAt:     time.Now().Add(time.Duration(i) * time.Millisecond).UTC().Format(time.RFC3339),
+			})
+			errs <- err
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("RecordConnectionAttempt concurrent wrong_code: %v", err)
+		}
+	}
+
+	state, err := seed.GetDeviceBlockState("desktop-1", "client-1")
+	if err != nil {
+		t.Fatalf("GetDeviceBlockState: %v", err)
+	}
+	if !state.Blocked {
+		t.Fatal("expected concurrent wrong_code attempts to block device")
+	}
+	if state.FailedAttemptCount != maxWrongConnectionCodeAttempts {
+		t.Fatalf("expected failed count %d, got %d", maxWrongConnectionCodeAttempts, state.FailedAttemptCount)
 	}
 }

@@ -9,7 +9,7 @@ func (s *Store) ListSyncRecords(desktopDeviceID string, clientID *string) ([]Des
 			u.original_filename, u.media_type, u.file_size, u.status, u.completed_at, u.updated_at
 		FROM uploads u
 		LEFT JOIN paired_devices p ON p.client_id = u.client_id
-		WHERE u.status = 'completed'`
+		WHERE u.status IN ('completed', 'failed')`
 	args := []any{}
 	if clientID != nil {
 		query += " AND u.client_id = ?"
@@ -35,8 +35,9 @@ func (s *Store) ListSyncRecords(desktopDeviceID string, clientID *string) ([]Des
 		}
 		record.DesktopDeviceID = desktopDeviceID
 		record.RecordID = record.FileKey
-		if record.CompletedAt == nil {
-			record.CompletedAt = &updatedAt
+		if record.Status == "failed" {
+			record.CompletedAt = nil
+			record.FailedAt = &updatedAt
 		}
 		records = append(records, record)
 	}

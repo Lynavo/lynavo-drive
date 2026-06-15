@@ -13,13 +13,9 @@ func (s *Store) AddSharedResource(input SharedResourceInput) (SharedResource, er
 	if input.LocalPath != nil && hasPathTraversal(*input.LocalPath) {
 		return SharedResource{}, fmt.Errorf("shared resource path rejects traversal")
 	}
-	resourceID := input.ResourceID
-	if resourceID == "" {
-		var err error
-		resourceID, err = randomID("res")
-		if err != nil {
-			return SharedResource{}, err
-		}
+	resourceID, err := randomID("res")
+	if err != nil {
+		return SharedResource{}, err
 	}
 	status := input.Status
 	if status == "" {
@@ -38,7 +34,7 @@ func (s *Store) AddSharedResource(input SharedResourceInput) (SharedResource, er
 		Status:          status,
 		AddedAt:         now,
 	}
-	_, err := s.db.Exec(`
+	_, err = s.db.Exec(`
 		INSERT INTO shared_resources
 			(resource_id, desktop_device_id, kind, display_name, local_path, received_file_key,
 			 file_size, media_type, status, added_at, removed_at, last_accessed_at, download_count)
@@ -76,7 +72,7 @@ func (s *Store) ListSharedResources(desktopDeviceID string) ([]SharedResource, e
 		SELECT resource_id, desktop_device_id, kind, display_name, local_path, received_file_key,
 		       file_size, media_type, status, added_at, removed_at, last_accessed_at, download_count
 		FROM shared_resources
-		WHERE desktop_device_id = ? AND status = 'available' AND removed_at IS NULL
+		WHERE desktop_device_id = ? AND status != 'removed' AND removed_at IS NULL
 		ORDER BY added_at DESC, resource_id DESC`,
 		desktopDeviceID,
 	)

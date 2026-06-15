@@ -53,36 +53,45 @@ func (s *Store) RecordConnectionAttempt(attempt ConnectionAttempt) (DeviceBlockS
 
 func (s *Store) recordWrongCodeAttempt(attempt ConnectionAttempt) error {
 	now := time.Now().UTC().Format(time.RFC3339)
-	current, err := s.GetDeviceBlockState(attempt.DesktopDeviceID, attempt.ClientID)
-	if err != nil {
-		return err
-	}
-	if current.Blocked {
-		return nil
-	}
-
-	failedCount := current.FailedAttemptCount + 1
 	reason := "wrong_code"
 	if attempt.FailureReason != nil && *attempt.FailureReason != "" {
 		reason = *attempt.FailureReason
 	}
-	var blockedAt *string
-	if failedCount >= maxWrongConnectionCodeAttempts {
-		failedCount = maxWrongConnectionCodeAttempts
-		blockedAt = &now
-	}
 
-	_, err = s.db.Exec(`
+	_, err := s.db.Exec(`
 		INSERT INTO device_blocks
 			(desktop_device_id, client_id, reason, failed_attempt_count, blocked_at, manually_unblocked_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, NULL, ?)
+		VALUES (?, ?, ?, 1, NULL, NULL, ?)
 		ON CONFLICT(desktop_device_id, client_id) DO UPDATE SET
-			reason = excluded.reason,
-			failed_attempt_count = excluded.failed_attempt_count,
-			blocked_at = excluded.blocked_at,
-			manually_unblocked_at = NULL,
-			updated_at = excluded.updated_at`,
-		attempt.DesktopDeviceID, attempt.ClientID, reason, failedCount, blockedAt, now,
+			reason = CASE
+				WHEN device_blocks.blocked_at IS NOT NULL AND device_blocks.manually_unblocked_at IS NULL
+					THEN device_blocks.reason
+				ELSE excluded.reason
+			END,
+			failed_attempt_count = CASE
+				WHEN device_blocks.blocked_at IS NOT NULL AND device_blocks.manually_unblocked_at IS NULL
+					THEN device_blocks.failed_attempt_count
+				ELSE MIN(device_blocks.failed_attempt_count + 1, ?)
+			END,
+			blocked_at = CASE
+				WHEN device_blocks.blocked_at IS NOT NULL AND device_blocks.manually_unblocked_at IS NULL
+					THEN device_blocks.blocked_at
+				WHEN device_blocks.failed_attempt_count + 1 >= ?
+					THEN excluded.updated_at
+				ELSE NULL
+			END,
+			manually_unblocked_at = CASE
+				WHEN device_blocks.blocked_at IS NOT NULL AND device_blocks.manually_unblocked_at IS NULL
+					THEN device_blocks.manually_unblocked_at
+				ELSE NULL
+			END,
+			updated_at = CASE
+				WHEN device_blocks.blocked_at IS NOT NULL AND device_blocks.manually_unblocked_at IS NULL
+					THEN device_blocks.updated_at
+				ELSE excluded.updated_at
+			END`,
+		attempt.DesktopDeviceID, attempt.ClientID, reason, now,
+		maxWrongConnectionCodeAttempts, maxWrongConnectionCodeAttempts,
 	)
 	if err != nil {
 		return fmt.Errorf("record wrong code attempt: %w", err)
@@ -134,6 +143,7 @@ func (s *Store) UnblockDevice(desktopDeviceID, clientID string) error {
 			(desktop_device_id, client_id, reason, failed_attempt_count, blocked_at, manually_unblocked_at, updated_at)
 		VALUES (?, ?, '', 0, NULL, ?, ?)
 		ON CONFLICT(desktop_device_id, client_id) DO UPDATE SET
+			reason = '',
 			failed_attempt_count = 0,
 			blocked_at = NULL,
 			manually_unblocked_at = excluded.manually_unblocked_at,
