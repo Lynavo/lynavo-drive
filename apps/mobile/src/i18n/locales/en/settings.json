@@ -5,7 +5,11 @@
   "sections": {
     "connectedDevice": "Connected Device",
     "supportHelp": "Support & Help",
-    "giftCard": "Gift Card"
+    "giftCard": "Gift Card",
+    "account": "My Account",
+    "myDevice": "My Device",
+    "computers": "Computer Devices",
+    "general": "General"
   },
   "android": {
     "title": "Android Capability Notes",
@@ -25,7 +29,8 @@
     "introTrial": "Monthly intro trial",
     "expired": "Expired",
     "active": "Active",
-    "subscribeCta": "Subscribe Now"
+    "subscribeCta": "Subscribe Now",
+    "restoreDesc": "Check purchase history from App Store"
   },
   "myDevice": {
     "label": "My Device Name",
@@ -41,7 +46,10 @@
     "currentAccount": "Current Account",
     "latestSync": "Latest Sync",
     "appVersion": "App Version",
-    "language": "Language"
+    "language": "Language",
+    "faq": "FAQ",
+    "faqDesc": "Usage instructions & FAQ",
+    "diagnosticsDesc": "Send logs and device status for troubleshooting"
   },
   "phone": {
     "reveal": "Show full phone number",
@@ -81,6 +89,7 @@
   },
   "giftCard": {
     "action": "Redeem gift card",
+    "desc": "Enter gift card code to unlock trial",
     "monthlyPlan": "monthly subscription",
     "yearlyPlan": "yearly subscription",
     "modal": {
@@ -120,7 +129,9 @@
     "switch": "Switch",
     "deleteAccount": "Delete account",
     "deletingAccount": "Deleting…",
-    "forgetDesktop": "Forget Desktop"
+    "forgetDesktop": "Forget Desktop",
+    "switchDevice": "Switch Device",
+    "switchDeviceDesc": "Disconnect current device and connect to another computer"
   },
   "status": {
     "noRecord": "No records yet",

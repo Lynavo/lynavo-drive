@@ -1,4 +1,19 @@
 {
+  "title": "Remote Resources",
+  "phoneSyncSpace": {
+    "title": "Phone Sync Space",
+    "desc": "View files synced to your computer and their upload sources",
+    "select": "Select",
+    "selectFeature": "This feature is under development",
+    "empty": "No synced files yet"
+  },
+  "remoteAccess": {
+    "title": "Remote Access",
+    "desc": "Browse your computer's shared directory and download files",
+    "select": "Select",
+    "selectFeature": "This feature is under development",
+    "empty": "No shared resources available"
+  },
   "defaultFolderName": "Shared Folder",
   "teamFolderName": "Shared Folder",
   "personalFolderName": "Personal Shared Folder",

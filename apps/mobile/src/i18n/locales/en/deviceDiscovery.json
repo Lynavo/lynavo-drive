@@ -82,5 +82,19 @@
   "sections": {
     "discovered": "Discovered Desktops",
     "recent": "Recent Connected Desktops"
+  },
+  "connectionMethod": {
+    "title": "Select Connection Method",
+    "selected": "Selected {{name}}",
+    "qrTitle": "Scan QR Code",
+    "qrDesc": "Scan QR code shown on {{name}}",
+    "codeTitle": "Enter Pairing Code",
+    "codeDesc": "Enter pairing code shown on {{name}}",
+    "cancel": "Cancel",
+    "connect": "Connect",
+    "inputPlaceholder": "Enter pairing code",
+    "verifying": "Verifying code...",
+    "connectCodeTitle": "Enter Pairing Code",
+    "connectCodeDesc": "Enter the pairing code shown on {{name}} to complete connection."
   }
 }

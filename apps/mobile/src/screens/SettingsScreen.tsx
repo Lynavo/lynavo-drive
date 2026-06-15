@@ -85,6 +85,8 @@ import {
 } from '../i18n/language-preference';
 import { getSuggestedPublicWakeHost } from '../services/public-wake-service';
 import { recordDiagnosticsLog } from '../services/diagnostics-log-service';
+import { GradientBackground } from '../components/GradientBackground';
+import { BottomTabBar } from '../components/BottomTabBar';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -372,7 +374,8 @@ function resolveRemoteWakeSetupSummary(
 
   return {
     hasLanWakeTargets: targets.length > 0,
-    hasEnabledPublicTarget: publicTarget?.enabled === true && publicHost.length > 0,
+    hasEnabledPublicTarget:
+      publicTarget?.enabled === true && publicHost.length > 0,
     suggestedPort,
     publicHost,
     hasPublicTarget: publicTarget !== null,
@@ -390,7 +393,9 @@ function isPrivateLanIPv4(value: unknown): boolean {
   });
   if (octets.some(octet => octet === null)) return false;
   const [a, b] = octets as [number, number, number, number];
-  return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+  return (
+    a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
+  );
 }
 
 function getSharedFilesRoute(state: Record<string, unknown>): string {
@@ -482,6 +487,7 @@ export function SettingsScreen() {
   const [languagePreference, setLanguagePreference] =
     useState<LanguagePreference>('system');
   const [isChangingLanguage, setIsChangingLanguage] = useState(false);
+  const [showLanguageSheet, setShowLanguageSheet] = useState(false);
   const isResetSyncDisabled = syncOverviewState.uploadState === 'uploading';
 
   const [wowEnabled, setWowEnabled] = useState(false);
@@ -705,7 +711,10 @@ export function SettingsScreen() {
       setHasLanWakeCached(wakeSetup.hasLanWakeTargets);
       setHasEnabledPublicWake(wakeSetup.hasEnabledPublicTarget);
 
-      const publicTarget = wake?.publicTarget as Record<string, unknown> | null | undefined;
+      const publicTarget = wake?.publicTarget as
+        | Record<string, unknown>
+        | null
+        | undefined;
       setWowEnabled(!!publicTarget?.enabled);
       setWowHost(wakeSetup.publicHost);
       setWowPort(String(publicTarget?.port ?? wakeSetup.suggestedPort));
@@ -782,8 +791,7 @@ export function SettingsScreen() {
                   error,
                 );
                 recordDiagnosticsLog('PublicWake', 'settings save failed', {
-                  error:
-                    error instanceof Error ? error.message : String(error),
+                  error: error instanceof Error ? error.message : String(error),
                   route: sharedFilesRoute || 'nil',
                 });
               });
@@ -1686,6 +1694,11 @@ export function SettingsScreen() {
   const giftCardQueuedUntilDate = isGiftCardEntitlementQueued
     ? formatDate(subscriptionDisplay.entitlementExpireAt)
     : '';
+  const languageSummaryLabel =
+    t(
+      LANGUAGE_OPTIONS.find(option => option.value === languagePreference)
+        ?.labelKey ?? 'settings.language.system',
+    ) || '';
   const batteryOptimizationCopy = resolveBatteryOptimizationCopy(i18n.language);
   const batteryOptimizationStatusText =
     batteryOptimizationStatus === 'checking'
@@ -1696,1039 +1709,846 @@ export function SettingsScreen() {
           ? batteryOptimizationCopy.statusNotIgnored
           : batteryOptimizationCopy.statusUnavailable;
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
-
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          activeOpacity={0.6}
-          hitSlop={{ top: 15, bottom: 15, left: 15, right: 30 }}
-          onPress={() => {
-            if (navigation.canGoBack()) {
-              navigation.goBack();
-            } else {
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'SyncActivity' as never }],
-              });
-            }
-          }}
-          accessibilityLabel={t('common.back')}
-        >
-          <Icon name="chevron-back" size={20} color={DARK} />
-        </TouchableOpacity>
-        <Text style={styles.title}>{t('settings.title')}</Text>
-      </View>
+    <GradientBackground>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>{t('settings.title')}</Text>
+        </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ============================================================= */}
-        {/* Top two-card row: device + subscription                        */}
-        {/* ============================================================= */}
-        <View style={styles.topCardRow}>
-          {/* Left: Connected device card (compact) */}
-          <View style={[styles.topCard, styles.topCardLeft]}>
-            <View style={styles.topCardIconRow}>
-              <View
-                style={[
-                  styles.wifiIconCircle,
-                  isConnected
-                    ? styles.wifiIconCircleOnline
-                    : isConnecting
-                      ? styles.wifiIconCircleConnecting
-                      : styles.wifiIconCircleOffline,
-                ]}
-              >
-                <Icon
-                  name={isConnected || isConnecting ? 'wifi' : 'wifi-outline'}
-                  size={20}
-                  color={
-                    isConnected
-                      ? ONLINE_GREEN
-                      : isConnecting
-                        ? CONNECTING_TEXT
-                        : OFFLINE_TEXT
-                  }
-                />
-              </View>
-              <Text style={styles.topCardSmallLabel}>
-                {t('settings.sections.connectedDevice')}
+        <ScrollView
+          testID="settings-scroll-view"
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Photo permission warning */}
+          {isPhotoPermissionBlocked ? (
+            <View style={styles.warningBox}>
+              <Text style={styles.warningTitle}>
+                {t('settings.photoPermission.title')}
               </Text>
-            </View>
-            <Text style={styles.topCardTitle} numberOfLines={1}>
-              {deviceName || t('settings.connection.notConnected')}
-            </Text>
-            {deviceIp ? (
-              <Text style={styles.topCardSubtext}>
-                {devicePort ? `${deviceIp}:${devicePort}` : deviceIp}
+              <Text style={styles.warningText}>
+                {t('settings.photoPermission.body')}
               </Text>
-            ) : null}
-            <View style={styles.topCardBottomRow}>
-              <View style={styles.statusBadge}>
-                <View
-                  style={[
-                    styles.statusDot,
-                    isConnected
-                      ? styles.statusDotOnline
-                      : isConnecting
-                        ? styles.statusDotConnecting
-                        : styles.statusDotOffline,
-                  ]}
-                />
-                <Text
-                  style={[
-                    styles.statusBadgeText,
-                    isConnected
-                      ? styles.statusTextOnline
-                      : isConnecting
-                        ? styles.statusTextConnecting
-                        : styles.statusTextOffline,
-                  ]}
-                >
-                  {isConnected
-                    ? t('settings.connection.online')
-                    : isConnecting
-                      ? t('settings.connection.connecting')
-                      : t('settings.connection.offline')}
-                </Text>
-              </View>
               <TouchableOpacity
-                style={styles.switchButton}
-                activeOpacity={0.6}
-                onPress={handleSwitchDevice}
+                style={styles.warningAction}
+                activeOpacity={0.8}
+                onPress={() => {
+                  void Linking.openSettings();
+                }}
               >
-                <Icon name="refresh-outline" size={13} color={BLUE} />
-                <Text style={styles.switchButtonText}>
-                  {t('settings.actions.switch')}
+                <Text style={styles.warningActionText}>
+                  {t('settings.photoPermission.openSettings')}
                 </Text>
               </TouchableOpacity>
             </View>
-          </View>
+          ) : null}
 
-          {/* Right: Subscription status card */}
-          <TouchableOpacity
-            style={[styles.topCard, styles.topCardRight]}
-            activeOpacity={isGiftCardSubscribed ? 1 : 0.82}
-            disabled={isGiftCardSubscribed}
-            onPress={
-              isGiftCardSubscribed
-                ? undefined
-                : () => navigation.navigate('Subscription')
-            }
-            accessibilityRole="button"
-          >
-            <View style={styles.topCardIconRow}>
-              {subscriptionIconTone ? (
-                <SubscriptionStatusIcon
-                  tone={subscriptionIconTone}
-                  size={21}
-                  framed
-                  frameSize={40}
-                />
-              ) : (
-                <View style={styles.subIconCircle}>
-                  <Icon name="time-outline" size={20} color={MUTED_TEXT} />
-                </View>
-              )}
-              <Text style={styles.topCardSmallLabel}>
-                {isSubscribed ||
-                isGiftCardSubscribed ||
-                isGiftCardEntitlementQueued ||
-                isSubscribedCancelled ||
-                isSubExpired ||
-                isSubscriptionIntroTrial
-                  ? t('settings.subscription.subscribed')
-                  : isAccountTrial || isTrialExpired
-                    ? t('settings.subscription.trial')
-                    : t('subscription.title')}
-              </Text>
-            </View>
-            {isAccountTrial || isSubscriptionIntroTrial ? (
-              <>
-                <Text style={styles.topCardTitle}>
-                  {t('settings.subscription.trialDays', { days: trialDays })}
-                </Text>
-                <Text style={styles.topCardSubtext}>
-                  {isSubscriptionIntroTrial
-                    ? t('settings.subscription.introTrial')
-                    : t('settings.subscription.freeTrial')}
-                </Text>
-              </>
-            ) : isTrialExpired ? (
-              <Text style={[styles.topCardTitle, { color: DANGER_RED }]}>
-                {t('settings.subscription.expired')}
-              </Text>
-            ) : isSubscribedCancelled ? (
-              // Cancelled-but-active: deliberately two-line so the amber
-              // tint carries the urgency while expiry date gives certainty.
-              <>
-                <Text style={[styles.topCardTitle, { color: DANGER_RED }]}>
-                  {t('subscription.status.subscribedCancelled', {
-                    date: cancelledUntilDate,
-                  })}
-                </Text>
-              </>
-            ) : isGiftCardSubscribed ? (
-              <Text
-                style={[
-                  styles.topCardTitle,
-                  { color: subscriptionStatusColor },
-                ]}
-              >
-                {t('subscription.status.giftCardSubscribed')}
-              </Text>
-            ) : isGiftCardEntitlementQueued ? (
-              <Text
-                style={[
-                  styles.topCardTitle,
-                  { color: subscriptionStatusColor },
-                ]}
-              >
-                {t('subscription.status.giftCardQueued', {
-                  date: giftCardQueuedUntilDate,
-                })}
-              </Text>
-            ) : isSubscribed ? (
-              <Text
-                style={[
-                  styles.topCardTitle,
-                  { color: subscriptionStatusColor },
-                ]}
-              >
-                {t('settings.subscription.active')}
-              </Text>
-            ) : isSubExpired ? (
-              <Text style={[styles.topCardTitle, { color: DANGER_RED }]}>
-                {t('settings.subscription.expired')}
-              </Text>
-            ) : (
-              <Text style={styles.topCardTitle}>
-                {hasKnownSubscriptionState
-                  ? '--'
-                  : t('settings.status.reading')}
-              </Text>
-            )}
-            {showSubCta ? (
-              <View style={styles.subCtaRow}>
-                <Text style={styles.subCtaText}>
-                  {t('settings.subscription.subscribeCta')}
-                </Text>
-                <Icon name="chevron-forward" size={13} color={BLUE} />
+          {/* ══════════════════════════════════════════════════════════════════
+              SECTION: MY ACCOUNT
+              ══════════════════════════════════════════════════════════════════ */}
+          <Text style={styles.sectionLabel}>{t('settings.sections.account') || '我的帳號'}</Text>
+          <View testID="settings-account-card" style={styles.card}>
+            {/* Account Row — display masked phone/email as primary content */}
+            <View style={styles.row}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(255,45,85,0.08)' }]}>
+                <Icon name="person-outline" size={18} color="#FF2D55" />
               </View>
-            ) : null}
-          </TouchableOpacity>
-        </View>
-
-        {/* ============================================================= */}
-        {/* My device name card                                            */}
-        {/* ============================================================= */}
-        <View style={styles.card}>
-          <View style={styles.myDeviceRow}>
-            <View style={styles.phoneIconCircle}>
-              <Icon name="phone-portrait-outline" size={20} color="#fff" />
-            </View>
-            <View style={styles.myDeviceInfo}>
-              <Text style={styles.myDeviceLabel}>
-                {t('settings.myDevice.label')}
-              </Text>
-              {editingMyName ? (
-                <View style={styles.editRow}>
-                  <TextInput
-                    style={styles.nameInput}
-                    value={myName}
-                    onChangeText={setMyName}
-                    autoFocus
-                    selectTextOnFocus
-                    returnKeyType="done"
-                    onSubmitEditing={handleConfirmMyName}
-                    editable={!isMyNameEditDisabled}
-                  />
+              <View style={styles.rowContent}>
+                <Text style={styles.rowTitle} numberOfLines={1}>{accountDisplayValue}</Text>
+              </View>
+              <View style={styles.rowRight}>
+                {canTogglePhoneReveal ? (
                   <TouchableOpacity
-                    style={[
-                      styles.confirmButton,
-                      isMyNameEditDisabled && styles.disabledIconButton,
-                    ]}
+                    style={styles.phoneEyeButton}
                     activeOpacity={0.7}
-                    onPress={handleConfirmMyName}
-                    disabled={isMyNameEditDisabled}
+                    onPress={() => setIsPhoneRevealed(v => !v)}
                   >
-                    <Icon name="checkmark" size={16} color={BLUE} />
+                    <Icon
+                      name={isPhoneRevealed ? 'eye-outline' : 'eye-off-outline'}
+                      size={16}
+                      color={MUTED_TEXT}
+                    />
                   </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={styles.nameRow}>
-                  <Text style={styles.myDeviceName} numberOfLines={1}>
-                    {myName}
-                  </Text>
-                  <TouchableOpacity
+                ) : null}
+              </View>
+            </View>
+
+            <View style={styles.hairline} />
+
+            {/* Membership Row */}
+            <TouchableOpacity
+              style={styles.row}
+              activeOpacity={showSubCta ? 0.7 : 1}
+              disabled={!showSubCta}
+              onPress={() => navigation.navigate('Subscription')}
+            >
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(139,92,246,0.08)' }]}>
+                {subscriptionIconTone ? (
+                  <SubscriptionStatusIcon tone={subscriptionIconTone} size={18} />
+                ) : (
+                  <Icon name="star-outline" size={18} color="#8B5CF6" />
+                )}
+              </View>
+              <View style={styles.rowContent}>
+                <Text style={styles.rowTitle}>
+                  {isSubscribed ||
+                  isGiftCardSubscribed ||
+                  isGiftCardEntitlementQueued ||
+                  isSubscribedCancelled ||
+                  isSubExpired ||
+                  isSubscriptionIntroTrial
+                    ? t('settings.subscription.subscribed')
+                    : isAccountTrial || isTrialExpired
+                      ? t('settings.subscription.trial')
+                      : t('subscription.title')}
+                </Text>
+                <Text style={styles.rowSubtitle} numberOfLines={1}>
+                  {isAccountTrial || isSubscriptionIntroTrial
+                    ? `${isSubscriptionIntroTrial ? t('settings.subscription.introTrial') : t('settings.subscription.freeTrial')} · ${t('settings.subscription.trialDays', { days: trialDays })}`
+                    : isTrialExpired
+                      ? t('settings.subscription.expired')
+                      : isSubscribedCancelled
+                        ? t('subscription.status.subscribedCancelled', { date: cancelledUntilDate })
+                        : isGiftCardSubscribed
+                          ? t('subscription.status.giftCardSubscribed')
+                          : isGiftCardEntitlementQueued
+                            ? t('subscription.status.giftCardQueued', { date: giftCardQueuedUntilDate })
+                            : isSubscribed
+                              ? t('settings.subscription.active')
+                              : isSubExpired
+                                ? t('settings.subscription.expired')
+                                : '--'}
+                </Text>
+              </View>
+              <View style={styles.rowRight}>
+                {badgeText ? (
+                  <View style={[styles.badge, badgeBgStyle]}>
+                    <Text style={[styles.badgeText, badgeTextStyle]}>{badgeText}</Text>
+                  </View>
+                ) : null}
+                {showSubCta && <Icon name="chevron-forward" size={16} color={ROW_CHEVRON} />}
+              </View>
+            </TouchableOpacity>
+
+            {FEATURES.IAP_ENABLED && FEATURES.IAP_RESTORE_ENABLED && Platform.OS === 'ios' ? (
+              <>
+                <View style={styles.hairline} />
+                <TouchableOpacity
+                  style={styles.row}
+                  activeOpacity={0.7}
+                  onPress={handleRestore}
+                  disabled={isRestoring}
+                >
+                  <View style={[styles.iconBox, { backgroundColor: 'rgba(59,130,246,0.08)' }]}>
+                    <Icon name="refresh-outline" size={18} color={BLUE} />
+                  </View>
+                  <View style={styles.rowContent}>
+                    <Text style={styles.rowTitle}>
+                      {isRestoring ? t('subscription.restore.inProgress') : t('subscription.restore.action')}
+                    </Text>
+                    <Text style={styles.rowSubtitle}>
+                      {t('settings.subscription.restoreDesc') || '從應用商店檢查歷史購買記錄'}
+                    </Text>
+                  </View>
+                  <View style={styles.rowRight}>
+                    <Icon name="chevron-forward" size={16} color={ROW_CHEVRON} />
+                  </View>
+                </TouchableOpacity>
+              </>
+            ) : null}
+
+            {isGiftCardEnabled ? (
+              <>
+                <View style={styles.hairline} />
+                <TouchableOpacity
+                  style={styles.row}
+                  activeOpacity={0.7}
+                  onPress={handleOpenGiftCardPrompt}
+                >
+                  <View style={[styles.iconBox, { backgroundColor: 'rgba(234,179,8,0.08)' }]}>
+                    <Icon name="gift-outline" size={18} color="#eab308" />
+                  </View>
+                  <View style={styles.rowContent}>
+                    <Text style={styles.rowTitle}>{t('settings.giftCard.action')}</Text>
+                    <Text style={styles.rowSubtitle}>
+                      {t('settings.giftCard.desc') || '輸入禮品碼以解鎖 7 天試用'}
+                    </Text>
+                  </View>
+                  <View style={styles.rowRight}>
+                    <Icon name="chevron-forward" size={16} color={ROW_CHEVRON} />
+                  </View>
+                </TouchableOpacity>
+              </>
+            ) : null}
+
+            {/* Device Name Row — moved into account card */}
+            <View style={styles.hairline} />
+            <View style={styles.row}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(59,130,246,0.08)' }]}>
+                <Icon name="phone-portrait-outline" size={18} color={BLUE} />
+              </View>
+              <View style={styles.rowContent}>
+                <Text style={styles.rowTitle}>{t('settings.myDevice.label')}</Text>
+                {editingMyName ? (
+                  <View style={styles.editRow}>
+                    <TextInput
+                      style={styles.nameInput}
+                      value={myName}
+                      onChangeText={setMyName}
+                      autoFocus
+                      selectTextOnFocus
+                      returnKeyType="done"
+                      onSubmitEditing={handleConfirmMyName}
+                      editable={!isMyNameEditDisabled}
+                    />
+                    <TouchableOpacity
+                      style={[styles.confirmButton, isMyNameEditDisabled && styles.disabledIconButton]}
+                      activeOpacity={0.7}
+                      onPress={handleConfirmMyName}
+                      disabled={isMyNameEditDisabled}
+                    >
+                      <Icon name="checkmark" size={16} color={BLUE} />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <Text
                     style={[
-                      styles.editButton,
-                      isMyNameEditDisabled && styles.disabledIconButton,
+                      styles.rowSubtitle,
+                      isMyNameEditDisabled && styles.lockedHintText,
                     ]}
+                    numberOfLines={1}
+                  >
+                    {isMyNameEditDisabled
+                      ? t('settings.myDevice.lockedHint')
+                      : myName}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.rowRight}>
+                {!editingMyName && (
+                  <TouchableOpacity
+                    style={[styles.editButton, isMyNameEditDisabled && styles.disabledIconButton]}
                     activeOpacity={0.7}
                     onPress={() => {
                       if (isMyNameEditDisabled) return;
                       setEditingMyName(true);
                     }}
                     disabled={isMyNameEditDisabled}
-                    accessibilityState={{ disabled: isMyNameEditDisabled }}
                   >
                     <Icon name="pencil-outline" size={14} color={MUTED_TEXT} />
                   </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          </View>
-          <Text style={styles.myDeviceHint}>
-            {isMyNameEditDisabled
-              ? t('settings.myDevice.lockedHint')
-              : t('settings.myDevice.hint')}
-          </Text>
-        </View>
-
-        {/* ============================================================= */}
-        {/* Info rows                                                      */}
-        {/* ============================================================= */}
-        <View style={styles.listCard}>
-          {isPhotoPermissionBlocked ? (
-            <>
-              <View style={styles.warningBox}>
-                <Text style={styles.warningTitle}>
-                  {t('settings.photoPermission.title')}
-                </Text>
-                <Text style={styles.warningText}>
-                  {t('settings.photoPermission.body')}
-                </Text>
-                <TouchableOpacity
-                  style={styles.warningAction}
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    void Linking.openSettings();
-                  }}
-                >
-                  <Text style={styles.warningActionText}>
-                    {t('settings.photoPermission.openSettings')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.listSep} />
-            </>
-          ) : null}
-          <View style={styles.infoRow}>
-            <View style={styles.infoRowLeft}>
-              <Icon name="person-outline" size={16} color={MUTED_TEXT} />
-              <Text style={styles.infoRowLabel}>
-                {t('settings.rows.currentAccount')}
-              </Text>
-            </View>
-            <View style={styles.accountValueRow}>
-              <Text style={styles.infoRowValue} numberOfLines={1}>
-                {accountDisplayValue}
-              </Text>
-              {badgeText ? (
-                <View style={[styles.badge, badgeBgStyle]}>
-                  <Text style={[styles.badgeText, badgeTextStyle]}>
-                    {badgeText}
-                  </Text>
-                </View>
-              ) : null}
-              {canTogglePhoneReveal ? (
-                <TouchableOpacity
-                  style={styles.phoneEyeButton}
-                  activeOpacity={0.7}
-                  onPress={() => setIsPhoneRevealed(v => !v)}
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    isPhoneRevealed
-                      ? t('settings.phone.hide')
-                      : t('settings.phone.reveal')
-                  }
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Icon
-                    name={isPhoneRevealed ? 'eye-outline' : 'eye-off-outline'}
-                    size={16}
-                    color={MUTED_TEXT}
-                  />
-                </TouchableOpacity>
-              ) : null}
-            </View>
-          </View>
-          <View style={styles.listSep} />
-          <View style={styles.infoRow}>
-            <View style={styles.infoRowLeft}>
-              <Icon name="time-outline" size={16} color={MUTED_TEXT} />
-              <Text style={styles.infoRowLabel}>
-                {t('settings.rows.latestSync')}
-              </Text>
-            </View>
-            <Text style={styles.infoRowValue}>{latestSyncLabel}</Text>
-          </View>
-          <View style={styles.listSep} />
-          <View style={styles.infoRow}>
-            <View style={styles.infoRowLeft}>
-              <Icon
-                name="information-circle-outline"
-                size={16}
-                color={MUTED_TEXT}
-              />
-              <Text style={styles.infoRowLabel}>
-                {t('settings.rows.appVersion')}
-              </Text>
-            </View>
-            <Text style={styles.infoRowValue}>{appVersionLabel}</Text>
-          </View>
-          <View style={styles.listSep} />
-          <View style={styles.languageRow}>
-            <View style={styles.languageHeaderRow}>
-              <Icon name="language-outline" size={16} color={MUTED_TEXT} />
-              <Text style={styles.infoRowLabel}>
-                {t('settings.rows.language')}
-              </Text>
-            </View>
-            <View style={styles.languageOptions}>
-              {LANGUAGE_OPTIONS.map(option => {
-                const isSelected = languagePreference === option.value;
-                return (
-                  <TouchableOpacity
-                    key={option.value}
-                    style={[
-                      styles.languageOption,
-                      isSelected ? styles.languageOptionSelected : null,
-                    ]}
-                    activeOpacity={0.75}
-                    disabled={isChangingLanguage}
-                    onPress={() => {
-                      void handleLanguagePreferenceChange(option.value);
-                    }}
-                    accessibilityRole="button"
-                    accessibilityState={{
-                      selected: isSelected,
-                      disabled: isChangingLanguage,
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.languageOptionText,
-                        isSelected ? styles.languageOptionTextSelected : null,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {t(option.labelKey)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        </View>
-
-        {/* ============================================================= */}
-        {/* Remote Wake / Wake-on-WAN card                                 */}
-        {/* ============================================================= */}
-        {deviceName ? (
-          <>
-            <Text style={styles.sectionLabel}>
-              {t('settings.remoteWake.title')}
-            </Text>
-            <View style={styles.listCard}>
-              <View style={styles.remoteWakeSetupBox}>
-                <View style={styles.remoteWakeSetupHeader}>
-                  <Icon
-                    name={hasLanWakeCached ? 'checkmark-circle-outline' : 'alert-circle-outline'}
-                    size={18}
-                    color={hasLanWakeCached ? ONLINE_GREEN : CONNECTING_AMBER}
-                  />
-                  <Text style={styles.remoteWakeSetupTitle}>
-                    {hasLanWakeCached
-                      ? t('settings.remoteWake.autoReadyTitle')
-                      : t('settings.remoteWake.autoMissingTitle')}
-                  </Text>
-                </View>
-                <Text style={styles.remoteWakeSetupBody}>
-                  {hasLanWakeCached
-                    ? t('settings.remoteWake.autoReadyBody')
-                    : t('settings.remoteWake.autoMissingBody')}
-                </Text>
-              </View>
-
-              <View style={styles.listSep} />
-
-              <View style={styles.infoRow}>
-                <View style={styles.infoRowLeft}>
-                  <Icon name="pulse-outline" size={16} color={MUTED_TEXT} />
-                  <Text style={styles.infoRowLabel}>
-                    {t('settings.remoteWake.lanStatus')}
-                  </Text>
-                </View>
-                <Text style={[styles.infoRowValue, { color: hasLanWakeCached ? ONLINE_GREEN : MUTED_TEXT }]}>
-                  {hasLanWakeCached ? t('settings.remoteWake.lanStatusCached') : t('settings.remoteWake.lanStatusNotCached')}
-                </Text>
-              </View>
-
-              <View style={styles.listSep} />
-
-              <View style={styles.infoRow}>
-                <View style={styles.infoRowLeft}>
-                  <Icon name="globe-outline" size={16} color={BLUE} />
-                  <Text style={styles.infoRowLabel}>{t('settings.remoteWake.wowEnable')}</Text>
-                </View>
-                <Switch
-                  value={wowEnabled}
-                  onValueChange={setWowEnabled}
-                  disabled={!hasLanWakeCached}
-                  trackColor={{ false: '#e9e9ea', true: BLUE }}
-                  thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
-                />
-              </View>
-
-              {hasEnabledPublicWake ? null : (
-                <Text style={styles.remoteWakeHint}>
-                  {t('settings.remoteWake.enableHint')}
-                </Text>
-              )}
-
-              <View style={styles.listSep} />
-              <Text style={styles.remoteWakeAdvancedLabel}>
-                {t('settings.remoteWake.advancedTitle')}
-              </Text>
-              <View style={styles.infoRow}>
-                <View style={styles.infoRowLeft}>
-                  <Icon name="link-outline" size={16} color={MUTED_TEXT} />
-                  <Text style={styles.infoRowLabel}>{t('settings.remoteWake.wowHostLabel')}</Text>
-                </View>
-                <TextInput
-                  style={[styles.infoRowValue, { flex: 1, padding: 0 }]}
-                  value={wowHost}
-                  onChangeText={setWowHost}
-                  placeholder={t('settings.remoteWake.wowHostPlaceholder')}
-                  placeholderTextColor={MUTED_TEXT}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  textAlign="right"
-                  editable={hasLanWakeCached}
-                />
-              </View>
-
-              <View style={styles.listSep} />
-              <View style={styles.infoRow}>
-                <View style={styles.infoRowLeft}>
-                  <Icon name="options-outline" size={16} color={MUTED_TEXT} />
-                  <Text style={styles.infoRowLabel}>{t('settings.remoteWake.wowPortLabel')}</Text>
-                </View>
-                <TextInput
-                  style={[styles.infoRowValue, { flex: 1, padding: 0 }]}
-                  value={wowPort}
-                  onChangeText={setWowPort}
-                  keyboardType="number-pad"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  textAlign="right"
-                  editable={hasLanWakeCached}
-                />
-              </View>
-
-              <View style={styles.listSep} />
-              <TouchableOpacity
-                style={{
-                  backgroundColor: BLUE,
-                  borderRadius: 10,
-                  padding: 12,
-                  alignItems: 'center',
-                  marginTop: 12,
-                  marginBottom: 12,
-                  marginHorizontal: 16,
-                  opacity: isSavingWow || !hasLanWakeCached ? 0.6 : 1,
-                }}
-                activeOpacity={0.7}
-                onPress={handleSavePublicWake}
-                disabled={isSavingWow || !hasLanWakeCached}
-              >
-                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>
-                  {isSavingWow ? t('settings.remoteWake.wowSaving') : t('settings.remoteWake.wowSave')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* Support & Help section                                         */}
-        {/* ============================================================= */}
-        <Text style={styles.sectionLabel}>
-          {t('settings.sections.supportHelp')}
-        </Text>
-        <View style={styles.listCard}>
-          {shouldShowBatteryOptimizationEntry ? (
-            <>
-              <TouchableOpacity
-                style={[
-                  styles.actionRow,
-                  (batteryOptimizationStatus === 'ignored' ||
-                    isRequestingBatteryOptimization) &&
-                    styles.actionRowDisabled,
-                ]}
-                activeOpacity={0.6}
-                onPress={handleBatteryOptimizationPress}
-                disabled={
-                  batteryOptimizationStatus === 'ignored' ||
-                  isRequestingBatteryOptimization
-                }
-                accessibilityRole="button"
-                accessibilityState={{
-                  disabled:
-                    batteryOptimizationStatus === 'ignored' ||
-                    isRequestingBatteryOptimization,
-                }}
-              >
-                <View style={styles.actionRowLeft}>
-                  <Icon
-                    name="battery-charging-outline"
-                    size={18}
-                    color={BLUE}
-                  />
-                  <View style={styles.actionRowTextStack}>
-                    <Text style={styles.actionRowText}>
-                      {batteryOptimizationCopy.title}
-                    </Text>
-                    <Text style={styles.actionRowSubtext}>
-                      {batteryOptimizationStatusText}
-                    </Text>
-                  </View>
-                </View>
-                {batteryOptimizationStatus === 'ignored' ? (
-                  <Icon
-                    name="checkmark-circle-outline"
-                    size={16}
-                    color={ONLINE_GREEN}
-                  />
-                ) : (
-                  <View style={styles.chevronCircle}>
-                    <Icon name="chevron-forward" size={12} color={BLUE} />
-                  </View>
                 )}
-              </TouchableOpacity>
-              <View style={styles.listSep} />
-            </>
-          ) : null}
-          <TouchableOpacity
-            style={styles.actionRow}
-            activeOpacity={0.6}
-            disabled={isUploadingDiagnostics}
-            onPress={handleUploadDiagnostics}
-          >
-            <View style={styles.actionRowLeft}>
-              <Icon name="cloud-upload-outline" size={18} color={BLUE} />
-              <Text style={styles.actionRowText}>
-                {t('settings.uploadDiagnostic.button')}
-              </Text>
+              </View>
             </View>
-            <View style={styles.chevronCircle}>
-              <Icon name="chevron-forward" size={12} color={BLUE} />
-            </View>
-          </TouchableOpacity>
-          <View style={styles.listSep} />
-          <TouchableOpacity
-            style={styles.actionRow}
-            activeOpacity={0.6}
-            onPress={() => navigation.navigate('Help')}
-          >
-            <View style={styles.actionRowLeft}>
-              <Icon name="help-circle-outline" size={18} color={BLUE} />
-              <Text style={styles.actionRowText}>
-                {t('settings.actions.help')}
-              </Text>
-            </View>
-            <View style={styles.chevronCircle}>
-              <Icon name="chevron-forward" size={12} color={BLUE} />
-            </View>
-          </TouchableOpacity>
-          {FEATURES.IAP_ENABLED &&
-          FEATURES.IAP_RESTORE_ENABLED &&
-          Platform.OS === 'ios' ? (
-            <>
-              <View style={styles.listSep} />
-              <TouchableOpacity
-                style={styles.actionRow}
-                activeOpacity={0.6}
-                onPress={() => {
-                  void handleRestore();
-                }}
-                disabled={isRestoring}
-              >
-                <View style={styles.actionRowLeft}>
-                  <Icon name="refresh-outline" size={18} color={BLUE} />
-                  <Text style={styles.actionRowText}>
-                    {isRestoring
-                      ? t('subscription.restore.inProgress')
-                      : t('subscription.restore.action')}
-                  </Text>
-                </View>
-                <View style={styles.chevronCircle}>
-                  <Icon name="chevron-forward" size={12} color={BLUE} />
-                </View>
-              </TouchableOpacity>
-            </>
-          ) : null}
-        </View>
+          </View>
 
-        {/* ============================================================= */}
-        {/* Danger zone                                                    */}
-        {/* ============================================================= */}
-        <View style={[styles.listCard, styles.dangerCard]}>
-          <TouchableOpacity
-            testID="settings-reset-sync-status-button"
-            style={[
-              styles.actionRow,
-              isResetSyncDisabled && styles.actionRowDisabled,
-            ]}
-            activeOpacity={0.6}
-            onPress={handleResetSyncStatus}
-            disabled={isResetSyncDisabled}
-            accessibilityState={{ disabled: isResetSyncDisabled }}
-          >
-            <View style={styles.actionRowLeft}>
-              <Icon
-                name="refresh-outline"
-                size={18}
-                color={isResetSyncDisabled ? MUTED_TEXT : DANGER_RED}
-              />
-              <Text
-                style={[
-                  styles.dangerRowText,
-                  isResetSyncDisabled && styles.dangerRowTextDisabled,
-                ]}
-              >
-                {t('settings.actions.resetSyncStatus')}
-              </Text>
+          {/* ══════════════════════════════════════════════════════════════════
+              SECTION: COMPUTER DEVICES
+              ══════════════════════════════════════════════════════════════════ */}
+          <Text style={styles.sectionLabel}>{t('settings.sections.computers') || '電腦設備'}</Text>
+          <View testID="settings-computers-card" style={styles.card}>
+            {/* Connected PC Row */}
+            <View style={styles.row}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(168,85,247,0.08)' }]}>
+                <Icon name="desktop-outline" size={18} color="#a855f7" />
+              </View>
+              <View style={styles.rowContent}>
+                <Text style={styles.rowTitle}>
+                  {deviceName || t('settings.connection.notConnected')}
+                </Text>
+                <Text style={styles.rowSubtitle}>
+                  {isConnected
+                    ? t('settings.connection.online')
+                    : isConnecting
+                      ? t('settings.connection.connecting')
+                      : t('settings.connection.offline')}
+                  {deviceIp ? ` · ${deviceIp}` : ''}
+                </Text>
+              </View>
+              <View style={styles.rowRight}>
+                {isConnected ? (
+                  <View style={styles.currentBadge}>
+                    <Text style={styles.currentBadgeText}>當前</Text>
+                  </View>
+                ) : null}
+              </View>
             </View>
-            <View style={styles.dangerChevronCircle}>
-              <Icon name="chevron-forward" size={12} color={DANGER_RED} />
+
+            <View style={styles.hairline} />
+
+            {/* Switch Device Row */}
+            <TouchableOpacity
+              style={styles.row}
+              activeOpacity={0.7}
+              onPress={handleSwitchDevice}
+            >
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(59,130,246,0.08)' }]}>
+                <Icon name="swap-horizontal-outline" size={18} color={BLUE} />
+              </View>
+              <View style={styles.rowContent}>
+                <Text style={styles.rowTitle}>{t('settings.actions.switchDevice') || '切換設備'}</Text>
+                <Text style={styles.rowSubtitle}>
+                  {t('settings.actions.switchDeviceDesc') || '將斷開當前設備並重新連接其他電腦'}
+                </Text>
+              </View>
+              <View style={styles.rowRight}>
+                <Icon name="chevron-forward" size={16} color={ROW_CHEVRON} />
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* ══════════════════════════════════════════════════════════════════
+              SECTION: GENERAL
+              ══════════════════════════════════════════════════════════════════ */}
+          <Text style={styles.sectionLabel}>{t('settings.sections.general') || '通用'}</Text>
+          <View testID="settings-general-card" style={styles.card}>
+            {/* Language Row */}
+            <TouchableOpacity
+              style={styles.row}
+              activeOpacity={0.7}
+              onPress={() => setShowLanguageSheet(true)}
+            >
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(59,130,246,0.08)' }]}>
+                <Icon name="language-outline" size={18} color={BLUE} />
+              </View>
+              <View style={styles.rowContent}>
+                <Text style={styles.rowTitle}>{t('settings.rows.language')}</Text>
+                <Text style={styles.rowSubtitle}>{languageSummaryLabel}</Text>
+              </View>
+              <View style={styles.rowRight}>
+                <Icon name="chevron-forward" size={16} color={ROW_CHEVRON} />
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.hairline} />
+
+            {/* FAQ Row */}
+            <TouchableOpacity
+              style={styles.row}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('Help')}
+            >
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(59,130,246,0.08)' }]}>
+                <Icon name="help-circle-outline" size={18} color={BLUE} />
+              </View>
+              <View style={styles.rowContent}>
+                <Text style={styles.rowTitle}>{t('settings.rows.faq') || '常見問題'}</Text>
+                <Text style={styles.rowSubtitle}>
+                  {t('settings.rows.faqDesc') || '操作說明與常見問題'}
+                </Text>
+              </View>
+              <View style={styles.rowRight}>
+                <Icon name="chevron-forward" size={16} color={ROW_CHEVRON} />
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.hairline} />
+
+            {/* Version Row */}
+            <View style={styles.row}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(139,92,246,0.08)' }]}>
+                <Icon name="information-circle-outline" size={18} color="#8B5CF6" />
+              </View>
+              <View style={styles.rowContent}>
+                <Text style={styles.rowTitle}>{t('settings.rows.appVersion')}</Text>
+                <Text style={styles.rowSubtitle}>{appVersionLabel}</Text>
+              </View>
+              <View style={styles.rowRight}>
+                <Text style={styles.latestText}>
+                  {t('settings.version.upToDate', { defaultValue: '已是最新' })}
+                </Text>
+              </View>
             </View>
-          </TouchableOpacity>
-          <View style={styles.listSep} />
+
+            <View style={styles.hairline} />
+
+            {/* Reset Sync Status Row */}
+            <TouchableOpacity
+              testID="settings-reset-sync-status-button"
+              style={[
+                styles.row,
+                isResetSyncDisabled && styles.actionRowDisabled,
+              ]}
+              activeOpacity={0.7}
+              onPress={handleResetSyncStatus}
+              disabled={isResetSyncDisabled}
+            >
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(239,68,68,0.08)' }]}>
+                <Icon name="sync-circle-outline" size={18} color={DANGER_RED} />
+              </View>
+              <View style={styles.rowContent}>
+                <Text style={styles.rowTitle}>
+                  {t('settings.actions.resetSyncStatus')}
+                </Text>
+                <Text style={styles.rowSubtitle}>
+                  {t('settings.rows.resetSyncStatusDesc', {
+                    defaultValue: '清除本機同步狀態並重新連接電腦',
+                  })}
+                </Text>
+              </View>
+              <View style={styles.rowRight}>
+                <Icon name="chevron-forward" size={16} color={ROW_CHEVRON} />
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.hairline} />
+
+            {/* Diagnostics Row */}
+            <TouchableOpacity
+              style={styles.row}
+              activeOpacity={0.7}
+              onPress={handleUploadDiagnostics}
+              disabled={isUploadingDiagnostics}
+            >
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(59,130,246,0.08)' }]}>
+                <Icon name="cloud-upload-outline" size={18} color={BLUE} />
+              </View>
+              <View style={styles.rowContent}>
+                <Text style={styles.rowTitle}>{t('settings.uploadDiagnostic.button')}</Text>
+                <Text style={styles.rowSubtitle}>
+                  {t('settings.rows.diagnosticsDesc') || '上傳日誌和設備狀態以方便排查問題'}
+                </Text>
+              </View>
+              <View style={styles.rowRight}>
+                <Icon name="chevron-forward" size={16} color={ROW_CHEVRON} />
+              </View>
+            </TouchableOpacity>
+
+            {/* Battery Optimization Row (China Android only) */}
+            {shouldShowBatteryOptimizationEntry ? (
+              <>
+                <View style={styles.hairline} />
+                <TouchableOpacity
+                  style={[
+                    styles.row,
+                    (batteryOptimizationStatus === 'ignored' || isRequestingBatteryOptimization) && styles.actionRowDisabled,
+                  ]}
+                  activeOpacity={0.7}
+                  onPress={handleBatteryOptimizationPress}
+                  disabled={batteryOptimizationStatus === 'ignored' || isRequestingBatteryOptimization}
+                >
+                  <View style={[styles.iconBox, { backgroundColor: 'rgba(59,130,246,0.08)' }]}>
+                    <Icon name="flash-outline" size={18} color={BLUE} />
+                  </View>
+                  <View style={styles.rowContent}>
+                    <Text style={styles.rowTitle}>{batteryOptimizationCopy.title}</Text>
+                    <Text style={styles.rowSubtitle}>{batteryOptimizationStatusText}</Text>
+                  </View>
+                  <View style={styles.rowRight}>
+                    {batteryOptimizationStatus === 'ignored' ? (
+                      <Icon name="checkmark-circle" size={16} color={ONLINE_GREEN} />
+                    ) : (
+                      <Icon name="chevron-forward" size={16} color={ROW_CHEVRON} />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              </>
+            ) : null}
+          </View>
+
+          {/* Logout — standalone card */}
           <TouchableOpacity
-            style={styles.actionRow}
-            activeOpacity={0.6}
+            style={styles.dangerActionCard}
+            activeOpacity={0.7}
             onPress={handleLogout}
           >
-            <View style={styles.actionRowLeft}>
-              <Icon name="log-out-outline" size={18} color={DANGER_RED} />
-              <Text style={styles.dangerRowText}>
-                {t('settings.actions.logout')}
-              </Text>
-            </View>
-            <View style={styles.dangerChevronCircle}>
-              <Icon name="chevron-forward" size={12} color={DANGER_RED} />
-            </View>
+            <Text style={styles.dangerActionText}>{t('settings.actions.logout')}</Text>
           </TouchableOpacity>
-          {deviceName ? (
-            <>
-              <View style={styles.listSep} />
-              <TouchableOpacity
-                testID="settings-forget-desktop-button"
-                style={styles.actionRow}
-                activeOpacity={0.6}
-                onPress={handleForgetDesktop}
-              >
-                <View style={styles.actionRowLeft}>
-                  <Icon name="trash-outline" size={18} color={DANGER_RED} />
-                  <Text style={styles.dangerRowText}>
-                    {t('settings.actions.forgetDesktop')}
-                  </Text>
-                </View>
-                <View style={styles.dangerChevronCircle}>
-                  <Icon name="chevron-forward" size={12} color={DANGER_RED} />
-                </View>
-              </TouchableOpacity>
-            </>
-          ) : null}
-        </View>
 
-        {/* ============================================================= */}
-        {/* Delete Account                                                 */}
-        {/* Required by App Store Guideline 5.1.1(v). Destructive; server  */}
-        {/* wipes identities/tokens + cancels active subscription.         */}
-        {/* ============================================================= */}
-        <View style={[styles.listCard, styles.dangerCard, styles.logoutCard]}>
+          {/* Delete Account — standalone card */}
           <TouchableOpacity
-            style={styles.actionRow}
-            activeOpacity={0.6}
+            style={styles.dangerActionCard}
+            activeOpacity={0.7}
             onPress={handleDeleteAccount}
             disabled={isDeletingAccount}
           >
-            <View style={styles.actionRowLeft}>
-              <Icon name="trash-outline" size={18} color={DANGER_RED} />
-              <Text style={styles.dangerRowText}>
-                {isDeletingAccount
-                  ? t('settings.actions.deletingAccount')
-                  : t('settings.actions.deleteAccount')}
-              </Text>
-            </View>
-            <View style={styles.dangerChevronCircle}>
-              <Icon name="chevron-forward" size={12} color={DANGER_RED} />
-            </View>
+            <Text style={styles.dangerActionText}>
+              {isDeletingAccount ? t('settings.actions.deletingAccount') : t('settings.actions.deleteAccount')}
+            </Text>
           </TouchableOpacity>
-        </View>
 
-        {isGiftCardEnabled ? (
-          <>
-            <Text style={styles.sectionLabel}>
-              {t('settings.sections.giftCard')}
-            </Text>
-            <View style={styles.listCard}>
-              <TouchableOpacity
-                style={styles.actionRow}
-                activeOpacity={0.6}
-                onPress={() => {
-                  void handleOpenGiftCardPrompt();
-                }}
-              >
-                <View style={styles.actionRowLeft}>
-                  <Icon name="gift-outline" size={18} color={BLUE} />
-                  <Text style={styles.actionRowText}>
-                    {t('settings.giftCard.action')}
+          {/* ══════════════════════════════════════════════════════════════════
+              SECTION: REMOTE WAKE (Only if device bound)
+              ══════════════════════════════════════════════════════════════════ */}
+          {deviceName ? (
+            <>
+              <Text style={styles.sectionLabel}>{t('settings.remoteWake.title')}</Text>
+              <View style={styles.card}>
+                <View style={styles.remoteWakeSetupBox}>
+                  <View style={styles.remoteWakeSetupHeader}>
+                    <Icon
+                      name={hasLanWakeCached ? 'checkmark-circle' : 'alert-circle-outline'}
+                      size={18}
+                      color={hasLanWakeCached ? ONLINE_GREEN : CONNECTING_AMBER}
+                    />
+                    <Text style={styles.remoteWakeSetupTitle}>
+                      {hasLanWakeCached
+                        ? t('settings.remoteWake.autoReadyTitle')
+                        : t('settings.remoteWake.autoMissingTitle')}
+                    </Text>
+                  </View>
+                  <Text style={styles.remoteWakeSetupBody}>
+                    {hasLanWakeCached
+                      ? t('settings.remoteWake.autoReadyBody')
+                      : t('settings.remoteWake.autoMissingBody')}
                   </Text>
                 </View>
-                <View style={styles.chevronCircle}>
-                  <Icon name="chevron-forward" size={12} color={BLUE} />
-                </View>
-              </TouchableOpacity>
-            </View>
-          </>
-        ) : null}
 
-        {!isGlobalMarket() && (
-          <View style={styles.footer}>
-            <Text style={styles.copyrightText}>{t('settings.copyright')}</Text>
-          </View>
-        )}
+                <View style={styles.hairline} />
 
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
-
-      <Modal
-        visible={giftCardPromptVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          if (isRedeemingGiftCard) return;
-          setGiftCardPromptVisible(false);
-          setGiftCardCode('');
-        }}
-      >
-        <View style={styles.diagnosticPromptBackdrop}>
-          <View style={styles.diagnosticPromptCard}>
-            <Text style={styles.diagnosticPromptTitle}>
-              {t('settings.giftCard.modal.title')}
-            </Text>
-            <Text style={styles.diagnosticPromptMessage}>
-              {t('settings.giftCard.modal.message')}
-            </Text>
-            <TextInput
-              value={giftCardCode}
-              onChangeText={value => setGiftCardCode(value.toUpperCase())}
-              placeholder={t('settings.giftCard.modal.placeholder')}
-              placeholderTextColor={MUTED_TEXT}
-              style={[styles.diagnosticPromptInput, styles.giftCardCodeInput]}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              editable={!isRedeemingGiftCard}
-              maxLength={64}
-              accessibilityLabel={t('settings.giftCard.modal.placeholder')}
-            />
-            <View style={styles.diagnosticPromptActions}>
-              <TouchableOpacity
-                style={[
-                  styles.diagnosticPromptButton,
-                  isRedeemingGiftCard && styles.diagnosticPromptButtonDisabled,
-                ]}
-                activeOpacity={0.75}
-                disabled={isRedeemingGiftCard}
-                onPress={() => {
-                  setGiftCardPromptVisible(false);
-                  setGiftCardCode('');
-                }}
-              >
-                <Text style={styles.diagnosticPromptCancelText}>
-                  {t('settings.giftCard.modal.cancel')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.diagnosticPromptButton,
-                  styles.diagnosticPromptPrimaryButton,
-                  (!giftCardCode.trim() || isRedeemingGiftCard) &&
-                    styles.diagnosticPromptButtonDisabled,
-                ]}
-                activeOpacity={0.75}
-                disabled={!giftCardCode.trim() || isRedeemingGiftCard}
-                onPress={() => {
-                  void handleRedeemGiftCard();
-                }}
-              >
-                {isRedeemingGiftCard ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.diagnosticPromptPrimaryText}>
-                    {t('settings.giftCard.modal.submit')}
+                <View style={styles.infoRow}>
+                  <View style={styles.infoRowLeft}>
+                    <Icon name="pulse-outline" size={16} color={MUTED_TEXT} />
+                    <Text style={styles.infoRowLabel}>{t('settings.remoteWake.lanStatus')}</Text>
+                  </View>
+                  <Text style={[styles.infoRowValue, { color: hasLanWakeCached ? ONLINE_GREEN : MUTED_TEXT }]}>
+                    {hasLanWakeCached ? t('settings.remoteWake.lanStatusCached') : t('settings.remoteWake.lanStatusNotCached')}
                   </Text>
+                </View>
+
+                <View style={styles.hairline} />
+
+                <View style={styles.infoRow}>
+                  <View style={styles.infoRowLeft}>
+                    <Icon name="globe-outline" size={16} color={BLUE} />
+                    <Text style={styles.infoRowLabel}>{t('settings.remoteWake.wowEnable')}</Text>
+                  </View>
+                  <Switch
+                    value={wowEnabled}
+                    onValueChange={setWowEnabled}
+                    disabled={!hasLanWakeCached}
+                    trackColor={{ false: '#e9e9ea', true: BLUE }}
+                    thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+                  />
+                </View>
+
+                {hasEnabledPublicWake ? null : (
+                  <Text style={styles.remoteWakeHint}>{t('settings.remoteWake.enableHint')}</Text>
                 )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
-      <Modal
-        visible={diagnosticPromptVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          setDiagnosticPromptVisible(false);
-          setDiagnosticPromptNote('');
-        }}
-      >
-        <View style={styles.diagnosticPromptBackdrop}>
-          <View style={styles.diagnosticPromptCard}>
-            <Text style={styles.diagnosticPromptTitle}>
-              {t('settings.uploadDiagnostic.confirm.title')}
-            </Text>
-            <Text style={styles.diagnosticPromptMessage}>
-              {t('settings.uploadDiagnostic.confirm.message')}
-            </Text>
-            <TextInput
-              value={diagnosticPromptNote}
-              onChangeText={setDiagnosticPromptNote}
-              placeholder={t('settings.uploadDiagnostic.confirm.placeholder')}
-              placeholderTextColor={MUTED_TEXT}
-              style={styles.diagnosticPromptInput}
-              multiline
-              maxLength={500}
-              textAlignVertical="top"
-              accessibilityLabel={t(
-                'settings.uploadDiagnostic.confirm.placeholder',
-              )}
-            />
-            <View style={styles.diagnosticPromptActions}>
-              <TouchableOpacity
-                style={styles.diagnosticPromptButton}
-                activeOpacity={0.75}
-                onPress={() => {
-                  setDiagnosticPromptVisible(false);
-                  setDiagnosticPromptNote('');
-                }}
-              >
-                <Text style={styles.diagnosticPromptCancelText}>
-                  {t('settings.uploadDiagnostic.confirm.cancel')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.diagnosticPromptButton,
-                  styles.diagnosticPromptPrimaryButton,
-                ]}
-                activeOpacity={0.75}
-                onPress={() => {
-                  const note = diagnosticPromptNote;
-                  setDiagnosticPromptVisible(false);
-                  setDiagnosticPromptNote('');
-                  startDiagnosticUpload(note);
-                }}
-              >
-                <Text style={styles.diagnosticPromptPrimaryText}>
-                  {t('settings.uploadDiagnostic.confirm.ok')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+                <View style={styles.hairline} />
+                <Text style={styles.remoteWakeAdvancedLabel}>{t('settings.remoteWake.advancedTitle')}</Text>
+                
+                <View style={styles.infoRow}>
+                  <View style={styles.infoRowLeft}>
+                    <Icon name="link-outline" size={16} color={MUTED_TEXT} />
+                    <Text style={styles.infoRowLabel}>{t('settings.remoteWake.wowHostLabel')}</Text>
+                  </View>
+                  <TextInput
+                    style={[styles.infoRowValue, { flex: 1, padding: 0 }]}
+                    value={wowHost}
+                    onChangeText={setWowHost}
+                    placeholder={t('settings.remoteWake.wowHostPlaceholder')}
+                    placeholderTextColor={MUTED_TEXT}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    textAlign="right"
+                    editable={hasLanWakeCached}
+                  />
+                </View>
 
-      {isLoggingOut ? (
-        <View
-          style={styles.logoutTransitionOverlay}
-          pointerEvents="auto"
-          accessibilityRole="progressbar"
-          accessibilityLiveRegion="polite"
-        >
-          <ActivityIndicator size="large" color={AUTH_COLORS.primary} />
-        </View>
-      ) : null}
+                <View style={styles.hairline} />
+                
+                <View style={styles.infoRow}>
+                  <View style={styles.infoRowLeft}>
+                    <Icon name="options-outline" size={16} color={MUTED_TEXT} />
+                    <Text style={styles.infoRowLabel}>{t('settings.remoteWake.wowPortLabel')}</Text>
+                  </View>
+                  <TextInput
+                    style={[styles.infoRowValue, { flex: 1, padding: 0 }]}
+                    value={wowPort}
+                    onChangeText={setWowPort}
+                    keyboardType="number-pad"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    textAlign="right"
+                    editable={hasLanWakeCached}
+                  />
+                </View>
 
-      {/*
-       * Full-screen blocking overlay while `handleDeleteAccount` runs its
-       * Phase-1 cleanup (server deleteAccount → setSignedOutTransition →
-       * sidecar reset → wipeSyncIdentity → clearUserScopedStorage →
-       * clearAuth). Between `setSignedOutTransition` and `clearAuth` the
-       * store still reports `isLoggedIn === true`, so the logged-in
-       * Settings tree underneath is live and every row would hit the
-       * backend with tokens that the delete transaction has already
-       * revoked. The overlay is rendered AFTER ScrollView so it layers
-       * on top, and uses `pointerEvents="auto"` on a StyleSheet.absoluteFill
-       * View to swallow every touch underneath.
-       *
-       * Do NOT try to fix this by firing-and-forgetting the cleanup and
-       * calling `clearAuth` immediately — per account-identity-reset spec
-       * §4 Phase 1 the await chain is deliberate so the next login flow
-       * doesn't race into residual native / storage state.
-       */}
-      {isUploadingDiagnostics ? (
-        <View
-          style={styles.deletingOverlay}
-          pointerEvents="auto"
-          accessibilityRole="progressbar"
-          accessibilityLiveRegion="polite"
-        >
-          <View style={styles.deletingOverlayCard}>
-            <ActivityIndicator size="large" color={BLUE} />
-            <Text style={styles.deletingOverlayText}>
-              {t('settings.uploadDiagnostic.progress.title')}{' '}
-              {diagnosticUploadProgress > 0
-                ? `${String(diagnosticUploadProgress)}%`
-                : ''}
-            </Text>
+                <View style={styles.hairline} />
+                <TouchableOpacity
+                  style={[styles.saveWowButton, (isSavingWow || !hasLanWakeCached) && styles.saveWowButtonDisabled]}
+                  activeOpacity={0.7}
+                  onPress={handleSavePublicWake}
+                  disabled={isSavingWow || !hasLanWakeCached}
+                >
+                  <Text style={styles.saveWowButtonText}>
+                    {isSavingWow ? t('settings.remoteWake.wowSaving') : t('settings.remoteWake.wowSave')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : null}
+
+          {/* Forget bound PC Row (Alternative placement at bottom) */}
+          {deviceName ? (
             <TouchableOpacity
-              onPress={() => {
-                diagnosticAbortRef.current?.abort();
-              }}
-              style={styles.uploadCancelButton}
+              testID="settings-forget-desktop-button"
+              style={[styles.card, { paddingVertical: 14, alignItems: 'center' }]}
               activeOpacity={0.7}
+              onPress={handleForgetDesktop}
             >
-              <Text style={styles.uploadCancelText}>
-                {t('settings.uploadDiagnostic.progress.cancel')}
+              <Text style={{ color: DANGER_RED, fontSize: 15, fontWeight: '600' }}>
+                {t('settings.actions.forgetDesktop')}
               </Text>
             </TouchableOpacity>
-          </View>
-        </View>
-      ) : null}
+          ) : null}
 
-      {isDeletingAccount ? (
-        <View
-          style={styles.deletingOverlay}
-          // `auto` (the default) is explicit here to signal intent: we
-          // want this View to catch every touch so the UI underneath is
-          // untappable.
-          pointerEvents="auto"
-          accessibilityRole="progressbar"
-          accessibilityLiveRegion="polite"
+          {!isGlobalMarket() && (
+            <View style={styles.footer}>
+              <Text style={styles.copyrightText}>{t('settings.copyright')}</Text>
+            </View>
+          )}
+
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
+
+        {/* ══════════════════════════════════════════════════════════════════
+            MODALS & BOTTOM SHEETS
+            ══════════════════════════════════════════════════════════════════ */}
+
+        {/* Language Bottom Sheet Modal */}
+        <Modal
+          visible={showLanguageSheet}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowLanguageSheet(false)}
         >
-          <View style={styles.deletingOverlayCard}>
-            <ActivityIndicator size="large" color={BLUE} />
-            <Text style={styles.deletingOverlayText}>
-              {resolveDeleteOverlayTitle(i18n.language)}
-            </Text>
+          <View style={styles.bottomSheetBackdrop}>
+            <TouchableOpacity 
+              style={styles.backdropClickArea} 
+              activeOpacity={1} 
+              onPress={() => setShowLanguageSheet(false)} 
+            />
+            <View style={styles.bottomSheetCard}>
+              <View style={styles.bottomSheetHandle} />
+              <Text style={styles.bottomSheetTitle}>{t('settings.rows.language')}</Text>
+              
+              <View style={styles.bottomSheetOptions}>
+                {LANGUAGE_OPTIONS.map(option => {
+                  const isSelected = languagePreference === option.value;
+                  return (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[styles.bottomSheetOption, isSelected && styles.bottomSheetOptionSelected]}
+                      activeOpacity={0.7}
+                      disabled={isChangingLanguage}
+                      onPress={() => {
+                        setShowLanguageSheet(false);
+                        void handleLanguagePreferenceChange(option.value);
+                      }}
+                    >
+                      <Text style={[styles.bottomSheetOptionText, isSelected && styles.bottomSheetOptionTextSelected]}>
+                        {t(option.labelKey)}
+                      </Text>
+                      {isSelected && <Icon name="checkmark" size={20} color={BLUE} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
           </View>
-        </View>
-      ) : null}
-    </SafeAreaView>
+        </Modal>
+
+        {/* Gift Card Modal */}
+        <Modal
+          visible={giftCardPromptVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            if (isRedeemingGiftCard) return;
+            setGiftCardPromptVisible(false);
+            setGiftCardCode('');
+          }}
+        >
+          <View style={styles.diagnosticPromptBackdrop}>
+            <View style={styles.diagnosticPromptCard}>
+              <Text style={styles.diagnosticPromptTitle}>
+                {t('settings.giftCard.modal.title')}
+              </Text>
+              <Text style={styles.diagnosticPromptMessage}>
+                {t('settings.giftCard.modal.message')}
+              </Text>
+              <TextInput
+                value={giftCardCode}
+                onChangeText={value => setGiftCardCode(value.toUpperCase())}
+                placeholder={t('settings.giftCard.modal.placeholder')}
+                placeholderTextColor={MUTED_TEXT}
+                style={[styles.diagnosticPromptInput, styles.giftCardCodeInput]}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                editable={!isRedeemingGiftCard}
+                maxLength={64}
+                accessibilityLabel={t('settings.giftCard.modal.placeholder')}
+              />
+              <View style={styles.diagnosticPromptActions}>
+                <TouchableOpacity
+                  style={[
+                    styles.diagnosticPromptButton,
+                    isRedeemingGiftCard && styles.diagnosticPromptButtonDisabled,
+                  ]}
+                  activeOpacity={0.75}
+                  disabled={isRedeemingGiftCard}
+                  onPress={() => {
+                    setGiftCardPromptVisible(false);
+                    setGiftCardCode('');
+                  }}
+                >
+                  <Text style={styles.diagnosticPromptCancelText}>
+                    {t('settings.giftCard.modal.cancel')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.diagnosticPromptButton,
+                    styles.diagnosticPromptPrimaryButton,
+                    (!giftCardCode.trim() || isRedeemingGiftCard) && styles.diagnosticPromptButtonDisabled,
+                  ]}
+                  activeOpacity={0.75}
+                  disabled={!giftCardCode.trim() || isRedeemingGiftCard}
+                  onPress={() => {
+                    void handleRedeemGiftCard();
+                  }}
+                >
+                  {isRedeemingGiftCard ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.diagnosticPromptPrimaryText}>
+                      {t('settings.giftCard.modal.submit')}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Diagnostics Upload Note Modal */}
+        <Modal
+          visible={diagnosticPromptVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            setDiagnosticPromptVisible(false);
+            setDiagnosticPromptNote('');
+          }}
+        >
+          <View style={styles.diagnosticPromptBackdrop}>
+            <View style={styles.diagnosticPromptCard}>
+              <Text style={styles.diagnosticPromptTitle}>
+                {t('settings.uploadDiagnostic.confirm.title')}
+              </Text>
+              <Text style={styles.diagnosticPromptMessage}>
+                {t('settings.uploadDiagnostic.confirm.message')}
+              </Text>
+              <TextInput
+                value={diagnosticPromptNote}
+                onChangeText={setDiagnosticPromptNote}
+                placeholder={t('settings.uploadDiagnostic.confirm.placeholder')}
+                placeholderTextColor={MUTED_TEXT}
+                style={styles.diagnosticPromptInput}
+                multiline
+                maxLength={500}
+                textAlignVertical="top"
+                accessibilityLabel={t(
+                  'settings.uploadDiagnostic.confirm.placeholder',
+                )}
+              />
+              <View style={styles.diagnosticPromptActions}>
+                <TouchableOpacity
+                  style={styles.diagnosticPromptButton}
+                  activeOpacity={0.75}
+                  onPress={() => {
+                    setDiagnosticPromptVisible(false);
+                    setDiagnosticPromptNote('');
+                  }}
+                >
+                  <Text style={styles.diagnosticPromptCancelText}>
+                    {t('settings.uploadDiagnostic.confirm.cancel')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.diagnosticPromptButton,
+                    styles.diagnosticPromptPrimaryButton,
+                  ]}
+                  activeOpacity={0.75}
+                  onPress={() => {
+                    const note = diagnosticPromptNote;
+                    setDiagnosticPromptVisible(false);
+                    setDiagnosticPromptNote('');
+                    startDiagnosticUpload(note);
+                  }}
+                >
+                  <Text style={styles.diagnosticPromptPrimaryText}>
+                    {t('settings.uploadDiagnostic.confirm.ok')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {isLoggingOut ? (
+          <View
+            style={styles.logoutTransitionOverlay}
+            pointerEvents="auto"
+            accessibilityRole="progressbar"
+            accessibilityLiveRegion="polite"
+          >
+            <ActivityIndicator size="large" color={AUTH_COLORS.primary} />
+          </View>
+        ) : null}
+
+        {isUploadingDiagnostics ? (
+          <View
+            style={styles.deletingOverlay}
+            pointerEvents="auto"
+            accessibilityRole="progressbar"
+            accessibilityLiveRegion="polite"
+          >
+            <View style={styles.deletingOverlayCard}>
+              <ActivityIndicator size="large" color={BLUE} />
+              <Text style={styles.deletingOverlayText}>
+                {t('settings.uploadDiagnostic.progress.title')}{' '}
+                {diagnosticUploadProgress > 0 ? `${String(diagnosticUploadProgress)}%` : ''}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  diagnosticAbortRef.current?.abort();
+                }}
+                style={styles.uploadCancelButton}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.uploadCancelText}>
+                  {t('settings.uploadDiagnostic.progress.cancel')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
+
+        {isDeletingAccount ? (
+          <View
+            style={styles.deletingOverlay}
+            pointerEvents="auto"
+            accessibilityRole="progressbar"
+            accessibilityLiveRegion="polite"
+          >
+            <View style={styles.deletingOverlayCard}>
+              <ActivityIndicator size="large" color={BLUE} />
+              <Text style={styles.deletingOverlayText}>
+                {resolveDeleteOverlayTitle(i18n.language)}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+      </SafeAreaView>
+      <BottomTabBar activeTab="settings" />
+    </GradientBackground>
   );
 }
 
@@ -2739,7 +2559,7 @@ export function SettingsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: SCREEN_BG,
+    backgroundColor: 'transparent',
   },
   chevronCircle: {
     width: 24,
@@ -2813,7 +2633,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 48,
+    paddingBottom: 116,
   },
 
   // Section label
@@ -2967,8 +2787,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: CARD_BORDER,
-    padding: 16,
+    padding: 0,
     marginBottom: 20,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
@@ -3421,5 +3242,161 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: BLUE,
     textAlign: 'center',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  iconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rowContent: {
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: 'center',
+  },
+  rowTitle: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: DARK,
+  },
+  rowSubtitle: {
+    fontSize: 13,
+    color: MUTED_TEXT,
+    marginTop: 2,
+  },
+  lockedHintText: {
+    color: DANGER_RED,
+  },
+  rowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginLeft: 8,
+  },
+  hairline: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: HAIRLINE,
+    marginLeft: 16,
+  },
+
+  // Current-device badge ("当前" green pill)
+  currentBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: 'rgba(34,197,94,0.12)',
+  },
+  currentBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: ONLINE_GREEN,
+  },
+
+  // Version row "已是最新" label
+  latestText: {
+    fontSize: 13,
+    color: MUTED_TEXT,
+  },
+
+  // Standalone danger action card (logout / delete account)
+  dangerActionCard: {
+    backgroundColor: CARD_BG,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    paddingVertical: 16,
+    marginBottom: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 2,
+    ...authCardSurfaceStyle,
+  },
+  dangerActionText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: DANGER_RED,
+  },
+  saveWowButton: {
+    backgroundColor: BLUE,
+    borderRadius: 12,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 16,
+    marginTop: 8,
+  },
+  saveWowButtonDisabled: {
+    backgroundColor: 'rgba(59, 130, 246, 0.4)',
+  },
+  saveWowButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  bottomSheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'flex-end',
+  },
+  backdropClickArea: {
+    flex: 1,
+  },
+  bottomSheetCard: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 40,
+    width: '100%',
+  },
+  bottomSheetHandle: {
+    width: 36,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 16,
+  },
+  bottomSheetTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: DARK,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  bottomSheetOptions: {
+    paddingHorizontal: 16,
+  },
+  bottomSheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 4,
+    backgroundColor: 'transparent',
+  },
+  bottomSheetOptionSelected: {
+    backgroundColor: 'rgba(99, 102, 241, 0.08)',
+  },
+  bottomSheetOptionText: {
+    fontSize: 15,
+    color: DARK,
+  },
+  bottomSheetOptionTextSelected: {
+    color: '#6366f1',
+    fontWeight: '600',
   },
 });

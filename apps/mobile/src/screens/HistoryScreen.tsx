@@ -1,551 +1,332 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SectionList,
+  FlatList,
   TouchableOpacity,
-  Animated,
-  Easing,
+  ActivityIndicator,
+  Alert,
   NativeModules,
-  NativeEventEmitter,
-  type SectionListData,
-  type SectionListRenderItemInfo,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useTranslation } from 'react-i18next';
-import type { TFunction } from 'i18next';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/colors';
-import { formatBytes, formatDuration } from '../utils/format';
-import { formatLocalDateKey, formatLocalYesterdayDateKey } from '../utils/localDateKey';
+import { formatBytes } from '../utils/format';
 import { Icon } from '../components/Icon';
-import { listHistory } from '../services/desktop-local-service';
+import { GradientBackground } from '../components/GradientBackground';
+import { BottomTabBar } from '../components/BottomTabBar';
+import { listHistory, downloadResource } from '../services/desktop-local-service';
 import type { DesktopSyncRecordDTO } from '@syncflow/contracts';
-
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface SessionCard {
-  id: string;
-  deviceName: string;
-  deviceIp: string;
-  fileCount: number;
-  totalSize: string;
-  duration: string;
-}
-
-interface HistorySection {
-  title: string;
-  isToday: boolean;
-  data: SessionCard[];
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function isToday(dateStr: string): boolean {
-  const today = formatLocalDateKey(new Date());
-  return dateStr === today;
-}
-
-function isYesterday(dateStr: string): boolean {
-  return dateStr === formatLocalYesterdayDateKey(new Date());
-}
-
-function formatDateLabel(dateStr: string, t: TFunction): string {
-  if (isToday(dateStr)) return t('history.dates.today');
-  if (isYesterday(dateStr)) return t('history.dates.yesterday');
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    return t('history.dates.monthDay', {
-      month: parseInt(parts[1], 10),
-      day: parseInt(parts[2], 10),
-    });
-  }
-  return dateStr;
-}
-
-// ---------------------------------------------------------------------------
-// Pulsing blue dot component
-// ---------------------------------------------------------------------------
-
-function PulsingDot() {
-  const pulseAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1200,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0,
-          duration: 1200,
-          easing: Easing.in(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [pulseAnim]);
-
-  return (
-    <View style={styles.dotContainer}>
-      <Animated.View
-        style={[
-          styles.dotPulse,
-          {
-            opacity: pulseAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.6, 0],
-            }),
-            transform: [
-              {
-                scale: pulseAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, 2.2],
-                }),
-              },
-            ],
-          },
-        ]}
-      />
-      <View style={styles.dotSolid} />
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Device summary card
-// ---------------------------------------------------------------------------
-
-interface DeviceCardProps {
-  deviceName: string;
-  deviceIp: string;
-  fileCount: number;
-  totalSize: string;
-  duration: string;
-  t: TFunction;
-}
-
-function DeviceCard({ deviceName, deviceIp, fileCount, totalSize, duration, t }: DeviceCardProps) {
-  return (
-    <View style={styles.card}>
-      {/* Row 1: device icon + name + IP */}
-      <View style={styles.cardHeader}>
-        <View style={styles.monitorIconWrapper}>
-          <Icon name="desktop-outline" size={20} color="#fff" />
-        </View>
-        <View style={styles.cardDeviceInfo}>
-          <Text style={styles.cardDeviceName} numberOfLines={1}>
-            {deviceName}
-          </Text>
-          <Text style={styles.cardDeviceIp}>{deviceIp}</Text>
-        </View>
-      </View>
-
-      {/* Divider */}
-      <View style={styles.cardDivider} />
-
-      {/* Row 2: stats */}
-      <View style={styles.cardStats}>
-        <View style={styles.cardStatsLeft}>
-          <Text style={styles.statsLabel}>{t('history.cards.statsLabel')}</Text>
-          <View style={styles.statsValue}>
-            <Text style={styles.statsCount}>{fileCount}</Text>
-            <Text style={styles.statsSep}> {t('history.cards.statsUnit')} {'·'} </Text>
-            <Text style={styles.statsSize}>{totalSize}</Text>
-          </View>
-        </View>
-        <View style={styles.cardStatsRight}>
-          <Text style={styles.durationLabel}>{t('history.cards.durationLabel')}</Text>
-          <Text style={styles.durationValue}>{duration}</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// HistoryScreen
-// ---------------------------------------------------------------------------
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'History'>;
 
 export function HistoryScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { t } = useTranslation();
-  const [sections, setSections] = useState<HistorySection[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [historyItems, setHistoryItems] = useState<DesktopSyncRecordDTO[]>([]);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  // ---------------------------------------------------------------------------
-  // Load real history from native module
-  // ---------------------------------------------------------------------------
+  const loadHistory = useCallback(async () => {
+    try {
+      const { NativeSyncEngine } = NativeModules;
+      if (!NativeSyncEngine) {
+        setLoading(false);
+        return;
+      }
 
-  useEffect(() => {
-    const loadHistory = async () => {
+      const binding = await NativeSyncEngine.getBindingState();
+      if (!binding || !binding.host) {
+        setHistoryItems([]);
+        setLoading(false);
+        return;
+      }
+
+      const desktop = { host: binding.host, port: 39394 };
+      const result = await listHistory(desktop);
+      // Filter out files that were completed successfully
+      const completedFiles = (result || []).filter(item => item.status === 'completed');
+      setHistoryItems(completedFiles);
+    } catch (e) {
+      console.warn('[HistoryScreen] Failed to load history:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      loadHistory();
+    }, [loadHistory])
+  );
+
+  const handleDownload = useCallback(
+    async (fileKey: string, filename: string) => {
+      if (downloadingId) return;
+      setDownloadingId(fileKey);
+
       try {
         const { NativeSyncEngine } = NativeModules;
-        if (!NativeSyncEngine) return;
-
-        const binding = await NativeSyncEngine.getBindingState();
+        const binding = await NativeSyncEngine?.getBindingState();
         if (!binding || !binding.host) {
-          setSections([]);
+          Alert.alert(t('sharedFiles.deviceUnavailable.title') || '設備不可用');
           return;
         }
 
         const desktop = { host: binding.host, port: 39394 };
-        const result = await listHistory(desktop);
-        const grouped = groupRecordsByDate(result, t);
-        setSections(grouped);
-      } catch (e) {
-        console.warn('Failed to load history scoped by current desktop:', e);
+        await downloadResource(desktop, fileKey);
+
+        Alert.alert(
+          t('sharedFiles.dialogs.downloadComplete') || '下載完成',
+          t('sharedFiles.dialogs.downloadSavedToPhotos', { name: filename }) ||
+            `${filename} 已儲存至相簿`
+        );
+      } catch (err) {
+        console.warn('[HistoryScreen] Download failed:', err);
+        Alert.alert(
+          t('sharedFiles.dialogs.downloadFailed') || '下載失敗',
+          t('sharedFiles.dialogs.downloadFailedMessage') ||
+            '無法下載檔案，請稍後重試'
+        );
+      } finally {
+        setDownloadingId(null);
       }
-    };
-
-    loadHistory();
-  }, []);
-
-
-  const renderSectionHeader = ({
-    section,
-  }: {
-    section: SectionListData<SessionCard, HistorySection>;
-  }) => (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{section.title}</Text>
-      {section.isToday && (
-        <>
-          <PulsingDot />
-          <Text style={styles.liveLabel}>{t('history.liveLabel')}</Text>
-        </>
-      )}
-    </View>
+    },
+    [downloadingId, t]
   );
 
-  const renderItem = ({ item }: SectionListRenderItemInfo<SessionCard, HistorySection>) => (
-    <DeviceCard
-      deviceName={item.deviceName}
-      deviceIp={item.deviceIp}
-      fileCount={item.fileCount}
-      totalSize={item.totalSize}
-      duration={item.duration}
-      t={t}
-    />
-  );
+  const getFileIcon = (mediaType: string, filename: string) => {
+    const isVideo = mediaType === 'video' || /\.(mp4|mov|avi|mkv|webm)$/i.test(filename);
+    const isImage = mediaType === 'image' || /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(filename);
+    if (isVideo) {
+      return { name: 'play', color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)' };
+    }
+    if (isImage) {
+      return { name: 'image', color: '#3b82f6', bg: 'rgba(59,130,246,0.08)' };
+    }
+    return { name: 'document-text', color: '#10b981', bg: 'rgba(16,185,129,0.08)' };
+  };
 
-  const keyExtractor = (item: SessionCard) => item.id;
+  const getFileTypeText = (mediaType: string, filename: string) => {
+    const isVideo = mediaType === 'video' || /\.(mp4|mov|avi|mkv|webm)$/i.test(filename);
+    const isImage = mediaType === 'image' || /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(filename);
+    if (isVideo) return '視頻';
+    if (isImage) return '照片';
+    return '文件';
+  };
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            activeOpacity={0.6}
-            hitSlop={{ top: 15, bottom: 15, left: 15, right: 30 }}
-            onPress={() => {
-              if (navigation.canGoBack()) {
-                navigation.goBack();
-              } else {
-                navigation.reset({ index: 0, routes: [{ name: 'SyncActivity' as never }] });
-              }
-            }}
-            accessibilityLabel={t('common.back')}
-          >
-            <Icon name="chevron-back" size={20} color={colors.screenTitle} />
-          </TouchableOpacity>
-          <Text style={styles.title}>{t('history.title')}</Text>
+  const formatItemTime = (isoString?: string) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) return '';
+
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+    if (date.toDateString() === today.toDateString()) {
+      return `今天 ${timeString}`;
+    }
+    if (date.toDateString() === yesterday.toDateString()) {
+      return `昨天 ${timeString}`;
+    }
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${timeString}`;
+  };
+
+  const renderItem = ({ item }: { item: DesktopSyncRecordDTO }) => {
+    const iconConfig = getFileIcon(item.mediaType, item.filename);
+    const fileType = getFileTypeText(item.mediaType, item.filename);
+    const formattedTime = formatItemTime(item.completedAt || item.failedAt);
+    const isDownloading = downloadingId === item.fileKey;
+
+    return (
+      <View style={styles.card}>
+        <View style={[styles.iconWrapper, { backgroundColor: iconConfig.bg }]}>
+          <Icon name={iconConfig.name} size={20} color={iconConfig.color} />
         </View>
 
-        {/* Content */}
-        <SectionList
-          sections={sections}
-          renderSectionHeader={renderSectionHeader}
-          renderItem={renderItem}
-          keyExtractor={keyExtractor}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          stickySectionHeadersEnabled={false}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>{t('history.emptyState.noRecords')}</Text>
-            </View>
-          }
-        />
+        <View style={styles.infoWrapper}>
+          <Text style={styles.fileName} numberOfLines={1}>
+            {item.filename}
+          </Text>
+          <Text style={styles.fileMeta}>
+            {`${fileType} · ${formatBytes(item.fileSize)}`}
+          </Text>
+          {formattedTime ? <Text style={styles.fileTime}>{formattedTime}</Text> : null}
+        </View>
+
+        <TouchableOpacity
+          style={styles.downloadButton}
+          activeOpacity={0.7}
+          disabled={isDownloading}
+          onPress={() => handleDownload(item.fileKey, item.filename)}
+        >
+          {isDownloading ? (
+            <ActivityIndicator size="small" color="#3b82f6" />
+          ) : (
+            <Icon name="download-outline" size={18} color="#3b82f6" />
+          )}
+        </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    );
+  };
+
+  return (
+    <GradientBackground>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              activeOpacity={0.6}
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 30 }}
+              onPress={() => {
+                if (navigation.canGoBack()) {
+                  navigation.goBack();
+                } else {
+                  navigation.reset({ index: 0, routes: [{ name: 'SyncActivity' }] });
+                }
+              }}
+              accessibilityLabel={t('common.back')}
+            >
+              <Icon name="chevron-back" size={20} color={colors.screenTitle} />
+            </TouchableOpacity>
+            <Text style={styles.title}>最近下載</Text>
+          </View>
+
+          {/* Content */}
+          {loading ? (
+            <View style={styles.centerSection}>
+              <ActivityIndicator size="large" color="#3b9fd8" />
+            </View>
+          ) : (
+            <FlatList
+              data={historyItems}
+              renderItem={renderItem}
+              keyExtractor={item => item.recordId}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Icon name="cloud-download-outline" size={48} color="#b0c8da" />
+                  <Text style={styles.emptyText}>暫無下載記錄</Text>
+                </View>
+              }
+            />
+          )}
+        </View>
+      </SafeAreaView>
+      <BottomTabBar activeTab="home" />
+    </GradientBackground>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Group ledger items by date into sections
-// ---------------------------------------------------------------------------
-
-interface LedgerItem {
-  ledgerDate?: string;
-  dateKey?: string;
-  deviceId: string;
-  deviceName?: string;
-  deviceNameSnapshot?: string;
-  deviceIp?: string;
-  deviceIpSnapshot?: string;
-  fileCount: number;
-  totalBytes: number;
-  transmissionMs?: number;
-  activeTransmissionMs?: number;
-}
-
-function groupRecordsByDate(items: DesktopSyncRecordDTO[], t: TFunction): HistorySection[] {
-  const map = new Map<string, SessionCard[]>();
-
-  for (const item of items) {
-    const rawDate = item.completedAt || item.failedAt || new Date().toISOString();
-    const date = rawDate.split('T')[0];
-    if (!map.has(date)) {
-      map.set(date, []);
-    }
-    map.get(date)!.push({
-      id: item.recordId,
-      deviceName: item.filename,
-      deviceIp:
-        item.status === 'completed'
-          ? t('history.status.completed') || '同步成功'
-          : t('history.status.failed') || '同步失敗',
-      fileCount: 1,
-      totalSize: formatBytes(item.fileSize),
-      duration: rawDate
-        ? new Date(rawDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        : '',
-    });
-  }
-
-  return Array.from(map.keys())
-    .sort((a, b) => b.localeCompare(a))
-    .map(date => ({
-      title: formatDateLabel(date, t),
-      isToday: isToday(date),
-      data: map.get(date)!,
-    }));
-}
-
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#DFF0FE',
   },
   container: {
     flex: 1,
   },
-
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 20,
-    gap: 10,
-    zIndex: 10,
+    paddingBottom: 16,
+    gap: 12,
   },
   backButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(255,255,255,0.70)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: 'rgba(120,172,210,0.12)',
-    shadowOffset: { width: 0, height: 5 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 1,
-    shadowRadius: 12,
+    shadowRadius: 8,
     elevation: 2,
   },
   title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    letterSpacing: -0.36,
-    color: colors.screenTitle,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1c304a',
   },
-
-  // Section list
   listContent: {
-    paddingHorizontal: 12,
-    paddingBottom: 40,
+    paddingHorizontal: 16,
+    paddingBottom: 100,
   },
-
-  // Section header
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 4,
-    marginTop: 4,
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    letterSpacing: -0.28,
-    color: '#264A73',
-  },
-
-  // Pulsing dot
-  dotContainer: {
-    width: 8,
-    height: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dotPulse: {
-    position: 'absolute',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#3398D6',
-  },
-  dotSolid: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#3398D6',
-  },
-  liveLabel: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#8FB2CF',
-  },
-
-  // Device card
   card: {
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 10,
-    shadowColor: 'rgba(81,145,197,0.08)',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 2,
-  },
-  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingBottom: 10,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 12,
+    shadowColor: 'rgba(0,0,0,0.03)',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 1,
   },
-  monitorIconWrapper: {
-    width: 43,
-    height: 43,
-    borderRadius: 14,
+  iconWrapper: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#42A7E2',
-    shadowColor: 'rgba(66,167,226,0.22)',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 1,
-    shadowRadius: 16,
-    elevation: 2,
   },
-  cardDeviceInfo: {
+  infoWrapper: {
     flex: 1,
-    minWidth: 0,
+    marginLeft: 12,
+    marginRight: 8,
   },
-  cardDeviceName: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    letterSpacing: -0.12,
-    color: '#173B67',
+  fileName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a3a5c',
   },
-  cardDeviceIp: {
-    fontSize: 9,
-    color: '#A8BDCF',
-    marginTop: 2,
-  },
-
-  // Divider
-  cardDivider: {
-    height: 1,
-    backgroundColor: '#EEF5FB',
-    marginBottom: 10,
-  },
-
-  // Stats
-  cardStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  cardStatsLeft: {
-    flex: 1,
-    minWidth: 0,
-  },
-  statsLabel: {
-    fontSize: 8,
-    fontWeight: '500',
-    color: '#B6C7D7',
-    marginBottom: 4,
-  },
-  statsValue: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  statsCount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    lineHeight: 18,
-    color: '#42A7E2',
-  },
-  statsSep: {
+  fileMeta: {
     fontSize: 11,
-    color: '#D0DAE4',
+    color: '#8fa0b5',
+    marginTop: 4,
   },
-  statsSize: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    lineHeight: 15,
-    color: '#173B67',
+  fileTime: {
+    fontSize: 10,
+    color: '#a0aec0',
+    marginTop: 3,
   },
-  cardStatsRight: {
-    alignItems: 'flex-end',
-    paddingLeft: 10,
+  downloadButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(59,130,246,0.06)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  durationLabel: {
-    fontSize: 8,
-    fontWeight: '500',
-    color: '#B6C7D7',
-    marginBottom: 4,
+  centerSection: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  durationValue: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    lineHeight: 15,
-    color: '#42A7E2',
-  },
-
-  // Empty
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 96,
+    paddingTop: 120,
+    gap: 12,
   },
   emptyText: {
     fontSize: 14,
-    color: '#8aabbd',
+    color: '#8fa0b5',
   },
 });

@@ -82,5 +82,19 @@
   "sections": {
     "discovered": "已偵測的電腦",
     "recent": "最近連線的電腦"
+  },
+  "connectionMethod": {
+    "title": "選擇連接方式",
+    "selected": "已選擇 {{name}}",
+    "qrTitle": "掃碼連接",
+    "qrDesc": "掃描 {{name}} 上顯示的二維碼",
+    "codeTitle": "輸入連接碼",
+    "codeDesc": "輸入 {{name}} 顯示的連接碼",
+    "cancel": "取消",
+    "connect": "連接",
+    "inputPlaceholder": "輸入連接碼",
+    "verifying": "正在驗證連接碼…",
+    "connectCodeTitle": "輸入連接碼",
+    "connectCodeDesc": "輸入 {{name}} 顯示的連接碼以完成連接。"
   }
 }

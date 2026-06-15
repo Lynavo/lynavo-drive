@@ -1,7 +1,22 @@
 {
-  "defaultFolderName": "共享目錄",
+  "title": "遠端資源",
+  "phoneSyncSpace": {
+    "title": "手機同步空間",
+    "desc": "檢視已同步至電腦的檔案與上傳來源",
+    "select": "選擇",
+    "selectFeature": "該功能正在開發中",
+    "empty": "尚無同步檔案"
+  },
+  "remoteAccess": {
+    "title": "遠端訪問電腦",
+    "desc": "瀏覽電腦端共享的目錄結構並下載文件",
+    "select": "選擇",
+    "selectFeature": "該功能正在開發中",
+    "empty": "目前沒有共享資源"
+  },
   "teamFolderName": "共享目錄",
   "personalFolderName": "個人共享目錄",
+  "defaultFolderName": "共享目錄",
   "globalPersonalFolderName": "我的電腦",
   "scopes": {
     "team": "共享目錄",

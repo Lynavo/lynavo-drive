@@ -27,6 +27,8 @@ import { ConnectionTutorialScreen } from '../screens/ConnectionTutorialScreen';
 import { SyncActivityScreen } from '../screens/SyncActivityScreen';
 import { AlbumWorkbenchScreen } from '../screens/AlbumWorkbenchScreen';
 import { SharedFilesScreen } from '../screens/SharedFilesScreen';
+import { PhoneSyncSpaceScreen } from '../screens/PhoneSyncSpaceScreen';
+import { RemoteAccessScreen } from '../screens/RemoteAccessScreen';
 import { HistoryScreen } from '../screens/HistoryScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { HelpScreen } from '../screens/HelpScreen';
@@ -61,6 +63,8 @@ export type RootStackParamList = {
   SyncActivity: undefined;
   AlbumWorkbench: undefined;
   SharedFiles: undefined;
+  PhoneSyncSpace: undefined;
+  RemoteAccess: { path?: string } | undefined;
   History: undefined;
   Settings: undefined;
   Help: undefined;
@@ -363,6 +367,8 @@ function AuthedStack({
         <Stack.Screen name="SyncActivity" component={SyncActivityScreen} />
         <Stack.Screen name="AlbumWorkbench" component={AlbumWorkbenchScreen} />
         <Stack.Screen name="SharedFiles" component={SharedFilesScreen} />
+        <Stack.Screen name="PhoneSyncSpace" component={PhoneSyncSpaceScreen} />
+        <Stack.Screen name="RemoteAccess" component={RemoteAccessScreen} />
         <Stack.Screen name="History" component={HistoryScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="Help" component={HelpScreen} />

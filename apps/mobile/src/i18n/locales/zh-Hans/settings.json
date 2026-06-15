@@ -5,7 +5,11 @@
   "sections": {
     "connectedDevice": "已连接设备",
     "supportHelp": "支持与帮助",
-    "giftCard": "礼品卡"
+    "giftCard": "礼品卡",
+    "account": "我的账户",
+    "myDevice": "我的设备",
+    "computers": "电脑设备",
+    "general": "通用"
   },
   "android": {
     "title": "Android 端能力说明",
@@ -25,7 +29,8 @@
     "introTrial": "月订阅免费期",
     "expired": "已到期",
     "active": "有效",
-    "subscribeCta": "立即订阅"
+    "subscribeCta": "立即订阅",
+    "restoreDesc": "从应用商店检查历史购买记录"
   },
   "myDevice": {
     "label": "我的设备名称",
@@ -41,7 +46,10 @@
     "currentAccount": "当前账号",
     "latestSync": "最近同步",
     "appVersion": "应用版本",
-    "language": "语言"
+    "language": "语言",
+    "faq": "常见问题",
+    "faqDesc": "操作说明与常见问题",
+    "diagnosticsDesc": "上传日志和设备状态以方便排查问题"
   },
   "phone": {
     "reveal": "显示完整手机号",
@@ -81,6 +89,7 @@
   },
   "giftCard": {
     "action": "礼品卡兑换",
+    "desc": "输入礼品码以解锁 7 天试用",
     "monthlyPlan": "月订阅",
     "yearlyPlan": "年订阅",
     "modal": {
@@ -116,11 +125,13 @@
     "exportingDiagnostics": "正在导出诊断包…",
     "help": "帮助",
     "resetSyncStatus": "重置同步状态",
-    "logout": "退出登录",
+    "logout": "登出",
     "switch": "切换",
-    "deleteAccount": "删除帐号",
-    "deletingAccount": "删除中…",
-    "forgetDesktop": "遗忘此电脑"
+    "deleteAccount": "注销账号",
+    "deletingAccount": "注销中…",
+    "forgetDesktop": "遗忘此电脑",
+    "switchDevice": "切换设备",
+    "switchDeviceDesc": "将断开当前设备并重新连接其他电脑"
   },
   "status": {
     "noRecord": "暂无记录",

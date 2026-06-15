@@ -82,5 +82,19 @@
   "sections": {
     "discovered": "已发现的电脑",
     "recent": "最近连接的电脑"
+  },
+  "connectionMethod": {
+    "title": "选择连接方式",
+    "selected": "已选择 {{name}}",
+    "qrTitle": "扫码连接",
+    "qrDesc": "扫描 {{name}} 上显示的二维码",
+    "codeTitle": "输入连接码",
+    "codeDesc": "输入 {{name}} 显示的连接码",
+    "cancel": "取消",
+    "connect": "连接",
+    "inputPlaceholder": "输入连接码",
+    "verifying": "正在验证连接码…",
+    "connectCodeTitle": "输入连接码",
+    "connectCodeDesc": "输入 {{name}} 显示的连接码以完成连接。"
   }
 }

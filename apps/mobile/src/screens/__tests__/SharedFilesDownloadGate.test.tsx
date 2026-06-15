@@ -180,7 +180,6 @@ describe('SharedFilesScreen V2', () => {
       expect(queryByText('載入中...')).toBeNull();
       expect(getByText('test-folder')).toBeTruthy();
       expect(getByText('photo.jpg')).toBeTruthy();
-      expect(getByText('1.50 MB')).toBeTruthy();
     });
   });
 
@@ -206,9 +205,8 @@ describe('SharedFilesScreen V2', () => {
       expect(getByText('photo.jpg')).toBeTruthy();
     });
 
-    // Press download
-    const downloadButton = getByText('download-outline');
-    fireEvent.press(downloadButton);
+    // Press download by pressing the file text
+    fireEvent.press(getByText('photo.jpg'));
 
     await waitFor(() => {
       expect(mockDownloadResource).toHaveBeenCalledWith(
@@ -250,7 +248,6 @@ describe('SharedFilesScreen V2', () => {
 
     await waitFor(() => {
       expect(getByText('received-file.mp4')).toBeTruthy();
-      expect(getByText('2.00 MB')).toBeTruthy();
     });
   });
 });

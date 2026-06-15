@@ -46,6 +46,7 @@ jest.mock('react-native', () => {
 import type { AppStateStatus } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { StyleSheet } from 'react-native';
 import type { ReactTestInstance } from 'react-test-renderer';
 import type { SubscriptionInfo, UserProfile } from '../../stores/auth-store';
 
@@ -338,8 +339,7 @@ describe('SettingsScreen', () => {
       expect(getByText('訂閱服務')).toBeTruthy();
     });
 
-    expect(getByText('7 天')).toBeTruthy();
-    expect(getByText('月訂閱免費期')).toBeTruthy();
+    expect(getByText('月訂閱免費期 · 7 天')).toBeTruthy();
     expect(queryByText('免費試用')).toBeNull();
     expect(queryByText('立即訂閱')).toBeNull();
   });
@@ -368,6 +368,35 @@ describe('SettingsScreen', () => {
     expect(queryByText('TEST: Flush IAP Queue')).toBeNull();
   });
 
+  test('renders settings groups as inset list cards with bottom-tab clearance', async () => {
+    const { getByTestId, getByText } = render(<SettingsScreen />);
+
+    await waitFor(() => {
+      expect(getByText('我的帳號')).toBeTruthy();
+    });
+
+    for (const testId of [
+      'settings-account-card',
+      'settings-computers-card',
+      'settings-general-card',
+    ]) {
+      expect(StyleSheet.flatten(getByTestId(testId).props.style)).toEqual(
+        expect.objectContaining({
+          padding: 0,
+          overflow: 'hidden',
+        }),
+      );
+    }
+
+    expect(
+      StyleSheet.flatten(getByTestId('settings-scroll-view').props.contentContainerStyle),
+    ).toEqual(
+      expect.objectContaining({
+        paddingBottom: 116,
+      }),
+    );
+  });
+
   test('does not show Android capability notes on Android settings', async () => {
     const originalPlatformOS = Platform.OS;
     Object.defineProperty(Platform, 'OS', {
@@ -379,7 +408,7 @@ describe('SettingsScreen', () => {
       const { getByText, queryByText } = render(<SettingsScreen />);
 
       await waitFor(() => {
-        expect(getByText('幫助')).toBeTruthy();
+        expect(getByText('常見問題')).toBeTruthy();
       });
 
       expect(queryByText('恢復已購買訂閱')).toBeNull();
@@ -812,6 +841,10 @@ describe('SettingsScreen', () => {
       expect(getByText('語言')).toBeTruthy();
     });
 
+    fireEvent.press(getByText('語言'));
+    await waitFor(() => {
+      expect(getByText('English')).toBeTruthy();
+    });
     fireEvent.press(getByText('English'));
 
     await waitFor(() => {
@@ -917,9 +950,9 @@ describe('SettingsScreen', () => {
       });
       const { getByText } = render(<SettingsScreen />);
       await waitFor(() => {
-        expect(getByText('切換')).toBeTruthy();
+        expect(getByText('切換設備')).toBeTruthy();
       });
-      fireEvent.press(getByText('切換'));
+      fireEvent.press(getByText('切換設備'));
       expect(mockNavigate).toHaveBeenCalledWith('DeviceDiscovery', {
         mode: 'switch',
       });
@@ -936,9 +969,9 @@ describe('SettingsScreen', () => {
       const alertSpy = jest.spyOn(Alert, 'alert');
       const { getByText } = render(<SettingsScreen />);
       await waitFor(() => {
-        expect(getByText('切換')).toBeTruthy();
+        expect(getByText('切換設備')).toBeTruthy();
       });
-      fireEvent.press(getByText('切換'));
+      fireEvent.press(getByText('切換設備'));
       expect(alertSpy).toHaveBeenCalledWith(
         expect.stringContaining('上傳'),
         expect.any(String),

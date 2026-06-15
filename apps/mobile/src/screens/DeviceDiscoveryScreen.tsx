@@ -19,6 +19,7 @@ import {
   Modal,
   Pressable,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
@@ -37,6 +38,7 @@ import type { DiscoveredDeviceDTO } from '@syncflow/contracts';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/colors';
 import { Icon } from '../components/Icon';
+import { GradientBackground } from '../components/GradientBackground';
 import {
   diagnosticUploadService,
   DiagnosticUploadError,
@@ -51,7 +53,6 @@ import { shouldKeepCachedDevicesVisible } from './deviceDiscoveryRefresh';
 import { marketConfig } from '../markets';
 import { useRecentDesktops } from '../stores/recent-desktops-store';
 import type { RecentDesktopDTO } from '@syncflow/contracts';
-
 
 // ---------------------------------------------------------------------------
 // Types
@@ -158,7 +159,6 @@ type NavigationProp = StackNavigationProp<
   'DeviceDiscovery'
 >;
 
-
 export function DeviceDiscoveryScreen() {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
@@ -185,6 +185,14 @@ export function DeviceDiscoveryScreen() {
   const [showManualModal, setShowManualModal] = useState(false);
   const [diagnosticPromptVisible, setDiagnosticPromptVisible] = useState(false);
   const [diagnosticPromptNote, setDiagnosticPromptNote] = useState('');
+  const [selectedDevice, setSelectedDevice] = useState<DiscoveredDevice | null>(
+    null,
+  );
+  const [showMethodModal, setShowMethodModal] = useState(false);
+  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [connectionCode, setConnectionCode] = useState('');
+  const [verifyingCode, setVerifyingCode] = useState(false);
+  const [codeError, setCodeError] = useState<string | null>(null);
   const devicesRef = useRef<DiscoveredDevice[]>([]);
   const preserveCachedDevicesRef = useRef(false);
 
@@ -193,18 +201,30 @@ export function DeviceDiscoveryScreen() {
     let cancelled = false;
     const { NativeSyncEngine: NSE } = NativeModules;
     Promise.all([
-      (NSE?.getKnownDeviceIds?.() ?? Promise.resolve([])).catch((err: unknown) => {
-        console.warn('[DiscoveryScreen] switch bootstrap: getKnownDeviceIds failed', err);
-        return [] as string[];
-      }),
-      (NSE?.getBindingState?.() ?? Promise.resolve(null)).catch((err: unknown) => {
-        console.warn('[DiscoveryScreen] switch bootstrap: getBindingState failed', err);
-        return null;
-      }),
+      (NSE?.getKnownDeviceIds?.() ?? Promise.resolve([])).catch(
+        (err: unknown) => {
+          console.warn(
+            '[DiscoveryScreen] switch bootstrap: getKnownDeviceIds failed',
+            err,
+          );
+          return [] as string[];
+        },
+      ),
+      (NSE?.getBindingState?.() ?? Promise.resolve(null)).catch(
+        (err: unknown) => {
+          console.warn(
+            '[DiscoveryScreen] switch bootstrap: getBindingState failed',
+            err,
+          );
+          return null;
+        },
+      ),
     ]).then(([ids, binding]) => {
       if (cancelled) return;
       setKnownDeviceIds(new Set(ids as string[]));
-      setCurrentDeviceId((binding as { deviceId?: string } | null)?.deviceId ?? null);
+      setCurrentDeviceId(
+        (binding as { deviceId?: string } | null)?.deviceId ?? null,
+      );
     });
     return () => {
       cancelled = true;
@@ -289,13 +309,18 @@ export function DeviceDiscoveryScreen() {
           console.log('[DiscoveryScreen] restarting discovery');
           NativeSyncEngine.stopDiscovery()
             .catch((e: Error) =>
-              console.warn('[DiscoveryScreen] stopDiscovery before start failed:', e),
+              console.warn(
+                '[DiscoveryScreen] stopDiscovery before start failed:',
+                e,
+              ),
             )
             .then(() => {
               if (!active) return undefined;
               return NativeSyncEngine.startDiscovery();
             })
-            .then(() => console.log('[DiscoveryScreen] startDiscovery resolved'))
+            .then(() =>
+              console.log('[DiscoveryScreen] startDiscovery resolved'),
+            )
             .catch((e: Error) =>
               console.warn('[DiscoveryScreen] startDiscovery failed:', e),
             );
@@ -375,11 +400,17 @@ export function DeviceDiscoveryScreen() {
         console.log('[DiscoveryScreen] handleRescan restarting discovery');
         NativeSyncEngine.stopDiscovery()
           .catch((e: Error) =>
-            console.warn('[DiscoveryScreen] handleRescan stopDiscovery failed:', e),
+            console.warn(
+              '[DiscoveryScreen] handleRescan stopDiscovery failed:',
+              e,
+            ),
           )
           .then(() => NativeSyncEngine.startDiscovery())
           .catch((e: Error) => {
-            console.warn('[DiscoveryScreen] handleRescan startDiscovery failed:', e);
+            console.warn(
+              '[DiscoveryScreen] handleRescan startDiscovery failed:',
+              e,
+            );
             setScanning(false);
           });
         return;
@@ -397,68 +428,24 @@ export function DeviceDiscoveryScreen() {
         `${device.name}/${device.ip || 'no-ip'}/${device.deviceId}/${device.type}`,
       );
 
-      if (mode !== 'switch') {
-        navigation.navigate('CodeVerify', {
-          deviceId: device.deviceId,
-          host: device.ip,
-          port: device.port,
-          deviceName: device.name,
-        });
-        return;
-      }
-
       if (device.deviceId === currentDeviceId) {
         Alert.alert(t('deviceDiscovery.switch.toast.alreadyCurrent'));
         return;
       }
 
-      if (knownDeviceIds.has(device.deviceId)) {
-        try {
-          const { NativeSyncEngine } = NativeModules;
-          if (!NativeSyncEngine) {
-            throw new Error('NativeSyncEngine unavailable');
-          }
-          await NativeSyncEngine.pairDevice({
-            deviceId: device.deviceId,
-            host: device.ip,
-            port: device.port,
-            connectionCode: '',
-          });
-          await addDesktop({
-            desktopDeviceId: device.deviceId,
-            desktopName: device.name,
-            host: device.ip,
-            port: device.port,
-            authorizationStatus: 'authorized',
-          });
-          navigation.dispatch(
-            CommonActions.reset({
-              index: 0,
-              routes: [{ name: 'SyncActivity' }],
-            }),
-          );
-          return;
-        } catch (error) {
-          console.warn(
-            '[DiscoveryScreen] known device direct switch failed, requiring code verification',
-            error,
-          );
-        }
-      }
-
-      navigation.navigate('CodeVerify', {
-        deviceId: device.deviceId,
-        host: device.ip,
-        port: device.port,
-        deviceName: device.name,
-      });
+      setSelectedDevice(device);
+      setConnectionCode('');
+      setCodeError(null);
+      setShowMethodModal(true);
     },
-    [mode, navigation, currentDeviceId, knownDeviceIds, t, addDesktop],
+    [currentDeviceId, t],
   );
 
   const handleRecentDevicePress = useCallback(
     async (recent: RecentDesktopDTO) => {
-      const discovered = devices.find(d => d.deviceId === recent.desktopDeviceId);
+      const discovered = devices.find(
+        d => d.deviceId === recent.desktopDeviceId,
+      );
       const host = discovered ? discovered.ip : recent.host;
       const port = discovered ? discovered.port : recent.port;
       const deviceId = recent.desktopDeviceId;
@@ -510,9 +497,54 @@ export function DeviceDiscoveryScreen() {
         deviceName,
       });
     },
-    [devices, mode, currentDeviceId, addDesktop, navigation, t]
+    [devices, mode, currentDeviceId, addDesktop, navigation, t],
   );
 
+  const handleVerifyCode = useCallback(async () => {
+    if (!selectedDevice || !connectionCode.trim()) return;
+    setVerifyingCode(true);
+    setCodeError(null);
+
+    try {
+      const { NativeSyncEngine } = NativeModules;
+      if (!NativeSyncEngine) {
+        throw new Error('NativeSyncEngine unavailable');
+      }
+
+      await NativeSyncEngine.pairDevice({
+        deviceId: selectedDevice.deviceId,
+        host: selectedDevice.ip,
+        port: selectedDevice.port || 39393,
+        connectionCode: connectionCode,
+      });
+
+      await addDesktop({
+        desktopDeviceId: selectedDevice.deviceId,
+        desktopName: selectedDevice.name,
+        host: selectedDevice.ip,
+        port: selectedDevice.port || 39393,
+        authorizationStatus: 'authorized',
+      });
+
+      setVerifyingCode(false);
+      setShowCodeModal(false);
+
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'SyncActivity' }],
+        }),
+      );
+    } catch (err: any) {
+      console.warn('[DiscoveryScreen] pairing failed:', err);
+      setVerifyingCode(false);
+      setCodeError(
+        err?.message ||
+          t('errors.pairingConnectFailed') ||
+          '配對失敗，請稍後重試。',
+      );
+    }
+  }, [selectedDevice, connectionCode, addDesktop, navigation, t]);
 
   const handleManualPair = useCallback(() => {
     console.log('[DiscoveryScreen] handleManualPair submitted', manualHost);
@@ -533,57 +565,60 @@ export function DeviceDiscoveryScreen() {
     handleDevicePress(manualDevice);
   }, [handleDevicePress, manualHost, t]);
 
-  const startDiagnosticUpload = useCallback(async (rawNote?: string) => {
-    try {
-      setIsUploadingDiagnostics(true);
+  const startDiagnosticUpload = useCallback(
+    async (rawNote?: string) => {
+      try {
+        setIsUploadingDiagnostics(true);
 
-      const { NativeSyncEngine } = NativeModules;
-      if (!NativeSyncEngine?.exportDiagnostics) {
-        Alert.alert(
-          t('settings.dialogs.exportUnavailable.title'),
-          t('settings.dialogs.exportUnavailable.body'),
+        const { NativeSyncEngine } = NativeModules;
+        if (!NativeSyncEngine?.exportDiagnostics) {
+          Alert.alert(
+            t('settings.dialogs.exportUnavailable.title'),
+            t('settings.dialogs.exportUnavailable.body'),
+          );
+          return;
+        }
+
+        const archivePath: string = await NativeSyncEngine.exportDiagnostics();
+        const archiveUrl = archivePath.startsWith('file://')
+          ? archivePath
+          : `file://${archivePath}`;
+        const clientId = String(await NativeSyncEngine.getClientId());
+        const note = (rawNote ?? '').trim();
+        const result = await diagnosticUploadService.upload(
+          archiveUrl,
+          clientId,
+          new AbortController().signal,
+          () => undefined,
+          note || undefined,
         );
-        return;
-      }
 
-      const archivePath: string = await NativeSyncEngine.exportDiagnostics();
-      const archiveUrl = archivePath.startsWith('file://')
-        ? archivePath
-        : `file://${archivePath}`;
-      const clientId = String(await NativeSyncEngine.getClientId());
-      const note = (rawNote ?? '').trim();
-      const result = await diagnosticUploadService.upload(
-        archiveUrl,
-        clientId,
-        new AbortController().signal,
-        () => undefined,
-        note || undefined,
-      );
-
-      Clipboard.setString(result.refId);
-      Alert.alert(
-        t('settings.uploadDiagnostic.success.toast', {
-          refId: result.refId,
-        }),
-      );
-    } catch (error) {
-      if (
-        error instanceof DiagnosticUploadError &&
-        error.detail.kind === 'BUNDLE_TOO_LARGE'
-      ) {
-        Alert.alert(t('settings.uploadDiagnostic.tooLarge.toast'));
-      } else if (
-        error instanceof DiagnosticUploadError &&
-        error.detail.kind === 'ABORTED'
-      ) {
-        Alert.alert(t('settings.uploadDiagnostic.aborted.toast'));
-      } else {
-        Alert.alert(t('settings.uploadDiagnostic.failure.toast'));
+        Clipboard.setString(result.refId);
+        Alert.alert(
+          t('settings.uploadDiagnostic.success.toast', {
+            refId: result.refId,
+          }),
+        );
+      } catch (error) {
+        if (
+          error instanceof DiagnosticUploadError &&
+          error.detail.kind === 'BUNDLE_TOO_LARGE'
+        ) {
+          Alert.alert(t('settings.uploadDiagnostic.tooLarge.toast'));
+        } else if (
+          error instanceof DiagnosticUploadError &&
+          error.detail.kind === 'ABORTED'
+        ) {
+          Alert.alert(t('settings.uploadDiagnostic.aborted.toast'));
+        } else {
+          Alert.alert(t('settings.uploadDiagnostic.failure.toast'));
+        }
+      } finally {
+        setIsUploadingDiagnostics(false);
       }
-    } finally {
-      setIsUploadingDiagnostics(false);
-    }
-  }, [t]);
+    },
+    [t],
+  );
 
   const handleUploadDiagnostics = useCallback(() => {
     setShowPairingMenu(false);
@@ -619,9 +654,12 @@ export function DeviceDiscoveryScreen() {
 
   const renderDevice = useCallback(
     ({ item }: ListRenderItemInfo<DiscoveredDevice>) => {
-      const isCurrentDevice = mode === 'switch' && item.deviceId === currentDeviceId;
+      const isCurrentDevice =
+        mode === 'switch' && item.deviceId === currentDeviceId;
       const isKnownDevice =
-        mode === 'switch' && !isCurrentDevice && knownDeviceIds.has(item.deviceId);
+        mode === 'switch' &&
+        !isCurrentDevice &&
+        knownDeviceIds.has(item.deviceId);
 
       return (
         <TouchableOpacity
@@ -707,7 +745,6 @@ export function DeviceDiscoveryScreen() {
     </View>
   );
 
-
   type ListEntry =
     | { type: 'header'; key: string; title: string }
     | { type: 'discovered'; key: string; device: DiscoveredDevice }
@@ -752,9 +789,12 @@ export function DeviceDiscoveryScreen() {
         return renderDevice({ item: item.device } as any);
       }
       const recent = item.desktop;
-      const isCurrentDevice = mode === 'switch' && recent.desktopDeviceId === currentDeviceId;
+      const isCurrentDevice =
+        mode === 'switch' && recent.desktopDeviceId === currentDeviceId;
       const isKnownDevice =
-        mode === 'switch' && !isCurrentDevice && knownDeviceIds.has(recent.desktopDeviceId);
+        mode === 'switch' &&
+        !isCurrentDevice &&
+        knownDeviceIds.has(recent.desktopDeviceId);
       return (
         <TouchableOpacity
           style={styles.deviceCard}
@@ -790,7 +830,14 @@ export function DeviceDiscoveryScreen() {
         </TouchableOpacity>
       );
     },
-    [renderDevice, handleRecentDevicePress, mode, currentDeviceId, knownDeviceIds, t]
+    [
+      renderDevice,
+      handleRecentDevicePress,
+      mode,
+      currentDeviceId,
+      knownDeviceIds,
+      t,
+    ],
   );
 
   const entryKeyExtractor = useCallback((item: ListEntry) => item.key, []);
@@ -801,339 +848,575 @@ export function DeviceDiscoveryScreen() {
     manualSectionHeight > 0 ? manualSectionHeight + 16 : 220;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerTopRow}>
-            {mode === 'switch' ? (
-              <TouchableOpacity
-                style={styles.backButton}
-                activeOpacity={0.7}
-                onPress={() => navigation.goBack()}
-              >
-                <Icon name="chevron-back" size={20} color="#3b9fd8" />
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.wifiIconBox}>
-                <Icon name="wifi" size={24} color="#3b9fd8" />
-              </View>
-            )}
-            <TouchableOpacity
-              style={styles.scanButton}
-              activeOpacity={0.8}
-              onPress={() => setShowPairingMenu(true)}
-            >
-              <Icon name="settings-outline" size={16} color="#3b9fd8" />
-              <Text style={styles.scanButtonText}>{t('deviceDiscovery.actions.manualPair')}</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.title}>
-            {mode === 'switch' ? t('deviceDiscovery.switch.title') : t('deviceDiscovery.title')}
-          </Text>
-          <Text style={styles.subtitle}>
-            {isAndroid
-              ? t('deviceDiscovery.subtitle.android')
-              : t('deviceDiscovery.subtitle.ios')}
-          </Text>
-        </View>
-
-        {/* Scanning animation */}
-        {scanning && devices.length === 0 && recentDesktops.length === 0 && (
-          <View style={styles.scanningSection}>
-            <PulseRings />
-            <Text style={styles.scanningText}>{t('deviceDiscovery.scanning.text')}</Text>
-          </View>
-        )}
-
-        {/* Device list */}
-        {(devices.length > 0 || recentDesktops.length > 0 || !scanning) && (
-          <View
-            style={[styles.listSection, { paddingBottom: listBottomInset }]}
-          >
-            {devices.length === 0 && recentDesktops.length === 0 ? (
-              <View style={styles.emptySection}>
-                <Text style={styles.emptyText}>
-                  {isAndroid
-                    ? t('deviceDiscovery.emptyState.android')
-                    : t('deviceDiscovery.emptyState.default')}
-                </Text>
-              </View>
-            ) : (
-              <FlatList
-                data={listData}
-                renderItem={renderListEntry}
-                keyExtractor={entryKeyExtractor}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-              />
-            )}
-          </View>
-        )}
-
-        <View
-          style={[
-            styles.manualDock,
-            {
-              bottom: manualDockBottom,
-              paddingBottom: Math.max(insets.bottom, 24),
-            },
-          ]}
-          onLayout={handleManualSectionLayout}
-        >
-          {/* Fixed Rescan button */}
-          {!scanning && (
-            <View style={styles.manualSection}>
-              <TouchableOpacity
-                style={styles.rescanButton}
-                activeOpacity={0.7}
-                onPress={handleRescan}
-              >
-                <View
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+    <GradientBackground>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.headerTopRow}>
+              {mode === 'switch' ? (
+                <TouchableOpacity
+                  style={styles.backButton}
+                  activeOpacity={0.7}
+                  onPress={() => navigation.goBack()}
                 >
-                  <Icon name="refresh" size={16} color="#5a9abf" />
-                  <Text style={styles.rescanText}>{t('deviceDiscovery.actions.rescan')}</Text>
+                  <Icon name="chevron-back" size={20} color="#3b9fd8" />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.wifiIconBox}>
+                  <Icon name="wifi" size={24} color="#3b9fd8" />
                 </View>
+              )}
+              <TouchableOpacity
+                style={styles.scanButton}
+                activeOpacity={0.8}
+                onPress={() => setShowPairingMenu(true)}
+              >
+                <Icon name="settings-outline" size={16} color="#3b9fd8" />
+                <Text style={styles.scanButtonText}>
+                  {t('deviceDiscovery.actions.manualPair')}
+                </Text>
               </TouchableOpacity>
-              {mode === 'switch' ? null : troubleshootingCard}
+            </View>
+            <Text style={styles.title}>
+              {mode === 'switch'
+                ? t('deviceDiscovery.switch.title')
+                : t('deviceDiscovery.title')}
+            </Text>
+            <Text style={styles.subtitle}>
+              {isAndroid
+                ? t('deviceDiscovery.subtitle.android')
+                : t('deviceDiscovery.subtitle.ios')}
+            </Text>
+          </View>
+
+          {/* Scanning animation */}
+          {scanning && devices.length === 0 && recentDesktops.length === 0 && (
+            <View style={styles.scanningSection}>
+              <PulseRings />
+              <Text style={styles.scanningText}>
+                {t('deviceDiscovery.scanning.text')}
+              </Text>
             </View>
           )}
-        </View>
 
-        {showUnconnectedGuide && (
-          <UnconnectedGuide
-            onSkip={() => void handleDismissUnconnectedGuide()}
-            onStart={() => void handleDismissUnconnectedGuide()}
-          />
-        )}
-
-        {/* Pairing Menu Popover */}
-        <Modal
-          visible={showPairingMenu}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowPairingMenu(false)}
-        >
-          <Pressable
-            style={styles.popoverOverlay}
-            onPress={() => setShowPairingMenu(false)}
-          >
+          {/* Device list */}
+          {(devices.length > 0 || recentDesktops.length > 0 || !scanning) && (
             <View
-              style={[
-                styles.popoverMenu,
-                { top: insets.top + 60, width: popoverMenuWidth },
-              ]}
+              style={[styles.listSection, { paddingBottom: listBottomInset }]}
             >
-              <TouchableOpacity
-                style={styles.popoverItem}
-                onPress={() => {
-                  setShowPairingMenu(false);
-                  setShowManualModal(true);
-                }}
-              >
-                <Icon name="create-outline" size={20} color="#3b9fd8" />
-                <Text style={styles.popoverText}>{t('deviceDiscovery.actions.manualInputIp')}</Text>
-              </TouchableOpacity>
-              <View style={styles.popoverDivider} />
-              <TouchableOpacity
-                style={styles.popoverItem}
-                onPress={() => {
-                  setShowPairingMenu(false);
-                  navigation.navigate('QRScanner');
-                }}
-              >
-                <Icon name="scan-outline" size={20} color="#3b9fd8" />
-                <Text style={styles.popoverText}>{t('deviceDiscovery.actions.qrPair')}</Text>
-              </TouchableOpacity>
-              <View style={styles.popoverDivider} />
-              <TouchableOpacity
-                style={styles.popoverItem}
-                disabled={isUploadingDiagnostics}
-                onPress={handleUploadDiagnostics}
-              >
-                <Icon name="cloud-upload-outline" size={20} color="#3b9fd8" />
-                <Text style={styles.popoverText}>
-                  {isUploadingDiagnostics
-                    ? t('settings.uploadDiagnostic.progress.title')
-                    : t('settings.uploadDiagnostic.button')}
-                </Text>
-              </TouchableOpacity>
+              {devices.length === 0 && recentDesktops.length === 0 ? (
+                <View style={styles.emptySection}>
+                  <Text style={styles.emptyText}>
+                    {isAndroid
+                      ? t('deviceDiscovery.emptyState.android')
+                      : t('deviceDiscovery.emptyState.default')}
+                  </Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={listData}
+                  renderItem={renderListEntry}
+                  keyExtractor={entryKeyExtractor}
+                  contentContainerStyle={styles.listContent}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                />
+              )}
             </View>
-          </Pressable>
-        </Modal>
+          )}
 
-        {/* Diagnostic Upload Prompt */}
-        <Modal
-          visible={diagnosticPromptVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => {
-            setDiagnosticPromptVisible(false);
-            setDiagnosticPromptNote('');
-          }}
-        >
-          <Pressable
-            style={styles.diagnosticPromptBackdrop}
-            onPress={() => {
+          <View
+            style={[
+              styles.manualDock,
+              {
+                bottom: manualDockBottom,
+                paddingBottom: Math.max(insets.bottom, 24),
+              },
+            ]}
+            onLayout={handleManualSectionLayout}
+          >
+            {/* Fixed Rescan button */}
+            {!scanning && (
+              <View style={styles.manualSection}>
+                <TouchableOpacity
+                  style={styles.rescanButton}
+                  activeOpacity={0.7}
+                  onPress={handleRescan}
+                >
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <Icon name="refresh" size={16} color="#5a9abf" />
+                    <Text style={styles.rescanText}>
+                      {t('deviceDiscovery.actions.rescan')}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+                {mode === 'switch' ? null : troubleshootingCard}
+              </View>
+            )}
+          </View>
+
+          {showUnconnectedGuide && (
+            <UnconnectedGuide
+              onSkip={() => void handleDismissUnconnectedGuide()}
+              onStart={() => void handleDismissUnconnectedGuide()}
+            />
+          )}
+
+          {/* Pairing Menu Popover */}
+          <Modal
+            visible={showPairingMenu}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowPairingMenu(false)}
+          >
+            <Pressable
+              style={styles.popoverOverlay}
+              onPress={() => setShowPairingMenu(false)}
+            >
+              <View
+                style={[
+                  styles.popoverMenu,
+                  { top: insets.top + 60, width: popoverMenuWidth },
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.popoverItem}
+                  onPress={() => {
+                    setShowPairingMenu(false);
+                    setShowManualModal(true);
+                  }}
+                >
+                  <Icon name="create-outline" size={20} color="#3b9fd8" />
+                  <Text style={styles.popoverText}>
+                    {t('deviceDiscovery.actions.manualInputIp')}
+                  </Text>
+                </TouchableOpacity>
+                <View style={styles.popoverDivider} />
+                <TouchableOpacity
+                  style={styles.popoverItem}
+                  onPress={() => {
+                    setShowPairingMenu(false);
+                    navigation.navigate('QRScanner');
+                  }}
+                >
+                  <Icon name="scan-outline" size={20} color="#3b9fd8" />
+                  <Text style={styles.popoverText}>
+                    {t('deviceDiscovery.actions.qrPair')}
+                  </Text>
+                </TouchableOpacity>
+                <View style={styles.popoverDivider} />
+                <TouchableOpacity
+                  style={styles.popoverItem}
+                  disabled={isUploadingDiagnostics}
+                  onPress={handleUploadDiagnostics}
+                >
+                  <Icon name="cloud-upload-outline" size={20} color="#3b9fd8" />
+                  <Text style={styles.popoverText}>
+                    {isUploadingDiagnostics
+                      ? t('settings.uploadDiagnostic.progress.title')
+                      : t('settings.uploadDiagnostic.button')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Modal>
+
+          {/* Diagnostic Upload Prompt */}
+          <Modal
+            visible={diagnosticPromptVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => {
               setDiagnosticPromptVisible(false);
               setDiagnosticPromptNote('');
             }}
           >
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={styles.diagnosticPromptKeyboard}
+            <Pressable
+              style={styles.diagnosticPromptBackdrop}
+              onPress={() => {
+                setDiagnosticPromptVisible(false);
+                setDiagnosticPromptNote('');
+              }}
             >
-              <Pressable onPress={() => {}}>
-                <View style={styles.diagnosticPromptCard}>
-                  <Text style={styles.diagnosticPromptTitle}>
-                    {t('settings.uploadDiagnostic.confirm.title')}
-                  </Text>
-                  <Text style={styles.diagnosticPromptMessage}>
-                    {t('settings.uploadDiagnostic.confirm.message')}
-                  </Text>
-                  <TextInput
-                    style={styles.diagnosticPromptInput}
-                    value={diagnosticPromptNote}
-                    onChangeText={setDiagnosticPromptNote}
-                    placeholder={t(
-                      'settings.uploadDiagnostic.confirm.placeholder',
-                    )}
-                    placeholderTextColor="#8aa9bc"
-                    multiline
-                    maxLength={500}
-                    textAlignVertical="top"
-                    accessibilityLabel={t(
-                      'settings.uploadDiagnostic.confirm.placeholder',
-                    )}
-                  />
-                  <View style={styles.diagnosticPromptActions}>
-                    <TouchableOpacity
-                      style={styles.diagnosticPromptButton}
-                      activeOpacity={0.72}
-                      onPress={() => {
-                        setDiagnosticPromptVisible(false);
-                        setDiagnosticPromptNote('');
-                      }}
-                    >
-                      <Text style={styles.diagnosticPromptCancelText}>
-                        {t('settings.uploadDiagnostic.confirm.cancel')}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.diagnosticPromptButton,
-                        styles.diagnosticPromptPrimaryButton,
-                      ]}
-                      activeOpacity={0.82}
-                      onPress={() => {
-                        const note = diagnosticPromptNote;
-                        setDiagnosticPromptVisible(false);
-                        setDiagnosticPromptNote('');
-                        void startDiagnosticUpload(note);
-                      }}
-                    >
-                      <Text style={styles.diagnosticPromptPrimaryText}>
-                        {t('settings.uploadDiagnostic.confirm.ok')}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </Pressable>
-            </KeyboardAvoidingView>
-          </Pressable>
-        </Modal>
-
-        {/* Manual Input Modal */}
-        <Modal
-          visible={showManualModal}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setShowManualModal(false)}
-        >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setShowManualModal(false)}
-          >
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={styles.modalContent}
-            >
-              <Pressable onPress={() => {}}>
-                <View style={styles.manualCard}>
-                  <View style={styles.manualHandle} />
-                  <View style={styles.modalHeader}>
-                    <Text style={styles.manualTitle}>{t('deviceDiscovery.dialogs.manualInput.title')}</Text>
-                    <TouchableOpacity onPress={() => setShowManualModal(false)}>
-                      <Icon name="close" size={22} color="#8aa9bc" />
-                    </TouchableOpacity>
-                  </View>
-                  <Text style={styles.manualDescription}>
-                    {t('deviceDiscovery.dialogs.manualInput.description')}
-                  </Text>
-                  <View style={styles.manualCallout}>
-                    <View style={styles.manualCalloutIcon}>
-                      <Icon name="desktop-outline" size={22} color="#3b82f6" />
-                    </View>
-                    <View style={styles.manualCalloutCopy}>
-                      <Text style={styles.manualCalloutTitle}>
-                        {t('deviceDiscovery.dialogs.manualInput.guideTitle')}
-                      </Text>
-                      <Text style={styles.manualCalloutBody}>
-                        {t('deviceDiscovery.dialogs.manualInput.guideBody')}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={styles.manualLabel}>
-                    {t('deviceDiscovery.dialogs.manualInput.hostLabel')}
-                  </Text>
-                  <View style={styles.manualInputRow}>
+              <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={styles.diagnosticPromptKeyboard}
+              >
+                <Pressable onPress={() => {}}>
+                  <View style={styles.diagnosticPromptCard}>
+                    <Text style={styles.diagnosticPromptTitle}>
+                      {t('settings.uploadDiagnostic.confirm.title')}
+                    </Text>
+                    <Text style={styles.diagnosticPromptMessage}>
+                      {t('settings.uploadDiagnostic.confirm.message')}
+                    </Text>
                     <TextInput
-                      style={[
-                        styles.manualInput,
-                        manualHostError && styles.manualInputError,
-                      ]}
-                      value={manualHost}
-                      onChangeText={value => {
-                        setManualHost(value);
-                        if (manualHostError) {
-                          setManualHostError(null);
-                        }
-                      }}
-                      placeholder="192.168.0.1"
+                      style={styles.diagnosticPromptInput}
+                      value={diagnosticPromptNote}
+                      onChangeText={setDiagnosticPromptNote}
+                      placeholder={t(
+                        'settings.uploadDiagnostic.confirm.placeholder',
+                      )}
                       placeholderTextColor="#8aa9bc"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="decimal-pad"
-                      returnKeyType="done"
-                      autoFocus
-                      onSubmitEditing={handleManualPair}
+                      multiline
+                      maxLength={500}
+                      textAlignVertical="top"
+                      accessibilityLabel={t(
+                        'settings.uploadDiagnostic.confirm.placeholder',
+                      )}
                     />
-                    <TouchableOpacity
-                      style={styles.manualButton}
-                      activeOpacity={0.8}
-                      onPress={handleManualPair}
+                    <View style={styles.diagnosticPromptActions}>
+                      <TouchableOpacity
+                        style={styles.diagnosticPromptButton}
+                        activeOpacity={0.72}
+                        onPress={() => {
+                          setDiagnosticPromptVisible(false);
+                          setDiagnosticPromptNote('');
+                        }}
+                      >
+                        <Text style={styles.diagnosticPromptCancelText}>
+                          {t('settings.uploadDiagnostic.confirm.cancel')}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.diagnosticPromptButton,
+                          styles.diagnosticPromptPrimaryButton,
+                        ]}
+                        activeOpacity={0.82}
+                        onPress={() => {
+                          const note = diagnosticPromptNote;
+                          setDiagnosticPromptVisible(false);
+                          setDiagnosticPromptNote('');
+                          void startDiagnosticUpload(note);
+                        }}
+                      >
+                        <Text style={styles.diagnosticPromptPrimaryText}>
+                          {t('settings.uploadDiagnostic.confirm.ok')}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </Pressable>
+              </KeyboardAvoidingView>
+            </Pressable>
+          </Modal>
+
+          {/* Manual Input Modal */}
+          <Modal
+            visible={showManualModal}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setShowManualModal(false)}
+          >
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setShowManualModal(false)}
+            >
+              <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={styles.modalContent}
+              >
+                <Pressable onPress={() => {}}>
+                  <View style={styles.manualCard}>
+                    <View style={styles.manualHandle} />
+                    <View style={styles.modalHeader}>
+                      <Text style={styles.manualTitle}>
+                        {t('deviceDiscovery.dialogs.manualInput.title')}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => setShowManualModal(false)}
+                      >
+                        <Icon name="close" size={22} color="#8aa9bc" />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.manualDescription}>
+                      {t('deviceDiscovery.dialogs.manualInput.description')}
+                    </Text>
+                    <View style={styles.manualCallout}>
+                      <View style={styles.manualCalloutIcon}>
+                        <Icon
+                          name="desktop-outline"
+                          size={22}
+                          color="#3b82f6"
+                        />
+                      </View>
+                      <View style={styles.manualCalloutCopy}>
+                        <Text style={styles.manualCalloutTitle}>
+                          {t('deviceDiscovery.dialogs.manualInput.guideTitle')}
+                        </Text>
+                        <Text style={styles.manualCalloutBody}>
+                          {t('deviceDiscovery.dialogs.manualInput.guideBody')}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.manualLabel}>
+                      {t('deviceDiscovery.dialogs.manualInput.hostLabel')}
+                    </Text>
+                    <View style={styles.manualInputRow}>
+                      <TextInput
+                        style={[
+                          styles.manualInput,
+                          manualHostError && styles.manualInputError,
+                        ]}
+                        value={manualHost}
+                        onChangeText={value => {
+                          setManualHost(value);
+                          if (manualHostError) {
+                            setManualHostError(null);
+                          }
+                        }}
+                        placeholder="192.168.0.1"
+                        placeholderTextColor="#8aa9bc"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="decimal-pad"
+                        returnKeyType="done"
+                        autoFocus
+                        onSubmitEditing={handleManualPair}
+                      />
+                      <TouchableOpacity
+                        style={styles.manualButton}
+                        activeOpacity={0.8}
+                        onPress={handleManualPair}
+                      >
+                        <Text style={styles.manualButtonText}>
+                          {t('deviceDiscovery.dialogs.manualInput.confirm')}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    {manualHostError ? (
+                      <Text style={styles.manualErrorText}>
+                        {manualHostError}
+                      </Text>
+                    ) : (
+                      <Text style={styles.manualHint}>
+                        {t('deviceDiscovery.dialogs.manualInput.hint')}
+                      </Text>
+                    )}
+                  </View>
+                </Pressable>
+              </KeyboardAvoidingView>
+            </Pressable>
+          </Modal>
+
+          {/* ── Method Selection Modal ── */}
+          <Modal
+            visible={showMethodModal && selectedDevice !== null}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowMethodModal(false)}
+          >
+            <Pressable
+              style={styles.pairModalOverlay}
+              onPress={() => setShowMethodModal(false)}
+            >
+              <View
+                style={styles.pairModalCard}
+                onStartShouldSetResponder={() => true}
+              >
+                <View style={styles.pairModalHeader}>
+                  <Text style={styles.pairModalTitle}>
+                    {t('deviceDiscovery.connectionMethod.title') ||
+                      '选择连接方式'}
+                  </Text>
+                  <Text style={styles.pairModalSubtitle}>
+                    {t('deviceDiscovery.connectionMethod.selected', {
+                      name: selectedDevice?.name,
+                    }) || `已选择 ${selectedDevice?.name}`}
+                  </Text>
+                </View>
+
+                <View style={styles.pairModalBody}>
+                  <TouchableOpacity
+                    style={styles.methodButton}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      setShowMethodModal(false);
+                      navigation.navigate('QRScanner');
+                    }}
+                  >
+                    <View
+                      style={[
+                        styles.methodIconBox,
+                        { backgroundColor: 'rgba(59,130,246,0.08)' },
+                      ]}
                     >
-                      <Text style={styles.manualButtonText}>{t('deviceDiscovery.dialogs.manualInput.confirm')}</Text>
+                      <Icon name="scan-outline" size={20} color="#3b82f6" />
+                    </View>
+                    <View style={styles.methodInfo}>
+                      <Text style={styles.methodTitle}>
+                        {t('deviceDiscovery.connectionMethod.qrTitle') ||
+                          '扫码连接'}
+                      </Text>
+                      <Text style={styles.methodDesc} numberOfLines={1}>
+                        {t('deviceDiscovery.connectionMethod.qrDesc', {
+                          name: selectedDevice?.name,
+                        }) || `扫描 ${selectedDevice?.name} 上显示的二维码`}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.methodButton}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      setShowMethodModal(false);
+                      setShowCodeModal(true);
+                    }}
+                  >
+                    <View
+                      style={[
+                        styles.methodIconBox,
+                        { backgroundColor: 'rgba(139,92,246,0.08)' },
+                      ]}
+                    >
+                      <Icon name="link-outline" size={20} color="#8b5cf6" />
+                    </View>
+                    <View style={styles.methodInfo}>
+                      <Text style={styles.methodTitle}>
+                        {t('deviceDiscovery.connectionMethod.codeTitle') ||
+                          '输入连接码'}
+                      </Text>
+                      <Text style={styles.methodDesc} numberOfLines={1}>
+                        {t('deviceDiscovery.connectionMethod.codeDesc', {
+                          name: selectedDevice?.name,
+                        }) || `输入 ${selectedDevice?.name} 显示的连接码`}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.pairModalCancelButton}
+                  activeOpacity={0.8}
+                  onPress={() => setShowMethodModal(false)}
+                >
+                  <Text style={styles.pairModalCancelText}>
+                    {t('deviceDiscovery.connectionMethod.cancel') || '取消'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Modal>
+
+          {/* ── Code Entry Modal ── */}
+          <Modal
+            visible={showCodeModal && selectedDevice !== null}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowCodeModal(false)}
+          >
+            <Pressable
+              style={styles.pairModalOverlay}
+              onPress={() => !verifyingCode && setShowCodeModal(false)}
+            >
+              <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                style={styles.pairModalOverlay}
+              >
+                <View
+                  style={styles.pairModalCard}
+                  onStartShouldSetResponder={() => true}
+                >
+                  <View style={styles.pairModalHeader}>
+                    <Text style={styles.pairModalTitle}>
+                      {t('deviceDiscovery.connectionMethod.connectCodeTitle') ||
+                        '输入连接码'}
+                    </Text>
+                    <Text style={styles.pairModalSubtitle}>
+                      {t('deviceDiscovery.connectionMethod.connectCodeDesc', {
+                        name: selectedDevice?.name,
+                      }) ||
+                        `输入 ${selectedDevice?.name} 显示的连接码以完成连接。`}
+                    </Text>
+                  </View>
+
+                  <View style={styles.pairModalBody}>
+                    <TextInput
+                      style={styles.codeInput}
+                      value={connectionCode}
+                      onChangeText={text =>
+                        setConnectionCode(text.toUpperCase())
+                      }
+                      placeholder={
+                        t(
+                          'deviceDiscovery.connectionMethod.inputPlaceholder',
+                        ) || '输入连接码'
+                      }
+                      placeholderTextColor="#a0aec0"
+                      autoFocus
+                      maxLength={6}
+                      keyboardType="default"
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                      editable={!verifyingCode}
+                    />
+
+                    {verifyingCode && (
+                      <View style={styles.verifyingRow}>
+                        <ActivityIndicator size="small" color="#3b82f6" />
+                        <Text style={styles.verifyingText}>
+                          {t('deviceDiscovery.connectionMethod.verifying') ||
+                            '正在验证连接码…'}
+                        </Text>
+                      </View>
+                    )}
+
+                    {codeError && (
+                      <Text style={styles.codeErrorText}>{codeError}</Text>
+                    )}
+                  </View>
+
+                  <View style={styles.pairModalFooterButtons}>
+                    <TouchableOpacity
+                      style={[
+                        styles.pairModalFooterButton,
+                        styles.pairModalFooterButtonLeft,
+                      ]}
+                      activeOpacity={0.8}
+                      disabled={verifyingCode}
+                      onPress={() => setShowCodeModal(false)}
+                    >
+                      <Text style={styles.pairModalFooterButtonText}>
+                        {t('deviceDiscovery.connectionMethod.cancel') || '取消'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.pairModalFooterButton,
+                        styles.pairModalFooterButtonRight,
+                      ]}
+                      activeOpacity={0.8}
+                      disabled={verifyingCode || !connectionCode.trim()}
+                      onPress={handleVerifyCode}
+                    >
+                      <Text
+                        style={[
+                          styles.pairModalFooterButtonText,
+                          styles.pairModalFooterButtonTextBold,
+                        ]}
+                      >
+                        {t('deviceDiscovery.connectionMethod.connect') ||
+                          '连接'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
-                  {manualHostError ? (
-                    <Text style={styles.manualErrorText}>
-                      {manualHostError}
-                    </Text>
-                  ) : (
-                    <Text style={styles.manualHint}>
-                      {t('deviceDiscovery.dialogs.manualInput.hint')}
-                    </Text>
-                  )}
                 </View>
-              </Pressable>
-            </KeyboardAvoidingView>
-          </Pressable>
-        </Modal>
-      </View>
-    </SafeAreaView>
+              </KeyboardAvoidingView>
+            </Pressable>
+          </Modal>
+        </View>
+      </SafeAreaView>
+    </GradientBackground>
   );
 }
 
@@ -1144,7 +1427,7 @@ export function DeviceDiscoveryScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#c4e4f5',
+    backgroundColor: 'transparent',
   },
   container: {
     flex: 1,
@@ -1670,5 +1953,146 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     color: '#db6b6b',
+  },
+
+  // Modal styles
+  pairModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  pairModalCard: {
+    width: '100%',
+    maxWidth: 300,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  pairModalHeader: {
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  pairModalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#20344F',
+    textAlign: 'center',
+  },
+  pairModalSubtitle: {
+    fontSize: 13,
+    color: '#7D97B5',
+    marginTop: 6,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  pairModalBody: {
+    padding: 20,
+    gap: 12,
+  },
+  methodButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#edf2f7',
+    backgroundColor: '#f7fafc',
+    borderRadius: 16,
+    padding: 14,
+  },
+  methodIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  methodInfo: {
+    flex: 1,
+  },
+  methodTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1a202c',
+  },
+  methodDesc: {
+    fontSize: 11,
+    color: '#718096',
+    marginTop: 2,
+  },
+  pairModalCancelButton: {
+    borderTopWidth: 1,
+    borderTopColor: '#edf2f7',
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pairModalCancelText: {
+    fontSize: 15,
+    color: '#3b82f6',
+    fontWeight: '500',
+  },
+  // Code entry modal specific
+  codeInput: {
+    width: '100%',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DCE7F6',
+    backgroundColor: '#F7FAFE',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#20344F',
+    textAlign: 'center',
+    letterSpacing: 2,
+    fontWeight: '600',
+  },
+  verifyingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+  },
+  verifyingText: {
+    fontSize: 13,
+    color: '#3b82f6',
+  },
+  codeErrorText: {
+    fontSize: 12,
+    color: '#db6b6b',
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  pairModalFooterButtons: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#edf2f7',
+  },
+  pairModalFooterButton: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pairModalFooterButtonLeft: {
+    borderRightWidth: 1,
+    borderRightColor: '#edf2f7',
+  },
+  pairModalFooterButtonRight: {},
+  pairModalFooterButtonText: {
+    fontSize: 15,
+    color: '#3b82f6',
+    fontWeight: '500',
+  },
+  pairModalFooterButtonTextBold: {
+    fontWeight: '700',
   },
 });
