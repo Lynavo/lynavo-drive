@@ -161,11 +161,11 @@ function DeviceCard({ deviceName, deviceIp, fileCount, totalSize, duration, t }:
       <View style={styles.cardStats}>
         <View style={styles.cardStatsLeft}>
           <Text style={styles.statsLabel}>{t('history.cards.statsLabel')}</Text>
-          <Text style={styles.statsValue}>
+          <View style={styles.statsValue}>
             <Text style={styles.statsCount}>{fileCount}</Text>
             <Text style={styles.statsSep}> {t('history.cards.statsUnit')} {'·'} </Text>
             <Text style={styles.statsSize}>{totalSize}</Text>
-          </Text>
+          </View>
         </View>
         <View style={styles.cardStatsRight}>
           <Text style={styles.durationLabel}>{t('history.cards.durationLabel')}</Text>
@@ -346,7 +346,7 @@ function groupRecordsByDate(items: DesktopSyncRecordDTO[], t: TFunction): Histor
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.screenBackground,
+    backgroundColor: '#DFF0FE',
   },
   container: {
     flex: 1,
@@ -356,29 +356,35 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 12,
-    gap: 12,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 20,
+    gap: 10,
     zIndex: 10,
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.6)',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.70)',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: 'rgba(120,172,210,0.12)',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 2,
   },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
+    letterSpacing: -0.36,
     color: colors.screenTitle,
   },
 
   // Section list
   listContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingBottom: 40,
   },
 
@@ -388,13 +394,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 4,
-    marginTop: 16,
+    marginTop: 4,
     marginBottom: 10,
   },
   sectionTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#4a6a8a',
+    fontWeight: 'bold',
+    letterSpacing: -0.28,
+    color: '#264A73',
   },
 
   // Pulsing dot
@@ -409,50 +416,50 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#3b9fd8',
+    backgroundColor: '#3398D6',
   },
   dotSolid: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#2a90d0',
+    backgroundColor: '#3398D6',
   },
   liveLabel: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '500',
-    color: '#90b8d0',
+    color: '#8FB2CF',
   },
 
   // Device card
   card: {
-    backgroundColor: 'rgba(255,255,255,0.88)',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    marginBottom: 12,
-    shadowColor: 'rgba(80,150,200,0.3)',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.09,
-    shadowRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
+    shadowColor: 'rgba(81,145,197,0.08)',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 1,
+    shadowRadius: 18,
     elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
+    gap: 10,
+    paddingBottom: 10,
   },
   monitorIconWrapper: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 43,
+    height: 43,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#3ba4dc',
-    shadowColor: 'rgba(59,159,216,0.5)',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    backgroundColor: '#42A7E2',
+    shadowColor: 'rgba(66,167,226,0.22)',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 1,
+    shadowRadius: 16,
     elevation: 2,
   },
   cardDeviceInfo: {
@@ -460,21 +467,22 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   cardDeviceName: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
-    color: colors.screenTitle,
+    letterSpacing: -0.12,
+    color: '#173B67',
   },
   cardDeviceIp: {
-    fontSize: 12,
-    color: '#9ab8cc',
-    marginTop: 1,
+    fontSize: 9,
+    color: '#A8BDCF',
+    marginTop: 2,
   },
 
   // Divider
   cardDivider: {
     height: 1,
-    backgroundColor: 'rgba(160,200,225,0.22)',
-    marginBottom: 12,
+    backgroundColor: '#EEF5FB',
+    marginBottom: 10,
   },
 
   // Stats
@@ -485,40 +493,49 @@ const styles = StyleSheet.create({
   },
   cardStatsLeft: {
     flex: 1,
+    minWidth: 0,
   },
   statsLabel: {
-    fontSize: 11,
-    color: '#9ab8cc',
-    marginBottom: 2,
+    fontSize: 8,
+    fontWeight: '500',
+    color: '#B6C7D7',
+    marginBottom: 4,
   },
   statsValue: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: colors.screenTitle,
-    fontVariant: ['tabular-nums'],
+    flexDirection: 'row',
+    alignItems: 'baseline',
   },
   statsCount: {
-    color: '#2a90d0',
+    fontSize: 18,
+    fontWeight: 'bold',
+    lineHeight: 18,
+    color: '#42A7E2',
   },
   statsSep: {
-    color: '#c8dce8',
+    fontSize: 11,
+    color: '#D0DAE4',
   },
   statsSize: {
-    color: colors.screenTitle,
+    fontSize: 15,
+    fontWeight: 'bold',
+    lineHeight: 15,
+    color: '#173B67',
   },
   cardStatsRight: {
     alignItems: 'flex-end',
+    paddingLeft: 10,
   },
   durationLabel: {
-    fontSize: 10,
-    color: '#b8d0dc',
-    marginBottom: 2,
+    fontSize: 8,
+    fontWeight: '500',
+    color: '#B6C7D7',
+    marginBottom: 4,
   },
   durationValue: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#2a90d0',
-    fontVariant: ['tabular-nums'],
+    fontSize: 15,
+    fontWeight: 'bold',
+    lineHeight: 15,
+    color: '#42A7E2',
   },
 
   // Empty

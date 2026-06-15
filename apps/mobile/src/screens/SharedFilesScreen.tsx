@@ -113,42 +113,60 @@ export function SharedFilesScreen() {
   const renderSharedResource = ({ item }: { item: DesktopSharedResourceDTO }) => {
     const isDownloading = downloadingId === item.resourceId;
     const isDownloaded = downloadedResources[item.resourceId];
+    const isVideo = /\.(mp4|mov|avi|mkv|webm)$/i.test(item.displayName);
 
     return (
-      <View style={styles.fileRow}>
-        <View style={styles.fileIconWrapper}>
-          <Icon
-            name={item.kind === 'shared_folder' ? 'folder' : 'document'}
-            size={20}
-            color="#3b9fd8"
-          />
-        </View>
-        <View style={styles.fileInfo}>
-          <Text style={styles.fileName} numberOfLines={1}>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        style={styles.gridCell}
+        onPress={() => handleDownload(item.resourceId, item.displayName)}
+        disabled={isDownloading || isDownloaded}
+      >
+        {/* Cell background: dark for video, light blue for others */}
+        <View style={[styles.gridCellInner, { backgroundColor: isVideo ? '#1a3a5c' : 'rgba(200,220,240,0.5)' }]}>
+          {/* Non-video icon */}
+          {!isVideo && (
+            <View style={styles.nonVideoIconWrapper}>
+              <Icon
+                name={item.kind === 'shared_folder' ? 'folder' : 'image'}
+                size={32}
+                color="#5a9ab8"
+              />
+            </View>
+          )}
+
+          {/* Video gradient vignette */}
+          {isVideo && (
+            <View style={styles.videoVignette} />
+          )}
+
+          {/* Video play button */}
+          {isVideo && (
+            <View style={styles.playButtonWrapper}>
+              <View style={styles.playButton}>
+                <Icon name="play" size={16} color="#fff" />
+              </View>
+            </View>
+          )}
+
+          {/* File name */}
+          <Text style={[styles.cellFileName, { color: isVideo ? '#fff' : '#1a3a5c' }]} numberOfLines={1}>
             {item.displayName}
           </Text>
-          <Text style={styles.fileMeta}>
-            {item.fileSize ? `${(item.fileSize / 1024 / 1024).toFixed(2)} MB` : ''}
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={[
-            styles.downloadBtn,
-            isDownloaded && styles.downloadBtnCompleted,
-            isDownloading && styles.downloadBtnDisabled,
-          ]}
-          disabled={isDownloading || isDownloaded}
-          onPress={() => handleDownload(item.resourceId, item.displayName)}
-        >
-          {isDownloading ? (
-            <ActivityIndicator size="small" color={BLUE} />
-          ) : isDownloaded ? (
-            <Icon name="checkmark-circle" size={18} color="#16a34a" />
-          ) : (
-            <Icon name="download-outline" size={18} color={BLUE} />
+
+          {/* Downloaded badge */}
+          {isDownloaded && (
+            <View style={styles.downloadedBadge}>
+              <Icon name="checkmark-circle" size={12} color="#fff" />
+            </View>
           )}
-        </TouchableOpacity>
-      </View>
+
+          {/* Downloading spinner */}
+          {isDownloading && (
+            <ActivityIndicator size="small" color="#fff" style={styles.cellSpinner} />
+          )}
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -157,36 +175,29 @@ export function SharedFilesScreen() {
     const isDownloaded = downloadedResources[item.resourceId];
 
     return (
-      <View style={styles.fileRow}>
-        <View style={styles.fileIconWrapper}>
-          <Icon name="document-text" size={20} color="#10b981" />
-        </View>
-        <View style={styles.fileInfo}>
-          <Text style={styles.fileName} numberOfLines={1}>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        style={styles.gridCell}
+        onPress={() => handleDownload(item.resourceId, item.displayName)}
+        disabled={isDownloading || isDownloaded}
+      >
+        <View style={[styles.gridCellInner, { backgroundColor: 'rgba(200,220,240,0.5)' }]}>
+          <View style={styles.nonVideoIconWrapper}>
+            <Icon name="document-text" size={32} color="#10b981" />
+          </View>
+          <Text style={[styles.cellFileName, { color: '#1a3a5c' }]} numberOfLines={1}>
             {item.displayName}
           </Text>
-          <Text style={styles.fileMeta}>
-            {`${(item.fileSize / 1024 / 1024).toFixed(2)} MB`}
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={[
-            styles.downloadBtn,
-            isDownloaded && styles.downloadBtnCompleted,
-            isDownloading && styles.downloadBtnDisabled,
-          ]}
-          disabled={isDownloading || isDownloaded}
-          onPress={() => handleDownload(item.resourceId, item.displayName)}
-        >
-          {isDownloading ? (
-            <ActivityIndicator size="small" color={BLUE} />
-          ) : isDownloaded ? (
-            <Icon name="checkmark-circle" size={18} color="#16a34a" />
-          ) : (
-            <Icon name="download-outline" size={18} color={BLUE} />
+          {isDownloaded && (
+            <View style={styles.downloadedBadge}>
+              <Icon name="checkmark-circle" size={12} color="#fff" />
+            </View>
           )}
-        </TouchableOpacity>
-      </View>
+          {isDownloading && (
+            <ActivityIndicator size="small" color="#3b9fd8" style={styles.cellSpinner} />
+          )}
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -247,7 +258,9 @@ export function SharedFilesScreen() {
         data={(activeTab === 'shared' ? sharedResources : receivedItems) as any}
         renderItem={activeTab === 'shared' ? (renderSharedResource as any) : (renderReceivedItem as any)}
         keyExtractor={item => item.resourceId}
-        contentContainerStyle={styles.listContent}
+        numColumns={3}
+        columnWrapperStyle={styles.gridRow}
+        contentContainerStyle={styles.gridContent}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} />
         }
@@ -259,7 +272,7 @@ export function SharedFilesScreen() {
     <SafeAreaView style={styles.safeArea}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('sharedFiles.scopes.team') || '檔案共享'}</Text>
+        <Text style={styles.headerTitle}>{t('sharedFiles.scopes.team') || '共享目录'}</Text>
       </View>
 
       {/* Tabs */}
@@ -269,7 +282,7 @@ export function SharedFilesScreen() {
           onPress={() => setActiveTab('shared')}
         >
           <Text style={[styles.tabButtonText, activeTab === 'shared' && styles.tabButtonTextActive]}>
-            {t('sharedFiles.scopes.shared') || '已分享的資源'}
+            {t('sharedFiles.scopes.shared') || '已分享'}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -277,7 +290,7 @@ export function SharedFilesScreen() {
           onPress={() => setActiveTab('received')}
         >
           <Text style={[styles.tabButtonText, activeTab === 'received' && styles.tabButtonTextActive]}>
-            {t('sharedFiles.scopes.received') || '已接收的檔案'}
+            {t('sharedFiles.scopes.received') || '已接收'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -291,49 +304,49 @@ export function SharedFilesScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#dceefa',
   },
   header: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
+    paddingTop: 12,
+    paddingBottom: 10,
+    backgroundColor: '#dceefa',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: DARK,
+    color: '#1a3a5c',
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
-    margin: 12,
-    borderRadius: 8,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    backgroundColor: 'rgba(255,255,255,0.40)',
+    borderRadius: 10,
     padding: 2,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 7,
     alignItems: 'center',
-    borderRadius: 6,
+    borderRadius: 8,
   },
   tabButtonActive: {
-    backgroundColor: '#ffffff',
-    shadowColor: 'rgba(0,0,0,0.05)',
+    backgroundColor: 'rgba(255,255,255,0.80)',
+    shadowColor: 'rgba(0,0,0,0.06)',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 1,
-    shadowRadius: 2,
+    shadowRadius: 3,
     elevation: 1,
   },
   tabButtonText: {
-    fontSize: 14,
-    color: '#64748b',
+    fontSize: 13,
+    color: '#5a7a96',
     fontWeight: '500',
   },
   tabButtonTextActive: {
-    color: DARK,
-    fontWeight: '600',
+    color: '#1a3a5c',
+    fontWeight: '700',
   },
   contentContainer: {
     flex: 1,
@@ -347,70 +360,94 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#64748b',
+    color: '#5a7a96',
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: DARK,
+    color: '#1a3a5c',
     marginTop: 16,
   },
   emptyMessage: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#5a7a96',
     marginTop: 8,
     textAlign: 'center',
   },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+
+  // Media grid
+  gridContent: {
+    paddingBottom: 32,
+    paddingHorizontal: 2,
   },
-  fileRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
+  gridRow: {
+    gap: 2,
+    marginBottom: 2,
   },
-  fileIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: '#f1f5f9',
+  gridCell: {
+    flex: 1 / 3,
+    aspectRatio: 1,
+  },
+  gridCellInner: {
+    flex: 1,
+    overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
-  fileInfo: {
-    flex: 1,
-    marginRight: 8,
+  nonVideoIconWrapper: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  fileName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: DARK,
+  videoVignette: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    // Simulate gradient: dark at bottom, transparent at top
+    backgroundColor: 'transparent',
+    borderBottomWidth: 40,
+    borderBottomColor: 'rgba(0,0,0,0)',
   },
-  fileMeta: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 4,
+  playButtonWrapper: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  downloadBtn: {
+  playButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: 'rgba(255,255,255,0.20)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.50)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  downloadBtnCompleted: {
-    backgroundColor: '#f0fdf4',
+  cellFileName: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    right: 6,
+    fontSize: 9,
+    fontWeight: '600',
   },
-  downloadBtnDisabled: {
-    opacity: 0.5,
+  downloadedBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(34,197,94,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cellSpinner: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
   },
 });
 
