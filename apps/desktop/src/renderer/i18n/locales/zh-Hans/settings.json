@@ -31,10 +31,10 @@
     "regenerate": "重新生成"
   },
   "powerSave": {
-    "preventSleepTitle": "同步期间防止电脑待机",
-    "preventSleepDescription": "手机同步期间保持电脑唤醒；传输时屏幕可能保持亮起，结束后会恢复系统待机设置。",
+    "preventSleepTitle": "防止电脑待机",
+    "preventSleepDescription": "保持电脑处于唤醒状态（允许屏幕熄灭），以便手机随时发起同步。此设置不会开启 Wake-on-LAN，远程唤醒仍需在 macOS 或 Windows 另外设置。",
     "blockingSleep": "正在保持唤醒",
-    "idle": "等待同步"
+    "idle": "未启用"
   },
   "giftCard": {
     "title": "礼品卡兑换",

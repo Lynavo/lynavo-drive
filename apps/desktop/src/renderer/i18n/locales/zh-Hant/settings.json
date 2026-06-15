@@ -31,10 +31,10 @@
     "regenerate": "重新產生"
   },
   "powerSave": {
-    "preventSleepTitle": "同步期間防止電腦待機",
-    "preventSleepDescription": "手機同步期間保持電腦喚醒；傳輸時螢幕可能維持亮起，結束後會恢復系統待機設定。",
+    "preventSleepTitle": "防止電腦待機",
+    "preventSleepDescription": "保持電腦處於喚醒狀態（允許螢幕熄滅），以便手機隨時發起同步。此設定不會開啟 Wake-on-LAN，遠端喚醒仍需在 macOS 或 Windows 另外設定。",
     "blockingSleep": "正在保持喚醒",
-    "idle": "等待同步"
+    "idle": "未啟用"
   },
   "giftCard": {
     "title": "禮品卡兌換",

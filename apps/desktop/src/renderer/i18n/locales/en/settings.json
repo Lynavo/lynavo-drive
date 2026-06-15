@@ -31,10 +31,10 @@
     "regenerate": "Regenerate"
   },
   "powerSave": {
-    "preventSleepTitle": "Prevent computer sleep during sync",
-    "preventSleepDescription": "Keeps this computer awake while a phone is syncing. The display may stay awake during transfer, then normal sleep behavior is restored.",
+    "preventSleepTitle": "Prevent computer sleep",
+    "preventSleepDescription": "Keep computer awake while SyncFlow is running (screen is allowed to turn off) so mobile can sync at any time. This does not enable Wake-on-LAN, which must be configured separately in macOS or Windows.",
     "blockingSleep": "Keeping awake",
-    "idle": "Waiting for sync"
+    "idle": "Disabled"
   },
   "giftCard": {
     "title": "Gift card redeem",

@@ -13,36 +13,21 @@ describe('PowerSaveManager', () => {
     vi.clearAllMocks();
   });
 
-  it('starts display sleep blocker only when enabled and transfer is active', () => {
+  it('starts app suspension blocker when enabled', () => {
     const blocker = createBlocker();
     const manager = new PowerSaveManager(blocker);
 
     manager.setEnabled(true);
-    expect(blocker.start).not.toHaveBeenCalled();
 
-    manager.setTransferActive(true);
-
-    expect(blocker.start).toHaveBeenCalledWith('prevent-display-sleep');
+    expect(blocker.start).toHaveBeenCalledWith('prevent-app-suspension');
     expect(blocker.start).toHaveBeenCalledTimes(1);
   });
 
-  it('stops the blocker when transfer becomes inactive', () => {
+  it('stops the blocker when the preference is disabled', () => {
     const blocker = createBlocker();
     const manager = new PowerSaveManager(blocker);
 
     manager.setEnabled(true);
-    manager.setTransferActive(true);
-    manager.setTransferActive(false);
-
-    expect(blocker.stop).toHaveBeenCalledWith(42);
-  });
-
-  it('stops the blocker when the preference is disabled during transfer', () => {
-    const blocker = createBlocker();
-    const manager = new PowerSaveManager(blocker);
-
-    manager.setEnabled(true);
-    manager.setTransferActive(true);
     manager.setEnabled(false);
 
     expect(blocker.stop).toHaveBeenCalledWith(42);
@@ -53,8 +38,6 @@ describe('PowerSaveManager', () => {
     const manager = new PowerSaveManager(blocker);
 
     manager.setEnabled(true);
-    manager.setTransferActive(true);
-    manager.setTransferActive(true);
     manager.setEnabled(true);
 
     expect(blocker.start).toHaveBeenCalledTimes(1);
@@ -70,7 +53,6 @@ describe('PowerSaveManager', () => {
     });
 
     manager.setPreventSleepDuringTransfer(true);
-    manager.setTransferActive(true);
 
     expect(manager.getState()).toEqual({
       preventSleepDuringTransfer: true,

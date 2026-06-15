@@ -40,19 +40,21 @@ describe('PowerSaveSection', () => {
   it('loads and displays the prevent sleep preference', async () => {
     render(<PowerSaveSection />);
 
-    const toggle = await screen.findByRole('switch', { name: '同步期间防止电脑待机' });
+    const toggle = await screen.findByRole('switch', { name: '防止电脑待机' });
 
     expect(toggle).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByTestId('power-save-switch-thumb')).toHaveClass('translate-x-[18px]');
     expect(
-      screen.getByText('手机同步期间保持电脑唤醒；传输时屏幕可能保持亮起，结束后会恢复系统待机设置。'),
+      screen.getByText(
+        '保持电脑处于唤醒状态（允许屏幕熄灭），以便手机随时发起同步。此设置不会开启 Wake-on-LAN，远程唤醒仍需在 macOS 或 Windows 另外设置。',
+      ),
     ).toBeInTheDocument();
   });
 
   it('updates the preference when toggled', async () => {
     render(<PowerSaveSection />);
 
-    const toggle = await screen.findByRole('switch', { name: '同步期间防止电脑待机' });
+    const toggle = await screen.findByRole('switch', { name: '防止电脑待机' });
     fireEvent.click(toggle);
 
     await waitFor(() => {
@@ -73,7 +75,7 @@ describe('PowerSaveSection', () => {
       });
 
     render(<PowerSaveSection />);
-    await screen.findByText('等待同步');
+    await screen.findByText('未启用');
 
     sidecarEventCallback?.({
       type: 'transfer.active.changed',

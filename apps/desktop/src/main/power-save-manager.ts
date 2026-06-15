@@ -45,10 +45,10 @@ export class PowerSaveManager {
   }
 
   private syncBlocker(): void {
-    const shouldBlock = this.enabled && this.transferActive;
+    const shouldBlock = this.enabled;
 
     if (shouldBlock && this.blockerId === null) {
-      this.blockerId = this.blocker.start('prevent-display-sleep');
+      this.blockerId = this.blocker.start('prevent-app-suspension');
       return;
     }
 
