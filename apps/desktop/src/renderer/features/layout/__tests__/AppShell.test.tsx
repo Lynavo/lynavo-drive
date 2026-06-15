@@ -31,6 +31,14 @@ vi.mock('@renderer/features/device-detail/DeviceDetailPage', () => ({
   DeviceDetailPage: () => <main>DeviceDetailPage</main>,
 }));
 
+vi.mock('@renderer/features/devices/DevicesPage', () => ({
+  DevicesPage: () => <main>DevicesPage</main>,
+}));
+
+vi.mock('@renderer/features/records/RecordsPage', () => ({
+  RecordsPage: () => <main>RecordsPage</main>,
+}));
+
 vi.mock('@renderer/features/directory/DirectoryPage', () => ({
   DirectoryPage: () => <main data-testid="legacy-directory-page">DirectoryPage</main>,
 }));
@@ -81,10 +89,8 @@ describe('AppShell', () => {
   });
 
   it.each([
-    ['devices', '设备管理', '已连接设备、授权状态与封锁名单将在这里集中管理。'],
     ['shared', '共享管理', '电脑端本机共享资源与访问范围将在这里配置。'],
     ['library', '资料库', '接收素材、归档位置与本机资料库状态将在这里汇总。'],
-    ['records', '记录', '连接、授权、封锁与同步记录将在这里查询。'],
   ] as const)('renders the %s desktop-local placeholder', (view, title, description) => {
     installElectronAPI();
     useAppStore.setState({ currentView: view });
@@ -93,6 +99,18 @@ describe('AppShell', () => {
 
     expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
     expect(screen.getByText(description)).toBeInTheDocument();
+  });
+
+  it.each([
+    ['devices', 'DevicesPage'],
+    ['records', 'RecordsPage'],
+  ] as const)('renders the %s desktop-local page', async (view, pageText) => {
+    installElectronAPI();
+    useAppStore.setState({ currentView: view });
+
+    render(<AppShell />);
+
+    expect(await screen.findByText(pageText)).toBeInTheDocument();
   });
 
   it('does not refresh the legacy directory store when shared.directory.changed arrives', async () => {

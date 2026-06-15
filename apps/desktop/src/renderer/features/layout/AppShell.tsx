@@ -30,6 +30,16 @@ const DeviceDetailPage = lazy(() =>
     default: m.DeviceDetailPage,
   })),
 );
+const DevicesPage = lazy(() =>
+  import('@renderer/features/devices/DevicesPage').then((m) => ({
+    default: m.DevicesPage,
+  })),
+);
+const RecordsPage = lazy(() =>
+  import('@renderer/features/records/RecordsPage').then((m) => ({
+    default: m.RecordsPage,
+  })),
+);
 
 function PageFallback() {
   return <Skeleton className="flex-1" />;
@@ -147,12 +157,7 @@ export function AppShell() {
         <Suspense fallback={<PageFallback />}>
           {currentView === 'dashboard' && <Dashboard />}
           {currentView === 'device-detail' && <DeviceDetailPage />}
-          {currentView === 'devices' && (
-            <DesktopLocalPlaceholder
-              title={t('layout.placeholders.devices.title')}
-              description={t('layout.placeholders.devices.description')}
-            />
-          )}
+          {currentView === 'devices' && <DevicesPage />}
           {currentView === 'shared' && (
             <DesktopLocalPlaceholder
               title={t('layout.placeholders.shared.title')}
@@ -165,12 +170,7 @@ export function AppShell() {
               description={t('layout.placeholders.library.description')}
             />
           )}
-          {currentView === 'records' && (
-            <DesktopLocalPlaceholder
-              title={t('layout.placeholders.records.title')}
-              description={t('layout.placeholders.records.description')}
-            />
-          )}
+          {currentView === 'records' && <RecordsPage />}
           {currentView === 'settings' && <SettingsPage />}
           {currentView === 'help' && (
             <ErrorBoundary fallbackMessage={t('layout.errorBoundary.helpLoadFailed')}>
