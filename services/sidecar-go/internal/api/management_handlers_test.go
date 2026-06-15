@@ -99,6 +99,145 @@ func TestManagementRejectsInvalidClientID(t *testing.T) {
 	}
 }
 
+func TestManagementUnblockUnknownDeviceReturnsNotFound(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	_, handler := api.NewServer(st, cfg, hub, nil)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Post(srv.URL+"/management/devices/unknown-client/unblock", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST unknown unblock: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status=%d, want 404", resp.StatusCode)
+	}
+}
+
+func TestManagementDevicesIncludesBlockedUnpairedClientAndCanUnblock(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	desktopDeviceID, err := st.GetDeviceID()
+	if err != nil {
+		t.Fatalf("GetDeviceID: %v", err)
+	}
+	reason := "wrong_code"
+	clientName := "Unpaired iPhone"
+	for i := 0; i < 5; i++ {
+		if _, err := st.RecordConnectionAttempt(store.ConnectionAttempt{
+			DesktopDeviceID: desktopDeviceID,
+			ClientID:        "blocked-unpaired",
+			ClientName:      &clientName,
+			Result:          "wrong_code",
+			FailureReason:   &reason,
+		}); err != nil {
+			t.Fatalf("RecordConnectionAttempt #%d: %v", i+1, err)
+		}
+	}
+
+	_, handler := api.NewServer(st, cfg, hub, nil)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/management/devices")
+	if err != nil {
+		t.Fatalf("GET /management/devices: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /management/devices status=%d, want 200", resp.StatusCode)
+	}
+
+	var listBody struct {
+		Items []store.ManagedDevice `json:"items"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&listBody); err != nil {
+		t.Fatalf("decode devices: %v", err)
+	}
+	if len(listBody.Items) != 1 {
+		t.Fatalf("expected 1 blocked unpaired device, got %d", len(listBody.Items))
+	}
+	got := listBody.Items[0]
+	if got.ClientID != "blocked-unpaired" || got.DisplayName != clientName {
+		t.Fatalf("unexpected blocked device identity: %+v", got)
+	}
+	if got.AuthorizationStatus != "revoked" || got.BlockStatus != "active" {
+		t.Fatalf("unexpected blocked device status: %+v", got)
+	}
+
+	resp, err = http.Post(srv.URL+"/management/devices/blocked-unpaired/unblock", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST unblock blocked-unpaired: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("POST unblock blocked-unpaired status=%d, want 200", resp.StatusCode)
+	}
+	state, err := st.GetDeviceBlockState(desktopDeviceID, "blocked-unpaired")
+	if err != nil {
+		t.Fatalf("GetDeviceBlockState: %v", err)
+	}
+	if state.Blocked || state.FailedAttemptCount != 0 {
+		t.Fatalf("expected unblock to clear unpaired block, got %+v", state)
+	}
+}
+
+func TestManagementUnblockKeepsOtherDesktopBlockState(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	desktopDeviceID, err := st.GetDeviceID()
+	if err != nil {
+		t.Fatalf("GetDeviceID: %v", err)
+	}
+	otherDesktopID := desktopDeviceID + "-other"
+	reason := "wrong_code"
+	for i := 0; i < 5; i++ {
+		if _, err := st.RecordConnectionAttempt(store.ConnectionAttempt{
+			DesktopDeviceID: desktopDeviceID,
+			ClientID:        "same-client",
+			Result:          "wrong_code",
+			FailureReason:   &reason,
+		}); err != nil {
+			t.Fatalf("RecordConnectionAttempt desktop #%d: %v", i+1, err)
+		}
+		if _, err := st.RecordConnectionAttempt(store.ConnectionAttempt{
+			DesktopDeviceID: otherDesktopID,
+			ClientID:        "same-client",
+			Result:          "wrong_code",
+			FailureReason:   &reason,
+		}); err != nil {
+			t.Fatalf("RecordConnectionAttempt other desktop #%d: %v", i+1, err)
+		}
+	}
+
+	_, handler := api.NewServer(st, cfg, hub, nil)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Post(srv.URL+"/management/devices/same-client/unblock", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST unblock same-client: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("POST unblock same-client status=%d, want 200", resp.StatusCode)
+	}
+
+	currentDesktop, err := st.GetDeviceBlockState(desktopDeviceID, "same-client")
+	if err != nil {
+		t.Fatalf("GetDeviceBlockState desktop: %v", err)
+	}
+	if currentDesktop.Blocked {
+		t.Fatalf("expected current desktop block cleared, got %+v", currentDesktop)
+	}
+	otherDesktop, err := st.GetDeviceBlockState(otherDesktopID, "same-client")
+	if err != nil {
+		t.Fatalf("GetDeviceBlockState other desktop: %v", err)
+	}
+	if !otherDesktop.Blocked || otherDesktop.FailedAttemptCount != 5 {
+		t.Fatalf("expected other desktop block to remain active, got %+v", otherDesktop)
+	}
+}
+
 func TestManagementRecordsSyncAndAccess(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	desktopDeviceID, err := st.GetDeviceID()
@@ -130,7 +269,7 @@ func TestManagementRecordsSyncAndAccess(t *testing.T) {
 		ClientID:        "client-001",
 		ClientName:      "Alice iPhone",
 		ResourceID:      "res-001",
-		ResourceKind:    "file",
+		ResourceKind:    "shared_file",
 		ResourceName:    "Manual.pdf",
 		Action:          "download",
 		Result:          "ok",

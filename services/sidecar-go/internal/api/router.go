@@ -226,6 +226,7 @@ func NewServer(s *store.Store, cfg *config.Config, hub *events.Hub, csp ClientSt
 	mux.HandleFunc("GET /resources/received", withJSON(srv.handleResourcesReceived))
 	mux.HandleFunc("GET /resources/mobile/shared", withJSON(srv.handleMobileSharedResources))
 	mux.HandleFunc("GET /resources/mobile/received", withJSON(srv.handleMobileReceivedResources))
+	mux.HandleFunc("POST /resources/mobile/view/{resourceId}", withJSON(srv.handleMobileResourceView))
 	mux.HandleFunc("GET /resources/mobile/download/{resourceId}", srv.handleMobileResourceDownload)
 	// Devices
 	mux.HandleFunc("GET /devices/{deviceId}", withJSON(srv.handleDeviceDetail))

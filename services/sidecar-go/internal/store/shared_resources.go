@@ -123,7 +123,19 @@ func scanSharedResource(scanner sharedResourceScanner) (SharedResource, error) {
 	); err != nil {
 		return SharedResource{}, fmt.Errorf("scan shared resource: %w", err)
 	}
+	resource.Kind = normalizeSharedResourceKind(resource.Kind)
 	return resource, nil
+}
+
+func normalizeSharedResourceKind(kind string) string {
+	switch kind {
+	case "file":
+		return "shared_file"
+	case "folder":
+		return "shared_folder"
+	default:
+		return kind
+	}
 }
 
 func hasPathTraversal(path string) bool {

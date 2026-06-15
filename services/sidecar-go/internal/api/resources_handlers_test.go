@@ -21,7 +21,7 @@ func TestResourcesSharedListAddAndRemove(t *testing.T) {
 	defer srv.Close()
 
 	body := bytes.NewBufferString(`{
-		"kind": "file",
+		"kind": "shared_file",
 		"displayName": "Manual.pdf",
 		"localPath": "/tmp/Manual.pdf",
 		"fileSize": 1234,
@@ -43,7 +43,7 @@ func TestResourcesSharedListAddAndRemove(t *testing.T) {
 	if created.ResourceID == "" {
 		t.Fatal("resourceId is empty")
 	}
-	if created.Kind != "file" || created.DisplayName != "Manual.pdf" || created.Status != "available" {
+	if created.Kind != "shared_file" || created.DisplayName != "Manual.pdf" || created.Status != "available" {
 		t.Fatalf("unexpected created resource: %+v", created)
 	}
 
@@ -154,7 +154,7 @@ func TestMobileResourcesListDownloadAndAccessRecords(t *testing.T) {
 	}
 	resource, err := st.AddSharedResource(store.SharedResourceInput{
 		DesktopDeviceID: desktopDeviceID,
-		Kind:            "file",
+		Kind:            "shared_file",
 		DisplayName:     "Manual.pdf",
 		LocalPath:       &sharedPath,
 		Status:          "available",
@@ -193,6 +193,22 @@ func TestMobileResourcesListDownloadAndAccessRecords(t *testing.T) {
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("unknown download status=%d, want 404", resp.StatusCode)
 	}
+	recordsAfterUnknown, err := st.ListAccessRecords(desktopDeviceID, &[]string{"client-001"}[0])
+	if err != nil {
+		t.Fatalf("ListAccessRecords after unknown download: %v", err)
+	}
+	if len(recordsAfterUnknown) != 1 {
+		t.Fatalf("unknown resource download must not create fake access record, got %d records", len(recordsAfterUnknown))
+	}
+
+	resp, err = http.Post(srv.URL+"/resources/mobile/view/"+resource.ResourceID+"?clientId=client-001&clientName=Alice%20iPhone", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST mobile view: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("view status=%d, want 200", resp.StatusCode)
+	}
 
 	resp, err = http.Get(srv.URL + "/resources/mobile/download/" + resource.ResourceID + "?clientId=client-001&clientName=Alice%20iPhone")
 	if err != nil {
@@ -215,19 +231,111 @@ func TestMobileResourcesListDownloadAndAccessRecords(t *testing.T) {
 		t.Fatalf("ListAccessRecords: %v", err)
 	}
 	if len(records) != 3 {
-		t.Fatalf("expected 3 access records for list, failed download, download; got %d", len(records))
+		t.Fatalf("expected 3 access records for list, view, download; got %d", len(records))
 	}
 	actions := map[string]bool{}
 	results := map[string]bool{}
+	kinds := map[string]bool{}
 	for _, record := range records {
 		actions[record.Action] = true
 		results[record.Result] = true
+		kinds[record.ResourceKind] = true
+		if !isContractAccessAction(record.Action) {
+			t.Fatalf("access record action must match contracts enum, got %+v", record)
+		}
+		if !isContractAccessResult(record.Result) {
+			t.Fatalf("access record result must match contracts enum, got %+v", record)
+		}
+		if !isContractResourceKind(record.ResourceKind) {
+			t.Fatalf("access record resource kind must match contracts enum, got %+v", record)
+		}
 	}
-	if !actions["list"] || !actions["download"] {
+	if !actions["list"] || !actions["view"] || !actions["download"] {
 		t.Fatalf("expected list and download access actions, got %+v", actions)
 	}
-	if !results["ok"] || !results["not_found"] {
-		t.Fatalf("expected ok and not_found access results, got %+v", results)
+	if !results["ok"] || results["not_found"] {
+		t.Fatalf("expected only contract-compatible ok results, got %+v", results)
+	}
+	if !kinds["shared_file"] {
+		t.Fatalf("expected contract-compatible resource kind shared_file, got %+v", kinds)
+	}
+}
+
+func TestMobileResourceAccessNormalizesLegacyResourceKind(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	desktopDeviceID, err := st.GetDeviceID()
+	if err != nil {
+		t.Fatalf("GetDeviceID: %v", err)
+	}
+	sharedPath := filepath.Join(t.TempDir(), "Legacy.pdf")
+	if err := os.WriteFile(sharedPath, []byte("legacy bytes"), 0o644); err != nil {
+		t.Fatalf("write legacy shared file: %v", err)
+	}
+	resource, err := st.AddSharedResource(store.SharedResourceInput{
+		DesktopDeviceID: desktopDeviceID,
+		Kind:            "file",
+		DisplayName:     "Legacy.pdf",
+		LocalPath:       &sharedPath,
+		Status:          "available",
+	})
+	if err != nil {
+		t.Fatalf("AddSharedResource legacy file: %v", err)
+	}
+
+	_, handler := api.NewServer(st, cfg, hub, nil)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/resources/mobile/shared?clientId=legacy-client")
+	if err != nil {
+		t.Fatalf("GET legacy mobile shared: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET legacy mobile shared status=%d, want 200", resp.StatusCode)
+	}
+	var sharedBody struct {
+		Items []store.SharedResource `json:"items"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&sharedBody); err != nil {
+		t.Fatalf("decode legacy mobile shared: %v", err)
+	}
+	if len(sharedBody.Items) != 1 || sharedBody.Items[0].Kind != "shared_file" {
+		t.Fatalf("expected legacy shared resource kind to normalize in response, got %+v", sharedBody.Items)
+	}
+
+	resp, err = http.Post(srv.URL+"/resources/mobile/view/"+resource.ResourceID+"?clientId=legacy-client", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST legacy view: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("POST legacy view status=%d, want 200", resp.StatusCode)
+	}
+
+	resp, err = http.Get(srv.URL + "/resources/mobile/download/" + resource.ResourceID + "?clientId=legacy-client")
+	if err != nil {
+		t.Fatalf("GET legacy download: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET legacy download status=%d, want 200", resp.StatusCode)
+	}
+
+	records, err := st.ListAccessRecords(desktopDeviceID, &[]string{"legacy-client"}[0])
+	if err != nil {
+		t.Fatalf("ListAccessRecords legacy: %v", err)
+	}
+	if len(records) != 3 {
+		t.Fatalf("expected 3 legacy access records, got %d", len(records))
+	}
+	for _, record := range records {
+		if record.ResourceKind != "shared_file" {
+			t.Fatalf("expected legacy access record kind shared_file, got %+v", record)
+		}
+		if !isContractAccessAction(record.Action) || !isContractAccessResult(record.Result) {
+			t.Fatalf("legacy access record must match contracts enums, got %+v", record)
+		}
 	}
 }
 
@@ -258,7 +366,34 @@ func TestMobileReceivedResourcesCreatesAccessRecord(t *testing.T) {
 	if len(records) != 1 {
 		t.Fatalf("expected 1 access record, got %d", len(records))
 	}
-	if records[0].ResourceID != "received_library" || records[0].Action != "list" || records[0].Result != "ok" {
+	if records[0].ResourceID != "received_library" || records[0].ResourceKind != "received_file" || records[0].Action != "list" || records[0].Result != "ok" {
 		t.Fatalf("unexpected access record: %+v", records[0])
+	}
+}
+
+func isContractResourceKind(kind string) bool {
+	switch kind {
+	case "shared_file", "shared_folder", "received_file":
+		return true
+	default:
+		return false
+	}
+}
+
+func isContractAccessAction(action string) bool {
+	switch action {
+	case "list", "view", "download", "error":
+		return true
+	default:
+		return false
+	}
+}
+
+func isContractAccessResult(result string) bool {
+	switch result {
+	case "ok", "denied", "missing", "error":
+		return true
+	default:
+		return false
 	}
 }

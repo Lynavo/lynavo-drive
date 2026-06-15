@@ -156,6 +156,32 @@ func (s *Store) UnblockDevice(desktopDeviceID, clientID string) error {
 	return nil
 }
 
+func (s *Store) DeviceKnownForManagement(desktopDeviceID, clientID string) (bool, error) {
+	var exists int
+	err := s.db.QueryRow(`
+		SELECT (
+			SELECT 1
+			FROM paired_devices
+			WHERE client_id = ?
+			LIMIT 1
+		) IS NOT NULL
+		OR (
+			SELECT 1
+			FROM device_blocks
+			WHERE desktop_device_id = ?
+				AND client_id = ?
+				AND blocked_at IS NOT NULL
+				AND manually_unblocked_at IS NULL
+			LIMIT 1
+		) IS NOT NULL`,
+		clientID, desktopDeviceID, clientID,
+	).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("check managed device exists: %w", err)
+	}
+	return exists == 1, nil
+}
+
 func (s *Store) ClearConnectionAttempts(desktopDeviceID, clientID string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.Exec(`
@@ -199,6 +225,7 @@ func (s *Store) ListManagedDevices(desktopDeviceID string) ([]ManagedDevice, err
 	defer rows.Close()
 
 	devices := make([]ManagedDevice, 0)
+	seen := make(map[string]struct{})
 	for rows.Next() {
 		var device ManagedDevice
 		var alias *string
@@ -231,9 +258,73 @@ func (s *Store) ListManagedDevices(desktopDeviceID string) ([]ManagedDevice, err
 		device.BlockedAt = block.BlockedAt
 		device.BlockReason = block.Reason
 		devices = append(devices, device)
+		seen[device.ClientID] = struct{}{}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate managed devices: %w", err)
+	}
+	blockedDevices, err := s.listBlockedUnpairedManagedDevices(desktopDeviceID, seen)
+	if err != nil {
+		return nil, err
+	}
+	devices = append(devices, blockedDevices...)
+	return devices, nil
+}
+
+func (s *Store) listBlockedUnpairedManagedDevices(desktopDeviceID string, seen map[string]struct{}) ([]ManagedDevice, error) {
+	rows, err := s.db.Query(`
+		SELECT
+			b.client_id,
+			COALESCE(
+				(
+					SELECT ca.client_name
+					FROM connection_attempts ca
+					WHERE ca.desktop_device_id = b.desktop_device_id
+						AND ca.client_id = b.client_id
+						AND ca.client_name IS NOT NULL
+						AND ca.client_name != ''
+					ORDER BY ca.attempted_at DESC, ca.id DESC
+					LIMIT 1
+				),
+				b.client_id
+			),
+			b.reason, b.failed_attempt_count, b.blocked_at
+		FROM device_blocks b
+		WHERE b.desktop_device_id = ?
+			AND b.blocked_at IS NOT NULL
+			AND b.manually_unblocked_at IS NULL
+		ORDER BY b.blocked_at DESC, b.client_id DESC`,
+		desktopDeviceID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list blocked unpaired managed devices: %w", err)
+	}
+	defer rows.Close()
+
+	devices := make([]ManagedDevice, 0)
+	for rows.Next() {
+		var device ManagedDevice
+		var reason string
+		if err := rows.Scan(
+			&device.ClientID, &device.DisplayName, &reason,
+			&device.FailedAttemptCount, &device.BlockedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan blocked unpaired managed device: %w", err)
+		}
+		if _, ok := seen[device.ClientID]; ok {
+			continue
+		}
+		device.DesktopDeviceID = desktopDeviceID
+		device.ClientIDShort = shortClientID(device.ClientID)
+		device.AuthorizationStatus = "revoked"
+		device.BlockStatus = "active"
+		if reason != "" {
+			device.BlockReason = &reason
+		}
+		devices = append(devices, device)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate blocked unpaired managed devices: %w", err)
 	}
 	return devices, nil
 }

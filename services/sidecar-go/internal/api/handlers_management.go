@@ -1,11 +1,8 @@
 package api
 
 import (
-	"errors"
 	"net/http"
 	"strings"
-
-	"github.com/nicksyncflow/sidecar/internal/store"
 )
 
 func (s *Server) handleManagementDevices(w http.ResponseWriter, r *http.Request) {
@@ -28,17 +25,18 @@ func (s *Server) handleManagementUnblockDevice(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusBadRequest, "invalid clientId")
 		return
 	}
-	if _, err := s.store.GetPairedDevice(clientID); err != nil {
-		if errors.Is(err, store.ErrNoRows) {
-			writeError(w, http.StatusNotFound, "device not found")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "failed to load device")
-		return
-	}
 	desktopDeviceID, err := s.store.GetDeviceID()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to load desktop device id")
+		return
+	}
+	known, err := s.store.DeviceKnownForManagement(desktopDeviceID, clientID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to load device")
+		return
+	}
+	if !known {
+		writeError(w, http.StatusNotFound, "device not found")
 		return
 	}
 	if err := s.store.UnblockDevice(desktopDeviceID, clientID); err != nil {

@@ -159,7 +159,7 @@ func (s *Server) handleMobileSharedResources(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusInternalServerError, "failed to list shared resources")
 		return
 	}
-	_, _ = s.recordResourceAccess(desktopDeviceID, client, "shared_resources", "collection", "Shared Resources", "list", "ok")
+	_, _ = s.recordResourceAccess(desktopDeviceID, client, "shared_resources", "shared_file", "Shared Resources", "list", "ok")
 	writeJSON(w, http.StatusOK, map[string]any{"items": resources})
 }
 
@@ -178,8 +178,39 @@ func (s *Server) handleMobileReceivedResources(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusInternalServerError, "failed to list received library")
 		return
 	}
-	_, _ = s.recordResourceAccess(desktopDeviceID, client, "received_library", "collection", "Received Library", "list", "ok")
+	_, _ = s.recordResourceAccess(desktopDeviceID, client, "received_library", "received_file", "Received Library", "list", "ok")
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func (s *Server) handleMobileResourceView(w http.ResponseWriter, r *http.Request) {
+	client, ok := mobileAccessClientFromQuery(w, r)
+	if !ok {
+		return
+	}
+	resourceID := strings.TrimSpace(r.PathValue("resourceId"))
+	if !isValidAPIID(resourceID) {
+		writeError(w, http.StatusBadRequest, "invalid resourceId")
+		return
+	}
+	desktopDeviceID, err := s.store.GetDeviceID()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to load desktop device id")
+		return
+	}
+	resource, err := s.store.ResolveSharedResource(desktopDeviceID, resourceID)
+	if err != nil {
+		if errors.Is(err, store.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "resource not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to resolve resource")
+		return
+	}
+	if _, err := s.recordResourceAccess(desktopDeviceID, client, resource.ResourceID, resource.Kind, resource.DisplayName, "view", "ok"); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to record resource access")
+		return
+	}
+	writeJSON(w, http.StatusOK, resource)
 }
 
 func (s *Server) handleMobileResourceDownload(w http.ResponseWriter, r *http.Request) {
@@ -200,7 +231,6 @@ func (s *Server) handleMobileResourceDownload(w http.ResponseWriter, r *http.Req
 	resource, err := s.store.ResolveSharedResource(desktopDeviceID, resourceID)
 	if err != nil {
 		if errors.Is(err, store.ErrNoRows) {
-			_, _ = s.recordResourceAccess(desktopDeviceID, client, resourceID, "unknown", resourceID, "download", "not_found")
 			writeError(w, http.StatusNotFound, "resource not found")
 			return
 		}
@@ -209,13 +239,13 @@ func (s *Server) handleMobileResourceDownload(w http.ResponseWriter, r *http.Req
 	}
 	localPath, err := s.localPathForSharedResource(resource)
 	if err != nil {
-		_, _ = s.recordResourceAccess(desktopDeviceID, client, resource.ResourceID, resource.Kind, resource.DisplayName, "download", "not_found")
+		_, _ = s.recordResourceAccess(desktopDeviceID, client, resource.ResourceID, resource.Kind, resource.DisplayName, "download", "missing")
 		writeError(w, http.StatusNotFound, "resource file not found")
 		return
 	}
 	info, err := os.Stat(localPath)
 	if err != nil || info.IsDir() {
-		_, _ = s.recordResourceAccess(desktopDeviceID, client, resource.ResourceID, resource.Kind, resource.DisplayName, "download", "not_found")
+		_, _ = s.recordResourceAccess(desktopDeviceID, client, resource.ResourceID, resource.Kind, resource.DisplayName, "download", "missing")
 		writeError(w, http.StatusNotFound, "resource file not found")
 		return
 	}
@@ -303,7 +333,7 @@ func (s *Server) recordResourceAccess(
 
 func isValidResourceKind(kind string) bool {
 	switch kind {
-	case "file", "folder", "received_file":
+	case "shared_file", "shared_folder", "received_file":
 		return true
 	default:
 		return false
@@ -312,7 +342,7 @@ func isValidResourceKind(kind string) bool {
 
 func isValidResourceStatus(status string) bool {
 	switch status {
-	case "available", "missing":
+	case "available", "missing", "removed":
 		return true
 	default:
 		return false
@@ -321,7 +351,7 @@ func isValidResourceStatus(status string) bool {
 
 func isValidAccessAction(action string) bool {
 	switch action {
-	case "list", "view", "download":
+	case "list", "view", "download", "error":
 		return true
 	default:
 		return false
@@ -330,7 +360,7 @@ func isValidAccessAction(action string) bool {
 
 func isValidAccessResult(result string) bool {
 	switch result {
-	case "ok", "not_found", "blocked", "error":
+	case "ok", "denied", "missing", "error":
 		return true
 	default:
 		return false
