@@ -13,6 +13,7 @@ import {
   openFolder,
   openFile,
   openExternal,
+  selectFile,
   selectFolder,
   copyToClipboard,
 } from './file-operations';
@@ -51,6 +52,14 @@ export const IPC = {
   SIDECAR_VALIDATE_SHARE: 'sidecar:validate-share',
   SIDECAR_TRANSFER_ACTIVE: 'sidecar:transfer-active',
   SIDECAR_SHARED_LIST: 'sidecar:shared-list',
+  SIDECAR_MANAGED_DEVICES: 'sidecar:managed-devices',
+  SIDECAR_UNBLOCK_DEVICE: 'sidecar:unblock-device',
+  SIDECAR_SYNC_RECORDS: 'sidecar:sync-records',
+  SIDECAR_ACCESS_RECORDS: 'sidecar:access-records',
+  SIDECAR_SHARED_RESOURCES: 'sidecar:shared-resources',
+  SIDECAR_ADD_SHARED_RESOURCE: 'sidecar:add-shared-resource',
+  SIDECAR_REMOVE_SHARED_RESOURCE: 'sidecar:remove-shared-resource',
+  SIDECAR_RECEIVED_LIBRARY: 'sidecar:received-library',
   SUPPORT_UPLOAD_DIAGNOSTICS: 'support:upload-diagnostics',
   SUPPORT_EXPORT_DIAGNOSTICS: 'support:export-diagnostics',
   SUPPORT_CHECK_FOR_UPDATES: 'support:check-for-updates',
@@ -58,6 +67,7 @@ export const IPC = {
   FILES_OPEN_FOLDER: 'files:open-folder',
   FILES_OPEN_FILE: 'files:open-file',
   FILES_OPEN_EXTERNAL: 'files:open-external',
+  FILES_SELECT_FILE: 'files:select-file',
   FILES_SELECT_FOLDER: 'files:select-folder',
   FILES_COPY_CLIPBOARD: 'files:copy-clipboard',
   POWER_SAVE_GET_STATE: 'power-save:get-state',
@@ -590,6 +600,20 @@ export function registerIpcHandlers(
   ipcMain.handle(IPC.SIDECAR_VALIDATE_SHARE, () => sidecarClient.validateShare());
   ipcMain.handle(IPC.SIDECAR_TRANSFER_ACTIVE, () => sidecarClient.getTransferActive());
   ipcMain.handle(IPC.SIDECAR_SHARED_LIST, (_e, path?: string) => sidecarClient.getSharedList(path));
+  ipcMain.handle(IPC.SIDECAR_MANAGED_DEVICES, () => sidecarClient.getManagedDevices());
+  ipcMain.handle(IPC.SIDECAR_UNBLOCK_DEVICE, (_e, clientId: string) =>
+    sidecarClient.unblockDevice(clientId),
+  );
+  ipcMain.handle(IPC.SIDECAR_SYNC_RECORDS, () => sidecarClient.getSyncRecords());
+  ipcMain.handle(IPC.SIDECAR_ACCESS_RECORDS, () => sidecarClient.getAccessRecords());
+  ipcMain.handle(IPC.SIDECAR_SHARED_RESOURCES, () => sidecarClient.getSharedResources());
+  ipcMain.handle(IPC.SIDECAR_ADD_SHARED_RESOURCE, (_e, payload) =>
+    sidecarClient.addSharedResource(payload),
+  );
+  ipcMain.handle(IPC.SIDECAR_REMOVE_SHARED_RESOURCE, (_e, resourceId: string) =>
+    sidecarClient.removeSharedResource(resourceId),
+  );
+  ipcMain.handle(IPC.SIDECAR_RECEIVED_LIBRARY, () => sidecarClient.getReceivedLibrary());
   if (powerSave) {
     ipcMain.handle(IPC.POWER_SAVE_GET_STATE, async () => powerSave.getState());
     ipcMain.handle(IPC.POWER_SAVE_SET_PREVENT_SLEEP, async (_e, enabled: boolean) =>
@@ -609,6 +633,7 @@ export function registerIpcHandlers(
   ipcMain.handle(IPC.FILES_OPEN_FOLDER, (_e, path: string) => openFolder(path));
   ipcMain.handle(IPC.FILES_OPEN_FILE, (_e, path: string) => openFile(path));
   ipcMain.handle(IPC.FILES_OPEN_EXTERNAL, (_e, target: string) => openExternal(target));
+  ipcMain.handle(IPC.FILES_SELECT_FILE, () => selectFile());
   ipcMain.handle(IPC.FILES_SELECT_FOLDER, () => selectFolder());
   ipcMain.handle(IPC.FILES_COPY_CLIPBOARD, (_e, text: string) => copyToClipboard(text));
 }

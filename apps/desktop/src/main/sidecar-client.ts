@@ -12,8 +12,15 @@ import {
   VIVIDROP_REVIEW_API_BASE_URL,
 } from '@syncflow/contracts';
 import type {
+  DesktopAccessRecordDTO,
+  DesktopManagedDeviceDTO,
+  DesktopSharedResourceDTO,
+  DesktopSyncRecordDTO,
+  DesktopResourceKind,
+  DesktopResourceStatus,
   DeviceFileLedgerPageDTO,
   DeviceFileSortField,
+  ReceivedLibraryItemDTO,
   SortDirection,
 } from '@syncflow/contracts';
 import { desktopClientHeaders } from './app-info';
@@ -48,6 +55,20 @@ const USER_PROFILE_PATH = process.env.SYNCFLOW_USER_PROFILE_PATH ?? '/api/v1/use
 
 type GiftCardRedeemPayload = {
   code: string;
+};
+
+export type DesktopLocalListResponse<T> = {
+  items: T[];
+};
+
+export type AddSharedResourcePayload = {
+  kind: DesktopResourceKind;
+  displayName: string;
+  localPath?: string;
+  receivedFileKey?: string;
+  fileSize?: number;
+  mediaType?: string;
+  status?: DesktopResourceStatus;
 };
 
 export type PowerEventSnapshot = {
@@ -888,6 +909,25 @@ export const sidecarClient = {
     const endpoint = encodedPath ? `/shared/list/${encodedPath}` : '/shared/list';
     return request<import('@syncflow/contracts').SharedDirectoryDTO>('GET', endpoint);
   },
+  getManagedDevices: () =>
+    request<DesktopLocalListResponse<DesktopManagedDeviceDTO>>('GET', '/management/devices'),
+  unblockDevice: (clientId: string) =>
+    request<{ ok: boolean }>(
+      'POST',
+      `/management/devices/${encodeURIComponent(clientId)}/unblock`,
+    ),
+  getSyncRecords: () =>
+    request<DesktopLocalListResponse<DesktopSyncRecordDTO>>('GET', '/management/records/sync'),
+  getAccessRecords: () =>
+    request<DesktopLocalListResponse<DesktopAccessRecordDTO>>('GET', '/management/records/access'),
+  getSharedResources: () =>
+    request<DesktopLocalListResponse<DesktopSharedResourceDTO>>('GET', '/resources/shared'),
+  addSharedResource: (payload: AddSharedResourcePayload) =>
+    request<DesktopSharedResourceDTO>('POST', '/resources/shared', payload),
+  removeSharedResource: (resourceId: string) =>
+    request<{ ok: boolean }>('DELETE', `/resources/shared/${encodeURIComponent(resourceId)}`),
+  getReceivedLibrary: () =>
+    request<DesktopLocalListResponse<ReceivedLibraryItemDTO>>('GET', '/resources/received'),
   getClientConfig: async () => {
     const response = await request<unknown>(
       'GET',

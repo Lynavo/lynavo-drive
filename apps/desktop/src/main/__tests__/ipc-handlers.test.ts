@@ -103,6 +103,14 @@ vi.mock('../sidecar-client', async () => {
       validateShare: vi.fn(),
       getTransferActive: vi.fn(),
       getSharedList: vi.fn(),
+      getManagedDevices: vi.fn(),
+      unblockDevice: vi.fn(),
+      getSyncRecords: vi.fn(),
+      getAccessRecords: vi.fn(),
+      getSharedResources: vi.fn(),
+      addSharedResource: vi.fn(),
+      removeSharedResource: vi.fn(),
+      getReceivedLibrary: vi.fn(),
       getClientConfig: vi.fn(),
       redeemGiftCard: vi.fn(),
       sendSMSCode: vi.fn(),
@@ -241,6 +249,68 @@ describe('registerIpcHandlers', () => {
       features: { giftCard: { enabled: true } },
     });
     expect(sidecarClient.getClientConfig).toHaveBeenCalledTimes(1);
+  });
+
+  it('registers desktop-local management and resource IPC handlers', async () => {
+    vi.mocked(sidecarClient.getManagedDevices).mockResolvedValue({
+      items: [{ desktopDeviceId: 'desktop-1', clientId: 'client-1' }],
+    } as never);
+    vi.mocked(sidecarClient.unblockDevice).mockResolvedValue({ ok: true });
+    vi.mocked(sidecarClient.getSyncRecords).mockResolvedValue({
+      items: [{ recordId: 'sync-1' }],
+    } as never);
+    vi.mocked(sidecarClient.getAccessRecords).mockResolvedValue({
+      items: [{ recordId: 'access-1' }],
+    } as never);
+    vi.mocked(sidecarClient.getSharedResources).mockResolvedValue({
+      items: [{ resourceId: 'res-1' }],
+    } as never);
+    vi.mocked(sidecarClient.addSharedResource).mockResolvedValue({
+      resourceId: 'res-2',
+    } as never);
+    vi.mocked(sidecarClient.removeSharedResource).mockResolvedValue({ ok: true });
+    vi.mocked(sidecarClient.getReceivedLibrary).mockResolvedValue({
+      items: [{ resourceId: 'received-1' }],
+    } as never);
+
+    registerIpcHandlers({ retryStart: vi.fn() } as never);
+
+    await expect(handlers.get(IPC.SIDECAR_MANAGED_DEVICES)?.()).resolves.toEqual({
+      items: [{ desktopDeviceId: 'desktop-1', clientId: 'client-1' }],
+    });
+    await expect(handlers.get(IPC.SIDECAR_UNBLOCK_DEVICE)?.(undefined, 'client-1')).resolves.toEqual(
+      { ok: true },
+    );
+    await expect(handlers.get(IPC.SIDECAR_SYNC_RECORDS)?.()).resolves.toEqual({
+      items: [{ recordId: 'sync-1' }],
+    });
+    await expect(handlers.get(IPC.SIDECAR_ACCESS_RECORDS)?.()).resolves.toEqual({
+      items: [{ recordId: 'access-1' }],
+    });
+    await expect(handlers.get(IPC.SIDECAR_SHARED_RESOURCES)?.()).resolves.toEqual({
+      items: [{ resourceId: 'res-1' }],
+    });
+    await expect(
+      handlers.get(IPC.SIDECAR_ADD_SHARED_RESOURCE)?.(undefined, {
+        kind: 'shared_folder',
+        displayName: 'Exports',
+        localPath: '/tmp/exports',
+      }),
+    ).resolves.toEqual({ resourceId: 'res-2' });
+    await expect(
+      handlers.get(IPC.SIDECAR_REMOVE_SHARED_RESOURCE)?.(undefined, 'res-1'),
+    ).resolves.toEqual({ ok: true });
+    await expect(handlers.get(IPC.SIDECAR_RECEIVED_LIBRARY)?.()).resolves.toEqual({
+      items: [{ resourceId: 'received-1' }],
+    });
+
+    expect(sidecarClient.unblockDevice).toHaveBeenCalledWith('client-1');
+    expect(sidecarClient.addSharedResource).toHaveBeenCalledWith({
+      kind: 'shared_folder',
+      displayName: 'Exports',
+      localPath: '/tmp/exports',
+    });
+    expect(sidecarClient.removeSharedResource).toHaveBeenCalledWith('res-1');
   });
 
   it('registers phone auth IPC for SMS send and login', async () => {

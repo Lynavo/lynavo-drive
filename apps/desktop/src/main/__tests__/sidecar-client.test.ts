@@ -192,6 +192,102 @@ describe('sidecarClient', () => {
     expect(options.path).toBe('/shared/list/%E7%9B%B8%E7%B0%BF%20A/IMG%20%231%25.jpg');
   });
 
+  it('calls desktop-local management and resource endpoints with typed sidecar APIs', async () => {
+    const bodies: unknown[] = [];
+    const httpRequest = vi.fn((options: RequestOptions, callback: (res: unknown) => void) => {
+      const req = new EventEmitter() as EventEmitter & {
+        on: typeof EventEmitter.prototype.on;
+        write: ReturnType<typeof vi.fn>;
+        end: ReturnType<typeof vi.fn>;
+      };
+      req.write = vi.fn((chunk: string) => {
+        bodies.push(JSON.parse(chunk));
+      });
+      req.end = vi.fn();
+      const path = options.path ?? '';
+      const responseBody =
+        path === '/management/devices'
+          ? { items: [{ desktopDeviceId: 'desktop-1', clientId: 'client-1' }] }
+          : path === '/management/devices/client-1/unblock'
+            ? { ok: true }
+            : path === '/management/records/sync'
+              ? { items: [{ recordId: 'sync-1' }] }
+              : path === '/management/records/access'
+                ? { items: [{ recordId: 'access-1' }] }
+                : path === '/resources/shared'
+                  ? options.method === 'POST'
+                    ? { resourceId: 'res-1' }
+                    : { items: [{ resourceId: 'res-1' }] }
+                  : path === '/resources/shared/res-1'
+                    ? { ok: true }
+                    : path === '/resources/received'
+                      ? { items: [{ resourceId: 'received-1' }] }
+                      : { ok: false };
+      callback(createResponse(200, JSON.stringify(responseBody)));
+      return req;
+    });
+    const httpsRequest = vi.fn();
+
+    vi.doMock('node:http', () => ({
+      default: { request: httpRequest },
+      request: httpRequest,
+    }));
+    vi.doMock('node:https', () => ({
+      default: { request: httpsRequest },
+      request: httpsRequest,
+    }));
+
+    vi.resetModules();
+
+    const { sidecarClient: client } = await import('../sidecar-client');
+
+    await expect(client.getManagedDevices()).resolves.toEqual({
+      items: [{ desktopDeviceId: 'desktop-1', clientId: 'client-1' }],
+    });
+    await expect(client.unblockDevice('client-1')).resolves.toEqual({ ok: true });
+    await expect(client.getSyncRecords()).resolves.toEqual({ items: [{ recordId: 'sync-1' }] });
+    await expect(client.getAccessRecords()).resolves.toEqual({
+      items: [{ recordId: 'access-1' }],
+    });
+    await expect(client.getSharedResources()).resolves.toEqual({
+      items: [{ resourceId: 'res-1' }],
+    });
+    await expect(
+      client.addSharedResource({
+        kind: 'shared_file',
+        displayName: 'photo.jpg',
+        localPath: '/tmp/photo.jpg',
+      }),
+    ).resolves.toEqual({ resourceId: 'res-1' });
+    await expect(client.removeSharedResource('res-1')).resolves.toEqual({ ok: true });
+    await expect(client.getReceivedLibrary()).resolves.toEqual({
+      items: [{ resourceId: 'received-1' }],
+    });
+
+    expect(
+      httpRequest.mock.calls.map(([options]) => ({
+        method: (options as RequestOptions).method,
+        path: (options as RequestOptions).path,
+      })),
+    ).toEqual([
+      { method: 'GET', path: '/management/devices' },
+      { method: 'POST', path: '/management/devices/client-1/unblock' },
+      { method: 'GET', path: '/management/records/sync' },
+      { method: 'GET', path: '/management/records/access' },
+      { method: 'GET', path: '/resources/shared' },
+      { method: 'POST', path: '/resources/shared' },
+      { method: 'DELETE', path: '/resources/shared/res-1' },
+      { method: 'GET', path: '/resources/received' },
+    ]);
+    expect(bodies).toEqual([
+      {
+        kind: 'shared_file',
+        displayName: 'photo.jpg',
+        localPath: '/tmp/photo.jpg',
+      },
+    ]);
+  });
+
   it('uses https transport when the redeem base url is https', async () => {
     const httpRequest = vi.fn();
     const httpsRequest = vi.fn((options: RequestOptions, callback: (res: unknown) => void) => {

@@ -67,12 +67,31 @@ const mockSidecar: ElectronAPI['sidecar'] = {
   }),
   getTransferActive: async () => ({ active: false }),
   getSharedList: async () => ({ path: '', files: [], totalCount: 0 }),
+  getManagedDevices: async () => ({ items: [] }),
+  unblockDevice: async () => ({ ok: true }),
+  getSyncRecords: async () => ({ items: [] }),
+  getAccessRecords: async () => ({ items: [] }),
+  getSharedResources: async () => ({ items: [] }),
+  addSharedResource: async (payload) => ({
+    resourceId: 'local-mock-resource',
+    desktopDeviceId: 'local-mock-desktop',
+    kind: payload.kind,
+    displayName: payload.displayName,
+    status: payload.status ?? 'available',
+    fileSize: payload.fileSize,
+    mediaType: payload.mediaType,
+    addedAt: new Date().toISOString(),
+    downloadCount: 0,
+  }),
+  removeSharedResource: async () => ({ ok: true }),
+  getReceivedLibrary: async () => ({ items: [] }),
 };
 
 const mockFiles: ElectronAPI['files'] = {
   openFolder: async () => {},
   openFile: async () => {},
   openExternal: async () => {},
+  selectFile: async () => null,
   selectFolder: async () => null,
   copyToClipboard: async () => {},
 };

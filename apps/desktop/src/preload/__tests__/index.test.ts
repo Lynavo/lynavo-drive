@@ -7,6 +7,17 @@ const exposed = vi.hoisted(() => ({
         sidecar: {
           getClientConfig(): Promise<unknown>;
           redeemGiftCard(payload: { code: string }): Promise<unknown>;
+          getManagedDevices(): Promise<unknown>;
+          unblockDevice(clientId: string): Promise<unknown>;
+          getSyncRecords(): Promise<unknown>;
+          getAccessRecords(): Promise<unknown>;
+          getSharedResources(): Promise<unknown>;
+          addSharedResource(payload: unknown): Promise<unknown>;
+          removeSharedResource(resourceId: string): Promise<unknown>;
+          getReceivedLibrary(): Promise<unknown>;
+        };
+        files: {
+          selectFile(): Promise<unknown>;
         };
         auth: {
           sendSMSCode(payload: { phone: string }): Promise<unknown>;
@@ -68,6 +79,47 @@ describe('preload electronAPI', () => {
       features: { giftCard: { enabled: true } },
     });
     expect(exposed.invoke).toHaveBeenCalledWith('sidecar:client-config');
+  });
+
+  it('maps desktop-local sidecar calls to IPC channels', async () => {
+    exposed.invoke.mockResolvedValue({ ok: true });
+
+    await import('../index');
+
+    await exposed.api?.sidecar.getManagedDevices();
+    await exposed.api?.sidecar.unblockDevice('client-1');
+    await exposed.api?.sidecar.getSyncRecords();
+    await exposed.api?.sidecar.getAccessRecords();
+    await exposed.api?.sidecar.getSharedResources();
+    await exposed.api?.sidecar.addSharedResource({
+      kind: 'shared_file',
+      displayName: 'photo.jpg',
+      localPath: '/tmp/photo.jpg',
+    });
+    await exposed.api?.sidecar.removeSharedResource('res-1');
+    await exposed.api?.sidecar.getReceivedLibrary();
+
+    expect(exposed.invoke).toHaveBeenCalledWith('sidecar:managed-devices');
+    expect(exposed.invoke).toHaveBeenCalledWith('sidecar:unblock-device', 'client-1');
+    expect(exposed.invoke).toHaveBeenCalledWith('sidecar:sync-records');
+    expect(exposed.invoke).toHaveBeenCalledWith('sidecar:access-records');
+    expect(exposed.invoke).toHaveBeenCalledWith('sidecar:shared-resources');
+    expect(exposed.invoke).toHaveBeenCalledWith('sidecar:add-shared-resource', {
+      kind: 'shared_file',
+      displayName: 'photo.jpg',
+      localPath: '/tmp/photo.jpg',
+    });
+    expect(exposed.invoke).toHaveBeenCalledWith('sidecar:remove-shared-resource', 'res-1');
+    expect(exposed.invoke).toHaveBeenCalledWith('sidecar:received-library');
+  });
+
+  it('maps file selection to the IPC channel', async () => {
+    exposed.invoke.mockResolvedValue('/tmp/photo.jpg');
+
+    await import('../index');
+
+    await expect(exposed.api?.files.selectFile()).resolves.toBe('/tmp/photo.jpg');
+    expect(exposed.invoke).toHaveBeenCalledWith('files:select-file');
   });
 
   it('maps phone auth calls to IPC channels', async () => {

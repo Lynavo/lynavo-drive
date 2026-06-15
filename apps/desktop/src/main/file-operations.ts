@@ -19,6 +19,11 @@ export async function selectFolder(): Promise<string | null> {
   return result.canceled ? null : result.filePaths[0] ?? null;
 }
 
+export async function selectFile(): Promise<string | null> {
+  const result = await dialog.showOpenDialog({ properties: ['openFile'] });
+  return result.canceled ? null : result.filePaths[0] ?? null;
+}
+
 export function copyToClipboard(text: string): void {
   clipboard.writeText(text);
 }

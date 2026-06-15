@@ -1,8 +1,15 @@
 import type {
   DashboardSummaryDTO,
   DashboardDeviceDTO,
+  DesktopAccessRecordDTO,
+  DesktopManagedDeviceDTO,
+  DesktopResourceKind,
+  DesktopResourceStatus,
+  DesktopSharedResourceDTO,
+  DesktopSyncRecordDTO,
   DeviceFileLedgerPageDTO,
   DeviceFileSortField,
+  ReceivedLibraryItemDTO,
   SettingsDTO,
   SharedDirectoryDTO,
   ShareStatusDTO,
@@ -53,6 +60,20 @@ export type PowerSaveState = {
   blockingSleep: boolean;
 };
 
+export type DesktopLocalListResponse<T> = {
+  items: T[];
+};
+
+export type AddSharedResourcePayload = {
+  kind: DesktopResourceKind;
+  displayName: string;
+  localPath?: string;
+  receivedFileKey?: string;
+  fileSize?: number;
+  mediaType?: string;
+  status?: DesktopResourceStatus;
+};
+
 export interface ElectronAPI {
   sidecar: {
     getHealth(): Promise<{ ok: boolean; service: string }>;
@@ -99,11 +120,20 @@ export interface ElectronAPI {
     validateShare(): Promise<ShareStatusDTO>;
     getTransferActive(): Promise<{ active: boolean }>;
     getSharedList(path?: string): Promise<SharedDirectoryDTO>;
+    getManagedDevices(): Promise<DesktopLocalListResponse<DesktopManagedDeviceDTO>>;
+    unblockDevice(clientId: string): Promise<{ ok: boolean }>;
+    getSyncRecords(): Promise<DesktopLocalListResponse<DesktopSyncRecordDTO>>;
+    getAccessRecords(): Promise<DesktopLocalListResponse<DesktopAccessRecordDTO>>;
+    getSharedResources(): Promise<DesktopLocalListResponse<DesktopSharedResourceDTO>>;
+    addSharedResource(payload: AddSharedResourcePayload): Promise<DesktopSharedResourceDTO>;
+    removeSharedResource(resourceId: string): Promise<{ ok: boolean }>;
+    getReceivedLibrary(): Promise<DesktopLocalListResponse<ReceivedLibraryItemDTO>>;
   };
   files: {
     openFolder(path: string): Promise<void>;
     openFile(path: string): Promise<void>;
     openExternal(target: string): Promise<void>;
+    selectFile(): Promise<string | null>;
     selectFolder(): Promise<string | null>;
     copyToClipboard(text: string): Promise<void>;
   };
