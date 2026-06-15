@@ -2,8 +2,30 @@
   "nav": {
     "dashboard": "首页看板",
     "directory": "目录管理",
+    "devices": "设备",
+    "shared": "共享",
+    "library": "资料库",
+    "records": "记录",
     "settings": "全局设置",
     "help": "帮助"
+  },
+  "placeholders": {
+    "devices": {
+      "title": "设备管理",
+      "description": "已连接设备、授权状态与封锁名单将在这里集中管理。"
+    },
+    "shared": {
+      "title": "共享管理",
+      "description": "电脑端本机共享资源与访问范围将在这里配置。"
+    },
+    "library": {
+      "title": "资料库",
+      "description": "接收素材、归档位置与本机资料库状态将在这里汇总。"
+    },
+    "records": {
+      "title": "记录",
+      "description": "连接、授权、封锁与同步记录将在这里查询。"
+    }
   },
   "account": {
     "promptTitle": "登录账号",

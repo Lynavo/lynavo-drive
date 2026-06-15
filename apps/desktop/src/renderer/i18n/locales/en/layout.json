@@ -2,8 +2,30 @@
   "nav": {
     "dashboard": "Dashboard",
     "directory": "Folders",
+    "devices": "Devices",
+    "shared": "Shared",
+    "library": "Library",
+    "records": "Records",
     "settings": "Settings",
     "help": "Help"
+  },
+  "placeholders": {
+    "devices": {
+      "title": "Device Management",
+      "description": "Connected devices, authorization status, and blocked clients will be managed here."
+    },
+    "shared": {
+      "title": "Shared Resources",
+      "description": "Desktop-local shared resources and access scopes will be configured here."
+    },
+    "library": {
+      "title": "Library",
+      "description": "Received assets, archive locations, and local library status will be summarized here."
+    },
+    "records": {
+      "title": "Records",
+      "description": "Connection, authorization, blocklist, and sync history will be available here."
+    }
   },
   "account": {
     "promptTitle": "Sign in",

@@ -1,9 +1,9 @@
 import { lazy, Suspense, useEffect, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
+import { GlassCard } from '@renderer/components/shared/GlassCard';
 import { Skeleton } from '@renderer/components/ui/skeleton';
 import { useAppStore } from '@renderer/stores/app-store';
 import { useDashboardStore } from '@renderer/stores/dashboard-store';
-import { useDirectoryStore } from '@renderer/stores/directory-store';
 import { useSettingsStore } from '@renderer/stores/settings-store';
 import { useSidecarRuntimeStore } from '@renderer/stores/sidecar-runtime-store';
 import { ErrorBoundary } from '@renderer/components/shared/ErrorBoundary';
@@ -13,11 +13,6 @@ import { SidecarStatusBanner } from './SidecarStatusBanner';
 const Dashboard = lazy(() =>
   import('@renderer/features/dashboard/Dashboard').then((m) => ({
     default: m.Dashboard,
-  })),
-);
-const DirectoryPage = lazy(() =>
-  import('@renderer/features/directory/DirectoryPage').then((m) => ({
-    default: m.DirectoryPage,
   })),
 );
 const SettingsPage = lazy(() =>
@@ -38,6 +33,17 @@ const DeviceDetailPage = lazy(() =>
 
 function PageFallback() {
   return <Skeleton className="flex-1" />;
+}
+
+function DesktopLocalPlaceholder({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="flex-1 overflow-auto px-6 py-8">
+      <GlassCard className="mx-auto max-w-3xl p-8">
+        <h1 className="text-xl font-semibold text-foreground">{title}</h1>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">{description}</p>
+      </GlassCard>
+    </div>
+  );
 }
 
 export function AppShell() {
@@ -105,9 +111,6 @@ export function AppShell() {
         case 'share.status.changed':
           useSettingsStore.getState().fetchSettings();
           break;
-        case 'shared.directory.changed':
-          useDirectoryStore.getState().fetchSharedFiles();
-          break;
       }
     });
     return unsub;
@@ -144,7 +147,30 @@ export function AppShell() {
         <Suspense fallback={<PageFallback />}>
           {currentView === 'dashboard' && <Dashboard />}
           {currentView === 'device-detail' && <DeviceDetailPage />}
-          {currentView === 'directory' && <DirectoryPage />}
+          {currentView === 'devices' && (
+            <DesktopLocalPlaceholder
+              title={t('layout.placeholders.devices.title')}
+              description={t('layout.placeholders.devices.description')}
+            />
+          )}
+          {currentView === 'shared' && (
+            <DesktopLocalPlaceholder
+              title={t('layout.placeholders.shared.title')}
+              description={t('layout.placeholders.shared.description')}
+            />
+          )}
+          {currentView === 'library' && (
+            <DesktopLocalPlaceholder
+              title={t('layout.placeholders.library.title')}
+              description={t('layout.placeholders.library.description')}
+            />
+          )}
+          {currentView === 'records' && (
+            <DesktopLocalPlaceholder
+              title={t('layout.placeholders.records.title')}
+              description={t('layout.placeholders.records.description')}
+            />
+          )}
           {currentView === 'settings' && <SettingsPage />}
           {currentView === 'help' && (
             <ErrorBoundary fallbackMessage={t('layout.errorBoundary.helpLoadFailed')}>

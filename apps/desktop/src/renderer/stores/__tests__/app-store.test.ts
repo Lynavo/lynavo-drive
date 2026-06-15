@@ -48,6 +48,15 @@ describe('app-store', () => {
     expect(useAppStore.getState().currentView).toBe('dashboard');
   });
 
+  it('supports desktop-local management views', () => {
+    const desktopLocalViews = ['devices', 'shared', 'library', 'records'] as const;
+
+    for (const view of desktopLocalViews) {
+      useAppStore.getState().setView(view);
+      expect(useAppStore.getState().currentView).toBe(view);
+    }
+  });
+
   it('opens device detail modal', () => {
     useAppStore.getState().openDeviceDetail(mockDevice);
     const state = useAppStore.getState();

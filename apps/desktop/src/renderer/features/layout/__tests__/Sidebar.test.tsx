@@ -119,4 +119,37 @@ describe('Sidebar', () => {
       expect(logout).toHaveBeenCalledTimes(1);
     });
   });
+
+  it('exposes the desktop-local navigation entries and hides legacy folder management', async () => {
+    setAuthSession(null);
+
+    render(<Sidebar />);
+
+    expect(screen.getByRole('button', { name: '首页看板' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '设备' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '共享' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '资料库' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '记录' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '全局设置' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '帮助' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '目录管理' })).not.toBeInTheDocument();
+  });
+
+  it('switches to each desktop-local view from the sidebar', async () => {
+    setAuthSession(null);
+
+    render(<Sidebar />);
+
+    fireEvent.click(screen.getByRole('button', { name: '设备' }));
+    expect(useAppStore.getState().currentView).toBe('devices');
+
+    fireEvent.click(screen.getByRole('button', { name: '共享' }));
+    expect(useAppStore.getState().currentView).toBe('shared');
+
+    fireEvent.click(screen.getByRole('button', { name: '资料库' }));
+    expect(useAppStore.getState().currentView).toBe('library');
+
+    fireEvent.click(screen.getByRole('button', { name: '记录' }));
+    expect(useAppStore.getState().currentView).toBe('records');
+  });
 });

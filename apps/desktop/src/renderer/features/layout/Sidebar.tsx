@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react';
 import {
   LayoutDashboard,
-  FolderOpen,
+  Library,
+  ListChecks,
+  MonitorSmartphone,
+  Share2,
   Settings,
   HelpCircle,
   LogIn,
@@ -18,7 +21,10 @@ import { getProductName } from '../../../shared/market';
 
 const navItems: { key: AppView; labelKey: string; icon: typeof LayoutDashboard }[] = [
   { key: 'dashboard', labelKey: 'layout.nav.dashboard', icon: LayoutDashboard },
-  { key: 'directory', labelKey: 'layout.nav.directory', icon: FolderOpen },
+  { key: 'devices', labelKey: 'layout.nav.devices', icon: MonitorSmartphone },
+  { key: 'shared', labelKey: 'layout.nav.shared', icon: Share2 },
+  { key: 'library', labelKey: 'layout.nav.library', icon: Library },
+  { key: 'records', labelKey: 'layout.nav.records', icon: ListChecks },
   { key: 'settings', labelKey: 'layout.nav.settings', icon: Settings },
 ];
 

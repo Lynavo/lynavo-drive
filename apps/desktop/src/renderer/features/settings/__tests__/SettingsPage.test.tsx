@@ -74,17 +74,17 @@ describe('SettingsPage', () => {
     expect(screen.getByTestId('device-name-section')).toBeInTheDocument();
   });
 
-  it('renders the "连接码管理" section heading', () => {
+  it('does NOT render the legacy pairing code section', () => {
     render(<SettingsPage />);
 
-    expect(screen.getByText('连接码管理')).toBeInTheDocument();
-    expect(screen.getByTestId('connection-code-section')).toBeInTheDocument();
+    expect(screen.queryByText('连接码管理')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('connection-code-section')).not.toBeInTheDocument();
   });
 
-  it('renders SupportSection', () => {
+  it('does NOT render SupportSection in the simplified desktop-local settings surface', () => {
     render(<SettingsPage />);
 
-    expect(screen.getByTestId('support-section')).toBeInTheDocument();
+    expect(screen.queryByTestId('support-section')).not.toBeInTheDocument();
   });
 
   it('renders power save section', () => {
@@ -108,12 +108,12 @@ describe('SettingsPage', () => {
     expect(screen.queryByTestId('bonjour-runtime-section')).not.toBeInTheDocument();
   });
 
-  it('renders BonjourRuntimeSection on Windows', () => {
+  it('does NOT render BonjourRuntimeSection on Windows in the simplified desktop-local settings surface', () => {
     setElectronPlatform({ isMac: false, isWindows: true });
     render(<SettingsPage />);
 
-    expect(screen.getByTestId('bonjour-runtime-section')).toBeInTheDocument();
-    expect(screen.getByText('Windows Bonjour 广播')).toBeInTheDocument();
+    expect(screen.queryByTestId('bonjour-runtime-section')).not.toBeInTheDocument();
+    expect(screen.queryByText('Windows Bonjour 广播')).not.toBeInTheDocument();
   });
 
   it('does NOT render FilePathSection (removed in v2 refactor)', () => {

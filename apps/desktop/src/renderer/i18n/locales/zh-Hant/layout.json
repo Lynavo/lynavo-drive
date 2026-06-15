@@ -2,8 +2,30 @@
   "nav": {
     "dashboard": "首頁看板",
     "directory": "目錄管理",
+    "devices": "裝置",
+    "shared": "共享",
+    "library": "資料庫",
+    "records": "記錄",
     "settings": "全域設定",
     "help": "說明"
+  },
+  "placeholders": {
+    "devices": {
+      "title": "裝置管理",
+      "description": "已連線裝置、授權狀態與封鎖名單會在這裡集中管理。"
+    },
+    "shared": {
+      "title": "共享管理",
+      "description": "電腦端本機共享資源與存取範圍會在這裡設定。"
+    },
+    "library": {
+      "title": "資料庫",
+      "description": "接收素材、歸檔位置與本機資料庫狀態會在這裡彙整。"
+    },
+    "records": {
+      "title": "記錄",
+      "description": "連線、授權、封鎖與同步記錄會在這裡查詢。"
+    }
   },
   "account": {
     "promptTitle": "登入帳號",

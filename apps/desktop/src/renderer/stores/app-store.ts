@@ -1,10 +1,11 @@
 import { create } from 'zustand';
 import type { DashboardDeviceDTO } from '@syncflow/contracts';
 
-export type AppView = 'dashboard' | 'directory' | 'settings' | 'help' | 'device-detail';
+export type AppView = 'dashboard' | 'devices' | 'shared' | 'library' | 'records' | 'settings' | 'help';
+type InternalAppView = AppView | 'device-detail';
 
 export interface AppState {
-  currentView: AppView;
+  currentView: InternalAppView;
   selectedDevice: DashboardDeviceDTO | null;
   /** @deprecated Kept for backward compatibility. Use `currentView === 'device-detail'` instead. */
   isModalOpen: boolean;
