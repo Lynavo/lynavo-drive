@@ -1,6 +1,8 @@
 package store
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -12,7 +14,7 @@ func TestAccessRecordsScopedByDesktopAndClient(t *testing.T) {
 		{
 			DesktopDeviceID: "desktop-1",
 			ClientID:        "client-1",
-			ClientName:      stringPtr("Alice iPhone"),
+			ClientName:      "Alice iPhone",
 			ResourceID:      "resource-1",
 			ResourceKind:    "shared_file",
 			ResourceName:    "Clip.mov",
@@ -82,5 +84,42 @@ func TestAccessRecordsScopedByDesktopAndClient(t *testing.T) {
 		if record.DesktopDeviceID != "desktop-1" || record.ClientID != "client-1" {
 			t.Fatalf("unexpected scoped record: %#v", record)
 		}
+	}
+}
+
+func TestAccessRecordAlwaysExposesDisplayName(t *testing.T) {
+	s := newTestStore(t)
+
+	record, err := s.RecordAccess(AccessRecord{
+		DesktopDeviceID: "desktop-1",
+		ClientID:        "client-1",
+		ResourceID:      "resource-1",
+		ResourceKind:    "shared_file",
+		ResourceName:    "Clip.mov",
+		Action:          "list",
+		Result:          "ok",
+		AccessedAt:      time.Now().UTC().Format(time.RFC3339),
+	})
+	if err != nil {
+		t.Fatalf("RecordAccess: %v", err)
+	}
+
+	payload, err := json.Marshal(record)
+	if err != nil {
+		t.Fatalf("Marshal AccessRecord: %v", err)
+	}
+	if !strings.Contains(string(payload), `"displayName":""`) {
+		t.Fatalf("expected AccessRecord JSON to include empty displayName string, got %s", string(payload))
+	}
+
+	records, err := s.ListAccessRecords("desktop-1", nil)
+	if err != nil {
+		t.Fatalf("ListAccessRecords: %v", err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(records))
+	}
+	if records[0].ClientName != "" {
+		t.Fatalf("expected NULL client_name to scan as empty displayName, got %q", records[0].ClientName)
 	}
 }

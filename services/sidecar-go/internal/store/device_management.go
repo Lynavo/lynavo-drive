@@ -98,12 +98,13 @@ func (s *Store) GetDeviceBlockState(desktopDeviceID, clientID string) (DeviceBlo
 		FailedAttemptCount: 0,
 	}
 	var reason string
+	var manuallyUnblockedAt *string
 	err := s.db.QueryRow(`
 		SELECT reason, failed_attempt_count, blocked_at, manually_unblocked_at
 		FROM device_blocks
 		WHERE desktop_device_id = ? AND client_id = ?`,
 		desktopDeviceID, clientID,
-	).Scan(&reason, &state.FailedAttemptCount, &state.BlockedAt, &state.ManuallyUnblockedAt)
+	).Scan(&reason, &state.FailedAttemptCount, &state.BlockedAt, &manuallyUnblockedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return state, nil
@@ -114,7 +115,7 @@ func (s *Store) GetDeviceBlockState(desktopDeviceID, clientID string) (DeviceBlo
 	if reason != "" {
 		state.Reason = &reason
 	}
-	state.Blocked = state.BlockedAt != nil && state.ManuallyUnblockedAt == nil
+	state.Blocked = state.BlockedAt != nil && manuallyUnblockedAt == nil
 	if state.Blocked {
 		state.RemainingAttempts = 0
 		return state, nil
@@ -156,7 +157,11 @@ func (s *Store) ClearConnectionAttempts(desktopDeviceID, clientID string) error 
 			failed_attempt_count = 0,
 			blocked_at = NULL,
 			manually_unblocked_at = NULL,
-			updated_at = excluded.updated_at`,
+			updated_at = excluded.updated_at
+		WHERE NOT (
+			device_blocks.blocked_at IS NOT NULL
+			AND device_blocks.manually_unblocked_at IS NULL
+		)`,
 		desktopDeviceID, clientID, now,
 	)
 	if err != nil {

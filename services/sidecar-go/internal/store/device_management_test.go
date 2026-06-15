@@ -1,6 +1,8 @@
 package store
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -72,6 +74,20 @@ func TestDeviceBlockLifecycle(t *testing.T) {
 		t.Fatal("expected success attempt not to clear active block")
 	}
 
+	if err := s.ClearConnectionAttempts("desktop-1", "client-1"); err != nil {
+		t.Fatalf("ClearConnectionAttempts while blocked: %v", err)
+	}
+	got, err = s.GetDeviceBlockState("desktop-1", "client-1")
+	if err != nil {
+		t.Fatalf("GetDeviceBlockState after clear while blocked: %v", err)
+	}
+	if !got.Blocked {
+		t.Fatal("expected ClearConnectionAttempts not to clear active block")
+	}
+	if got.FailedAttemptCount != 5 {
+		t.Fatalf("expected ClearConnectionAttempts to preserve failed count 5 while blocked, got %d", got.FailedAttemptCount)
+	}
+
 	if err := s.UnblockDevice("desktop-1", "client-1"); err != nil {
 		t.Fatalf("UnblockDevice: %v", err)
 	}
@@ -84,6 +100,13 @@ func TestDeviceBlockLifecycle(t *testing.T) {
 	}
 	if got.FailedAttemptCount != 0 {
 		t.Fatalf("expected unblock to reset failed count, got %d", got.FailedAttemptCount)
+	}
+	payload, err := json.Marshal(got)
+	if err != nil {
+		t.Fatalf("Marshal DeviceBlockState: %v", err)
+	}
+	if strings.Contains(string(payload), "manuallyUnblockedAt") {
+		t.Fatalf("DeviceBlockState JSON must not expose manuallyUnblockedAt: %s", string(payload))
 	}
 }
 

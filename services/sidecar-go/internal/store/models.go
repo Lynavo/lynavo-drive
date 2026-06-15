@@ -128,14 +128,13 @@ type ManagedDevice struct {
 }
 
 type DeviceBlockState struct {
-	DesktopDeviceID     string  `json:"desktopDeviceId"`
-	ClientID            string  `json:"clientId"`
-	Blocked             bool    `json:"blocked"`
-	FailedAttemptCount  int     `json:"failedAttemptCount"`
-	RemainingAttempts   int     `json:"remainingAttempts"`
-	BlockedAt           *string `json:"blockedAt,omitempty"`
-	Reason              *string `json:"reason,omitempty"`
-	ManuallyUnblockedAt *string `json:"manuallyUnblockedAt,omitempty"`
+	DesktopDeviceID    string  `json:"desktopDeviceId"`
+	ClientID           string  `json:"clientId"`
+	Blocked            bool    `json:"blocked"`
+	FailedAttemptCount int     `json:"failedAttemptCount"`
+	RemainingAttempts  int     `json:"remainingAttempts"`
+	BlockedAt          *string `json:"blockedAt,omitempty"`
+	Reason             *string `json:"reason,omitempty"`
 }
 
 type ConnectionAttempt struct {
@@ -178,16 +177,16 @@ type SharedResourceInput struct {
 }
 
 type AccessRecord struct {
-	RecordID        string  `json:"recordId"`
-	DesktopDeviceID string  `json:"desktopDeviceId"`
-	ClientID        string  `json:"clientId"`
-	ClientName      *string `json:"displayName,omitempty"`
-	ResourceID      string  `json:"resourceId"`
-	ResourceKind    string  `json:"resourceKind"`
-	ResourceName    string  `json:"resourceName"`
-	Action          string  `json:"action"`
-	Result          string  `json:"result"`
-	AccessedAt      string  `json:"accessedAt"`
+	RecordID        string `json:"recordId"`
+	DesktopDeviceID string `json:"desktopDeviceId"`
+	ClientID        string `json:"clientId"`
+	ClientName      string `json:"displayName"`
+	ResourceID      string `json:"resourceId"`
+	ResourceKind    string `json:"resourceKind"`
+	ResourceName    string `json:"resourceName"`
+	Action          string `json:"action"`
+	Result          string `json:"result"`
+	AccessedAt      string `json:"accessedAt"`
 }
 
 type DesktopSyncRecord struct {

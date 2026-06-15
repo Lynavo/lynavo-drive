@@ -46,7 +46,7 @@ func (s *Store) RecordAccess(record AccessRecord) (AccessRecord, error) {
 
 func (s *Store) ListAccessRecords(desktopDeviceID string, clientID *string) ([]AccessRecord, error) {
 	query := `
-		SELECT record_id, desktop_device_id, client_id, client_name, resource_id, resource_kind,
+		SELECT record_id, desktop_device_id, client_id, COALESCE(client_name, ''), resource_id, resource_kind,
 		       resource_name, action, result, accessed_at
 		FROM access_records
 		WHERE desktop_device_id = ?`
