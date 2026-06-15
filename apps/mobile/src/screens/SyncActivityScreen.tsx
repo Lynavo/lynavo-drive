@@ -24,6 +24,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { UploadTaskSource, AutoUploadState } from '@syncflow/contracts';
+import { colors } from '../theme/colors';
 import { Icon } from '../components/Icon';
 import { SubscriptionStatusIcon } from '../components/SubscriptionStatusIcon';
 import {
@@ -148,30 +149,30 @@ interface AutoRoundDisplayBaseline {
 // Constants
 // ---------------------------------------------------------------------------
 
-const BLUE = '#3b9fd8';
-const DARK = '#1a3a5c';
-const SCREEN_BG = '#d6ecf8';
-const CARD_BG = '#ffffff';
-const CARD_BORDER = 'rgba(187, 214, 233, 0.72)';
-const ICON_SURFACE = '#eaf4fb';
-const HEADER_ICON = '#6d86a3';
-const PRIMARY_NAVY = '#24466e';
-const PRIMARY_NAVY_PRESSED = '#1f3d60';
-const OUTLINE_SURFACE = '#eef6fd';
-const OUTLINE_BORDER = '#b6d3ee';
-const OUTLINE_TEXT = '#274a72';
-const ONLINE_GREEN = '#22c55e';
-const ONLINE_TEXT = '#1ebc63';
-const CONNECTING_AMBER = '#f3b24c';
-const CONNECTING_TEXT = '#c68a23';
-const OFFLINE_SLATE = '#94a3b8';
-const OFFLINE_TEXT = '#72859a';
-const SOFT_TEXT = '#8eaac0';
-const MUTED_TEXT = '#7893ab';
-const EMPTY_INFO_BG = '#edf6fd';
-const EMPTY_INFO_ICON = '#8faabd';
-const EMPTY_OFFLINE_BG = '#edf6fd';
-const EMPTY_OFFLINE_ICON = '#df7266';
+const BLUE = colors.accent;
+const DARK = colors.primary;
+const SCREEN_BG = colors.background;
+const CARD_BG = colors.card;
+const CARD_BORDER = colors.border;
+const ICON_SURFACE = 'rgba(59, 159, 216, 0.08)';
+const HEADER_ICON = colors.secondaryForeground;
+const PRIMARY_NAVY = colors.primary;
+const PRIMARY_NAVY_PRESSED = '#163352';
+const OUTLINE_SURFACE = colors.secondary;
+const OUTLINE_BORDER = colors.border;
+const OUTLINE_TEXT = colors.primary;
+const ONLINE_GREEN = colors.success;
+const ONLINE_TEXT = colors.success;
+const CONNECTING_AMBER = colors.warning;
+const CONNECTING_TEXT = colors.warningForeground;
+const OFFLINE_SLATE = colors.mutedForeground;
+const OFFLINE_TEXT = colors.mutedForeground;
+const SOFT_TEXT = colors.secondaryForeground;
+const MUTED_TEXT = colors.secondaryForeground;
+const EMPTY_INFO_BG = colors.secondary;
+const EMPTY_INFO_ICON = colors.mutedForeground;
+const EMPTY_OFFLINE_BG = 'rgba(239, 68, 68, 0.08)';
+const EMPTY_OFFLINE_ICON = colors.destructive;
 
 /** Grace period on mount / foreground before showing offline state (ms). */
 const STARTUP_CONNECTION_GRACE_MS = 2500;
@@ -2792,11 +2793,13 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    backgroundColor: '#f5fbff',
-    marginBottom: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: 12,
   },
   statItem: {
     flex: 1,
@@ -2840,9 +2843,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderRadius: 14,
-    backgroundColor: '#f6fbff',
+    backgroundColor: colors.background,
     borderWidth: 1,
-    borderColor: 'rgba(182, 211, 238, 0.68)',
+    borderColor: colors.border,
   },
   completionStatLabel: {
     fontSize: 10,
