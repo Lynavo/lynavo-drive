@@ -123,6 +123,15 @@ class NativeSyncEngineModule(
 
   override fun getName(): String = MODULE_NAME
 
+  override fun getConstants(): Map<String, Any>? {
+    val packageName = reactApplicationContext.packageName
+    val market = if (packageName.contains("global")) "global" else "cn"
+    return mapOf(
+      "SYNCFLOW_MARKET" to market,
+      "PACKAGE_NAME" to packageName
+    )
+  }
+
   override fun invalidate() {
     stopDiscoveryInternal(emitUpdate = false)
     cancelPresenceRecoveryProbe(reason = "module_invalidated")

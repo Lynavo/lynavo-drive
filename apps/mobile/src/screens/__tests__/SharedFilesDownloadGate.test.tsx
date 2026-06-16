@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { Alert, NativeModules } from 'react-native';
 
 // Mock react-native-localize
@@ -31,7 +31,14 @@ jest.mock('react-i18next', () => ({
         'sharedFiles.networkError.title': '載入失敗',
         'sharedFiles.networkError.message': '請稍後重試',
         'sharedFiles.dialogs.downloadFailed': '下載失敗',
-        'sharedFiles.dialogs.downloadFailedMessage': '無法下載檔案，請稍後重試',
+        'sharedFiles.dialogs.downloadFailedMessage': '無法下載檔案，请稍後重試',
+        'sharedFiles.title': '遠端資源',
+        'sharedFiles.phoneSyncSpace.title': '手機同步空間',
+        'sharedFiles.phoneSyncSpace.desc': '檢視已同步至电脑的檔案與上传来源',
+        'sharedFiles.remoteAccess.title': '遠端訪問電腦',
+        'sharedFiles.remoteAccess.desc': '流覽電腦端共享的目錄結構並下載文件',
+        'sharedFiles.remoteAccess.empty': '此資料夾為空',
+        'sharedFiles.remoteAccess.select': '選擇',
       };
       if (key === 'sharedFiles.dialogs.downloadSavedToPhotos' && options?.name) {
         return `${options.name} 已儲存至相簿`;
@@ -59,8 +66,11 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   default: { getItem: jest.fn(), setItem: jest.fn(), removeItem: jest.fn() },
 }));
 
+const mockNavigate = jest.fn();
+const mockGoBack = jest.fn();
+
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ navigate: jest.fn(), goBack: jest.fn() }),
+  useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack }),
   useFocusEffect: (effect: () => void | (() => void)) => {
     const ReactInner = require('react');
     ReactInner.useEffect(effect, [effect]);
@@ -76,7 +86,6 @@ jest.mock('../../stores/auth-store', () => ({
 // Mock local desktop service
 jest.mock('../../services/desktop-local-service', () => ({
   listSharedResources: jest.fn(),
-  listReceivedLibrary: jest.fn(),
   downloadResource: jest.fn(),
 }));
 
@@ -85,14 +94,13 @@ import {
   normalizeDirectoryPath,
   parentDirectoryPath,
 } from '../SharedFilesScreen';
+import { RemoteAccessScreen } from '../RemoteAccessScreen';
 import {
   listSharedResources,
-  listReceivedLibrary,
   downloadResource,
 } from '../../services/desktop-local-service';
 
 const mockListSharedResources = listSharedResources as jest.Mock;
-const mockListReceivedLibrary = listReceivedLibrary as jest.Mock;
 const mockDownloadResource = downloadResource as jest.Mock;
 
 class TestErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
@@ -126,9 +134,55 @@ describe('SharedFilesScreen Helpers', () => {
   });
 });
 
-describe('SharedFilesScreen V2', () => {
-  const mockBindingState = NativeModules.NativeSyncEngine.getBindingState as jest.Mock;
+describe('SharedFilesScreen V2 (Landing Menu)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
+  it('renders landing page with correct options', () => {
+    const { getByText } = render(
+      <TestErrorBoundary>
+        <SharedFilesScreen />
+      </TestErrorBoundary>
+    );
+
+    expect(getByText('手機同步空間')).toBeTruthy();
+    expect(getByText('遠端訪問電腦')).toBeTruthy();
+  });
+
+  it('navigates to PhoneSyncSpace on card press', () => {
+    const { getByText } = render(
+      <TestErrorBoundary>
+        <SharedFilesScreen />
+      </TestErrorBoundary>
+    );
+
+    fireEvent.press(getByText('手機同步空間'));
+    expect(mockNavigate).toHaveBeenCalledWith('PhoneSyncSpace');
+  });
+
+  it('navigates to RemoteAccess on card press', () => {
+    const { getByText } = render(
+      <TestErrorBoundary>
+        <SharedFilesScreen />
+      </TestErrorBoundary>
+    );
+
+    fireEvent.press(getByText('遠端訪問電腦'));
+    expect(mockNavigate).toHaveBeenCalledWith('RemoteAccess');
+  });
+});
+
+describe('RemoteAccessScreen', () => {
+  const mockBindingState = jest.fn();
+
+  beforeAll(() => {
+    (NativeModules as Record<string, unknown>).NativeSyncEngine = {
+      getBindingState: mockBindingState,
+      addListener: jest.fn(),
+      removeListeners: jest.fn(),
+    };
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -139,19 +193,19 @@ describe('SharedFilesScreen V2', () => {
     });
   });
 
-  it('renders device unavailable when no device is bound', async () => {
+  it('renders empty root list when no device is bound', async () => {
     mockBindingState.mockResolvedValueOnce(null);
     const { getByText } = render(
       <TestErrorBoundary>
-        <SharedFilesScreen />
+        <RemoteAccessScreen />
       </TestErrorBoundary>
     );
     await waitFor(() => {
-      expect(getByText('設備不可用')).toBeTruthy();
+      expect(getByText('此資料夾為空')).toBeTruthy();
     });
   });
 
-  it('renders loading state and list of shared resources', async () => {
+  it('renders list of shared resources', async () => {
     mockListSharedResources.mockResolvedValueOnce([
       {
         resourceId: 'res-1',
@@ -162,22 +216,18 @@ describe('SharedFilesScreen V2', () => {
       {
         resourceId: 'res-2',
         displayName: 'photo.jpg',
-        kind: 'file',
+        kind: 'shared_file',
         fileSize: 1572864, // 1.5 MB
       },
     ]);
 
-    const { getByText, queryByText } = render(
+    const { getByText } = render(
       <TestErrorBoundary>
-        <SharedFilesScreen />
+        <RemoteAccessScreen />
       </TestErrorBoundary>
     );
 
-    // Shows loading state initially
-    expect(getByText('載入中...')).toBeTruthy();
-
     await waitFor(() => {
-      expect(queryByText('載入中...')).toBeNull();
       expect(getByText('test-folder')).toBeTruthy();
       expect(getByText('photo.jpg')).toBeTruthy();
     });
@@ -189,7 +239,7 @@ describe('SharedFilesScreen V2', () => {
       {
         resourceId: 'res-2',
         displayName: 'photo.jpg',
-        kind: 'file',
+        kind: 'shared_file',
         fileSize: 1048576, // 1.0 MB
       },
     ]);
@@ -197,7 +247,7 @@ describe('SharedFilesScreen V2', () => {
 
     const { getByText } = render(
       <TestErrorBoundary>
-        <SharedFilesScreen />
+        <RemoteAccessScreen />
       </TestErrorBoundary>
     );
 
@@ -205,8 +255,8 @@ describe('SharedFilesScreen V2', () => {
       expect(getByText('photo.jpg')).toBeTruthy();
     });
 
-    // Press download by pressing the file text
-    fireEvent.press(getByText('photo.jpg'));
+    // Press download button (has testID or Icon name or layout element in item row)
+    fireEvent.press(getByText('download-outline'));
 
     await waitFor(() => {
       expect(mockDownloadResource).toHaveBeenCalledWith(
@@ -220,34 +270,5 @@ describe('SharedFilesScreen V2', () => {
     });
 
     alertSpy.mockRestore();
-  });
-
-  it('switches tabs to received files and lists them', async () => {
-    mockListSharedResources.mockResolvedValueOnce([]);
-    mockListReceivedLibrary.mockResolvedValueOnce([
-      {
-        resourceId: 'rec-1',
-        displayName: 'received-file.mp4',
-        fileSize: 2097152, // 2.0 MB
-      },
-    ]);
-
-    const { getByText } = render(
-      <TestErrorBoundary>
-        <SharedFilesScreen />
-      </TestErrorBoundary>
-    );
-
-    await waitFor(() => {
-      expect(getByText('目前沒有內容')).toBeTruthy();
-    });
-
-    // Switch tab
-    const receivedTabButton = getByText('已接收的檔案');
-    fireEvent.press(receivedTabButton);
-
-    await waitFor(() => {
-      expect(getByText('received-file.mp4')).toBeTruthy();
-    });
   });
 });

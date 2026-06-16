@@ -475,6 +475,9 @@ class IapServiceImpl implements IapService {
     const requestedSkus: readonly string[] = skus ?? ALL_PRODUCT_IDS;
     if (requestedSkus.length === 0) return [];
     try {
+      if (!this.initialized) {
+        await this.initialize();
+      }
       const products = await getSubscriptions({ skus: [...requestedSkus] });
       const summaries: IapProductSummary[] = [];
       for (const productId of requestedSkus) {

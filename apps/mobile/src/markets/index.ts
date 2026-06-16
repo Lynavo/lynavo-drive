@@ -8,12 +8,13 @@ import { globalMarketConfig } from './global/config';
 import type { Market, MobileMarketConfig } from './types';
 
 const appleAuth = NativeModules?.AppleAuthModule;
-const nativeMarket = appleAuth?.SYNCFLOW_MARKET;
+const nativeSyncEngine = NativeModules?.NativeSyncEngine;
+const nativeMarket = appleAuth?.SYNCFLOW_MARKET || nativeSyncEngine?.SYNCFLOW_MARKET;
 const releaseMarket = mobileReleaseProfile.market;
 
 console.log('[SYNCFLOW MARKET DEBUG]', {
   hasAppleAuthModule: !!appleAuth,
-  appleAuthKeys: appleAuth ? Object.keys(appleAuth) : [],
+  hasNativeSyncEngine: !!nativeSyncEngine,
   nativeMarket,
   processEnvMarket: process.env.SYNCFLOW_MARKET,
   releaseMarket,

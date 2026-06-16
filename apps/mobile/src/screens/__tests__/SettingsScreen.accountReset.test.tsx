@@ -374,7 +374,7 @@ describe('SettingsScreen — account-identity-reset (Phase 1)', () => {
       });
 
       const { getByText } = await renderSettingsScreen();
-      fireEvent.press(getByText('刪除帳號'));
+      fireEvent.press(getByText(/注[销銷]帳號/));
       await pressAlertButton('繼續');
       await pressAlertButton('確定刪除');
 
@@ -400,7 +400,7 @@ describe('SettingsScreen — account-identity-reset (Phase 1)', () => {
       mockResetSidecar.mockImplementationOnce(() => sidecarGate);
 
       const { getByText, queryByText } = await renderSettingsScreen();
-      fireEvent.press(getByText('刪除帳號'));
+      fireEvent.press(getByText(/注[销銷]帳號/));
       await pressAlertButton('繼續');
 
       // Fire the final confirm but do NOT await it — we want to sample
@@ -447,7 +447,7 @@ describe('SettingsScreen — account-identity-reset (Phase 1)', () => {
 
       const { getByText } = await renderSettingsScreen();
       await act(async () => {
-        fireEvent.press(getByText('刪除帳號'));
+        fireEvent.press(getByText(/注[销銷]帳號/));
       });
       await pressAlertButton('繼續');
       await pressAlertButton('確定刪除');
@@ -462,7 +462,7 @@ describe('SettingsScreen — account-identity-reset (Phase 1)', () => {
       );
 
       const { getByText } = await renderSettingsScreen();
-      fireEvent.press(getByText('刪除帳號'));
+      fireEvent.press(getByText(/注[销銷]帳號/));
       await pressAlertButton('繼續');
       await pressAlertButton('確定刪除');
 
@@ -484,7 +484,7 @@ describe('SettingsScreen — account-identity-reset (Phase 1)', () => {
       );
 
       const { getByText } = await renderSettingsScreen();
-      fireEvent.press(getByText('刪除帳號'));
+      fireEvent.press(getByText(/注[销銷]帳號/));
       await pressAlertButton('繼續');
       await pressAlertButton('確定刪除');
 

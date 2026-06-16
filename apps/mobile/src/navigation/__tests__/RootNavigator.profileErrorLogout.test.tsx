@@ -269,8 +269,8 @@ describe('RootNavigator — ProfileErrorScreen logout escape hatch', () => {
     renderProfileError(clearAuth);
 
     // i18n is configured to zh-Hans in this test suite, so the logout
-    // label renders as "退出登录" (settings.actions.logout).
-    const logoutBtn = await screen.findByText('退出登录');
+    // label renders as "登出" (settings.actions.logout).
+    const logoutBtn = await screen.findByText('登出');
     fireEvent.press(logoutBtn);
 
     await waitFor(() => {
@@ -295,7 +295,7 @@ describe('RootNavigator — ProfileErrorScreen logout escape hatch', () => {
 
     renderProfileError(clearAuth);
 
-    const logoutBtn = await screen.findByText('退出登录');
+    const logoutBtn = await screen.findByText('登出');
     fireEvent.press(logoutBtn);
 
     await waitFor(() => {
@@ -321,7 +321,7 @@ describe('RootNavigator — ProfileErrorScreen logout escape hatch', () => {
 
     renderProfileError(clearAuth);
 
-    const logoutBtn = await screen.findByText('退出登录');
+    const logoutBtn = await screen.findByText('登出');
     fireEvent.press(logoutBtn);
 
     await waitFor(() => {
