@@ -167,6 +167,38 @@ export function buildBootstrapPlans(
 ): CatalogSubscriptionPlan[] {
   if (platform === 'android') {
     const epoch = new Date(0).toISOString();
+    if (marketConfig.market === 'global') {
+      return [
+        {
+          id: 101,
+          product_id: 'com.vividrop.mobile.global.monthly.999',
+          plan: 'monthly',
+          platform,
+          name: 'Monthly Plan',
+          description: 'Subscribe monthly, cancel anytime',
+          badges: [],
+          recommended: false,
+          sort_order: 10,
+          active: true,
+          created_at: epoch,
+          updated_at: epoch,
+        },
+        {
+          id: 102,
+          product_id: 'com.vividrop.mobile.global.yearly.9900',
+          plan: 'yearly',
+          platform,
+          name: 'Yearly Plan',
+          description: 'One year of unlimited sync',
+          badges: [],
+          recommended: true,
+          sort_order: 20,
+          active: true,
+          created_at: epoch,
+          updated_at: epoch,
+        },
+      ];
+    }
     return [
       {
         id: 101,

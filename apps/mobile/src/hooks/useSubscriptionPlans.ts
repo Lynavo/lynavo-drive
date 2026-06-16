@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
 import type { SubscriptionPlanPlatform } from '@syncflow/contracts';
 import { iapService, type IapProductSummary } from '../services/iap-service';
 import {
@@ -237,10 +238,22 @@ export function useSubscriptionPlans({
           '[useSubscriptionPlans] StoreKit returned no products for server catalog',
         );
       }
-      setProducts(fetchedProducts);
+      if (fetchedProducts.length === 0 && Platform.OS === 'android') {
+        console.log(
+          '[useSubscriptionPlans] Android: falling back to static/server prices',
+        );
+        setProducts(buildWalletProductSummaries(validPlans, formatPrice));
+      } else {
+        setProducts(fetchedProducts);
+      }
     } catch (err) {
       console.warn('[useSubscriptionPlans] StoreKit product fetch failed', err);
-      setProducts([]);
+      if (Platform.OS === 'android') {
+        console.log('[useSubscriptionPlans] Android fallback after failure');
+        setProducts(buildWalletProductSummaries(validPlans, formatPrice));
+      } else {
+        setProducts([]);
+      }
     } finally {
       setProductsLoading(false);
     }

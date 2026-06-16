@@ -1073,7 +1073,13 @@ describe('iapService — purchase product preflight', () => {
 
     const pending = iapService.purchase(IAP_PRODUCTS.monthly);
     await flushPurchasePreflight();
+    await Promise.resolve();
+    await new Promise<void>(r => setImmediate(r));
 
+    expect(mockResolveSubscriptionProductPlan).toHaveBeenCalledWith(
+      IAP_PRODUCTS.monthly,
+      'android',
+    );
     expect(requestSubscription).toHaveBeenCalledWith({
       subscriptionOffers: [
         {
@@ -1112,6 +1118,8 @@ describe('iapService — purchase product preflight', () => {
 
     const pending = iapService.purchase(adminYearlySku);
     await flushPurchasePreflight();
+    await Promise.resolve();
+    await new Promise<void>(r => setImmediate(r));
 
     expect(requestSubscription).toHaveBeenCalledWith({
       subscriptionOffers: [

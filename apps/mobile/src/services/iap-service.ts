@@ -11,6 +11,9 @@ import {
   clearTransactionIOS,
   type Purchase,
   type PurchaseError,
+  type PricingPhaseAndroid,
+  type SubscriptionAndroid,
+  type SubscriptionOfferAndroid,
 } from 'react-native-iap';
 import { Platform, type EmitterSubscription } from 'react-native';
 import {
@@ -32,6 +35,10 @@ const MAX_RESTORE_RECEIPTS = 10;
 const PURCHASE_TIMEOUT_MS = 60_000;
 const NON_FATAL_ERROR_GRACE_MS = PURCHASE_TIMEOUT_MS;
 const ORPHAN_PURCHASE_RETRY_BACKOFF_MS = 60_000;
+const ANDROID_BASE_PLAN_BY_TIER: Record<SubscriptionPlanTier, string> = {
+  monthly: 'monthly-plan',
+  yearly: 'yearly-plan',
+};
 type RestorablePlan = SubscriptionPlanTier;
 type PendingPurchase = {
   resolve: (r: PurchaseReceipt) => void;
@@ -85,6 +92,81 @@ export interface IapProductSummary {
   periodUnit?: SubscriptionPeriodUnit;
   periodCount?: number;
   eligibleForIntroOffer: boolean;
+}
+
+function isAndroidSubscription(product: {
+  productId: string;
+}): product is SubscriptionAndroid {
+  return (
+    'subscriptionOfferDetails' in product &&
+    Array.isArray(product.subscriptionOfferDetails)
+  );
+}
+
+function selectAndroidSubscriptionOffer(
+  product: SubscriptionAndroid,
+  planTier: SubscriptionPlanTier | null,
+): SubscriptionOfferAndroid | null {
+  const targetBasePlanId =
+    planTier == null ? null : ANDROID_BASE_PLAN_BY_TIER[planTier];
+  const offers = product.subscriptionOfferDetails;
+  if (targetBasePlanId) {
+    const targetOffer = offers.find(
+      offer => offer.basePlanId === targetBasePlanId,
+    );
+    if (targetOffer) return targetOffer;
+  }
+  return offers[0] ?? null;
+}
+
+function parseAndroidBillingPeriod(billingPeriod: string): {
+  periodUnit: SubscriptionPeriodUnit;
+  periodCount: number;
+} {
+  const matchPeriod = billingPeriod.match(/^P(\d+)([DMYW])$/);
+  if (!matchPeriod) {
+    return { periodUnit: 'MONTH', periodCount: 1 };
+  }
+  const periodCount = Number.parseInt(matchPeriod[1], 10);
+  const unitChar = matchPeriod[2];
+  const periodUnit: SubscriptionPeriodUnit =
+    unitChar === 'D'
+      ? 'DAY'
+      : unitChar === 'W'
+        ? 'WEEK'
+        : unitChar === 'Y'
+          ? 'YEAR'
+          : 'MONTH';
+  return {
+    periodUnit,
+    periodCount: Number.isFinite(periodCount) ? periodCount : 1,
+  };
+}
+
+function buildAndroidProductSummary(
+  productId: string,
+  product: SubscriptionAndroid,
+): IapProductSummary | null {
+  const offer = product.subscriptionOfferDetails[0];
+  const pricingPhases = offer?.pricingPhases.pricingPhaseList ?? [];
+  const phase: PricingPhaseAndroid | undefined =
+    pricingPhases[pricingPhases.length - 1];
+  if (!phase) return null;
+
+  const priceAmount = Number.parseInt(phase.priceAmountMicros, 10) / 1_000_000;
+  if (!Number.isFinite(priceAmount)) return null;
+  const { periodUnit, periodCount } = parseAndroidBillingPeriod(
+    phase.billingPeriod,
+  );
+  return {
+    productId,
+    displayPrice: phase.formattedPrice,
+    priceAmount,
+    currency: phase.priceCurrencyCode,
+    periodUnit,
+    periodCount,
+    eligibleForIntroOffer: pricingPhases.length > 1,
+  };
 }
 
 export interface IapService {
@@ -164,7 +246,7 @@ class IapServiceImpl implements IapService {
       await Promise.race([
         endConnection(),
         new Promise<void>((_, reject) =>
-          setTimeout(() => reject(new Error('endConnection timed out')), 2000)
+          setTimeout(() => reject(new Error('endConnection timed out')), 2000),
         ),
       ]).catch(err => {
         console.warn('[iap-service] endConnection failed or timed out', err);
@@ -251,19 +333,47 @@ class IapServiceImpl implements IapService {
         transientErrorTimeout: null,
         requestedAtMs: Date.now(),
       });
-      void Promise.resolve(requestSubscription({ sku: productId })).catch(
-        err => {
-          const entry = this.pendingPurchase.get(productId);
-          if (!entry) return;
-          this.clearPendingTimers(entry);
-          this.pendingPurchase.delete(productId);
-          recordDiagnosticsLog('IAP', 'requestSubscription failed', {
+      const purchasePromise = (async () => {
+        if (Platform.OS === 'android') {
+          const products = await getSubscriptions({ skus: [productId] });
+          const product = products.find(p => p.productId === productId);
+          if (!product || !isAndroidSubscription(product)) {
+            throw new Error(
+              `Subscription product is not available from Google Play.`,
+            );
+          }
+          const planTier = await resolveSubscriptionProductPlan(
             productId,
-            error: err instanceof Error ? err.message : String(err),
+            'android',
+          );
+          const offer = selectAndroidSubscriptionOffer(product, planTier);
+          if (!offer) {
+            throw new Error(`No subscription offer found for ${productId}.`);
+          }
+          await requestSubscription({
+            subscriptionOffers: [
+              {
+                sku: productId,
+                offerToken: offer.offerToken,
+              },
+            ],
           });
-          reject(err);
-        },
-      );
+        } else {
+          await requestSubscription({ sku: productId });
+        }
+      })();
+
+      void purchasePromise.catch(err => {
+        const entry = this.pendingPurchase.get(productId);
+        if (!entry) return;
+        this.clearPendingTimers(entry);
+        this.pendingPurchase.delete(productId);
+        recordDiagnosticsLog('IAP', 'requestSubscription failed', {
+          productId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        reject(err);
+      });
     });
   }
 
@@ -370,6 +480,14 @@ class IapServiceImpl implements IapService {
       for (const productId of requestedSkus) {
         const match = products.find(p => p.productId === productId);
         if (!match) continue;
+        if (Platform.OS === 'android' && isAndroidSubscription(match)) {
+          const summary = buildAndroidProductSummary(productId, match);
+          if (summary) {
+            summaries.push(summary);
+            continue;
+          }
+        }
+
         // The react-native-iap `Subscription` union spans iOS / Android /
         // Amazon, but only the iOS variant exposes localizedPrice / currency.
         // This app ships iOS only, so cast through a structural shape that
@@ -428,7 +546,10 @@ class IapServiceImpl implements IapService {
     const products = await Promise.race([
       getSubscriptions({ skus: [productId] }),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('getSubscriptions timed out')), 15000)
+        setTimeout(
+          () => reject(new Error('getSubscriptions timed out')),
+          15000,
+        ),
       ),
     ]);
     if (products.some(product => product.productId === productId)) {
@@ -842,10 +963,14 @@ class IapServiceImpl implements IapService {
               transactionReceipt: p.transactionReceipt,
               transactionId: txId,
             });
-            recordDiagnosticsLog('IAP', 'pending purchase resolved via orphan fallback after delay', {
-              productId,
-              transactionId: txId,
-            });
+            recordDiagnosticsLog(
+              'IAP',
+              'pending purchase resolved via orphan fallback after delay',
+              {
+                productId,
+                transactionId: txId,
+              },
+            );
           }
         }, 3000);
       }
@@ -874,10 +999,14 @@ class IapServiceImpl implements IapService {
                   transactionReceipt: p.transactionReceipt,
                   transactionId: txId,
                 });
-                recordDiagnosticsLog('IAP', 'pending purchase resolved via orphan fallback (already used) after delay', {
-                  productId,
-                  transactionId: txId,
-                });
+                recordDiagnosticsLog(
+                  'IAP',
+                  'pending purchase resolved via orphan fallback (already used) after delay',
+                  {
+                    productId,
+                    transactionId: txId,
+                  },
+                );
               }
             }, 3000);
           }

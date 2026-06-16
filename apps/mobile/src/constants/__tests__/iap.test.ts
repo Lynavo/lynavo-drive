@@ -1,3 +1,9 @@
+jest.mock('../../markets', () => ({
+  activeMarket: 'cn',
+  isGlobalMarket: () => false,
+  isChinaMarket: () => true,
+}));
+
 import {
   IAP_PRODUCTS,
   ALL_PRODUCT_IDS,
