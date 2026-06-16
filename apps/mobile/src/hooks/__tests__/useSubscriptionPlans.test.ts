@@ -1,3 +1,12 @@
+jest.mock('../../markets', () => ({
+  activeMarket: 'cn',
+  isGlobalMarket: () => false,
+  isChinaMarket: () => true,
+  marketConfig: {
+    market: 'cn',
+  },
+}));
+
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import type {
   SubscriptionPlanDto,

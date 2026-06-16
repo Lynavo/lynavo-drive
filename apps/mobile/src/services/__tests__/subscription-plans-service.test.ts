@@ -1,5 +1,12 @@
-// Mocks must be declared before importing the service so the imports inside
-// `subscription-plans-service` see the stubs (Jest hoists `jest.mock` calls).
+jest.mock('../../markets', () => ({
+  activeMarket: 'cn',
+  isGlobalMarket: () => false,
+  isChinaMarket: () => true,
+  marketConfig: {
+    market: 'cn',
+  },
+}));
+
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(),
   setItem: jest.fn(),
@@ -115,7 +122,9 @@ describe('subscriptionPlansService.fetchPlans', () => {
     expect(result.plans).toHaveLength(2);
     expect(result.plans[0]?.product_id).toBe(monthlyPlan.product_id);
     expect(result.plans[1]?.product_id).toBe(yearlyPlan.product_id);
-    expect(apiGet).toHaveBeenCalledWith('/subscription/plans?platform=ios&region=cn');
+    expect(apiGet).toHaveBeenCalledWith(
+      '/subscription/plans?platform=ios&region=cn',
+    );
 
     // Cache written with sorted plans.
     expect(AsyncStorage.setItem).toHaveBeenCalledTimes(1);
@@ -293,7 +302,9 @@ describe('subscriptionPlansService.fetchPlans', () => {
 
     // Assert: platform value reaches the URL exactly so the server can scope
     // the catalog (different SKUs / pricing tiers per store).
-    expect(apiGet).toHaveBeenCalledWith('/subscription/plans?platform=android&region=cn');
+    expect(apiGet).toHaveBeenCalledWith(
+      '/subscription/plans?platform=android&region=cn',
+    );
   });
 
   test('bootstrap product prices stay aligned with the wallet fallback copy', () => {

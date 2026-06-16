@@ -552,6 +552,7 @@ describe('iapService — purchase', () => {
 import { finishTransaction as finishTxMock } from 'react-native-iap';
 import { verifyIapReceipt } from '../subscription-service';
 import { ApiError, ERROR_CODE } from '../api';
+import { Platform } from 'react-native';
 
 describe('iapService — orphan recovery', () => {
   let updatedCb: ((p: any) => void) | null = null;
@@ -1003,6 +1004,181 @@ describe('iapService — purchase product preflight', () => {
       productId: IAP_PRODUCTS.yearly,
     });
     expect(requestSubscription).not.toHaveBeenCalled();
+  });
+});
+
+const originalPlatformOS = Platform.OS;
+
+function setPlatformOS(os: 'ios' | 'android'): void {
+  Object.defineProperty(Platform, 'OS', {
+    configurable: true,
+    value: os,
+  });
+}
+
+function makeAndroidSubscriptionProduct(
+  productId: string,
+  offers: Array<{
+    basePlanId: string;
+    offerToken: string;
+    pricingPhaseList?: Array<{
+      formattedPrice: string;
+      priceCurrencyCode: string;
+      billingPeriod: string;
+      priceAmountMicros: string;
+    }>;
+  }>,
+) {
+  return {
+    platform: 'android',
+    productType: 'subs',
+    name: productId,
+    title: productId,
+    description: '',
+    productId,
+    subscriptionOfferDetails: offers.map(offer => ({
+      basePlanId: offer.basePlanId,
+      offerId: null,
+      offerToken: offer.offerToken,
+      offerTags: [],
+      pricingPhases: {
+        pricingPhaseList: (offer.pricingPhaseList ?? []).map(phase => ({
+          ...phase,
+          billingCycleCount: 0,
+          recurrenceMode: 1,
+        })),
+      },
+    })),
+  };
+}
+
+describe('iapService — Android Google Play Billing', () => {
+  let updatedCb:
+    | ((p: {
+        productId: string;
+        transactionReceipt: string;
+        transactionId: string;
+      }) => void)
+    | null = null;
+
+  const flushPurchasePreflight = async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise<void>(r => setImmediate(r));
+  };
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    setPlatformOS('android');
+    mockDefaultCatalogPlanResolvers();
+    (purchaseUpdatedListener as jest.Mock).mockImplementation(cb => {
+      updatedCb = cb;
+      return { remove: jest.fn() };
+    });
+    (purchaseErrorListener as jest.Mock).mockReturnValue({ remove: jest.fn() });
+    await iapService.initialize();
+  });
+
+  afterEach(async () => {
+    await iapService.teardown();
+    updatedCb = null;
+    setPlatformOS(originalPlatformOS as 'ios' | 'android');
+  });
+
+  test('requests Google Play offer token for the resolved Android base plan', async () => {
+    const productId = 'com.vividrop.mobile.global.monthly.999';
+    (getSubscriptions as jest.Mock).mockResolvedValue([
+      makeAndroidSubscriptionProduct(productId, [
+        { basePlanId: 'yearly-plan', offerToken: 'yearly-token' },
+        { basePlanId: 'monthly-plan', offerToken: 'monthly-token' },
+      ]),
+    ]);
+    mockResolveSubscriptionProductPlan.mockResolvedValue('monthly');
+
+    const pending = iapService.purchase(productId);
+    await flushPurchasePreflight();
+
+    expect(mockResolveSubscriptionProductPlan).toHaveBeenCalledWith(
+      productId,
+      'android',
+    );
+    expect(requestSubscription).toHaveBeenCalledWith({
+      subscriptionOffers: [{ sku: productId, offerToken: 'monthly-token' }],
+    });
+
+    updatedCb?.({
+      productId,
+      transactionReceipt: 'ANDROID_RECEIPT',
+      transactionId: 'gpa.1',
+    });
+    await expect(pending).resolves.toMatchObject({
+      productId,
+      transactionReceipt: 'ANDROID_RECEIPT',
+      transactionId: 'gpa.1',
+    });
+  });
+
+  test('falls back to the first Google Play offer when no resolved base plan matches', async () => {
+    const productId = 'com.vividrop.mobile.global.yearly.9900';
+    (getSubscriptions as jest.Mock).mockResolvedValue([
+      makeAndroidSubscriptionProduct(productId, [
+        { basePlanId: 'legacy-yearly', offerToken: 'legacy-token' },
+      ]),
+    ]);
+    mockResolveSubscriptionProductPlan.mockResolvedValue('yearly');
+
+    const pending = iapService.purchase(productId);
+    await flushPurchasePreflight();
+
+    expect(requestSubscription).toHaveBeenCalledWith({
+      subscriptionOffers: [{ sku: productId, offerToken: 'legacy-token' }],
+    });
+
+    updatedCb?.({
+      productId,
+      transactionReceipt: 'ANDROID_RECEIPT',
+      transactionId: 'gpa.2',
+    });
+    await expect(pending).resolves.toMatchObject({ transactionId: 'gpa.2' });
+  });
+
+  test('builds Android product summaries from the last pricing phase', async () => {
+    const productId = 'com.vividrop.mobile.global.monthly.999';
+    (getSubscriptions as jest.Mock).mockResolvedValue([
+      makeAndroidSubscriptionProduct(productId, [
+        {
+          basePlanId: 'monthly-plan',
+          offerToken: 'monthly-token',
+          pricingPhaseList: [
+            {
+              formattedPrice: 'Free',
+              priceCurrencyCode: 'USD',
+              billingPeriod: 'P7D',
+              priceAmountMicros: '0',
+            },
+            {
+              formattedPrice: '$9.99',
+              priceCurrencyCode: 'USD',
+              billingPeriod: 'P1M',
+              priceAmountMicros: '9990000',
+            },
+          ],
+        },
+      ]),
+    ]);
+
+    await expect(iapService.getProductSummaries([productId])).resolves.toEqual([
+      {
+        productId,
+        displayPrice: '$9.99',
+        priceAmount: 9.99,
+        currency: 'USD',
+        periodUnit: 'MONTH',
+        periodCount: 1,
+        eligibleForIntroOffer: true,
+      },
+    ]);
   });
 });
 

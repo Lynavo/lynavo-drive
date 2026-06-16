@@ -1,5 +1,20 @@
+jest.mock('../../markets', () => ({
+  activeMarket: 'cn',
+  isGlobalMarket: () => false,
+  isChinaMarket: () => true,
+  marketConfig: {
+    market: 'cn',
+  },
+}));
+
 import React from 'react';
-import { Alert, Clipboard, NativeModules, Platform, Linking } from 'react-native';
+import {
+  Alert,
+  Clipboard,
+  NativeModules,
+  Platform,
+  Linking,
+} from 'react-native';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import type {
   SubscriptionPlanDto,
@@ -531,14 +546,18 @@ describe('SubscriptionScreen', () => {
     const { findByText } = renderScreen();
 
     // Assert: EULA and Privacy Policy links are present
-    const eulaLink = await findByText(/服务协议|服務協議|用户协议|用戶協議|Terms of Service|User Agreement/i);
+    const eulaLink = await findByText(
+      /服务协议|服務協議|用户协议|用戶協議|Terms of Service|User Agreement/i,
+    );
     const privacyLink = await findByText(/隐私政策|隱私政策|Privacy Policy/i);
     expect(eulaLink).toBeTruthy();
     expect(privacyLink).toBeTruthy();
 
     // Act: Tap EULA link
     fireEvent.press(eulaLink);
-    expect(openURLSpy).toHaveBeenCalledWith('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/');
+    expect(openURLSpy).toHaveBeenCalledWith(
+      'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/',
+    );
 
     // Act: Tap Privacy link
     fireEvent.press(privacyLink);
@@ -553,12 +572,16 @@ describe('SubscriptionScreen', () => {
       configurable: true,
       value: 'android',
     });
-    
+
     // Act
     const { queryByText } = renderScreen();
 
     // Assert: EULA and Privacy Policy links should not be present
-    expect(queryByText(/服务协议|服務協議|用户协议|用戶協議|Terms of Service|User Agreement/i)).toBeNull();
+    expect(
+      queryByText(
+        /服务协议|服務協議|用户协议|用戶協議|Terms of Service|User Agreement/i,
+      ),
+    ).toBeNull();
     expect(queryByText(/隐私政策|隱私政策|Privacy Policy/i)).toBeNull();
   });
 

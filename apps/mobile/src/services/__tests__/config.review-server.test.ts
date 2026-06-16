@@ -1,3 +1,19 @@
+jest.mock('../../markets', () => ({
+  activeMarket: 'cn',
+  isGlobalMarket: () => false,
+  isChinaMarket: () => true,
+  marketConfig: {
+    market: 'cn',
+    apiBaseUrl: 'https://api.vividrop.cn',
+    reviewApiBaseUrl: 'https://review-api.vividrop.cn',
+    appReviewPhone: '18812345678',
+  },
+}));
+
+jest.mock('../../release-profile', () => ({
+  releaseApiBaseUrl: null,
+}));
+
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: {

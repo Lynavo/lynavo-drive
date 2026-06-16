@@ -5,6 +5,7 @@ import {
   Linking,
   Modal,
   NativeModules,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,15 +19,24 @@ import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import Svg, { Path } from 'react-native-svg';
 
-import { AUTH_COLORS, AuthScreenShell } from '../components/auth/AuthScreenShell';
+import {
+  AUTH_COLORS,
+  AuthScreenShell,
+} from '../components/auth/AuthScreenShell';
 import {
   authCardSurfaceStyle,
   authSingleLineInputStyle,
   authTextScalingProps,
 } from '../components/auth/authPlatformStyles';
-import { appleLogin, googleLogin, sendEmailCode, sendSmsCode } from '../services/auth-service';
+import {
+  appleLogin,
+  googleLogin,
+  sendEmailCode,
+  sendSmsCode,
+} from '../services/auth-service';
 import { useAuth } from '../stores/auth-store';
 import { PRIVACY_POLICY_URL, USER_AGREEMENT_URL } from '../constants/legal';
+import { getBaseUrl } from '../services/config';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { Icon } from '../components/Icon';
 import { isValidChinaPhone } from '../utils/phone-validation';
@@ -35,6 +45,44 @@ import * as RNLocalize from 'react-native-localize';
 
 type Provider = 'apple' | 'google' | 'email';
 type LoginGlobalNavProp = StackNavigationProp<RootStackParamList, 'Login'>;
+
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === 'object' && err !== null && 'message' in err) {
+    const message = (err as { message?: unknown }).message;
+    if (typeof message === 'string' && message.length > 0) return message;
+  }
+  return typeof err === 'string' && err.length > 0 ? err : fallback;
+}
+
+function isProviderSignInCancelled(err: unknown): boolean {
+  const code =
+    typeof err === 'object' && err !== null && 'code' in err
+      ? (err as { code?: unknown }).code
+      : null;
+  const message = getErrorMessage(err, '');
+
+  return (
+    code === 'SIGN_IN_CANCELLED' ||
+    message === 'Sign in cancelled' ||
+    message.toLowerCase().includes('cancel')
+  );
+}
+
+function getGoogleIdToken(
+  userInfo: Awaited<ReturnType<typeof GoogleSignin.signIn>>,
+): string | null {
+  if (userInfo.data?.idToken) return userInfo.data.idToken;
+  if (
+    typeof userInfo === 'object' &&
+    userInfo !== null &&
+    'idToken' in userInfo
+  ) {
+    const idToken = (userInfo as { idToken?: unknown }).idToken;
+    if (typeof idToken === 'string' && idToken.length > 0) return idToken;
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Premium Native SVG Icons
@@ -88,8 +136,6 @@ function PhoneIcon({ color = '#1a2a3a' }: { color?: string }) {
   );
 }
 
-
-
 export function LoginGlobalScreen() {
   const navigation = useNavigation<LoginGlobalNavProp>();
   const [method, setMethod] = useState<'email' | 'phone'>('phone');
@@ -130,7 +176,8 @@ export function LoginGlobalScreen() {
   useEffect(() => {
     try {
       GoogleSignin.configure({
-        webClientId: '318131526906-jdsojdqh6057pn3fo5hhtgudht1bh6c8.apps.googleusercontent.com',
+        webClientId:
+          '318131526906-jdsojdqh6057pn3fo5hhtgudht1bh6c8.apps.googleusercontent.com',
       });
     } catch (err) {
       console.warn('Failed to configure Google Sign-In:', err);
@@ -142,52 +189,113 @@ export function LoginGlobalScreen() {
     setPendingProvider(provider);
     try {
       if (provider === 'apple') {
-        const { AppleAuthModule } = NativeModules;
-        if (!AppleAuthModule) {
-          throw new Error('Apple Sign-In is only supported on iOS devices.');
+        if (Platform.OS === 'android') {
+          const clientId = 'com.vividrop.global.signin';
+          const baseUrl = getBaseUrl();
+          const redirectUri = `${baseUrl}/api/v1/auth/apple/callback`;
+          const state = Math.random().toString(36).substring(2);
+          const nonce = Math.random().toString(36).substring(2);
+
+          const appleAuthUrl = `https://appleid.apple.com/auth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+            redirectUri,
+          )}&response_type=code%20id_token&response_mode=form_post&scope=name%20email&state=${state}&nonce=${nonce}`;
+
+          await new Promise<void>((resolvePromise, rejectPromise) => {
+            const handleDeepLink = async (event: { url: string }) => {
+              if (event.url.includes('vividrop://auth/apple/callback')) {
+                linkingSubscription.remove();
+
+                const getParam = (name: string) => {
+                  const match = event.url.match(
+                    new RegExp('[?&]' + name + '=([^&]*)'),
+                  );
+                  return match ? decodeURIComponent(match[1]) : null;
+                };
+
+                const accessToken = getParam('access_token');
+                const refreshToken = getParam('refresh_token');
+
+                if (accessToken && refreshToken) {
+                  try {
+                    login(accessToken, refreshToken);
+                    resolvePromise();
+                  } catch (err) {
+                    rejectPromise(err);
+                  }
+                } else {
+                  rejectPromise(
+                    new Error(
+                      'Login failed: Did not receive tokens from server.',
+                    ),
+                  );
+                }
+              }
+            };
+
+            const linkingSubscription = Linking.addEventListener(
+              'url',
+              handleDeepLink,
+            );
+
+            Linking.openURL(appleAuthUrl).catch((err: unknown) => {
+              linkingSubscription.remove();
+              rejectPromise(
+                new Error(
+                  `Failed to open Apple Sign-In browser: ${getErrorMessage(
+                    err,
+                    'Unknown error',
+                  )}`,
+                ),
+              );
+            });
+          });
+        } else {
+          const { AppleAuthModule } = NativeModules;
+          if (!AppleAuthModule) {
+            throw new Error('Apple Sign-In is only supported on iOS devices.');
+          }
+          const res = await AppleAuthModule.login();
+          const authRes = await appleLogin({
+            identityToken: res.identityToken,
+            authorizationCode: res.authorizationCode,
+            fullName: res.fullName,
+          });
+          login(authRes.accessToken, authRes.refreshToken);
         }
-        const res = await AppleAuthModule.login();
-        const authRes = await appleLogin({
-          identityToken: res.identityToken,
-          authorizationCode: res.authorizationCode,
-          fullName: res.fullName,
-        });
-        login(authRes.accessToken, authRes.refreshToken);
       } else {
         await GoogleSignin.hasPlayServices();
         const userInfo = await GoogleSignin.signIn();
-        const idToken = userInfo.data?.idToken || (userInfo as any).idToken;
+        const idToken = getGoogleIdToken(userInfo);
         if (!idToken) {
           throw new Error('Google Sign-In failed: No ID token returned.');
         }
         const authRes = await googleLogin(idToken);
         login(authRes.accessToken, authRes.refreshToken);
       }
-    } catch (err: any) {
-      const isCancelled =
-        err.code === 'SIGN_IN_CANCELLED' ||
-        err.message === 'Sign in cancelled' ||
-        err.message?.includes('cancel');
-
-      if (!isCancelled) {
-        Alert.alert('Sign In Failed', err.message || String(err));
+    } catch (err: unknown) {
+      if (!isProviderSignInCancelled(err)) {
+        Alert.alert('Sign In Failed', getErrorMessage(err, 'Unknown error'));
       }
     } finally {
       setPendingProvider(null);
     }
   };
 
-
-  const handleInputChange = useCallback((val: string) => {
-    if (isPhoneMode) {
-      // Only allow digits for phone number
-      const digits = val.replace(/\D/g, '').slice(0, selectedCountry.maxLength);
-      setInputValue(digits);
-    } else {
-      setInputValue(val.trim());
-    }
-    setError(null);
-  }, [isPhoneMode, selectedCountry]);
+  const handleInputChange = useCallback(
+    (val: string) => {
+      if (isPhoneMode) {
+        // Only allow digits for phone number
+        const digits = val
+          .replace(/\D/g, '')
+          .slice(0, selectedCountry.maxLength);
+        setInputValue(digits);
+      } else {
+        setInputValue(val.trim());
+      }
+      setError(null);
+    },
+    [isPhoneMode, selectedCountry],
+  );
 
   const handleContinue = useCallback(async () => {
     const trimmed = inputValue.trim();
@@ -217,9 +325,12 @@ export function LoginGlobalScreen() {
         const { authBaseUrl } = await sendSmsCode(fullPhone);
         setPendingProvider(null);
         navigation.navigate('SmsVerify', { phone: fullPhone, authBaseUrl });
-      } catch (err: any) {
+      } catch (err: unknown) {
         setPendingProvider(null);
-        Alert.alert('Error', err.message || 'Failed to send SMS verification code.');
+        Alert.alert(
+          'Error',
+          getErrorMessage(err, 'Failed to send SMS verification code.'),
+        );
       }
     } else {
       if (!emailRegex.test(trimmed)) {
@@ -232,9 +343,12 @@ export function LoginGlobalScreen() {
         await sendEmailCode(trimmed);
         setPendingProvider(null);
         navigation.navigate('SmsVerify', { email: trimmed });
-      } catch (err: any) {
+      } catch (err: unknown) {
         setPendingProvider(null);
-        Alert.alert('Error', err.message || 'Failed to send email verification code.');
+        Alert.alert(
+          'Error',
+          getErrorMessage(err, 'Failed to send email verification code.'),
+        );
       }
     }
   }, [inputValue, isPhoneMode, selectedCountry, navigation]);
@@ -352,9 +466,7 @@ export function LoginGlobalScreen() {
               onSubmitEditing={handleContinue}
             />
           </View>
-          {error && (
-            <Text style={styles.errorText}>{error}</Text>
-          )}
+          {error && <Text style={styles.errorText}>{error}</Text>}
         </View>
 
         {/* Continue Action Button */}
@@ -397,10 +509,7 @@ export function LoginGlobalScreen() {
           visible={isPickerVisible}
           onRequestClose={closePicker}
         >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={closePicker}
-          >
+          <Pressable style={styles.modalOverlay} onPress={closePicker}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Select Country / Region</Text>
@@ -415,7 +524,11 @@ export function LoginGlobalScreen() {
               {/* Search Bar */}
               <View style={styles.searchWrapper}>
                 <View style={styles.searchContainer}>
-                  <Icon name="search-outline" size={16} color={AUTH_COLORS.textMuted} />
+                  <Icon
+                    name="search-outline"
+                    size={16}
+                    color={AUTH_COLORS.textMuted}
+                  />
                   <TextInput
                     style={styles.searchInput}
                     value={searchQuery}
@@ -429,8 +542,11 @@ export function LoginGlobalScreen() {
                 </View>
               </View>
 
-              <ScrollView style={styles.countryList} keyboardShouldPersistTaps="handled">
-                {filteredCountries.map((country) => (
+              <ScrollView
+                style={styles.countryList}
+                keyboardShouldPersistTaps="handled"
+              >
+                {filteredCountries.map(country => (
                   <TouchableOpacity
                     key={country.iso}
                     style={[

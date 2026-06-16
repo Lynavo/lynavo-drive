@@ -81,7 +81,8 @@ import {
   type MainlandPaymentMethod,
 } from '../utils/subscriptionPaymentRouting';
 
-const APPLE_EULA_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+const APPLE_EULA_URL =
+  'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 
 const DARK = '#202022';
 const SCREEN_BG = '#d6ecf8';
@@ -178,9 +179,7 @@ export function resolveMainlandPaymentAlertKey(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   const signal = `${code ?? ''} ${message}`;
 
-  if (
-    signal.includes('MAINLAND_PAYMENT_WECHAT_NOT_INSTALLED')
-  ) {
+  if (signal.includes('MAINLAND_PAYMENT_WECHAT_NOT_INSTALLED')) {
     return 'subscription.payment.wechatNotInstalled';
   }
   if (
@@ -1413,22 +1412,6 @@ export function SubscriptionScreen() {
       return;
     }
 
-    if (paymentRoute.kind === 'google_play_billing') {
-      recordDiagnosticsLog(
-        'SubscriptionScreen',
-        'subscribe blocked google billing future',
-        {
-          productId: targetProductId,
-          targetTier,
-        },
-      );
-      Alert.alert(
-        t('subscription.payment.googleFutureTitle'),
-        t('subscription.payment.googleFutureBody'),
-      );
-      return;
-    }
-
     if (paymentRoute.kind === 'android_cn_wallets') {
       recordDiagnosticsLog('SubscriptionScreen', 'wallet sheet open', {
         productId: targetProductId,
@@ -1988,12 +1971,12 @@ export function SubscriptionScreen() {
   const subscribeButtonLabel = hasQueuedGiftCardEntitlement
     ? t('subscription.actions.giftCardQueued')
     : isGiftCardSubscribed
-    ? t('subscription.actions.giftCardMember')
-    : currentPlan === 'yearly'
-    ? t('subscription.actions.currentYearly')
-    : currentPlan && selectedPlanTier && selectedPlanTier !== currentPlan
-    ? t('subscription.actions.switchPlan')
-    : t('subscription.actions.subscribe');
+      ? t('subscription.actions.giftCardMember')
+      : currentPlan === 'yearly'
+        ? t('subscription.actions.currentYearly')
+        : currentPlan && selectedPlanTier && selectedPlanTier !== currentPlan
+          ? t('subscription.actions.switchPlan')
+          : t('subscription.actions.subscribe');
   const canRestorePurchases =
     paymentRoute.restorePurchases &&
     FEATURES.IAP_ENABLED &&
