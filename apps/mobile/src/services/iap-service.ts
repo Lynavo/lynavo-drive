@@ -300,6 +300,11 @@ class IapServiceImpl implements IapService {
       this.errorSub = errorSub;
       this.initialized = true;
       recordDiagnosticsLog('IAP', 'initialize connection success');
+    } catch (err) {
+      recordDiagnosticsLog('IAP', 'initialize connection failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
     } finally {
       this.initializePromise = null;
     }
@@ -536,6 +541,9 @@ class IapServiceImpl implements IapService {
       }
       return summaries;
     } catch (err) {
+      recordDiagnosticsLog('IAP', 'getProductSummaries failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       console.warn('[iap-service] getProductSummaries failed', err);
       return [];
     }
