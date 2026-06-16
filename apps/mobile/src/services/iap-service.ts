@@ -201,6 +201,7 @@ class IapServiceImpl implements IapService {
   private orphanListeners = new Set<() => void>();
   private orphanVerificationInFlight = new Set<string>();
   private orphanRetryAfter = new Map<string, number>();
+  private purchasesByFinishKey = new Map<string, Purchase>();
 
   async initialize(): Promise<void> {
     while (true) {
@@ -427,7 +428,7 @@ class IapServiceImpl implements IapService {
       const txId = p.transactionId ?? '';
       const receiptCandidates = this.restoreReceiptCandidates(
         refreshedReceipt,
-        p.transactionReceipt,
+        p,
       );
       if (receiptCandidates.length === 0) continue;
 
@@ -436,6 +437,7 @@ class IapServiceImpl implements IapService {
         plan ?? undefined,
         txId,
         p.productId,
+        p,
       );
       if (restored) {
         out.push(restored);
@@ -445,11 +447,20 @@ class IapServiceImpl implements IapService {
   }
   async finishTransaction(transactionId: string): Promise<void> {
     // react-native-iap v12 accepts either a Purchase object or transactionId
-    // via `purchase`; we keep a minimal stub shape it understands.
+    // via `purchase`. Android acknowledgement requires purchaseToken, so keep
+    // the native purchase object from the purchase / restore / orphan path.
+    const purchase =
+      Platform.OS === 'android'
+        ? this.purchasesByFinishKey.get(transactionId) ??
+          ({ purchaseToken: transactionId } as Purchase)
+        : ({ transactionId } as Purchase);
     await rnFinishTransaction({
-      purchase: { transactionId } as Purchase,
+      purchase,
       isConsumable: false,
     });
+    if (Platform.OS === 'android') {
+      this.forgetPurchaseForFinish(purchase);
+    }
   }
   async checkEligibility(): Promise<EligibilityResult[]> {
     if (!this.initialized) return [];
@@ -666,19 +677,13 @@ class IapServiceImpl implements IapService {
         productId,
         hasTransactionId: !!purchase.transactionId,
       });
-      // A successful StoreKit purchase update already carries the receipt RN-IAP
-      // obtained for this transaction. Forcing a unified receipt refresh here
-      // often triggers ASDErrorDomain 603 ("Request throttled") because the
-      // receipt is already valid/current. Plan-switch mismatch handling can
-      // still explicitly refresh from SubscriptionScreen when the backend
-      // proves the transaction receipt was stale.
-      const transactionReceipt =
-        purchase.transactionReceipt ||
-        (await this.refreshReceiptForUserPurchase()) ||
-        '';
+      const transactionReceipt = await this.verificationReceiptForPurchase(
+        purchase,
+      );
       if (!transactionReceipt) {
         throw new Error('purchase receipt is empty');
       }
+      this.rememberPurchaseForFinish(purchase);
       pending.resolve({
         // Reflect what the receipt actually reports; server resolves truth
         // from the receipt blob and the caller passes the user-selected plan.
@@ -710,16 +715,64 @@ class IapServiceImpl implements IapService {
 
   private restoreReceiptCandidates(
     refreshedReceipt: string | null,
-    transactionReceipt: string | undefined,
+    purchase: Purchase,
   ): string[] {
+    if (Platform.OS === 'android') {
+      const purchaseToken = this.androidPurchaseToken(purchase);
+      return purchaseToken != null ? [purchaseToken] : [];
+    }
     return Array.from(
       new Set(
-        [refreshedReceipt, transactionReceipt].filter(
+        [refreshedReceipt, purchase.transactionReceipt].filter(
           (receipt): receipt is string =>
             typeof receipt === 'string' && receipt.length > 0,
         ),
       ),
     );
+  }
+
+  private androidPurchaseToken(purchase: Purchase): string | null {
+    const purchaseToken = purchase.purchaseToken;
+    if (typeof purchaseToken !== 'string') return null;
+    const trimmed = purchaseToken.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private async verificationReceiptForPurchase(
+    purchase: Purchase,
+  ): Promise<string> {
+    if (Platform.OS === 'android') {
+      return this.androidPurchaseToken(purchase) ?? '';
+    }
+    if (
+      typeof purchase.transactionReceipt === 'string' &&
+      purchase.transactionReceipt.length > 0
+    ) {
+      return purchase.transactionReceipt;
+    }
+    return (await this.refreshReceiptForUserPurchase()) ?? '';
+  }
+
+  private rememberPurchaseForFinish(purchase: Purchase): void {
+    if (Platform.OS !== 'android') return;
+    if (purchase.transactionId) {
+      this.purchasesByFinishKey.set(purchase.transactionId, purchase);
+    }
+    const purchaseToken = this.androidPurchaseToken(purchase);
+    if (purchaseToken) {
+      this.purchasesByFinishKey.set(purchaseToken, purchase);
+    }
+  }
+
+  private forgetPurchaseForFinish(purchase: Purchase): void {
+    if (Platform.OS !== 'android') return;
+    if (purchase.transactionId) {
+      this.purchasesByFinishKey.delete(purchase.transactionId);
+    }
+    const purchaseToken = this.androidPurchaseToken(purchase);
+    if (purchaseToken) {
+      this.purchasesByFinishKey.delete(purchaseToken);
+    }
   }
 
   private async restoreProductCandidates(
@@ -766,6 +819,7 @@ class IapServiceImpl implements IapService {
     initialPlan: RestorablePlan | undefined,
     transactionId: string,
     initialProductId?: string,
+    purchase?: Purchase,
   ): Promise<PurchaseReceipt | null> {
     const candidates = await this.restoreProductCandidates(
       initialPlan,
@@ -781,6 +835,7 @@ class IapServiceImpl implements IapService {
             transactionId,
           );
           if (transactionId) {
+            if (purchase) this.rememberPurchaseForFinish(purchase);
             await this.finishTransaction(transactionId).catch(() => {});
           }
           return {
@@ -792,6 +847,7 @@ class IapServiceImpl implements IapService {
           if (err instanceof ApiError) {
             if (err.code === ERROR_CODE.RECEIPT_ALREADY_USED) {
               if (transactionId) {
+                if (purchase) this.rememberPurchaseForFinish(purchase);
                 await this.finishTransaction(transactionId).catch(() => {});
               }
               return {
@@ -921,7 +977,7 @@ class IapServiceImpl implements IapService {
         // entitlement tiers; finishing first would lose the recovery path.
         const receiptCandidates = this.restoreReceiptCandidates(
           null,
-          p.transactionReceipt,
+          p,
         );
         const restored =
           receiptCandidates.length > 0
@@ -930,6 +986,7 @@ class IapServiceImpl implements IapService {
                 undefined,
                 txId,
                 productId,
+                p,
               )
             : null;
         if (restored) {
@@ -956,7 +1013,9 @@ class IapServiceImpl implements IapService {
         plan,
         hasTransactionId: !!txId,
       });
-      await verifyIapReceipt(p.transactionReceipt, plan, productId, txId);
+      const receipt = await this.verificationReceiptForPurchase(p);
+      await verifyIapReceipt(receipt, plan, productId, txId);
+      this.rememberPurchaseForFinish(p);
       await this.finishTransaction(txId).catch(() => {});
       this.orphanRetryAfter.delete(orphanKey);
       this.orphanListeners.forEach(cb => cb());
@@ -976,7 +1035,7 @@ class IapServiceImpl implements IapService {
             this.pendingPurchase.delete(productId);
             pending.resolve({
               productId,
-              transactionReceipt: p.transactionReceipt,
+              transactionReceipt: receipt,
               transactionId: txId,
             });
             recordDiagnosticsLog(
@@ -993,6 +1052,7 @@ class IapServiceImpl implements IapService {
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === ERROR_CODE.RECEIPT_ALREADY_USED) {
+          this.rememberPurchaseForFinish(p);
           await this.finishTransaction(txId).catch(() => {});
           this.orphanRetryAfter.delete(orphanKey);
           this.orphanListeners.forEach(cb => cb());
@@ -1006,13 +1066,16 @@ class IapServiceImpl implements IapService {
             if (pending.orphanResolveTimeout) {
               clearTimeout(pending.orphanResolveTimeout);
             }
+            const receipt = await this.verificationReceiptForPurchase(p).catch(
+              () => p.transactionReceipt ?? '',
+            );
             pending.orphanResolveTimeout = setTimeout(() => {
               if (this.pendingPurchase.get(productId) === pending) {
                 this.clearPendingTimers(pending);
                 this.pendingPurchase.delete(productId);
                 pending.resolve({
                   productId,
-                  transactionReceipt: p.transactionReceipt,
+                  transactionReceipt: receipt,
                   transactionId: txId,
                 });
                 recordDiagnosticsLog(
@@ -1056,6 +1119,10 @@ class IapServiceImpl implements IapService {
   }
 
   private orphanPurchaseKey(p: Purchase): string {
+    const purchaseToken = this.androidPurchaseToken(p);
+    if (Platform.OS === 'android' && purchaseToken) {
+      return `token:${purchaseToken}`;
+    }
     if (p.transactionId) return `tx:${p.transactionId}`;
     const receipt =
       typeof p.transactionReceipt === 'string' ? p.transactionReceipt : '';

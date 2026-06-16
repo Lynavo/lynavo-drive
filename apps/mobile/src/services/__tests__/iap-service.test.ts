@@ -1092,12 +1092,60 @@ describe('iapService — purchase product preflight', () => {
     updatedCb?.({
       productId: IAP_PRODUCTS.monthly,
       transactionReceipt: 'ANDROID_RECEIPT',
+      purchaseToken: 'ANDROID_RECEIPT',
       transactionId: 'android_tx_1',
     });
 
     await expect(pending).resolves.toMatchObject({
       productId: IAP_PRODUCTS.monthly,
       transactionReceipt: 'ANDROID_RECEIPT',
+    });
+  });
+
+  test('uses Android purchaseToken as the verification receipt and acknowledgement token', async () => {
+    setPlatformOS('android');
+    mockResolveSubscriptionProductPlan.mockResolvedValueOnce('monthly');
+    (getSubscriptions as jest.Mock)
+      .mockResolvedValueOnce([
+        makeAndroidSubscriptionProduct(IAP_PRODUCTS.monthly, [
+          { basePlanId: 'monthly-plan', offerToken: 'monthly-token' },
+        ]),
+      ])
+      .mockResolvedValueOnce([
+        makeAndroidSubscriptionProduct(IAP_PRODUCTS.monthly, [
+          { basePlanId: 'monthly-plan', offerToken: 'monthly-token' },
+        ]),
+      ]);
+
+    const pending = iapService.purchase(IAP_PRODUCTS.monthly);
+    await flushPurchasePreflight();
+    await Promise.resolve();
+    await new Promise<void>(r => setImmediate(r));
+
+    updatedCb?.({
+      productId: IAP_PRODUCTS.monthly,
+      transactionReceipt: '{"purchaseToken":"ANDROID_PURCHASE_TOKEN"}',
+      purchaseToken: 'ANDROID_PURCHASE_TOKEN',
+      transactionId: 'GPA.1234-5678-9012-34567',
+      purchaseStateAndroid: 1,
+      isAcknowledgedAndroid: false,
+    });
+
+    const receipt = await pending;
+    expect(receipt).toEqual({
+      productId: IAP_PRODUCTS.monthly,
+      transactionReceipt: 'ANDROID_PURCHASE_TOKEN',
+      transactionId: 'GPA.1234-5678-9012-34567',
+    });
+
+    await iapService.finishTransaction(receipt.transactionId);
+
+    expect(finishTxMock).toHaveBeenCalledWith({
+      purchase: expect.objectContaining({
+        purchaseToken: 'ANDROID_PURCHASE_TOKEN',
+        transactionId: 'GPA.1234-5678-9012-34567',
+      }),
+      isConsumable: false,
     });
   });
 
@@ -1133,6 +1181,7 @@ describe('iapService — purchase product preflight', () => {
     updatedCb?.({
       productId: adminYearlySku,
       transactionReceipt: 'ANDROID_RECEIPT',
+      purchaseToken: 'ANDROID_RECEIPT',
       transactionId: 'android_tx_2',
     });
 
