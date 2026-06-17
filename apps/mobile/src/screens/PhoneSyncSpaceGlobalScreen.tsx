@@ -37,6 +37,7 @@ import { listReceivedLibrary } from '../services/desktop-local-service';
 type NavigationProp = StackNavigationProp<RootStackParamList, 'PhoneSyncSpace'>;
 type ReceivedSection = {
   title: string;
+  key: string;
   data: ReceivedLibraryItemDTO[];
 };
 type SortKey = 'time' | 'name' | 'size';
@@ -320,7 +321,7 @@ export function PhoneSyncSpaceGlobalScreen() {
         if (section) {
           section.data.push(item);
         } else {
-          acc.push({ title, data: [item] });
+          acc.push({ title, key: title, data: [item] });
         }
         return acc;
       }, []),
@@ -448,7 +449,7 @@ export function PhoneSyncSpaceGlobalScreen() {
         ) : (
           <SectionList
             sections={sections}
-            keyExtractor={item => item.resourceId}
+            keyExtractor={item => item.resourceId || item.fileKey}
             renderItem={renderItem}
             renderSectionHeader={({ section }) => (
               <View style={styles.sectionHeader}>

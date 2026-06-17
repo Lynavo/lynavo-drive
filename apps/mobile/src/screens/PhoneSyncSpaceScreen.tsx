@@ -195,7 +195,7 @@ export function PhoneSyncSpaceScreen() {
         ) : (
           <FlatList
             data={sortedItems}
-            keyExtractor={item => item.resourceId}
+            keyExtractor={item => item.resourceId || item.fileKey}
             renderItem={renderItem}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
