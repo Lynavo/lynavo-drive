@@ -4,11 +4,15 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  Image,
+  Modal,
   TouchableOpacity,
   ActivityIndicator,
   Alert,
   NativeModules,
 } from 'react-native';
+import { viewDocument } from '@react-native-documents/viewer';
+import Video from 'react-native-video';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -19,10 +23,25 @@ import { formatBytes } from '../utils/format';
 import { Icon } from '../components/Icon';
 import { GradientBackground } from '../components/GradientBackground';
 import { BottomTabBar } from '../components/BottomTabBar';
-import { listReceivedLibrary } from '../services/desktop-local-service';
-import type { BindingStateDTO, ReceivedLibraryItemDTO } from '@syncflow/contracts';
+import {
+  downloadResource,
+  getResourcePreviewUrl,
+  listReceivedLibrary,
+  prepareResourcePreview,
+} from '../services/desktop-local-service';
+import { recordDownloadedFile } from '../services/download-records-service';
+import { documentMimeType, isImageFile, isVideoFile } from '../utils/file-preview';
+import {
+  SIDECAR_HTTP_PORT,
+  type BindingStateDTO,
+  type ReceivedLibraryItemDTO,
+} from '@syncflow/contracts';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'PhoneSyncSpace'>;
+type PhoneSyncPreviewState = {
+  item: ReceivedLibraryItemDTO;
+  url: string;
+};
 
 export function PhoneSyncSpaceScreen() {
   const navigation = useNavigation<NavigationProp>();
@@ -31,6 +50,8 @@ export function PhoneSyncSpaceScreen() {
   const [items, setItems] = useState<ReceivedLibraryItemDTO[]>([]);
   const [sortDesc, setSortDesc] = useState(true);
   const [binding, setBinding] = useState<BindingStateDTO | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<PhoneSyncPreviewState | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -48,7 +69,7 @@ export function PhoneSyncSpaceScreen() {
         return;
       }
 
-      const desktop = { host: bindingState.host, port: 39394 };
+      const desktop = { host: bindingState.host, port: SIDECAR_HTTP_PORT };
       const result = await listReceivedLibrary(desktop);
       setItems(result || []);
     } catch (e) {
@@ -109,6 +130,92 @@ export function PhoneSyncSpaceScreen() {
     Alert.alert(t('sharedFiles.phoneSyncSpace.select') || '選擇檔案', t('sharedFiles.phoneSyncSpace.selectFeature') || '該功能正在開發中');
   };
 
+  const handleDownload = useCallback(
+    async (item: ReceivedLibraryItemDTO) => {
+      if (downloadingId) return;
+      setDownloadingId(item.resourceId);
+
+      try {
+        const { NativeSyncEngine } = NativeModules;
+        const bindingState = await NativeSyncEngine?.getBindingState();
+        if (!bindingState || !bindingState.host) {
+          Alert.alert(t('sharedFiles.deviceUnavailable.title') || '設備不可用');
+          return;
+        }
+
+        const filename = item.filename || item.displayName;
+        const desktop = { host: bindingState.host, port: SIDECAR_HTTP_PORT };
+        await downloadResource(desktop, item.resourceId);
+        await recordDownloadedFile({
+          resourceId: item.resourceId,
+          filename,
+          fileSize: item.fileSize,
+          mediaType: item.mediaType,
+          localPath: null,
+          savedToPhotos: false,
+        });
+
+        Alert.alert(
+          t('sharedFiles.dialogs.downloadComplete') || '下載完成',
+          t('sharedFiles.dialogs.downloadSavedToPhotos', { name: filename }) ||
+            `${filename} 已儲存至相簿`
+        );
+      } catch (err) {
+        console.warn('[PhoneSyncSpaceScreen] Download failed:', err);
+        Alert.alert(
+          t('sharedFiles.dialogs.downloadFailed') || '下載失敗',
+          t('sharedFiles.dialogs.downloadFailedMessage') ||
+            '無法下載檔案，請稍後重試'
+        );
+      } finally {
+        setDownloadingId(null);
+      }
+    },
+    [downloadingId, t]
+  );
+
+  const handleOpenItem = useCallback(
+    async (item: ReceivedLibraryItemDTO) => {
+      try {
+        const { NativeSyncEngine } = NativeModules;
+        const bindingState = await NativeSyncEngine?.getBindingState();
+        if (!bindingState || !bindingState.host) {
+          Alert.alert(t('sharedFiles.deviceUnavailable.title') || '設備不可用');
+          return;
+        }
+
+        const filename = item.filename || item.displayName;
+        const desktop = { host: bindingState.host, port: SIDECAR_HTTP_PORT };
+        if (
+          isImageFile(item.mediaType, filename) ||
+          isVideoFile(item.mediaType, filename)
+        ) {
+          const url = await getResourcePreviewUrl(desktop, item.resourceId);
+          setPreview({ item, url });
+          return;
+        }
+
+        const localPath = await prepareResourcePreview(
+          desktop,
+          item.resourceId,
+          filename,
+        );
+        await viewDocument({
+          uri: localPath,
+          headerTitle: filename,
+          mimeType: documentMimeType(filename),
+        });
+      } catch (err) {
+        console.warn('[PhoneSyncSpaceScreen] Preview failed:', err);
+        Alert.alert(
+          t('sharedFiles.dialogs.previewFailed') || '預覽失敗',
+          t('sharedFiles.dialogs.previewFailedMessage') || '無法取得檔案預覽',
+        );
+      }
+    },
+    [t],
+  );
+
   const sortedItems = [...items].sort((a, b) => {
     const timeA = new Date(a.completedAt).getTime();
     const timeB = new Date(b.completedAt).getTime();
@@ -120,6 +227,7 @@ export function PhoneSyncSpaceScreen() {
     const fileType = getFileTypeText(item.mediaType, item.filename);
     const formattedTime = formatItemTime(item.completedAt);
     const displayName = item.filename || item.displayName;
+    const isDownloading = downloadingId === item.resourceId;
 
     const desktopName = binding
       ? (item.desktopDeviceId === binding.deviceId || (item.desktopDeviceId && (item.desktopDeviceId.includes('-') || item.desktopDeviceId.length > 12))
@@ -128,7 +236,11 @@ export function PhoneSyncSpaceScreen() {
       : (item.desktopDeviceId || '未知設備');
 
     return (
-      <View style={styles.card}>
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.75}
+        onPress={() => handleOpenItem(item)}
+      >
         <View style={[styles.iconWrapper, { backgroundColor: iconConfig.bg }]}>
           <Icon name={iconConfig.name} size={24} color={iconConfig.color} />
         </View>
@@ -152,8 +264,20 @@ export function PhoneSyncSpaceScreen() {
           <Text style={styles.deviceText} numberOfLines={1}>
             {desktopName}
           </Text>
+          <TouchableOpacity
+            style={[styles.downloadButton, isDownloading && styles.downloadButtonDisabled]}
+            onPress={() => handleDownload(item)}
+            activeOpacity={0.7}
+            disabled={isDownloading || downloadingId !== null}
+          >
+            {isDownloading ? (
+              <ActivityIndicator size="small" color="#3b82f6" />
+            ) : (
+              <Icon name="download-outline" size={18} color="#3b82f6" />
+            )}
+          </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -211,8 +335,71 @@ export function PhoneSyncSpaceScreen() {
           />
         )}
       </SafeAreaView>
+      <PhoneSyncPreviewModal
+        preview={preview}
+        onClose={() => setPreview(null)}
+      />
       <BottomTabBar activeTab="files" />
     </GradientBackground>
+  );
+}
+
+function PhoneSyncPreviewModal({
+  preview,
+  onClose,
+}: {
+  preview: PhoneSyncPreviewState | null;
+  onClose: () => void;
+}) {
+  if (!preview) return null;
+
+  const filename = preview.item.filename || preview.item.displayName;
+  const video = isVideoFile(preview.item.mediaType, filename);
+
+  return (
+    <Modal
+      animationType="fade"
+      presentationStyle="fullScreen"
+      visible={preview != null}
+      onRequestClose={onClose}
+    >
+      <View style={styles.previewModalRoot}>
+        <View style={styles.previewHeader}>
+          <Text style={styles.previewTitle} numberOfLines={1}>
+            {filename}
+          </Text>
+          <TouchableOpacity
+            style={styles.previewCloseButton}
+            accessibilityRole="button"
+            accessibilityLabel="關閉預覽"
+            activeOpacity={0.7}
+            onPress={onClose}
+          >
+            <Icon name="close" size={18} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.previewBody}>
+          {video ? (
+            <Video
+              testID="phone-sync-cn-preview-video"
+              source={{ uri: preview.url }}
+              style={styles.previewMedia}
+              resizeMode="contain"
+              controls
+              paused={false}
+              muted={false}
+            />
+          ) : (
+            <Image
+              testID="phone-sync-cn-preview-image"
+              source={{ uri: preview.url }}
+              style={styles.previewMedia}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -345,6 +532,18 @@ const styles = StyleSheet.create({
     marginTop: 4,
     maxWidth: 90,
   },
+  downloadButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  downloadButtonDisabled: {
+    backgroundColor: 'rgba(148, 163, 184, 0.08)',
+  },
   missingBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -355,5 +554,43 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     color: '#ef4444',
+  },
+  previewModalRoot: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  previewHeader: {
+    minHeight: 84,
+    paddingHorizontal: 16,
+    paddingTop: 46,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  previewTitle: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  previewCloseButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  previewBody: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewMedia: {
+    width: '100%',
+    height: '100%',
   },
 });

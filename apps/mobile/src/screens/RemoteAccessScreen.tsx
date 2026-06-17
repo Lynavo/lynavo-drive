@@ -4,11 +4,15 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  Image,
+  Modal,
   TouchableOpacity,
   ActivityIndicator,
   Alert,
   NativeModules,
 } from 'react-native';
+import { viewDocument } from '@react-native-documents/viewer';
+import Video from 'react-native-video';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -23,10 +27,13 @@ import {
   listSharedResources,
   listSharedFolderContents,
   downloadResource,
+  getResourcePreviewUrl,
+  prepareResourcePreview,
   shareResources,
 } from '../services/desktop-local-service';
 import { recordDownloadedFile } from '../services/download-records-service';
 import type { DesktopSharedResourceDTO, DirectoryFileDTO } from '@syncflow/contracts';
+import { documentMimeType, isImageFile, isVideoFile } from '../utils/file-preview';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'RemoteAccess'>;
 
@@ -38,6 +45,11 @@ interface RemoteAccessItem {
   mediaType?: string;
   rootResourceId?: string;
   remotePath?: string;
+}
+
+interface RemotePreviewState {
+  item: RemoteAccessItem;
+  url: string;
 }
 
 const SHARED_DIRECTORY_RESOURCE_PREFIX = 'shared-dir:';
@@ -101,6 +113,7 @@ export function RemoteAccessScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [sharing, setSharing] = useState(false);
   const [sortDesc, setSortDesc] = useState(true);
+  const [preview, setPreview] = useState<RemotePreviewState | null>(null);
 
   const getBoundDesktop = useCallback(async () => {
     const { NativeSyncEngine } = NativeModules;
@@ -271,6 +284,47 @@ export function RemoteAccessScreen() {
     }
   }, [currentItems, getBoundDesktop, selectedIds, sharing, t]);
 
+  const handleOpenFile = useCallback(
+    async (item: RemoteAccessItem) => {
+      if (item.kind !== 'shared_file') return;
+
+      try {
+        const desktop = await getBoundDesktop();
+        if (!desktop) {
+          Alert.alert(t('sharedFiles.deviceUnavailable.title') || '設備不可用');
+          return;
+        }
+
+        if (
+          isImageFile(item.mediaType, item.displayName) ||
+          isVideoFile(item.mediaType, item.displayName)
+        ) {
+          const url = await getResourcePreviewUrl(desktop, item.resourceId);
+          setPreview({ item, url });
+          return;
+        }
+
+        const localPath = await prepareResourcePreview(
+          desktop,
+          item.resourceId,
+          item.displayName,
+        );
+        await viewDocument({
+          uri: localPath,
+          headerTitle: item.displayName,
+          mimeType: documentMimeType(item.displayName),
+        });
+      } catch (err) {
+        console.warn('[RemoteAccessScreen] Preview failed:', err);
+        Alert.alert(
+          t('sharedFiles.dialogs.previewFailed') || '預覽失敗',
+          t('sharedFiles.dialogs.previewFailedMessage') || '無法取得檔案預覽',
+        );
+      }
+    },
+    [getBoundDesktop, t],
+  );
+
   const navigateIntoFolder = useCallback(
     async (folder: RemoteAccessItem) => {
       const desktop = await getBoundDesktop();
@@ -384,7 +438,9 @@ export function RemoteAccessScreen() {
           }
           if (isFolder) {
             void navigateIntoFolder(item);
+            return;
           }
+          void handleOpenFile(item);
         }}
       >
         <View style={[styles.iconWrapper, { backgroundColor: iconConfig.bg }]}>
@@ -563,8 +619,70 @@ export function RemoteAccessScreen() {
           </View>
         )}
       </SafeAreaView>
+      <RemoteAccessPreviewModal
+        preview={preview}
+        onClose={() => setPreview(null)}
+      />
       <BottomTabBar activeTab="files" />
     </GradientBackground>
+  );
+}
+
+function RemoteAccessPreviewModal({
+  preview,
+  onClose,
+}: {
+  preview: RemotePreviewState | null;
+  onClose: () => void;
+}) {
+  if (!preview) return null;
+
+  const video = isVideoFile(preview.item.mediaType, preview.item.displayName);
+
+  return (
+    <Modal
+      animationType="fade"
+      presentationStyle="fullScreen"
+      visible={preview != null}
+      onRequestClose={onClose}
+    >
+      <View style={styles.previewModalRoot}>
+        <View style={styles.previewHeader}>
+          <Text style={styles.previewTitle} numberOfLines={1}>
+            {preview.item.displayName}
+          </Text>
+          <TouchableOpacity
+            style={styles.previewCloseButton}
+            accessibilityRole="button"
+            accessibilityLabel="關閉預覽"
+            activeOpacity={0.7}
+            onPress={onClose}
+          >
+            <Icon name="close" size={18} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.previewBody}>
+          {video ? (
+            <Video
+              testID="remote-access-preview-video"
+              source={{ uri: preview.url }}
+              style={styles.previewMedia}
+              resizeMode="contain"
+              controls
+              paused={false}
+              muted={false}
+            />
+          ) : (
+            <Image
+              testID="remote-access-preview-image"
+              source={{ uri: preview.url }}
+              style={styles.previewMedia}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -806,5 +924,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  previewModalRoot: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  previewHeader: {
+    minHeight: 84,
+    paddingHorizontal: 16,
+    paddingTop: 46,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  previewTitle: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  previewCloseButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  previewBody: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewMedia: {
+    width: '100%',
+    height: '100%',
   },
 });

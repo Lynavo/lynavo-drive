@@ -77,6 +77,33 @@ async function resourceDownloadUrl(
   )}`;
 }
 
+export async function getResourcePreviewUrl(
+  desktop: DesktopInfo,
+  resourceId: string,
+): Promise<string> {
+  return resourceDownloadUrl(desktop, resourceId);
+}
+
+export async function prepareResourcePreview(
+  desktop: DesktopInfo,
+  resourceId: string,
+  filename?: string,
+): Promise<string> {
+  if (typeof NativeSyncEngine?.downloadUrlToShareCache !== 'function') {
+    throw new Error('System preview is not available');
+  }
+
+  const url = await resourceDownloadUrl(desktop, resourceId);
+  const localPath = await NativeSyncEngine.downloadUrlToShareCache(
+    url,
+    filename?.trim() || 'remote-file',
+  );
+  if (typeof localPath !== 'string' || localPath.trim().length === 0) {
+    throw new Error('Remote file was not prepared for preview');
+  }
+  return localPath;
+}
+
 async function requestResourceDownload(
   desktop: DesktopInfo,
   resourceId: string,

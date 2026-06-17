@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Modal,
   NativeModules,
@@ -11,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { viewDocument } from '@react-native-documents/viewer';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -20,6 +22,7 @@ import {
   Check,
   ChevronLeft,
   CloudUpload,
+  Download,
   Eye,
   FileImage,
   FileText,
@@ -39,9 +42,16 @@ import { formatBytes } from '../utils/format';
 import { GlobalGradientBackground } from '../components/GlobalGradientBackground';
 import { ModalBlurBackdrop } from '../components/shared/ModalBlurBackdrop';
 import {
+  type DesktopInfo,
+  downloadResourceForGlobal,
+  getResourcePreviewUrl,
+  isDownloadSavedLocally,
   listCurrentClientReceivedLibrary,
+  prepareResourcePreview,
   type ReceivedLibraryMediaItem,
 } from '../services/desktop-local-service';
+import { recordDownloadedFile } from '../services/download-records-service';
+import { documentMimeType, isImageFile, isVideoFile } from '../utils/file-preview';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'PhoneSyncSpace'>;
 type ReceivedSection = {
@@ -54,6 +64,10 @@ type MediaTypeIconKind = 'photo' | 'video' | 'file';
 type MediaTypeGradientStop = {
   offset: string;
   color: string;
+};
+type ReceivedPreviewState = {
+  item: ReceivedLibraryMediaItem;
+  url: string;
 };
 
 const SORT_OPTIONS: Array<{ id: SortKey; label: string }> = [
@@ -286,10 +300,9 @@ export function PhoneSyncSpaceGlobalScreen() {
   const [items, setItems] = useState<ReceivedLibraryMediaItem[]>([]);
   const [sortBy, setSortBy] = useState<SortKey>('time');
   const [showSortSheet, setShowSortSheet] = useState(false);
-  const [previewItem, setPreviewItem] = useState<ReceivedLibraryMediaItem | null>(
-    null,
-  );
+  const [preview, setPreview] = useState<ReceivedPreviewState | null>(null);
   const [binding, setBinding] = useState<BindingStateDTO | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -336,6 +349,114 @@ export function PhoneSyncSpaceGlobalScreen() {
     navigation.reset({ index: 0, routes: [{ name: 'SharedFiles' }] });
   }, [navigation]);
 
+  const handleDownload = useCallback(
+    async (item: ReceivedLibraryMediaItem) => {
+      if (downloadingId) return;
+      setDownloadingId(item.resourceId);
+      try {
+        const { NativeSyncEngine } = NativeModules;
+        const bindingState = await NativeSyncEngine?.getBindingState();
+        if (!bindingState || !bindingState.host) {
+          Alert.alert(t('sharedFiles.deviceUnavailable.title') || '设备不可用');
+          return;
+        }
+        const desktop: DesktopInfo = { host: bindingState.host, port: SIDECAR_HTTP_PORT };
+        const result = await downloadResourceForGlobal(
+          desktop,
+          item.resourceId,
+          item.filename || item.displayName,
+          item.mediaType,
+        );
+        if (!isDownloadSavedLocally(result)) {
+          Alert.alert(
+            '暂不支持保存',
+            '当前版本还没有接入客户端本地保存能力，请等待后续版本。',
+          );
+          return;
+        }
+        await recordDownloadedFile({
+          resourceId: item.resourceId,
+          filename: item.filename || item.displayName,
+          fileSize: item.fileSize,
+          mediaType: item.mediaType,
+          localPath: result.localPath,
+          savedToPhotos: result.savedToPhotos,
+        });
+        Alert.alert(
+          t('sharedFiles.dialogs.downloadComplete') || '下載完成',
+          result.savedToPhotos
+            ? `${item.filename || item.displayName} 已儲存至相簿`
+            : `${item.filename || item.displayName} 已保存至 ${
+                result.savedLocation ?? result.localPath
+              }`,
+        );
+      } catch (err) {
+        console.warn('[PhoneSyncSpaceGlobalScreen] Download failed:', err);
+        Alert.alert(
+          t('sharedFiles.dialogs.downloadFailed') || '下載失敗',
+          t('sharedFiles.dialogs.downloadFailedMessage') || '無法下載檔案，請稍後重試',
+        );
+      } finally {
+        setDownloadingId(null);
+      }
+    },
+    [downloadingId, t],
+  );
+
+  const handleOpenReceivedItem = useCallback(
+    async (item: ReceivedLibraryMediaItem) => {
+      const filename = getReceivedFileTitle(item);
+      const image = isImageFile(item.mediaType, filename);
+      const video = isVideoFile(item.mediaType, filename);
+
+      try {
+        const existingPreviewUrl = video
+          ? item.streamUrl || item.previewUrl
+          : item.previewUrl || item.thumbnailUrl;
+        if ((image || video) && existingPreviewUrl) {
+          setPreview({ item, url: existingPreviewUrl });
+          return;
+        }
+
+        const { NativeSyncEngine } = NativeModules;
+        const bindingState = await NativeSyncEngine?.getBindingState();
+        if (!bindingState || !bindingState.host) {
+          Alert.alert(t('sharedFiles.deviceUnavailable.title') || '設備不可用');
+          return;
+        }
+
+        const desktop: DesktopInfo = {
+          host: bindingState.host,
+          port: SIDECAR_HTTP_PORT,
+        };
+
+        if (image || video) {
+          const url = await getResourcePreviewUrl(desktop, item.resourceId);
+          setPreview({ item, url });
+          return;
+        }
+
+        const localPath = await prepareResourcePreview(
+          desktop,
+          item.resourceId,
+          filename,
+        );
+        await viewDocument({
+          uri: localPath,
+          headerTitle: filename,
+          mimeType: documentMimeType(filename),
+        });
+      } catch (err) {
+        console.warn('[PhoneSyncSpaceGlobalScreen] Preview failed:', err);
+        Alert.alert(
+          t('sharedFiles.dialogs.previewFailed') || '預覽失敗',
+          t('sharedFiles.dialogs.previewFailedMessage') || '無法取得檔案預覽',
+        );
+      }
+    },
+    [t],
+  );
+
   const sortedItems = useMemo(() => {
     return [...items].sort((a, b) => {
       if (sortBy === 'name') {
@@ -375,19 +496,14 @@ export function PhoneSyncSpaceGlobalScreen() {
     const displayName = getReceivedFileTitle(item);
     const fileType = getFileTypeText(item.mediaType, item.filename);
     const clock = formatClock(item.completedAt);
-
-    const looksLikeDesktopId =
-      item.desktopDeviceId &&
-      (item.desktopDeviceId === binding?.deviceId ||
-        item.desktopDeviceId.includes('-') ||
-        item.desktopDeviceId.length > 12);
-    const desktopName =
-      binding && looksLikeDesktopId
-        ? binding.deviceAlias || binding.deviceName || '已同步的电脑'
-        : item.desktopDeviceId || '未知设备';
+    const isDownloading = downloadingId === item.resourceId;
 
     return (
-      <View style={styles.card}>
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.75}
+        onPress={() => handleOpenReceivedItem(item)}
+      >
         <ReceivedMediaThumbnail item={item} iconType={iconType} />
         <View style={styles.infoWrapper}>
           <Text style={styles.filename} numberOfLines={1}>
@@ -397,19 +513,11 @@ export function PhoneSyncSpaceGlobalScreen() {
             {`${fileType} · ${formatBytes(item.fileSize)}${clock ? ` · ${clock}` : ''}`}
           </Text>
         </View>
-        <View style={styles.rightWrapper}>
-          <Text style={styles.deviceText} numberOfLines={1}>
-            {desktopName}
-          </Text>
-          {item.shareStatus === 'missing' && (
-            <Text style={styles.missingText}>仅电脑端存在</Text>
-          )}
-        </View>
         <TouchableOpacity
           style={styles.previewButton}
           accessibilityRole="button"
           accessibilityLabel="预览已同步文件"
-          onPress={() => setPreviewItem(item)}
+          onPress={() => handleOpenReceivedItem(item)}
           activeOpacity={0.72}
         >
           <Eye
@@ -419,7 +527,30 @@ export function PhoneSyncSpaceGlobalScreen() {
             strokeWidth={2}
           />
         </TouchableOpacity>
-      </View>
+        <TouchableOpacity
+          style={[styles.downloadButton, isDownloading && styles.downloadButtonDisabled]}
+          accessibilityRole="button"
+          accessibilityLabel="下载已同步文件"
+          disabled={isDownloading || downloadingId !== null}
+          onPress={() => handleDownload(item)}
+          activeOpacity={0.72}
+        >
+          {isDownloading ? (
+            <ActivityIndicator
+              testID="phone-sync-download-icon"
+              size="small"
+              color={colors.primary}
+            />
+          ) : (
+            <Download
+              testID="phone-sync-download-icon"
+              size={16}
+              color={colors.primary}
+              strokeWidth={2}
+            />
+          )}
+        </TouchableOpacity>
+      </TouchableOpacity>
     );
   };
 
@@ -521,8 +652,8 @@ export function PhoneSyncSpaceGlobalScreen() {
         }}
       />
       <ReceivedMediaPreviewModal
-        item={previewItem}
-        onClose={() => setPreviewItem(null)}
+        preview={preview}
+        onClose={() => setPreview(null)}
       />
     </GlobalGradientBackground>
   );
@@ -760,27 +891,25 @@ function SortSheet({
 }
 
 function ReceivedMediaPreviewModal({
-  item,
+  preview,
   onClose,
 }: {
-  item: ReceivedLibraryMediaItem | null;
+  preview: ReceivedPreviewState | null;
   onClose: () => void;
 }) {
-  if (!item) return null;
+  if (!preview) return null;
 
+  const { item } = preview;
   const displayName = getReceivedFileTitle(item);
   const imagePreview = isImage(item.mediaType, item.filename);
   const videoPreview = isVideo(item.mediaType, item.filename);
-  const previewUri = videoPreview
-    ? item.streamUrl || item.previewUrl
-    : item.previewUrl || item.thumbnailUrl;
 
   return (
     <Modal
       animationType="fade"
       presentationStyle="fullScreen"
       statusBarTranslucent
-      visible={item != null}
+      visible={preview != null}
       onRequestClose={onClose}
     >
       <View style={styles.mediaPreviewModalRoot}>
@@ -800,18 +929,18 @@ function ReceivedMediaPreviewModal({
         </View>
 
         <View style={styles.mediaPreviewBody}>
-          {previewUri && imagePreview ? (
+          {imagePreview ? (
             <Image
               testID="phone-sync-preview-image"
-              source={{ uri: previewUri }}
+              source={{ uri: preview.url }}
               style={styles.mediaPreviewFullMedia}
               resizeMode="contain"
             />
           ) : null}
-          {previewUri && videoPreview ? (
+          {videoPreview ? (
             <Video
               testID="phone-sync-preview-video"
-              source={{ uri: previewUri }}
+              source={{ uri: preview.url }}
               style={styles.mediaPreviewFullMedia}
               resizeMode="contain"
               controls
@@ -822,7 +951,7 @@ function ReceivedMediaPreviewModal({
               ignoreSilentSwitch="ignore"
             />
           ) : null}
-          {!previewUri || (!imagePreview && !videoPreview) ? (
+          {!imagePreview && !videoPreview ? (
             <View style={styles.mediaPreviewErrorBox}>
               <Text style={styles.mediaPreviewErrorText}>
                 无法加载预览，请确认电脑在线且文件仍存在。
@@ -1125,6 +1254,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.64)',
+    marginRight: 6,
+  },
+  downloadButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.64)',
+  },
+  downloadButtonDisabled: {
+    opacity: 0.5,
   },
   centeredCard: {
     borderRadius: 16,

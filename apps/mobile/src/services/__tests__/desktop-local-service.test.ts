@@ -3,11 +3,13 @@ import { NativeModules } from 'react-native';
 import {
   downloadResource,
   downloadResourceForGlobal,
+  getResourcePreviewUrl,
   isDownloadSavedLocally,
   listCurrentClientReceivedLibrary,
   listReceivedLibrary,
   listSharedResources,
   listSharedFolderContents,
+  prepareResourcePreview,
   shareResources,
 } from '../desktop-local-service';
 import { getClientId } from '../SyncEngineModule';
@@ -387,6 +389,52 @@ describe('desktop-local-service', () => {
       '/cache/spec.pdf',
     ]);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('prepares a normal remote resource for system preview through the share cache', async () => {
+    mockDownloadUrlToShareCache.mockResolvedValueOnce('/cache/report.pdf');
+
+    await expect(
+      prepareResourcePreview(
+        { host: '192.168.10.20', port: 39394 },
+        'resource-1',
+        'report.pdf',
+      ),
+    ).resolves.toBe('/cache/report.pdf');
+
+    expect(mockDownloadUrlToShareCache).toHaveBeenCalledWith(
+      'http://192.168.10.20:39394/resources/mobile/download/resource-1?clientId=client-001&clientName=Alice%20iPhone',
+      'report.pdf',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('prepares a shared-folder entry for system preview with the nested path preserved', async () => {
+    mockDownloadUrlToShareCache.mockResolvedValueOnce('/cache/june-plan.pdf');
+
+    await expect(
+      prepareResourcePreview(
+        { host: '192.168.10.20', port: 39394 },
+        'shared-folder-entry:folder-1:Specs/June Plan.pdf',
+        'June Plan.pdf',
+      ),
+    ).resolves.toBe('/cache/june-plan.pdf');
+
+    expect(mockDownloadUrlToShareCache).toHaveBeenCalledWith(
+      'http://192.168.10.20:39394/resources/mobile/download/folder-1?path=Specs%2FJune%20Plan.pdf&clientId=client-001&clientName=Alice%20iPhone',
+      'June Plan.pdf',
+    );
+  });
+
+  it('returns a direct preview URL for fallback shared-directory resources', async () => {
+    await expect(
+      getResourcePreviewUrl(
+        { host: '192.168.10.20', port: 39394 },
+        'shared-dir:Reports/Quarterly%20Summary.pdf',
+      ),
+    ).resolves.toBe(
+      'http://192.168.10.20:39394/shared/download/Reports/Quarterly%20Summary.pdf',
+    );
   });
 
   it('detects whether a download result was actually saved locally', () => {

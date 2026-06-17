@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Modal,
   NativeModules,
   Pressable,
@@ -14,6 +15,7 @@ import {
   type ViewStyle,
   View,
 } from 'react-native';
+import { viewDocument } from '@react-native-documents/viewer';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -28,6 +30,7 @@ import {
   Rows3,
   Search,
 } from 'lucide-react-native';
+import Video from 'react-native-video';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import {
   SIDECAR_HTTP_PORT,
@@ -45,12 +48,15 @@ import { ModalBlurBackdrop } from '../components/shared/ModalBlurBackdrop';
 import {
   type DesktopInfo,
   downloadResourceForGlobal,
+  getResourcePreviewUrl,
   isDownloadSavedLocally,
   listSharedFolderContents,
   listSharedResources,
+  prepareResourcePreview,
   shareResources,
 } from '../services/desktop-local-service';
 import { recordDownloadedFile } from '../services/download-records-service';
+import { documentMimeType, isImageFile, isVideoFile } from '../utils/file-preview';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'RemoteAccess'>;
 type LayoutMode = 'list' | 'grid';
@@ -73,6 +79,10 @@ type RemoteResourceIconType = 'photo' | 'video' | 'file' | 'folder';
 type RemoteResourceGradientStop = {
   offset: string;
   color: string;
+};
+type RemoteResourcePreviewState = {
+  item: RemoteResourceItem;
+  url: string;
 };
 
 const SORT_OPTIONS: Array<{ id: SortKey; label: string }> = [
@@ -521,6 +531,8 @@ export function RemoteAccessGlobalScreen() {
   const [sharing, setSharing] = useState(false);
   const [showSortSheet, setShowSortSheet] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
+  const [resourcePreview, setResourcePreview] =
+    useState<RemoteResourcePreviewState | null>(null);
 
   const currentFolder = folderStack[folderStack.length - 1] ?? null;
 
@@ -749,6 +761,55 @@ export function RemoteAccessGlobalScreen() {
     [loadFolderContents, previewMode, resetSelection],
   );
 
+  const getBoundDesktop = useCallback(async (): Promise<DesktopInfo | null> => {
+    if (desktopEndpoint) return desktopEndpoint;
+    const { NativeSyncEngine } = NativeModules;
+    const binding = await NativeSyncEngine?.getBindingState();
+    if (!binding || !binding.host) return null;
+    return { host: binding.host, port: SIDECAR_HTTP_PORT };
+  }, [desktopEndpoint]);
+
+  const handleOpenFile = useCallback(
+    async (item: RemoteResourceItem) => {
+      if (isFolder(item)) return;
+
+      try {
+        const desktop = await getBoundDesktop();
+        if (!desktop) {
+          Alert.alert(t('sharedFiles.deviceUnavailable.title') || '設備不可用');
+          return;
+        }
+
+        if (
+          isImageFile(item.mediaType, item.displayName) ||
+          isVideoFile(item.mediaType, item.displayName)
+        ) {
+          const url = await getResourcePreviewUrl(desktop, item.resourceId);
+          setResourcePreview({ item, url });
+          return;
+        }
+
+        const localPath = await prepareResourcePreview(
+          desktop,
+          item.resourceId,
+          item.displayName,
+        );
+        await viewDocument({
+          uri: localPath,
+          headerTitle: item.displayName,
+          mimeType: documentMimeType(item.displayName),
+        });
+      } catch (err) {
+        console.warn('[RemoteAccessScreen] Preview failed:', err);
+        Alert.alert(
+          t('sharedFiles.dialogs.previewFailed') || '預覽失敗',
+          t('sharedFiles.dialogs.previewFailedMessage') || '無法取得檔案預覽',
+        );
+      }
+    },
+    [getBoundDesktop, t],
+  );
+
   const goBack = useCallback(() => {
     if (currentFolder) {
       setFolderStack(stack => stack.slice(0, -1));
@@ -849,6 +910,7 @@ export function RemoteAccessGlobalScreen() {
           item,
           downloadingId,
           onDownload: handleDownload,
+          onOpenFile: handleOpenFile,
           onOpenFolder: openFolder,
           onToggleSelection: toggleSelection,
           selected: selectedIds.includes(item.resourceId),
@@ -858,6 +920,7 @@ export function RemoteAccessGlobalScreen() {
           item,
           downloadingId,
           onDownload: handleDownload,
+          onOpenFile: handleOpenFile,
           onOpenFolder: openFolder,
           onToggleSelection: toggleSelection,
           selected: selectedIds.includes(item.resourceId),
@@ -1069,6 +1132,10 @@ export function RemoteAccessGlobalScreen() {
         selectedCount={selectedItems.length}
         onClose={() => setShowShareSheet(false)}
       />
+      <RemoteResourcePreviewModal
+        preview={resourcePreview}
+        onClose={() => setResourcePreview(null)}
+      />
     </GlobalGradientBackground>
   );
 }
@@ -1213,6 +1280,7 @@ function renderListItem({
   item,
   downloadingId,
   onDownload,
+  onOpenFile,
   onOpenFolder,
   onToggleSelection,
   selected,
@@ -1221,6 +1289,7 @@ function renderListItem({
   item: RemoteResourceItem;
   downloadingId: string | null;
   onDownload: (item: RemoteResourceItem) => void;
+  onOpenFile: (item: RemoteResourceItem) => void;
   onOpenFolder: (item: RemoteResourceItem) => void;
   onToggleSelection: (item: RemoteResourceItem) => void;
   selected: boolean;
@@ -1235,8 +1304,15 @@ function renderListItem({
       style={styles.card}
       activeOpacity={folder || selectionMode ? 0.7 : 1}
       onPress={() => {
-        if (folder) onOpenFolder(item);
-        if (!folder && selectionMode) onToggleSelection(item);
+        if (folder) {
+          onOpenFolder(item);
+          return;
+        }
+        if (selectionMode) {
+          onToggleSelection(item);
+          return;
+        }
+        onOpenFile(item);
       }}
     >
       <RemoteResourceTypeIcon type={iconType} style={styles.iconWrapper} />
@@ -1280,6 +1356,7 @@ function renderGridItem({
   item,
   downloadingId,
   onDownload,
+  onOpenFile,
   onOpenFolder,
   onToggleSelection,
   selected,
@@ -1288,6 +1365,7 @@ function renderGridItem({
   item: RemoteResourceItem;
   downloadingId: string | null;
   onDownload: (item: RemoteResourceItem) => void;
+  onOpenFile: (item: RemoteResourceItem) => void;
   onOpenFolder: (item: RemoteResourceItem) => void;
   onToggleSelection: (item: RemoteResourceItem) => void;
   selected: boolean;
@@ -1303,8 +1381,15 @@ function renderGridItem({
         style={styles.gridPreview}
         activeOpacity={folder || selectionMode ? 0.7 : 1}
         onPress={() => {
-          if (folder) onOpenFolder(item);
-          if (!folder && selectionMode) onToggleSelection(item);
+          if (folder) {
+            onOpenFolder(item);
+            return;
+          }
+          if (selectionMode) {
+            onToggleSelection(item);
+            return;
+          }
+          onOpenFile(item);
         }}
       >
         <RemoteResourceTypeIcon type={iconType} style={styles.gridIconWrapper} />
@@ -1337,6 +1422,65 @@ function renderGridItem({
         {folder ? getItemMeta(item) : formatBytes(item.fileSize ?? 0)}
       </Text>
     </View>
+  );
+}
+
+function RemoteResourcePreviewModal({
+  preview,
+  onClose,
+}: {
+  preview: RemoteResourcePreviewState | null;
+  onClose: () => void;
+}) {
+  if (!preview) return null;
+
+  const video = isVideoFile(preview.item.mediaType, preview.item.displayName);
+
+  return (
+    <Modal
+      animationType="fade"
+      presentationStyle="fullScreen"
+      statusBarTranslucent
+      visible={preview != null}
+      onRequestClose={onClose}
+    >
+      <View style={styles.mediaPreviewModalRoot}>
+        <View style={styles.mediaPreviewHeader}>
+          <Text style={styles.mediaPreviewTitle} numberOfLines={1}>
+            {preview.item.displayName}
+          </Text>
+          <TouchableOpacity
+            style={styles.mediaPreviewCloseButton}
+            accessibilityRole="button"
+            accessibilityLabel="关闭预览"
+            activeOpacity={0.7}
+            onPress={onClose}
+          >
+            <Icon name="close" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.mediaPreviewBody}>
+          {video ? (
+            <Video
+              testID="remote-resource-preview-video"
+              source={{ uri: preview.url }}
+              style={styles.mediaPreviewFullMedia}
+              resizeMode="contain"
+              controls
+              paused={false}
+              muted={false}
+            />
+          ) : (
+            <Image
+              testID="remote-resource-preview-image"
+              source={{ uri: preview.url }}
+              style={styles.mediaPreviewFullMedia}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -2109,6 +2253,44 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     color: colors.foreground,
+  },
+  mediaPreviewModalRoot: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  mediaPreviewHeader: {
+    minHeight: 86,
+    paddingHorizontal: 16,
+    paddingTop: 48,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  mediaPreviewTitle: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  mediaPreviewCloseButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  mediaPreviewBody: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mediaPreviewFullMedia: {
+    width: '100%',
+    height: '100%',
   },
   shareCard: {
     borderRadius: 22,
