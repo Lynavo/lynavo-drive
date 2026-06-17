@@ -290,6 +290,29 @@ async function receivedLibraryFileUrl(
   return buildReceivedMediaUrl(desktop, kind, clientId, clientName, fileKey);
 }
 
+function isReceivedDownloadEndpointUnavailableError(error: unknown): boolean {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : '';
+  return /\b(404|405|501)\b/i.test(message) || /page not found/i.test(message);
+}
+
+function receivedLibraryMediaDownloadFallbackKind(
+  item: ReceivedLibraryItemDTO,
+): 'preview' | 'stream' | null {
+  const filename = item.filename || item.displayName || '';
+  if (isVideoMedia(item.mediaType, filename)) {
+    return 'stream';
+  }
+  if (isImageMedia(item.mediaType, filename)) {
+    return 'preview';
+  }
+  return null;
+}
+
 function normalizeLocalDownloadResult(
   result: {
     savedToPhotos?: boolean;
@@ -533,11 +556,27 @@ export async function downloadReceivedLibraryItem(
     throw new Error('Native local download is not available');
   }
   const url = await receivedLibraryFileUrl(desktop, item, 'download');
-  const result = await NativeSyncEngine.downloadUrlToLocal(
-    url,
-    (item.filename || item.displayName || '').trim() || 'remote-file',
-    item.mediaType ?? null,
-  );
+  const filename =
+    (item.filename || item.displayName || '').trim() || 'remote-file';
+  const mediaType = item.mediaType ?? null;
+  let result;
+  try {
+    result = await NativeSyncEngine.downloadUrlToLocal(url, filename, mediaType);
+  } catch (error) {
+    const fallbackKind = receivedLibraryMediaDownloadFallbackKind(item);
+    if (
+      fallbackKind === null ||
+      !isReceivedDownloadEndpointUnavailableError(error)
+    ) {
+      throw error;
+    }
+    const fallbackUrl = await receivedLibraryFileUrl(desktop, item, fallbackKind);
+    result = await NativeSyncEngine.downloadUrlToLocal(
+      fallbackUrl,
+      filename,
+      mediaType,
+    );
+  }
   return normalizeLocalDownloadResult(result);
 }
 

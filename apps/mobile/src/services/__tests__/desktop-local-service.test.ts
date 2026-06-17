@@ -179,6 +179,121 @@ describe('desktop-local-service', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('falls back to received preview when a legacy desktop cannot download received images', async () => {
+    mockDownloadUrlToLocal
+      .mockRejectedValueOnce(new Error('HTTP 404: page not found'))
+      .mockResolvedValueOnce({
+        savedToPhotos: true,
+        localPath: 'ph://asset-002',
+        savedLocation: 'Photos',
+      });
+
+    await expect(
+      downloadReceivedLibraryItem(
+        { host: '192.168.10.20', port: 39394 },
+        {
+          resourceId: '',
+          desktopDeviceId: 'desktop-001',
+          clientId: 'client-001',
+          displayName: 'Alice iPhone',
+          fileKey: '2026/06/17/client-001-photo',
+          filename: 'IMG_0001.JPG',
+          mediaType: 'image',
+          fileSize: 2048,
+          completedAt: '2026-06-16T08:00:00.000Z',
+          shareStatus: 'not_shared',
+        },
+      ),
+    ).resolves.toEqual({
+      savedToPhotos: true,
+      localPath: 'ph://asset-002',
+      savedLocation: 'Photos',
+    });
+
+    expect(mockDownloadUrlToLocal).toHaveBeenNthCalledWith(
+      1,
+      'http://192.168.10.20:39394/resources/mobile/received/download?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fclient-001-photo',
+      'IMG_0001.JPG',
+      'image',
+    );
+    expect(mockDownloadUrlToLocal).toHaveBeenNthCalledWith(
+      2,
+      'http://192.168.10.20:39394/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fclient-001-photo',
+      'IMG_0001.JPG',
+      'image',
+    );
+  });
+
+  it('falls back to received stream when a legacy desktop cannot download received videos', async () => {
+    mockDownloadUrlToLocal
+      .mockRejectedValueOnce(new Error('HTTP 404: page not found'))
+      .mockResolvedValueOnce({
+        savedToPhotos: true,
+        localPath: 'ph://asset-003',
+        savedLocation: 'Photos',
+      });
+
+    await expect(
+      downloadReceivedLibraryItem(
+        { host: '192.168.10.20', port: 39394 },
+        {
+          resourceId: '',
+          desktopDeviceId: 'desktop-001',
+          clientId: 'client-001',
+          displayName: 'Alice iPhone',
+          fileKey: '2026/06/17/client-001-video',
+          filename: 'VID_0001.MOV',
+          mediaType: 'video',
+          fileSize: 4096,
+          completedAt: '2026-06-16T08:00:00.000Z',
+          shareStatus: 'not_shared',
+        },
+      ),
+    ).resolves.toEqual({
+      savedToPhotos: true,
+      localPath: 'ph://asset-003',
+      savedLocation: 'Photos',
+    });
+
+    expect(mockDownloadUrlToLocal).toHaveBeenNthCalledWith(
+      1,
+      'http://192.168.10.20:39394/resources/mobile/received/download?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fclient-001-video',
+      'VID_0001.MOV',
+      'video',
+    );
+    expect(mockDownloadUrlToLocal).toHaveBeenNthCalledWith(
+      2,
+      'http://192.168.10.20:39394/resources/mobile/received/stream?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fclient-001-video',
+      'VID_0001.MOV',
+      'video',
+    );
+  });
+
+  it('does not fall back for legacy received document downloads without a file endpoint', async () => {
+    const error = new Error('HTTP 404: page not found');
+    mockDownloadUrlToLocal.mockRejectedValueOnce(error);
+
+    await expect(
+      downloadReceivedLibraryItem(
+        { host: '192.168.10.20', port: 39394 },
+        {
+          resourceId: '',
+          desktopDeviceId: 'desktop-001',
+          clientId: 'client-001',
+          displayName: 'Alice iPhone',
+          fileKey: '2026/06/17/client-001-doc',
+          filename: 'notes.txt',
+          mediaType: 'document',
+          fileSize: 512,
+          completedAt: '2026-06-16T08:00:00.000Z',
+          shareStatus: 'not_shared',
+        },
+      ),
+    ).rejects.toThrow(error);
+
+    expect(mockDownloadUrlToLocal).toHaveBeenCalledTimes(1);
+  });
+
   it('lists a shared folder with encoded nested path segments', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
