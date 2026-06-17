@@ -2589,6 +2589,127 @@ func TestPersonalListUsesConfiguredPersonalSharePathInsteadOfReceivePath(t *test
 	}
 }
 
+func TestPersonalDownloadServesRegularDocumentFile(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	personalRoot := filepath.Join(t.TempDir(), "Personal Share")
+	cfg.PersonalShareDir = personalRoot
+	if err := os.MkdirAll(personalRoot, 0o755); err != nil {
+		t.Fatalf("mkdir personal share dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(personalRoot, "notes.txt"), []byte("personal notes"), 0o644); err != nil {
+		t.Fatalf("write personal file: %v", err)
+	}
+	authSrv := profileAuthServer(t, "account-1")
+	defer authSrv.Close()
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1","iceServers":[]}`
+	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("POST /tunnel/credentials: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/personal/download/notes.txt", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
+
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /personal/download/notes.txt: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d body=%s", resp.StatusCode, string(body))
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	if string(body) != "personal notes" {
+		t.Fatalf("download body=%q, want personal notes", string(body))
+	}
+}
+
+func TestPersonalListSkipsSymlinkEscapingPersonalRoot(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	personalRoot := filepath.Join(t.TempDir(), "Personal Share")
+	outsideRoot := t.TempDir()
+	cfg.PersonalShareDir = personalRoot
+	if err := os.MkdirAll(personalRoot, 0o755); err != nil {
+		t.Fatalf("mkdir personal share dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(personalRoot, "notes.txt"), []byte("personal"), 0o644); err != nil {
+		t.Fatalf("write personal file: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(outsideRoot, "external.txt"), []byte("outside"), 0o644); err != nil {
+		t.Fatalf("write external file: %v", err)
+	}
+	if err := os.Symlink(filepath.Join(outsideRoot, "external.txt"), filepath.Join(personalRoot, "external-link.txt")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	authSrv := profileAuthServer(t, "account-1")
+	defer authSrv.Close()
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1","iceServers":[]}`
+	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("POST /tunnel/credentials: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/personal/list", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
+
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /personal/list: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var body struct {
+		Files []struct {
+			Path string `json:"path"`
+		} `json:"files"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	paths := map[string]bool{}
+	for _, file := range body.Files {
+		paths[file.Path] = true
+	}
+	if !paths["notes.txt"] {
+		t.Fatalf("expected regular personal file, got %+v", body.Files)
+	}
+	if paths["external-link.txt"] {
+		t.Fatalf("personal listing exposed escaping symlink: %+v", body.Files)
+	}
+}
+
 func TestPersonalListRejectsEscapes(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	personalDir := cfg.PersonalDir()

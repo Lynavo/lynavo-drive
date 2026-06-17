@@ -193,11 +193,6 @@ func (s *Server) listDirectory(
 			continue
 		}
 
-		eInfo, err := e.Info()
-		if err != nil {
-			continue
-		}
-
 		filePath := relPath
 		if filePath == "" {
 			filePath = e.Name()
@@ -205,8 +200,17 @@ func (s *Server) listDirectory(
 			filePath = filePath + "/" + e.Name()
 		}
 
+		resolvedEntry, err := resolvePath(filePath)
+		if err != nil {
+			continue
+		}
+		entryInfo, err := os.Stat(resolvedEntry)
+		if err != nil {
+			continue
+		}
+
 		fileType := classifyFileType(e.Name())
-		if e.IsDir() {
+		if entryInfo.IsDir() {
 			fileType = "other"
 		}
 
@@ -220,10 +224,10 @@ func (s *Server) listDirectory(
 			Name:         e.Name(),
 			Path:         filePath,
 			Type:         fileType,
-			Size:         eInfo.Size(),
-			ModifiedAt:   eInfo.ModTime().UTC().Format(time.RFC3339),
+			Size:         entryInfo.Size(),
+			ModifiedAt:   entryInfo.ModTime().UTC().Format(time.RFC3339),
 			ThumbnailURL: thumbURL,
-			IsDirectory:  e.IsDir(),
+			IsDirectory:  entryInfo.IsDir(),
 		})
 	}
 
