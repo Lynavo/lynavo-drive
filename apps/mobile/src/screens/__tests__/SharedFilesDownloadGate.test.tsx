@@ -163,13 +163,19 @@ jest.mock('../../dev/visualQa', () => ({
 jest.mock('../../services/desktop-local-service', () => ({
   listSharedResources: jest.fn(),
   listSharedFolderContents: jest.fn(),
+  listGlobalRemoteAccessResources: jest.fn(),
+  listGlobalRemoteAccessFolderContents: jest.fn(),
   listReceivedLibrary: jest.fn(),
   listCurrentClientReceivedLibrary: jest.fn(),
   downloadResource: jest.fn(),
   downloadResourceForGlobal: jest.fn(),
+  downloadGlobalRemoteAccessResource: jest.fn(),
   getResourcePreviewUrl: jest.fn(),
+  getGlobalRemoteAccessPreviewUrl: jest.fn(),
   prepareResourcePreview: jest.fn(),
+  prepareGlobalRemoteAccessPreview: jest.fn(),
   shareResources: jest.fn(),
+  shareGlobalRemoteAccessResources: jest.fn(),
   isDownloadSavedLocally: jest.fn(
     (result: { savedToPhotos?: boolean; localPath?: string | null }) =>
       result.savedToPhotos === true ||
@@ -191,13 +197,19 @@ import { RemoteAccessScreen } from '../RemoteAccessScreen';
 import {
   listSharedResources,
   listSharedFolderContents,
+  listGlobalRemoteAccessResources,
+  listGlobalRemoteAccessFolderContents,
   listReceivedLibrary,
   listCurrentClientReceivedLibrary,
   downloadResource,
   downloadResourceForGlobal,
+  downloadGlobalRemoteAccessResource,
   getResourcePreviewUrl,
+  getGlobalRemoteAccessPreviewUrl,
   prepareResourcePreview,
+  prepareGlobalRemoteAccessPreview,
   shareResources,
+  shareGlobalRemoteAccessResources,
 } from '../../services/desktop-local-service';
 import { recordDownloadedFile } from '../../services/download-records-service';
 import { viewDocument } from '@react-native-documents/viewer';
@@ -208,14 +220,26 @@ import { PhoneSyncSpaceScreen } from '../PhoneSyncSpaceScreen';
 
 const mockListSharedResources = listSharedResources as jest.Mock;
 const mockListSharedFolderContents = listSharedFolderContents as jest.Mock;
+const mockListGlobalRemoteAccessResources =
+  listGlobalRemoteAccessResources as jest.Mock;
+const mockListGlobalRemoteAccessFolderContents =
+  listGlobalRemoteAccessFolderContents as jest.Mock;
 const mockListReceivedLibrary = listReceivedLibrary as jest.Mock;
 const mockListCurrentClientReceivedLibrary =
   listCurrentClientReceivedLibrary as jest.Mock;
 const mockDownloadResource = downloadResource as jest.Mock;
 const mockDownloadResourceForGlobal = downloadResourceForGlobal as jest.Mock;
+const mockDownloadGlobalRemoteAccessResource =
+  downloadGlobalRemoteAccessResource as jest.Mock;
 const mockGetResourcePreviewUrl = getResourcePreviewUrl as jest.Mock;
+const mockGetGlobalRemoteAccessPreviewUrl =
+  getGlobalRemoteAccessPreviewUrl as jest.Mock;
 const mockPrepareResourcePreview = prepareResourcePreview as jest.Mock;
+const mockPrepareGlobalRemoteAccessPreview =
+  prepareGlobalRemoteAccessPreview as jest.Mock;
 const mockShareResources = shareResources as jest.Mock;
+const mockShareGlobalRemoteAccessResources =
+  shareGlobalRemoteAccessResources as jest.Mock;
 const mockRecordDownloadedFile = recordDownloadedFile as jest.Mock;
 const mockViewDocument = viewDocument as jest.Mock;
 
@@ -333,7 +357,7 @@ describe('RemoteAccessGlobalScreen', () => {
 
   it('keeps an empty real response empty unless the remote preview gate is explicit', async () => {
     mockVisualQaEnabled = true;
-    mockListSharedResources.mockResolvedValueOnce([]);
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([]);
 
     const { getByTestId, getByText, queryByText } = render(
       <TestErrorBoundary>
@@ -342,10 +366,7 @@ describe('RemoteAccessGlobalScreen', () => {
     );
 
     await waitFor(() => {
-      expect(mockListSharedResources).toHaveBeenCalledWith({
-        host: '192.168.1.100',
-        port: 39394,
-      });
+      expect(mockListGlobalRemoteAccessResources).toHaveBeenCalledWith();
     });
 
     await waitFor(() => {
@@ -364,7 +385,7 @@ describe('RemoteAccessGlobalScreen', () => {
       host: '192.168.1.100',
       connectionState: 'connected',
     });
-    mockListSharedResources.mockResolvedValueOnce([]);
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([]);
 
     const { getByText, queryByText } = render(
       <TestErrorBoundary>
@@ -379,9 +400,9 @@ describe('RemoteAccessGlobalScreen', () => {
   });
 
   it('loads real shared folder contents when a production folder is opened', async () => {
-    mockListSharedResources.mockResolvedValueOnce([
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([
       {
-        resourceId: 'res-folder',
+        resourceId: 'personal-dir:Project%20Files',
         desktopDeviceId: 'desktop-device-id',
         displayName: 'Project Files',
         kind: 'shared_folder',
@@ -390,7 +411,7 @@ describe('RemoteAccessGlobalScreen', () => {
         downloadCount: 0,
       },
     ]);
-    mockListSharedFolderContents.mockResolvedValueOnce({
+    mockListGlobalRemoteAccessFolderContents.mockResolvedValueOnce({
       path: '',
       files: [
         {
@@ -427,9 +448,8 @@ describe('RemoteAccessGlobalScreen', () => {
     });
 
     await waitFor(() => {
-      expect(mockListSharedFolderContents).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
-        'res-folder',
+      expect(mockListGlobalRemoteAccessFolderContents).toHaveBeenCalledWith(
+        'personal-dir:Project%20Files',
         '',
       );
       expect(getByText('Contracts')).toBeTruthy();
@@ -438,7 +458,7 @@ describe('RemoteAccessGlobalScreen', () => {
   });
 
   it('renders the reference-style media type icons in the global remote access list', async () => {
-    mockListSharedResources.mockResolvedValueOnce([
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([
       {
         resourceId: 'res-folder',
         desktopDeviceId: 'desktop-device-id',
@@ -498,7 +518,7 @@ describe('RemoteAccessGlobalScreen', () => {
   });
 
   it('uses reference lucide toolbar icons instead of Ionicons glyph mappings', async () => {
-    mockListSharedResources.mockResolvedValueOnce([]);
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([]);
 
     const { queryAllByTestId, queryByText } = render(
       <TestErrorBoundary>
@@ -553,9 +573,9 @@ describe('RemoteAccessGlobalScreen', () => {
 
   it('records a saved global remote download after native persistence succeeds', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    mockListSharedResources.mockResolvedValueOnce([
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([
       {
-        resourceId: 'res-1',
+        resourceId: 'personal-dir:alpha.jpg',
         desktopDeviceId: 'desktop-device-id',
         displayName: 'alpha.jpg',
         kind: 'shared_file',
@@ -566,7 +586,7 @@ describe('RemoteAccessGlobalScreen', () => {
         downloadCount: 0,
       },
     ]);
-    mockDownloadResourceForGlobal.mockResolvedValueOnce({
+    mockDownloadGlobalRemoteAccessResource.mockResolvedValueOnce({
       savedToPhotos: false,
       localPath: '/local/alpha.jpg',
     });
@@ -584,15 +604,12 @@ describe('RemoteAccessGlobalScreen', () => {
     fireEvent.press(getByText('download-outline'));
 
     await waitFor(() => {
-      expect(mockDownloadResourceForGlobal).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
-        'res-1',
-        'alpha.jpg',
-        'image',
+      expect(mockDownloadGlobalRemoteAccessResource).toHaveBeenCalledWith(
+        'personal-dir:alpha.jpg',
       );
     });
     expect(mockRecordDownloadedFile).toHaveBeenCalledWith({
-      resourceId: 'res-1',
+      resourceId: 'personal-dir:alpha.jpg',
       filename: 'alpha.jpg',
       fileSize: 1024,
       mediaType: 'image',
@@ -608,9 +625,9 @@ describe('RemoteAccessGlobalScreen', () => {
   });
 
   it('runs the global download gate for every selected file instead of only the first selection', async () => {
-    mockListSharedResources.mockResolvedValueOnce([
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([
       {
-        resourceId: 'res-1',
+        resourceId: 'personal-dir:alpha.jpg',
         desktopDeviceId: 'desktop-device-id',
         displayName: 'alpha.jpg',
         kind: 'shared_file',
@@ -621,7 +638,7 @@ describe('RemoteAccessGlobalScreen', () => {
         downloadCount: 0,
       },
       {
-        resourceId: 'res-2',
+        resourceId: 'personal-dir:beta.mov',
         desktopDeviceId: 'desktop-device-id',
         displayName: 'beta.mov',
         kind: 'shared_file',
@@ -632,7 +649,7 @@ describe('RemoteAccessGlobalScreen', () => {
         downloadCount: 0,
       },
     ]);
-    mockDownloadResourceForGlobal.mockResolvedValue({
+    mockDownloadGlobalRemoteAccessResource.mockResolvedValue({
       savedToPhotos: false,
       localPath: null,
     });
@@ -654,28 +671,22 @@ describe('RemoteAccessGlobalScreen', () => {
     fireEvent.press(getByText('下载'));
 
     await waitFor(() => {
-      expect(mockDownloadResourceForGlobal).toHaveBeenCalledTimes(2);
+      expect(mockDownloadGlobalRemoteAccessResource).toHaveBeenCalledTimes(2);
     });
-    expect(mockDownloadResourceForGlobal).toHaveBeenNthCalledWith(
+    expect(mockDownloadGlobalRemoteAccessResource).toHaveBeenNthCalledWith(
       1,
-      { host: '192.168.1.100', port: 39394 },
-      'res-1',
-      'alpha.jpg',
-      'image',
+      'personal-dir:alpha.jpg',
     );
-    expect(mockDownloadResourceForGlobal).toHaveBeenNthCalledWith(
+    expect(mockDownloadGlobalRemoteAccessResource).toHaveBeenNthCalledWith(
       2,
-      { host: '192.168.1.100', port: 39394 },
-      'res-2',
-      'beta.mov',
-      'video',
+      'personal-dir:beta.mov',
     );
   });
 
   it('opens the system share flow for selected global remote files', async () => {
-    mockListSharedResources.mockResolvedValueOnce([
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([
       {
-        resourceId: 'res-1',
+        resourceId: 'personal-dir:alpha.jpg',
         desktopDeviceId: 'desktop-device-id',
         displayName: 'alpha.jpg',
         kind: 'shared_file',
@@ -686,7 +697,7 @@ describe('RemoteAccessGlobalScreen', () => {
         downloadCount: 0,
       },
     ]);
-    mockShareResources.mockResolvedValueOnce(undefined);
+    mockShareGlobalRemoteAccessResources.mockResolvedValueOnce(undefined);
 
     const { getByText } = render(
       <TestErrorBoundary>
@@ -703,17 +714,16 @@ describe('RemoteAccessGlobalScreen', () => {
     fireEvent.press(getByText('分享'));
 
     await waitFor(() => {
-      expect(mockShareResources).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
-        [{ resourceId: 'res-1', displayName: 'alpha.jpg' }],
-      );
+      expect(mockShareGlobalRemoteAccessResources).toHaveBeenCalledWith([
+        { resourceId: 'personal-dir:alpha.jpg', displayName: 'alpha.jpg' },
+      ]);
     });
   });
 
   it('opens a global remote document with the system preview viewer', async () => {
-    mockListSharedResources.mockResolvedValueOnce([
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([
       {
-        resourceId: 'res-doc',
+        resourceId: 'personal-dir:manual.pdf',
         desktopDeviceId: 'desktop-device-id',
         displayName: 'manual.pdf',
         kind: 'shared_file',
@@ -724,7 +734,7 @@ describe('RemoteAccessGlobalScreen', () => {
         downloadCount: 0,
       },
     ]);
-    mockPrepareResourcePreview.mockResolvedValueOnce('/cache/manual.pdf');
+    mockPrepareGlobalRemoteAccessPreview.mockResolvedValueOnce('/cache/manual.pdf');
     mockViewDocument.mockResolvedValueOnce(undefined);
 
     const { getByText } = render(
@@ -740,9 +750,8 @@ describe('RemoteAccessGlobalScreen', () => {
     fireEvent.press(getByText('manual.pdf'));
 
     await waitFor(() => {
-      expect(mockPrepareResourcePreview).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
-        'res-doc',
+      expect(mockPrepareGlobalRemoteAccessPreview).toHaveBeenCalledWith(
+        'personal-dir:manual.pdf',
         'manual.pdf',
       );
     });
@@ -754,9 +763,9 @@ describe('RemoteAccessGlobalScreen', () => {
   });
 
   it('opens a global remote image inside the app preview instead of the system viewer', async () => {
-    mockListSharedResources.mockResolvedValueOnce([
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([
       {
-        resourceId: 'res-image',
+        resourceId: 'personal-dir:cover.png',
         desktopDeviceId: 'desktop-device-id',
         displayName: 'cover.png',
         kind: 'shared_file',
@@ -767,8 +776,8 @@ describe('RemoteAccessGlobalScreen', () => {
         downloadCount: 0,
       },
     ]);
-    mockGetResourcePreviewUrl.mockResolvedValueOnce(
-      'http://192.168.1.100:39394/resources/mobile/download/res-image',
+    mockGetGlobalRemoteAccessPreviewUrl.mockResolvedValueOnce(
+      'http://192.168.1.100:39394/personal/stream/cover.png',
     );
 
     const { getByTestId, getByText } = render(
@@ -784,13 +793,12 @@ describe('RemoteAccessGlobalScreen', () => {
     fireEvent.press(getByText('cover.png'));
 
     await waitFor(() => {
-      expect(mockGetResourcePreviewUrl).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
-        'res-image',
+      expect(mockGetGlobalRemoteAccessPreviewUrl).toHaveBeenCalledWith(
+        'personal-dir:cover.png',
       );
       expect(getByTestId('remote-resource-preview-image')).toBeTruthy();
     });
-    expect(mockPrepareResourcePreview).not.toHaveBeenCalled();
+    expect(mockPrepareGlobalRemoteAccessPreview).not.toHaveBeenCalled();
     expect(mockViewDocument).not.toHaveBeenCalled();
   });
 });

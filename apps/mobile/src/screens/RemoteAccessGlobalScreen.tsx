@@ -33,7 +33,6 @@ import {
 import Video from 'react-native-video';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import {
-  SIDECAR_HTTP_PORT,
   type BindingStateDTO,
   type DirectoryFileDTO,
   type DesktopSharedResourceDTO,
@@ -46,14 +45,13 @@ import { Icon } from '../components/Icon';
 import { GlobalGradientBackground } from '../components/GlobalGradientBackground';
 import { ModalBlurBackdrop } from '../components/shared/ModalBlurBackdrop';
 import {
-  type DesktopInfo,
-  downloadResourceForGlobal,
-  getResourcePreviewUrl,
+  downloadGlobalRemoteAccessResource,
+  getGlobalRemoteAccessPreviewUrl,
   isDownloadSavedLocally,
-  listSharedFolderContents,
-  listSharedResources,
-  prepareResourcePreview,
-  shareResources,
+  listGlobalRemoteAccessFolderContents,
+  listGlobalRemoteAccessResources,
+  prepareGlobalRemoteAccessPreview,
+  shareGlobalRemoteAccessResources,
 } from '../services/desktop-local-service';
 import { recordDownloadedFile } from '../services/download-records-service';
 import { documentMimeType, isImageFile, isVideoFile } from '../utils/file-preview';
@@ -454,20 +452,29 @@ function getModifiedLabel(modifiedAt: string) {
   return `上次修改时间 ${Math.floor(diffMs / dayMs)}天前`;
 }
 
+function personalDirectoryResourceId(path: string) {
+  const encodedPath = path
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\/+|\/+$/g, '')
+    .split('/')
+    .filter(segment => segment.trim().length > 0)
+    .map(segment => encodeURIComponent(segment))
+    .join('/');
+  return `personal-dir:${encodedPath}`;
+}
+
 function directoryFileToResourceItem({
   file,
-  folder,
   desktopDisplayName,
 }: {
   file: DirectoryFileDTO;
-  folder: FolderCrumb;
   desktopDisplayName: string | null;
 }): RemoteResourceItem {
-  const rootResourceId = folder.rootResourceId ?? folder.id;
-  const syntheticId = `shared-folder-entry:${rootResourceId}:${file.path}`;
+  const resourceId = personalDirectoryResourceId(file.path);
   const mediaType = file.isDirectory || file.type === 'other' ? undefined : file.type;
   return {
-    resourceId: syntheticId,
+    resourceId,
     desktopDeviceId: desktopDisplayName ?? FALLBACK_DESKTOP_LABEL,
     kind: file.isDirectory ? 'shared_folder' : 'shared_file',
     displayName: file.name,
@@ -478,8 +485,8 @@ function directoryFileToResourceItem({
     downloadCount: 0,
     countLabel: file.isDirectory ? '文件夹' : undefined,
     modifiedLabel: getModifiedLabel(file.modifiedAt),
-    sharedRootResourceId: rootResourceId,
-    relativePath: file.path,
+    sharedRootResourceId: file.isDirectory ? resourceId : undefined,
+    relativePath: '',
   };
 }
 
@@ -518,7 +525,6 @@ export function RemoteAccessGlobalScreen() {
   const [folderItemsByKey, setFolderItemsByKey] = useState<Record<string, RemoteResourceItem[]>>({});
   const [folderLoading, setFolderLoading] = useState(false);
   const [folderLoadError, setFolderLoadError] = useState(false);
-  const [desktopEndpoint, setDesktopEndpoint] = useState<DesktopInfo | null>(null);
   const [desktopDisplayName, setDesktopDisplayName] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
   const [folderStack, setFolderStack] = useState<FolderCrumb[]>([]);
@@ -541,7 +547,6 @@ export function RemoteAccessGlobalScreen() {
     setFolderLoadError(false);
     setFolderLoading(false);
     setFolderItemsByKey({});
-    setDesktopEndpoint(null);
     setDesktopDisplayName(null);
     try {
       const { NativeSyncEngine } = NativeModules;
@@ -567,9 +572,7 @@ export function RemoteAccessGlobalScreen() {
       );
       setDesktopDisplayName(bindingDisplayName);
 
-      const desktop = { host: binding.host, port: SIDECAR_HTTP_PORT };
-      setDesktopEndpoint(desktop);
-      const result = await listSharedResources(desktop);
+      const result = await listGlobalRemoteAccessResources();
       const remoteItems = result ?? [];
       setDesktopDisplayName(
         firstNonEmptyString(bindingDisplayName, getResourceDesktopDisplayName(remoteItems)),
@@ -601,7 +604,7 @@ export function RemoteAccessGlobalScreen() {
   const loadFolderContents = useCallback(
     async (folder: FolderCrumb) => {
       if (folder.preview || previewMode) return;
-      if (!desktopEndpoint || !folder.rootResourceId) {
+      if (!folder.rootResourceId) {
         setFolderLoadError(true);
         return;
       }
@@ -610,15 +613,13 @@ export function RemoteAccessGlobalScreen() {
       setFolderLoading(true);
       setFolderLoadError(false);
       try {
-        const listing = await listSharedFolderContents(
-          desktopEndpoint,
+        const listing = await listGlobalRemoteAccessFolderContents(
           folder.rootResourceId,
           folder.path,
         );
         const folderItems = listing.files.map(file =>
           directoryFileToResourceItem({
             file,
-            folder,
             desktopDisplayName,
           }),
         );
@@ -637,7 +638,7 @@ export function RemoteAccessGlobalScreen() {
         setFolderLoading(false);
       }
     },
-    [desktopDisplayName, desktopEndpoint, previewMode],
+    [desktopDisplayName, previewMode],
   );
 
   useFocusEffect(
@@ -666,13 +667,7 @@ export function RemoteAccessGlobalScreen() {
           return;
         }
 
-        const desktop = { host: binding.host, port: SIDECAR_HTTP_PORT };
-        const result = await downloadResourceForGlobal(
-          desktop,
-          item.resourceId,
-          item.displayName,
-          item.mediaType,
-        );
+        const result = await downloadGlobalRemoteAccessResource(item.resourceId);
         if (!isDownloadSavedLocally(result)) {
           Alert.alert(
             LOCAL_SAVE_UNSUPPORTED_TITLE,
@@ -761,21 +756,19 @@ export function RemoteAccessGlobalScreen() {
     [loadFolderContents, previewMode, resetSelection],
   );
 
-  const getBoundDesktop = useCallback(async (): Promise<DesktopInfo | null> => {
-    if (desktopEndpoint) return desktopEndpoint;
+  const isDesktopBound = useCallback(async (): Promise<boolean> => {
     const { NativeSyncEngine } = NativeModules;
     const binding = await NativeSyncEngine?.getBindingState();
-    if (!binding || !binding.host) return null;
-    return { host: binding.host, port: SIDECAR_HTTP_PORT };
-  }, [desktopEndpoint]);
+    return Boolean(binding?.host);
+  }, []);
 
   const handleOpenFile = useCallback(
     async (item: RemoteResourceItem) => {
       if (isFolder(item)) return;
 
       try {
-        const desktop = await getBoundDesktop();
-        if (!desktop) {
+        const bound = await isDesktopBound();
+        if (!bound) {
           Alert.alert(t('sharedFiles.deviceUnavailable.title') || '設備不可用');
           return;
         }
@@ -784,13 +777,12 @@ export function RemoteAccessGlobalScreen() {
           isImageFile(item.mediaType, item.displayName) ||
           isVideoFile(item.mediaType, item.displayName)
         ) {
-          const url = await getResourcePreviewUrl(desktop, item.resourceId);
+          const url = await getGlobalRemoteAccessPreviewUrl(item.resourceId);
           setResourcePreview({ item, url });
           return;
         }
 
-        const localPath = await prepareResourcePreview(
-          desktop,
+        const localPath = await prepareGlobalRemoteAccessPreview(
           item.resourceId,
           item.displayName,
         );
@@ -807,7 +799,7 @@ export function RemoteAccessGlobalScreen() {
         );
       }
     },
-    [getBoundDesktop, t],
+    [isDesktopBound, t],
   );
 
   const goBack = useCallback(() => {
@@ -862,8 +854,7 @@ export function RemoteAccessGlobalScreen() {
         return;
       }
 
-      await shareResources(
-        { host: binding.host, port: SIDECAR_HTTP_PORT },
+      await shareGlobalRemoteAccessResources(
         selectedItems.map(item => ({
           resourceId: item.resourceId,
           displayName: item.displayName,

@@ -1,18 +1,30 @@
 import { NativeModules } from 'react-native';
 
 import {
+  downloadGlobalRemoteAccessResource,
   downloadResource,
   downloadResourceForGlobal,
+  getGlobalRemoteAccessPreviewUrl,
   getResourcePreviewUrl,
   isDownloadSavedLocally,
+  listGlobalRemoteAccessFolderContents,
+  listGlobalRemoteAccessResources,
   listCurrentClientReceivedLibrary,
   listReceivedLibrary,
   listSharedResources,
   listSharedFolderContents,
+  prepareGlobalRemoteAccessPreview,
   prepareResourcePreview,
+  shareGlobalRemoteAccessResources,
   shareResources,
 } from '../desktop-local-service';
-import { getClientId } from '../SyncEngineModule';
+import {
+  browseDirectory,
+  downloadDirectoryFile,
+  getDirectoryFileStreamUrl,
+  getClientId,
+  prepareDirectoryFilePreview,
+} from '../SyncEngineModule';
 
 jest.mock('react-native', () => ({
   NativeModules: {
@@ -27,11 +39,29 @@ jest.mock('react-native', () => ({
 
 jest.mock('../SyncEngineModule', () => ({
   getClientId: jest.fn(),
+  browseDirectory: jest.fn(),
+  downloadDirectoryFile: jest.fn(),
+  getDirectoryFileStreamUrl: jest.fn(),
+  prepareDirectoryFilePreview: jest.fn(),
 }));
 
 const mockedGetClientId = getClientId as jest.MockedFunction<
   typeof getClientId
 >;
+const mockedBrowseDirectory = browseDirectory as jest.MockedFunction<
+  typeof browseDirectory
+>;
+const mockedDownloadDirectoryFile = downloadDirectoryFile as jest.MockedFunction<
+  typeof downloadDirectoryFile
+>;
+const mockedGetDirectoryFileStreamUrl =
+  getDirectoryFileStreamUrl as jest.MockedFunction<
+    typeof getDirectoryFileStreamUrl
+  >;
+const mockedPrepareDirectoryFilePreview =
+  prepareDirectoryFilePreview as jest.MockedFunction<
+    typeof prepareDirectoryFilePreview
+  >;
 const mockGetClientDisplayName = NativeModules.NativeSyncEngine
   ?.getClientDisplayName as jest.MockedFunction<() => Promise<string>>;
 const mockDownloadUrlToShareCache = NativeModules.NativeSyncEngine
@@ -435,6 +465,181 @@ describe('desktop-local-service', () => {
     ).resolves.toBe(
       'http://192.168.10.20:39394/shared/download/Reports/Quarterly%20Summary.pdf',
     );
+  });
+
+  it('lists global remote access from the desktop personal directory root', async () => {
+    mockedBrowseDirectory.mockResolvedValueOnce({
+      scope: 'personal',
+      path: '',
+      files: [
+        {
+          name: 'Desktop',
+          path: 'Desktop',
+          type: 'other',
+          size: 96,
+          modifiedAt: '2026-06-17T08:00:00.000Z',
+          isDirectory: true,
+        },
+        {
+          name: 'notes.txt',
+          path: 'notes.txt',
+          type: 'document',
+          size: 12,
+          modifiedAt: '2026-06-17T08:01:00.000Z',
+        },
+      ],
+      totalCount: 2,
+    });
+
+    await expect(listGlobalRemoteAccessResources()).resolves.toEqual([
+      {
+        resourceId: 'personal-dir:Desktop',
+        desktopDeviceId: 'personal-dir',
+        kind: 'shared_folder',
+        displayName: 'Desktop',
+        status: 'available',
+        fileSize: 96,
+        mediaType: 'other',
+        addedAt: '2026-06-17T08:00:00.000Z',
+        downloadCount: 0,
+      },
+      {
+        resourceId: 'personal-dir:notes.txt',
+        desktopDeviceId: 'personal-dir',
+        kind: 'shared_file',
+        displayName: 'notes.txt',
+        status: 'available',
+        fileSize: 12,
+        mediaType: 'document',
+        addedAt: '2026-06-17T08:01:00.000Z',
+        downloadCount: 0,
+      },
+    ]);
+    expect(mockedBrowseDirectory).toHaveBeenCalledWith('personal');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('lists global remote access folders through the desktop personal directory bridge', async () => {
+    mockedBrowseDirectory.mockResolvedValueOnce({
+      scope: 'personal',
+      path: 'Desktop/Projects',
+      files: [
+        {
+          name: 'brief.pdf',
+          path: 'Desktop/Projects/brief.pdf',
+          type: 'document',
+          size: 4096,
+          modifiedAt: '2026-06-17T09:00:00.000Z',
+        },
+      ],
+      totalCount: 1,
+    });
+
+    await expect(
+      listGlobalRemoteAccessFolderContents(
+        'personal-dir:Desktop',
+        'Projects',
+      ),
+    ).resolves.toEqual({
+      scope: 'personal',
+      path: 'Desktop/Projects',
+      files: [
+        {
+          name: 'brief.pdf',
+          path: 'Desktop/Projects/brief.pdf',
+          type: 'document',
+          size: 4096,
+          modifiedAt: '2026-06-17T09:00:00.000Z',
+        },
+      ],
+      totalCount: 1,
+    });
+    expect(mockedBrowseDirectory).toHaveBeenCalledWith(
+      'personal',
+      'Desktop/Projects',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('downloads and previews global remote access files through the personal directory bridge', async () => {
+    mockedDownloadDirectoryFile.mockResolvedValueOnce({
+      savedToPhotos: false,
+      localPath: '/downloads/notes.txt',
+      savedLocation: '/downloads/notes.txt',
+    });
+    mockedGetDirectoryFileStreamUrl.mockResolvedValueOnce(
+      'http://127.0.0.1:39394/personal/stream/Desktop/notes.txt',
+    );
+    mockedPrepareDirectoryFilePreview.mockResolvedValueOnce('/cache/notes.txt');
+
+    await expect(
+      downloadGlobalRemoteAccessResource('personal-dir:Desktop/notes.txt'),
+    ).resolves.toEqual({
+      savedToPhotos: false,
+      localPath: '/downloads/notes.txt',
+      savedLocation: '/downloads/notes.txt',
+    });
+    await expect(
+      getGlobalRemoteAccessPreviewUrl('personal-dir:Desktop/notes.txt'),
+    ).resolves.toBe(
+      'http://127.0.0.1:39394/personal/stream/Desktop/notes.txt',
+    );
+    await expect(
+      prepareGlobalRemoteAccessPreview(
+        'personal-dir:Desktop/notes.txt',
+        'notes.txt',
+      ),
+    ).resolves.toBe('/cache/notes.txt');
+
+    expect(mockedDownloadDirectoryFile).toHaveBeenCalledWith(
+      'personal',
+      'Desktop/notes.txt',
+    );
+    expect(mockedGetDirectoryFileStreamUrl).toHaveBeenCalledWith(
+      'personal',
+      'Desktop/notes.txt',
+    );
+    expect(mockedPrepareDirectoryFilePreview).toHaveBeenCalledWith(
+      'personal',
+      'Desktop/notes.txt',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('shares global remote access files through the personal directory preview cache', async () => {
+    mockedPrepareDirectoryFilePreview
+      .mockResolvedValueOnce('/cache/photo.jpg')
+      .mockResolvedValueOnce('/cache/report.pdf');
+    mockShareFiles.mockResolvedValueOnce(true);
+
+    await expect(
+      shareGlobalRemoteAccessResources([
+        {
+          resourceId: 'personal-dir:Pictures/photo.jpg',
+          displayName: 'photo.jpg',
+        },
+        {
+          resourceId: 'personal-dir:Documents/report.pdf',
+          displayName: 'report.pdf',
+        },
+      ]),
+    ).resolves.toBeUndefined();
+
+    expect(mockedPrepareDirectoryFilePreview).toHaveBeenNthCalledWith(
+      1,
+      'personal',
+      'Pictures/photo.jpg',
+    );
+    expect(mockedPrepareDirectoryFilePreview).toHaveBeenNthCalledWith(
+      2,
+      'personal',
+      'Documents/report.pdf',
+    );
+    expect(mockShareFiles).toHaveBeenCalledWith([
+      '/cache/photo.jpg',
+      '/cache/report.pdf',
+    ]);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('detects whether a download result was actually saved locally', () => {

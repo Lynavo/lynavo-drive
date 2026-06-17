@@ -2,11 +2,18 @@ import { NativeModules } from 'react-native';
 import type {
   DesktopSharedResourceDTO,
   DirectoryFileDTO,
+  DirectoryListingDTO,
   ReceivedLibraryItemDTO,
   DesktopSyncRecordDTO,
   SharedDirectoryDTO,
 } from '@syncflow/contracts';
-import { getClientId } from './SyncEngineModule';
+import {
+  browseDirectory,
+  downloadDirectoryFile,
+  getClientId,
+  getDirectoryFileStreamUrl,
+  prepareDirectoryFilePreview,
+} from './SyncEngineModule';
 
 const { NativeSyncEngine } = NativeModules;
 
@@ -35,6 +42,8 @@ export type ReceivedLibraryMediaItem = ReceivedLibraryItemDTO & {
 const SHARED_DIRECTORY_RESOURCE_PREFIX = 'shared-dir:';
 const SHARED_DIRECTORY_DESKTOP_ID = 'shared-dir';
 const SHARED_FOLDER_ENTRY_PREFIX = 'shared-folder-entry:';
+const PERSONAL_DIRECTORY_RESOURCE_PREFIX = 'personal-dir:';
+const PERSONAL_DIRECTORY_DESKTOP_ID = 'personal-dir';
 
 export function isDownloadSavedLocally(result: ResourceDownloadResult): boolean {
   return (
@@ -160,13 +169,29 @@ function isSharedDirectoryResourceId(resourceId: string): boolean {
   return resourceId.startsWith(SHARED_DIRECTORY_RESOURCE_PREFIX);
 }
 
+function isPersonalDirectoryResourceId(resourceId: string): boolean {
+  return resourceId.startsWith(PERSONAL_DIRECTORY_RESOURCE_PREFIX);
+}
+
 function getSharedDirectoryPathFromResourceId(resourceId: string): string {
   const encodedPath = resourceId.slice(SHARED_DIRECTORY_RESOURCE_PREFIX.length);
   return normalizeRemotePath(decodeRemotePath(encodedPath));
 }
 
+function getPersonalDirectoryPathFromResourceId(resourceId: string): string {
+  if (!isPersonalDirectoryResourceId(resourceId)) {
+    throw new Error('Invalid personal directory resource ID');
+  }
+  const encodedPath = resourceId.slice(PERSONAL_DIRECTORY_RESOURCE_PREFIX.length);
+  return normalizeRemotePath(decodeRemotePath(encodedPath));
+}
+
 function sharedDirectoryResourceId(path: string): string {
   return `${SHARED_DIRECTORY_RESOURCE_PREFIX}${encodeRemotePath(path)}`;
+}
+
+function personalDirectoryResourceId(path: string): string {
+  return `${PERSONAL_DIRECTORY_RESOURCE_PREFIX}${encodeRemotePath(path)}`;
 }
 
 function directoryFileToSharedResource(
@@ -175,6 +200,22 @@ function directoryFileToSharedResource(
   return {
     resourceId: sharedDirectoryResourceId(file.path),
     desktopDeviceId: SHARED_DIRECTORY_DESKTOP_ID,
+    kind: file.isDirectory ? 'shared_folder' : 'shared_file',
+    displayName: file.name,
+    status: 'available',
+    fileSize: file.size,
+    mediaType: file.type,
+    addedAt: file.modifiedAt,
+    downloadCount: 0,
+  };
+}
+
+function personalDirectoryFileToSharedResource(
+  file: DirectoryFileDTO,
+): DesktopSharedResourceDTO {
+  return {
+    resourceId: personalDirectoryResourceId(file.path),
+    desktopDeviceId: PERSONAL_DIRECTORY_DESKTOP_ID,
     kind: file.isDirectory ? 'shared_folder' : 'shared_file',
     displayName: file.name,
     status: 'available',
@@ -294,6 +335,13 @@ export async function listSharedResources(
   return sharedDirectory.files.map(directoryFileToSharedResource);
 }
 
+export async function listGlobalRemoteAccessResources(): Promise<
+  DesktopSharedResourceDTO[]
+> {
+  const listing = await browseDirectory('personal');
+  return listing.files.map(personalDirectoryFileToSharedResource);
+}
+
 export async function listSharedFolderContents(
   desktop: DesktopInfo,
   resourceId: string,
@@ -318,6 +366,14 @@ export async function listSharedFolderContents(
     throw new Error(`Failed to list shared folder contents: ${res.statusText}`);
   }
   return (await res.json()) as SharedDirectoryDTO;
+}
+
+export async function listGlobalRemoteAccessFolderContents(
+  resourceId: string,
+  path?: string,
+): Promise<DirectoryListingDTO> {
+  const rootPath = getPersonalDirectoryPathFromResourceId(resourceId);
+  return browseDirectory('personal', joinRemotePath(rootPath, path));
 }
 
 async function listReceivedLibraryWithScope(
@@ -425,6 +481,72 @@ export async function downloadResourceForGlobal(
         ? result.savedLocation
         : null,
   };
+}
+
+export async function downloadGlobalRemoteAccessResource(
+  resourceId: string,
+): Promise<ResourceDownloadResult> {
+  const result = await downloadDirectoryFile(
+    'personal',
+    getPersonalDirectoryPathFromResourceId(resourceId),
+  );
+  return {
+    savedToPhotos: result.savedToPhotos === true,
+    localPath:
+      typeof result.localPath === 'string' && result.localPath.trim().length > 0
+        ? result.localPath
+        : null,
+    savedLocation:
+      typeof result.savedLocation === 'string' &&
+      result.savedLocation.trim().length > 0
+        ? result.savedLocation
+        : null,
+  };
+}
+
+export async function getGlobalRemoteAccessPreviewUrl(
+  resourceId: string,
+): Promise<string> {
+  return getDirectoryFileStreamUrl(
+    'personal',
+    getPersonalDirectoryPathFromResourceId(resourceId),
+  );
+}
+
+export async function prepareGlobalRemoteAccessPreview(
+  resourceId: string,
+  _filename?: string,
+): Promise<string> {
+  const localPath = await prepareDirectoryFilePreview(
+    'personal',
+    getPersonalDirectoryPathFromResourceId(resourceId),
+  );
+  if (typeof localPath !== 'string' || localPath.trim().length === 0) {
+    throw new Error('Remote file was not prepared for preview');
+  }
+  return localPath;
+}
+
+export async function shareGlobalRemoteAccessResources(
+  resources: ResourceShareItem[],
+): Promise<void> {
+  if (resources.length === 0) {
+    return;
+  }
+  if (typeof NativeSyncEngine?.shareFiles !== 'function') {
+    throw new Error('System share is not available');
+  }
+
+  const localPaths: string[] = [];
+  for (const resource of resources) {
+    const localPath = await prepareGlobalRemoteAccessPreview(
+      resource.resourceId,
+      resource.displayName,
+    );
+    localPaths.push(localPath);
+  }
+
+  await NativeSyncEngine.shareFiles(localPaths);
 }
 
 export async function listHistory(
