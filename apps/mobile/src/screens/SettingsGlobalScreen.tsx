@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -701,9 +702,11 @@ export function SettingsGlobalScreen({
               title="版本"
               subtitle={getVersionLabel(appInfo)}
               rightAccessory={
-                <View style={styles.updateBadge}>
-                  <Text style={styles.updateBadgeText}>更新</Text>
-                </View>
+                Platform.OS !== 'ios' ? (
+                  <View style={styles.updateBadge}>
+                    <Text style={styles.updateBadgeText}>更新</Text>
+                  </View>
+                ) : null
               }
             />
             <SettingsRow

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { Alert, NativeModules } from 'react-native';
 
 let mockVisualQaEnabled = false;
@@ -384,7 +384,9 @@ describe('RemoteAccessGlobalScreen', () => {
       expect(getByText('Project Files')).toBeTruthy();
     });
 
-    fireEvent.press(getByText('Project Files'));
+    await act(async () => {
+      fireEvent.press(getByText('Project Files'));
+    });
 
     await waitFor(() => {
       expect(mockListSharedFolderContents).toHaveBeenCalledWith(
@@ -851,6 +853,54 @@ describe('RemoteAccessScreen', () => {
       expect(getByText('test-folder')).toBeTruthy();
       expect(getByText('photo.jpg')).toBeTruthy();
     });
+  });
+
+  it('loads real folder contents when a folder is opened', async () => {
+    mockListSharedResources.mockResolvedValueOnce([
+      {
+        resourceId: 'res-folder',
+        displayName: 'Project Files',
+        kind: 'shared_folder',
+        fileSize: 0,
+      },
+    ]);
+    mockListSharedFolderContents.mockResolvedValueOnce({
+      path: '',
+      files: [
+        {
+          name: 'real-contract.pdf',
+          path: 'real-contract.pdf',
+          type: 'document',
+          size: 4096,
+          modifiedAt: '2026-06-16T08:31:00.000Z',
+        },
+      ],
+      totalCount: 1,
+    });
+
+    const { getByText, queryByText } = render(
+      <TestErrorBoundary>
+        <RemoteAccessScreen />
+      </TestErrorBoundary>
+    );
+
+    await waitFor(() => {
+      expect(getByText('Project Files')).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.press(getByText('Project Files'));
+    });
+
+    await waitFor(() => {
+      expect(mockListSharedFolderContents).toHaveBeenCalledWith(
+        { host: '192.168.1.100', port: 39394 },
+        'res-folder',
+        '',
+      );
+      expect(getByText('real-contract.pdf')).toBeTruthy();
+    });
+    expect(queryByText('vividrop-presentation.pdf')).toBeNull();
   });
 
   it('triggers download when download button is pressed', async () => {

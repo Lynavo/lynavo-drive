@@ -1,6 +1,7 @@
 import { NativeModules } from 'react-native';
 import type {
   DesktopSharedResourceDTO,
+  DirectoryFileDTO,
   ReceivedLibraryItemDTO,
   DesktopSyncRecordDTO,
   SharedDirectoryDTO,
@@ -19,6 +20,9 @@ export interface ResourceDownloadResult {
   localPath: string | null;
 }
 
+const SHARED_DIRECTORY_RESOURCE_PREFIX = 'shared-dir:';
+const SHARED_DIRECTORY_DESKTOP_ID = 'shared-dir';
+
 export function isDownloadSavedLocally(result: ResourceDownloadResult): boolean {
   return (
     result.savedToPhotos ||
@@ -30,6 +34,17 @@ async function requestResourceDownload(
   desktop: DesktopInfo,
   resourceId: string,
 ): Promise<void> {
+  if (isSharedDirectoryResourceId(resourceId)) {
+    const sharedPath = getSharedDirectoryPathFromResourceId(resourceId);
+    const encodedPath = encodeRemotePath(sharedPath);
+    const url = `http://${desktop.host}:${desktop.port}/shared/download/${encodedPath}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`Failed to download shared file: ${res.statusText}`);
+    }
+    return;
+  }
+
   const clientId = await getClientId();
   const clientName = (await NativeSyncEngine?.getClientDisplayName?.()) || clientId;
   const url = `http://${desktop.host}:${desktop.port}/resources/mobile/download/${resourceId}?clientId=${clientId}&clientName=${encodeURIComponent(
@@ -51,6 +66,80 @@ function encodeRemotePath(path?: string): string {
     .join('/');
 }
 
+function decodeRemotePath(path: string): string {
+  return path
+    .split('/')
+    .map(segment => {
+      try {
+        return decodeURIComponent(segment);
+      } catch {
+        return segment;
+      }
+    })
+    .join('/');
+}
+
+function normalizeRemotePath(path?: string): string {
+  return (path ?? '')
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\/+|\/+$/g, '')
+    .split('/')
+    .filter(segment => segment.trim().length > 0)
+    .join('/');
+}
+
+function joinRemotePath(basePath: string, childPath?: string): string {
+  const normalizedBase = normalizeRemotePath(basePath);
+  const normalizedChild = normalizeRemotePath(childPath);
+  if (!normalizedBase) return normalizedChild;
+  if (!normalizedChild) return normalizedBase;
+  return `${normalizedBase}/${normalizedChild}`;
+}
+
+function isSharedDirectoryResourceId(resourceId: string): boolean {
+  return resourceId.startsWith(SHARED_DIRECTORY_RESOURCE_PREFIX);
+}
+
+function getSharedDirectoryPathFromResourceId(resourceId: string): string {
+  const encodedPath = resourceId.slice(SHARED_DIRECTORY_RESOURCE_PREFIX.length);
+  return normalizeRemotePath(decodeRemotePath(encodedPath));
+}
+
+function sharedDirectoryResourceId(path: string): string {
+  return `${SHARED_DIRECTORY_RESOURCE_PREFIX}${encodeRemotePath(path)}`;
+}
+
+function directoryFileToSharedResource(
+  file: DirectoryFileDTO,
+): DesktopSharedResourceDTO {
+  return {
+    resourceId: sharedDirectoryResourceId(file.path),
+    desktopDeviceId: SHARED_DIRECTORY_DESKTOP_ID,
+    kind: file.isDirectory ? 'shared_folder' : 'shared_file',
+    displayName: file.name,
+    status: 'available',
+    fileSize: file.size,
+    mediaType: file.type,
+    addedAt: file.modifiedAt,
+    downloadCount: 0,
+  };
+}
+
+async function requestSharedDirectory(
+  desktop: DesktopInfo,
+  path?: string,
+): Promise<SharedDirectoryDTO> {
+  const encodedPath = encodeRemotePath(path);
+  const pathSuffix = encodedPath ? `/${encodedPath}` : '';
+  const url = `http://${desktop.host}:${desktop.port}/shared/list${pathSuffix}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to list shared directory: ${res.statusText}`);
+  }
+  return (await res.json()) as SharedDirectoryDTO;
+}
+
 export async function listSharedResources(
   desktop: DesktopInfo
 ): Promise<DesktopSharedResourceDTO[]> {
@@ -59,12 +148,23 @@ export async function listSharedResources(
   const url = `http://${desktop.host}:${desktop.port}/resources/mobile/shared?clientId=${clientId}&clientName=${encodeURIComponent(
     clientName
   )}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Failed to list shared resources: ${res.statusText}`);
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`Failed to list shared resources: ${res.statusText}`);
+    }
+    const data = await res.json();
+    const items = (data.items || []) as DesktopSharedResourceDTO[];
+    if (items.length > 0) {
+      return items;
+    }
+  } catch {
+    // Older or minimally configured desktops may expose only the legacy
+    // shared directory route. Fall through to that browseable directory.
   }
-  const data = await res.json();
-  return (data.items || []) as DesktopSharedResourceDTO[];
+
+  const sharedDirectory = await requestSharedDirectory(desktop);
+  return sharedDirectory.files.map(directoryFileToSharedResource);
 }
 
 export async function listSharedFolderContents(
@@ -72,6 +172,11 @@ export async function listSharedFolderContents(
   resourceId: string,
   path?: string,
 ): Promise<SharedDirectoryDTO> {
+  if (isSharedDirectoryResourceId(resourceId)) {
+    const rootPath = getSharedDirectoryPathFromResourceId(resourceId);
+    return requestSharedDirectory(desktop, joinRemotePath(rootPath, path));
+  }
+
   const clientId = await getClientId();
   const clientName = (await NativeSyncEngine?.getClientDisplayName?.()) || clientId;
   const encodedPath = encodeRemotePath(path);

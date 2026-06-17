@@ -19,70 +19,118 @@ import { formatBytes } from '../utils/format';
 import { Icon } from '../components/Icon';
 import { GradientBackground } from '../components/GradientBackground';
 import { BottomTabBar } from '../components/BottomTabBar';
-import { listSharedResources, downloadResource } from '../services/desktop-local-service';
-import type { DesktopSharedResourceDTO } from '@syncflow/contracts';
+import {
+  listSharedResources,
+  listSharedFolderContents,
+  downloadResource,
+} from '../services/desktop-local-service';
+import type { DesktopSharedResourceDTO, DirectoryFileDTO } from '@syncflow/contracts';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'RemoteAccess'>;
 
-interface MockFile {
+interface RemoteAccessItem {
   resourceId: string;
   displayName: string;
   kind: 'shared_file' | 'shared_folder';
   fileSize?: number;
   mediaType?: string;
+  rootResourceId?: string;
+  remotePath?: string;
 }
 
-const MOCK_FOLDER_CONTENTS: Record<string, MockFile[]> = {
-  'Projects': [
-    { resourceId: 'mock-proj-1', displayName: 'vividrop-presentation.pdf', kind: 'shared_file', fileSize: 13002342, mediaType: 'document' },
-    { resourceId: 'mock-proj-2', displayName: 'SourceCode.zip', kind: 'shared_file', fileSize: 47392100, mediaType: 'document' },
-    { resourceId: 'mock-proj-3', displayName: 'Design-v2.fig', kind: 'shared_file', fileSize: 3984512, mediaType: 'document' },
-    { resourceId: 'mock-proj-sub', displayName: 'Archive', kind: 'shared_folder' },
-  ],
-  'Photos': [
-    { resourceId: 'mock-photo-1', displayName: 'family_gathering.jpg', kind: 'shared_file', fileSize: 2516582, mediaType: 'image' },
-    { resourceId: 'mock-photo-2', displayName: 'summer_vacation.mp4', kind: 'shared_file', fileSize: 130023420, mediaType: 'video' },
-    { resourceId: 'mock-photo-3', displayName: 'profile_picture.png', kind: 'shared_file', fileSize: 1048576, mediaType: 'image' },
-  ],
-  'Archive': [
-    { resourceId: 'mock-arc-1', displayName: 'old-backup.tar.gz', kind: 'shared_file', fileSize: 104857600, mediaType: 'document' },
-  ]
-};
+const SHARED_DIRECTORY_RESOURCE_PREFIX = 'shared-dir:';
+
+function sharedResourceToRemoteItem(
+  resource: DesktopSharedResourceDTO,
+): RemoteAccessItem | null {
+  if (resource.kind !== 'shared_file' && resource.kind !== 'shared_folder') {
+    return null;
+  }
+
+  return {
+    resourceId: resource.resourceId,
+    displayName: resource.displayName,
+    kind: resource.kind,
+    fileSize: resource.fileSize,
+    mediaType: resource.mediaType,
+  };
+}
+
+function encodeRemotePath(path: string): string {
+  return path
+    .trim()
+    .replace(/^\/+|\/+$/g, '')
+    .split('/')
+    .filter(segment => segment.trim().length > 0)
+    .map(segment => encodeURIComponent(segment))
+    .join('/');
+}
+
+function directoryFileToRemoteItem(
+  file: DirectoryFileDTO,
+  folder: RemoteAccessItem,
+): RemoteAccessItem {
+  const isSharedDirectory = folder.resourceId.startsWith(SHARED_DIRECTORY_RESOURCE_PREFIX);
+  const rootResourceId = folder.rootResourceId ?? folder.resourceId;
+  const resourceId = isSharedDirectory
+    ? `${SHARED_DIRECTORY_RESOURCE_PREFIX}${encodeRemotePath(file.path)}`
+    : `shared-folder-entry:${rootResourceId}:${file.path}`;
+  return {
+    resourceId,
+    displayName: file.name,
+    kind: file.isDirectory ? 'shared_folder' : 'shared_file',
+    fileSize: file.isDirectory ? undefined : file.size,
+    mediaType: file.isDirectory ? undefined : file.type,
+    rootResourceId: isSharedDirectory ? resourceId : rootResourceId,
+    remotePath: isSharedDirectory ? '' : file.path,
+  };
+}
 
 export function RemoteAccessScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
-  const [rootItems, setRootItems] = useState<DesktopSharedResourceDTO[]>([]);
-  const [currentFolder, setCurrentFolder] = useState<string | null>(null);
-  const [folderHistory, setFolderHistory] = useState<string[]>([]);
+  const [rootItems, setRootItems] = useState<RemoteAccessItem[]>([]);
+  const [folderItems, setFolderItems] = useState<RemoteAccessItem[]>([]);
+  const [currentFolder, setCurrentFolder] = useState<RemoteAccessItem | null>(null);
+  const [folderHistory, setFolderHistory] = useState<RemoteAccessItem[]>([]);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [sortDesc, setSortDesc] = useState(true);
 
+  const getBoundDesktop = useCallback(async () => {
+    const { NativeSyncEngine } = NativeModules;
+    if (!NativeSyncEngine) return null;
+    const binding = await NativeSyncEngine.getBindingState();
+    if (!binding || !binding.host) return null;
+    return { host: binding.host, port: 39394 };
+  }, []);
+
   const loadData = useCallback(async () => {
     try {
-      const { NativeSyncEngine } = NativeModules;
-      if (!NativeSyncEngine) {
-        setLoading(false);
-        return;
-      }
-
-      const binding = await NativeSyncEngine.getBindingState();
-      if (!binding || !binding.host) {
+      const desktop = await getBoundDesktop();
+      if (!desktop) {
         setRootItems([]);
+        setFolderItems([]);
+        setCurrentFolder(null);
+        setFolderHistory([]);
         setLoading(false);
         return;
       }
 
-      const desktop = { host: binding.host, port: 39394 };
       const result = await listSharedResources(desktop);
-      setRootItems(result || []);
+      setRootItems((result || []).flatMap(resource => {
+        const item = sharedResourceToRemoteItem(resource);
+        return item ? [item] : [];
+      }));
+      setFolderItems([]);
+      setCurrentFolder(null);
+      setFolderHistory([]);
     } catch (e) {
       console.warn('[RemoteAccessScreen] Failed to load data:', e);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getBoundDesktop]);
 
   useFocusEffect(
     useCallback(() => {
@@ -130,20 +178,71 @@ export function RemoteAccessScreen() {
     Alert.alert(t('sharedFiles.remoteAccess.select') || '選擇檔案', t('sharedFiles.remoteAccess.selectFeature') || '該功能正在開發中');
   };
 
-  const navigateIntoFolder = (folderName: string) => {
-    if (currentFolder) {
-      setFolderHistory([...folderHistory, currentFolder]);
-    }
-    setCurrentFolder(folderName);
-  };
+  const navigateIntoFolder = useCallback(
+    async (folder: RemoteAccessItem) => {
+      const desktop = await getBoundDesktop();
+      if (!desktop) {
+        setFolderItems([]);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const rootResourceId = folder.rootResourceId ?? folder.resourceId;
+        const listing = await listSharedFolderContents(
+          desktop,
+          rootResourceId,
+          folder.remotePath ?? '',
+        );
+        setFolderItems(listing.files.map(file => directoryFileToRemoteItem(file, folder)));
+        if (currentFolder) {
+          setFolderHistory(prev => [...prev, currentFolder]);
+        }
+        setCurrentFolder(folder);
+      } catch (e) {
+        console.warn('[RemoteAccessScreen] Failed to load folder contents:', e);
+        setFolderItems([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [currentFolder, getBoundDesktop],
+  );
+
+  const reloadFolder = useCallback(
+    async (folder: RemoteAccessItem) => {
+      const desktop = await getBoundDesktop();
+      if (!desktop) {
+        setFolderItems([]);
+        return;
+      }
+      setLoading(true);
+      try {
+        const listing = await listSharedFolderContents(
+          desktop,
+          folder.rootResourceId ?? folder.resourceId,
+          folder.remotePath ?? '',
+        );
+        setFolderItems(listing.files.map(file => directoryFileToRemoteItem(file, folder)));
+      } catch (e) {
+        console.warn('[RemoteAccessScreen] Failed to reload folder contents:', e);
+        setFolderItems([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [getBoundDesktop],
+  );
 
   const navigateBackFolder = () => {
     if (folderHistory.length > 0) {
       const prev = folderHistory[folderHistory.length - 1];
       setFolderHistory(folderHistory.slice(0, -1));
       setCurrentFolder(prev);
+      void reloadFolder(prev);
     } else {
       setCurrentFolder(null);
+      setFolderItems([]);
     }
   };
 
@@ -163,7 +262,7 @@ export function RemoteAccessScreen() {
   };
 
   const currentItems = currentFolder
-    ? (MOCK_FOLDER_CONTENTS[currentFolder] || [])
+    ? folderItems
     : rootItems;
 
   const sortedItems = [...currentItems].sort((a, b) => {
@@ -175,7 +274,7 @@ export function RemoteAccessScreen() {
     return sortDesc ? nameB.localeCompare(nameA) : nameA.localeCompare(nameB);
   });
 
-  const renderItem = ({ item }: { item: MockFile | DesktopSharedResourceDTO }) => {
+  const renderItem = ({ item }: { item: RemoteAccessItem }) => {
     const iconConfig = getFileIcon(item.kind, item.mediaType, item.displayName);
     const isFolder = item.kind === 'shared_folder';
     const isDownloading = downloadingId === item.resourceId;
@@ -186,7 +285,7 @@ export function RemoteAccessScreen() {
         activeOpacity={isFolder ? 0.7 : 1}
         onPress={() => {
           if (isFolder) {
-            navigateIntoFolder(item.displayName);
+            void navigateIntoFolder(item);
           }
         }}
       >
@@ -244,7 +343,7 @@ export function RemoteAccessScreen() {
             <Icon name="arrow-back" size={24} color="#1e293b" />
           </TouchableOpacity>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            {currentFolder ? `${currentFolder}` : (t('sharedFiles.remoteAccess.title') || '遠端訪問電腦')}
+            {currentFolder ? `${currentFolder.displayName}` : (t('sharedFiles.remoteAccess.title') || '遠端訪問電腦')}
           </Text>
           <TouchableOpacity
             style={styles.selectButton}
