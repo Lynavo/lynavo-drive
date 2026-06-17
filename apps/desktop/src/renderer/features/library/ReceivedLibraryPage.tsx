@@ -63,6 +63,12 @@ function getShareStatusBadge(
   }
 }
 
+function getReceivedItemKey(item: ReceivedLibraryItemDTO, index: number): string {
+  if (item.resourceId.trim() !== '') return item.resourceId;
+  if (item.fileKey.trim() !== '') return item.fileKey;
+  return `${item.clientId}:${item.filename}:${item.completedAt}:${index}`;
+}
+
 // ─── FileItemRow ─────────────────────────────────────────────────────────────
 
 function FileItemRow({
@@ -374,9 +380,9 @@ export function ReceivedLibraryPage() {
                   ))}
                 </div>
               ) : (
-                visibleReceivedItems.map((item) => (
+                visibleReceivedItems.map((item, index) => (
                   <FileItemRow
-                    key={item.resourceId}
+                    key={getReceivedItemKey(item, index)}
                     item={item}
                     deviceDisplayName={deviceNameMap.get(item.clientId) ?? item.displayName}
                   />
