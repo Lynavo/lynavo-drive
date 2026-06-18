@@ -614,6 +614,50 @@ func TestParseICEServersJSONDoesNotDuplicateDefaultStun(t *testing.T) {
 	}
 }
 
+func TestSummarizeTURNEndpointsIncludesTransportAndLiteralIPWithoutCredentials(t *testing.T) {
+	endpoints := summarizeTURNEndpoints([]webrtc.ICEServer{
+		{
+			URLs: []string{
+				"stun:stun.cloudflare.com:3478",
+				"turn:user:secret@43.129.81.231:3478?transport=udp",
+				"turn:turn.vividrop.cn:3478?transport=tcp",
+			},
+			Username:   "turn-user",
+			Credential: "turn-pass",
+		},
+	})
+
+	if len(endpoints) != 2 {
+		t.Fatalf("expected 2 TURN endpoints, got %#v", endpoints)
+	}
+	if got := endpoints[0]; got != "scheme=turn host=43.129.81.231 port=3478 transport=udp literalIP=true" {
+		t.Fatalf("unexpected literal IP endpoint: %s", got)
+	}
+	if got := endpoints[1]; got != "scheme=turn host=turn.vividrop.cn port=3478 transport=tcp literalIP=false" {
+		t.Fatalf("unexpected DNS endpoint: %s", got)
+	}
+	joined := strings.Join(endpoints, ";")
+	if strings.Contains(joined, "secret") || strings.Contains(joined, "turn-pass") || strings.Contains(joined, "turn-user") {
+		t.Fatalf("TURN endpoint diagnostics leaked credentials: %s", joined)
+	}
+}
+
+func TestSanitizePionICELogMessageRedactsTurnCredentials(t *testing.T) {
+	msg := "failed to allocate on TURN client turn:turn-user:turn-pass@43.129.81.231:3478?transport=udp username=turn-user credential=turn-pass password=turn-pass"
+
+	got := sanitizePionICELogMessage(msg)
+
+	if strings.Contains(got, "turn-user") || strings.Contains(got, "turn-pass") {
+		t.Fatalf("Pion ICE diagnostics leaked TURN credentials: %s", got)
+	}
+	if !strings.Contains(got, "turn:43.129.81.231:3478?transport=udp") {
+		t.Fatalf("Pion ICE diagnostics lost sanitized TURN endpoint: %s", got)
+	}
+	if !strings.Contains(got, "username=<redacted>") || !strings.Contains(got, "credential=<redacted>") || !strings.Contains(got, "password=<redacted>") {
+		t.Fatalf("Pion ICE diagnostics did not redact credential fields: %s", got)
+	}
+}
+
 func TestAppendConnectionStateDiagnosticArgsIncludesSelectedPairSnapshot(t *testing.T) {
 	selectedAt := time.Date(2026, 6, 5, 16, 50, 58, 0, time.UTC)
 	now := selectedAt.Add(8*time.Second + 250*time.Millisecond)

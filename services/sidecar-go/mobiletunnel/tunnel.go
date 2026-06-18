@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/hashicorp/yamux"
 	"github.com/nicksyncflow/sidecar/internal/protocol"
 	"github.com/nicksyncflow/sidecar/internal/wsdial"
+	"github.com/pion/logging"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -66,6 +68,11 @@ const (
 	iceRouteModeAll   iceRouteMode = "all"
 	iceRouteModeWAN   iceRouteMode = "wan"
 	iceRouteModeRelay iceRouteMode = "relay"
+)
+
+var (
+	iceURLUserInfoPattern     = regexp.MustCompile(`(?i)\b(turns?:)(//)?[^\s@]+@`)
+	iceCredentialFieldPattern = regexp.MustCompile(`(?i)\b(username|credential|password)=([^\s,;]+)`)
 )
 
 type tunnelOptions struct {
@@ -220,13 +227,197 @@ func sanitizeICEURL(rawURL string) string {
 	return url
 }
 
-func registerICELogging(pc *webrtc.PeerConnection, component string, peerKey string, peerID string, iceServers []webrtc.ICEServer, routeMode iceRouteMode) {
+func sanitizePionICELogMessage(msg string) string {
+	sanitized := strings.TrimSpace(msg)
+	if sanitized == "" {
+		return ""
+	}
+	sanitized = iceURLUserInfoPattern.ReplaceAllString(sanitized, `${1}${2}`)
+	sanitized = iceCredentialFieldPattern.ReplaceAllString(sanitized, `${1}=<redacted>`)
+	return sanitized
+}
+
+func summarizeTURNEndpoints(servers []webrtc.ICEServer) []string {
+	endpoints := make([]string, 0)
+	for _, server := range servers {
+		for _, rawURL := range server.URLs {
+			endpoint, ok := summarizeTURNEndpoint(rawURL)
+			if ok {
+				endpoints = append(endpoints, endpoint)
+			}
+		}
+	}
+	return endpoints
+}
+
+func summarizeTURNEndpoint(rawURL string) (string, bool) {
+	trimmed := strings.TrimSpace(rawURL)
+	schemeEnd := strings.Index(trimmed, ":")
+	if schemeEnd <= 0 {
+		return "", false
+	}
+	scheme := strings.ToLower(trimmed[:schemeEnd])
+	if scheme != "turn" && scheme != "turns" {
+		return "", false
+	}
+
+	addressAndQuery := strings.TrimPrefix(trimmed[schemeEnd+1:], "//")
+	address, query, _ := strings.Cut(addressAndQuery, "?")
+	if at := strings.LastIndex(address, "@"); at >= 0 {
+		address = address[at+1:]
+	}
+
+	host, port := splitICEHostPort(address)
+	if host == "" {
+		return "", false
+	}
+	transport := parseICETransport(query)
+	if transport == "" {
+		transport = "udp"
+		if scheme == "turns" {
+			transport = "tcp"
+		}
+	}
+
+	return fmt.Sprintf(
+		"scheme=%s host=%s port=%s transport=%s literalIP=%t",
+		scheme,
+		host,
+		port,
+		transport,
+		net.ParseIP(host) != nil,
+	), true
+}
+
+func splitICEHostPort(address string) (string, string) {
+	host, port, err := net.SplitHostPort(address)
+	if err == nil {
+		return strings.Trim(host, "[]"), port
+	}
+	if strings.HasPrefix(address, "[") {
+		if end := strings.Index(address, "]"); end >= 0 {
+			return strings.Trim(address[:end+1], "[]"), ""
+		}
+	}
+	if host, port, ok := strings.Cut(address, ":"); ok && !strings.Contains(host, ":") {
+		return strings.Trim(host, "[]"), port
+	}
+	return strings.Trim(address, "[]"), ""
+}
+
+func parseICETransport(query string) string {
+	for _, pair := range strings.Split(query, "&") {
+		key, value, ok := strings.Cut(pair, "=")
+		if !ok {
+			continue
+		}
+		if strings.EqualFold(key, "transport") {
+			return strings.ToLower(strings.TrimSpace(value))
+		}
+	}
+	return ""
+}
+
+type pionICELoggerFactory struct {
+	component      string
+	peerKey        string
+	peerID         string
+	routeMode      iceRouteMode
+	hasTurn        bool
+	hasStun        bool
+	candidateStats *iceCandidateGatheringStats
+}
+
+func (f pionICELoggerFactory) NewLogger(scope string) logging.LeveledLogger {
+	return pionICELogger{factory: f, scope: scope}
+}
+
+type pionICELogger struct {
+	factory pionICELoggerFactory
+	scope   string
+}
+
+func (l pionICELogger) Trace(string)          {}
+func (l pionICELogger) Tracef(string, ...any) {}
+func (l pionICELogger) Debug(string)          {}
+func (l pionICELogger) Debugf(string, ...any) {}
+func (l pionICELogger) Info(string)           {}
+func (l pionICELogger) Infof(string, ...any)  {}
+
+func (l pionICELogger) Warn(msg string) {
+	l.log("warn", msg)
+}
+
+func (l pionICELogger) Warnf(format string, args ...any) {
+	l.Warn(fmt.Sprintf(format, args...))
+}
+
+func (l pionICELogger) Error(msg string) {
+	l.log("error", msg)
+}
+
+func (l pionICELogger) Errorf(format string, args ...any) {
+	l.Error(fmt.Sprintf(format, args...))
+}
+
+func (l pionICELogger) log(level string, msg string) {
+	message := sanitizePionICELogMessage(msg)
+	if message == "" {
+		return
+	}
+	if l.factory.candidateStats != nil {
+		l.factory.candidateStats.recordPionICELog(level, l.scope, message)
+	}
+	args := []any{
+		l.factory.peerKey, l.factory.peerID,
+		"scope", l.scope,
+		"routeMode", l.factory.routeMode,
+		"hasTurn", l.factory.hasTurn,
+		"hasStun", l.factory.hasStun,
+		"pionLogLevel", level,
+		"pionMessage", message,
+	}
+	if l.factory.candidateStats != nil {
+		args = l.factory.candidateStats.snapshot().appendDiagnosticArgs(args)
+	}
+	if level == "error" {
+		tunnelError(l.factory.component+" Pion ICE error", args...)
+		return
+	}
+	tunnelWarn(l.factory.component+" Pion ICE warning", args...)
+}
+
+func newPeerConnectionWithICELogger(config webrtc.Configuration, component string, peerKey string, peerID string, routeMode iceRouteMode) (*webrtc.PeerConnection, *iceCandidateGatheringStats, error) {
+	_, hasTurn, hasStun := summarizeICEServers(config.ICEServers)
+	candidateStats := &iceCandidateGatheringStats{}
+	api := webrtc.NewAPI(webrtc.WithSettingEngine(webrtc.SettingEngine{
+		LoggerFactory: pionICELoggerFactory{
+			component:      component,
+			peerKey:        peerKey,
+			peerID:         peerID,
+			routeMode:      routeMode,
+			hasTurn:        hasTurn,
+			hasStun:        hasStun,
+			candidateStats: candidateStats,
+		},
+	}))
+	pc, err := api.NewPeerConnection(config)
+	if err != nil {
+		return nil, nil, err
+	}
+	return pc, candidateStats, nil
+}
+
+func registerICELogging(pc *webrtc.PeerConnection, component string, peerKey string, peerID string, iceServers []webrtc.ICEServer, routeMode iceRouteMode, candidateStats *iceCandidateGatheringStats) *iceCandidateGatheringStats {
 	urls, hasTurn, hasStun := summarizeICEServers(iceServers)
+	turnEndpoints := summarizeTURNEndpoints(iceServers)
 	tunnelInfo(component+" ICE config",
 		peerKey, peerID,
 		"iceServerCount", len(iceServers),
 		"iceURLCount", len(urls),
 		"iceURLs", strings.Join(urls, ","),
+		"turnEndpointCount", len(turnEndpoints),
+		"turnEndpoints", strings.Join(turnEndpoints, ";"),
 		"hasTurn", hasTurn,
 		"hasStun", hasStun,
 		"routeMode", routeMode,
@@ -238,6 +429,9 @@ func registerICELogging(pc *webrtc.PeerConnection, component string, peerKey str
 	var iceConnectedAt time.Time
 	var peerConnectedAt time.Time
 	lastSelectedPair := selectedPairSnapshot(nil, time.Time{})
+	if candidateStats == nil {
+		candidateStats = &iceCandidateGatheringStats{}
+	}
 
 	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
 		now := time.Now()
@@ -274,13 +468,24 @@ func registerICELogging(pc *webrtc.PeerConnection, component string, peerKey str
 		tunnelInfo(component+" peer connection state changed", args...)
 	})
 	pc.OnICEGatheringStateChange(func(state webrtc.ICEGatheringState) {
-		tunnelInfo(component+" ICE gathering state changed", peerKey, peerID, "state", state.String())
+		stats := candidateStats.snapshot()
+		args := stats.appendDiagnosticArgs([]any{
+			peerKey, peerID,
+			"state", state.String(),
+			"routeMode", routeMode,
+			"hasTurn", hasTurn,
+			"hasStun", hasStun,
+		})
+		tunnelInfo(component+" ICE gathering state changed", args...)
+		if state == webrtc.ICEGatheringStateComplete && stats.missingRelayCandidate(routeMode, hasTurn) {
+			tunnelWarn(component+" relay ICE gathering completed without relay candidates", args...)
+		}
 	})
 
 	transport := peerConnectionICETransport(pc)
 	if transport == nil {
 		tunnelWarn(component+" ICE transport unavailable for selected pair logging", peerKey, peerID)
-		return
+		return candidateStats
 	}
 	transport.OnSelectedCandidatePairChange(func(pair *webrtc.ICECandidatePair) {
 		now := time.Now()
@@ -289,6 +494,7 @@ func registerICELogging(pc *webrtc.PeerConnection, component string, peerKey str
 		mu.Unlock()
 		logSelectedICECandidatePair(component+" ICE selected candidate pair changed", pair, peerKey, peerID, "reason", "selected_pair_change")
 	})
+	return candidateStats
 }
 
 func peerConnectionICETransport(pc *webrtc.PeerConnection) *webrtc.ICETransport {
@@ -549,6 +755,125 @@ func logRemoteICECandidate(component string, peerKey string, peerID string, cand
 		"relatedPort", relatedPort,
 		"sdpMid", candidate.SDPMid,
 		"sdpMLineIndex", candidate.SDPMLineIndex,
+	)
+}
+
+type iceCandidateGatheringStats struct {
+	mu sync.Mutex
+
+	localCandidateCount           int
+	localHostCandidateCount       int
+	localSrflxCandidateCount      int
+	localPrflxCandidateCount      int
+	localRelayCandidateCount      int
+	localSuppressedCandidateCount int
+	pionICEWarnCount              int
+	pionICEErrorCount             int
+	lastPionICELogLevel           string
+	lastPionICELogScope           string
+	lastPionICELogMessage         string
+}
+
+type iceCandidateGatheringStatsSnapshot struct {
+	localCandidateCount           int
+	localHostCandidateCount       int
+	localSrflxCandidateCount      int
+	localPrflxCandidateCount      int
+	localRelayCandidateCount      int
+	localSuppressedCandidateCount int
+	pionICEWarnCount              int
+	pionICEErrorCount             int
+	lastPionICELogLevel           string
+	lastPionICELogScope           string
+	lastPionICELogMessage         string
+}
+
+func (s *iceCandidateGatheringStats) recordLocalCandidate(candidate *webrtc.ICECandidate, signaled bool) {
+	if s == nil || candidate == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.localCandidateCount++
+	switch candidate.Typ {
+	case webrtc.ICECandidateTypeHost:
+		s.localHostCandidateCount++
+	case webrtc.ICECandidateTypeSrflx:
+		s.localSrflxCandidateCount++
+	case webrtc.ICECandidateTypePrflx:
+		s.localPrflxCandidateCount++
+	case webrtc.ICECandidateTypeRelay:
+		s.localRelayCandidateCount++
+	}
+	if !signaled {
+		s.localSuppressedCandidateCount++
+	}
+}
+
+func (s *iceCandidateGatheringStats) recordPionICELog(level string, scope string, message string) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	switch level {
+	case "error":
+		s.pionICEErrorCount++
+	default:
+		s.pionICEWarnCount++
+	}
+	s.lastPionICELogLevel = level
+	s.lastPionICELogScope = scope
+	s.lastPionICELogMessage = message
+}
+
+func (s *iceCandidateGatheringStats) snapshot() iceCandidateGatheringStatsSnapshot {
+	if s == nil {
+		return iceCandidateGatheringStatsSnapshot{}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return iceCandidateGatheringStatsSnapshot{
+		localCandidateCount:           s.localCandidateCount,
+		localHostCandidateCount:       s.localHostCandidateCount,
+		localSrflxCandidateCount:      s.localSrflxCandidateCount,
+		localPrflxCandidateCount:      s.localPrflxCandidateCount,
+		localRelayCandidateCount:      s.localRelayCandidateCount,
+		localSuppressedCandidateCount: s.localSuppressedCandidateCount,
+		pionICEWarnCount:              s.pionICEWarnCount,
+		pionICEErrorCount:             s.pionICEErrorCount,
+		lastPionICELogLevel:           s.lastPionICELogLevel,
+		lastPionICELogScope:           s.lastPionICELogScope,
+		lastPionICELogMessage:         s.lastPionICELogMessage,
+	}
+}
+
+func (s *iceCandidateGatheringStats) missingRelayCandidate(routeMode iceRouteMode, hasTurn bool) bool {
+	if s == nil {
+		return false
+	}
+	return s.snapshot().missingRelayCandidate(routeMode, hasTurn)
+}
+
+func (s iceCandidateGatheringStatsSnapshot) missingRelayCandidate(routeMode iceRouteMode, hasTurn bool) bool {
+	return routeMode == iceRouteModeRelay && hasTurn && s.localRelayCandidateCount == 0
+}
+
+func (s iceCandidateGatheringStatsSnapshot) appendDiagnosticArgs(args []any) []any {
+	return append(args,
+		"localCandidateCount", s.localCandidateCount,
+		"localHostCandidateCount", s.localHostCandidateCount,
+		"localSrflxCandidateCount", s.localSrflxCandidateCount,
+		"localPrflxCandidateCount", s.localPrflxCandidateCount,
+		"localRelayCandidateCount", s.localRelayCandidateCount,
+		"localSuppressedCandidateCount", s.localSuppressedCandidateCount,
+		"pionICEWarnCount", s.pionICEWarnCount,
+		"pionICEErrorCount", s.pionICEErrorCount,
+		"lastPionICELogLevel", s.lastPionICELogLevel,
+		"lastPionICELogScope", s.lastPionICELogScope,
+		"lastPionICELogMessage", s.lastPionICELogMessage,
 	)
 }
 
@@ -958,13 +1283,13 @@ func (t *Tunnel) establishWebRTCTunnel(wsConn *websocket.Conn, clientID, targetC
 
 	config := webrtcConfigurationForRouteMode(t.iceServers, t.routeMode)
 
-	pc, err := webrtc.NewPeerConnection(config)
+	pc, candidateStats, err := newPeerConnectionWithICELogger(config, "mobile tunnel", "targetClientId", targetClientID, t.routeMode)
 	if err != nil {
 		return err
 	}
 	t.pc = pc
 	defer pc.Close()
-	registerICELogging(pc, "mobile tunnel", "targetClientId", targetClientID, t.iceServers, t.routeMode)
+	candidateStats = registerICELogging(pc, "mobile tunnel", "targetClientId", targetClientID, t.iceServers, t.routeMode, candidateStats)
 
 	// Handle ICE candidates from desktop
 	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
@@ -972,7 +1297,9 @@ func (t *Tunnel) establishWebRTCTunnel(wsConn *websocket.Conn, clientID, targetC
 			return
 		}
 		logLocalICECandidate("mobile tunnel", "targetClientId", targetClientID, c)
-		if !shouldSignalICECandidate(t.routeMode, c) {
+		signaled := shouldSignalICECandidate(t.routeMode, c)
+		candidateStats.recordLocalCandidate(c, signaled)
+		if !signaled {
 			tunnelInfo("mobile tunnel local ICE candidate suppressed",
 				"targetClientId", targetClientID,
 				"routeMode", t.routeMode,

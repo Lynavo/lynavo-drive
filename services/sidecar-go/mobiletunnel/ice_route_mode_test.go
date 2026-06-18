@@ -88,3 +88,34 @@ func TestSelectedHostICERouteClassifiesPublicIPv4Direct(t *testing.T) {
 		t.Fatalf("expected public IPv4 host route, got %q", got)
 	}
 }
+
+func TestICECandidateGatheringStatsDetectsMissingRelayCandidates(t *testing.T) {
+	stats := iceCandidateGatheringStats{}
+	stats.recordLocalCandidate(&webrtc.ICECandidate{
+		Typ:     webrtc.ICECandidateTypeHost,
+		Address: "172.16.20.108",
+	}, false)
+	stats.recordLocalCandidate(&webrtc.ICECandidate{
+		Typ:     webrtc.ICECandidateTypeSrflx,
+		Address: "203.0.113.10",
+	}, false)
+
+	if stats.localCandidateCount != 2 {
+		t.Fatalf("localCandidateCount = %d, want 2", stats.localCandidateCount)
+	}
+	if stats.localHostCandidateCount != 1 {
+		t.Fatalf("localHostCandidateCount = %d, want 1", stats.localHostCandidateCount)
+	}
+	if stats.localSrflxCandidateCount != 1 {
+		t.Fatalf("localSrflxCandidateCount = %d, want 1", stats.localSrflxCandidateCount)
+	}
+	if stats.localRelayCandidateCount != 0 {
+		t.Fatalf("localRelayCandidateCount = %d, want 0", stats.localRelayCandidateCount)
+	}
+	if stats.localSuppressedCandidateCount != 2 {
+		t.Fatalf("localSuppressedCandidateCount = %d, want 2", stats.localSuppressedCandidateCount)
+	}
+	if !stats.missingRelayCandidate(iceRouteModeRelay, true) {
+		t.Fatal("expected relay mode with TURN and no relay candidates to be diagnosed")
+	}
+}
