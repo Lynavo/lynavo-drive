@@ -25,6 +25,11 @@ function setElectronPlatform() {
         .mockResolvedValue({ preventSleepDuringTransfer: true }),
     },
     support: {
+      getAppInfo: vi.fn().mockResolvedValue({
+        name: 'ViviDrop Desktop',
+        version: '1.0.1',
+        buildNumber: '56',
+      }),
       checkForUpdates: vi.fn().mockResolvedValue(null),
       uploadDiagnostics: vi.fn().mockResolvedValue(null),
     },
@@ -117,6 +122,14 @@ describe('SettingsPage', () => {
     });
   });
 
+  it('renders the installed desktop version from app info', async () => {
+    render(<SettingsPage />);
+
+    expect(
+      await screen.findByText('v1.0.1 (56) · 当前版本已安装'),
+    ).toBeInTheDocument();
+  });
+
   it('renders support section and handles log upload', async () => {
     render(<SettingsPage />);
     const uploadBtn = screen.getByRole('button', { name: '上传' });
@@ -146,8 +159,9 @@ describe('SettingsPage', () => {
     });
   });
 
-  it('opens feedback panel and sends a composed email link', () => {
+  it('opens feedback panel and sends a composed email link', async () => {
     render(<SettingsPage />);
+    await screen.findByText('v1.0.1 (56) · 当前版本已安装');
 
     fireEvent.click(screen.getByRole('button', { name: /问题反馈/ }));
     fireEvent.change(screen.getByPlaceholderText('请描述问题、发生步骤或希望改进的地方'), {
@@ -160,6 +174,9 @@ describe('SettingsPage', () => {
     );
     expect(window.electronAPI?.files.openExternal).toHaveBeenCalledWith(
       expect.stringContaining(encodeURIComponent('手机无法连接电脑')),
+    );
+    expect(window.electronAPI?.files.openExternal).toHaveBeenCalledWith(
+      expect.stringContaining(encodeURIComponent('当前版本：v1.0.1 (56)')),
     );
   });
 });

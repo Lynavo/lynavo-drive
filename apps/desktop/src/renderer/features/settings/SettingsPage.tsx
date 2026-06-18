@@ -37,9 +37,10 @@ import { Label } from '@renderer/components/ui/label';
 import type { PowerSaveState } from '../../../preload/api';
 
 type Tone = 'blue' | 'sky' | 'green' | 'amber' | 'rose' | 'slate';
+type AppInfo = Awaited<ReturnType<NonNullable<Window['electronAPI']>['support']['getAppInfo']>>;
 
 const developerFeedbackEmail = 'developer@vividrop.app';
-const installedVersion = '0.1.0';
+const installedVersionFallback = '0.1.0';
 
 const localeLabels: Record<SupportedLocale, { label: string; caption: string }> = {
   en: { label: 'English', caption: 'English UI' },
@@ -72,6 +73,7 @@ export function SettingsPage() {
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [diagnosticsDescription, setDiagnosticsDescription] = useState('');
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
 
   const currentLocale = isSupportedLocale(i18n.resolvedLanguage) ? i18n.resolvedLanguage : 'en';
   const activeLanguage = localeLabels[currentLocale];
@@ -86,10 +88,23 @@ export function SettingsPage() {
   const preventStandbyVal = powerState?.preventSleepDuringTransfer ?? false;
   const localIp = localIps[0] || '192.168.0.227';
   const feedbackReady = feedbackText.trim().length > 0;
+  const installedVersionLabel = appInfo
+    ? `${appInfo.version}${appInfo.buildNumber ? ` (${appInfo.buildNumber})` : ''}`
+    : installedVersionFallback;
 
   useEffect(() => {
     const ips = window.electronAPI?.platform.getLocalIPs?.() ?? [];
     setLocalIps(ips);
+  }, []);
+
+  useEffect(() => {
+    const api = window.electronAPI;
+    if (!api) return;
+
+    void api.support
+      .getAppInfo()
+      .then(setAppInfo)
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -172,11 +187,11 @@ export function SettingsPage() {
   const handleSendFeedback = () => {
     if (!feedbackReady) return;
 
-    const subject = encodeURIComponent(`ViviDrop 问题反馈 - v${installedVersion}`);
+    const subject = encodeURIComponent(`ViviDrop 问题反馈 - v${installedVersionLabel}`);
     const body = encodeURIComponent(
       `问题描述：\n${feedbackText.trim()}\n\n联系方式：${
         feedbackContact.trim() || '未填写'
-      }\n当前版本：v${installedVersion}`,
+      }\n当前版本：v${installedVersionLabel}`,
     );
 
     void window.electronAPI?.files.openExternal(
@@ -334,7 +349,7 @@ export function SettingsPage() {
                 icon={BadgeCheck}
                 tone="green"
                 title="ViviDrop Desktop"
-                caption={`v${installedVersion} · 当前版本已安装`}
+                caption={`v${installedVersionLabel} · 当前版本已安装`}
                 action={
                   <button
                     type="button"
