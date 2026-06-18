@@ -2037,9 +2037,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
             if !didLogWait {
                 didLogWait = true
+                updateSharedFilesReachability(
+                    .unknown,
+                    route: sharedFilesReachabilityRoute(forTunnelRouteMode: state.routeMode),
+                    reason: "\(reason)_p2p_wait_started"
+                )
                 syncDiagnosticsLog(
                     "SharedFiles",
-                    "waiting for P2P tunnel before shared files route reason=\(reason)"
+                    "waiting for P2P tunnel before shared files route reason=\(reason) routeMode=\(state.routeMode)"
                 )
             }
 
@@ -2058,7 +2063,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             attempt += 1
         }
 
-        let finalState = await p2pTunnelRouteState(startReason: nil)
+        var finalState = await p2pTunnelRouteState(startReason: nil)
         if finalState.isActive,
            await acceptedSharedFilesTunnelHost(
                state: finalState,
@@ -2071,6 +2076,40 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             )
             return true
         }
+
+        while finalState.hasCredentials,
+              !finalState.isActive,
+              let nextRouteMode = SharedFilesRoutePolicy.nextP2PTunnelRouteModeAfterStartupTimeout(
+                  currentRouteMode: finalState.routeMode
+              ) {
+            updateSharedFilesReachability(
+                .unknown,
+                route: sharedFilesReachabilityRoute(forTunnelRouteMode: nextRouteMode),
+                reason: "\(reason)_startup_timeout_retry_\(nextRouteMode)"
+            )
+            syncDiagnosticsLog(
+                "SharedFiles",
+                "advancing P2P tunnel route mode after startup timeout reason=\(reason) \(finalState.routeMode)->\(nextRouteMode) active=\(finalState.isActive) port=\(finalState.port.map(String.init) ?? "nil") selectedRoute=\(normalizedICERouteLabel(finalState.selectedICERoute))"
+            )
+            await restartP2PTunnelAndWait(
+                reason: "\(reason)_startup_timeout_retry_\(nextRouteMode)",
+                routeMode: nextRouteMode
+            )
+            finalState = await p2pTunnelRouteState(startReason: nil)
+            if finalState.isActive,
+               await acceptedSharedFilesTunnelHost(
+                   state: finalState,
+                   hasReachableLANHost: false,
+                   reason: "\(reason)_startup_timeout_retry_\(nextRouteMode)_ready"
+               ) != nil {
+                syncDiagnosticsLog(
+                    "SharedFiles",
+                    "P2P tunnel ready after startup timeout retry reason=\(reason) routeMode=\(nextRouteMode) port=\(finalState.port.map(String.init) ?? "nil") selectedRoute=\(normalizedICERouteLabel(finalState.selectedICERoute))"
+                )
+                return true
+            }
+        }
+
         syncDiagnosticsLog(
             "SharedFiles",
             "P2P tunnel wait timed out for shared files reason=\(reason) hasCredentials=\(finalState.hasCredentials) active=\(finalState.isActive) port=\(finalState.port.map(String.init) ?? "nil") selectedRoute=\(normalizedICERouteLabel(finalState.selectedICERoute))"
@@ -2105,7 +2144,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let clientId = bindingService.getOrCreateClientId()
         let generation = p2pTunnelGeneration
         p2pTunnelStarting = true
-        syncDiagnosticsLog("SyncEngine", "P2P tunnel starting target=\(binding.deviceId) reason=\(reason) routeMode=\(p2pTunnelRouteMode)")
+        syncDiagnosticsLog(
+            "SyncEngine",
+            "P2P tunnel starting target=\(binding.deviceId) reason=\(reason) routeMode=\(p2pTunnelRouteMode) networkPath=\(SharedFilesRoutePolicy.diagnosticNetworkPathSummary(NetworkPathObserver.shared.snapshot()))"
+        )
         let iceServersJSON = SharedFilesRoutePolicy.tunnelOptionsJSON(
             iceServersJSON: credentials.iceServersJSON,
             routeMode: p2pTunnelRouteMode
@@ -2132,9 +2174,17 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             localTCPProxy.stop()
         }
         if shouldCommit {
+            let failedRouteMode = p2pTunnelRouteMode
+            let nextRouteMode = SharedFilesRoutePolicy.storedP2PTunnelRouteModeAfterStartFailure(
+                currentRouteMode: failedRouteMode
+            )
+            p2pTunnelRouteMode = nextRouteMode
             sharedFilesService.tunnelPort = nil
             sharedFilesService.isTunnelActive = false
-            syncDiagnosticsLog("SyncEngine", "P2P tunnel failed to start, fallback to direct LAN")
+            syncDiagnosticsLog(
+                "SyncEngine",
+                "P2P tunnel failed to start routeMode=\(failedRouteMode), fallback to route selection nextRouteMode=\(nextRouteMode)"
+            )
         }
         p2pTunnelStarting = false
     }
@@ -7646,6 +7696,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             currentRouteMode: state.routeMode,
             selectedICERoute: state.selectedICERoute
         )
+        updateSharedFilesReachability(
+            .unknown,
+            route: sharedFilesReachabilityRoute(forTunnelRouteMode: nextRouteMode),
+            reason: "\(reason)_rejected_tunnel_retry_\(nextRouteMode)"
+        )
         await restartP2PTunnelAndWait(
             reason: "\(reason)_rejected_tunnel",
             routeMode: nextRouteMode
@@ -7679,6 +7734,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     private func currentSharedFilesTunnelReachabilityRoute() -> SharedFilesReachabilityRoute {
         if localTCPProxy.currentSelectedICERoute() == "turn_relay" {
+            return .relay
+        }
+        return .tunnel
+    }
+
+    private func sharedFilesReachabilityRoute(forTunnelRouteMode routeMode: String) -> SharedFilesReachabilityRoute {
+        if routeMode.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == SharedFilesRoutePolicy.p2pTunnelRouteModeRelay {
             return .relay
         }
         return .tunnel
@@ -7970,7 +8032,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
         syncDiagnosticsLog(
             "SharedFiles",
-            "prepare route reason=\(reason) allowWake=\(allowWake) hasWakeMetadata=\(binding.wake != nil) hasUsableWakeTargets=\(binding.wake?.hasUsableTargets == true) \(wakeCapabilityLogSummary(binding.wake))"
+            "prepare route reason=\(reason) allowWake=\(allowWake) networkPath=\(SharedFilesRoutePolicy.diagnosticNetworkPathSummary(NetworkPathObserver.shared.snapshot())) hasWakeMetadata=\(binding.wake != nil) hasUsableWakeTargets=\(binding.wake?.hasUsableTargets == true) \(wakeCapabilityLogSummary(binding.wake))"
         )
 
         if !discoveryService.isBrowsing {
@@ -8055,7 +8117,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
         if SharedFilesRoutePolicy.shouldAttemptWakeBeforeP2PFallback(
             allowWake: allowWake,
-            hasActiveTunnel: false
+            hasActiveTunnel: initialTunnelState.isActive,
+            hasTunnelCredentials: initialTunnelState.hasCredentials
         ),
            let wokeHost = await attemptSharedFilesLANWakeIfNeeded(
                binding: binding,

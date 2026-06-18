@@ -17,6 +17,30 @@ expect(
     "shared files P2P fallback must wait briefly because LAN/WoL is the primary route"
 )
 
+let cellularPathSummary = SharedFilesRoutePolicy.diagnosticNetworkPathSummary([
+    "status": "satisfied",
+    "interfaces": [
+        [
+            "name": "pdp_ip0",
+            "type": "cellular",
+            "index": 7,
+        ],
+    ],
+    "usesWiFi": false,
+    "usesCellular": true,
+    "usesWiredEthernet": false,
+    "isExpensive": true,
+    "isConstrained": false,
+    "supportsIPv4": true,
+    "supportsIPv6": true,
+    "supportsDNS": true,
+])
+
+expect(
+    cellularPathSummary == "status=satisfied interfaces=[pdp_ip0(cellular)] wifi=false cellular=true wired=false expensive=true constrained=false supportsIPv4=true supportsIPv6=true supportsDNS=true",
+    "shared files diagnostics must format cellular network path snapshots deterministically"
+)
+
 expect(
     SharedFilesRoutePolicy.shouldWaitForP2PTunnelRoute(
         hasTunnelCredentials: true,
@@ -105,6 +129,16 @@ expect(
     SharedFilesRoutePolicy.shouldAcceptActiveP2PTunnelRoute(
         isTunnelActive: true,
         hasTunnelPort: true,
+        selectedICERoute: "link_local_direct",
+        hasReachableLANHost: false
+    ),
+    "shared files must accept an already-active link-local P2P tunnel even when LAN health probes time out"
+)
+
+expect(
+    SharedFilesRoutePolicy.shouldAcceptActiveP2PTunnelRoute(
+        isTunnelActive: true,
+        hasTunnelPort: true,
         selectedICERoute: "turn_relay",
         hasReachableLANHost: false
     ),
@@ -145,6 +179,48 @@ expect(
     "a rejected relay tunnel route must remain relay-only"
 )
 
+expect(
+    SharedFilesRoutePolicy.nextP2PTunnelRouteModeAfterStartupTimeout(
+        currentRouteMode: "all"
+    ) == "wan",
+    "a default tunnel startup timeout must retry with WAN candidate filtering before relay-only fallback"
+)
+
+expect(
+    SharedFilesRoutePolicy.nextP2PTunnelRouteModeAfterStartupTimeout(
+        currentRouteMode: "wan"
+    ) == "relay",
+    "a WAN-filtered tunnel startup timeout must retry with relay-only ICE"
+)
+
+expect(
+    SharedFilesRoutePolicy.nextP2PTunnelRouteModeAfterStartupTimeout(
+        currentRouteMode: "relay"
+    ) == nil,
+    "a relay-only tunnel startup timeout must stop route-mode escalation"
+)
+
+expect(
+    SharedFilesRoutePolicy.storedP2PTunnelRouteModeAfterStartFailure(
+        currentRouteMode: "all"
+    ) == "wan",
+    "a failed default tunnel start must store WAN mode for the next route attempt"
+)
+
+expect(
+    SharedFilesRoutePolicy.storedP2PTunnelRouteModeAfterStartFailure(
+        currentRouteMode: "wan"
+    ) == "relay",
+    "a failed WAN tunnel start must store relay mode so the next route attempt does not repeat WAN"
+)
+
+expect(
+    SharedFilesRoutePolicy.storedP2PTunnelRouteModeAfterStartFailure(
+        currentRouteMode: "relay"
+    ) == "relay",
+    "a failed relay tunnel start must keep relay mode instead of resetting to WAN"
+)
+
 let wrappedTunnelOptions = SharedFilesRoutePolicy.tunnelOptionsJSON(
     iceServersJSON: #"[{"urls":["turn:turn.vividrop.cn:3478?transport=udp"],"username":"u","credential":"p"}]"#,
     routeMode: "wan"
@@ -164,15 +240,26 @@ expect(
 expect(
     SharedFilesRoutePolicy.shouldAttemptWakeBeforeP2PFallback(
         allowWake: true,
-        hasActiveTunnel: false
+        hasActiveTunnel: false,
+        hasTunnelCredentials: false
     ),
-    "opening the personal root should attempt wake before waiting for P2P fallback when no tunnel is active"
+    "opening the personal root may attempt wake before P2P fallback only when no tunnel credentials exist"
 )
 
 expect(
     !SharedFilesRoutePolicy.shouldAttemptWakeBeforeP2PFallback(
         allowWake: true,
-        hasActiveTunnel: true
+        hasActiveTunnel: false,
+        hasTunnelCredentials: true
+    ),
+    "opening the personal root must try P2P before wake when tunnel credentials exist"
+)
+
+expect(
+    !SharedFilesRoutePolicy.shouldAttemptWakeBeforeP2PFallback(
+        allowWake: true,
+        hasActiveTunnel: true,
+        hasTunnelCredentials: true
     ),
     "opening the personal root must use an active P2P tunnel directly instead of waking first"
 )
@@ -180,7 +267,8 @@ expect(
 expect(
     !SharedFilesRoutePolicy.shouldAttemptWakeBeforeP2PFallback(
         allowWake: false,
-        hasActiveTunnel: false
+        hasActiveTunnel: false,
+        hasTunnelCredentials: false
     ),
     "shared files must not wake before P2P fallback outside the scoped personal trigger"
 )

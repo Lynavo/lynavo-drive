@@ -91,6 +91,52 @@ enum SharedFilesRoutePolicy {
         normalizedHost(host) != nil
     }
 
+    static func diagnosticNetworkPathSummary(_ snapshot: [String: Any]) -> String {
+        let status = stringValue(snapshot["status"])
+        let interfaces = networkInterfacesSummary(snapshot["interfaces"])
+        return [
+            "status=\(status)",
+            "interfaces=[\(interfaces)]",
+            "wifi=\(boolValue(snapshot["usesWiFi"]))",
+            "cellular=\(boolValue(snapshot["usesCellular"]))",
+            "wired=\(boolValue(snapshot["usesWiredEthernet"]))",
+            "expensive=\(boolValue(snapshot["isExpensive"]))",
+            "constrained=\(boolValue(snapshot["isConstrained"]))",
+            "supportsIPv4=\(boolValue(snapshot["supportsIPv4"]))",
+            "supportsIPv6=\(boolValue(snapshot["supportsIPv6"]))",
+            "supportsDNS=\(boolValue(snapshot["supportsDNS"]))",
+        ].joined(separator: " ")
+    }
+
+    private static func networkInterfacesSummary(_ value: Any?) -> String {
+        guard let interfaces = value as? [[String: Any]], !interfaces.isEmpty else {
+            return ""
+        }
+        return interfaces
+            .map { iface in
+                "\(stringValue(iface["name"]))(\(stringValue(iface["type"])))"
+            }
+            .joined(separator: ",")
+    }
+
+    private static func stringValue(_ value: Any?) -> String {
+        if let value = value as? String {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? "unknown" : trimmed
+        }
+        return "unknown"
+    }
+
+    private static func boolValue(_ value: Any?) -> String {
+        if let value = value as? Bool {
+            return value ? "true" : "false"
+        }
+        if let value = value as? NSNumber {
+            return value.boolValue ? "true" : "false"
+        }
+        return "unknown"
+    }
+
     static func shouldInvalidateTunnelAfterRouteFailure(isTunnelRoute: Bool) -> Bool {
         isTunnelRoute
     }
@@ -182,7 +228,8 @@ enum SharedFilesRoutePolicy {
         if normalizedRoute == "turn_relay" ||
             normalizedRoute == "ipv6_direct" ||
             normalizedRoute == "public_ipv4_direct" ||
-            normalizedRoute == "direct_reflexive" {
+            normalizedRoute == "direct_reflexive" ||
+            normalizedRoute == "link_local_direct" {
             return true
         }
         return hasReachableLANHost
@@ -200,6 +247,26 @@ enum SharedFilesRoutePolicy {
         default:
             return p2pTunnelRouteModeWAN
         }
+    }
+
+    static func nextP2PTunnelRouteModeAfterStartupTimeout(
+        currentRouteMode: String
+    ) -> String? {
+        switch currentRouteMode.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case p2pTunnelRouteModeRelay:
+            return nil
+        case p2pTunnelRouteModeWAN:
+            return p2pTunnelRouteModeRelay
+        default:
+            return p2pTunnelRouteModeWAN
+        }
+    }
+
+    static func storedP2PTunnelRouteModeAfterStartFailure(
+        currentRouteMode: String
+    ) -> String {
+        nextP2PTunnelRouteModeAfterStartupTimeout(currentRouteMode: currentRouteMode)
+            ?? p2pTunnelRouteModeRelay
     }
 
     static func tunnelOptionsJSON(iceServersJSON: String, routeMode: String) -> String {
@@ -259,9 +326,10 @@ enum SharedFilesRoutePolicy {
 
     static func shouldAttemptWakeBeforeP2PFallback(
         allowWake: Bool,
-        hasActiveTunnel: Bool
+        hasActiveTunnel: Bool,
+        hasTunnelCredentials: Bool
     ) -> Bool {
-        allowWake && !hasActiveTunnel
+        allowWake && !hasActiveTunnel && !hasTunnelCredentials
     }
 
     static func shouldAllowPublicWake(
