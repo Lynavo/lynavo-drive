@@ -244,6 +244,13 @@ export function RecentDownloadsSection({
               ) : null}
             </View>
           ))}
+          {Array.from({ length: 4 - recentItems.length }).map((_, index) => (
+            <View
+              key={`dummy-${index}`}
+              style={styles.recentDownloadTileDummy}
+              testID="recent-download-tile-dummy"
+            />
+          ))}
         </View>
       )}
     </View>
@@ -785,6 +792,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
     alignSelf: 'flex-start',
     justifyContent: 'flex-start',
+  },
+  recentDownloadTileDummy: {
+    flex: 1,
+    minWidth: 0,
   },
   recentDownloadIconWrap: {
     width: '100%',
