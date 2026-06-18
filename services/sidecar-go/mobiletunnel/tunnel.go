@@ -22,6 +22,7 @@ type Tunnel struct {
 	cancel     context.CancelFunc
 	ctx        context.Context
 	iceServers []webrtc.ICEServer
+	routeMode  iceRouteMode
 	listener   net.Listener
 	pc         *webrtc.PeerConnection
 	yamuxSess  *yamux.Session
@@ -59,23 +60,69 @@ type iceServerPayload struct {
 	Credential string   `json:"credential"`
 }
 
+type iceRouteMode string
+
+const (
+	iceRouteModeAll   iceRouteMode = "all"
+	iceRouteModeWAN   iceRouteMode = "wan"
+	iceRouteModeRelay iceRouteMode = "relay"
+)
+
+type tunnelOptions struct {
+	iceServers []webrtc.ICEServer
+	routeMode  iceRouteMode
+}
+
+type tunnelOptionsPayload struct {
+	ICEServers []iceServerPayload `json:"iceServers"`
+	Servers    []iceServerPayload `json:"servers"`
+	RouteMode  string             `json:"routeMode"`
+}
+
 type nat64Prefix struct {
 	IP     net.IP
 	Length int
 }
 
 func parseICEServersJSON(raw string) []webrtc.ICEServer {
+	return parseTunnelOptionsJSON(raw).iceServers
+}
+
+func parseTunnelOptionsJSON(raw string) tunnelOptions {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
-		return defaultICEServers()
+		return tunnelOptions{iceServers: defaultICEServers(), routeMode: iceRouteModeAll}
+	}
+
+	if strings.HasPrefix(trimmed, "{") {
+		var payload tunnelOptionsPayload
+		if err := json.Unmarshal([]byte(trimmed), &payload); err != nil {
+			tunnelWarn("failed to parse tunnel options JSON, using default STUN", "err", err)
+			return tunnelOptions{iceServers: defaultICEServers(), routeMode: iceRouteModeAll}
+		}
+		serversPayload := payload.ICEServers
+		if len(serversPayload) == 0 {
+			serversPayload = payload.Servers
+		}
+		return tunnelOptions{
+			iceServers: parseICEServerPayloads(serversPayload),
+			routeMode:  normalizeICERouteMode(payload.RouteMode),
+		}
 	}
 
 	var payloads []iceServerPayload
 	if err := json.Unmarshal([]byte(trimmed), &payloads); err != nil {
 		tunnelWarn("failed to parse ICE servers JSON, using default STUN", "err", err)
-		return defaultICEServers()
+		return tunnelOptions{iceServers: defaultICEServers(), routeMode: iceRouteModeAll}
 	}
 
+	return tunnelOptions{
+		iceServers: parseICEServerPayloads(payloads),
+		routeMode:  iceRouteModeAll,
+	}
+}
+
+func parseICEServerPayloads(payloads []iceServerPayload) []webrtc.ICEServer {
 	servers := make([]webrtc.ICEServer, 0, len(payloads))
 	for _, payload := range payloads {
 		urls := make([]string, 0, len(payload.URLs))
@@ -98,6 +145,17 @@ func parseICEServersJSON(raw string) []webrtc.ICEServer {
 		return defaultICEServers()
 	}
 	return withDefaultSTUNServer(servers)
+}
+
+func normalizeICERouteMode(raw string) iceRouteMode {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case string(iceRouteModeWAN):
+		return iceRouteModeWAN
+	case string(iceRouteModeRelay):
+		return iceRouteModeRelay
+	default:
+		return iceRouteModeAll
+	}
 }
 
 func defaultICEServers() []webrtc.ICEServer {
@@ -162,7 +220,7 @@ func sanitizeICEURL(rawURL string) string {
 	return url
 }
 
-func registerICELogging(pc *webrtc.PeerConnection, component string, peerKey string, peerID string, iceServers []webrtc.ICEServer) {
+func registerICELogging(pc *webrtc.PeerConnection, component string, peerKey string, peerID string, iceServers []webrtc.ICEServer, routeMode iceRouteMode) {
 	urls, hasTurn, hasStun := summarizeICEServers(iceServers)
 	tunnelInfo(component+" ICE config",
 		peerKey, peerID,
@@ -171,6 +229,7 @@ func registerICELogging(pc *webrtc.PeerConnection, component string, peerKey str
 		"iceURLs", strings.Join(urls, ","),
 		"hasTurn", hasTurn,
 		"hasStun", hasStun,
+		"routeMode", routeMode,
 	)
 
 	var mu sync.Mutex
@@ -381,6 +440,9 @@ func selectedHostICERoute(localAddress string, remoteAddress string) string {
 	if isPublicIPv6(localIP) && isPublicIPv6(remoteIP) {
 		return "ipv6_direct"
 	}
+	if isPublicIPv4(localIP) && isPublicIPv4(remoteIP) {
+		return "public_ipv4_direct"
+	}
 	return "direct_host"
 }
 
@@ -392,8 +454,19 @@ func isPublicIPv6(ip net.IP) bool {
 	return ip.To4() == nil && ip.IsGlobalUnicast() && !ip.IsPrivate() && !ip.IsLinkLocalUnicast()
 }
 
+func isPublicIPv4(ip net.IP) bool {
+	return ip.To4() != nil && ip.IsGlobalUnicast() && !ip.IsPrivate() && !ip.IsLinkLocalUnicast() && !ip.IsLoopback()
+}
+
 func isLinkLocalIP(ip net.IP) bool {
 	return ip.IsLinkLocalUnicast()
+}
+
+func isPublicRoutableIP(ip net.IP) bool {
+	if ip == nil {
+		return false
+	}
+	return isPublicIPv4(ip) || isPublicIPv6(ip)
 }
 
 func pairLocal(pair *webrtc.ICECandidatePair) *webrtc.ICECandidate {
@@ -479,6 +552,43 @@ func logRemoteICECandidate(component string, peerKey string, peerID string, cand
 	)
 }
 
+func shouldSignalICECandidate(routeMode iceRouteMode, candidate *webrtc.ICECandidate) bool {
+	if candidate == nil || routeMode == iceRouteModeAll {
+		return true
+	}
+	if routeMode == iceRouteModeRelay {
+		return candidate.Typ == webrtc.ICECandidateTypeRelay
+	}
+	if candidate.Typ != webrtc.ICECandidateTypeHost {
+		return true
+	}
+	return isPublicRoutableIP(net.ParseIP(candidate.Address))
+}
+
+func shouldAcceptRemoteICECandidate(routeMode iceRouteMode, candidate webrtc.ICECandidateInit) bool {
+	if routeMode == iceRouteModeAll {
+		return true
+	}
+	candidateType, _, address, _, _, _ := summarizeICECandidateInit(candidate)
+	if routeMode == iceRouteModeRelay {
+		return candidateType == "relay"
+	}
+	if candidateType != "host" {
+		return true
+	}
+	return isPublicRoutableIP(net.ParseIP(address))
+}
+
+func webrtcConfigurationForRouteMode(iceServers []webrtc.ICEServer, routeMode iceRouteMode) webrtc.Configuration {
+	config := webrtc.Configuration{
+		ICEServers: iceServers,
+	}
+	if routeMode == iceRouteModeRelay {
+		config.ICETransportPolicy = webrtc.ICETransportPolicyRelay
+	}
+	return config
+}
+
 func summarizeICECandidateInit(candidate webrtc.ICECandidateInit) (string, string, string, string, string, string) {
 	fields := strings.Fields(candidate.Candidate)
 	if len(fields) < 8 {
@@ -516,10 +626,12 @@ func StartTunnel(signalingURL, clientID, targetClientID, token, pairingToken, ic
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	options := parseTunnelOptionsJSON(iceServersJSON)
 	t := &Tunnel{
 		ctx:        ctx,
 		cancel:     cancel,
-		iceServers: parseICEServersJSON(iceServersJSON),
+		iceServers: options.iceServers,
+		routeMode:  options.routeMode,
 		readyChan:  make(chan int, 1),
 	}
 	activeTunnel = t
@@ -844,9 +956,7 @@ func (t *Tunnel) establishWebRTCTunnel(wsConn *websocket.Conn, clientID, targetC
 		}
 	}()
 
-	config := webrtc.Configuration{
-		ICEServers: t.iceServers,
-	}
+	config := webrtcConfigurationForRouteMode(t.iceServers, t.routeMode)
 
 	pc, err := webrtc.NewPeerConnection(config)
 	if err != nil {
@@ -854,7 +964,7 @@ func (t *Tunnel) establishWebRTCTunnel(wsConn *websocket.Conn, clientID, targetC
 	}
 	t.pc = pc
 	defer pc.Close()
-	registerICELogging(pc, "mobile tunnel", "targetClientId", targetClientID, t.iceServers)
+	registerICELogging(pc, "mobile tunnel", "targetClientId", targetClientID, t.iceServers, t.routeMode)
 
 	// Handle ICE candidates from desktop
 	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
@@ -862,6 +972,15 @@ func (t *Tunnel) establishWebRTCTunnel(wsConn *websocket.Conn, clientID, targetC
 			return
 		}
 		logLocalICECandidate("mobile tunnel", "targetClientId", targetClientID, c)
+		if !shouldSignalICECandidate(t.routeMode, c) {
+			tunnelInfo("mobile tunnel local ICE candidate suppressed",
+				"targetClientId", targetClientID,
+				"routeMode", t.routeMode,
+				"candidateType", iceCandidateType(c),
+				"address", iceCandidateAddress(c),
+			)
+			return
+		}
 		candBytes, err := json.Marshal(c.ToJSON())
 		if err != nil {
 			return
@@ -898,6 +1017,7 @@ func (t *Tunnel) establishWebRTCTunnel(wsConn *websocket.Conn, clientID, targetC
 		"payload":    offer.SDP,
 		"senderId":   clientID,
 		"receiverId": targetClientID,
+		"routeMode":  string(t.routeMode),
 	})
 	err = sConn.WriteMessage(websocket.TextMessage, offerMsg)
 	if err != nil {
@@ -962,6 +1082,16 @@ func (t *Tunnel) establishWebRTCTunnel(wsConn *websocket.Conn, clientID, targetC
 				var cand webrtc.ICECandidateInit
 				if err := json.Unmarshal([]byte(payload), &cand); err == nil {
 					logRemoteICECandidate("mobile tunnel", "targetClientId", targetClientID, cand)
+					if !shouldAcceptRemoteICECandidate(t.routeMode, cand) {
+						candidateType, _, address, _, _, _ := summarizeICECandidateInit(cand)
+						tunnelInfo("mobile tunnel remote ICE candidate suppressed",
+							"targetClientId", targetClientID,
+							"routeMode", t.routeMode,
+							"candidateType", candidateType,
+							"address", address,
+						)
+						continue
+					}
 					if err := pc.AddICECandidate(cand); err != nil {
 						tunnelError("mobile tunnel failed to add remote ICE candidate", "targetClientId", targetClientID, "err", err)
 					}

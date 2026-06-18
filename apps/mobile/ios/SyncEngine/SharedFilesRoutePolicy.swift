@@ -1,6 +1,10 @@
 import Foundation
 
 enum SharedFilesRoutePolicy {
+    static let p2pTunnelRouteModeAll = "all"
+    static let p2pTunnelRouteModeWAN = "wan"
+    static let p2pTunnelRouteModeRelay = "relay"
+
     static let sharedFileListRequestTimeout: TimeInterval = 15
     static let sharedFileDownloadRequestTimeout: TimeInterval = 300
     static let sharedFileDownloadResourceTimeout: TimeInterval = 86_400
@@ -175,10 +179,54 @@ enum SharedFilesRoutePolicy {
         }
 
         let normalizedRoute = selectedICERoute.trimmingCharacters(in: .whitespacesAndNewlines)
-        if normalizedRoute == "turn_relay" || normalizedRoute == "ipv6_direct" {
+        if normalizedRoute == "turn_relay" ||
+            normalizedRoute == "ipv6_direct" ||
+            normalizedRoute == "public_ipv4_direct" ||
+            normalizedRoute == "direct_reflexive" {
             return true
         }
         return hasReachableLANHost
+    }
+
+    static func nextP2PTunnelRouteModeAfterRejectedRoute(
+        currentRouteMode: String,
+        selectedICERoute _: String
+    ) -> String {
+        switch currentRouteMode.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case p2pTunnelRouteModeRelay:
+            return p2pTunnelRouteModeRelay
+        case p2pTunnelRouteModeWAN:
+            return p2pTunnelRouteModeRelay
+        default:
+            return p2pTunnelRouteModeWAN
+        }
+    }
+
+    static func tunnelOptionsJSON(iceServersJSON: String, routeMode: String) -> String {
+        let normalizedRouteMode = routeMode.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let trimmedIceServers = iceServersJSON.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalizedRouteMode != p2pTunnelRouteModeAll else {
+            return trimmedIceServers
+        }
+
+        let iceServersValue: Any
+        if let data = trimmedIceServers.data(using: .utf8),
+           let decoded = try? JSONSerialization.jsonObject(with: data) {
+            iceServersValue = decoded
+        } else {
+            iceServersValue = []
+        }
+        let payload: [String: Any] = [
+            "routeMode": normalizedRouteMode,
+            "iceServers": iceServersValue,
+        ]
+        guard JSONSerialization.isValidJSONObject(payload),
+              let data = try? JSONSerialization.data(withJSONObject: payload),
+              let encoded = String(data: data, encoding: .utf8)
+        else {
+            return trimmedIceServers
+        }
+        return encoded
     }
 
     static func shouldContinueWaitingForP2PTunnelRoute(

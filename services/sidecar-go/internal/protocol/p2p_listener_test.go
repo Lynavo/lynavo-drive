@@ -551,7 +551,7 @@ func TestP2PManagerUsesProvidedICEServers(t *testing.T) {
 	)
 	defer m.Stop()
 
-	pc, err := m.createPeerConnection(nil, "mobile-123")
+	pc, err := m.createPeerConnection(nil, "mobile-123", iceRouteModeAll)
 	if err != nil {
 		t.Fatalf("createPeerConnection: %v", err)
 	}

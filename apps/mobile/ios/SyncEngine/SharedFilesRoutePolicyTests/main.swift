@@ -95,6 +95,16 @@ expect(
     SharedFilesRoutePolicy.shouldAcceptActiveP2PTunnelRoute(
         isTunnelActive: true,
         hasTunnelPort: true,
+        selectedICERoute: "direct_reflexive",
+        hasReachableLANHost: false
+    ),
+    "shared files must accept a server-reflexive P2P tunnel when LAN is not reachable"
+)
+
+expect(
+    SharedFilesRoutePolicy.shouldAcceptActiveP2PTunnelRoute(
+        isTunnelActive: true,
+        hasTunnelPort: true,
         selectedICERoute: "turn_relay",
         hasReachableLANHost: false
     ),
@@ -109,6 +119,46 @@ expect(
         hasReachableLANHost: true
     ),
     "shared files may keep a direct_host tunnel only when LAN is also reachable"
+)
+
+expect(
+    SharedFilesRoutePolicy.nextP2PTunnelRouteModeAfterRejectedRoute(
+        currentRouteMode: "all",
+        selectedICERoute: "link_local_direct"
+    ) == "wan",
+    "a rejected default tunnel route must retry with WAN candidate filtering before relay-only fallback"
+)
+
+expect(
+    SharedFilesRoutePolicy.nextP2PTunnelRouteModeAfterRejectedRoute(
+        currentRouteMode: "wan",
+        selectedICERoute: "direct_host"
+    ) == "relay",
+    "a rejected WAN-filtered tunnel route must retry with relay-only ICE"
+)
+
+expect(
+    SharedFilesRoutePolicy.nextP2PTunnelRouteModeAfterRejectedRoute(
+        currentRouteMode: "relay",
+        selectedICERoute: "direct_host"
+    ) == "relay",
+    "a rejected relay tunnel route must remain relay-only"
+)
+
+let wrappedTunnelOptions = SharedFilesRoutePolicy.tunnelOptionsJSON(
+    iceServersJSON: #"[{"urls":["turn:turn.vividrop.cn:3478?transport=udp"],"username":"u","credential":"p"}]"#,
+    routeMode: "wan"
+)
+let wrappedTunnelOptionsData = wrappedTunnelOptions.data(using: .utf8)!
+let wrappedTunnelOptionsObject = try! JSONSerialization.jsonObject(with: wrappedTunnelOptionsData) as! [String: Any]
+expect(
+    wrappedTunnelOptionsObject["routeMode"] as? String == "wan",
+    "tunnel options JSON must carry the requested route mode"
+)
+expect(
+    ((wrappedTunnelOptionsObject["iceServers"] as? [[String: Any]])?.first?["urls"] as? [String])?.first
+        == "turn:turn.vividrop.cn:3478?transport=udp",
+    "tunnel options JSON must preserve the TURN URL including transport"
 )
 
 expect(

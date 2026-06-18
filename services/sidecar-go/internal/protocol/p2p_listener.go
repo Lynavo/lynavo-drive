@@ -53,6 +53,30 @@ type iceServerPayload struct {
 	Credential string   `json:"credential"`
 }
 
+type iceRouteMode string
+
+const (
+	iceRouteModeAll   iceRouteMode = "all"
+	iceRouteModeWAN   iceRouteMode = "wan"
+	iceRouteModeRelay iceRouteMode = "relay"
+)
+
+type peerConnectionState struct {
+	pc        *webrtc.PeerConnection
+	routeMode iceRouteMode
+}
+
+func normalizeICERouteMode(raw string) iceRouteMode {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case string(iceRouteModeWAN):
+		return iceRouteModeWAN
+	case string(iceRouteModeRelay):
+		return iceRouteModeRelay
+	default:
+		return iceRouteModeAll
+	}
+}
+
 func NewP2PManager(desktopID, serverURL, localAddress, authToken string) *P2PManager {
 	return NewP2PManagerWithICEServers(desktopID, serverURL, localAddress, authToken, defaultICEServers())
 }
@@ -209,7 +233,7 @@ func sanitizeICEURL(rawURL string) string {
 	return url
 }
 
-func registerICELogging(pc *webrtc.PeerConnection, component string, peerKey string, peerID string, iceServers []webrtc.ICEServer) {
+func registerICELogging(pc *webrtc.PeerConnection, component string, peerKey string, peerID string, iceServers []webrtc.ICEServer, routeMode iceRouteMode) {
 	urls, hasTurn, hasStun := summarizeICEServers(iceServers)
 	slog.Info(component+" ICE config",
 		peerKey, peerID,
@@ -218,6 +242,7 @@ func registerICELogging(pc *webrtc.PeerConnection, component string, peerKey str
 		"iceURLs", strings.Join(urls, ","),
 		"hasTurn", hasTurn,
 		"hasStun", hasStun,
+		"routeMode", routeMode,
 	)
 
 	var mu sync.Mutex
@@ -408,6 +433,9 @@ func selectedHostICERoute(localAddress string, remoteAddress string) string {
 	if isPublicIPv6(localIP) && isPublicIPv6(remoteIP) {
 		return "ipv6_direct"
 	}
+	if isPublicIPv4(localIP) && isPublicIPv4(remoteIP) {
+		return "public_ipv4_direct"
+	}
 	return "direct_host"
 }
 
@@ -419,8 +447,19 @@ func isPublicIPv6(ip net.IP) bool {
 	return ip.To4() == nil && ip.IsGlobalUnicast() && !ip.IsPrivate() && !ip.IsLinkLocalUnicast()
 }
 
+func isPublicIPv4(ip net.IP) bool {
+	return ip.To4() != nil && ip.IsGlobalUnicast() && !ip.IsPrivate() && !ip.IsLinkLocalUnicast() && !ip.IsLoopback()
+}
+
 func isLinkLocalIP(ip net.IP) bool {
 	return ip.IsLinkLocalUnicast()
+}
+
+func isPublicRoutableIP(ip net.IP) bool {
+	if ip == nil {
+		return false
+	}
+	return isPublicIPv4(ip) || isPublicIPv6(ip)
 }
 
 func pairLocal(pair *webrtc.ICECandidatePair) *webrtc.ICECandidate {
@@ -504,6 +543,43 @@ func logRemoteICECandidate(component string, peerKey string, peerID string, cand
 		"sdpMid", candidate.SDPMid,
 		"sdpMLineIndex", candidate.SDPMLineIndex,
 	)
+}
+
+func shouldSignalICECandidate(routeMode iceRouteMode, candidate *webrtc.ICECandidate) bool {
+	if candidate == nil || routeMode == iceRouteModeAll {
+		return true
+	}
+	if routeMode == iceRouteModeRelay {
+		return candidate.Typ == webrtc.ICECandidateTypeRelay
+	}
+	if candidate.Typ != webrtc.ICECandidateTypeHost {
+		return true
+	}
+	return isPublicRoutableIP(net.ParseIP(candidate.Address))
+}
+
+func shouldAcceptRemoteICECandidate(routeMode iceRouteMode, candidate webrtc.ICECandidateInit) bool {
+	if routeMode == iceRouteModeAll {
+		return true
+	}
+	candidateType, _, address, _, _, _ := summarizeICECandidateInit(candidate)
+	if routeMode == iceRouteModeRelay {
+		return candidateType == "relay"
+	}
+	if candidateType != "host" {
+		return true
+	}
+	return isPublicRoutableIP(net.ParseIP(address))
+}
+
+func webrtcConfigurationForRouteMode(iceServers []webrtc.ICEServer, routeMode iceRouteMode) webrtc.Configuration {
+	config := webrtc.Configuration{
+		ICEServers: iceServers,
+	}
+	if routeMode == iceRouteModeRelay {
+		config.ICETransportPolicy = webrtc.ICETransportPolicyRelay
+	}
+	return config
 }
 
 func summarizeICECandidateInit(candidate webrtc.ICECandidateInit) (string, string, string, string, string, string) {
@@ -675,7 +751,7 @@ func clonePairedDevices(devices []map[string]string) []map[string]string {
 }
 
 func (m *P2PManager) handleSignalingSession(sConn *safeWriteConn) {
-	peerConnections := make(map[string]*webrtc.PeerConnection)
+	peerConnections := make(map[string]peerConnectionState)
 	var mu sync.Mutex
 
 	// Configure ping/pong keepalive
@@ -708,9 +784,9 @@ func (m *P2PManager) handleSignalingSession(sConn *safeWriteConn) {
 	// M1: Clean up all PeerConnections when the signaling session ends
 	defer func() {
 		mu.Lock()
-		for id, pc := range peerConnections {
+		for id, state := range peerConnections {
 			slog.Info("closing peer connection on session end", "mobileId", id)
-			pc.Close()
+			state.pc.Close()
 		}
 		mu.Unlock()
 	}()
@@ -729,34 +805,47 @@ func (m *P2PManager) handleSignalingSession(sConn *safeWriteConn) {
 		senderID, _ := signal["senderId"].(string)
 		msgType, _ := signal["type"].(string)
 		payload, _ := signal["payload"].(string)
+		routeMode := normalizeICERouteMode("")
+		if msgType == "offer" {
+			if rawRouteMode, _ := signal["routeMode"].(string); rawRouteMode != "" {
+				routeMode = normalizeICERouteMode(rawRouteMode)
+			}
+		}
 
 		mu.Lock()
-		pc, exists := peerConnections[senderID]
+		state, exists := peerConnections[senderID]
 		if msgType == "offer" && exists {
 			slog.Info("replacing existing peer connection for new tunnel offer",
 				"mobileId", senderID,
-				"connectionState", pc.ConnectionState().String(),
-				"signalingState", pc.SignalingState().String(),
+				"connectionState", state.pc.ConnectionState().String(),
+				"signalingState", state.pc.SignalingState().String(),
+				"previousRouteMode", state.routeMode,
+				"nextRouteMode", routeMode,
 			)
-			pc.Close()
+			state.pc.Close()
 			delete(peerConnections, senderID)
 			exists = false
 		}
-		if exists && (pc.ConnectionState() == webrtc.PeerConnectionStateClosed || pc.ConnectionState() == webrtc.PeerConnectionStateFailed) {
-			slog.Info("discarding closed or failed peer connection", "mobileId", senderID, "state", pc.ConnectionState().String())
-			pc.Close()
+		if exists && (state.pc.ConnectionState() == webrtc.PeerConnectionStateClosed || state.pc.ConnectionState() == webrtc.PeerConnectionStateFailed) {
+			slog.Info("discarding closed or failed peer connection", "mobileId", senderID, "state", state.pc.ConnectionState().String(), "routeMode", state.routeMode)
+			state.pc.Close()
 			delete(peerConnections, senderID)
 			exists = false
 		}
 		if !exists {
-			var err error
-			pc, err = m.createPeerConnection(sConn, senderID)
+			pc, err := m.createPeerConnection(sConn, senderID, routeMode)
 			if err != nil {
 				mu.Unlock()
 				continue
 			}
-			peerConnections[senderID] = pc
+			state = peerConnectionState{
+				pc:        pc,
+				routeMode: routeMode,
+			}
+			peerConnections[senderID] = state
 		}
+		pc := state.pc
+		routeMode = state.routeMode
 		mu.Unlock()
 
 		if msgType == "offer" {
@@ -784,6 +873,7 @@ func (m *P2PManager) handleSignalingSession(sConn *safeWriteConn) {
 				"payload":    answer.SDP,
 				"senderId":   m.desktopID,
 				"receiverId": senderID,
+				"routeMode":  string(routeMode),
 			})
 			sConn.WriteMessage(websocket.TextMessage, ansMsg)
 		} else if msgType == "candidate" {
@@ -794,6 +884,16 @@ func (m *P2PManager) handleSignalingSession(sConn *safeWriteConn) {
 				continue
 			}
 			logRemoteICECandidate("desktop tunnel", "mobileId", senderID, cand)
+			if !shouldAcceptRemoteICECandidate(routeMode, cand) {
+				candidateType, _, address, _, _, _ := summarizeICECandidateInit(cand)
+				slog.Info("desktop tunnel remote ICE candidate suppressed",
+					"mobileId", senderID,
+					"routeMode", routeMode,
+					"candidateType", candidateType,
+					"address", address,
+				)
+				continue
+			}
 			err = pc.AddICECandidate(cand)
 			if err != nil {
 				slog.Error("failed to add ice candidate", "err", err, "mobileId", senderID)
@@ -803,22 +903,29 @@ func (m *P2PManager) handleSignalingSession(sConn *safeWriteConn) {
 	}
 }
 
-func (m *P2PManager) createPeerConnection(signalingConn *safeWriteConn, mobileID string) (*webrtc.PeerConnection, error) {
-	config := webrtc.Configuration{
-		ICEServers: cloneICEServers(m.iceServers),
-	}
+func (m *P2PManager) createPeerConnection(signalingConn *safeWriteConn, mobileID string, routeMode iceRouteMode) (*webrtc.PeerConnection, error) {
+	config := webrtcConfigurationForRouteMode(cloneICEServers(m.iceServers), routeMode)
 
 	pc, err := webrtc.NewPeerConnection(config)
 	if err != nil {
 		return nil, err
 	}
-	registerICELogging(pc, "desktop tunnel", "mobileId", mobileID, config.ICEServers)
+	registerICELogging(pc, "desktop tunnel", "mobileId", mobileID, config.ICEServers, routeMode)
 
 	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
 		if c == nil {
 			return
 		}
 		logLocalICECandidate("desktop tunnel", "mobileId", mobileID, c)
+		if !shouldSignalICECandidate(routeMode, c) {
+			slog.Info("desktop tunnel local ICE candidate suppressed",
+				"mobileId", mobileID,
+				"routeMode", routeMode,
+				"candidateType", iceCandidateType(c),
+				"address", iceCandidateAddress(c),
+			)
+			return
+		}
 		candBytes, err := json.Marshal(c.ToJSON())
 		if err != nil {
 			slog.Error("failed to marshal candidate payload", "err", err, "mobileId", mobileID)

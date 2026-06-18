@@ -43,3 +43,17 @@ func TestParseICEServersJSONDoesNotDuplicateDefaultStun(t *testing.T) {
 		t.Fatalf("unexpected ICE URL: %s", got)
 	}
 }
+
+func TestParseTunnelOptionsJSONReadsRouteModeWrapper(t *testing.T) {
+	options := parseTunnelOptionsJSON(`{"routeMode":"wan","iceServers":[{"urls":["turn:turn.vividrop.cn:3478?transport=udp"],"username":"u","credential":"p"}]}`)
+
+	if options.routeMode != iceRouteModeWAN {
+		t.Fatalf("expected WAN route mode, got %q", options.routeMode)
+	}
+	if len(options.iceServers) != 2 {
+		t.Fatalf("expected STUN plus TURN ICE servers, got %d", len(options.iceServers))
+	}
+	if got := options.iceServers[1].URLs[0]; got != "turn:turn.vividrop.cn:3478?transport=udp" {
+		t.Fatalf("unexpected ICE URL: %s", got)
+	}
+}

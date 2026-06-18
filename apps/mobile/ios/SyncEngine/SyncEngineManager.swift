@@ -386,12 +386,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private var p2pTunnelCredentials: P2PTunnelCredentials?
     private var p2pTunnelGeneration = 0
     private var p2pTunnelStarting = false
+    private var p2pTunnelRouteMode = SharedFilesRoutePolicy.p2pTunnelRouteModeAll
     private struct P2PTunnelRouteState {
         let hasCredentials: Bool
         let isActive: Bool
         let isStarting: Bool
         let port: UInt16?
         let selectedICERoute: String
+        let routeMode: String
     }
     private let sharedFileTunnelOperationLock = NSLock()
     private var activeSharedFileTunnelOperations = 0
@@ -1974,7 +1976,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             isActive: sharedFilesService.isTunnelActive && port != nil,
             isStarting: p2pTunnelStarting,
             port: port,
-            selectedICERoute: localTCPProxy.currentSelectedICERoute()
+            selectedICERoute: localTCPProxy.currentSelectedICERoute(),
+            routeMode: p2pTunnelRouteMode
         )
     }
 
@@ -2102,14 +2105,18 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let clientId = bindingService.getOrCreateClientId()
         let generation = p2pTunnelGeneration
         p2pTunnelStarting = true
-        syncDiagnosticsLog("SyncEngine", "P2P tunnel starting target=\(binding.deviceId) reason=\(reason)")
+        syncDiagnosticsLog("SyncEngine", "P2P tunnel starting target=\(binding.deviceId) reason=\(reason) routeMode=\(p2pTunnelRouteMode)")
+        let iceServersJSON = SharedFilesRoutePolicy.tunnelOptionsJSON(
+            iceServersJSON: credentials.iceServersJSON,
+            routeMode: p2pTunnelRouteMode
+        )
         let port = localTCPProxy.start(
             signalingURL: credentials.signalingURL,
             clientID: clientId,
             targetClientID: binding.deviceId,
             token: credentials.accessToken,
             pairingToken: pairingToken,
-            iceServersJSON: credentials.iceServersJSON
+            iceServersJSON: iceServersJSON
         )
 
         let shouldCommit = generation == p2pTunnelGeneration && p2pTunnelCredentials == credentials
@@ -2141,6 +2148,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private func stopP2PTunnelLocked(reason: String) {
         p2pTunnelGeneration += 1
         p2pTunnelStarting = false
+        p2pTunnelRouteMode = SharedFilesRoutePolicy.p2pTunnelRouteModeAll
         sharedFilesService.tunnelPort = nil
         sharedFilesService.isTunnelActive = false
         sharedFilesService.useTunnelRoute = false
@@ -2155,15 +2163,20 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
     }
 
-    private func restartP2PTunnelAndWait(reason: String) async {
+    private func restartP2PTunnelAndWait(reason: String, routeMode: String? = nil) async {
         p2pTunnelQueue.sync {
+            if let routeMode {
+                p2pTunnelRouteMode = routeMode
+            }
             restartP2PTunnelLocked(reason: reason)
         }
     }
 
     private func restartP2PTunnelLocked(reason: String) {
         syncDiagnosticsLog("SyncEngine", "P2P tunnel restarting (\(reason))")
+        let routeMode = p2pTunnelRouteMode
         stopP2PTunnelLocked(reason: reason)
+        p2pTunnelRouteMode = routeMode
         startP2PTunnelIfNeededLocked(reason: "\(reason)_restart")
     }
 
@@ -7629,7 +7642,20 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             "SharedFiles",
             "restarting rejected P2P tunnel reason=\(reason) active=\(state.isActive) starting=\(state.isStarting) port=\(state.port.map(String.init) ?? "nil") selectedRoute=\(normalizedICERouteLabel(state.selectedICERoute))"
         )
-        await restartP2PTunnelAndWait(reason: "\(reason)_rejected_tunnel")
+        let nextRouteMode = SharedFilesRoutePolicy.nextP2PTunnelRouteModeAfterRejectedRoute(
+            currentRouteMode: state.routeMode,
+            selectedICERoute: state.selectedICERoute
+        )
+        await restartP2PTunnelAndWait(
+            reason: "\(reason)_rejected_tunnel",
+            routeMode: nextRouteMode
+        )
+        if state.routeMode != nextRouteMode {
+            syncDiagnosticsLog(
+                "SharedFiles",
+                "advanced P2P tunnel route mode reason=\(reason) \(state.routeMode)->\(nextRouteMode) selectedRoute=\(normalizedICERouteLabel(state.selectedICERoute))"
+            )
+        }
     }
 
     private func applySharedFilesLANRoute(host: String, reason: String) {
