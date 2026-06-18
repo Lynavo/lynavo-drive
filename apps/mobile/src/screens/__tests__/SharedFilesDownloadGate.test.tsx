@@ -1,6 +1,12 @@
 import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
-import { Alert, NativeModules } from 'react-native';
+import {
+  Alert,
+  NativeEventEmitter,
+  NativeModules,
+  StyleSheet,
+  type EmitterSubscription,
+} from 'react-native';
 
 let mockVisualQaEnabled = false;
 
@@ -388,6 +394,9 @@ describe('SharedFilesGlobalScreen', () => {
 
 describe('RemoteAccessGlobalScreen', () => {
   const mockBindingState = jest.fn();
+  const nativeEventHandlers: Partial<
+    Record<string, (payload: unknown) => void>
+  > = {};
   const testGlobal = globalThis as typeof globalThis & {
     __SYNCFLOW_REMOTE_RESOURCES_PREVIEW__?: boolean;
   };
@@ -401,11 +410,27 @@ describe('RemoteAccessGlobalScreen', () => {
       addListener: jest.fn(),
       removeListeners: jest.fn(),
     };
+    Object.keys(nativeEventHandlers).forEach(key => {
+      delete nativeEventHandlers[key];
+    });
+    jest
+      .spyOn(NativeEventEmitter.prototype, 'addListener')
+      .mockImplementation((eventName, listener) => {
+        nativeEventHandlers[String(eventName)] = listener as (
+          payload: unknown,
+        ) => void;
+        return { remove: jest.fn() } as unknown as EmitterSubscription;
+      });
     mockBindingState.mockResolvedValue({
       deviceId: 'desktop-device-id',
       host: '192.168.1.100',
       connectionState: 'connected',
     });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
   });
 
   it('keeps an empty real response empty unless the remote preview gate is explicit', async () => {
@@ -452,6 +477,264 @@ describe('RemoteAccessGlobalScreen', () => {
     expect(queryByText('MacBook Pro / 用户目录')).toBeNull();
   });
 
+  it('shows the current shared-files route from the binding snapshot', async () => {
+    mockBindingState.mockResolvedValueOnce({
+      deviceId: 'desktop-device-id',
+      deviceName: 'Studio Mini',
+      host: 'Studio-Mini.local',
+      connectionState: 'connected',
+      sharedFilesReachability: {
+        deviceId: 'desktop-device-id',
+        state: 'available',
+        route: 'lan',
+        reason: 'browse_shared_files_success',
+        updatedAt: '2026-06-17T08:00:00.000Z',
+      },
+    });
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([]);
+
+    const { getByText } = render(
+      <TestErrorBoundary>
+        <RemoteAccessGlobalScreen />
+      </TestErrorBoundary>,
+    );
+
+    await waitFor(() => {
+      expect(getByText('局域网')).toBeTruthy();
+    });
+  });
+
+  it('keeps the shared-files route out of the top-right selection actions', async () => {
+    mockBindingState.mockResolvedValueOnce({
+      deviceId: 'desktop-device-id',
+      deviceName: 'Studio Mini',
+      host: 'Studio-Mini.local',
+      connectionState: 'connected',
+      sharedFilesReachability: {
+        deviceId: 'desktop-device-id',
+        state: 'available',
+        route: 'lan',
+        reason: 'browse_shared_files_success',
+        updatedAt: '2026-06-17T08:00:00.000Z',
+      },
+    });
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([]);
+
+    const { getByText } = render(
+      <TestErrorBoundary>
+        <RemoteAccessGlobalScreen />
+      </TestErrorBoundary>,
+    );
+
+    await waitFor(() => {
+      expect(getByText('局域网')).toBeTruthy();
+    });
+
+    let cursor = getByText('局域网').parent;
+    let nestedInHeaderActions = false;
+    while (cursor) {
+      const ancestorStyle = StyleSheet.flatten(cursor.props.style);
+      if (
+        ancestorStyle?.alignItems === 'flex-end' &&
+        ancestorStyle?.gap === 6
+      ) {
+        nestedInHeaderActions = true;
+        break;
+      }
+      cursor = cursor.parent;
+    }
+
+    expect(nestedInHeaderActions).toBe(false);
+  });
+
+  it('maps the native tunnel route to the P2P badge', async () => {
+    mockBindingState.mockResolvedValueOnce({
+      deviceId: 'desktop-device-id',
+      host: '192.168.1.100',
+      connectionState: 'connected',
+      sharedFilesReachability: {
+        deviceId: 'desktop-device-id',
+        state: 'available',
+        route: 'tunnel',
+        reason: 'browse_shared_files_success',
+        updatedAt: '2026-06-17T08:00:00.000Z',
+      },
+    });
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([]);
+
+    const { getByText } = render(
+      <TestErrorBoundary>
+        <RemoteAccessGlobalScreen />
+      </TestErrorBoundary>,
+    );
+
+    await waitFor(() => {
+      expect(getByText('P2P')).toBeTruthy();
+    });
+  });
+
+  it('updates the shared-files route badge from native reachability events', async () => {
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([]);
+
+    const { getByText } = render(
+      <TestErrorBoundary>
+        <RemoteAccessGlobalScreen />
+      </TestErrorBoundary>,
+    );
+
+    await waitFor(() => {
+      expect(mockListGlobalRemoteAccessResources).toHaveBeenCalledWith();
+    });
+
+    await act(async () => {
+      nativeEventHandlers.onSharedFilesReachabilityChanged?.({
+        deviceId: 'desktop-device-id',
+        state: 'available',
+        route: 'relay',
+        reason: 'browse_shared_files_success',
+        updatedAt: '2026-06-17T08:01:00.000Z',
+      });
+    });
+
+    await waitFor(() => {
+      expect(getByText('中继服务器')).toBeTruthy();
+    });
+  });
+
+  it('keeps a successful LAN browse badge when a later native event is still waking', async () => {
+    mockBindingState.mockResolvedValue({
+      deviceId: 'desktop-device-id',
+      deviceName: 'Studio Mini',
+      host: 'Studio-Mini.local',
+      connectionState: 'connected',
+      sharedFilesReachability: {
+        deviceId: 'desktop-device-id',
+        state: 'waking',
+        route: null,
+        reason: 'wake_in_progress',
+        updatedAt: '2026-06-17T08:00:00.000Z',
+      },
+    });
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([
+      {
+        resourceId: 'personal-dir:Project%20Files',
+        desktopDeviceId: 'desktop-device-id',
+        displayName: 'Project Files',
+        kind: 'shared_folder',
+        status: 'available',
+        addedAt: '2026-06-16T08:00:00.000Z',
+        downloadCount: 0,
+      },
+    ]);
+
+    const { getByText, queryByText } = render(
+      <TestErrorBoundary>
+        <RemoteAccessGlobalScreen />
+      </TestErrorBoundary>,
+    );
+
+    await waitFor(() => {
+      expect(getByText('Project Files')).toBeTruthy();
+      expect(getByText('局域网')).toBeTruthy();
+    });
+
+    await act(async () => {
+      nativeEventHandlers.onSharedFilesReachabilityChanged?.({
+        deviceId: 'desktop-device-id',
+        state: 'waking',
+        route: null,
+        reason: 'wake_in_progress',
+        updatedAt: '2026-06-17T08:01:00.000Z',
+      });
+    });
+
+    expect(getByText('局域网')).toBeTruthy();
+    expect(queryByText('唤醒中')).toBeNull();
+  });
+
+  it('falls back to the disconnected state when global remote loading times out', async () => {
+    jest.useFakeTimers();
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockListGlobalRemoteAccessResources.mockImplementationOnce(
+      () => new Promise(() => {}),
+    );
+
+    const { getByText, queryByText } = render(
+      <TestErrorBoundary>
+        <RemoteAccessGlobalScreen />
+      </TestErrorBoundary>,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mockListGlobalRemoteAccessResources).toHaveBeenCalledWith();
+    expect(getByText('远程资源加载中')).toBeTruthy();
+
+    await act(async () => {
+      jest.advanceTimersByTime(35_000);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(getByText('网络断开')).toBeTruthy();
+    expect(queryByText('远程资源加载中')).toBeNull();
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[RemoteAccessScreen] Failed to load data:',
+      expect.any(Error),
+    );
+
+    await act(async () => {
+      jest.runOnlyPendingTimers();
+    });
+  });
+
+  it('silently retries the first global remote list while the shared-files route is becoming ready', async () => {
+    jest.useFakeTimers();
+    mockListGlobalRemoteAccessResources
+      .mockRejectedValueOnce(new Error('No shared files route available'))
+      .mockResolvedValueOnce([
+        {
+          resourceId: 'personal-dir:Project%20Files',
+          desktopDeviceId: 'desktop-device-id',
+          displayName: 'Project Files',
+          kind: 'shared_folder',
+          status: 'available',
+          addedAt: '2026-06-16T08:00:00.000Z',
+          downloadCount: 0,
+        },
+      ]);
+
+    const { getByText, queryByText } = render(
+      <TestErrorBoundary>
+        <RemoteAccessGlobalScreen />
+      </TestErrorBoundary>,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mockListGlobalRemoteAccessResources).toHaveBeenCalledTimes(1);
+    expect(queryByText('网络断开')).toBeNull();
+
+    await act(async () => {
+      jest.advanceTimersByTime(1_200);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(getByText('Project Files')).toBeTruthy();
+    });
+    expect(mockListGlobalRemoteAccessResources).toHaveBeenCalledTimes(2);
+    expect(queryByText('网络断开')).toBeNull();
+  });
+
   it('loads real shared folder contents when a production folder is opened', async () => {
     mockListGlobalRemoteAccessResources.mockResolvedValueOnce([
       {
@@ -482,8 +765,22 @@ describe('RemoteAccessGlobalScreen', () => {
           size: 2048,
           modifiedAt: '2026-06-16T08:31:00.000Z',
         },
+        {
+          name: 'cover.jpg',
+          path: 'cover.jpg',
+          type: 'image',
+          size: 4096,
+          modifiedAt: '2026-06-16T08:32:00.000Z',
+        },
+        {
+          name: 'walkthrough.mov',
+          path: 'walkthrough.mov',
+          type: 'video',
+          size: 8192,
+          modifiedAt: '2026-06-16T08:33:00.000Z',
+        },
       ],
-      totalCount: 2,
+      totalCount: 4,
     });
 
     const { getByText } = render(
@@ -507,6 +804,66 @@ describe('RemoteAccessGlobalScreen', () => {
       );
       expect(getByText('Contracts')).toBeTruthy();
       expect(getByText('brief.pdf')).toBeTruthy();
+      expect(getByText('cover.jpg')).toBeTruthy();
+      expect(getByText('walkthrough.mov')).toBeTruthy();
+    });
+  });
+
+  it('keeps sparse global remote grid items constrained to a single column', async () => {
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([
+      {
+        resourceId: 'personal-dir:command-line-tools',
+        desktopDeviceId: 'desktop-device-id',
+        displayName: 'command-line-tools',
+        kind: 'shared_folder',
+        status: 'available',
+        addedAt: '2026-06-16T08:00:00.000Z',
+        downloadCount: 0,
+      },
+    ]);
+
+    const { getByText, queryAllByTestId, queryAllByText } = render(
+      <TestErrorBoundary>
+        <RemoteAccessGlobalScreen />
+      </TestErrorBoundary>,
+    );
+
+    await waitFor(() => {
+      expect(getByText('command-line-tools')).toBeTruthy();
+    });
+
+    let gridToggle = queryAllByTestId('remote-toolbar-grid-icon')[0].parent;
+    while (gridToggle && typeof gridToggle.props.onPress !== 'function') {
+      gridToggle = gridToggle.parent;
+    }
+    if (!gridToggle) {
+      throw new Error('Unable to find grid layout toggle');
+    }
+
+    await act(async () => {
+      fireEvent.press(gridToggle);
+    });
+
+    await waitFor(() => {
+      const gridCardStyles = queryAllByText('command-line-tools').flatMap(
+        node => {
+          const ancestorStyles = [];
+          let cursor = node.parent;
+          while (cursor) {
+            ancestorStyles.push(StyleSheet.flatten(cursor.props.style));
+            cursor = cursor.parent;
+          }
+          return ancestorStyles;
+        },
+      );
+      expect(
+        gridCardStyles.some(
+          style =>
+            style?.flex !== 1 &&
+            style?.flexGrow === 0 &&
+            style?.flexShrink === 0,
+        ),
+      ).toBe(true);
     });
   });
 
@@ -570,54 +927,117 @@ describe('RemoteAccessGlobalScreen', () => {
     });
   });
 
-  it('renders remote image and video thumbnails when preview urls are available', async () => {
-    mockBindingState.mockResolvedValueOnce({
-      deviceId: 'desktop-device-id',
-      host: '192.168.1.100',
-      connectionState: 'connected',
-    });
+  it('renders global remote image thumbnails while keeping videos on file type icons', async () => {
     mockListGlobalRemoteAccessResources.mockResolvedValueOnce([
       {
-        resourceId: 'personal-dir:photo.jpg',
-        desktopDeviceId: 'personal-dir',
-        displayName: 'photo.jpg',
+        resourceId: 'personal-dir:alpha.jpg',
+        desktopDeviceId: 'desktop-device-id',
+        displayName: 'alpha.jpg',
         kind: 'shared_file',
-        status: 'available',
         fileSize: 1024,
         mediaType: 'image',
-        addedAt: '2026-06-17T08:00:00.000Z',
+        status: 'available',
+        addedAt: '2026-06-16T08:00:00.000Z',
         downloadCount: 0,
-        thumbnailUrl: 'http://127.0.0.1:39394/personal/thumb/photo.jpg',
-        previewUrl: 'http://127.0.0.1:39394/personal/stream/photo.jpg',
+        thumbnailUrl:
+          'http://192.168.1.100:39394/personal/thumbnail/alpha.jpg?v=1024-1780000',
       },
       {
-        resourceId: 'personal-dir:clip.mov',
-        desktopDeviceId: 'personal-dir',
-        displayName: 'clip.mov',
+        resourceId: 'personal-dir:beta.mov',
+        desktopDeviceId: 'desktop-device-id',
+        displayName: 'beta.mov',
         kind: 'shared_file',
-        status: 'available',
         fileSize: 2048,
         mediaType: 'video',
-        addedAt: '2026-06-17T08:01:00.000Z',
+        status: 'available',
+        addedAt: '2026-06-16T08:01:00.000Z',
         downloadCount: 0,
-        previewUrl: 'http://127.0.0.1:39394/personal/stream/clip.mov',
-        streamUrl: 'http://127.0.0.1:39394/personal/stream/clip.mov',
       },
     ]);
 
-    const { getByTestId, getByText } = render(
+    const { getByTestId, getByText, queryByTestId } = render(
       <TestErrorBoundary>
         <RemoteAccessGlobalScreen />
       </TestErrorBoundary>,
     );
 
     await waitFor(() => {
-      expect(getByText('photo.jpg')).toBeTruthy();
-      expect(getByText('clip.mov')).toBeTruthy();
+      expect(getByText('alpha.jpg')).toBeTruthy();
+      expect(getByText('beta.mov')).toBeTruthy();
     });
 
-    expect(getByTestId('remote-access-thumbnail-image')).toBeTruthy();
-    expect(getByTestId('remote-access-thumbnail-video')).toBeTruthy();
+    expect(getByTestId('remote-resource-thumbnail-image')).toBeTruthy();
+    expect(queryByTestId('remote-resource-icon-photo')).toBeNull();
+    expect(getByTestId('remote-resource-icon-video')).toBeTruthy();
+    expect(queryByTestId('remote-resource-thumbnail-video')).toBeNull();
+  });
+
+  it('falls back to the image file type icon when a global remote thumbnail fails', async () => {
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([
+      {
+        resourceId: 'personal-dir:broken.jpg',
+        desktopDeviceId: 'desktop-device-id',
+        displayName: 'broken.jpg',
+        kind: 'shared_file',
+        fileSize: 1024,
+        mediaType: 'image',
+        status: 'available',
+        addedAt: '2026-06-16T08:00:00.000Z',
+        downloadCount: 0,
+        thumbnailUrl:
+          'http://192.168.1.100:39394/personal/thumbnail/broken.jpg?v=1024-1780000',
+      },
+    ]);
+
+    const { getByTestId, getByText, queryByTestId } = render(
+      <TestErrorBoundary>
+        <RemoteAccessGlobalScreen />
+      </TestErrorBoundary>,
+    );
+
+    await waitFor(() => {
+      expect(getByText('broken.jpg')).toBeTruthy();
+      expect(getByTestId('remote-resource-thumbnail-image')).toBeTruthy();
+    });
+
+    fireEvent(getByTestId('remote-resource-thumbnail-image'), 'error');
+
+    await waitFor(() => {
+      expect(queryByTestId('remote-resource-thumbnail-image')).toBeNull();
+      expect(getByTestId('remote-resource-icon-photo')).toBeTruthy();
+    });
+  });
+
+  it('limits the global remote FlatList render batch to ten rows', async () => {
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce(
+      Array.from({ length: 12 }, (_, index) => ({
+        resourceId: `personal-dir:photo-${index}.jpg`,
+        desktopDeviceId: 'desktop-device-id',
+        displayName: `photo-${index}.jpg`,
+        kind: 'shared_file' as const,
+        fileSize: 1024,
+        mediaType: 'image',
+        status: 'available' as const,
+        addedAt: '2026-06-16T08:00:00.000Z',
+        downloadCount: 0,
+        thumbnailUrl: `http://192.168.1.100:39394/personal/thumbnail/photo-${index}.jpg?v=1024-1780000`,
+      })),
+    );
+
+    const { UNSAFE_getByProps, getByText } = render(
+      <TestErrorBoundary>
+        <RemoteAccessGlobalScreen />
+      </TestErrorBoundary>,
+    );
+
+    await waitFor(() => {
+      expect(getByText('photo-0.jpg')).toBeTruthy();
+    });
+
+    const list = UNSAFE_getByProps({ initialNumToRender: 10 });
+    expect(list.props.initialNumToRender).toBe(10);
+    expect(list.props.maxToRenderPerBatch).toBe(10);
+    expect(list.props.windowSize).toBeLessThanOrEqual(7);
   });
 
   it('uses reference lucide toolbar icons instead of Ionicons glyph mappings', async () => {
@@ -1080,7 +1500,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
     });
   });
 
-  it('renders received video preview frame and opens the real video preview', async () => {
+  it('renders received video icon without preloading the video and opens the real video preview', async () => {
     mockListCurrentClientReceivedLibrary.mockResolvedValueOnce([
       {
         resourceId: 'received-video',
@@ -1103,7 +1523,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
       'http://192.168.1.100:39394/resources/mobile/received/stream?clientId=client-001&fileKey=received%2Fbeta.mov',
     );
 
-    const { getByLabelText, getByTestId, getByText } = render(
+    const { getByLabelText, getByTestId, getByText, queryByTestId } = render(
       <TestErrorBoundary>
         <PhoneSyncSpaceGlobalScreen />
       </TestErrorBoundary>,
@@ -1113,7 +1533,8 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
       expect(getByText('beta.mov')).toBeTruthy();
     });
 
-    expect(getByTestId('phone-sync-thumbnail-video')).toBeTruthy();
+    expect(queryByTestId('phone-sync-thumbnail-video')).toBeNull();
+    expect(getByTestId('phone-sync-media-icon-video')).toBeTruthy();
 
     fireEvent.press(getByLabelText('预览已同步文件'));
 

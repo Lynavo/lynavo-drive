@@ -3777,14 +3777,19 @@ class NativeSyncEngineModule(
       snapshotTunnelStarting = snapshot.isStarting,
       snapshotTunnelPort = snapshot.port,
     )
+    val authorizationToken = requestAccessToken.takeIf { normalizedScope == "personal" }?.trim()?.ifBlank { null }
     return SharedFileRoute(
       scope = normalizedScope,
       kind = kind,
       path = path,
-      url = URL("http", decision.host, decision.port, endpoint),
+      url = appendSharedDirectoryQueryParams(
+        URL("http", decision.host, decision.port, endpoint),
+        normalizedScope,
+        authorizationToken,
+      ),
       urlHost = decision.host,
       port = decision.port,
-      authorizationToken = requestAccessToken.takeIf { normalizedScope == "personal" }?.trim()?.ifBlank { null },
+      authorizationToken = authorizationToken,
       displayHost = displayHost,
       isTunnel = decision.isTunnel,
       reachabilityRoute = if (decision.isTunnel) currentSharedFilesTunnelReachabilityRoute() else "lan",
@@ -3888,9 +3893,29 @@ class NativeSyncEngineModule(
   }
 
   private fun appendSharedDirectoryAccessToken(url: URL, route: SharedFileRoute): URL {
-    val token = route.authorizationToken ?: return url
+    return appendSharedDirectoryQueryParams(url, route.scope, route.authorizationToken)
+  }
+
+  private fun appendSharedDirectoryQueryParams(url: URL, scope: String, authorizationToken: String?): URL {
+    val queryItems = mutableListOf<Pair<String, String>>()
+    authorizationToken?.trim()?.takeIf { it.isNotBlank() }?.let {
+      queryItems.add("access_token" to it)
+    }
+    if (scope == "personal") {
+      val clientId = getOrCreateClientId().trim()
+      if (clientId.isNotBlank()) {
+        queryItems.add("clientId" to clientId)
+        queryItems.add("clientName" to getClientDisplayNameValue().trim().ifBlank { clientId })
+      }
+    }
+    if (queryItems.isEmpty()) {
+      return url
+    }
     val separator = if (url.query.isNullOrBlank()) "?" else "&"
-    return URL("${url}$separator" + "access_token=${URLEncoder.encode(token, "UTF-8")}")
+    val query = queryItems.joinToString("&") { (name, value) ->
+      "$name=${URLEncoder.encode(value, "UTF-8")}"
+    }
+    return URL("${url}$separator$query")
   }
 
   private fun p2pTunnelRouteSnapshot(): P2PTunnelRouteSnapshot =

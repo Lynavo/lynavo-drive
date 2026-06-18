@@ -55,4 +55,26 @@ describe('file-preview', () => {
     expect(canPreviewDocumentFile('text/plain', 'README')).toBe(false);
     expect(canPreviewDocumentFile('application/pdf', 'report.pdf')).toBe(true);
   });
+
+  it('does not crash at module load when the native share module is missing', async () => {
+    jest.resetModules();
+    jest.doMock('react-native-share', () => {
+      throw new Error('RNShare could not be found');
+    });
+
+    let moduleUnderTest: typeof import('../file-preview') | undefined;
+    expect(() => {
+      moduleUnderTest = require('../file-preview') as typeof import('../file-preview');
+    }).not.toThrow();
+    if (!moduleUnderTest) {
+      throw new Error('file-preview module did not load');
+    }
+
+    await expect(
+      moduleUnderTest.openFileWithOtherApp('/tmp/cache-item', 'cache-item'),
+    ).rejects.toThrow('react-native-share open is unavailable');
+
+    jest.dontMock('react-native-share');
+    jest.resetModules();
+  });
 });

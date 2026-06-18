@@ -158,9 +158,10 @@ enum SharedFilesRoutePolicy {
 
     static func shouldWaitForP2PTunnelRoute(
         hasTunnelCredentials: Bool,
-        isTunnelActive: Bool
+        isTunnelActive: Bool,
+        hasUsableDirectRouteHost: Bool
     ) -> Bool {
-        hasTunnelCredentials && !isTunnelActive
+        hasTunnelCredentials && !isTunnelActive && !hasUsableDirectRouteHost
     }
 
     static func shouldAcceptActiveP2PTunnelRoute(

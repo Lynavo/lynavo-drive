@@ -822,8 +822,26 @@ describe('desktop-local-service', () => {
           modifiedAt: '2026-06-17T08:01:00.000Z',
           streamUrl: 'http://127.0.0.1:39394/personal/stream/clip.mov',
         },
+        {
+          name: 'cover.jpg',
+          path: 'cover.jpg',
+          type: 'image',
+          size: 2048,
+          modifiedAt: '2026-06-17T08:02:00.000Z',
+          thumbnailUrl:
+            'http://192.168.1.100:39394/personal/thumbnail/cover.jpg?v=2048-1780000',
+        },
+        {
+          name: 'walkthrough.mov',
+          path: 'walkthrough.mov',
+          type: 'video',
+          size: 4096,
+          modifiedAt: '2026-06-17T08:03:00.000Z',
+          streamUrl:
+            'http://192.168.1.100:39394/personal/stream/walkthrough.mov',
+        },
       ],
-      totalCount: 2,
+      totalCount: 4,
     });
 
     await expect(listGlobalRemoteAccessResources()).resolves.toEqual([
@@ -848,8 +866,30 @@ describe('desktop-local-service', () => {
         mediaType: 'video',
         addedAt: '2026-06-17T08:01:00.000Z',
         downloadCount: 0,
-        previewUrl: 'http://127.0.0.1:39394/personal/stream/clip.mov',
-        streamUrl: 'http://127.0.0.1:39394/personal/stream/clip.mov',
+      },
+      {
+        resourceId: 'personal-dir:cover.jpg',
+        desktopDeviceId: 'personal-dir',
+        kind: 'shared_file',
+        displayName: 'cover.jpg',
+        status: 'available',
+        fileSize: 2048,
+        mediaType: 'image',
+        thumbnailUrl:
+          'http://192.168.1.100:39394/personal/thumbnail/cover.jpg?v=2048-1780000',
+        addedAt: '2026-06-17T08:02:00.000Z',
+        downloadCount: 0,
+      },
+      {
+        resourceId: 'personal-dir:walkthrough.mov',
+        desktopDeviceId: 'personal-dir',
+        kind: 'shared_file',
+        displayName: 'walkthrough.mov',
+        status: 'available',
+        fileSize: 4096,
+        mediaType: 'video',
+        addedAt: '2026-06-17T08:03:00.000Z',
+        downloadCount: 0,
       },
     ]);
     expect(mockedBrowseDirectory).toHaveBeenCalledWith('personal');

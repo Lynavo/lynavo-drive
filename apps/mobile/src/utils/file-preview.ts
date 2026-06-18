@@ -1,4 +1,4 @@
-import Share, { type ShareOptions } from 'react-native-share';
+import type { ShareOptions } from 'react-native-share';
 
 type ShareOpen = (options: ShareOptions) => Promise<unknown>;
 type ShareModuleShape = {
@@ -9,7 +9,12 @@ type ShareModuleShape = {
 };
 
 function resolveShareOpen(): ShareOpen {
-  const shareModule = Share as unknown as ShareModuleShape;
+  let shareModule: ShareModuleShape;
+  try {
+    shareModule = require('react-native-share') as ShareModuleShape;
+  } catch {
+    throw new Error('react-native-share open is unavailable');
+  }
   const shareOpen = shareModule.open ?? shareModule.default?.open;
   if (!shareOpen) {
     throw new Error('react-native-share open is unavailable');

@@ -48,6 +48,10 @@ export type ReceivedLibraryMediaItem = ReceivedLibraryItemDTO & {
   streamUrl?: string;
 };
 
+export type GlobalRemoteAccessResource = DesktopSharedResourceDTO & {
+  thumbnailUrl?: string;
+};
+
 const SHARED_DIRECTORY_RESOURCE_PREFIX = 'shared-dir:';
 const SHARED_DIRECTORY_DESKTOP_ID = 'shared-dir';
 const SHARED_FOLDER_ENTRY_PREFIX = 'shared-folder-entry:';
@@ -265,8 +269,8 @@ function directoryFileToSharedResource(
 
 function personalDirectoryFileToSharedResource(
   file: DirectoryFileDTO,
-): DesktopSharedResourceWithPreview {
-  return {
+): GlobalRemoteAccessResource {
+  const resource: GlobalRemoteAccessResource = {
     resourceId: personalDirectoryResourceId(file.path),
     desktopDeviceId: PERSONAL_DIRECTORY_DESKTOP_ID,
     kind: file.isDirectory ? 'shared_folder' : 'shared_file',
@@ -276,8 +280,12 @@ function personalDirectoryFileToSharedResource(
     mediaType: file.type,
     addedAt: file.modifiedAt,
     downloadCount: 0,
-    ...directoryFilePreviewUrls(file),
   };
+  const thumbnailUrl = file.thumbnailUrl?.trim();
+  if (!file.isDirectory && isImageMedia(file.type, file.name) && thumbnailUrl) {
+    resource.thumbnailUrl = thumbnailUrl;
+  }
+  return resource;
 }
 
 function directoryFilePreviewUrls(
@@ -484,7 +492,7 @@ export async function listSharedResources(
 }
 
 export async function listGlobalRemoteAccessResources(): Promise<
-  DesktopSharedResourceDTO[]
+  GlobalRemoteAccessResource[]
 > {
   const listing = await browseDirectory('personal');
   return listing.files.map(personalDirectoryFileToSharedResource);

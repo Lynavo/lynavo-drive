@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -6,6 +6,7 @@ import {
   FlatList,
   Image,
   Modal,
+  NativeEventEmitter,
   NativeModules,
   Pressable,
   StyleSheet,
@@ -37,6 +38,7 @@ import {
   type BindingStateDTO,
   type DirectoryFileDTO,
   type DesktopSharedResourceDTO,
+  type SharedFilesReachabilityDTO,
 } from '@syncflow/contracts';
 
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -72,9 +74,7 @@ type RemoteResourceItem = DesktopSharedResourceDTO & {
   countLabel?: string;
   modifiedLabel?: string;
   preview?: 'blue' | 'dark' | 'settings';
-  previewUrl?: string;
   thumbnailUrl?: string;
-  streamUrl?: string;
   sharedRootResourceId?: string;
   relativePath?: string;
 };
@@ -94,6 +94,11 @@ type RemoteResourcePreviewState = {
   item: RemoteResourceItem;
   url: string;
 };
+type RouteStatusTone = 'online' | 'pending' | 'offline';
+type RouteStatusViewModel = {
+  label: string;
+  tone: RouteStatusTone;
+};
 
 const SORT_OPTIONS: Array<{ id: SortKey; label: string }> = [
   { id: 'name', label: '名称' },
@@ -108,6 +113,10 @@ const FALLBACK_DESKTOP_LABEL = '当前电脑';
 const LOCAL_SAVE_UNSUPPORTED_TITLE = '暂不支持保存';
 const LOCAL_SAVE_UNSUPPORTED_MESSAGE =
   '当前版本还没有接入客户端本地保存能力，请等待后续版本。';
+const REMOTE_ACCESS_REQUEST_TIMEOUT_MS = 30_000;
+const REMOTE_ACCESS_TIMEOUT_ERROR_MESSAGE = 'Remote access request timed out';
+const REMOTE_ACCESS_READY_RETRY_ATTEMPTS = 2;
+const REMOTE_ACCESS_READY_RETRY_DELAY_MS = 1_200;
 const REMOTE_RESOURCE_ICON_GRADIENTS: Record<
   RemoteResourceIconType,
   RemoteResourceGradientStop[]
@@ -384,6 +393,62 @@ function getPreviewRootItems() {
   return isRemoteResourcesPreviewMode() ? MOCK_ROOT_ITEMS : [];
 }
 
+function withRemoteAccessTimeout<T>(operation: Promise<T>): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(REMOTE_ACCESS_TIMEOUT_ERROR_MESSAGE));
+    }, REMOTE_ACCESS_REQUEST_TIMEOUT_MS);
+  });
+
+  return Promise.race([operation, timeout]).finally(() => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  });
+}
+
+function isRemoteAccessTimeoutError(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message === REMOTE_ACCESS_TIMEOUT_ERROR_MESSAGE
+  );
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function withRemoteAccessReadyRetry<T>(
+  operation: () => Promise<T>,
+): Promise<T> {
+  let lastError: unknown;
+  for (
+    let attempt = 1;
+    attempt <= REMOTE_ACCESS_READY_RETRY_ATTEMPTS;
+    attempt += 1
+  ) {
+    try {
+      return await withRemoteAccessTimeout(operation());
+    } catch (error) {
+      lastError = error;
+      if (
+        isRemoteAccessTimeoutError(error) ||
+        attempt >= REMOTE_ACCESS_READY_RETRY_ATTEMPTS
+      ) {
+        throw error;
+      }
+      await delay(REMOTE_ACCESS_READY_RETRY_DELAY_MS);
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('Remote access request failed');
+}
+
 function isFolder(item: RemoteResourceItem) {
   return item.kind === 'shared_folder';
 }
@@ -432,6 +497,157 @@ function firstNonEmptyString(...values: Array<string | null | undefined>) {
       return normalized;
     }
   }
+  return null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function normalizeSharedFilesReachability(
+  value: unknown,
+): SharedFilesReachabilityDTO | null {
+  const record = asRecord(value);
+  if (!record) return null;
+
+  const deviceId = nonEmptyString(record.deviceId);
+  const state = nonEmptyString(record.state);
+  if (!deviceId || !state) return null;
+
+  const route = nonEmptyString(record.route);
+  const normalizedRoute =
+    route === 'lan' || route === 'tunnel' || route === 'relay' ? route : null;
+
+  if (
+    state !== 'unknown' &&
+    state !== 'available' &&
+    state !== 'unavailable' &&
+    state !== 'waking' &&
+    state !== 'wake_setup_required' &&
+    state !== 'wake_unavailable'
+  ) {
+    return null;
+  }
+
+  return {
+    deviceId,
+    state,
+    route: normalizedRoute,
+    reason: nonEmptyString(record.reason) ?? '',
+    updatedAt: nonEmptyString(record.updatedAt) ?? new Date(0).toISOString(),
+  };
+}
+
+function getBindingSharedFilesReachability(
+  binding: unknown,
+): SharedFilesReachabilityDTO | null {
+  const record = asRecord(binding);
+  return normalizeSharedFilesReachability(record?.sharedFilesReachability);
+}
+
+function isPrivateIPv4(value: string | null): boolean {
+  if (!value) return false;
+  const parts = value.split('.').map(part => Number(part));
+  if (parts.length !== 4 || parts.some(part => !Number.isInteger(part))) {
+    return false;
+  }
+  const [first, second] = parts;
+  if (first === 10) return true;
+  if (first === 172 && second >= 16 && second <= 31) return true;
+  if (first === 192 && second === 168) return true;
+  if (first === 169 && second === 254) return true;
+  return false;
+}
+
+function getSuccessfulBrowseReachability(
+  binding: unknown,
+  nativeReachability: SharedFilesReachabilityDTO | null,
+): SharedFilesReachabilityDTO | null {
+  if (nativeReachability?.route) {
+    return {
+      ...nativeReachability,
+      state: 'available',
+      reason: nativeReachability.reason || 'browse_shared_files_success',
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  const record = asRecord(binding);
+  const host = nonEmptyString(record?.host);
+  const isConnectedBinding =
+    nonEmptyString(record?.connectionState) === 'connected';
+  if ((!host || !isPrivateIPv4(host)) && !isConnectedBinding) {
+    return null;
+  }
+
+  return {
+    deviceId:
+      nonEmptyString(record?.deviceId) ??
+      nonEmptyString(record?.desktopDeviceId) ??
+      host ??
+      'bound-desktop',
+    state: 'available',
+    route: 'lan',
+    reason: 'browse_shared_files_success',
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function getDisplayedSharedFilesReachability(
+  current: SharedFilesReachabilityDTO | null,
+  lastSuccessful: SharedFilesReachabilityDTO | null,
+): SharedFilesReachabilityDTO | null {
+  if (!lastSuccessful) return current;
+  if (!current) return lastSuccessful;
+
+  if (current.state === 'unknown' || current.state === 'waking') {
+    return lastSuccessful;
+  }
+
+  return current;
+}
+
+function getRouteStatusViewModel(
+  reachability: SharedFilesReachabilityDTO | null,
+): RouteStatusViewModel | null {
+  if (!reachability) return null;
+
+  if (reachability.state === 'available') {
+    if (reachability.route === 'lan') {
+      return { label: '局域网', tone: 'online' };
+    }
+    if (reachability.route === 'tunnel') {
+      return { label: 'P2P', tone: 'online' };
+    }
+    if (reachability.route === 'relay') {
+      return { label: '中继服务器', tone: 'online' };
+    }
+    return null;
+  }
+
+  if (reachability.state === 'waking') {
+    return { label: '唤醒中', tone: 'pending' };
+  }
+
+  if (
+    reachability.state === 'unavailable' ||
+    reachability.state === 'wake_unavailable'
+  ) {
+    return { label: '不可达', tone: 'offline' };
+  }
+
+  if (reachability.state === 'wake_setup_required') {
+    return { label: '需设置唤醒', tone: 'pending' };
+  }
+
   return null;
 }
 
@@ -504,11 +720,15 @@ function directoryFileToResourceItem({
     downloadCount: 0,
     countLabel: file.isDirectory ? '文件夹' : undefined,
     modifiedLabel: getModifiedLabel(file.modifiedAt),
-    thumbnailUrl: file.isDirectory ? undefined : file.thumbnailUrl,
-    previewUrl: file.isDirectory ? undefined : file.streamUrl,
-    streamUrl: file.isDirectory ? undefined : file.streamUrl,
     sharedRootResourceId: file.isDirectory ? resourceId : undefined,
     relativePath: '',
+    thumbnailUrl:
+      !file.isDirectory &&
+      file.type === 'image' &&
+      typeof file.thumbnailUrl === 'string' &&
+      file.thumbnailUrl.trim().length > 0
+        ? file.thumbnailUrl.trim()
+        : undefined,
   };
 }
 
@@ -563,10 +783,36 @@ export function RemoteAccessGlobalScreen() {
   const [sharing, setSharing] = useState(false);
   const [showSortSheet, setShowSortSheet] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
+  const [sharedFilesReachability, setSharedFilesReachability] =
+    useState<SharedFilesReachabilityDTO | null>(null);
+  const [
+    lastSuccessfulSharedFilesReachability,
+    setLastSuccessfulSharedFilesReachability,
+  ] = useState<SharedFilesReachabilityDTO | null>(null);
   const [resourcePreview, setResourcePreview] =
     useState<RemoteResourcePreviewState | null>(null);
 
   const currentFolder = folderStack[folderStack.length - 1] ?? null;
+
+  useEffect(() => {
+    const nativeSyncEngine = NativeModules.NativeSyncEngine;
+    if (!nativeSyncEngine) {
+      setSharedFilesReachability(null);
+      return undefined;
+    }
+
+    const emitter = new NativeEventEmitter(nativeSyncEngine);
+    const subscription = emitter.addListener(
+      'onSharedFilesReachabilityChanged',
+      payload => {
+        setSharedFilesReachability(normalizeSharedFilesReachability(payload));
+      },
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   const loadData = useCallback(async () => {
     setNetworkDisconnected(false);
@@ -585,10 +831,15 @@ export function RemoteAccessGlobalScreen() {
       }
 
       const binding = await NativeSyncEngine.getBindingState();
+      setSharedFilesReachability(getBindingSharedFilesReachability(binding));
       if (!binding || !binding.host) {
         const previewItems = getPreviewRootItems();
         setPreviewMode(previewItems.length > 0);
         setRootItems(previewItems);
+        if (previewItems.length === 0) {
+          setSharedFilesReachability(null);
+          setLastSuccessfulSharedFilesReachability(null);
+        }
         setLoading(false);
         return;
       }
@@ -598,8 +849,27 @@ export function RemoteAccessGlobalScreen() {
       );
       setDesktopDisplayName(bindingDisplayName);
 
-      const result = await listGlobalRemoteAccessResources();
+      const result = await withRemoteAccessReadyRetry(() =>
+        listGlobalRemoteAccessResources(),
+      );
       const remoteItems = result ?? [];
+      const refreshedBinding = await NativeSyncEngine.getBindingState?.();
+      const refreshedReachability =
+        getBindingSharedFilesReachability(refreshedBinding);
+      const successfulReachability = getSuccessfulBrowseReachability(
+        refreshedBinding ?? binding,
+        refreshedReachability ?? getBindingSharedFilesReachability(binding),
+      );
+      if (successfulReachability) {
+        setLastSuccessfulSharedFilesReachability(successfulReachability);
+        setSharedFilesReachability(
+          refreshedReachability?.state === 'available'
+            ? refreshedReachability
+            : successfulReachability,
+        );
+      } else if (refreshedReachability) {
+        setSharedFilesReachability(refreshedReachability);
+      }
       setDesktopDisplayName(
         firstNonEmptyString(
           bindingDisplayName,
@@ -639,12 +909,13 @@ export function RemoteAccessGlobalScreen() {
       }
 
       const folderKey = getFolderKey(folder);
+      const rootResourceId = folder.rootResourceId;
+      const folderPath = folder.path ?? '';
       setFolderLoading(true);
       setFolderLoadError(false);
       try {
-        const listing = await listGlobalRemoteAccessFolderContents(
-          folder.rootResourceId,
-          folder.path,
+        const listing = await withRemoteAccessReadyRetry(() =>
+          listGlobalRemoteAccessFolderContents(rootResourceId, folderPath),
         );
         const folderItems = listing.files.map(file =>
           directoryFileToResourceItem({
@@ -652,6 +923,15 @@ export function RemoteAccessGlobalScreen() {
             desktopDisplayName,
           }),
         );
+        const binding =
+          await NativeModules.NativeSyncEngine?.getBindingState?.();
+        const successfulReachability = getSuccessfulBrowseReachability(
+          binding,
+          getBindingSharedFilesReachability(binding),
+        );
+        if (successfulReachability) {
+          setLastSuccessfulSharedFilesReachability(successfulReachability);
+        }
         setFolderItemsByKey(prev => ({
           ...prev,
           [folderKey]: folderItems,
@@ -955,6 +1235,14 @@ export function RemoteAccessGlobalScreen() {
     desktopDisplayName,
     previewMode,
   });
+  const routeStatus = getRouteStatusViewModel(
+    networkDisconnected
+      ? null
+      : getDisplayedSharedFilesReachability(
+          sharedFilesReachability,
+          lastSuccessfulSharedFilesReachability,
+        ),
+  );
 
   const renderItem = ({ item }: { item: RemoteResourceItem }) => {
     return layoutMode === 'grid'
@@ -997,29 +1285,36 @@ export function RemoteAccessGlobalScreen() {
             <Text style={styles.headerTitle} numberOfLines={1}>
               {title}
             </Text>
-            <Text style={styles.headerSubtitle} numberOfLines={1}>
-              {subtitle}
-            </Text>
+            <View style={styles.headerSubtitleRow}>
+              <Text style={styles.headerSubtitle} numberOfLines={1}>
+                {subtitle}
+              </Text>
+              {routeStatus ? (
+                <RemoteAccessRouteBadge status={routeStatus} variant="inline" />
+              ) : null}
+            </View>
           </View>
-          <TouchableOpacity
-            style={[
-              styles.selectionButton,
-              selectionMode ? styles.selectionButtonActive : null,
-            ]}
-            onPress={handleSelectionButton}
-            activeOpacity={0.7}
-          >
-            <Text
+          <View style={styles.headerActions}>
+            <TouchableOpacity
               style={[
-                styles.selectionButtonText,
-                selectionMode ? styles.selectionButtonActiveText : null,
+                styles.selectionButton,
+                selectionMode ? styles.selectionButtonActive : null,
               ]}
+              onPress={handleSelectionButton}
+              activeOpacity={0.7}
             >
-              {selectionMode
-                ? '完成'
-                : t('sharedFiles.remoteAccess.select') || '選擇'}
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[
+                  styles.selectionButtonText,
+                  selectionMode ? styles.selectionButtonActiveText : null,
+                ]}
+              >
+                {selectionMode
+                  ? '完成'
+                  : t('sharedFiles.remoteAccess.select') || '選擇'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.searchBox}>
@@ -1168,6 +1463,9 @@ export function RemoteAccessGlobalScreen() {
             data={visibleItems}
             keyExtractor={item => item.resourceId}
             renderItem={renderItem}
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={7}
             numColumns={layoutMode === 'grid' ? 3 : 1}
             columnWrapperStyle={
               layoutMode === 'grid' ? styles.gridRow : undefined
@@ -1201,6 +1499,47 @@ export function RemoteAccessGlobalScreen() {
         onClose={() => setResourcePreview(null)}
       />
     </GlobalGradientBackground>
+  );
+}
+
+function RemoteAccessRouteBadge({
+  status,
+  variant = 'default',
+}: {
+  status: RouteStatusViewModel;
+  variant?: 'default' | 'inline';
+}) {
+  const inline = variant === 'inline';
+  return (
+    <View
+      accessibilityLabel={`远端访问连接方式：${status.label}`}
+      style={[
+        styles.routeBadge,
+        status.tone === 'pending' ? styles.routeBadgePending : null,
+        status.tone === 'offline' ? styles.routeBadgeOffline : null,
+        inline ? styles.routeBadgeInline : null,
+      ]}
+    >
+      <View
+        style={[
+          styles.routeBadgeDot,
+          inline ? styles.routeBadgeDotInline : null,
+          status.tone === 'pending' ? styles.routeBadgeDotPending : null,
+          status.tone === 'offline' ? styles.routeBadgeDotOffline : null,
+        ]}
+      />
+      <Text
+        style={[
+          styles.routeBadgeText,
+          inline ? styles.routeBadgeTextInline : null,
+          status.tone === 'pending' ? styles.routeBadgeTextPending : null,
+          status.tone === 'offline' ? styles.routeBadgeTextOffline : null,
+        ]}
+        numberOfLines={1}
+      >
+        {status.label}
+      </Text>
+    </View>
   );
 }
 
@@ -1284,64 +1623,6 @@ function RemoteResourceTypeIcon({
       <RemoteResourceGlyph type={type} />
     </View>
   );
-}
-
-function RemoteResourceThumbnail({
-  item,
-  type,
-  style,
-}: {
-  item: RemoteResourceItem;
-  type: RemoteResourceIconType;
-  style: StyleProp<ViewStyle>;
-}) {
-  const [imageFailed, setImageFailed] = useState(false);
-  const [videoFailed, setVideoFailed] = useState(false);
-  const imagePreviewUrl = item.thumbnailUrl || item.previewUrl || item.streamUrl;
-  const videoPreviewUrl = item.streamUrl || item.previewUrl;
-
-  if (type === 'photo' && imagePreviewUrl && !imageFailed) {
-    return (
-      <View style={[styles.remoteResourceThumbnail, style]}>
-        <Image
-          testID="remote-access-thumbnail-image"
-          source={{ uri: imagePreviewUrl }}
-          style={styles.remoteResourceThumbnailMedia}
-          resizeMode="cover"
-          accessibilityLabel={`${item.displayName} 缩略图`}
-          onError={() => setImageFailed(true)}
-        />
-      </View>
-    );
-  }
-
-  if (type === 'video' && videoPreviewUrl && !videoFailed) {
-    return (
-      <View style={[styles.remoteResourceThumbnail, style]}>
-        <Video
-          testID="remote-access-thumbnail-video"
-          source={{ uri: videoPreviewUrl }}
-          style={styles.remoteResourceThumbnailMedia}
-          resizeMode="cover"
-          paused
-          muted
-          repeat={false}
-          onError={() => setVideoFailed(true)}
-        />
-        <View style={styles.remoteResourceThumbnailPlayBadge}>
-          <Play
-            size={12}
-            color="#FFFFFF"
-            fill="#FFFFFF"
-            strokeWidth={2}
-            style={styles.videoPlayIcon}
-          />
-        </View>
-      </View>
-    );
-  }
-
-  return <RemoteResourceTypeIcon type={type} style={style} />;
 }
 
 function RemoteResourceGlyph({ type }: { type: RemoteResourceIconType }) {
@@ -1441,9 +1722,9 @@ function renderListItem({
         onOpenFile(item);
       }}
     >
-      <RemoteResourceThumbnail
+      <RemoteResourceVisual
         item={item}
-        type={iconType}
+        iconType={iconType}
         style={styles.iconWrapper}
       />
       <View style={styles.infoWrapper}>
@@ -1525,9 +1806,9 @@ function renderGridItem({
           onOpenFile(item);
         }}
       >
-        <RemoteResourceThumbnail
+        <RemoteResourceVisual
           item={item}
-          type={iconType}
+          iconType={iconType}
           style={styles.gridIconWrapper}
         />
         {selectionMode && !folder ? (
@@ -1560,6 +1841,36 @@ function renderGridItem({
       </Text>
     </View>
   );
+}
+
+function RemoteResourceVisual({
+  item,
+  iconType,
+  style,
+}: {
+  item: RemoteResourceItem;
+  iconType: RemoteResourceIconType;
+  style: StyleProp<ViewStyle>;
+}) {
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
+  const thumbnailUrl =
+    isImage(item) && !thumbnailFailed ? item.thumbnailUrl?.trim() : undefined;
+
+  if (thumbnailUrl) {
+    return (
+      <View style={style}>
+        <Image
+          testID="remote-resource-thumbnail-image"
+          source={{ uri: thumbnailUrl }}
+          style={styles.remoteResourceThumbnail}
+          resizeMode="cover"
+          onError={() => setThumbnailFailed(true)}
+        />
+      </View>
+    );
+  }
+
+  return <RemoteResourceTypeIcon type={iconType} style={style} />;
 }
 
 function RemoteResourcePreviewModal({
@@ -1902,10 +2213,81 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.foreground,
   },
+  headerSubtitleRow: {
+    marginTop: 3,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
   headerSubtitle: {
-    marginTop: 2,
+    flexShrink: 1,
+    minWidth: 0,
     fontSize: 11,
     color: '#59616D',
+  },
+  headerActions: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  routeBadge: {
+    minHeight: 24,
+    maxWidth: 96,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(219,241,255,0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(40,132,214,0.18)',
+  },
+  routeBadgePending: {
+    backgroundColor: 'rgba(255,248,222,0.94)',
+    borderColor: 'rgba(217,158,28,0.20)',
+  },
+  routeBadgeOffline: {
+    backgroundColor: 'rgba(255,232,232,0.94)',
+    borderColor: 'rgba(220,38,38,0.18)',
+  },
+  routeBadgeInline: {
+    minHeight: 18,
+    maxWidth: 88,
+    paddingHorizontal: 0,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+  },
+  routeBadgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
+  },
+  routeBadgeDotPending: {
+    backgroundColor: '#D99E1C',
+  },
+  routeBadgeDotOffline: {
+    backgroundColor: '#DC2626',
+  },
+  routeBadgeDotInline: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
+  routeBadgeText: {
+    flexShrink: 1,
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  routeBadgeTextInline: {
+    fontSize: 11,
+  },
+  routeBadgeTextPending: {
+    color: '#9A6A11',
+  },
+  routeBadgeTextOffline: {
+    color: '#B91C1C',
   },
   selectionButton: {
     minWidth: 52,
@@ -2039,6 +2421,7 @@ const styles = StyleSheet.create({
   },
   gridRow: {
     gap: 10,
+    justifyContent: 'flex-start',
   },
   card: {
     flexDirection: 'row',
@@ -2053,9 +2436,10 @@ const styles = StyleSheet.create({
     ...glassShadow,
   },
   gridCard: {
-    flex: 1,
+    width: GRID_CARD_WIDTH,
+    flexGrow: 0,
+    flexShrink: 0,
     minWidth: 0,
-    maxWidth: GRID_CARD_WIDTH,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.70)',
@@ -2076,6 +2460,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.75)',
+    overflow: 'hidden',
   },
   gridIconWrapper: {
     width: '100%',
@@ -2085,6 +2470,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.75)',
+    overflow: 'hidden',
+  },
+  remoteResourceThumbnail: {
+    width: '100%',
+    height: '100%',
   },
   remoteResourceIcon: {
     position: 'relative',
@@ -2094,31 +2484,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 28,
     elevation: 2,
-  },
-  remoteResourceThumbnail: {
-    position: 'relative',
-    overflow: 'hidden',
-    backgroundColor: '#E8EEF6',
-    shadowColor: '#46608A',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.1,
-    shadowRadius: 28,
-    elevation: 2,
-  },
-  remoteResourceThumbnailMedia: {
-    width: '100%',
-    height: '100%',
-  },
-  remoteResourceThumbnailPlayBadge: {
-    position: 'absolute',
-    right: 6,
-    bottom: 6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(15, 23, 42, 0.72)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   remoteResourceGlyphCenter: {
     ...StyleSheet.absoluteFillObject,

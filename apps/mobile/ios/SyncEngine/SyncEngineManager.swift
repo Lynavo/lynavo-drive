@@ -7977,6 +7977,34 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             )
         }
 
+        if let directHost = await reachableFallbackDirectSharedFilesHost(for: binding, excluding: unreachableLANHost) {
+            syncDiagnosticsLog(
+                "SharedFiles",
+                "using cached direct LAN host before P2P route state host=\(directHost) reason=\(reason)"
+            )
+            sidecarHost = directHost
+            sharedFilesService.sidecarHost = directHost
+            sharedFilesService.useTunnelRoute = false
+            return (directHost, false)
+        }
+
+        if let discoveredHost = await waitForSharedFilesLANHost(binding: binding),
+           await canReachSharedFilesLANHost(discoveredHost),
+           SharedFilesRoutePolicy.shouldPreferLANRoute(
+               hasReachableLANHost: true,
+               isTunnelActive: sharedFilesService.isTunnelActive
+           )
+        {
+            syncDiagnosticsLog(
+                "SharedFiles",
+                "using discovered LAN host before P2P route state host=\(discoveredHost) reason=\(reason)"
+            )
+            sidecarHost = discoveredHost
+            sharedFilesService.sidecarHost = discoveredHost
+            sharedFilesService.useTunnelRoute = false
+            return (discoveredHost, false)
+        }
+
         let initialTunnelState = await p2pTunnelRouteState(startReason: reason)
         if let tunnelHost = await acceptedSharedFilesTunnelHost(
             state: initialTunnelState,
@@ -8207,6 +8235,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             allowWake: allowWake,
             allowPublicWake: allowPublicWake
         )
+        let accessClientID = scope == .personal ? getClientId() : ""
+        let accessClientName = scope == .personal ? getClientDisplayName() : ""
         slog("[SharedFiles] browseSharedFiles scope=%@ path=%@ resolved_host=%@ is_tunnel=%@", scope.rawValue, path, route.host, String(route.isTunnel))
         syncDiagnosticsLog("SharedFiles", "browseSharedFiles scope=\(scope.rawValue) path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
 
@@ -8217,7 +8247,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 reason: "browse_shared_files",
                 isTunnelRoute: route.isTunnel
             ) {
-                try await sharedFilesService.listSharedFiles(scope: scope, path: path, accessToken: accessToken)
+                try await sharedFilesService.listSharedFiles(
+                    scope: scope,
+                    path: path,
+                    accessToken: accessToken,
+                    clientID: accessClientID,
+                    clientName: accessClientName
+                )
             }
         } catch {
             guard SharedFilesRoutePolicy.shouldInvalidateTunnelAfterRouteFailure(isTunnelRoute: route.isTunnel) else {
@@ -8235,7 +8271,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 reason: "browse_shared_files_retry",
                 isTunnelRoute: route.isTunnel
             ) {
-                try await sharedFilesService.listSharedFiles(scope: scope, path: path, accessToken: accessToken)
+                try await sharedFilesService.listSharedFiles(
+                    scope: scope,
+                    path: path,
+                    accessToken: accessToken,
+                    clientID: accessClientID,
+                    clientName: accessClientName
+                )
             }
         }
         let reachabilityRoute: SharedFilesReachabilityRoute = route.isTunnel ? currentSharedFilesTunnelReachabilityRoute() : .lan
@@ -8257,10 +8299,22 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 "isDirectory": file.isDirectory,
             ]
             // Build absolute URLs for thumbnails and video streams
-            if file.type == "image", let thumbUrl = sharedFilesService.getThumbnailUrl(scope: scope, path: file.path, accessToken: accessToken) {
+            if file.type == "image", let thumbUrl = sharedFilesService.getThumbnailUrl(
+                scope: scope,
+                path: file.path,
+                accessToken: accessToken,
+                clientID: accessClientID,
+                clientName: accessClientName
+            ) {
                 fileDict["thumbnailUrl"] = thumbUrl.absoluteString
             }
-            if file.type == "video", let streamUrl = sharedFilesService.getStreamUrl(scope: scope, path: file.path, accessToken: accessToken) {
+            if file.type == "video", let streamUrl = sharedFilesService.getStreamUrl(
+                scope: scope,
+                path: file.path,
+                accessToken: accessToken,
+                clientID: accessClientID,
+                clientName: accessClientName
+            ) {
                 fileDict["streamUrl"] = streamUrl.absoluteString
             }
             return fileDict
@@ -8285,6 +8339,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             "wake decision scope=\(scope.rawValue) path=\(path) operation=download allowWake=\(allowWake) \(wakeCapabilityLogSummary(uploadStore?.getBinding()?.wake))"
         )
         var route = try await prepareSharedFilesRoute(reason: "download_shared_file", allowWake: allowWake)
+        let accessClientID = scope == .personal ? getClientId() : ""
+        let accessClientName = scope == .personal ? getClientDisplayName() : ""
         slog("[SharedFiles] downloadSharedFile scope=%@ path=%@ resolved_host=%@ is_tunnel=%@", scope.rawValue, path, route.host, String(route.isTunnel))
         syncDiagnosticsLog("SharedFiles", "downloadSharedFile scope=\(scope.rawValue) path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
 
@@ -8306,7 +8362,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     reason: reason,
                     isTunnelRoute: route.isTunnel
                 ) {
-                    try await sharedFilesService.downloadFile(scope: scope, path: path, accessToken: accessToken, onProgress: progressHandler)
+                    try await sharedFilesService.downloadFile(
+                        scope: scope,
+                        path: path,
+                        accessToken: accessToken,
+                        clientID: accessClientID,
+                        clientName: accessClientName,
+                        onProgress: progressHandler
+                    )
                 }
                 result = downloadResult
                 syncDiagnosticsLog(
@@ -8653,7 +8716,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     func getSharedFileStreamUrl(scope scopeRaw: String, path: String, accessToken: String) -> String? {
         let scope = SharedDirectoryScope(rawValue: scopeRaw) ?? .team
-        return sharedFilesService.getStreamUrl(scope: scope, path: path, accessToken: accessToken)?.absoluteString
+        return sharedFilesService.getStreamUrl(
+            scope: scope,
+            path: path,
+            accessToken: accessToken,
+            clientID: scope == .personal ? getClientId() : "",
+            clientName: scope == .personal ? getClientDisplayName() : ""
+        )?.absoluteString
     }
 
     func prepareSharedFilePreview(scope scopeRaw: String, path: String, accessToken: String, filename: String) async throws -> String {
@@ -8668,6 +8737,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             "wake decision scope=\(scope.rawValue) path=\(path) operation=preview allowWake=\(allowWake) \(wakeCapabilityLogSummary(uploadStore?.getBinding()?.wake))"
         )
         var route = try await prepareSharedFilesRoute(reason: "preview_shared_file", allowWake: allowWake)
+        let accessClientID = scope == .personal ? getClientId() : ""
+        let accessClientName = scope == .personal ? getClientDisplayName() : ""
         slog("[SharedFiles] prepareSharedFilePreview scope=%@ path=%@ resolved_host=%@ is_tunnel=%@", scope.rawValue, path, route.host, String(route.isTunnel))
         syncDiagnosticsLog("SharedFiles", "prepareSharedFilePreview scope=\(scope.rawValue) path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
 
@@ -8685,7 +8756,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                         scope: scope,
                         path: path,
                         accessToken: accessToken,
-                        filename: filename
+                        filename: filename,
+                        clientID: accessClientID,
+                        clientName: accessClientName
                     )
                 }
                 previewURL = downloadedPreviewURL

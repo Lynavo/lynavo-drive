@@ -293,13 +293,18 @@ class SharedFilesService {
     func listSharedFiles(
         scope: SharedDirectoryScope = .team,
         path: String = "",
-        accessToken: String = ""
+        accessToken: String = "",
+        clientID: String = "",
+        clientName: String = ""
     ) async throws -> SharedDirectory {
         let encodedPath = SharedFilesRoutePolicy.encodedSharedFilePath(path)
         let endpoint = encodedPath.isEmpty
             ? "\(scope.endpointPrefix)/list"
             : "\(scope.endpointPrefix)/list/\(encodedPath)"
-        let url = try buildURL(path: endpoint)
+        let url = try buildURL(
+            path: endpoint,
+            queryItems: personalAccessQueryItems(scope: scope, clientID: clientID, clientName: clientName)
+        )
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -322,11 +327,14 @@ class SharedFilesService {
         scope: SharedDirectoryScope = .team,
         path: String,
         accessToken: String = "",
+        clientID: String = "",
+        clientName: String = "",
         onProgress: SharedFileDownloadProgressHandler? = nil
     ) async throws -> DownloadResult {
         let endpoint = "\(scope.endpointPrefix)/download/\(SharedFilesRoutePolicy.encodedSharedFilePath(path))"
         return try await downloadEndpointToLocalFile(
             endpoint: endpoint,
+            queryItems: personalAccessQueryItems(scope: scope, clientID: clientID, clientName: clientName),
             partialKey: path,
             filename: (path as NSString).lastPathComponent,
             mediaType: nil,
@@ -509,9 +517,12 @@ class SharedFilesService {
         scope: SharedDirectoryScope = .team,
         path: String,
         accessToken: String = "",
-        filename: String = ""
+        filename: String = "",
+        clientID: String = "",
+        clientName: String = ""
     ) async throws -> URL {
         let endpoint = "\(scope.endpointPrefix)/download/\(SharedFilesRoutePolicy.encodedSharedFilePath(path))"
+        let queryItems = personalAccessQueryItems(scope: scope, clientID: clientID, clientName: clientName)
         let partialURL = try partialDownloadURL(path: "preview:\(scope.rawValue):\(path)")
         let metadataURL = partialMetadataURL(for: partialURL)
         var partialMetadata = readPartialDownloadMetadata(at: metadataURL)
@@ -550,6 +561,7 @@ class SharedFilesService {
                 metadataURL: metadataURL,
                 metadata: partialMetadata,
                 resumeOffset: resumeOffset,
+                queryItems: queryItems,
                 onProgress: nil
             )
         } catch SharedFilePartialDownloadError.invalidPartial(_) {
@@ -564,6 +576,7 @@ class SharedFilesService {
                 metadataURL: metadataURL,
                 metadata: partialMetadata,
                 resumeOffset: resumeOffset,
+                queryItems: queryItems,
                 onProgress: nil
             )
         }
@@ -818,22 +831,38 @@ class SharedFilesService {
     // MARK: - Streaming URL
 
     /// Construct the streaming URL for AVPlayer (video playback).
-    func getStreamUrl(scope: SharedDirectoryScope = .team, path: String, accessToken: String = "") -> URL? {
+    func getStreamUrl(
+        scope: SharedDirectoryScope = .team,
+        path: String,
+        accessToken: String = "",
+        clientID: String = "",
+        clientName: String = ""
+    ) -> URL? {
         return try? buildMediaURL(
             path: "\(scope.endpointPrefix)/stream/\(SharedFilesRoutePolicy.encodedSharedFilePath(path))",
             scope: scope,
-            accessToken: accessToken
+            accessToken: accessToken,
+            clientID: clientID,
+            clientName: clientName
         )
     }
 
     // MARK: - Thumbnail URL
 
     /// Construct the thumbnail URL for a shared file.
-    func getThumbnailUrl(scope: SharedDirectoryScope = .team, path: String, accessToken: String = "") -> URL? {
+    func getThumbnailUrl(
+        scope: SharedDirectoryScope = .team,
+        path: String,
+        accessToken: String = "",
+        clientID: String = "",
+        clientName: String = ""
+    ) -> URL? {
         return try? buildMediaURL(
             path: "\(scope.endpointPrefix)/thumbnail/\(SharedFilesRoutePolicy.encodedSharedFilePath(path))",
             scope: scope,
-            accessToken: accessToken
+            accessToken: accessToken,
+            clientID: clientID,
+            clientName: clientName
         )
     }
 
@@ -863,7 +892,13 @@ class SharedFilesService {
         return url
     }
 
-    private func buildMediaURL(path: String, scope: SharedDirectoryScope, accessToken: String) throws -> URL {
+    private func buildMediaURL(
+        path: String,
+        scope: SharedDirectoryScope,
+        accessToken: String,
+        clientID: String,
+        clientName: String
+    ) throws -> URL {
         let baseURL = try buildURL(path: path)
         guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
             return baseURL
@@ -875,8 +910,25 @@ class SharedFilesService {
                     URLQueryItem(name: "access_token", value: token),
                 ]
             }
+            components.queryItems = (components.queryItems ?? [])
+                + personalAccessQueryItems(scope: scope, clientID: clientID, clientName: clientName)
         }
         return components.url ?? baseURL
+    }
+
+    private func personalAccessQueryItems(
+        scope: SharedDirectoryScope,
+        clientID: String,
+        clientName: String
+    ) -> [URLQueryItem] {
+        guard scope == .personal else { return [] }
+        let trimmedID = clientID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedID.isEmpty else { return [] }
+        let trimmedName = clientName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return [
+            URLQueryItem(name: "clientId", value: trimmedID),
+            URLQueryItem(name: "clientName", value: trimmedName.isEmpty ? trimmedID : trimmedName),
+        ]
     }
 
     private func applyAuthorizationIfNeeded(

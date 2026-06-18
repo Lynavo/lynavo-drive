@@ -20,7 +20,8 @@ expect(
 expect(
     SharedFilesRoutePolicy.shouldWaitForP2PTunnelRoute(
         hasTunnelCredentials: true,
-        isTunnelActive: false
+        isTunnelActive: false,
+        hasUsableDirectRouteHost: false
     ),
     "shared files must wait for the P2P tunnel after reconnect when credentials exist but the tunnel is not active"
 )
@@ -28,7 +29,8 @@ expect(
 expect(
     !SharedFilesRoutePolicy.shouldWaitForP2PTunnelRoute(
         hasTunnelCredentials: true,
-        isTunnelActive: true
+        isTunnelActive: true,
+        hasUsableDirectRouteHost: false
     ),
     "shared files must not wait for the P2P tunnel when the tunnel is already active"
 )
@@ -36,9 +38,19 @@ expect(
 expect(
     !SharedFilesRoutePolicy.shouldWaitForP2PTunnelRoute(
         hasTunnelCredentials: false,
-        isTunnelActive: false
+        isTunnelActive: false,
+        hasUsableDirectRouteHost: false
     ),
     "shared files must fall back to direct LAN when no P2P tunnel credentials exist"
+)
+
+expect(
+    !SharedFilesRoutePolicy.shouldWaitForP2PTunnelRoute(
+        hasTunnelCredentials: true,
+        isTunnelActive: false,
+        hasUsableDirectRouteHost: true
+    ),
+    "shared files must prefer a usable direct LAN route over waiting for a not-yet-active P2P tunnel"
 )
 
 expect(

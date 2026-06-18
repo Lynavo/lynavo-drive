@@ -539,7 +539,9 @@ export function PhoneSyncSpaceGlobalScreen() {
             {displayName}
           </Text>
           <Text style={styles.metaText} numberOfLines={1}>
-            {`${fileType} · ${formatBytes(item.fileSize)}${clock ? ` · ${clock}` : ''}`}
+            {`${fileType} · ${formatBytes(item.fileSize)}${
+              clock ? ` · ${clock}` : ''
+            }`}
           </Text>
         </View>
         <TouchableOpacity
@@ -664,6 +666,9 @@ export function PhoneSyncSpaceGlobalScreen() {
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             stickySectionHeadersEnabled={false}
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={7}
           />
         )}
       </SafeAreaView>
@@ -765,7 +770,6 @@ function ReceivedMediaThumbnail({
   iconType: MediaTypeIconKind;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
-  const [videoFailed, setVideoFailed] = useState(false);
   const displayName = getReceivedFileTitle(item);
 
   if (iconType === 'photo' && item.thumbnailUrl && !imageFailed) {
@@ -779,33 +783,6 @@ function ReceivedMediaThumbnail({
           accessibilityLabel={`${displayName} 缩略图`}
           onError={() => setImageFailed(true)}
         />
-      </View>
-    );
-  }
-
-  const videoPreviewUrl = item.streamUrl || item.previewUrl;
-  if (iconType === 'video' && videoPreviewUrl && !videoFailed) {
-    return (
-      <View style={styles.mediaPreviewThumb}>
-        <Video
-          testID="phone-sync-thumbnail-video"
-          source={{ uri: videoPreviewUrl }}
-          style={styles.mediaPreviewImage}
-          resizeMode="cover"
-          paused
-          muted
-          repeat={false}
-          onError={() => setVideoFailed(true)}
-        />
-        <View style={styles.mediaPreviewPlayBadge}>
-          <Play
-            size={12}
-            color="#FFFFFF"
-            fill="#FFFFFF"
-            strokeWidth={2}
-            style={styles.videoPlayIcon}
-          />
-        </View>
       </View>
     );
   }
@@ -1135,17 +1112,6 @@ const styles = StyleSheet.create({
   mediaPreviewImage: {
     width: '100%',
     height: '100%',
-  },
-  mediaPreviewPlayBadge: {
-    position: 'absolute',
-    left: 13,
-    top: 13,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.46)',
   },
   mediaTypeGlyphCenter: {
     ...StyleSheet.absoluteFillObject,
