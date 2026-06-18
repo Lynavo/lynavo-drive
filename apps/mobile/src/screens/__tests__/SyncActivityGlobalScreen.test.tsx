@@ -308,8 +308,17 @@ describe('SyncActivityGlobalScreen', () => {
     expect(getHistoryDays).toHaveBeenCalledTimes(1);
     expect(getByText('Studio Mac')).toBeTruthy();
     expect(getByText('已连接')).toBeTruthy();
+    const metaRowChildren = React.Children.toArray(
+      getByTestId('sync-activity-auto-meta-row').props.children,
+    ) as React.ReactElement<{ testID?: string }>[];
+    expect(metaRowChildren.map(child => child.props.testID)).toEqual([
+      'sync-activity-auto-state-badge',
+      'sync-activity-auto-device-name',
+    ]);
     expect(
-      StyleSheet.flatten(getByTestId('sync-activity-auto-meta-row').props.style),
+      StyleSheet.flatten(
+        getByTestId('sync-activity-auto-meta-row').props.style,
+      ),
     ).toEqual(
       expect.objectContaining({
         flexDirection: 'row',

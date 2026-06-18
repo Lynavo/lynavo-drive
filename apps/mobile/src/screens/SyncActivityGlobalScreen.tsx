@@ -301,16 +301,23 @@ export function SyncActivityGlobalScreen({
                       testID="sync-activity-auto-meta-row"
                       style={styles.autoMetaRow}
                     >
-                      {connectionMeta.deviceName ? (
-                        <Text style={styles.autoDeviceName} numberOfLines={1}>
-                          {connectionMeta.deviceName}
-                        </Text>
-                      ) : null}
-                      <View style={styles.autoStateBadge}>
+                      <View
+                        testID="sync-activity-auto-state-badge"
+                        style={styles.autoStateBadge}
+                      >
                         <Text style={styles.autoStateText}>
                           {connectionMeta.stateLabel}
                         </Text>
                       </View>
+                      {connectionMeta.deviceName ? (
+                        <Text
+                          testID="sync-activity-auto-device-name"
+                          style={styles.autoDeviceName}
+                          numberOfLines={1}
+                        >
+                          {connectionMeta.deviceName}
+                        </Text>
+                      ) : null}
                     </View>
                   </View>
                 </View>

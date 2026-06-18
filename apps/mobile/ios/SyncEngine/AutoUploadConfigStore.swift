@@ -50,20 +50,14 @@ class AutoUploadConfigStore {
             // "from_now" means only assets created after the config was saved.
             // Use the updatedAt timestamp as the threshold.
             if !config.updatedAt.isEmpty {
-                return ISO8601DateFormatter().date(from: config.updatedAt)
+                return Self.parseISO8601Date(config.updatedAt)
             }
             return Date()
         case "from_today":
             return Calendar.current.startOfDay(for: Date())
         case "custom":
             if let customFrom = config.customTimeFrom, !customFrom.isEmpty {
-                if let parsed = ISO8601DateFormatter().date(from: customFrom) {
-                    return parsed
-                }
-                // Also try with fractional seconds (toISOString() format)
-                let fmtFrac = ISO8601DateFormatter()
-                fmtFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                if let parsed = fmtFrac.date(from: customFrom) {
+                if let parsed = Self.parseISO8601Date(customFrom) {
                     return parsed
                 }
                 slog("[AutoUploadConfig] failed to parse customTimeFrom: %@, falling back to no filter", customFrom)
@@ -74,6 +68,15 @@ class AutoUploadConfigStore {
         default:
             return nil
         }
+    }
+
+    private static func parseISO8601Date(_ value: String) -> Date? {
+        if let parsed = ISO8601DateFormatter().date(from: value) {
+            return parsed
+        }
+        let fractionalFormatter = ISO8601DateFormatter()
+        fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractionalFormatter.date(from: value)
     }
 
 }
