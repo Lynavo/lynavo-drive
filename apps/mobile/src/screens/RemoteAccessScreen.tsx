@@ -50,9 +50,24 @@ interface RemoteAccessItem {
   kind: 'shared_file' | 'shared_folder';
   fileSize?: number;
   mediaType?: string;
+  thumbnailUrl?: string;
+  previewUrl?: string;
+  streamUrl?: string;
   rootResourceId?: string;
   remotePath?: string;
 }
+
+type RemoteAccessIconConfig = {
+  name: string;
+  color: string;
+  bg: string;
+};
+
+type RemoteAccessResourceDTO = DesktopSharedResourceDTO & {
+  thumbnailUrl?: string;
+  previewUrl?: string;
+  streamUrl?: string;
+};
 
 interface RemotePreviewState {
   item: RemoteAccessItem;
@@ -62,7 +77,7 @@ interface RemotePreviewState {
 const SHARED_DIRECTORY_RESOURCE_PREFIX = 'shared-dir:';
 
 function sharedResourceToRemoteItem(
-  resource: DesktopSharedResourceDTO,
+  resource: RemoteAccessResourceDTO,
 ): RemoteAccessItem | null {
   if (resource.kind !== 'shared_file' && resource.kind !== 'shared_folder') {
     return null;
@@ -74,6 +89,9 @@ function sharedResourceToRemoteItem(
     kind: resource.kind,
     fileSize: resource.fileSize,
     mediaType: resource.mediaType,
+    thumbnailUrl: resource.thumbnailUrl,
+    previewUrl: resource.previewUrl,
+    streamUrl: resource.streamUrl,
   };
 }
 
@@ -102,6 +120,9 @@ function directoryFileToRemoteItem(
     kind: file.isDirectory ? 'shared_folder' : 'shared_file',
     fileSize: file.isDirectory ? undefined : file.size,
     mediaType: file.isDirectory ? undefined : file.type,
+    thumbnailUrl: file.isDirectory ? undefined : file.thumbnailUrl,
+    previewUrl: file.isDirectory ? undefined : file.streamUrl,
+    streamUrl: file.isDirectory ? undefined : file.streamUrl,
     rootResourceId: isSharedDirectory ? resourceId : rootResourceId,
     remotePath: isSharedDirectory ? '' : file.path,
   };
@@ -480,9 +501,7 @@ export function RemoteAccessScreen() {
           void handleOpenFile(item);
         }}
       >
-        <View style={[styles.iconWrapper, { backgroundColor: iconConfig.bg }]}>
-          <Icon name={iconConfig.name} size={24} color={iconConfig.color} />
-        </View>
+        <RemoteAccessThumbnail item={item} iconConfig={iconConfig} />
         <View style={styles.infoWrapper}>
           <Text style={styles.filename} numberOfLines={1}>
             {item.displayName}
@@ -665,6 +684,70 @@ export function RemoteAccessScreen() {
   );
 }
 
+function RemoteAccessThumbnail({
+  item,
+  iconConfig,
+}: {
+  item: RemoteAccessItem;
+  iconConfig: RemoteAccessIconConfig;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
+  const imagePreviewUrl = item.thumbnailUrl || item.previewUrl || item.streamUrl;
+  const videoPreviewUrl = item.streamUrl || item.previewUrl;
+
+  if (
+    item.kind !== 'shared_folder' &&
+    isImageFile(item.mediaType, item.displayName) &&
+    imagePreviewUrl &&
+    !imageFailed
+  ) {
+    return (
+      <View style={[styles.iconWrapper, styles.thumbnailWrapper]}>
+        <Image
+          testID="remote-access-thumbnail-image"
+          source={{ uri: imagePreviewUrl }}
+          style={styles.thumbnailMedia}
+          resizeMode="cover"
+          accessibilityLabel={`${item.displayName} 縮圖`}
+          onError={() => setImageFailed(true)}
+        />
+      </View>
+    );
+  }
+
+  if (
+    item.kind !== 'shared_folder' &&
+    isVideoFile(item.mediaType, item.displayName) &&
+    videoPreviewUrl &&
+    !videoFailed
+  ) {
+    return (
+      <View style={[styles.iconWrapper, styles.thumbnailWrapper]}>
+        <Video
+          testID="remote-access-thumbnail-video"
+          source={{ uri: videoPreviewUrl }}
+          style={styles.thumbnailMedia}
+          resizeMode="cover"
+          paused
+          muted
+          repeat={false}
+          onError={() => setVideoFailed(true)}
+        />
+        <View style={styles.thumbnailPlayBadge}>
+          <Icon name="play" size={10} color="#ffffff" />
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.iconWrapper, { backgroundColor: iconConfig.bg }]}>
+      <Icon name={iconConfig.name} size={24} color={iconConfig.color} />
+    </View>
+  );
+}
+
 function RemoteAccessPreviewModal({
   preview,
   onClose,
@@ -841,6 +924,26 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  thumbnailWrapper: {
+    position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: '#e2e8f0',
+  },
+  thumbnailMedia: {
+    width: '100%',
+    height: '100%',
+  },
+  thumbnailPlayBadge: {
+    position: 'absolute',
+    right: 4,
+    bottom: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
     justifyContent: 'center',
     alignItems: 'center',
   },

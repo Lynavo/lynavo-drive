@@ -72,6 +72,9 @@ type RemoteResourceItem = DesktopSharedResourceDTO & {
   countLabel?: string;
   modifiedLabel?: string;
   preview?: 'blue' | 'dark' | 'settings';
+  previewUrl?: string;
+  thumbnailUrl?: string;
+  streamUrl?: string;
   sharedRootResourceId?: string;
   relativePath?: string;
 };
@@ -407,7 +410,7 @@ function getItemIconType(item: RemoteResourceItem): RemoteResourceIconType {
 }
 
 function getItemSize(item: RemoteResourceItem) {
-  return isFolder(item) ? Number.POSITIVE_INFINITY : (item.fileSize ?? 0);
+  return isFolder(item) ? Number.POSITIVE_INFINITY : item.fileSize ?? 0;
 }
 
 function getItemTime(item: RemoteResourceItem) {
@@ -501,6 +504,9 @@ function directoryFileToResourceItem({
     downloadCount: 0,
     countLabel: file.isDirectory ? '文件夹' : undefined,
     modifiedLabel: getModifiedLabel(file.modifiedAt),
+    thumbnailUrl: file.isDirectory ? undefined : file.thumbnailUrl,
+    previewUrl: file.isDirectory ? undefined : file.streamUrl,
+    streamUrl: file.isDirectory ? undefined : file.streamUrl,
     sharedRootResourceId: file.isDirectory ? resourceId : undefined,
     relativePath: '',
   };
@@ -1280,6 +1286,64 @@ function RemoteResourceTypeIcon({
   );
 }
 
+function RemoteResourceThumbnail({
+  item,
+  type,
+  style,
+}: {
+  item: RemoteResourceItem;
+  type: RemoteResourceIconType;
+  style: StyleProp<ViewStyle>;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
+  const imagePreviewUrl = item.thumbnailUrl || item.previewUrl || item.streamUrl;
+  const videoPreviewUrl = item.streamUrl || item.previewUrl;
+
+  if (type === 'photo' && imagePreviewUrl && !imageFailed) {
+    return (
+      <View style={[styles.remoteResourceThumbnail, style]}>
+        <Image
+          testID="remote-access-thumbnail-image"
+          source={{ uri: imagePreviewUrl }}
+          style={styles.remoteResourceThumbnailMedia}
+          resizeMode="cover"
+          accessibilityLabel={`${item.displayName} 缩略图`}
+          onError={() => setImageFailed(true)}
+        />
+      </View>
+    );
+  }
+
+  if (type === 'video' && videoPreviewUrl && !videoFailed) {
+    return (
+      <View style={[styles.remoteResourceThumbnail, style]}>
+        <Video
+          testID="remote-access-thumbnail-video"
+          source={{ uri: videoPreviewUrl }}
+          style={styles.remoteResourceThumbnailMedia}
+          resizeMode="cover"
+          paused
+          muted
+          repeat={false}
+          onError={() => setVideoFailed(true)}
+        />
+        <View style={styles.remoteResourceThumbnailPlayBadge}>
+          <Play
+            size={12}
+            color="#FFFFFF"
+            fill="#FFFFFF"
+            strokeWidth={2}
+            style={styles.videoPlayIcon}
+          />
+        </View>
+      </View>
+    );
+  }
+
+  return <RemoteResourceTypeIcon type={type} style={style} />;
+}
+
 function RemoteResourceGlyph({ type }: { type: RemoteResourceIconType }) {
   if (type === 'photo') {
     return (
@@ -1377,7 +1441,11 @@ function renderListItem({
         onOpenFile(item);
       }}
     >
-      <RemoteResourceTypeIcon type={iconType} style={styles.iconWrapper} />
+      <RemoteResourceThumbnail
+        item={item}
+        type={iconType}
+        style={styles.iconWrapper}
+      />
       <View style={styles.infoWrapper}>
         <Text style={styles.filename} numberOfLines={1}>
           {item.displayName}
@@ -1457,7 +1525,8 @@ function renderGridItem({
           onOpenFile(item);
         }}
       >
-        <RemoteResourceTypeIcon
+        <RemoteResourceThumbnail
+          item={item}
           type={iconType}
           style={styles.gridIconWrapper}
         />
@@ -1628,8 +1697,8 @@ function RemoteEmptyArtwork({
   const stops = isFolder
     ? ['#FFFDF4', '#FFEAB7', '#F7C76F']
     : isSearch
-      ? ['#FFFFFF', '#EFF5FB', '#D7E2F0']
-      : ['#F8FCFF', '#DFF3FF', '#B6E3FF'];
+    ? ['#FFFFFF', '#EFF5FB', '#D7E2F0']
+    : ['#F8FCFF', '#DFF3FF', '#B6E3FF'];
 
   return (
     <View
@@ -2025,6 +2094,31 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 28,
     elevation: 2,
+  },
+  remoteResourceThumbnail: {
+    position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: '#E8EEF6',
+    shadowColor: '#46608A',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.1,
+    shadowRadius: 28,
+    elevation: 2,
+  },
+  remoteResourceThumbnailMedia: {
+    width: '100%',
+    height: '100%',
+  },
+  remoteResourceThumbnailPlayBadge: {
+    position: 'absolute',
+    right: 6,
+    bottom: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   remoteResourceGlyphCenter: {
     ...StyleSheet.absoluteFillObject,

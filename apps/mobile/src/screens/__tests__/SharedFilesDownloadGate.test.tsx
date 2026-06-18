@@ -53,7 +53,9 @@ jest.mock('react-i18next', () => ({
         'sharedFiles.remoteAccess.done': '完成',
         'sharedFiles.remoteAccess.download': '下載',
         'sharedFiles.remoteAccess.share': '分享',
-        'sharedFiles.remoteAccess.selectedCount': `已選擇 ${options?.count ?? 0} 個`,
+        'sharedFiles.remoteAccess.selectedCount': `已選擇 ${
+          options?.count ?? 0
+        } 個`,
       };
       if (
         key === 'sharedFiles.dialogs.downloadSavedToPhotos' &&
@@ -566,6 +568,56 @@ describe('RemoteAccessGlobalScreen', () => {
       expect(getByTestId('remote-resource-icon-video')).toBeTruthy();
       expect(getByTestId('remote-resource-icon-file')).toBeTruthy();
     });
+  });
+
+  it('renders remote image and video thumbnails when preview urls are available', async () => {
+    mockBindingState.mockResolvedValueOnce({
+      deviceId: 'desktop-device-id',
+      host: '192.168.1.100',
+      connectionState: 'connected',
+    });
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([
+      {
+        resourceId: 'personal-dir:photo.jpg',
+        desktopDeviceId: 'personal-dir',
+        displayName: 'photo.jpg',
+        kind: 'shared_file',
+        status: 'available',
+        fileSize: 1024,
+        mediaType: 'image',
+        addedAt: '2026-06-17T08:00:00.000Z',
+        downloadCount: 0,
+        thumbnailUrl: 'http://127.0.0.1:39394/personal/thumb/photo.jpg',
+        previewUrl: 'http://127.0.0.1:39394/personal/stream/photo.jpg',
+      },
+      {
+        resourceId: 'personal-dir:clip.mov',
+        desktopDeviceId: 'personal-dir',
+        displayName: 'clip.mov',
+        kind: 'shared_file',
+        status: 'available',
+        fileSize: 2048,
+        mediaType: 'video',
+        addedAt: '2026-06-17T08:01:00.000Z',
+        downloadCount: 0,
+        previewUrl: 'http://127.0.0.1:39394/personal/stream/clip.mov',
+        streamUrl: 'http://127.0.0.1:39394/personal/stream/clip.mov',
+      },
+    ]);
+
+    const { getByTestId, getByText } = render(
+      <TestErrorBoundary>
+        <RemoteAccessGlobalScreen />
+      </TestErrorBoundary>,
+    );
+
+    await waitFor(() => {
+      expect(getByText('photo.jpg')).toBeTruthy();
+      expect(getByText('clip.mov')).toBeTruthy();
+    });
+
+    expect(getByTestId('remote-access-thumbnail-image')).toBeTruthy();
+    expect(getByTestId('remote-access-thumbnail-video')).toBeTruthy();
   });
 
   it('uses reference lucide toolbar icons instead of Ionicons glyph mappings', async () => {
@@ -1490,6 +1542,47 @@ describe('RemoteAccessScreen', () => {
       expect(getByText('test-folder')).toBeTruthy();
       expect(getByText('photo.jpg')).toBeTruthy();
     });
+  });
+
+  it('renders remote image and video thumbnails when preview urls are available', async () => {
+    mockListSharedResources.mockResolvedValueOnce([
+      {
+        resourceId: 'res-image',
+        displayName: 'photo.jpg',
+        kind: 'shared_file',
+        fileSize: 1048576,
+        mediaType: 'image',
+        thumbnailUrl:
+          'http://192.168.1.100:39394/resources/mobile/thumbnail/res-image',
+        previewUrl:
+          'http://192.168.1.100:39394/resources/mobile/download/res-image',
+      },
+      {
+        resourceId: 'res-video',
+        displayName: 'clip.mov',
+        kind: 'shared_file',
+        fileSize: 2097152,
+        mediaType: 'video',
+        previewUrl:
+          'http://192.168.1.100:39394/resources/mobile/download/res-video',
+        streamUrl:
+          'http://192.168.1.100:39394/resources/mobile/download/res-video',
+      },
+    ]);
+
+    const { getByTestId, getByText } = render(
+      <TestErrorBoundary>
+        <RemoteAccessScreen />
+      </TestErrorBoundary>,
+    );
+
+    await waitFor(() => {
+      expect(getByText('photo.jpg')).toBeTruthy();
+      expect(getByText('clip.mov')).toBeTruthy();
+    });
+
+    expect(getByTestId('remote-access-thumbnail-image')).toBeTruthy();
+    expect(getByTestId('remote-access-thumbnail-video')).toBeTruthy();
   });
 
   it('loads real folder contents when a folder is opened', async () => {
