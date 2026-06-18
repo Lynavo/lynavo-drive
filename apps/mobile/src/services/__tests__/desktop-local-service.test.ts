@@ -15,6 +15,7 @@ import {
   listReceivedLibrary,
   listSharedResources,
   listSharedFolderContents,
+  prepareGlobalRemoteAccessShareFile,
   prepareGlobalRemoteAccessPreview,
   prepareReceivedLibraryPreview,
   prepareResourcePreview,
@@ -427,11 +428,14 @@ describe('desktop-local-service', () => {
               isDirectory: true,
             },
             {
-              name: 'readme.txt',
-              path: 'readme.txt',
-              type: 'document',
+              name: 'photo.jpg',
+              path: 'photo.jpg',
+              type: 'image',
               size: 2048,
               modifiedAt: '2026-06-16T08:31:00.000Z',
+              thumbnailUrl:
+                'http://192.168.10.20:39394/shared/thumbnail/photo.jpg',
+              streamUrl: 'http://192.168.10.20:39394/shared/stream/photo.jpg',
             },
           ],
           totalCount: 2,
@@ -453,15 +457,18 @@ describe('desktop-local-service', () => {
         downloadCount: 0,
       },
       {
-        resourceId: 'shared-dir:readme.txt',
+        resourceId: 'shared-dir:photo.jpg',
         desktopDeviceId: 'shared-dir',
         kind: 'shared_file',
-        displayName: 'readme.txt',
+        displayName: 'photo.jpg',
         status: 'available',
         fileSize: 2048,
-        mediaType: 'document',
+        mediaType: 'image',
         addedAt: '2026-06-16T08:31:00.000Z',
         downloadCount: 0,
+        thumbnailUrl: 'http://192.168.10.20:39394/shared/thumbnail/photo.jpg',
+        previewUrl: 'http://192.168.10.20:39394/shared/stream/photo.jpg',
+        streamUrl: 'http://192.168.10.20:39394/shared/stream/photo.jpg',
       },
     ]);
 
@@ -808,11 +815,12 @@ describe('desktop-local-service', () => {
           isDirectory: true,
         },
         {
-          name: 'notes.txt',
-          path: 'notes.txt',
-          type: 'document',
+          name: 'clip.mov',
+          path: 'clip.mov',
+          type: 'video',
           size: 12,
           modifiedAt: '2026-06-17T08:01:00.000Z',
+          streamUrl: 'http://127.0.0.1:39394/personal/stream/clip.mov',
         },
       ],
       totalCount: 2,
@@ -831,15 +839,17 @@ describe('desktop-local-service', () => {
         downloadCount: 0,
       },
       {
-        resourceId: 'personal-dir:notes.txt',
+        resourceId: 'personal-dir:clip.mov',
         desktopDeviceId: 'personal-dir',
         kind: 'shared_file',
-        displayName: 'notes.txt',
+        displayName: 'clip.mov',
         status: 'available',
         fileSize: 12,
-        mediaType: 'document',
+        mediaType: 'video',
         addedAt: '2026-06-17T08:01:00.000Z',
         downloadCount: 0,
+        previewUrl: 'http://127.0.0.1:39394/personal/stream/clip.mov',
+        streamUrl: 'http://127.0.0.1:39394/personal/stream/clip.mov',
       },
     ]);
     expect(mockedBrowseDirectory).toHaveBeenCalledWith('personal');
@@ -945,10 +955,44 @@ describe('desktop-local-service', () => {
     });
   });
 
-  it('shares global remote access files through the personal directory preview cache', async () => {
-    mockedPrepareDirectoryFilePreview
-      .mockResolvedValueOnce('/cache/photo.jpg')
-      .mockResolvedValueOnce('/cache/report.pdf');
+  it('prepares global remote access share files through the native share cache', async () => {
+    mockedGetDirectoryFileStreamUrl.mockResolvedValueOnce(
+      'http://127.0.0.1:39394/personal/stream/protoc-gen-go',
+    );
+    mockDownloadUrlToShareCache.mockResolvedValueOnce(
+      '/share-cache/protoc-gen-go',
+    );
+
+    await expect(
+      prepareGlobalRemoteAccessShareFile(
+        'personal-dir:protoc-gen-go',
+        'protoc-gen-go',
+      ),
+    ).resolves.toBe('/share-cache/protoc-gen-go');
+
+    expect(mockedGetDirectoryFileStreamUrl).toHaveBeenCalledWith(
+      'personal',
+      'protoc-gen-go',
+    );
+    expect(mockDownloadUrlToShareCache).toHaveBeenCalledWith(
+      'http://127.0.0.1:39394/personal/stream/protoc-gen-go',
+      'protoc-gen-go',
+    );
+    expect(mockedDownloadDirectoryFile).not.toHaveBeenCalled();
+    expect(mockedPrepareDirectoryFilePreview).not.toHaveBeenCalled();
+  });
+
+  it('shares global remote access files through the native share cache', async () => {
+    mockedGetDirectoryFileStreamUrl
+      .mockResolvedValueOnce(
+        'http://127.0.0.1:39394/personal/stream/Pictures/photo.jpg',
+      )
+      .mockResolvedValueOnce(
+        'http://127.0.0.1:39394/personal/stream/Documents/report.pdf',
+      );
+    mockDownloadUrlToShareCache
+      .mockResolvedValueOnce('/share-cache/photo.jpg')
+      .mockResolvedValueOnce('/share-cache/report.pdf');
     mockShareFiles.mockResolvedValueOnce(true);
 
     await expect(
@@ -964,21 +1008,31 @@ describe('desktop-local-service', () => {
       ]),
     ).resolves.toBeUndefined();
 
-    expect(mockedPrepareDirectoryFilePreview).toHaveBeenNthCalledWith(
+    expect(mockedGetDirectoryFileStreamUrl).toHaveBeenNthCalledWith(
       1,
       'personal',
       'Pictures/photo.jpg',
-      'photo.jpg',
     );
-    expect(mockedPrepareDirectoryFilePreview).toHaveBeenNthCalledWith(
+    expect(mockedGetDirectoryFileStreamUrl).toHaveBeenNthCalledWith(
       2,
       'personal',
       'Documents/report.pdf',
+    );
+    expect(mockDownloadUrlToShareCache).toHaveBeenNthCalledWith(
+      1,
+      'http://127.0.0.1:39394/personal/stream/Pictures/photo.jpg',
+      'photo.jpg',
+    );
+    expect(mockDownloadUrlToShareCache).toHaveBeenNthCalledWith(
+      2,
+      'http://127.0.0.1:39394/personal/stream/Documents/report.pdf',
       'report.pdf',
     );
+    expect(mockedDownloadDirectoryFile).not.toHaveBeenCalled();
+    expect(mockedPrepareDirectoryFilePreview).not.toHaveBeenCalled();
     expect(mockShareFiles).toHaveBeenCalledWith([
-      '/cache/photo.jpg',
-      '/cache/report.pdf',
+      '/share-cache/photo.jpg',
+      '/share-cache/report.pdf',
     ]);
     expect(fetchMock).not.toHaveBeenCalled();
   });

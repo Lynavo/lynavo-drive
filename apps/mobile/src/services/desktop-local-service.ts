@@ -36,6 +36,12 @@ export interface ResourceShareItem {
   displayName: string;
 }
 
+type DesktopSharedResourceWithPreview = DesktopSharedResourceDTO & {
+  previewUrl?: string;
+  thumbnailUrl?: string;
+  streamUrl?: string;
+};
+
 export type ReceivedLibraryMediaItem = ReceivedLibraryItemDTO & {
   previewUrl?: string;
   thumbnailUrl?: string;
@@ -242,7 +248,7 @@ function personalDirectoryResourceId(path: string): string {
 
 function directoryFileToSharedResource(
   file: DirectoryFileDTO,
-): DesktopSharedResourceDTO {
+): DesktopSharedResourceWithPreview {
   return {
     resourceId: sharedDirectoryResourceId(file.path),
     desktopDeviceId: SHARED_DIRECTORY_DESKTOP_ID,
@@ -253,12 +259,13 @@ function directoryFileToSharedResource(
     mediaType: file.type,
     addedAt: file.modifiedAt,
     downloadCount: 0,
+    ...directoryFilePreviewUrls(file),
   };
 }
 
 function personalDirectoryFileToSharedResource(
   file: DirectoryFileDTO,
-): DesktopSharedResourceDTO {
+): DesktopSharedResourceWithPreview {
   return {
     resourceId: personalDirectoryResourceId(file.path),
     desktopDeviceId: PERSONAL_DIRECTORY_DESKTOP_ID,
@@ -269,6 +276,26 @@ function personalDirectoryFileToSharedResource(
     mediaType: file.type,
     addedAt: file.modifiedAt,
     downloadCount: 0,
+    ...directoryFilePreviewUrls(file),
+  };
+}
+
+function directoryFilePreviewUrls(
+  file: DirectoryFileDTO,
+): Pick<
+  DesktopSharedResourceWithPreview,
+  'previewUrl' | 'thumbnailUrl' | 'streamUrl'
+> {
+  if (file.isDirectory) {
+    return {};
+  }
+
+  const thumbnailUrl = file.thumbnailUrl?.trim();
+  const streamUrl = file.streamUrl?.trim();
+
+  return {
+    ...(thumbnailUrl ? { thumbnailUrl } : {}),
+    ...(streamUrl ? { previewUrl: streamUrl, streamUrl } : {}),
   };
 }
 
@@ -672,9 +699,9 @@ export async function prepareReceivedLibraryPreview(
     typeof result.localPath === 'string' && result.localPath.trim().length > 0
       ? result.localPath
       : typeof result.savedLocation === 'string' &&
-          result.savedLocation.trim().length > 0
-        ? result.savedLocation
-        : null;
+        result.savedLocation.trim().length > 0
+      ? result.savedLocation
+      : null;
   if (typeof localPath !== 'string' || localPath.trim().length === 0) {
     throw new Error('Remote file was not prepared for preview');
   }
@@ -715,6 +742,32 @@ export async function prepareGlobalRemoteAccessPreview(
   return localPath;
 }
 
+export async function prepareGlobalRemoteAccessShareFile(
+  resourceId: string,
+  filename?: string,
+): Promise<string> {
+  if (typeof NativeSyncEngine?.downloadUrlToShareCache !== 'function') {
+    throw new Error('System share is not available');
+  }
+
+  const remotePath = getPersonalDirectoryPathFromResourceId(resourceId);
+  const url = await getDirectoryFileStreamUrl('personal', remotePath);
+  const fallbackFilename =
+    remotePath
+      .split('/')
+      .filter(segment => segment.trim().length > 0)
+      .pop()
+      ?.trim() || 'remote-file';
+  const localPath = await NativeSyncEngine.downloadUrlToShareCache(
+    url,
+    filename?.trim() || fallbackFilename,
+  );
+  if (typeof localPath !== 'string' || localPath.trim().length === 0) {
+    throw new Error('Remote file was not prepared for sharing');
+  }
+  return localPath;
+}
+
 export async function shareGlobalRemoteAccessResources(
   resources: ResourceShareItem[],
 ): Promise<void> {
@@ -727,7 +780,7 @@ export async function shareGlobalRemoteAccessResources(
 
   const localPaths: string[] = [];
   for (const resource of resources) {
-    const localPath = await prepareGlobalRemoteAccessPreview(
+    const localPath = await prepareGlobalRemoteAccessShareFile(
       resource.resourceId,
       resource.displayName,
     );
