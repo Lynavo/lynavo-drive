@@ -83,10 +83,9 @@ export function documentMimeType(filename?: string | null): string | undefined {
 }
 
 export function canPreviewDocumentFile(
-  mediaType?: string | null,
+  _mediaType?: string | null,
   filename?: string | null,
 ): boolean {
-  const normalizedMediaType = mediaType?.trim().toLowerCase();
   const ext = filename?.split('.').pop()?.toLowerCase();
   const hasExtension = Boolean(ext && ext !== filename?.toLowerCase());
 
@@ -97,11 +96,7 @@ export function canPreviewDocumentFile(
     );
   }
 
-  return (
-    normalizedMediaType?.startsWith('text/') === true ||
-    (normalizedMediaType?.startsWith('application/') === true &&
-      normalizedMediaType !== 'application/octet-stream')
-  );
+  return false;
 }
 
 function decodePathSegment(segment: string): string {

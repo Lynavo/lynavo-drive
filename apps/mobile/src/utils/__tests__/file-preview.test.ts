@@ -1,4 +1,8 @@
-import { documentPreviewUri, openFileWithOtherApp } from '../file-preview';
+import {
+  canPreviewDocumentFile,
+  documentPreviewUri,
+  openFileWithOtherApp,
+} from '../file-preview';
 
 const shareOpenMock = (
   globalThis as unknown as { __mockReactNativeShareOpen: jest.Mock }
@@ -42,5 +46,13 @@ describe('file-preview', () => {
         subject: '客戶_報告_Q2.pdf',
       }),
     );
+  });
+
+  it('routes extensionless files through the share sheet instead of document preview', () => {
+    expect(
+      canPreviewDocumentFile('application/x-mach-binary', 'protoc-gen-go'),
+    ).toBe(false);
+    expect(canPreviewDocumentFile('text/plain', 'README')).toBe(false);
+    expect(canPreviewDocumentFile('application/pdf', 'report.pdf')).toBe(true);
   });
 });
