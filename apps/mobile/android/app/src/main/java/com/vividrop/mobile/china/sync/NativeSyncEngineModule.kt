@@ -1557,6 +1557,42 @@ class NativeSyncEngineModule(
   }
 
   @ReactMethod
+  fun listReceivedFiles(promise: Promise) {
+    runAsync(promise) {
+      recordNativeLog("SharedFiles", "listReceivedFiles requested")
+      promise.resolve(fetchReceivedFiles())
+    }
+  }
+
+  @ReactMethod
+  fun getReceivedFilePreviewUrl(fileKey: String, kind: String, promise: Promise) {
+    runAsync(promise) {
+      val normalizedFileKey = fileKey.trim()
+      require(normalizedFileKey.isNotBlank()) { "Received file key is required" }
+      val normalizedKind = normalizeReceivedMediaKind(kind)
+      val route = resolveSharedFileRoute(
+        scope = "team",
+        kind = if (normalizedKind == "download") "download" else "stream",
+        path = normalizedFileKey,
+        requestAccessToken = "",
+        reason = "preview_received_file",
+      )
+      logSharedFileRoute("getReceivedFilePreviewUrl", route)
+      val previewUrl = receivedFileUrlForRoute(normalizedFileKey, route, normalizedKind)
+      recordNativeLog(
+        "SharedFiles",
+        "getReceivedFilePreviewUrl resolved fileKey=$normalizedFileKey kind=$normalizedKind url_host=${previewUrl.host} url_path=${previewUrl.path}",
+      )
+      updateSharedFilesReachability(
+        state = "available",
+        route = route,
+        reason = "preview_received_file_route_selected",
+      )
+      promise.resolve(previewUrl.toString())
+    }
+  }
+
+  @ReactMethod
   fun getSharedFileStreamUrl(scope: String, path: String, accessToken: String, promise: Promise) {
     runAsync(promise) {
       val route = resolveSharedFileRoute(
@@ -1891,8 +1927,11 @@ class NativeSyncEngineModule(
 
   private fun localDownloadMediaType(filename: String, requestedMediaType: String?): String {
     val normalized = requestedMediaType?.trim()?.lowercase(Locale.ROOT)
-    if (normalized == "image" || normalized == "video") {
-      return normalized
+    if (normalized == "image" || normalized?.startsWith("image/") == true) {
+      return "image"
+    }
+    if (normalized == "video" || normalized?.startsWith("video/") == true) {
+      return "video"
     }
     return AndroidSyncPrimitives.classifyMediaType(
       AndroidSyncPrimitives.mimeTypeForFilename(filename),
@@ -3003,6 +3042,73 @@ class NativeSyncEngineModule(
     }
   }
 
+  private fun fetchReceivedFiles(): WritableArray {
+    var route = receivedListRoute(
+      resolveSharedFileRoute(
+        scope = "team",
+        kind = "list",
+        path = "received",
+        requestAccessToken = "",
+        reason = "list_received_files",
+      ),
+    )
+    logSharedFileRoute("listReceivedFiles", route)
+    val json = try {
+      JSONObject(readHttpString(route))
+    } catch (err: Throwable) {
+      if (!AndroidSyncPrimitives.shouldRetrySharedFilesRouteAfterFailure(route.isTunnel)) {
+        throw err
+      }
+      route = receivedListRoute(
+        recoverSharedFileTunnelAfterRouteFailure(
+          scope = "team",
+          kind = "list",
+          path = "received",
+          requestAccessToken = "",
+          reason = "list_received_files",
+          error = err,
+        ),
+      )
+      logSharedFileRoute("listReceivedFiles", route, retry = true)
+      JSONObject(readHttpString(route))
+    }
+    updateSharedFilesReachability(
+      state = "available",
+      route = route,
+      reason = "list_received_files_success",
+    )
+
+    val items = Arguments.createArray()
+    val sourceItems = json.optJSONArray("items") ?: JSONArray()
+    for (index in 0 until sourceItems.length()) {
+      val source = sourceItems.optJSONObject(index) ?: continue
+      val fileKey = source.optString("fileKey")
+      val filename = source.optString("filename").ifBlank { source.optString("displayName") }
+      val mediaType = source.optString("mediaType")
+      items.pushMap(Arguments.createMap().apply {
+        putString("resourceId", source.optString("resourceId"))
+        putString("desktopDeviceId", source.optString("desktopDeviceId"))
+        putString("clientId", source.optString("clientId"))
+        putString("displayName", source.optString("displayName"))
+        putString("fileKey", fileKey)
+        putString("filename", source.optString("filename"))
+        putString("mediaType", mediaType)
+        putDouble("fileSize", source.optLong("fileSize", 0L).toDouble())
+        putString("completedAt", source.optString("completedAt"))
+        putString("shareStatus", source.optString("shareStatus").ifBlank { "not_shared" })
+        if (fileKey.isNotBlank() && isReceivedImage(mediaType, filename)) {
+          putString("previewUrl", receivedFileUrlForRoute(fileKey, route, "preview").toString())
+          putString("thumbnailUrl", receivedFileUrlForRoute(fileKey, route, "thumbnail").toString())
+        }
+        if (fileKey.isNotBlank() && isReceivedVideo(mediaType, filename)) {
+          putString("previewUrl", receivedFileUrlForRoute(fileKey, route, "preview").toString())
+          putString("streamUrl", receivedFileUrlForRoute(fileKey, route, "stream").toString())
+        }
+      })
+    }
+    return items
+  }
+
   private fun downloadSharedFileToLocalStorage(scope: String, path: String, requestAccessToken: String): WritableMap {
     recordNativeLog("SharedFiles", "downloadSharedFile resolving route scope=$scope path=$path")
     var route = resolveSharedFileRoute(
@@ -3697,7 +3803,33 @@ class NativeSyncEngineModule(
       route,
     )
 
-  private fun receivedFileUrlForRoute(fileKey: String, route: SharedFileRoute): URL {
+  private fun receivedListRoute(route: SharedFileRoute): SharedFileRoute {
+    val query = listOf(
+      "clientId" to getOrCreateClientId(),
+      "clientName" to getClientDisplayNameValue(),
+      "scope" to "client",
+    ).joinToString("&") { (name, value) ->
+      "$name=${URLEncoder.encode(value, "UTF-8")}"
+    }
+    return route.copy(
+      kind = "list",
+      path = "received",
+      url = URL(
+        "http",
+        route.urlHost,
+        route.port,
+        "/resources/mobile/received?$query",
+      ),
+      authorizationToken = null,
+    )
+  }
+
+  private fun receivedFileUrlForRoute(
+    fileKey: String,
+    route: SharedFileRoute,
+    kind: String = "download",
+  ): URL {
+    val normalizedKind = normalizeReceivedMediaKind(kind)
     val query = listOf(
       "clientId" to getOrCreateClientId(),
       "clientName" to getClientDisplayNameValue(),
@@ -3709,8 +3841,30 @@ class NativeSyncEngineModule(
       "http",
       route.urlHost,
       route.port,
-      "/resources/mobile/received/download?$query",
+      "/resources/mobile/received/$normalizedKind?$query",
     )
+  }
+
+  private fun normalizeReceivedMediaKind(kind: String): String =
+    when (kind.trim().lowercase(Locale.US)) {
+      "preview" -> "preview"
+      "thumbnail" -> "thumbnail"
+      "stream" -> "stream"
+      else -> "download"
+    }
+
+  private fun isReceivedImage(mediaType: String, filename: String): Boolean {
+    val normalized = mediaType.trim().lowercase(Locale.US)
+    if (normalized == "image" || normalized.startsWith("image/")) return true
+    return filename.substringAfterLast('.', "")
+      .lowercase(Locale.US) in setOf("jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "bmp", "tiff", "tif")
+  }
+
+  private fun isReceivedVideo(mediaType: String, filename: String): Boolean {
+    val normalized = mediaType.trim().lowercase(Locale.US)
+    if (normalized == "video" || normalized.startsWith("video/")) return true
+    return filename.substringAfterLast('.', "")
+      .lowercase(Locale.US) in setOf("mp4", "mov", "avi", "mkv", "webm", "m4v")
   }
 
   private fun sharedFileEndpoint(scope: String, kind: String, path: String): String {

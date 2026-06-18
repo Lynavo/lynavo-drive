@@ -31,10 +31,7 @@ import {
   X,
 } from 'lucide-react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import {
-  SIDECAR_HTTP_PORT,
-  type BindingStateDTO,
-} from '@syncflow/contracts';
+import { SIDECAR_HTTP_PORT, type BindingStateDTO } from '@syncflow/contracts';
 
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/globalColors';
@@ -46,6 +43,7 @@ import {
   downloadReceivedLibraryItem,
   getReceivedLibraryPreviewUrl,
   isDownloadSavedLocally,
+  isDownloadSavedToPhotos,
   listCurrentClientReceivedLibrary,
   prepareReceivedLibraryPreview,
   type ReceivedLibraryMediaItem,
@@ -304,6 +302,7 @@ export function PhoneSyncSpaceGlobalScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [items, setItems] = useState<ReceivedLibraryMediaItem[]>([]);
   const [sortBy, setSortBy] = useState<SortKey>('time');
   const [showSortSheet, setShowSortSheet] = useState(false);
@@ -312,10 +311,12 @@ export function PhoneSyncSpaceGlobalScreen() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
+    setLoadError(false);
     try {
       const { NativeSyncEngine } = NativeModules;
       if (!NativeSyncEngine) {
         setItems(getPreviewReceivedItems());
+        setLoadError(false);
         setLoading(false);
         return;
       }
@@ -324,6 +325,7 @@ export function PhoneSyncSpaceGlobalScreen() {
       setBinding(bindingState);
       if (!bindingState || !bindingState.host) {
         setItems(getPreviewReceivedItems());
+        setLoadError(false);
         setLoading(false);
         return;
       }
@@ -333,9 +335,12 @@ export function PhoneSyncSpaceGlobalScreen() {
       const receivedItems = result ?? [];
       const previewItems = getPreviewReceivedItems();
       setItems(receivedItems.length > 0 ? receivedItems : previewItems);
+      setLoadError(false);
     } catch (e) {
       console.warn('[PhoneSyncSpaceScreen] Failed to load data:', e);
-      setItems(getPreviewReceivedItems());
+      const previewItems = getPreviewReceivedItems();
+      setItems(previewItems);
+      setLoadError(previewItems.length === 0);
     } finally {
       setLoading(false);
     }
@@ -344,6 +349,7 @@ export function PhoneSyncSpaceGlobalScreen() {
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
+      setLoadError(false);
       loadData();
     }, [loadData]),
   );
@@ -368,11 +374,11 @@ export function PhoneSyncSpaceGlobalScreen() {
           Alert.alert(t('sharedFiles.deviceUnavailable.title') || '设备不可用');
           return;
         }
-        const desktop: DesktopInfo = { host: bindingState.host, port: SIDECAR_HTTP_PORT };
-        const result = await downloadReceivedLibraryItem(
-          desktop,
-          item,
-        );
+        const desktop: DesktopInfo = {
+          host: bindingState.host,
+          port: SIDECAR_HTTP_PORT,
+        };
+        const result = await downloadReceivedLibraryItem(desktop, item);
         if (!isDownloadSavedLocally(result)) {
           Alert.alert(
             '暂不支持保存',
@@ -380,17 +386,18 @@ export function PhoneSyncSpaceGlobalScreen() {
           );
           return;
         }
+        const savedToPhotos = isDownloadSavedToPhotos(result);
         await recordDownloadedFile({
           resourceId: itemKey,
           filename: item.filename || item.displayName,
           fileSize: item.fileSize,
           mediaType: item.mediaType,
           localPath: result.localPath,
-          savedToPhotos: result.savedToPhotos,
+          savedToPhotos,
         });
         Alert.alert(
           t('sharedFiles.dialogs.downloadComplete') || '下載完成',
-          result.savedToPhotos
+          savedToPhotos
             ? t('sharedFiles.dialogs.downloadSavedToPhotos', {
                 name: item.filename || item.displayName,
               }) || `${item.filename || item.displayName} 已儲存至相簿`
@@ -402,7 +409,8 @@ export function PhoneSyncSpaceGlobalScreen() {
         console.warn('[PhoneSyncSpaceGlobalScreen] Download failed:', err);
         Alert.alert(
           t('sharedFiles.dialogs.downloadFailed') || '下載失敗',
-          t('sharedFiles.dialogs.downloadFailedMessage') || '無法下載檔案，請稍後重試',
+          t('sharedFiles.dialogs.downloadFailedMessage') ||
+            '無法下載檔案，請稍後重試',
         );
       } finally {
         setDownloadingId(null);
@@ -457,10 +465,7 @@ export function PhoneSyncSpaceGlobalScreen() {
           return;
         }
 
-        const localPath = await prepareReceivedLibraryPreview(
-          desktop,
-          item,
-        );
+        const localPath = await prepareReceivedLibraryPreview(desktop, item);
         await viewDocument({
           uri: documentPreviewUri(localPath),
           headerTitle: filename,
@@ -536,7 +541,10 @@ export function PhoneSyncSpaceGlobalScreen() {
           </Text>
         </View>
         <TouchableOpacity
-          style={[styles.downloadButton, isDownloading && styles.downloadButtonDisabled]}
+          style={[
+            styles.downloadButton,
+            isDownloading && styles.downloadButtonDisabled,
+          ]}
           accessibilityRole="button"
           accessibilityLabel="下载已同步文件"
           disabled={isDownloading || downloadingId !== null}
@@ -617,6 +625,15 @@ export function PhoneSyncSpaceGlobalScreen() {
             <Text style={styles.centeredTitle}>正在加载</Text>
             <Text style={styles.centeredSubtitle}>
               同步空间列表会在这里刷新。
+            </Text>
+          </View>
+        ) : loadError ? (
+          <View style={styles.centeredCard}>
+            <Text style={styles.centeredTitle}>
+              {t('sharedFiles.networkError.title') || '載入失敗'}
+            </Text>
+            <Text style={styles.centeredSubtitle}>
+              {t('sharedFiles.networkError.message') || '請稍後重試'}
             </Text>
           </View>
         ) : sortedItems.length === 0 ? (

@@ -60,10 +60,7 @@ jest.mock('react-i18next', () => ({
       ) {
         return `${options.name} 已儲存至相簿`;
       }
-      if (
-        key === 'sharedFiles.dialogs.downloadSavedToFiles' &&
-        options?.name
-      ) {
+      if (key === 'sharedFiles.dialogs.downloadSavedToFiles' && options?.name) {
         return `${options.name} 已儲存到檔案`;
       }
       return map[key] || key;
@@ -208,6 +205,20 @@ jest.mock('../../services/desktop-local-service', () => ({
       (typeof result.savedLocation === 'string' &&
         result.savedLocation.trim().length > 0),
   ),
+  isDownloadSavedToPhotos: jest.fn(
+    (result: {
+      savedToPhotos?: boolean;
+      localPath?: string | null;
+      savedLocation?: string | null;
+    }) =>
+      result.savedToPhotos === true ||
+      (typeof result.localPath === 'string' &&
+        result.localPath.trim().toLowerCase().startsWith('ph://')) ||
+      (typeof result.savedLocation === 'string' &&
+        ['photos', 'pictures/vivi drop', 'movies/vivi drop'].includes(
+          result.savedLocation.trim().toLowerCase(),
+        )),
+  ),
 }));
 
 jest.mock('../../services/download-records-service', () => ({
@@ -258,15 +269,18 @@ const mockListCurrentClientReceivedLibrary =
   listCurrentClientReceivedLibrary as jest.Mock;
 const mockDownloadResource = downloadResource as jest.Mock;
 const mockDownloadResourceForGlobal = downloadResourceForGlobal as jest.Mock;
-const mockDownloadReceivedLibraryItem = downloadReceivedLibraryItem as jest.Mock;
+const mockDownloadReceivedLibraryItem =
+  downloadReceivedLibraryItem as jest.Mock;
 const mockDownloadGlobalRemoteAccessResource =
   downloadGlobalRemoteAccessResource as jest.Mock;
 const mockGetResourcePreviewUrl = getResourcePreviewUrl as jest.Mock;
-const mockGetReceivedLibraryPreviewUrl = getReceivedLibraryPreviewUrl as jest.Mock;
+const mockGetReceivedLibraryPreviewUrl =
+  getReceivedLibraryPreviewUrl as jest.Mock;
 const mockGetGlobalRemoteAccessPreviewUrl =
   getGlobalRemoteAccessPreviewUrl as jest.Mock;
 const mockPrepareResourcePreview = prepareResourcePreview as jest.Mock;
-const mockPrepareReceivedLibraryPreview = prepareReceivedLibraryPreview as jest.Mock;
+const mockPrepareReceivedLibraryPreview =
+  prepareReceivedLibraryPreview as jest.Mock;
 const mockPrepareGlobalRemoteAccessPreview =
   prepareGlobalRemoteAccessPreview as jest.Mock;
 const mockShareResources = shareResources as jest.Mock;
@@ -648,10 +662,7 @@ describe('RemoteAccessGlobalScreen', () => {
       localPath: '/local/alpha.jpg',
       savedToPhotos: false,
     });
-    expect(alertSpy).toHaveBeenCalledWith(
-      '下載完成',
-      'alpha.jpg 已儲存到檔案',
-    );
+    expect(alertSpy).toHaveBeenCalledWith('下載完成', 'alpha.jpg 已儲存到檔案');
 
     alertSpy.mockRestore();
   });
@@ -766,7 +777,9 @@ describe('RemoteAccessGlobalScreen', () => {
         downloadCount: 0,
       },
     ]);
-    mockPrepareGlobalRemoteAccessPreview.mockResolvedValueOnce('/cache/manual.pdf');
+    mockPrepareGlobalRemoteAccessPreview.mockResolvedValueOnce(
+      '/cache/manual.pdf',
+    );
     mockViewDocument.mockResolvedValueOnce(undefined);
 
     const { getByText } = render(
@@ -837,6 +850,8 @@ describe('RemoteAccessGlobalScreen', () => {
       url: 'file:///cache/protoc-gen-go',
       type: 'application/octet-stream',
       filename: 'protoc-gen-go',
+      title: 'protoc-gen-go',
+      subject: 'protoc-gen-go',
       failOnCancel: false,
       showAppsToView: true,
     });
@@ -930,6 +945,24 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
     expect(queryByText('IMG_8421.JPG')).toBeNull();
   });
 
+  it('shows a load error instead of the empty state when the global phone sync listing fails', async () => {
+    mockListCurrentClientReceivedLibrary.mockRejectedValueOnce(
+      new Error('route unavailable'),
+    );
+
+    const { getByText, queryByText } = render(
+      <TestErrorBoundary>
+        <PhoneSyncSpaceGlobalScreen />
+      </TestErrorBoundary>,
+    );
+
+    await waitFor(() => {
+      expect(getByText('載入失敗')).toBeTruthy();
+    });
+    expect(getByText('請稍後重試')).toBeTruthy();
+    expect(queryByText('尚無同步檔案')).toBeNull();
+  });
+
   it('renders received image thumbnail and opens the real image preview', async () => {
     mockListCurrentClientReceivedLibrary.mockResolvedValueOnce([
       {
@@ -971,7 +1004,9 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
 
     expect(getByTestId('phone-sync-thumbnail-image')).toBeTruthy();
     expect(queryByLabelText('保存暂不可用')).toBeNull();
-    expect(queryAllByTestId('phone-sync-download-icon').length).toBeGreaterThan(0);
+    expect(queryAllByTestId('phone-sync-download-icon').length).toBeGreaterThan(
+      0,
+    );
 
     const previewButton = getByLabelText('预览已同步文件');
     expect(previewButton.props.accessibilityState?.disabled).not.toBe(true);
@@ -1167,10 +1202,61 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
       localPath: 'ph://asset-001',
       savedToPhotos: true,
     });
-    expect(alertSpy).toHaveBeenCalledWith(
-      '下載完成',
-      'alpha.jpg 已儲存至相簿',
+    expect(alertSpy).toHaveBeenCalledWith('下載完成', 'alpha.jpg 已儲存至相簿');
+
+    alertSpy.mockRestore();
+  });
+
+  it('shows the photo-library alert for global sync-space downloads identified by PhotoKit path', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockListCurrentClientReceivedLibrary.mockResolvedValueOnce([
+      {
+        resourceId: '',
+        desktopDeviceId: 'desktop-device-id',
+        clientId: 'client-001',
+        displayName: 'alpha.jpg',
+        fileKey: 'received/alpha.jpg',
+        filename: 'alpha.jpg',
+        mediaType: 'image/jpeg',
+        fileSize: 1024,
+        completedAt: '2026-06-16T08:00:00.000Z',
+        shareStatus: 'not_shared',
+      },
+    ]);
+    mockDownloadReceivedLibraryItem.mockResolvedValueOnce({
+      savedToPhotos: false,
+      localPath: 'ph://asset-001',
+      savedLocation: 'Photos',
+    });
+    mockRecordDownloadedFile.mockResolvedValueOnce(undefined);
+
+    const { getByLabelText, getByText } = render(
+      <TestErrorBoundary>
+        <PhoneSyncSpaceGlobalScreen />
+      </TestErrorBoundary>,
     );
+
+    await waitFor(() => {
+      expect(getByText('alpha.jpg')).toBeTruthy();
+    });
+
+    fireEvent.press(getByLabelText('下载已同步文件'));
+
+    await waitFor(() => {
+      expect(mockDownloadReceivedLibraryItem).toHaveBeenCalledWith(
+        { host: '192.168.1.100', port: 39394 },
+        expect.objectContaining({ fileKey: 'received/alpha.jpg' }),
+      );
+    });
+    expect(mockRecordDownloadedFile).toHaveBeenCalledWith({
+      resourceId: 'received/alpha.jpg',
+      filename: 'alpha.jpg',
+      fileSize: 1024,
+      mediaType: 'image/jpeg',
+      localPath: 'ph://asset-001',
+      savedToPhotos: true,
+    });
+    expect(alertSpy).toHaveBeenCalledWith('下載完成', 'alpha.jpg 已儲存至相簿');
 
     alertSpy.mockRestore();
   });
@@ -1224,10 +1310,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
       localPath: 'content://downloads/my_downloads/42',
       savedToPhotos: false,
     });
-    expect(alertSpy).toHaveBeenCalledWith(
-      '下載完成',
-      'notes.txt 已儲存到檔案',
-    );
+    expect(alertSpy).toHaveBeenCalledWith('下載完成', 'notes.txt 已儲存到檔案');
 
     alertSpy.mockRestore();
   });
@@ -1335,7 +1418,9 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
     });
     expect(queryByText('list-outline')).toBeNull();
     expect(queryByText('download-outline')).toBeNull();
-    expect(queryAllByTestId('phone-sync-download-icon').length).toBeGreaterThan(0);
+    expect(queryAllByTestId('phone-sync-download-icon').length).toBeGreaterThan(
+      0,
+    );
     expect(queryByText('folder-open-outline')).toBeNull();
     expect(queryByText('document-text')).toBeNull();
   });
@@ -1427,7 +1512,7 @@ describe('RemoteAccessScreen', () => {
     const { getByText, queryByText } = render(
       <TestErrorBoundary>
         <RemoteAccessScreen />
-      </TestErrorBoundary>
+      </TestErrorBoundary>,
     );
 
     await waitFor(() => {
@@ -1490,12 +1575,15 @@ describe('RemoteAccessScreen', () => {
           filename: 'photo.jpg',
           fileSize: 1048576,
           mediaType: 'image',
-        })
+        }),
       );
     });
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith('下載完成', 'photo.jpg 已儲存至相簿');
+      expect(alertSpy).toHaveBeenCalledWith(
+        '下載完成',
+        'photo.jpg 已儲存至相簿',
+      );
     });
 
     alertSpy.mockRestore();
@@ -1530,7 +1618,7 @@ describe('RemoteAccessScreen', () => {
     const { getByText } = render(
       <TestErrorBoundary>
         <RemoteAccessScreen />
-      </TestErrorBoundary>
+      </TestErrorBoundary>,
     );
 
     // Open the folder
@@ -1561,7 +1649,7 @@ describe('RemoteAccessScreen', () => {
           filename: 'contract.pdf',
           fileSize: 204800,
           mediaType: 'document',
-        })
+        }),
       );
     });
 
@@ -1591,7 +1679,7 @@ describe('RemoteAccessScreen', () => {
     const { getByText } = render(
       <TestErrorBoundary>
         <RemoteAccessScreen />
-      </TestErrorBoundary>
+      </TestErrorBoundary>,
     );
 
     await waitFor(() => {
@@ -1633,7 +1721,7 @@ describe('RemoteAccessScreen', () => {
     const { getByText } = render(
       <TestErrorBoundary>
         <RemoteAccessScreen />
-      </TestErrorBoundary>
+      </TestErrorBoundary>,
     );
 
     await waitFor(() => {
@@ -1831,6 +1919,24 @@ describe('PhoneSyncSpaceScreen', () => {
     expect(alertSpy).toHaveBeenCalledWith('下載完成', 'alpha.jpg 已儲存至相簿');
 
     alertSpy.mockRestore();
+  });
+
+  it('shows a load error instead of the empty state when the phone sync listing fails', async () => {
+    mockListCurrentClientReceivedLibrary.mockRejectedValueOnce(
+      new Error('route unavailable'),
+    );
+
+    const { getByText, queryByText } = render(
+      <TestErrorBoundary>
+        <PhoneSyncSpaceScreen />
+      </TestErrorBoundary>,
+    );
+
+    await waitFor(() => {
+      expect(getByText('載入失敗')).toBeTruthy();
+    });
+    expect(getByText('請稍後重試')).toBeTruthy();
+    expect(queryByText('尚無同步檔案')).toBeNull();
   });
 
   it('opens a received image inside the app preview when a phone-sync row is pressed', async () => {

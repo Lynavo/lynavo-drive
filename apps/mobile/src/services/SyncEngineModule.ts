@@ -14,6 +14,7 @@ import type {
   PairingErrorMetadataDTO,
   ReadOnlyQueueItemDTO,
   DirectoryScope,
+  ReceivedLibraryItemDTO,
   SharedDirectoryDTO,
   SyncSummaryDTO,
   AutoUploadTimeRangeMode,
@@ -491,6 +492,22 @@ export async function downloadReceivedFile(
   return result as DownloadResult;
 }
 
+export async function listReceivedFiles(): Promise<ReceivedLibraryItemDTO[]> {
+  const result = await NativeSyncEngine.listReceivedFiles();
+  return (result ?? []) as ReceivedLibraryItemDTO[];
+}
+
+export async function getReceivedFilePreviewUrl(
+  fileKey: string,
+  kind: 'download' | 'preview' | 'thumbnail' | 'stream',
+): Promise<string> {
+  const result = await NativeSyncEngine.getReceivedFilePreviewUrl(
+    fileKey,
+    kind,
+  );
+  return result as string;
+}
+
 export async function getDirectoryFileStreamUrl(
   scope: DirectoryScope,
   path: string,
@@ -816,15 +833,15 @@ export async function pairDevice(params: {
       err?.remainingAttempts !== undefined
         ? Number(err.remainingAttempts)
         : meta?.remainingAttempts !== undefined
-        ? Number(meta.remainingAttempts)
-        : undefined;
+          ? Number(meta.remainingAttempts)
+          : undefined;
 
     const blocked =
       err?.blocked !== undefined
         ? Boolean(err.blocked)
         : err?.userInfo?.blocked !== undefined
-        ? Boolean(err.userInfo.blocked)
-        : undefined;
+          ? Boolean(err.userInfo.blocked)
+          : undefined;
 
     throw new PairingError(
       errMsg,

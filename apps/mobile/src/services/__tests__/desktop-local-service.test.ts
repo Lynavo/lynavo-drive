@@ -27,6 +27,8 @@ import {
   downloadDirectoryFile,
   getDirectoryFileStreamUrl,
   getClientId,
+  getReceivedFilePreviewUrl,
+  listReceivedFiles,
   prepareDirectoryFilePreview,
 } from '../SyncEngineModule';
 
@@ -47,6 +49,8 @@ jest.mock('../SyncEngineModule', () => ({
   downloadReceivedFile: jest.fn(),
   downloadDirectoryFile: jest.fn(),
   getDirectoryFileStreamUrl: jest.fn(),
+  getReceivedFilePreviewUrl: jest.fn(),
+  listReceivedFiles: jest.fn(),
   prepareDirectoryFilePreview: jest.fn(),
 }));
 
@@ -65,6 +69,13 @@ const mockedGetDirectoryFileStreamUrl =
   getDirectoryFileStreamUrl as jest.MockedFunction<
     typeof getDirectoryFileStreamUrl
   >;
+const mockedGetReceivedFilePreviewUrl =
+  getReceivedFilePreviewUrl as jest.MockedFunction<
+    typeof getReceivedFilePreviewUrl
+  >;
+const mockedListReceivedFiles = listReceivedFiles as jest.MockedFunction<
+  typeof listReceivedFiles
+>;
 const mockedPrepareDirectoryFilePreview =
   prepareDirectoryFilePreview as jest.MockedFunction<
     typeof prepareDirectoryFilePreview
@@ -184,6 +195,66 @@ describe('desktop-local-service', () => {
     );
     expect(mockDownloadUrlToLocal).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('treats received iOS PhotoKit downloads as saved to photos even when native omits the flag', async () => {
+    mockedDownloadReceivedFile.mockResolvedValueOnce({
+      savedToPhotos: false,
+      localPath: 'ph://asset-004',
+      savedLocation: 'Photos',
+    });
+
+    await expect(
+      downloadReceivedLibraryItem(
+        { host: '192.168.10.20', port: 39394 },
+        {
+          resourceId: '',
+          desktopDeviceId: 'desktop-001',
+          clientId: 'client-001',
+          displayName: 'Alice iPhone',
+          fileKey: '2026/06/17/client-001-photo',
+          filename: 'IMG_0002.JPG',
+          mediaType: 'image/jpeg',
+          fileSize: 2048,
+          completedAt: '2026-06-16T08:00:00.000Z',
+          shareStatus: 'not_shared',
+        },
+      ),
+    ).resolves.toEqual({
+      savedToPhotos: true,
+      localPath: 'ph://asset-004',
+      savedLocation: 'Photos',
+    });
+  });
+
+  it('treats received Android media-store downloads as saved to photos from their saved location', async () => {
+    mockedDownloadReceivedFile.mockResolvedValueOnce({
+      savedToPhotos: false,
+      localPath: null,
+      savedLocation: 'Pictures/Vivi Drop',
+    });
+
+    await expect(
+      downloadReceivedLibraryItem(
+        { host: '192.168.10.20', port: 39394 },
+        {
+          resourceId: '',
+          desktopDeviceId: 'desktop-001',
+          clientId: 'client-001',
+          displayName: 'Alice iPhone',
+          fileKey: '2026/06/17/client-001-photo',
+          filename: 'IMG_0003.JPG',
+          mediaType: 'image/jpeg',
+          fileSize: 2048,
+          completedAt: '2026-06-16T08:00:00.000Z',
+          shareStatus: 'not_shared',
+        },
+      ),
+    ).resolves.toEqual({
+      savedToPhotos: true,
+      localPath: null,
+      savedLocation: 'Pictures/Vivi Drop',
+    });
   });
 
   it('does not bypass the native received route for received image downloads', async () => {
@@ -470,22 +541,20 @@ describe('desktop-local-service', () => {
   });
 
   it('scopes the global received library request to the current mobile client', async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      statusText: 'OK',
-      json: jest.fn().mockResolvedValue({ items: [] }),
-    });
+    mockedListReceivedFiles.mockResolvedValueOnce([]);
 
     await expect(
       listCurrentClientReceivedLibrary({ host: '192.168.10.20', port: 39394 }),
     ).resolves.toEqual([]);
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://192.168.10.20:39394/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&scope=client',
-    );
+    expect(mockedListReceivedFiles).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('adds absolute preview and thumbnail urls for current-client received media', async () => {
+  it('falls back to the scoped HTTP received library only when the native listing bridge is missing', async () => {
+    mockedListReceivedFiles.mockRejectedValueOnce(
+      new TypeError('NativeSyncEngine.listReceivedFiles is not a function'),
+    );
     fetchMock.mockResolvedValueOnce({
       ok: true,
       statusText: 'OK',
@@ -496,28 +565,12 @@ describe('desktop-local-service', () => {
             desktopDeviceId: 'desktop-001',
             clientId: 'client-001',
             displayName: 'Alice iPhone',
-            fileKey: '2026/06/17/image-key',
-            filename: 'IMG_0001.JPG',
+            fileKey: '2026/06/17/fallback-image',
+            filename: 'IMG_FALLBACK.JPG',
             mediaType: 'image',
             fileSize: 2048,
             completedAt: '2026-06-16T08:00:00.000Z',
             shareStatus: 'not_shared',
-            previewUrl: '/resources/mobile/download/legacy-image-resource',
-            thumbnailUrl: '/resources/mobile/download/legacy-image-thumb',
-          },
-          {
-            resourceId: '',
-            desktopDeviceId: 'desktop-001',
-            clientId: 'client-001',
-            displayName: 'Alice iPhone',
-            fileKey: '2026/06/17/video-key',
-            filename: 'VID_0001.MOV',
-            mediaType: 'video',
-            fileSize: 4096,
-            completedAt: '2026-06-16T08:01:00.000Z',
-            shareStatus: 'not_shared',
-            previewUrl: '/resources/mobile/download/legacy-video-resource',
-            streamUrl: '/resources/mobile/download/legacy-video-stream',
           },
         ],
       }),
@@ -527,20 +580,87 @@ describe('desktop-local-service', () => {
       listCurrentClientReceivedLibrary({ host: '192.168.10.20', port: 39394 }),
     ).resolves.toMatchObject([
       {
+        fileKey: '2026/06/17/fallback-image',
+        previewUrl:
+          'http://192.168.10.20:39394/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Ffallback-image',
+        thumbnailUrl:
+          'http://192.168.10.20:39394/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Ffallback-image',
+      },
+    ]);
+
+    expect(mockedListReceivedFiles).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://192.168.10.20:39394/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&scope=client',
+    );
+  });
+
+  it('propagates native received listing route failures without falling back to LAN-only HTTP', async () => {
+    const routeError = new Error('Shared files route unavailable');
+    mockedListReceivedFiles.mockRejectedValueOnce(routeError);
+
+    await expect(
+      listCurrentClientReceivedLibrary({ host: '192.168.10.20', port: 39394 }),
+    ).rejects.toBe(routeError);
+
+    expect(mockedListReceivedFiles).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps native received media urls for the current-client global library', async () => {
+    mockedListReceivedFiles.mockResolvedValueOnce([
+      {
+        resourceId: '',
+        desktopDeviceId: 'desktop-001',
+        clientId: 'client-001',
+        displayName: 'Alice iPhone',
+        fileKey: '2026/06/17/image-key',
+        filename: 'IMG_0001.JPG',
+        mediaType: 'image',
+        fileSize: 2048,
+        completedAt: '2026-06-16T08:00:00.000Z',
+        shareStatus: 'not_shared',
+        previewUrl:
+          'http://127.0.0.1:49394/resources/mobile/received/preview?fileKey=image-key',
+        thumbnailUrl:
+          'http://127.0.0.1:49394/resources/mobile/received/thumbnail?fileKey=image-key',
+      },
+      {
+        resourceId: '',
+        desktopDeviceId: 'desktop-001',
+        clientId: 'client-001',
+        displayName: 'Alice iPhone',
+        fileKey: '2026/06/17/video-key',
+        filename: 'VID_0001.MOV',
+        mediaType: 'video',
+        fileSize: 4096,
+        completedAt: '2026-06-16T08:01:00.000Z',
+        shareStatus: 'not_shared',
+        previewUrl:
+          'http://127.0.0.1:49394/resources/mobile/received/preview?fileKey=video-key',
+        streamUrl:
+          'http://127.0.0.1:49394/resources/mobile/received/stream?fileKey=video-key',
+      },
+    ]);
+
+    await expect(
+      listCurrentClientReceivedLibrary({ host: '192.168.10.20', port: 39394 }),
+    ).resolves.toMatchObject([
+      {
         fileKey: '2026/06/17/image-key',
         previewUrl:
-          'http://192.168.10.20:39394/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fimage-key',
+          'http://127.0.0.1:49394/resources/mobile/received/preview?fileKey=image-key',
         thumbnailUrl:
-          'http://192.168.10.20:39394/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fimage-key',
+          'http://127.0.0.1:49394/resources/mobile/received/thumbnail?fileKey=image-key',
       },
       {
         fileKey: '2026/06/17/video-key',
         previewUrl:
-          'http://192.168.10.20:39394/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fvideo-key',
+          'http://127.0.0.1:49394/resources/mobile/received/preview?fileKey=video-key',
         streamUrl:
-          'http://192.168.10.20:39394/resources/mobile/received/stream?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fvideo-key',
+          'http://127.0.0.1:49394/resources/mobile/received/stream?fileKey=video-key',
       },
     ]);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('downloads selected remote resources to share cache and opens the system share sheet once', async () => {
@@ -595,7 +715,13 @@ describe('desktop-local-service', () => {
   });
 
   it('previews received library media and documents by fileKey', async () => {
-    mockDownloadUrlToShareCache.mockResolvedValueOnce('/cache/notes.pdf');
+    mockedGetReceivedFilePreviewUrl.mockResolvedValueOnce(
+      'http://127.0.0.1:49394/resources/mobile/received/preview?fileKey=client-001-photo',
+    );
+    mockedDownloadReceivedFile.mockResolvedValueOnce({
+      savedToPhotos: false,
+      localPath: '/cache/notes.pdf',
+    });
 
     const desktop = { host: '192.168.10.20', port: 39394 };
     const imageItem = {
@@ -621,16 +747,23 @@ describe('desktop-local-service', () => {
     await expect(
       getReceivedLibraryPreviewUrl(desktop, imageItem),
     ).resolves.toBe(
-      'http://192.168.10.20:39394/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fclient-001-photo',
+      'http://127.0.0.1:49394/resources/mobile/received/preview?fileKey=client-001-photo',
     );
     await expect(prepareReceivedLibraryPreview(desktop, docItem)).resolves.toBe(
       '/cache/notes.pdf',
     );
 
-    expect(mockDownloadUrlToShareCache).toHaveBeenCalledWith(
-      'http://192.168.10.20:39394/resources/mobile/received/download?clientId=client-001&clientName=Alice%20iPhone&fileKey=client-001-doc',
-      'notes.pdf',
+    expect(mockedGetReceivedFilePreviewUrl).toHaveBeenCalledWith(
+      '2026/06/17/client-001-photo',
+      'preview',
     );
+    expect(mockedDownloadReceivedFile).toHaveBeenCalledWith(
+      'client-001-doc',
+      'notes.pdf',
+      'document',
+    );
+    expect(mockDownloadUrlToShareCache).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('prepares a shared-folder entry for system preview with the nested path preserved', async () => {
@@ -794,6 +927,22 @@ describe('desktop-local-service', () => {
       'notes.txt',
     );
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('normalizes global remote access media-store downloads as saved to photos', async () => {
+    mockedDownloadDirectoryFile.mockResolvedValueOnce({
+      savedToPhotos: false,
+      localPath: null,
+      savedLocation: 'Movies/Vivi Drop',
+    });
+
+    await expect(
+      downloadGlobalRemoteAccessResource('personal-dir:Projects/video.mov'),
+    ).resolves.toEqual({
+      savedToPhotos: true,
+      localPath: null,
+      savedLocation: 'Movies/Vivi Drop',
+    });
   });
 
   it('shares global remote access files through the personal directory preview cache', async () => {

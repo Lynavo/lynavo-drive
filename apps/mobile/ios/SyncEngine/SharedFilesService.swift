@@ -360,6 +360,57 @@ class SharedFilesService {
         )
     }
 
+    func listReceivedFiles(
+        clientId: String,
+        clientName: String
+    ) async throws -> [[String: Any]] {
+        let url = try buildURL(
+            path: "/resources/mobile/received",
+            queryItems: [
+                URLQueryItem(name: "clientId", value: clientId),
+                URLQueryItem(name: "clientName", value: clientName),
+                URLQueryItem(name: "scope", value: "client"),
+            ]
+        )
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = SharedFilesRoutePolicy.sharedFileListRequestTimeout
+
+        let (data, response) = try await urlSession.data(for: request)
+        try validateHTTPResponse(response, path: "/resources/mobile/received")
+
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+        return json["items"] as? [[String: Any]] ?? []
+    }
+
+    func getReceivedFileMediaUrl(
+        fileKey: String,
+        clientId: String,
+        clientName: String,
+        kind: String
+    ) throws -> URL {
+        let normalizedKind: String
+        switch kind.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "preview":
+            normalizedKind = "preview"
+        case "thumbnail":
+            normalizedKind = "thumbnail"
+        case "stream":
+            normalizedKind = "stream"
+        default:
+            normalizedKind = "download"
+        }
+        return try buildURL(
+            path: "/resources/mobile/received/\(normalizedKind)",
+            queryItems: [
+                URLQueryItem(name: "clientId", value: clientId),
+                URLQueryItem(name: "clientName", value: clientName),
+                URLQueryItem(name: "fileKey", value: fileKey),
+            ]
+        )
+    }
+
     private func downloadEndpointToLocalFile(
         endpoint: String,
         queryItems: [URLQueryItem] = [],
@@ -597,8 +648,11 @@ class SharedFilesService {
         let normalized = mediaType?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
-        if normalized == "image" || normalized == "video" {
-            return normalized!
+        if normalized == "image" || normalized?.hasPrefix("image/") == true {
+            return "image"
+        }
+        if normalized == "video" || normalized?.hasPrefix("video/") == true {
+            return "video"
         }
         return classifyLocalFileType(filename: filename)
     }

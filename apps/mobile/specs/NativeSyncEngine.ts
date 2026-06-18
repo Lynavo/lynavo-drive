@@ -7,6 +7,7 @@ import type {
   ReadOnlyQueueItemDTO,
   DirectoryListingDTO,
   DirectoryScope,
+  ReceivedLibraryItemDTO,
   SharedFilesReachabilityDTO,
   SyncSummaryDTO,
 } from '@syncflow/contracts';
@@ -57,6 +58,11 @@ export interface Spec extends TurboModule {
     localPath: string | null;
     savedLocation?: string | null;
   }>;
+  listReceivedFiles(): Promise<ReceivedLibraryItemDTO[]>;
+  getReceivedFilePreviewUrl(
+    fileKey: string,
+    kind: 'download' | 'preview' | 'thumbnail' | 'stream',
+  ): Promise<string>;
   getSharedFileStreamUrl(
     scope: DirectoryScope,
     path: string,

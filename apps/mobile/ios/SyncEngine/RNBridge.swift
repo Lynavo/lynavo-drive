@@ -845,6 +845,33 @@ class NativeSyncEngineModule: RCTEventEmitter {
     }
 
     @objc
+    func listReceivedFiles(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        Task {
+            do {
+                let result = try await SyncEngineManager.shared.listReceivedFiles()
+                resolve(result)
+            } catch {
+                reject("LIST_RECEIVED_FILES_ERROR", error.localizedDescription, error)
+            }
+        }
+    }
+
+    @objc
+    func getReceivedFilePreviewUrl(_ fileKey: NSString, kind: NSString, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        Task {
+            do {
+                let result = try await SyncEngineManager.shared.getReceivedFilePreviewUrl(
+                    fileKey: fileKey as String,
+                    kind: kind as String
+                )
+                resolve(result)
+            } catch {
+                reject("RECEIVED_FILE_PREVIEW_URL_ERROR", error.localizedDescription, error)
+            }
+        }
+    }
+
+    @objc
     func getSharedFileStreamUrl(_ scope: NSString, path: NSString, accessToken: NSString, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         let url = SyncEngineManager.shared.getSharedFileStreamUrl(scope: scope as String, path: path as String, accessToken: accessToken as String)
         resolve(url)

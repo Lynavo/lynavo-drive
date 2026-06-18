@@ -8359,6 +8359,179 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         ]
     }
 
+    func listReceivedFiles() async throws -> [[String: Any]] {
+        let allowWake = SharedFilesRoutePolicy.shouldAttemptWake(
+            scope: SharedDirectoryScope.team.rawValue,
+            path: "received",
+            operation: "list"
+        )
+        syncDiagnosticsLog(
+            "SharedFiles",
+            "wake decision scope=received path=received operation=list allowWake=\(allowWake) \(wakeCapabilityLogSummary(uploadStore?.getBinding()?.wake))"
+        )
+        var route = try await prepareSharedFilesRoute(reason: "list_received_files", allowWake: allowWake)
+        slog("[SharedFiles] listReceivedFiles resolved_host=%@ is_tunnel=%@", route.host, String(route.isTunnel))
+        syncDiagnosticsLog("SharedFiles", "listReceivedFiles resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
+
+        let items: [[String: Any]]
+        do {
+            items = try await withSharedFileTunnelOperation(
+                path: "received",
+                reason: "list_received_files",
+                isTunnelRoute: route.isTunnel
+            ) {
+                try await sharedFilesService.listReceivedFiles(
+                    clientId: getClientId(),
+                    clientName: getClientDisplayName()
+                )
+            }
+        } catch {
+            guard SharedFilesRoutePolicy.shouldInvalidateTunnelAfterRouteFailure(isTunnelRoute: route.isTunnel) else {
+                throw error
+            }
+            route = try await recoverSharedFilesTunnelAfterRouteFailure(
+                path: "received",
+                reason: "list_received_files",
+                error: error
+            )
+            slog("[SharedFiles] listReceivedFiles retry resolved_host=%@ is_tunnel=%@", route.host, String(route.isTunnel))
+            syncDiagnosticsLog("SharedFiles", "listReceivedFiles retry resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
+            items = try await withSharedFileTunnelOperation(
+                path: "received",
+                reason: "list_received_files_retry",
+                isTunnelRoute: route.isTunnel
+            ) {
+                try await sharedFilesService.listReceivedFiles(
+                    clientId: getClientId(),
+                    clientName: getClientDisplayName()
+                )
+            }
+        }
+
+        let reachabilityRoute: SharedFilesReachabilityRoute = route.isTunnel ? currentSharedFilesTunnelReachabilityRoute() : .lan
+        updateSharedFilesReachability(
+            .available,
+            route: reachabilityRoute,
+            reason: "list_received_files_success"
+        )
+        if !route.isTunnel && bindingConnectionState != .connected {
+            updateBindingConnectionState(.connected, reason: "list_received_files_success")
+        }
+
+        return items.map { item in
+            var next = item
+            let fileKey = (item["fileKey"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let filename = item["filename"] as? String ?? item["displayName"] as? String ?? ""
+            let mediaType = item["mediaType"] as? String ?? ""
+            guard !fileKey.isEmpty else {
+                return next
+            }
+            if isReceivedImage(mediaType: mediaType, filename: filename) {
+                if let previewUrl = try? sharedFilesService.getReceivedFileMediaUrl(
+                    fileKey: fileKey,
+                    clientId: getClientId(),
+                    clientName: getClientDisplayName(),
+                    kind: "preview"
+                ) {
+                    next["previewUrl"] = previewUrl.absoluteString
+                }
+                if let thumbnailUrl = try? sharedFilesService.getReceivedFileMediaUrl(
+                    fileKey: fileKey,
+                    clientId: getClientId(),
+                    clientName: getClientDisplayName(),
+                    kind: "thumbnail"
+                ) {
+                    next["thumbnailUrl"] = thumbnailUrl.absoluteString
+                }
+            }
+            if isReceivedVideo(mediaType: mediaType, filename: filename) {
+                if let previewUrl = try? sharedFilesService.getReceivedFileMediaUrl(
+                    fileKey: fileKey,
+                    clientId: getClientId(),
+                    clientName: getClientDisplayName(),
+                    kind: "preview"
+                ) {
+                    next["previewUrl"] = previewUrl.absoluteString
+                }
+                if let streamUrl = try? sharedFilesService.getReceivedFileMediaUrl(
+                    fileKey: fileKey,
+                    clientId: getClientId(),
+                    clientName: getClientDisplayName(),
+                    kind: "stream"
+                ) {
+                    next["streamUrl"] = streamUrl.absoluteString
+                }
+            }
+            return next
+        }
+    }
+
+    func getReceivedFilePreviewUrl(fileKey: String, kind: String) async throws -> String {
+        let trimmedFileKey = fileKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedFileKey.isEmpty else {
+            throw SyncEngineError.networkError("Received file key is required")
+        }
+        let normalizedKind = normalizedReceivedPreviewKind(kind)
+        let allowWake = SharedFilesRoutePolicy.shouldAttemptWake(
+            scope: SharedDirectoryScope.team.rawValue,
+            path: trimmedFileKey,
+            operation: normalizedKind == "download" ? "download" : "preview"
+        )
+        syncDiagnosticsLog(
+            "SharedFiles",
+            "wake decision scope=received path=\(trimmedFileKey) operation=\(normalizedKind) allowWake=\(allowWake) \(wakeCapabilityLogSummary(uploadStore?.getBinding()?.wake))"
+        )
+        let route = try await prepareSharedFilesRoute(reason: "preview_received_file", allowWake: allowWake)
+        slog("[SharedFiles] getReceivedFilePreviewUrl fileKey=%@ kind=%@ resolved_host=%@ is_tunnel=%@", trimmedFileKey, normalizedKind, route.host, String(route.isTunnel))
+        syncDiagnosticsLog("SharedFiles", "getReceivedFilePreviewUrl fileKey=\(trimmedFileKey) kind=\(normalizedKind) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
+        let reachabilityRoute: SharedFilesReachabilityRoute = route.isTunnel ? currentSharedFilesTunnelReachabilityRoute() : .lan
+        updateSharedFilesReachability(
+            .available,
+            route: reachabilityRoute,
+            reason: "preview_received_file_route_selected"
+        )
+        if !route.isTunnel && bindingConnectionState != .connected {
+            updateBindingConnectionState(.connected, reason: "preview_received_file_route_selected")
+        }
+        return try sharedFilesService.getReceivedFileMediaUrl(
+            fileKey: trimmedFileKey,
+            clientId: getClientId(),
+            clientName: getClientDisplayName(),
+            kind: normalizedKind
+        ).absoluteString
+    }
+
+    private func normalizedReceivedPreviewKind(_ kind: String) -> String {
+        switch kind.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "preview":
+            return "preview"
+        case "thumbnail":
+            return "thumbnail"
+        case "stream":
+            return "stream"
+        default:
+            return "download"
+        }
+    }
+
+    private func isReceivedImage(mediaType: String, filename: String) -> Bool {
+        let normalized = mediaType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if normalized == "image" || normalized.hasPrefix("image/") {
+            return true
+        }
+        let ext = (filename as NSString).pathExtension.lowercased()
+        return ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "bmp", "tiff", "tif"].contains(ext)
+    }
+
+    private func isReceivedVideo(mediaType: String, filename: String) -> Bool {
+        let normalized = mediaType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if normalized == "video" || normalized.hasPrefix("video/") {
+            return true
+        }
+        let ext = (filename as NSString).pathExtension.lowercased()
+        return ["mp4", "mov", "avi", "mkv", "webm", "m4v"].contains(ext)
+    }
+
     func downloadReceivedFile(fileKey: String, filename: String, mediaType: String?) async throws -> [String: Any] {
         let trimmedFileKey = fileKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedFileKey.isEmpty else {

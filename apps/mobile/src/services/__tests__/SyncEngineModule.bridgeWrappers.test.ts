@@ -211,6 +211,56 @@ describe('SyncEngineModule shared bridge wrappers', () => {
     );
   });
 
+  it('forwards received library listing to the native bridge', async () => {
+    const items = [
+      {
+        resourceId: '',
+        desktopDeviceId: 'desktop-001',
+        clientId: 'client-001',
+        displayName: 'Alice iPhone',
+        fileKey: '2026/06/17/client-001-doc',
+        filename: 'notes.txt',
+        mediaType: 'document',
+        fileSize: 1024,
+        completedAt: '2026-06-17T08:00:00.000Z',
+        shareStatus: 'not_shared',
+      },
+    ];
+    const nativeSyncEngine = {
+      listReceivedFiles: jest.fn().mockResolvedValue(items),
+    };
+    const syncEngine = loadModule(nativeSyncEngine);
+
+    await expect(syncEngine.listReceivedFiles()).resolves.toEqual(items);
+
+    expect(nativeSyncEngine.listReceivedFiles).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards received file preview URL resolution to the native bridge', async () => {
+    const nativeSyncEngine = {
+      getReceivedFilePreviewUrl: jest
+        .fn()
+        .mockResolvedValue(
+          'http://127.0.0.1:49394/resources/mobile/received/preview?fileKey=client-001-doc',
+        ),
+    };
+    const syncEngine = loadModule(nativeSyncEngine);
+
+    await expect(
+      syncEngine.getReceivedFilePreviewUrl(
+        '2026/06/17/client-001-doc',
+        'preview',
+      ),
+    ).resolves.toBe(
+      'http://127.0.0.1:49394/resources/mobile/received/preview?fileKey=client-001-doc',
+    );
+
+    expect(nativeSyncEngine.getReceivedFilePreviewUrl).toHaveBeenCalledWith(
+      '2026/06/17/client-001-doc',
+      'preview',
+    );
+  });
+
   it('forwards preview cache filenames to the native bridge', async () => {
     const nativeSyncEngine = {
       prepareSharedFilePreview: jest.fn().mockResolvedValue('/cache/notes.txt'),
