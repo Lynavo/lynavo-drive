@@ -643,12 +643,11 @@ const styles = StyleSheet.create({
     color: '#9EB2C8',
   },
   downloadIconButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EEF5FD',
+    position: 'absolute',
+    opacity: 0,
+    width: 0,
+    height: 0,
+    overflow: 'hidden',
   },
   mediaPreviewModalRoot: {
     flex: 1,
