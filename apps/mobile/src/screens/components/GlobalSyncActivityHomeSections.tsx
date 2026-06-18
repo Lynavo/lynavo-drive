@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Video from 'react-native-video';
 import Svg, {
   Circle,
   Defs,
@@ -23,6 +24,10 @@ export interface RecentDownloadRecord {
   filename: string;
   fileSize?: number;
   mediaType?: string;
+  thumbnailUrl?: string;
+  previewUrl?: string;
+  streamUrl?: string;
+  localPath?: string | null;
   completedAt?: string;
   failedAt?: string;
 }
@@ -97,6 +102,10 @@ interface SyncStatePreviewSectionProps {
 }
 
 type GlobalMediaPreviewKind = 'photo' | 'video' | 'file';
+type RecentDownloadThumbnailSource = {
+  uri: string;
+  renderer: 'image' | 'video';
+};
 
 const GLOBAL_SECTION_EMPTY_ALIGNMENT_STYLE = {
   alignItems: 'center' as const,
@@ -156,6 +165,10 @@ export function RecentDownloadsSection({
             iconColor: metadata.iconColor,
             iconBackground: metadata.iconBackground,
             previewType: metadata.previewType,
+            thumbnailSource: getRecentDownloadThumbnailSource(
+              rec,
+              metadata.previewType,
+            ),
           };
         })
       : placeholders.slice(0, 4).map(item => ({
@@ -166,6 +179,7 @@ export function RecentDownloadsSection({
           iconColor: item.iconColor,
           iconBackground: item.iconBackground,
           previewType: item.previewType,
+          thumbnailSource: undefined,
         }));
 
   return (
@@ -227,7 +241,9 @@ export function RecentDownloadsSection({
                 ]}
               >
                 {isGlobalPreview ? (
-                  <GlobalMediaPreviewIcon
+                  <RecentDownloadPreview
+                    label={item.label}
+                    thumbnailSource={item.thumbnailSource}
                     type={
                       item.previewType ?? getPreviewTypeFromIcon(item.iconName)
                     }
@@ -255,6 +271,55 @@ export function RecentDownloadsSection({
       )}
     </View>
   );
+}
+
+function RecentDownloadPreview({
+  label,
+  thumbnailSource,
+  type,
+}: {
+  label: string;
+  thumbnailSource?: RecentDownloadThumbnailSource;
+  type: GlobalMediaPreviewKind;
+}) {
+  const [thumbnailFailed, setThumbnailFailed] = React.useState(false);
+
+  if (
+    thumbnailSource &&
+    !thumbnailFailed &&
+    thumbnailSource.renderer === 'image'
+  ) {
+    return (
+      <Image
+        testID="recent-download-thumbnail-image"
+        source={{ uri: thumbnailSource.uri }}
+        style={styles.recentDownloadThumbnailImage}
+        resizeMode="cover"
+        accessibilityLabel={`${label} 縮圖`}
+        onError={() => setThumbnailFailed(true)}
+      />
+    );
+  }
+
+  if (
+    thumbnailSource &&
+    !thumbnailFailed &&
+    thumbnailSource.renderer === 'video'
+  ) {
+    return (
+      <Video
+        testID="recent-download-thumbnail-video"
+        source={{ uri: thumbnailSource.uri }}
+        style={styles.recentDownloadThumbnailImage}
+        resizeMode="cover"
+        paused
+        muted
+        onError={() => setThumbnailFailed(true)}
+      />
+    );
+  }
+
+  return <GlobalMediaPreviewIcon type={type} />;
 }
 
 export function SyncRecordSummarySection({
@@ -710,6 +775,49 @@ function getPreviewTypeFromIcon(iconName: string): GlobalMediaPreviewKind {
   return 'file';
 }
 
+function getRecentDownloadThumbnailSource(
+  record: RecentDownloadRecord,
+  previewType: GlobalMediaPreviewKind,
+): RecentDownloadThumbnailSource | undefined {
+  if (previewType === 'file') {
+    return undefined;
+  }
+
+  const thumbnailUrl = readNonEmptyUri(record.thumbnailUrl);
+  if (thumbnailUrl) {
+    return { uri: thumbnailUrl, renderer: 'image' };
+  }
+
+  const mediaUri =
+    readNonEmptyUri(record.previewUrl) ??
+    readNonEmptyUri(record.streamUrl) ??
+    readLocalPathUri(record.localPath);
+  if (!mediaUri) {
+    return undefined;
+  }
+
+  return {
+    uri: mediaUri,
+    renderer: previewType === 'video' ? 'video' : 'image',
+  };
+}
+
+function readNonEmptyUri(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function readLocalPathUri(
+  value: string | null | undefined,
+): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  return trimmed.startsWith('file://') ? trimmed : `file://${trimmed}`;
+}
+
 function formatRecordTimeLabel(record: RecentDownloadRecord) {
   const dateObj = new Date(record.completedAt || record.failedAt || '');
   if (Number.isNaN(dateObj.getTime())) {
@@ -819,6 +927,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 1,
+  },
+  recentDownloadThumbnailImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 14,
   },
   globalMediaIcon: {
     flex: 1,

@@ -8,6 +8,9 @@ export interface DownloadRecord {
   mediaType?: string;
   downloadedAt: string;
   localPath?: string | null;
+  thumbnailUrl?: string | null;
+  previewUrl?: string | null;
+  streamUrl?: string | null;
   savedToPhotos?: boolean;
 }
 
@@ -17,6 +20,9 @@ interface RecordDownloadedFileInput {
   fileSize?: number;
   mediaType?: string;
   localPath?: string | null;
+  thumbnailUrl?: string | null;
+  previewUrl?: string | null;
+  streamUrl?: string | null;
   savedToPhotos?: boolean;
 }
 
@@ -51,13 +57,36 @@ function normalizeLocalPath(
   return trimmed;
 }
 
+function normalizeOptionalString(value?: string | null): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 function normalizeDownloadRecord(record: DownloadRecord): DownloadRecord {
   const localPath = normalizeLocalPath(record.localPath);
+  const thumbnailUrl = normalizeOptionalString(record.thumbnailUrl);
+  const previewUrl = normalizeOptionalString(record.previewUrl);
+  const streamUrl = normalizeOptionalString(record.streamUrl);
+  const {
+    localPath: _localPath,
+    thumbnailUrl: _thumbnailUrl,
+    previewUrl: _previewUrl,
+    streamUrl: _streamUrl,
+    ...rest
+  } = record;
+
+  const normalized: DownloadRecord = {
+    ...rest,
+    ...(thumbnailUrl ? { thumbnailUrl } : {}),
+    ...(previewUrl ? { previewUrl } : {}),
+    ...(streamUrl ? { streamUrl } : {}),
+  };
+
   if (localPath === undefined) {
-    const { localPath: _localPath, ...rest } = record;
-    return rest;
+    return normalized;
   }
-  return { ...record, localPath };
+  return { ...normalized, localPath };
 }
 
 export async function listDownloadRecords(): Promise<DownloadRecord[]> {
@@ -82,6 +111,9 @@ export async function listDownloadRecords(): Promise<DownloadRecord[]> {
 export async function recordDownloadedFile(
   input: RecordDownloadedFileInput,
 ): Promise<DownloadRecord> {
+  const thumbnailUrl = normalizeOptionalString(input.thumbnailUrl);
+  const previewUrl = normalizeOptionalString(input.previewUrl);
+  const streamUrl = normalizeOptionalString(input.streamUrl);
   const record: DownloadRecord = {
     id: input.resourceId,
     resourceId: input.resourceId,
@@ -90,6 +122,9 @@ export async function recordDownloadedFile(
     mediaType: input.mediaType,
     downloadedAt: new Date().toISOString(),
     localPath: normalizeLocalPath(input.localPath) ?? null,
+    ...(thumbnailUrl ? { thumbnailUrl } : {}),
+    ...(previewUrl ? { previewUrl } : {}),
+    ...(streamUrl ? { streamUrl } : {}),
     savedToPhotos: input.savedToPhotos,
   };
   const records = await listDownloadRecords();

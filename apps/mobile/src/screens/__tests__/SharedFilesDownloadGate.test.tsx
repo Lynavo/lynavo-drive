@@ -652,6 +652,87 @@ describe('RemoteAccessGlobalScreen', () => {
     expect(queryByText('唤醒中')).toBeNull();
   });
 
+  it('shows a pending P2P badge instead of stale LAN while a fallback tunnel is connecting', async () => {
+    mockBindingState.mockResolvedValue({
+      deviceId: 'desktop-device-id',
+      deviceName: 'Studio Mini',
+      host: 'Studio-Mini.local',
+      connectionState: 'connected',
+      sharedFilesReachability: {
+        deviceId: 'desktop-device-id',
+        state: 'available',
+        route: 'lan',
+        reason: 'browse_shared_files_success',
+        updatedAt: '2026-06-17T08:00:00.000Z',
+      },
+    });
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([
+      {
+        resourceId: 'personal-dir:Project%20Files',
+        desktopDeviceId: 'desktop-device-id',
+        displayName: 'Project Files',
+        kind: 'shared_folder',
+        status: 'available',
+        addedAt: '2026-06-16T08:00:00.000Z',
+        downloadCount: 0,
+      },
+    ]);
+
+    const { getByText, queryByText } = render(
+      <TestErrorBoundary>
+        <RemoteAccessGlobalScreen />
+      </TestErrorBoundary>,
+    );
+
+    await waitFor(() => {
+      expect(getByText('Project Files')).toBeTruthy();
+      expect(getByText('局域网')).toBeTruthy();
+    });
+
+    await act(async () => {
+      nativeEventHandlers.onSharedFilesReachabilityChanged?.({
+        deviceId: 'desktop-device-id',
+        state: 'unknown',
+        route: 'tunnel',
+        reason: 'browse_shared_files_p2p_wait_started',
+        updatedAt: '2026-06-17T08:01:00.000Z',
+      });
+    });
+
+    expect(getByText('P2P 连接中')).toBeTruthy();
+    expect(queryByText('局域网')).toBeNull();
+    expect(queryByText('唤醒中')).toBeNull();
+  });
+
+  it('shows a pending relay badge when the fallback advances to relay', async () => {
+    mockBindingState.mockResolvedValueOnce({
+      deviceId: 'desktop-device-id',
+      host: '192.168.1.100',
+      connectionState: 'connected',
+      sharedFilesReachability: {
+        deviceId: 'desktop-device-id',
+        state: 'unknown',
+        route: 'relay',
+        reason: 'browse_shared_files_rejected_tunnel_p2p_retry_relay',
+        updatedAt: '2026-06-17T08:00:00.000Z',
+      },
+    });
+    mockListGlobalRemoteAccessResources.mockImplementationOnce(
+      () => new Promise(() => {}),
+    );
+
+    const { getByText, queryByText } = render(
+      <TestErrorBoundary>
+        <RemoteAccessGlobalScreen />
+      </TestErrorBoundary>,
+    );
+
+    await waitFor(() => {
+      expect(getByText('中继服务器连接中')).toBeTruthy();
+    });
+    expect(queryByText('唤醒中')).toBeNull();
+  });
+
   it('falls back to the disconnected state when global remote loading times out', async () => {
     jest.useFakeTimers();
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -1107,6 +1188,7 @@ describe('RemoteAccessGlobalScreen', () => {
         status: 'available',
         addedAt: '2026-06-16T08:00:00.000Z',
         downloadCount: 0,
+        thumbnailUrl: 'http://192.168.1.100:39394/personal/thumbnail/alpha.jpg',
       },
     ]);
     mockDownloadGlobalRemoteAccessResource.mockResolvedValueOnce({
@@ -1137,6 +1219,7 @@ describe('RemoteAccessGlobalScreen', () => {
       fileSize: 1024,
       mediaType: 'image',
       localPath: '/local/alpha.jpg',
+      thumbnailUrl: 'http://192.168.1.100:39394/personal/thumbnail/alpha.jpg',
       savedToPhotos: false,
     });
     expect(alertSpy).toHaveBeenCalledWith('下載完成', 'alpha.jpg 已儲存到檔案');
@@ -1215,6 +1298,7 @@ describe('RemoteAccessGlobalScreen', () => {
         status: 'available',
         addedAt: '2026-06-16T08:00:00.000Z',
         downloadCount: 0,
+        thumbnailUrl: 'http://192.168.1.100:39394/personal/thumbnail/alpha.jpg',
       },
     ]);
     mockShareGlobalRemoteAccessResources.mockResolvedValueOnce(undefined);
@@ -1646,6 +1730,10 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
         fileSize: 1024,
         completedAt: '2026-06-16T08:00:00.000Z',
         shareStatus: 'not_shared',
+        thumbnailUrl:
+          'http://192.168.1.100:39394/resources/mobile/received/thumbnail?fileKey=received-1',
+        previewUrl:
+          'http://192.168.1.100:39394/resources/mobile/received/preview?fileKey=received-1',
       },
     ]);
     mockDownloadReceivedLibraryItem.mockResolvedValueOnce({
@@ -1679,6 +1767,10 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
       fileSize: 1024,
       mediaType: 'image',
       localPath: 'ph://asset-001',
+      thumbnailUrl:
+        'http://192.168.1.100:39394/resources/mobile/received/thumbnail?fileKey=received-1',
+      previewUrl:
+        'http://192.168.1.100:39394/resources/mobile/received/preview?fileKey=received-1',
       savedToPhotos: true,
     });
     expect(alertSpy).toHaveBeenCalledWith('下載完成', 'alpha.jpg 已儲存到相簿');
@@ -2063,6 +2155,10 @@ describe('RemoteAccessScreen', () => {
         kind: 'shared_file',
         fileSize: 1048576, // 1.0 MB
         mediaType: 'image',
+        thumbnailUrl:
+          'http://192.168.1.100:39394/resources/mobile/thumbnail/res-2',
+        previewUrl:
+          'http://192.168.1.100:39394/resources/mobile/download/res-2',
       },
     ]);
     mockDownloadResource.mockResolvedValueOnce(undefined);
@@ -2095,6 +2191,10 @@ describe('RemoteAccessScreen', () => {
           filename: 'photo.jpg',
           fileSize: 1048576,
           mediaType: 'image',
+          thumbnailUrl:
+            'http://192.168.1.100:39394/resources/mobile/thumbnail/res-2',
+          previewUrl:
+            'http://192.168.1.100:39394/resources/mobile/download/res-2',
         }),
       );
     });
@@ -2398,6 +2498,10 @@ describe('PhoneSyncSpaceScreen', () => {
         fileSize: 1024,
         completedAt: '2026-06-16T08:00:00.000Z',
         shareStatus: 'shared',
+        thumbnailUrl:
+          'http://192.168.1.100:39394/resources/mobile/received/thumbnail?fileKey=received-1',
+        previewUrl:
+          'http://192.168.1.100:39394/resources/mobile/received/preview?fileKey=received-1',
       },
     ]);
     mockDownloadReceivedLibraryItem.mockResolvedValueOnce({
@@ -2434,6 +2538,10 @@ describe('PhoneSyncSpaceScreen', () => {
       fileSize: 1024,
       mediaType: 'image',
       localPath: 'ph://asset-001',
+      thumbnailUrl:
+        'http://192.168.1.100:39394/resources/mobile/received/thumbnail?fileKey=received-1',
+      previewUrl:
+        'http://192.168.1.100:39394/resources/mobile/received/preview?fileKey=received-1',
       savedToPhotos: true,
     });
     expect(alertSpy).toHaveBeenCalledWith('下載完成', 'alpha.jpg 已儲存到相簿');

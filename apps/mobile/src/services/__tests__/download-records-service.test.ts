@@ -99,6 +99,31 @@ describe('download-records-service', () => {
     );
   });
 
+  it('stores normalized preview fields for downloaded files', async () => {
+    mockedAsyncStorage.getItem.mockResolvedValueOnce('[]');
+
+    const record = await recordDownloadedFile({
+      resourceId: 'preview-resource',
+      filename: 'Preview.mov',
+      mediaType: 'video/quicktime',
+      thumbnailUrl: ' https://desktop.local/thumb.jpg ',
+      previewUrl: ' https://desktop.local/preview.mov ',
+      streamUrl: ' https://desktop.local/stream.mov ',
+      localPath: ' /tmp/Preview.mov ',
+    });
+
+    expect(record).toMatchObject({
+      thumbnailUrl: 'https://desktop.local/thumb.jpg',
+      previewUrl: 'https://desktop.local/preview.mov',
+      streamUrl: 'https://desktop.local/stream.mov',
+      localPath: '/tmp/Preview.mov',
+    });
+    expect(mockedAsyncStorage.setItem).toHaveBeenCalledWith(
+      'syncflow:download-records:v1',
+      JSON.stringify([record]),
+    );
+  });
+
   it('normalizes legacy mock download paths when reading stored records', async () => {
     mockedAsyncStorage.getItem.mockResolvedValueOnce(
       JSON.stringify([
@@ -119,6 +144,28 @@ describe('download-records-service', () => {
         filename: 'Legacy Mock.pdf',
         downloadedAt: '2026-06-16T08:30:00.000Z',
         localPath: null,
+      },
+    ]);
+  });
+
+  it('keeps legacy records readable when preview fields are missing', async () => {
+    mockedAsyncStorage.getItem.mockResolvedValueOnce(
+      JSON.stringify([
+        {
+          id: 'legacy-resource',
+          resourceId: 'legacy-resource',
+          filename: 'Legacy.pdf',
+          downloadedAt: '2026-06-16T08:30:00.000Z',
+        },
+      ]),
+    );
+
+    await expect(listDownloadRecords()).resolves.toEqual([
+      {
+        id: 'legacy-resource',
+        resourceId: 'legacy-resource',
+        filename: 'Legacy.pdf',
+        downloadedAt: '2026-06-16T08:30:00.000Z',
       },
     ]);
   });

@@ -32,7 +32,10 @@ import {
   shareResources,
 } from '../services/desktop-local-service';
 import { recordDownloadedFile } from '../services/download-records-service';
-import type { DesktopSharedResourceDTO, DirectoryFileDTO } from '@syncflow/contracts';
+import type {
+  DesktopSharedResourceDTO,
+  DirectoryFileDTO,
+} from '@syncflow/contracts';
 import {
   canPreviewDocumentFile,
   documentMimeType,
@@ -109,7 +112,9 @@ function directoryFileToRemoteItem(
   file: DirectoryFileDTO,
   folder: RemoteAccessItem,
 ): RemoteAccessItem {
-  const isSharedDirectory = folder.resourceId.startsWith(SHARED_DIRECTORY_RESOURCE_PREFIX);
+  const isSharedDirectory = folder.resourceId.startsWith(
+    SHARED_DIRECTORY_RESOURCE_PREFIX,
+  );
   const rootResourceId = folder.rootResourceId ?? folder.resourceId;
   const resourceId = isSharedDirectory
     ? `${SHARED_DIRECTORY_RESOURCE_PREFIX}${encodeRemotePath(file.path)}`
@@ -134,7 +139,9 @@ export function RemoteAccessScreen() {
   const [loading, setLoading] = useState(true);
   const [rootItems, setRootItems] = useState<RemoteAccessItem[]>([]);
   const [folderItems, setFolderItems] = useState<RemoteAccessItem[]>([]);
-  const [currentFolder, setCurrentFolder] = useState<RemoteAccessItem | null>(null);
+  const [currentFolder, setCurrentFolder] = useState<RemoteAccessItem | null>(
+    null,
+  );
   const [folderHistory, setFolderHistory] = useState<RemoteAccessItem[]>([]);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
@@ -166,10 +173,12 @@ export function RemoteAccessScreen() {
       }
 
       const result = await listSharedResources(desktop);
-      setRootItems((result || []).flatMap(resource => {
-        const item = sharedResourceToRemoteItem(resource);
-        return item ? [item] : [];
-      }));
+      setRootItems(
+        (result || []).flatMap(resource => {
+          const item = sharedResourceToRemoteItem(resource);
+          return item ? [item] : [];
+        }),
+      );
       setFolderItems([]);
       setCurrentFolder(null);
       setFolderHistory([]);
@@ -186,12 +195,10 @@ export function RemoteAccessScreen() {
     useCallback(() => {
       setLoading(true);
       loadData();
-    }, [loadData])
+    }, [loadData]),
   );
 
-  const currentItems = currentFolder
-    ? folderItems
-    : rootItems;
+  const currentItems = currentFolder ? folderItems : rootItems;
 
   const handleDownload = useCallback(
     async (item: RemoteAccessItem) => {
@@ -217,6 +224,9 @@ export function RemoteAccessScreen() {
           fileSize: item.fileSize,
           mediaType: item.mediaType,
           localPath: null,
+          thumbnailUrl: item.thumbnailUrl,
+          previewUrl: item.previewUrl,
+          streamUrl: item.streamUrl,
           savedToPhotos: false,
         });
 
@@ -231,23 +241,23 @@ export function RemoteAccessScreen() {
                 name: filename,
                 location:
                   t('sharedFiles.dialogs.savedLocationPhotos') || '相簿',
-              }) ||
-                `${filename} 已儲存至相簿`
-            : t('sharedFiles.dialogs.downloadSavedToFiles', { name: filename }) ||
-                `${filename} 已保存到文件`
+              }) || `${filename} 已儲存至相簿`
+            : t('sharedFiles.dialogs.downloadSavedToFiles', {
+                name: filename,
+              }) || `${filename} 已保存到文件`,
         );
       } catch (err) {
         console.warn('[RemoteAccessScreen] Download failed:', err);
         Alert.alert(
           t('sharedFiles.dialogs.downloadFailed') || '下載失敗',
           t('sharedFiles.dialogs.downloadFailedMessage') ||
-            '無法下載檔案，請稍後重試'
+            '無法下載檔案，請稍後重試',
         );
       } finally {
         setDownloadingId(null);
       }
     },
-    [downloadingId, t]
+    [downloadingId, t],
   );
 
   const handleSelect = useCallback(() => {
@@ -290,7 +300,8 @@ export function RemoteAccessScreen() {
     if (selectedFiles.length === 0) {
       Alert.alert(
         t('sharedFiles.remoteAccess.shareNoSelectionTitle') || '尚未選擇檔案',
-        t('sharedFiles.remoteAccess.shareNoSelectionMessage') || '請先選擇要分享的檔案',
+        t('sharedFiles.remoteAccess.shareNoSelectionMessage') ||
+          '請先選擇要分享的檔案',
       );
       return;
     }
@@ -352,7 +363,10 @@ export function RemoteAccessScreen() {
             );
             await openFileWithOtherApp(localPath, item.displayName);
           } catch (err) {
-            console.warn('[RemoteAccessScreen] Open with other app failed:', err);
+            console.warn(
+              '[RemoteAccessScreen] Open with other app failed:',
+              err,
+            );
             Alert.alert(
               t('sharedFiles.dialogs.previewFailed') || '預覽失敗',
               t('sharedFiles.dialogs.previewFailedMessage') ||
@@ -399,7 +413,9 @@ export function RemoteAccessScreen() {
           rootResourceId,
           folder.remotePath ?? '',
         );
-        setFolderItems(listing.files.map(file => directoryFileToRemoteItem(file, folder)));
+        setFolderItems(
+          listing.files.map(file => directoryFileToRemoteItem(file, folder)),
+        );
         setSelectedIds(new Set());
         if (currentFolder) {
           setFolderHistory(prev => [...prev, currentFolder]);
@@ -429,10 +445,15 @@ export function RemoteAccessScreen() {
           folder.rootResourceId ?? folder.resourceId,
           folder.remotePath ?? '',
         );
-        setFolderItems(listing.files.map(file => directoryFileToRemoteItem(file, folder)));
+        setFolderItems(
+          listing.files.map(file => directoryFileToRemoteItem(file, folder)),
+        );
         setSelectedIds(new Set());
       } catch (e) {
-        console.warn('[RemoteAccessScreen] Failed to reload folder contents:', e);
+        console.warn(
+          '[RemoteAccessScreen] Failed to reload folder contents:',
+          e,
+        );
         setFolderItems([]);
       } finally {
         setLoading(false);
@@ -459,15 +480,23 @@ export function RemoteAccessScreen() {
     if (kind === 'shared_folder') {
       return { name: 'folder', color: '#eab308', bg: 'rgba(234,179,8,0.08)' };
     }
-    const isVideo = mediaType === 'video' || (filename && /\.(mp4|mov|avi|mkv|webm)$/i.test(filename));
-    const isImage = mediaType === 'image' || (filename && /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(filename));
+    const isVideo =
+      mediaType === 'video' ||
+      (filename && /\.(mp4|mov|avi|mkv|webm)$/i.test(filename));
+    const isImage =
+      mediaType === 'image' ||
+      (filename && /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(filename));
     if (isVideo) {
       return { name: 'play', color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)' };
     }
     if (isImage) {
       return { name: 'image', color: '#3b82f6', bg: 'rgba(59,130,246,0.08)' };
     }
-    return { name: 'document-text', color: '#10b981', bg: 'rgba(16,185,129,0.08)' };
+    return {
+      name: 'document-text',
+      color: '#10b981',
+      bg: 'rgba(16,185,129,0.08)',
+    };
   };
 
   const sortedItems = [...currentItems].sort((a, b) => {
@@ -507,9 +536,7 @@ export function RemoteAccessScreen() {
             {item.displayName}
           </Text>
           {!isFolder && item.fileSize && (
-            <Text style={styles.metaText}>
-              {formatBytes(item.fileSize)}
-            </Text>
+            <Text style={styles.metaText}>{formatBytes(item.fileSize)}</Text>
           )}
         </View>
         <View style={styles.rightWrapper}>
@@ -521,13 +548,18 @@ export function RemoteAccessScreen() {
                 isFolder && styles.selectionCircleDisabled,
               ]}
             >
-              {isSelected && <Icon name="checkmark" size={14} color="#ffffff" />}
+              {isSelected && (
+                <Icon name="checkmark" size={14} color="#ffffff" />
+              )}
             </View>
           ) : isFolder ? (
             <Icon name="chevron-forward" size={20} color="#94a3b8" />
           ) : (
             <TouchableOpacity
-              style={[styles.downloadButton, isDownloading && styles.downloadButtonDisabled]}
+              style={[
+                styles.downloadButton,
+                isDownloading && styles.downloadButtonDisabled,
+              ]}
               onPress={() => handleDownload(item)}
               activeOpacity={0.7}
               disabled={isDownloading}
@@ -563,7 +595,9 @@ export function RemoteAccessScreen() {
             <Icon name="arrow-back" size={24} color="#1e293b" />
           </TouchableOpacity>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            {currentFolder ? `${currentFolder.displayName}` : (t('sharedFiles.remoteAccess.title') || '遠端訪問電腦')}
+            {currentFolder
+              ? `${currentFolder.displayName}`
+              : t('sharedFiles.remoteAccess.title') || '遠端訪問電腦'}
           </Text>
           <TouchableOpacity
             style={styles.selectButton}
@@ -609,7 +643,9 @@ export function RemoteAccessScreen() {
         ) : sortedItems.length === 0 ? (
           <View style={styles.centered}>
             <Icon name="folder-open-outline" size={48} color="#94a3b8" />
-            <Text style={styles.emptyText}>{t('sharedFiles.remoteAccess.empty') || '此資料夾為空'}</Text>
+            <Text style={styles.emptyText}>
+              {t('sharedFiles.remoteAccess.empty') || '此資料夾為空'}
+            </Text>
           </View>
         ) : (
           <FlatList
@@ -626,8 +662,9 @@ export function RemoteAccessScreen() {
         {selectionMode && (
           <View style={styles.selectionBar}>
             <Text style={styles.selectionCount}>
-              {t('sharedFiles.remoteAccess.selectedCount', { count: selectedIds.size }) ||
-                `已選擇 ${selectedIds.size} 個`}
+              {t('sharedFiles.remoteAccess.selectedCount', {
+                count: selectedIds.size,
+              }) || `已選擇 ${selectedIds.size} 個`}
             </Text>
             <View style={styles.selectionActions}>
               <TouchableOpacity
@@ -654,7 +691,8 @@ export function RemoteAccessScreen() {
               <TouchableOpacity
                 style={[
                   styles.shareButton,
-                  (selectedIds.size === 0 || sharing) && styles.shareButtonDisabled,
+                  (selectedIds.size === 0 || sharing) &&
+                    styles.shareButtonDisabled,
                 ]}
                 activeOpacity={0.75}
                 disabled={selectedIds.size === 0 || sharing}
@@ -693,7 +731,8 @@ function RemoteAccessThumbnail({
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
-  const imagePreviewUrl = item.thumbnailUrl || item.previewUrl || item.streamUrl;
+  const imagePreviewUrl =
+    item.thumbnailUrl || item.previewUrl || item.streamUrl;
   const videoPreviewUrl = item.streamUrl || item.previewUrl;
 
   if (

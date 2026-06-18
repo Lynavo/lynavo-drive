@@ -456,11 +456,25 @@ export function SyncActivityGlobalScreen({
 }
 
 function toRecentDownloadRecord(record: DownloadRecord): RecentDownloadRecord {
+  const extraFields = isRecord(record)
+    ? {
+        thumbnailUrl: readStringField(record, 'thumbnailUrl'),
+        previewUrl: readStringField(record, 'previewUrl'),
+        streamUrl: readStringField(record, 'streamUrl'),
+      }
+    : {};
+
   return {
     recordId: record.id,
     filename: record.filename,
     fileSize: record.fileSize,
     mediaType: record.mediaType,
+    ...(extraFields.thumbnailUrl
+      ? { thumbnailUrl: extraFields.thumbnailUrl }
+      : {}),
+    ...(extraFields.previewUrl ? { previewUrl: extraFields.previewUrl } : {}),
+    ...(extraFields.streamUrl ? { streamUrl: extraFields.streamUrl } : {}),
+    ...(record.localPath ? { localPath: record.localPath } : {}),
     completedAt: record.downloadedAt,
   };
 }

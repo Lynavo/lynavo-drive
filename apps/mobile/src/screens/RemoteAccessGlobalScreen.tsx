@@ -475,7 +475,7 @@ function getItemIconType(item: RemoteResourceItem): RemoteResourceIconType {
 }
 
 function getItemSize(item: RemoteResourceItem) {
-  return isFolder(item) ? Number.POSITIVE_INFINITY : item.fileSize ?? 0;
+  return isFolder(item) ? Number.POSITIVE_INFINITY : (item.fileSize ?? 0);
 }
 
 function getItemTime(item: RemoteResourceItem) {
@@ -608,6 +608,13 @@ function getDisplayedSharedFilesReachability(
   if (!lastSuccessful) return current;
   if (!current) return lastSuccessful;
 
+  if (
+    current.state === 'unknown' &&
+    (current.route === 'tunnel' || current.route === 'relay')
+  ) {
+    return current;
+  }
+
   if (current.state === 'unknown' || current.state === 'waking') {
     return lastSuccessful;
   }
@@ -631,6 +638,15 @@ function getRouteStatusViewModel(
       return { label: '中继服务器', tone: 'online' };
     }
     return null;
+  }
+
+  if (reachability.state === 'unknown') {
+    if (reachability.route === 'tunnel') {
+      return { label: 'P2P 连接中', tone: 'pending' };
+    }
+    if (reachability.route === 'relay') {
+      return { label: '中继服务器连接中', tone: 'pending' };
+    }
   }
 
   if (reachability.state === 'waking') {
@@ -993,6 +1009,7 @@ export function RemoteAccessGlobalScreen() {
           fileSize: item.fileSize,
           mediaType: item.mediaType,
           localPath: result.localPath,
+          thumbnailUrl: item.thumbnailUrl,
           savedToPhotos: result.savedToPhotos,
         });
 
@@ -2008,8 +2025,8 @@ function RemoteEmptyArtwork({
   const stops = isFolder
     ? ['#FFFDF4', '#FFEAB7', '#F7C76F']
     : isSearch
-    ? ['#FFFFFF', '#EFF5FB', '#D7E2F0']
-    : ['#F8FCFF', '#DFF3FF', '#B6E3FF'];
+      ? ['#FFFFFF', '#EFF5FB', '#D7E2F0']
+      : ['#F8FCFF', '#DFF3FF', '#B6E3FF'];
 
   return (
     <View

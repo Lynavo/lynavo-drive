@@ -393,6 +393,9 @@ export function PhoneSyncSpaceGlobalScreen() {
           fileSize: item.fileSize,
           mediaType: item.mediaType,
           localPath: result.localPath,
+          thumbnailUrl: item.thumbnailUrl,
+          previewUrl: item.previewUrl,
+          streamUrl: item.streamUrl,
           savedToPhotos,
         });
         Alert.alert(
