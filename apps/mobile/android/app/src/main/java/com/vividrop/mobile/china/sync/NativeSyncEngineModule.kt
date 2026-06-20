@@ -275,6 +275,18 @@ class NativeSyncEngineModule(
   }
 
   @ReactMethod
+  fun getDiscoveryPermissionStatus(promise: Promise) {
+    promise.resolve(
+      AndroidSyncPrimitives.nearbyWifiPermissionStatus(
+        sdkInt = Build.VERSION.SDK_INT,
+        permissionGranted = reactApplicationContext.checkSelfPermission(
+          Manifest.permission.NEARBY_WIFI_DEVICES,
+        ) == PackageManager.PERMISSION_GRANTED,
+      ),
+    )
+  }
+
+  @ReactMethod
   fun startDiscovery(promise: Promise) {
     recordNativeLog("Discovery", "startDiscovery requested")
     if (shouldRequestNearbyWifiPermission()) {

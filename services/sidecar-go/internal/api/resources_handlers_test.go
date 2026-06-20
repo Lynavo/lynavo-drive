@@ -878,6 +878,115 @@ func TestMobileReceivedResourcesCreatesAccessRecord(t *testing.T) {
 	}
 }
 
+func TestMobileReceivedResourcesSupportsScopedPagination(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	insertPairedDeviceWithStableID(t, st, "client-001", "Alice iPhone", "Alice iPhone", "stable-001", "2026-06-14T08:00:00Z")
+	insertPairedDeviceWithStableID(t, st, "other-client", "Bob iPhone", "Bob iPhone", "stable-002", "2026-06-14T08:00:00Z")
+	desktopDeviceID, err := st.GetDeviceID()
+	if err != nil {
+		t.Fatalf("GetDeviceID: %v", err)
+	}
+	for _, upload := range []store.Upload{
+		{
+			FileKey:              "client-001-photo-new",
+			ClientID:             "client-001",
+			OriginalFilename:     "photo-new.jpg",
+			MediaType:            "image",
+			FileSize:             2048,
+			Status:               "completed",
+			CommittedBytes:       2048,
+			ActiveTransmissionMs: 250,
+			CompletedAt:          &[]string{"2026-06-14T09:03:00Z"}[0],
+			UpdatedAt:            "2026-06-14T09:03:00Z",
+		},
+		{
+			FileKey:              "client-001-video-mid",
+			ClientID:             "client-001",
+			OriginalFilename:     "video-mid.mov",
+			MediaType:            "video",
+			FileSize:             4096,
+			Status:               "completed",
+			CommittedBytes:       4096,
+			ActiveTransmissionMs: 300,
+			CompletedAt:          &[]string{"2026-06-14T09:02:00Z"}[0],
+			UpdatedAt:            "2026-06-14T09:02:00Z",
+		},
+		{
+			FileKey:              "2026/06/14/client-001-notes.pdf",
+			ClientID:             "client-001",
+			OriginalFilename:     "notes.pdf",
+			MediaType:            "document",
+			FileSize:             1024,
+			Status:               "completed",
+			CommittedBytes:       1024,
+			ActiveTransmissionMs: 220,
+			CompletedAt:          &[]string{"2026-06-14T09:01:00Z"}[0],
+			UpdatedAt:            "2026-06-14T09:01:00Z",
+		},
+		{
+			FileKey:              "other-client-photo",
+			ClientID:             "other-client",
+			OriginalFilename:     "other-client.jpg",
+			MediaType:            "image",
+			FileSize:             8192,
+			Status:               "completed",
+			CommittedBytes:       8192,
+			ActiveTransmissionMs: 300,
+			CompletedAt:          &[]string{"2026-06-14T09:04:00Z"}[0],
+			UpdatedAt:            "2026-06-14T09:04:00Z",
+		},
+	} {
+		if err := st.UpsertUpload(upload); err != nil {
+			t.Fatalf("UpsertUpload %s: %v", upload.FileKey, err)
+		}
+	}
+
+	_, handler := api.NewServer(st, cfg, hub, nil)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&scope=client&page=2&pageSize=2")
+	if err != nil {
+		t.Fatalf("GET paged mobile received: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET paged mobile received status=%d, want 200", resp.StatusCode)
+	}
+	var body store.ReceivedLibraryPage
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode paged mobile received: %v", err)
+	}
+	if err := resp.Body.Close(); err != nil {
+		t.Fatalf("close paged mobile received body: %v", err)
+	}
+
+	if body.Page != 2 || body.PageSize != 2 || body.TotalItems != 3 || body.TotalBytes != 7168 {
+		t.Fatalf("unexpected page metadata: %+v", body)
+	}
+	if len(body.Items) != 1 || body.Items[0].FileKey != "2026/06/14/client-001-notes.pdf" {
+		t.Fatalf("expected second page to contain only the client document, got %+v", body.Items)
+	}
+	if body.Items[0].ClientID != "client-001" ||
+		!strings.Contains(body.Items[0].PreviewURL, "/resources/mobile/received/download?") {
+		t.Fatalf("paged scoped item should be current-client enriched download url, got %+v", body.Items[0])
+	}
+	if len(body.DeviceStats) != 1 ||
+		body.DeviceStats[0].ClientID != "client-001" ||
+		body.DeviceStats[0].PhotoCount != 2 ||
+		body.DeviceStats[0].FileCount != 1 ||
+		body.DeviceStats[0].TotalBytes != 7168 {
+		t.Fatalf("unexpected scoped device stats: %+v", body.DeviceStats)
+	}
+
+	records, err := st.ListAccessRecords(desktopDeviceID, &[]string{"client-001"}[0])
+	if err != nil {
+		t.Fatalf("ListAccessRecords: %v", err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("expected 1 access record, got %d", len(records))
+	}
+}
+
 func TestMobileReceivedFilePreviewByFileKeyIsScopedToCurrentClient(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	insertPairedDeviceWithStableID(t, st, "client-001", "Alice iPhone", "Alice iPhone", "stable-001", "2026-06-14T08:00:00Z")

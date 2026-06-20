@@ -26,6 +26,7 @@ import {
   type DownloadRecord,
 } from '../services/download-records-service';
 import { colors } from '../theme/globalColors';
+import { androidBoxShadow } from '../utils/androidShadow';
 import {
   canPreviewDocumentFile,
   documentMimeType,
@@ -415,6 +416,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 24,
     elevation: 3,
+    ...androidBoxShadow({
+      offsetY: 12,
+      blurRadius: 24,
+      color: 'rgba(70, 96, 138, 0.10)',
+    }),
   },
   title: {
     fontSize: 18,
@@ -447,6 +453,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 52,
     elevation: 6,
+    ...androidBoxShadow({
+      offsetY: 18,
+      blurRadius: 52,
+      color: 'rgba(70, 96, 138, 0.12)',
+    }),
   },
   emptyIcon: {
     width: 58,
@@ -493,6 +504,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 52,
     elevation: 6,
+    ...androidBoxShadow({
+      offsetY: 18,
+      blurRadius: 52,
+      color: 'rgba(70, 96, 138, 0.12)',
+    }),
   },
   recordOpenArea: {
     flex: 1,

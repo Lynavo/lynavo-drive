@@ -9,6 +9,7 @@ import { GlobalGradientBackground } from '../components/GlobalGradientBackground
 import { GlobalBottomTabBar } from '../components/GlobalBottomTabBar';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/globalColors';
+import { androidBoxShadow } from '../utils/androidShadow';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'SharedFiles'>;
 
@@ -148,6 +149,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 52,
     elevation: 6,
+    ...androidBoxShadow({
+      offsetY: 18,
+      blurRadius: 52,
+      color: 'rgba(70, 96, 138, 0.12)',
+    }),
   },
   iconWrapper: {
     width: 52,

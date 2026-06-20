@@ -30,6 +30,7 @@ import {
   isDiagnosticsExportUnavailable,
   shareDiagnosticsArchive,
 } from '../utils/shareDiagnosticsArchive';
+import { androidBoxShadow } from '../utils/androidShadow';
 
 interface FaqItem {
   title: string;
@@ -395,6 +396,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 19,
     elevation: 3,
+    ...androidBoxShadow({
+      offsetY: 14,
+      blurRadius: 19,
+      color: 'rgba(70, 96, 138, 0.10)',
+    }),
   },
   backButton: {
     width: 36,
@@ -440,6 +446,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 26,
     elevation: 3,
+    ...androidBoxShadow({
+      offsetY: 18,
+      blurRadius: 26,
+      color: 'rgba(70, 96, 138, 0.12)',
+    }),
   },
   faqCardLast: {
     marginBottom: 0,
@@ -467,6 +478,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 26,
     elevation: 3,
+    ...androidBoxShadow({
+      offsetY: 18,
+      blurRadius: 26,
+      color: 'rgba(70, 96, 138, 0.12)',
+    }),
   },
   actionRow: {
     minHeight: 68,
@@ -536,6 +552,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.24,
     shadowRadius: 35,
     elevation: 12,
+    ...androidBoxShadow({
+      offsetY: 24,
+      blurRadius: 35,
+      color: 'rgba(35, 52, 77, 0.24)',
+    }),
   },
   modalIconBox: {
     width: 64,

@@ -1,10 +1,11 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
   Modal,
   NativeModules,
+  Platform,
   Pressable,
   SectionList,
   StyleSheet,
@@ -35,6 +36,7 @@ import { SIDECAR_HTTP_PORT, type BindingStateDTO } from '@syncflow/contracts';
 
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/globalColors';
+import { androidBoxShadow } from '../utils/androidShadow';
 import { formatBytes } from '../utils/format';
 import { GlobalGradientBackground } from '../components/GlobalGradientBackground';
 import { ModalBlurBackdrop } from '../components/shared/ModalBlurBackdrop';
@@ -44,8 +46,9 @@ import {
   getReceivedLibraryPreviewUrl,
   isDownloadSavedLocally,
   isDownloadSavedToPhotos,
-  listCurrentClientReceivedLibrary,
+  listCurrentClientReceivedLibraryPage,
   prepareReceivedLibraryPreview,
+  type ReceivedLibraryMediaPage,
   type ReceivedLibraryMediaItem,
 } from '../services/desktop-local-service';
 import { recordDownloadedFile } from '../services/download-records-service';
@@ -74,12 +77,28 @@ type ReceivedPreviewState = {
   item: ReceivedLibraryMediaItem;
   url: string;
 };
+type IdleCallbackHandle = number;
+type IdleCallbackOptions = {
+  timeout?: number;
+};
+type IdleDeadlineLike = {
+  didTimeout: boolean;
+  timeRemaining: () => number;
+};
+type GlobalIdleCallbacks = typeof globalThis & {
+  requestIdleCallback?: (
+    callback: (deadline: IdleDeadlineLike) => void,
+    options?: IdleCallbackOptions,
+  ) => IdleCallbackHandle;
+  cancelIdleCallback?: (handle: IdleCallbackHandle) => void;
+};
 
 const SORT_OPTIONS: Array<{ id: SortKey; label: string }> = [
   { id: 'time', label: '时间' },
   { id: 'name', label: '名称' },
   { id: 'size', label: '文件大小' },
 ];
+const RECEIVED_LIBRARY_PAGE_SIZE = 20;
 const MEDIA_TYPE_ICON_GRADIENTS: Record<
   MediaTypeIconKind,
   MediaTypeGradientStop[]
@@ -298,24 +317,66 @@ function formatClock(isoString: string) {
   });
 }
 
+function hasNextReceivedLibraryPage(page: ReceivedLibraryMediaPage) {
+  if (page.totalItems <= 0) return false;
+  return page.page * page.pageSize < page.totalItems;
+}
+
+function mergeReceivedLibraryItems(
+  current: ReceivedLibraryMediaItem[],
+  next: ReceivedLibraryMediaItem[],
+) {
+  const seen = new Set(
+    current.map((item, index) => getReceivedItemKey(item, index)),
+  );
+  const merged = [...current];
+  for (const item of next) {
+    const key = getReceivedItemKey(item, merged.length);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    merged.push(item);
+  }
+  return merged;
+}
+
 export function PhoneSyncSpaceGlobalScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [items, setItems] = useState<ReceivedLibraryMediaItem[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMorePages, setHasMorePages] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [libraryTotalItems, setLibraryTotalItems] = useState(0);
+  const [libraryTotalBytes, setLibraryTotalBytes] = useState(0);
   const [sortBy, setSortBy] = useState<SortKey>('time');
   const [showSortSheet, setShowSortSheet] = useState(false);
   const [preview, setPreview] = useState<ReceivedPreviewState | null>(null);
   const [binding, setBinding] = useState<BindingStateDTO | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [remoteThumbnailsEnabled, setRemoteThumbnailsEnabled] = useState(
+    Platform.OS !== 'android',
+  );
+  const hasDeferredAndroidThumbnails = useRef(Platform.OS !== 'android');
 
   const loadData = useCallback(async () => {
     setLoadError(false);
+    setLoadingMore(false);
     try {
       const { NativeSyncEngine } = NativeModules;
       if (!NativeSyncEngine) {
-        setItems(getPreviewReceivedItems());
+        const previewItems = getPreviewReceivedItems();
+        setItems(previewItems);
+        setCurrentPage(1);
+        setHasMorePages(false);
+        setLibraryTotalItems(previewItems.length);
+        setLibraryTotalBytes(
+          previewItems.reduce((total, item) => total + item.fileSize, 0),
+        );
         setLoadError(false);
         setLoading(false);
         return;
@@ -324,35 +385,123 @@ export function PhoneSyncSpaceGlobalScreen() {
       const bindingState = await NativeSyncEngine.getBindingState();
       setBinding(bindingState);
       if (!bindingState || !bindingState.host) {
-        setItems(getPreviewReceivedItems());
+        const previewItems = getPreviewReceivedItems();
+        setItems(previewItems);
+        setCurrentPage(1);
+        setHasMorePages(false);
+        setLibraryTotalItems(previewItems.length);
+        setLibraryTotalBytes(
+          previewItems.reduce((total, item) => total + item.fileSize, 0),
+        );
         setLoadError(false);
         setLoading(false);
         return;
       }
 
       const desktop = { host: bindingState.host, port: SIDECAR_HTTP_PORT };
-      const result = await listCurrentClientReceivedLibrary(desktop);
-      const receivedItems = result ?? [];
+      const result = await listCurrentClientReceivedLibraryPage(desktop, {
+        page: 1,
+        pageSize: RECEIVED_LIBRARY_PAGE_SIZE,
+      });
+      const receivedItems = result.items ?? [];
       const previewItems = getPreviewReceivedItems();
-      setItems(receivedItems.length > 0 ? receivedItems : previewItems);
+      const nextItems = receivedItems.length > 0 ? receivedItems : previewItems;
+      setItems(nextItems);
+      setCurrentPage(result.page);
+      setHasMorePages(
+        receivedItems.length > 0 ? hasNextReceivedLibraryPage(result) : false,
+      );
+      setLibraryTotalItems(
+        receivedItems.length > 0 ? result.totalItems : previewItems.length,
+      );
+      setLibraryTotalBytes(
+        receivedItems.length > 0
+          ? result.totalBytes
+          : previewItems.reduce((total, item) => total + item.fileSize, 0),
+      );
       setLoadError(false);
     } catch (e) {
-      console.warn('[PhoneSyncSpaceScreen] Failed to load data:', e);
+      console.warn('[PhoneSyncSpaceGlobalScreen] Failed to load data:', e);
       const previewItems = getPreviewReceivedItems();
       setItems(previewItems);
+      setCurrentPage(1);
+      setHasMorePages(false);
+      setLibraryTotalItems(previewItems.length);
+      setLibraryTotalBytes(
+        previewItems.reduce((total, item) => total + item.fileSize, 0),
+      );
       setLoadError(previewItems.length === 0);
     } finally {
       setLoading(false);
+      setHasLoadedOnce(true);
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
+      let idleTask: IdleCallbackHandle | null = null;
+      let fallbackTask: ReturnType<typeof setTimeout> | null = null;
+      const idleCallbacks = globalThis as GlobalIdleCallbacks;
+      if (Platform.OS === 'android' && !hasDeferredAndroidThumbnails.current) {
+        setRemoteThumbnailsEnabled(false);
+        const enableThumbnails = () => {
+          hasDeferredAndroidThumbnails.current = true;
+          setRemoteThumbnailsEnabled(true);
+        };
+        if (typeof idleCallbacks.requestIdleCallback === 'function') {
+          idleTask = idleCallbacks.requestIdleCallback(enableThumbnails, {
+            timeout: 600,
+          });
+        } else {
+          fallbackTask = setTimeout(enableThumbnails, 240);
+        }
+      } else {
+        setRemoteThumbnailsEnabled(true);
+      }
+
       setLoading(true);
       setLoadError(false);
       loadData();
+
+      return () => {
+        if (
+          idleTask !== null &&
+          typeof idleCallbacks.cancelIdleCallback === 'function'
+        ) {
+          idleCallbacks.cancelIdleCallback(idleTask);
+        }
+        if (fallbackTask !== null) {
+          clearTimeout(fallbackTask);
+        }
+      };
     }, [loadData]),
   );
+
+  const loadNextPage = useCallback(async () => {
+    if (loading || loadingMore || !hasMorePages || !binding?.host) {
+      return;
+    }
+    setLoadingMore(true);
+    try {
+      const desktop = { host: binding.host, port: SIDECAR_HTTP_PORT };
+      const result = await listCurrentClientReceivedLibraryPage(desktop, {
+        page: currentPage + 1,
+        pageSize: RECEIVED_LIBRARY_PAGE_SIZE,
+      });
+      setItems(currentItems =>
+        mergeReceivedLibraryItems(currentItems, result.items ?? []),
+      );
+      setCurrentPage(result.page);
+      setHasMorePages(hasNextReceivedLibraryPage(result));
+      setLibraryTotalItems(result.totalItems);
+      setLibraryTotalBytes(result.totalBytes);
+      setLoadError(false);
+    } catch (e) {
+      console.warn('[PhoneSyncSpaceGlobalScreen] Failed to load next page:', e);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [binding?.host, currentPage, hasMorePages, loading, loadingMore]);
 
   const goBack = useCallback(() => {
     if (navigation.canGoBack()) {
@@ -515,11 +664,17 @@ export function PhoneSyncSpaceGlobalScreen() {
     [sortedItems],
   );
 
-  const totalSizeLabel = formatBytes(
-    items.reduce((total, item) => total + item.fileSize, 0),
-  );
+  const totalSizeLabel = formatBytes(libraryTotalBytes);
+  const totalItemCount = libraryTotalItems;
   const sortLabel =
     SORT_OPTIONS.find(option => option.id === sortBy)?.label ?? '时间';
+  const showBlockingLoading = loading && !hasLoadedOnce;
+  const showBlockingError = loadError && sortedItems.length === 0;
+  const listFooter = loadingMore ? (
+    <View style={styles.listFooter}>
+      <ActivityIndicator size="small" color={colors.primary} />
+    </View>
+  ) : null;
 
   const renderItem = ({ item }: { item: ReceivedLibraryMediaItem }) => {
     const iconType = getFileIconType(item.mediaType, item.filename);
@@ -536,7 +691,11 @@ export function PhoneSyncSpaceGlobalScreen() {
         accessibilityRole="button"
         accessibilityLabel="预览已同步文件"
       >
-        <ReceivedMediaThumbnail item={item} iconType={iconType} />
+        <ReceivedMediaThumbnail
+          item={item}
+          iconType={iconType}
+          loadRemoteThumbnail={remoteThumbnailsEnabled}
+        />
         <View style={styles.infoWrapper}>
           <Text style={styles.filename} numberOfLines={1}>
             {displayName}
@@ -620,13 +779,20 @@ export function PhoneSyncSpaceGlobalScreen() {
             <Text style={styles.sortButtonText}>{sortLabel}</Text>
           </TouchableOpacity>
           <View style={styles.summaryBadge}>
+            {loading && hasLoadedOnce ? (
+              <ActivityIndicator
+                size="small"
+                color="#7B8490"
+                style={styles.summarySpinner}
+              />
+            ) : null}
             <Text style={styles.summaryText}>
-              {items.length} 个 · {totalSizeLabel}
+              {totalItemCount} 个 · {totalSizeLabel}
             </Text>
           </View>
         </View>
 
-        {loading ? (
+        {showBlockingLoading ? (
           <View style={styles.centeredCard}>
             <ActivityIndicator size="small" color={colors.primary} />
             <Text style={styles.centeredTitle}>正在加载</Text>
@@ -634,7 +800,7 @@ export function PhoneSyncSpaceGlobalScreen() {
               同步空间列表会在这里刷新。
             </Text>
           </View>
-        ) : loadError ? (
+        ) : showBlockingError ? (
           <View style={styles.centeredCard}>
             <Text style={styles.centeredTitle}>
               {t('sharedFiles.networkError.title') || '載入失敗'}
@@ -655,6 +821,7 @@ export function PhoneSyncSpaceGlobalScreen() {
           </View>
         ) : (
           <SectionList
+            testID="phone-sync-section-list"
             sections={sections}
             keyExtractor={(item, index) => getReceivedItemKey(item, index)}
             renderItem={renderItem}
@@ -669,9 +836,9 @@ export function PhoneSyncSpaceGlobalScreen() {
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             stickySectionHeadersEnabled={false}
-            initialNumToRender={10}
-            maxToRenderPerBatch={10}
-            windowSize={7}
+            ListFooterComponent={listFooter}
+            onEndReached={loadNextPage}
+            onEndReachedThreshold={0.45}
           />
         )}
       </SafeAreaView>
@@ -768,14 +935,21 @@ function MediaTypeIcon({ type }: { type: MediaTypeIconKind }) {
 function ReceivedMediaThumbnail({
   item,
   iconType,
+  loadRemoteThumbnail,
 }: {
   item: ReceivedLibraryMediaItem;
   iconType: MediaTypeIconKind;
+  loadRemoteThumbnail: boolean;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const displayName = getReceivedFileTitle(item);
 
-  if (iconType === 'photo' && item.thumbnailUrl && !imageFailed) {
+  if (
+    loadRemoteThumbnail &&
+    iconType === 'photo' &&
+    item.thumbnailUrl &&
+    !imageFailed
+  ) {
     return (
       <View style={styles.mediaPreviewThumb}>
         <Image
@@ -783,6 +957,7 @@ function ReceivedMediaThumbnail({
           source={{ uri: item.thumbnailUrl }}
           style={styles.mediaPreviewImage}
           resizeMode="cover"
+          fadeDuration={Platform.OS === 'android' ? 0 : undefined}
           accessibilityLabel={`${displayName} 缩略图`}
           onError={() => setImageFailed(true)}
         />
@@ -856,6 +1031,48 @@ function SortSheet({
   onClose: () => void;
   onSelect: (value: SortKey) => void;
 }) {
+  if (!visible) return null;
+
+  const content = (
+    <View
+      testID="phone-sync-sort-sheet-layer"
+      pointerEvents="box-none"
+      style={styles.sheetLayer}
+    >
+      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
+        <ModalBlurBackdrop overlayColor="rgba(23,25,28,0.18)" />
+      </Pressable>
+      <View style={styles.sheetCard}>
+        <Text style={styles.sheetTitle}>排序方式</Text>
+        {options.map(option => {
+          const active = option.id === value;
+          return (
+            <TouchableOpacity
+              key={option.id}
+              style={styles.sheetOption}
+              activeOpacity={0.7}
+              onPress={() => onSelect(option.id)}
+            >
+              <Text style={styles.sheetOptionText}>{option.label}</Text>
+              {active ? (
+                <Check
+                  testID="phone-sync-sort-check-icon"
+                  size={20}
+                  color={colors.primary}
+                  strokeWidth={2.4}
+                />
+              ) : null}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+
+  if (Platform.OS === 'android') {
+    return content;
+  }
+
   return (
     <Modal
       animationType="fade"
@@ -864,35 +1081,7 @@ function SortSheet({
       visible={visible}
       onRequestClose={onClose}
     >
-      <View style={styles.sheetLayer}>
-        <Pressable style={styles.sheetBackdrop} onPress={onClose}>
-          <ModalBlurBackdrop overlayColor="rgba(23,25,28,0.18)" />
-        </Pressable>
-        <View style={styles.sheetCard}>
-          <Text style={styles.sheetTitle}>排序方式</Text>
-          {options.map(option => {
-            const active = option.id === value;
-            return (
-              <TouchableOpacity
-                key={option.id}
-                style={styles.sheetOption}
-                activeOpacity={0.7}
-                onPress={() => onSelect(option.id)}
-              >
-                <Text style={styles.sheetOptionText}>{option.label}</Text>
-                {active ? (
-                  <Check
-                    testID="phone-sync-sort-check-icon"
-                    size={20}
-                    color={colors.primary}
-                    strokeWidth={2.4}
-                  />
-                ) : null}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
+      {content}
     </Modal>
   );
 }
@@ -977,6 +1166,11 @@ const glassShadow = {
   shadowOpacity: 0.08,
   shadowRadius: 34,
   elevation: 3,
+  ...androidBoxShadow({
+    offsetY: 12,
+    blurRadius: 34,
+    color: 'rgba(70, 96, 138, 0.08)',
+  }),
 };
 
 const styles = StyleSheet.create({
@@ -1048,6 +1242,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.62)',
     paddingHorizontal: 10,
     paddingVertical: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  summarySpinner: {
+    transform: [{ scale: 0.72 }],
   },
   summaryText: {
     fontSize: 10,
@@ -1056,6 +1256,11 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 34,
+  },
+  listFooter: {
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -1097,6 +1302,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 28,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 12,
+      blurRadius: 28,
+      color: 'rgba(70, 96, 138, 0.10)',
+    }),
   },
   mediaPreviewThumb: {
     width: 46,
@@ -1111,6 +1321,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 28,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 12,
+      blurRadius: 28,
+      color: 'rgba(70, 96, 138, 0.10)',
+    }),
   },
   mediaPreviewImage: {
     width: '100%',
@@ -1195,6 +1410,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 2,
     elevation: 1,
+    ...androidBoxShadow({
+      offsetY: 1,
+      blurRadius: 2,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
   },
   videoPlayIcon: {
     marginLeft: 2,
@@ -1289,6 +1509,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 30,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 16,
+      blurRadius: 30,
+      color: 'rgba(70, 96, 138, 0.12)',
+    }),
   },
   emptyArtworkSheetBack: {
     width: 58,
@@ -1338,10 +1563,13 @@ const styles = StyleSheet.create({
     color: '#59616D',
   },
   sheetLayer: {
+    ...StyleSheet.absoluteFillObject,
     flex: 1,
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
     paddingBottom: 16,
+    zIndex: 30,
+    elevation: 30,
   },
   sheetBackdrop: {
     ...StyleSheet.absoluteFillObject,

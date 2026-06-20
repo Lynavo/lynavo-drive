@@ -31,6 +31,7 @@ import DateTimePicker, {
 import type { AutoUploadTimeRangeMode } from '@syncflow/contracts';
 
 import { GlobalGradientBackground } from '../components/GlobalGradientBackground';
+import { androidBoxShadow } from '../utils/androidShadow';
 import {
   disableAutoUpload,
   enableAutoUpload,
@@ -961,6 +962,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 38,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 14,
+      blurRadius: 38,
+      color: 'rgba(70, 96, 138, 0.10)',
+    }),
   },
   backButton: {
     width: 36,
@@ -1003,6 +1009,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 22,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 10,
+      blurRadius: 22,
+      color: 'rgba(70, 96, 138, 0.10)',
+    }),
   },
   planHeaderRow: {
     flexDirection: 'row',
@@ -1121,6 +1132,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 34,
     elevation: 1,
+    ...androidBoxShadow({
+      offsetY: 12,
+      blurRadius: 34,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
   },
   optionRowActive: {
     backgroundColor: 'rgba(255,255,255,0.58)',
@@ -1188,6 +1204,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 34,
     elevation: 1,
+    ...androidBoxShadow({
+      offsetY: 12,
+      blurRadius: 34,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
   },
   optionRowHeader: {
     flexDirection: 'row',
@@ -1297,6 +1318,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 34,
     elevation: 1,
+    ...androidBoxShadow({
+      offsetY: 12,
+      blurRadius: 34,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
   },
   infoIconBox: {
     width: 36,

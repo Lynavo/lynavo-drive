@@ -13,6 +13,7 @@ import { ArrowDownCircle } from 'lucide-react-native';
 import type { TFunction } from 'i18next';
 import { colors } from '../../theme/colors';
 import { Icon } from '../../components/Icon';
+import { androidBoxShadow } from '../../utils/androidShadow';
 import { formatBytes } from '../../utils/format';
 
 const BLUE = colors.accent;
@@ -853,6 +854,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 24,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 10,
+      blurRadius: 24,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
   },
   globalRecentDownloadSection: {
     marginHorizontal: 20,
@@ -918,6 +924,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 10,
     elevation: 1,
+    ...androidBoxShadow({
+      offsetY: 4,
+      blurRadius: 10,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
   },
   globalMediaPreviewWrap: {
     borderRadius: 14,
@@ -927,6 +938,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 1,
+    ...androidBoxShadow({
+      offsetY: 2,
+      blurRadius: 4,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
   },
   recentDownloadThumbnailImage: {
     width: '100%',
@@ -1057,6 +1073,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 24,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 10,
+      blurRadius: 24,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
   },
   globalSyncRecordSection: {
     marginHorizontal: 20,
@@ -1324,6 +1345,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.07,
     shadowRadius: 22,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 10,
+      blurRadius: 22,
+      color: 'rgba(70, 96, 138, 0.07)',
+    }),
   },
   syncStateIconWrap: {
     width: 42,

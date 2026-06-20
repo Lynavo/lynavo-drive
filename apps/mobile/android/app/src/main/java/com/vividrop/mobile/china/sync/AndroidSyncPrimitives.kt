@@ -540,6 +540,16 @@ object AndroidSyncPrimitives {
     permissionGranted: Boolean,
   ): Boolean = sdkInt >= ANDROID_13_API && !permissionGranted
 
+  fun nearbyWifiPermissionStatus(
+    sdkInt: Int,
+    permissionGranted: Boolean,
+  ): String =
+    if (shouldRequestNearbyWifiPermission(sdkInt, permissionGranted)) {
+      "required"
+    } else {
+      "granted"
+    }
+
   fun buildSubnetProbeHosts(
     clientIp: String,
     prefixLength: Int,

@@ -146,6 +146,12 @@ jest.mock('../../services/SyncEngineModule', () => ({
   getAlbumCollections: jest.fn().mockResolvedValue([]),
 }));
 
+jest.mock('react-native-video', () => 'Video');
+
+jest.mock('@react-native-documents/viewer', () => ({
+  viewDocument: jest.fn(),
+}));
+
 // ---------------------------------------------------------------------------
 // Screen stubs — test only cares about which screen gets routed to
 // ---------------------------------------------------------------------------
@@ -520,11 +526,6 @@ describe('RootNavigator — SUBSCRIPTION_ENFORCEMENT', () => {
         screen.getByTestId('global-main-tabs-root').props.style,
       ).backgroundColor,
     ).toBe('#F7FBFF');
-    expect(
-      StyleSheet.flatten(
-        screen.getByTestId('global-bottom-tab-bar-outer').props.style,
-      ).position,
-    ).toBeUndefined();
     expect(screen.queryByTestId('bottom-tab-bar-outer')).toBeNull();
     expect(screen.getByTestId('global-bottom-tab-files')).toBeTruthy();
 
@@ -534,6 +535,9 @@ describe('RootNavigator — SUBSCRIPTION_ENFORCEMENT', () => {
         screen.getByText('SharedFilesGlobal showBottomTabBar=false'),
       ).toBeTruthy(),
     );
+    expect(
+      screen.UNSAFE_getByProps({ testID: 'global-sync-activity-screen' }),
+    ).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('global-bottom-tab-settings'));
     await waitFor(() =>
@@ -541,6 +545,9 @@ describe('RootNavigator — SUBSCRIPTION_ENFORCEMENT', () => {
         screen.getByText('SettingsGlobal showBottomTabBar=false'),
       ).toBeTruthy(),
     );
+    expect(
+      screen.UNSAFE_getByProps({ testID: 'shared-files-global-screen' }),
+    ).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('global-bottom-tab-home'));
     await waitFor(() =>

@@ -364,8 +364,34 @@ func (s *Server) handleMobileReceivedResources(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusInternalServerError, "failed to load desktop device id")
 		return
 	}
-	var items []store.ReceivedLibraryItem
 	scopedToClient := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("scope")), "client")
+	hasPageParams := strings.TrimSpace(r.URL.Query().Get("page")) != "" ||
+		strings.TrimSpace(r.URL.Query().Get("pageSize")) != ""
+	if hasPageParams {
+		page := parsePositiveQueryInt(r, "page", 1)
+		pageSize := parsePositiveQueryInt(r, "pageSize", 30)
+		if pageSize > 200 {
+			pageSize = 200
+		}
+		var result store.ReceivedLibraryPage
+		if scopedToClient {
+			result, err = s.store.ListReceivedLibraryPageForClient(desktopDeviceID, client.ClientID, page, pageSize)
+		} else {
+			result, err = s.store.ListReceivedLibraryPage(desktopDeviceID, page, pageSize)
+		}
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to list received library")
+			return
+		}
+		if scopedToClient {
+			enrichMobileReceivedPreviewURLs(result.Items, client)
+		}
+		_, _ = s.recordResourceAccess(desktopDeviceID, client, "received_library", "received_file", "Received Library", "list", "ok")
+		writeJSON(w, http.StatusOK, result)
+		return
+	}
+
+	var items []store.ReceivedLibraryItem
 	if scopedToClient {
 		items, err = s.store.ListReceivedLibraryForClient(desktopDeviceID, client.ClientID)
 	} else {

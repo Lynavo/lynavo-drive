@@ -712,6 +712,31 @@ class AndroidSyncPrimitivesTest {
   }
 
   @Test
+  fun nearbyWifiPermissionStatusMatchesRuntimePromptRequirement() {
+    assertEquals(
+      "granted",
+      AndroidSyncPrimitives.nearbyWifiPermissionStatus(
+        sdkInt = 32,
+        permissionGranted = false,
+      ),
+    )
+    assertEquals(
+      "required",
+      AndroidSyncPrimitives.nearbyWifiPermissionStatus(
+        sdkInt = 33,
+        permissionGranted = false,
+      ),
+    )
+    assertEquals(
+      "granted",
+      AndroidSyncPrimitives.nearbyWifiPermissionStatus(
+        sdkInt = 33,
+        permissionGranted = true,
+      ),
+    )
+  }
+
+  @Test
   fun buildPresenceHeartbeatUrlUsesSidecarHttpPresenceEndpoint() {
     assertEquals(
       "http://192.168.10.237:39394/presence/client-123",

@@ -17,6 +17,7 @@ import { Icon } from '../components/Icon';
 import { GlobalGradientBackground } from '../components/GlobalGradientBackground';
 import { listHistory } from '../services/desktop-local-service';
 import { getBindingState } from '../services/SyncEngineModule';
+import { androidBoxShadow } from '../utils/androidShadow';
 import { formatBytes } from '../utils/format';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'History'>;
@@ -407,6 +408,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 12,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 5,
+      blurRadius: 12,
+      color: 'rgba(120, 172, 210, 0.12)',
+    }),
   },
   title: {
     fontSize: 20,
@@ -485,6 +491,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 10,
     elevation: 1,
+    ...androidBoxShadow({
+      offsetY: 4,
+      blurRadius: 10,
+      color: 'rgba(81, 145, 197, 0.06)',
+    }),
   },
   summaryTopRow: {
     flexDirection: 'row',
@@ -582,6 +593,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 18,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 8,
+      blurRadius: 18,
+      color: 'rgba(81, 145, 197, 0.08)',
+    }),
   },
   stateIcon: {
     width: 54,
