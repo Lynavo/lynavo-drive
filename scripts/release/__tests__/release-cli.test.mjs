@@ -13,6 +13,20 @@ function runReleaseDryRun(profile, targets = 'ios,android,win,linux') {
   );
 }
 
+function runReleaseHelp() {
+  return spawnSync(process.execPath, ['scripts/release/release.mjs', '--help'], {
+    cwd: new URL('../../..', import.meta.url),
+    encoding: 'utf8',
+  });
+}
+
+test('prints linux in release target help', () => {
+  const result = runReleaseHelp();
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /--targets ios,android,mac,win,linux/);
+});
+
 test('prints the cn-review release plan without running build commands in dry-run mode', () => {
   const result = runReleaseDryRun('cn-review');
 

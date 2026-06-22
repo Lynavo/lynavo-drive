@@ -75,7 +75,7 @@ function parseArgs(args) {
 
 function printUsage() {
   console.log(`Usage:
-  pnpm release --profile <profile> [--targets ios,android,mac,win] [--dry-run]
+  pnpm release --profile <profile> [--targets ios,android,mac,win,linux] [--dry-run]
 
 Profiles:
   ${listReleaseProfileNames().join('\n  ')}
