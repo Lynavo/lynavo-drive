@@ -51,6 +51,7 @@ import { ModalBlurBackdrop } from '../components/shared/ModalBlurBackdrop';
 import { NativeModalBlurView } from '../components/shared/NativeModalBlurView';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { useRecentDesktops } from '../stores/recent-desktops-store';
+import { androidBoxShadow } from '../utils/androidShadow';
 import {
   hasSeenUnconnectedGuide,
   markUnconnectedGuideSeen,
@@ -83,6 +84,7 @@ type ConnectionFlowStatus =
   | 'empty'
   | 'failed'
   | 'timeout'
+  | 'permissionRequired'
   | 'cameraDenied';
 type ConnectionFailureCode =
   | 'wrong_code'
@@ -99,6 +101,14 @@ type ConnectionModalStep =
   | 'cameraPermission'
   | 'code';
 type FlowStateTone = 'neutral' | 'danger' | 'warning';
+type NativeDiscoveryModule = {
+  addListener: (eventName: string) => void;
+  removeListeners: (count: number) => void;
+  startDiscovery?: () => Promise<void>;
+  stopDiscovery?: () => Promise<void>;
+  getDiscoveryPermissionStatus?: () => Promise<unknown>;
+};
+type DiscoveryPermissionStatus = 'granted' | 'required' | 'unavailable';
 type ConnectionGuidePreviewKind =
   | 'connect'
   | 'autoUpload'
@@ -239,6 +249,25 @@ function getConnectionFailureCopy(failure: ConnectionFailure | null): {
     icon: 'alert-circle-outline',
     tone: 'danger',
   };
+}
+
+async function getAndroidDiscoveryPermissionStatus(
+  nativeSyncEngine: NativeDiscoveryModule | undefined,
+): Promise<DiscoveryPermissionStatus> {
+  if (Platform.OS !== 'android') {
+    return 'granted';
+  }
+
+  const status = await (
+    nativeSyncEngine?.getDiscoveryPermissionStatus?.() ??
+    Promise.resolve('granted')
+  ).catch(() => 'granted');
+
+  if (status === 'required' || status === 'unavailable') {
+    return status;
+  }
+
+  return 'granted';
 }
 
 export function resolveConnectionGuideCardPosition({
@@ -509,14 +538,22 @@ export function DeviceDiscoveryGlobalScreen() {
       };
     }
 
-    try {
-      const { NativeSyncEngine } = NativeModules;
-      if (!NativeSyncEngine) {
-        timeoutTimer = setTimeout(() => {
-          preserveCachedDevicesRef.current = false;
-          setScanning(false);
+    const scheduleDiscoveryTimeout = () => {
+      timeoutTimer = setTimeout(() => {
+        preserveCachedDevicesRef.current = false;
+        setScanning(false);
+        if (devicesRef.current.length === 0) {
           setConnectionStatus('empty');
-        }, 8000);
+        }
+      }, 8000);
+    };
+
+    try {
+      const { NativeSyncEngine } = NativeModules as {
+        NativeSyncEngine?: NativeDiscoveryModule;
+      };
+      if (!NativeSyncEngine) {
+        scheduleDiscoveryTimeout();
         return () => {
           if (visualQaTimer) clearTimeout(visualQaTimer);
           if (timeoutTimer) clearTimeout(timeoutTimer);
@@ -550,29 +587,33 @@ export function DeviceDiscoveryGlobalScreen() {
         },
       );
 
-      NativeSyncEngine.stopDiscovery()
-        .catch(() => undefined)
-        .then(() => {
-          if (!active) return undefined;
-          return NativeSyncEngine.startDiscovery();
-        })
-        .catch(() => undefined);
+      void (async () => {
+        await (NativeSyncEngine.stopDiscovery?.() ?? Promise.resolve()).catch(
+          () => undefined,
+        );
+        if (!active) return;
 
-      timeoutTimer = setTimeout(() => {
-        preserveCachedDevicesRef.current = false;
-        setScanning(false);
-        if (devicesRef.current.length === 0) {
-          setConnectionStatus('empty');
+        const permissionStatus =
+          await getAndroidDiscoveryPermissionStatus(NativeSyncEngine);
+        if (!active) return;
+        if (permissionStatus === 'required') {
+          preserveCachedDevicesRef.current = false;
+          setScanning(false);
+          setConnectionStatus('permissionRequired');
+          return;
         }
-      }, 8000);
+
+        await (NativeSyncEngine.startDiscovery?.() ?? Promise.resolve()).catch(
+          () => undefined,
+        );
+        if (!active) return;
+        scheduleDiscoveryTimeout();
+      })().catch(() => {
+        if (!active) return;
+        scheduleDiscoveryTimeout();
+      });
     } catch {
-      timeoutTimer = setTimeout(() => {
-        preserveCachedDevicesRef.current = false;
-        setScanning(false);
-        if (devicesRef.current.length === 0) {
-          setConnectionStatus('empty');
-        }
-      }, 8000);
+      scheduleDiscoveryTimeout();
     }
 
     return () => {
@@ -604,6 +645,8 @@ export function DeviceDiscoveryGlobalScreen() {
   const isShowingSkeleton = scanning && discoveredCount === 0;
   const statusLabel = isShowingSkeleton
     ? '扫描中...'
+    : connectionStatus === 'permissionRequired'
+    ? '等待授权'
     : `已发现 ${discoveredCount} 台`;
 
   const measureGuideTarget = useCallback(() => {
@@ -947,6 +990,16 @@ export function DeviceDiscoveryGlobalScreen() {
             setConnectionModalStep('manualPair');
           },
         }
+      : !isShowingSkeleton && connectionStatus === 'permissionRequired'
+        ? {
+            title: '允许查找附近设备',
+            description:
+              'Android 需要允许查找附近设备，才能发现同一局域网下的电脑。',
+            actionLabel: '开始扫描',
+            icon: 'radio-outline',
+            tone: 'neutral',
+            onAction: handleRescan,
+          }
       : !isShowingSkeleton && connectionStatus === 'failed'
         ? {
             ...getConnectionFailureCopy(connectionFailure),
@@ -2096,6 +2149,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 24,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 12,
+      blurRadius: 24,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
   },
   header: {
     marginTop: 24,
@@ -2125,6 +2183,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 42,
     elevation: 5,
+    ...androidBoxShadow({
+      offsetY: 18,
+      blurRadius: 42,
+      color: 'rgba(70, 96, 138, 0.12)',
+    }),
   },
   devicesHeader: {
     flexDirection: 'row',
@@ -2191,6 +2254,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 24,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 10,
+      blurRadius: 24,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
   },
   manualPairRow: {
     flexDirection: 'row',
@@ -2301,6 +2369,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 34,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 12,
+      blurRadius: 34,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
   },
   flowStateIcon: {
     width: 40,
@@ -2386,6 +2459,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 50,
     elevation: 8,
+    ...androidBoxShadow({
+      offsetY: 18,
+      blurRadius: 50,
+      color: 'rgba(70, 96, 138, 0.18)',
+    }),
   },
   guideCardSurface: {
     ...StyleSheet.absoluteFillObject,
@@ -2456,6 +2534,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 24,
     elevation: 3,
+    ...androidBoxShadow({
+      offsetY: 10,
+      blurRadius: 24,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
   },
   guidePreviewHeader: {
     flexDirection: 'row',
@@ -2855,6 +2938,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 28,
     elevation: 10,
+    ...androidBoxShadow({
+      offsetY: 12,
+      blurRadius: 28,
+      color: 'rgba(23, 61, 88, 0.18)',
+    }),
   },
   modalHeader: {
     flexDirection: 'row',

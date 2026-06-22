@@ -77,6 +77,10 @@ func (s *Store) ListReceivedLibraryPage(desktopDeviceID string, page, pageSize i
 	return s.listReceivedLibraryPage(desktopDeviceID, nil, page, pageSize)
 }
 
+func (s *Store) ListReceivedLibraryPageForClient(desktopDeviceID string, clientID string, page, pageSize int) (ReceivedLibraryPage, error) {
+	return s.listReceivedLibraryPage(desktopDeviceID, &clientID, page, pageSize)
+}
+
 func (s *Store) listReceivedLibraryPage(desktopDeviceID string, clientID *string, page, pageSize int) (ReceivedLibraryPage, error) {
 	if page < 1 {
 		page = 1

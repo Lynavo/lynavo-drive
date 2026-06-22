@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { androidBoxShadow } from '../utils/androidShadow';
 
 const DARK = '#202022';
 const CARD_BG = '#ffffff';
@@ -182,6 +183,11 @@ const planStyles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 4,
+    ...androidBoxShadow({
+      offsetY: 4,
+      blurRadius: 12,
+      color: 'rgba(31, 41, 55, 0.08)',
+    }),
   },
   cardUnselected: {
     backgroundColor: CARD_BG,
@@ -199,6 +205,11 @@ const planStyles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 14,
     elevation: 5,
+    ...androidBoxShadow({
+      offsetY: 6,
+      blurRadius: 14,
+      color: 'rgba(31, 41, 55, 0.12)',
+    }),
   },
   cardDisabled: {
     backgroundColor: PLAN_DISABLED_BG,

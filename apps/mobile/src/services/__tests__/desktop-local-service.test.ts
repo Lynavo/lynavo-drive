@@ -1,4 +1,4 @@
-import { NativeModules } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 
 import {
   downloadGlobalRemoteAccessResource,
@@ -9,6 +9,7 @@ import {
   getReceivedLibraryPreviewUrl,
   getResourcePreviewUrl,
   isDownloadSavedLocally,
+  listCurrentClientReceivedLibraryPage,
   listGlobalRemoteAccessFolderContents,
   listGlobalRemoteAccessResources,
   listCurrentClientReceivedLibrary,
@@ -41,6 +42,9 @@ jest.mock('react-native', () => ({
       downloadUrlToLocal: jest.fn(),
       shareFiles: jest.fn(),
     },
+  },
+  Platform: {
+    OS: 'ios',
   },
 }));
 
@@ -104,11 +108,19 @@ const mockShareFiles = NativeModules.NativeSyncEngine
   (localPaths: string[]) => Promise<boolean>
 >;
 
+function setPlatformOS(os: typeof Platform.OS): void {
+  Object.defineProperty(Platform, 'OS', {
+    configurable: true,
+    value: os,
+  });
+}
+
 describe('desktop-local-service', () => {
   let fetchMock: jest.Mock;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    setPlatformOS('ios');
     mockedGetClientId.mockResolvedValue('client-001');
     mockGetClientDisplayName.mockResolvedValue('Alice iPhone');
     fetchMock = jest.fn();
@@ -547,7 +559,7 @@ describe('desktop-local-service', () => {
     );
   });
 
-  it('scopes the global received library request to the current mobile client', async () => {
+  it('keeps non-Android global received library requests on the native route first', async () => {
     mockedListReceivedFiles.mockResolvedValueOnce([]);
 
     await expect(
@@ -558,10 +570,8 @@ describe('desktop-local-service', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('falls back to the scoped HTTP received library only when the native listing bridge is missing', async () => {
-    mockedListReceivedFiles.mockRejectedValueOnce(
-      new TypeError('NativeSyncEngine.listReceivedFiles is not a function'),
-    );
+  it('adds direct desktop media URLs to the current-client global library', async () => {
+    setPlatformOS('android');
     fetchMock.mockResolvedValueOnce({
       ok: true,
       statusText: 'OK',
@@ -595,13 +605,166 @@ describe('desktop-local-service', () => {
       },
     ]);
 
-    expect(mockedListReceivedFiles).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
       'http://192.168.10.20:39394/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&scope=client',
     );
+    expect(mockedListReceivedFiles).not.toHaveBeenCalled();
   });
 
-  it('propagates native received listing route failures without falling back to LAN-only HTTP', async () => {
+  it('requests current-client global library pages over direct Android HTTP', async () => {
+    setPlatformOS('android');
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      statusText: 'OK',
+      json: jest.fn().mockResolvedValue({
+        items: [
+          {
+            resourceId: '',
+            desktopDeviceId: 'desktop-001',
+            clientId: 'client-001',
+            displayName: 'Alice iPhone',
+            fileKey: '2026/06/17/page-image',
+            filename: 'IMG_PAGE.JPG',
+            mediaType: 'image',
+            fileSize: 2048,
+            completedAt: '2026-06-16T08:00:00.000Z',
+            shareStatus: 'not_shared',
+          },
+        ],
+        page: 2,
+        pageSize: 20,
+        totalItems: 41,
+        totalBytes: 8388608,
+        deviceStats: [
+          {
+            clientId: 'client-001',
+            photoCount: 39,
+            fileCount: 2,
+            totalBytes: 8388608,
+          },
+        ],
+      }),
+    });
+
+    await expect(
+      listCurrentClientReceivedLibraryPage(
+        { host: '192.168.10.20', port: 39394 },
+        { page: 2, pageSize: 20 },
+      ),
+    ).resolves.toMatchObject({
+      page: 2,
+      pageSize: 20,
+      totalItems: 41,
+      totalBytes: 8388608,
+      items: [
+        {
+          fileKey: '2026/06/17/page-image',
+          previewUrl:
+            'http://192.168.10.20:39394/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fpage-image',
+          thumbnailUrl:
+            'http://192.168.10.20:39394/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fpage-image',
+        },
+      ],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://192.168.10.20:39394/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&scope=client&page=2&pageSize=20',
+    );
+    expect(mockedListReceivedFiles).not.toHaveBeenCalled();
+  });
+
+  it('requests current-client global library pages over direct HTTP on iOS before native', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      statusText: 'OK',
+      json: jest.fn().mockResolvedValue({
+        items: [
+          {
+            resourceId: '',
+            desktopDeviceId: 'desktop-001',
+            clientId: 'client-001',
+            displayName: 'Alice iPhone',
+            fileKey: '2026/06/17/ios-page-image',
+            filename: 'IMG_IOS_PAGE.JPG',
+            mediaType: 'image',
+            fileSize: 4096,
+            completedAt: '2026-06-16T08:00:00.000Z',
+            shareStatus: 'not_shared',
+          },
+        ],
+        page: 1,
+        pageSize: 20,
+        totalItems: 41,
+        totalBytes: 8388608,
+        deviceStats: [],
+      }),
+    });
+
+    await expect(
+      listCurrentClientReceivedLibraryPage(
+        { host: '192.168.10.20', port: 39394 },
+        { page: 1, pageSize: 20 },
+      ),
+    ).resolves.toMatchObject({
+      page: 1,
+      pageSize: 20,
+      totalItems: 41,
+      items: [
+        {
+          fileKey: '2026/06/17/ios-page-image',
+          thumbnailUrl:
+            'http://192.168.10.20:39394/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fios-page-image',
+        },
+      ],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://192.168.10.20:39394/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&scope=client&page=1&pageSize=20',
+    );
+    expect(mockedListReceivedFiles).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the native received library when direct HTTP fails', async () => {
+    setPlatformOS('android');
+    fetchMock.mockRejectedValueOnce(new Error('LAN route unavailable'));
+    mockedListReceivedFiles.mockResolvedValueOnce([
+      {
+        resourceId: '',
+        desktopDeviceId: 'desktop-001',
+        clientId: 'client-001',
+        displayName: 'Alice iPhone',
+        fileKey: '2026/06/17/native-image',
+        filename: 'IMG_NATIVE.JPG',
+        mediaType: 'image',
+        fileSize: 2048,
+        completedAt: '2026-06-16T08:00:00.000Z',
+        shareStatus: 'not_shared',
+        previewUrl:
+          'http://127.0.0.1:49394/resources/mobile/received/preview?fileKey=native-image',
+        thumbnailUrl:
+          'http://127.0.0.1:49394/resources/mobile/received/thumbnail?fileKey=native-image',
+      },
+    ]);
+
+    await expect(
+      listCurrentClientReceivedLibrary({ host: '192.168.10.20', port: 39394 }),
+    ).resolves.toMatchObject([
+      {
+        fileKey: '2026/06/17/native-image',
+        previewUrl:
+          'http://127.0.0.1:49394/resources/mobile/received/preview?fileKey=native-image',
+        thumbnailUrl:
+          'http://127.0.0.1:49394/resources/mobile/received/thumbnail?fileKey=native-image',
+      },
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(mockedListReceivedFiles).toHaveBeenCalledTimes(1);
+  });
+
+  it('propagates native received listing route failures after direct HTTP fails', async () => {
+    setPlatformOS('android');
+    fetchMock.mockRejectedValueOnce(new Error('LAN route unavailable'));
     const routeError = new Error('Shared files route unavailable');
     mockedListReceivedFiles.mockRejectedValueOnce(routeError);
 
@@ -609,11 +772,13 @@ describe('desktop-local-service', () => {
       listCurrentClientReceivedLibrary({ host: '192.168.10.20', port: 39394 }),
     ).rejects.toBe(routeError);
 
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(mockedListReceivedFiles).toHaveBeenCalledTimes(1);
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('keeps native received media urls for the current-client global library', async () => {
+  it('keeps native received media urls when direct HTTP falls back to native listing', async () => {
+    setPlatformOS('android');
+    fetchMock.mockRejectedValueOnce(new Error('LAN route unavailable'));
     mockedListReceivedFiles.mockResolvedValueOnce([
       {
         resourceId: '',
@@ -667,7 +832,8 @@ describe('desktop-local-service', () => {
           'http://127.0.0.1:49394/resources/mobile/received/stream?fileKey=video-key',
       },
     ]);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(mockedListReceivedFiles).toHaveBeenCalledTimes(1);
   });
 
   it('downloads selected remote resources to share cache and opens the system share sheet once', async () => {

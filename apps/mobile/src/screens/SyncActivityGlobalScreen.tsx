@@ -47,6 +47,7 @@ import {
   getReadOnlyQueue,
   getSyncOverview,
 } from '../services/SyncEngineModule';
+import { androidBoxShadow } from '../utils/androidShadow';
 import { formatBytes, formatDuration } from '../utils/format';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'SyncActivity'>;
@@ -873,6 +874,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 52,
     elevation: 3,
+    ...androidBoxShadow({
+      offsetY: 18,
+      blurRadius: 52,
+      color: 'rgba(70, 96, 138, 0.12)',
+    }),
   },
   autoCardSurface: {
     paddingHorizontal: 16,
@@ -971,6 +977,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 34,
     elevation: 1,
+    ...androidBoxShadow({
+      offsetY: 12,
+      blurRadius: 34,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
   },
   phoneTitle: {
     fontSize: 14,

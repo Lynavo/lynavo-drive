@@ -4,6 +4,7 @@ import { useNavigation, CommonActions } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { FolderOpen, Home, User } from 'lucide-react-native';
 import { colors } from '../theme/globalColors';
+import { androidBoxShadow } from '../utils/androidShadow';
 
 const SIDE_INSET = 16;
 const BOTTOM_GAP = 16;
@@ -157,6 +158,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.14,
     shadowRadius: 48,
     elevation: 8,
+    ...androidBoxShadow({
+      offsetY: 20,
+      blurRadius: 48,
+      color: 'rgba(70, 96, 138, 0.14)',
+    }),
   },
   tabButton: {
     alignItems: 'center',
@@ -174,6 +180,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 24,
     elevation: 3,
+    ...androidBoxShadow({
+      offsetY: 10,
+      blurRadius: 24,
+      color: 'rgba(70, 96, 138, 0.10)',
+    }),
   },
   tabLabel: {
     fontSize: 10,

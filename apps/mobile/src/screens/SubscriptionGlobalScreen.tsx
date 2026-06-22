@@ -81,6 +81,7 @@ import {
   resolveSubscriptionPaymentRoute,
   type MainlandPaymentMethod,
 } from '../utils/subscriptionPaymentRouting';
+import { androidBoxShadow } from '../utils/androidShadow';
 
 const APPLE_EULA_URL =
   'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
@@ -654,6 +655,11 @@ const modalStyles = StyleSheet.create({
     shadowOpacity: 0.24,
     shadowRadius: 70,
     elevation: 12,
+    ...androidBoxShadow({
+      offsetY: 24,
+      blurRadius: 70,
+      color: 'rgba(35, 52, 77, 0.24)',
+    }),
   },
   iconCircle: {
     marginBottom: 16,
@@ -883,6 +889,11 @@ const paymentSheetStyles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 40,
     elevation: 12,
+    ...androidBoxShadow({
+      offsetY: -12,
+      blurRadius: 40,
+      color: 'rgba(35, 52, 77, 0.18)',
+    }),
   },
   handle: {
     alignSelf: 'center',
@@ -2494,6 +2505,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 38,
     elevation: 3,
+    ...androidBoxShadow({
+      offsetY: 14,
+      blurRadius: 38,
+      color: 'rgba(70, 96, 138, 0.10)',
+    }),
   },
   backButton: {
     width: 36,
@@ -2538,6 +2554,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 52,
     elevation: 4,
+    ...androidBoxShadow({
+      offsetY: 18,
+      blurRadius: 52,
+      color: 'rgba(70, 96, 138, 0.12)',
+    }),
   },
   membershipCardExpired: {
     borderColor: 'rgba(239,68,68,0.18)',
@@ -2618,6 +2639,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 34,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 14,
+      blurRadius: 34,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
   },
   benefitsTitle: {
     fontSize: 13,
@@ -2708,6 +2734,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 24,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 10,
+      blurRadius: 24,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
   },
   giftCardButtonText: {
     fontSize: 14,
@@ -2751,6 +2782,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 24,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 10,
+      blurRadius: 24,
+      color: 'rgba(70, 96, 138, 0.06)',
+    }),
   },
   errorBannerText: {
     flex: 1,
@@ -2787,6 +2823,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.24,
     shadowRadius: 70,
     elevation: 12,
+    ...androidBoxShadow({
+      offsetY: 24,
+      blurRadius: 70,
+      color: 'rgba(35, 52, 77, 0.24)',
+    }),
   },
   giftCardPromptTitle: {
     fontSize: 17,

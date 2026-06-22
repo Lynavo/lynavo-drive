@@ -39,6 +39,7 @@ import { GlobalGradientBackground } from '../components/GlobalGradientBackground
 import { GlobalBottomTabBar } from '../components/GlobalBottomTabBar';
 import { ModalBlurBackdrop } from '../components/shared/ModalBlurBackdrop';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { androidBoxShadow } from '../utils/androidShadow';
 import {
   useAuth,
   type SubscriptionInfo,
@@ -1337,6 +1338,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 52,
     elevation: 3,
+    ...androidBoxShadow({
+      offsetY: 18,
+      blurRadius: 52,
+      color: 'rgba(70, 96, 138, 0.12)',
+    }),
   },
   row: {
     minHeight: 64,
@@ -1436,6 +1442,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 38,
     elevation: 3,
+    ...androidBoxShadow({
+      offsetY: 14,
+      blurRadius: 38,
+      color: 'rgba(70, 96, 138, 0.10)',
+    }),
   },
   childBackButton: {
     width: 36,
@@ -1533,6 +1544,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 28,
     elevation: 10,
+    ...androidBoxShadow({
+      offsetY: 12,
+      blurRadius: 28,
+      color: 'rgba(23, 61, 88, 0.18)',
+    }),
   },
   modalHeader: {
     flexDirection: 'row',

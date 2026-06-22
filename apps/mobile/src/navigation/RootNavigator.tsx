@@ -11,6 +11,10 @@ import {
 } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useNavigation } from '@react-navigation/native';
+import {
+  createBottomTabNavigator,
+  type BottomTabBarProps,
+} from '@react-navigation/bottom-tabs';
 import { useTranslation } from 'react-i18next';
 
 import { isFeatureAccessAllowed, useAuth } from '../stores/auth-store';
@@ -18,6 +22,7 @@ import type { AccountStatus, SubscriptionInfo } from '../stores/auth-store';
 import { useExpiryReminder } from '../hooks/useExpiryReminder';
 import { FEATURES } from '../constants/features';
 import { isGlobalMarket } from '../markets';
+import { androidBoxShadow } from '../utils/androidShadow';
 import { LoginScreen } from '../screens/LoginScreen';
 import { LoginGlobalScreen } from '../screens/LoginGlobalScreen';
 import { SmsVerifyScreen } from '../screens/SmsVerifyScreen';
@@ -61,6 +66,14 @@ import { resolveVisualQaInitialRoute } from '../dev/visualQa';
 // ---------------------------------------------------------------------------
 
 type MainTabKey = 'home' | 'files' | 'settings';
+
+type GlobalMainTabParamList = {
+  GlobalHomeTab: undefined;
+  GlobalFilesTab: undefined;
+  GlobalSettingsTab: undefined;
+};
+
+const GlobalMainTab = createBottomTabNavigator<GlobalMainTabParamList>();
 
 export type RootStackParamList = {
   Login: undefined;
@@ -443,12 +456,51 @@ function AuthedStack({
   );
 }
 
-function getMainTabForRouteName(
+function getGlobalMainTabInitialRouteName(
   routeName: keyof RootStackParamList | undefined,
-): MainTabKey {
-  if (routeName === 'SharedFiles') return 'files';
-  if (routeName === 'Settings') return 'settings';
+): keyof GlobalMainTabParamList {
+  if (routeName === 'SharedFiles') return 'GlobalFilesTab';
+  if (routeName === 'Settings') return 'GlobalSettingsTab';
+  return 'GlobalHomeTab';
+}
+
+function getMainTabForTabRouteName(routeName: string | undefined): MainTabKey {
+  if (routeName === 'GlobalFilesTab') return 'files';
+  if (routeName === 'GlobalSettingsTab') return 'settings';
   return 'home';
+}
+
+function getGlobalMainTabRouteName(
+  tab: MainTabKey,
+): keyof GlobalMainTabParamList {
+  if (tab === 'files') return 'GlobalFilesTab';
+  if (tab === 'settings') return 'GlobalSettingsTab';
+  return 'GlobalHomeTab';
+}
+
+function GlobalHomeTabScreen() {
+  return <SyncActivityGlobalScreen showBottomTabBar={false} />;
+}
+
+function GlobalFilesTabScreen() {
+  return <SharedFilesGlobalScreen showBottomTabBar={false} />;
+}
+
+function GlobalSettingsTabScreen() {
+  return <SettingsGlobalScreen showBottomTabBar={false} />;
+}
+
+function GlobalMainTabsTabBar({ state, navigation }: BottomTabBarProps) {
+  const activeTab = getMainTabForTabRouteName(state.routes[state.index]?.name);
+
+  return (
+    <GlobalBottomTabBar
+      activeTab={activeTab}
+      onTabPress={tab => {
+        navigation.navigate(getGlobalMainTabRouteName(tab));
+      }}
+    />
+  );
 }
 
 function GlobalMainTabsScreen({
@@ -456,26 +508,34 @@ function GlobalMainTabsScreen({
 }: {
   route: { name: keyof RootStackParamList };
 }) {
-  const [activeTab, setActiveTab] = useState<MainTabKey>(() =>
-    getMainTabForRouteName(route.name),
-  );
-
-  useEffect(() => {
-    setActiveTab(getMainTabForRouteName(route.name));
-  }, [route.name]);
-
   return (
     <View testID="global-main-tabs-root" style={styles.mainTabsRoot}>
-      <View style={styles.mainTabsContent}>
-        {activeTab === 'home' ? (
-          <SyncActivityGlobalScreen showBottomTabBar={false} />
-        ) : activeTab === 'files' ? (
-          <SharedFilesGlobalScreen showBottomTabBar={false} />
-        ) : (
-          <SettingsGlobalScreen showBottomTabBar={false} />
-        )}
-      </View>
-      <GlobalBottomTabBar activeTab={activeTab} onTabPress={setActiveTab} />
+      <GlobalMainTab.Navigator
+        initialRouteName={getGlobalMainTabInitialRouteName(route.name)}
+        backBehavior="history"
+        detachInactiveScreens={false}
+        screenOptions={{
+          headerShown: false,
+          lazy: false,
+          freezeOnBlur: false,
+          animation: 'none',
+          sceneStyle: styles.mainTabsScene,
+        }}
+        tabBar={props => <GlobalMainTabsTabBar {...props} />}
+      >
+        <GlobalMainTab.Screen
+          name="GlobalHomeTab"
+          component={GlobalHomeTabScreen}
+        />
+        <GlobalMainTab.Screen
+          name="GlobalFilesTab"
+          component={GlobalFilesTabScreen}
+        />
+        <GlobalMainTab.Screen
+          name="GlobalSettingsTab"
+          component={GlobalSettingsTabScreen}
+        />
+      </GlobalMainTab.Navigator>
     </View>
   );
 }
@@ -671,8 +731,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F7FBFF',
   },
-  mainTabsContent: {
-    flex: 1,
+  mainTabsScene: {
+    backgroundColor: '#F7FBFF',
   },
   loading: {
     flex: 1,
@@ -741,6 +801,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 26,
     elevation: 8,
+    ...androidBoxShadow({
+      offsetY: 14,
+      blurRadius: 26,
+      color: 'rgba(79, 144, 255, 0.12)',
+    }),
   },
   transitionIcon: {
     width: 62,

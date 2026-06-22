@@ -1,9 +1,10 @@
-import { NativeModules } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 import type {
   DesktopSharedResourceDTO,
   DirectoryFileDTO,
   DirectoryListingDTO,
   ReceivedLibraryItemDTO,
+  ReceivedLibraryPageDTO,
   DesktopSyncRecordDTO,
   SharedDirectoryDTO,
 } from '@syncflow/contracts';
@@ -48,6 +49,18 @@ export type ReceivedLibraryMediaItem = ReceivedLibraryItemDTO & {
   streamUrl?: string;
 };
 
+export type ReceivedLibraryMediaPage = Omit<
+  ReceivedLibraryPageDTO,
+  'items'
+> & {
+  items: ReceivedLibraryMediaItem[];
+};
+
+type ReceivedLibraryPageOptions = {
+  page?: number;
+  pageSize?: number;
+};
+
 export type GlobalRemoteAccessResource = DesktopSharedResourceDTO & {
   thumbnailUrl?: string;
 };
@@ -57,6 +70,7 @@ const SHARED_DIRECTORY_DESKTOP_ID = 'shared-dir';
 const SHARED_FOLDER_ENTRY_PREFIX = 'shared-folder-entry:';
 const PERSONAL_DIRECTORY_RESOURCE_PREFIX = 'personal-dir:';
 const PERSONAL_DIRECTORY_DESKTOP_ID = 'personal-dir';
+const DIRECT_RECEIVED_LIBRARY_HTTP_TIMEOUT_MS = 1500;
 
 export function isDownloadSavedLocally(
   result: ResourceDownloadResult,
@@ -337,6 +351,27 @@ function isVideoMedia(mediaType: string, filename: string) {
   );
 }
 
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<T>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutHandle !== null) {
+      clearTimeout(timeoutHandle);
+    }
+  }
+}
+
 function absoluteDesktopUrl(
   desktop: DesktopInfo,
   value?: string,
@@ -461,6 +496,57 @@ function withCurrentClientReceivedMediaUrls(
   });
 }
 
+function receivedLibraryListUrl(
+  desktop: DesktopInfo,
+  clientId: string,
+  clientName: string,
+  scope?: 'client',
+  options?: ReceivedLibraryPageOptions,
+): string {
+  const params = [
+    `clientId=${encodeURIComponent(clientId)}`,
+    `clientName=${encodeURIComponent(clientName)}`,
+  ];
+  if (scope) {
+    params.push(`scope=${encodeURIComponent(scope)}`);
+  }
+  if (typeof options?.page === 'number') {
+    params.push(`page=${Math.max(1, Math.floor(options.page))}`);
+  }
+  if (typeof options?.pageSize === 'number') {
+    params.push(`pageSize=${Math.max(1, Math.floor(options.pageSize))}`);
+  }
+  return `http://${desktop.host}:${desktop.port}/resources/mobile/received?${params.join(
+    '&',
+  )}`;
+}
+
+function normalizeReceivedLibraryPage(
+  data: Partial<ReceivedLibraryPageDTO> & { items?: ReceivedLibraryMediaItem[] },
+  options?: ReceivedLibraryPageOptions,
+): ReceivedLibraryMediaPage {
+  const items = data.items || [];
+  const totalBytes =
+    typeof data.totalBytes === 'number'
+      ? data.totalBytes
+      : items.reduce((total, item) => total + item.fileSize, 0);
+  return {
+    items,
+    page:
+      typeof data.page === 'number'
+        ? data.page
+        : Math.max(1, Math.floor(options?.page ?? 1)),
+    pageSize:
+      typeof data.pageSize === 'number'
+        ? data.pageSize
+        : Math.max(1, Math.floor(options?.pageSize ?? items.length)),
+    totalItems:
+      typeof data.totalItems === 'number' ? data.totalItems : items.length,
+    totalBytes,
+    deviceStats: data.deviceStats || [],
+  };
+}
+
 export async function listSharedResources(
   desktop: DesktopInfo,
 ): Promise<DesktopSharedResourceDTO[]> {
@@ -538,17 +624,21 @@ export async function listGlobalRemoteAccessFolderContents(
 async function listReceivedLibraryWithScope(
   desktop: DesktopInfo,
   scope?: 'client',
+  timeoutMs?: number,
 ): Promise<ReceivedLibraryItemDTO[]> {
   const clientId = await getClientId();
   const clientName =
     (await NativeSyncEngine?.getClientDisplayName?.()) || clientId;
-  const scopeSuffix = scope ? `&scope=${encodeURIComponent(scope)}` : '';
-  const url = `http://${desktop.host}:${
-    desktop.port
-  }/resources/mobile/received?clientId=${clientId}&clientName=${encodeURIComponent(
-    clientName,
-  )}${scopeSuffix}`;
-  const res = await fetch(url);
+  const url = receivedLibraryListUrl(desktop, clientId, clientName, scope);
+  const responsePromise = fetch(url);
+  const res =
+    typeof timeoutMs === 'number'
+      ? await withTimeout(
+          responsePromise,
+          timeoutMs,
+          'Timed out listing received library over direct HTTP',
+        )
+      : await responsePromise;
   if (!res.ok) {
     throw new Error(`Failed to list received library: ${res.statusText}`);
   }
@@ -563,6 +653,49 @@ async function listReceivedLibraryWithScope(
     clientId,
     clientName,
   );
+}
+
+async function listReceivedLibraryPageWithScope(
+  desktop: DesktopInfo,
+  scope: 'client',
+  options: ReceivedLibraryPageOptions,
+  timeoutMs?: number,
+): Promise<ReceivedLibraryMediaPage> {
+  const clientId = await getClientId();
+  const clientName =
+    (await NativeSyncEngine?.getClientDisplayName?.()) || clientId;
+  const url = receivedLibraryListUrl(
+    desktop,
+    clientId,
+    clientName,
+    scope,
+    options,
+  );
+  const responsePromise = fetch(url);
+  const res =
+    typeof timeoutMs === 'number'
+      ? await withTimeout(
+          responsePromise,
+          timeoutMs,
+          'Timed out listing received library page over direct HTTP',
+        )
+      : await responsePromise;
+  if (!res.ok) {
+    throw new Error(`Failed to list received library: ${res.statusText}`);
+  }
+  const data = (await res.json()) as Partial<ReceivedLibraryPageDTO> & {
+    items?: ReceivedLibraryMediaItem[];
+  };
+  const page = normalizeReceivedLibraryPage(data, options);
+  return {
+    ...page,
+    items: withCurrentClientReceivedMediaUrls(
+      desktop,
+      page.items,
+      clientId,
+      clientName,
+    ),
+  };
 }
 
 function isMissingListReceivedFilesBridgeError(error: unknown): boolean {
@@ -582,16 +715,79 @@ export async function listReceivedLibrary(
   return listReceivedLibraryWithScope(desktop);
 }
 
+function nativeReceivedLibraryPage(
+  items: ReceivedLibraryMediaItem[],
+  options: ReceivedLibraryPageOptions = {},
+): ReceivedLibraryMediaPage {
+  const page = Math.max(1, Math.floor(options.page ?? 1));
+  const pageSize = Math.max(1, Math.floor(options.pageSize ?? items.length));
+  const start = (page - 1) * pageSize;
+  const pageItems = items.slice(start, start + pageSize);
+  return normalizeReceivedLibraryPage(
+    {
+      items: pageItems,
+      page,
+      pageSize,
+      totalItems: items.length,
+      totalBytes: items.reduce((total, item) => total + item.fileSize, 0),
+      deviceStats: [],
+    },
+    options,
+  );
+}
+
+export async function listCurrentClientReceivedLibraryPage(
+  desktop: DesktopInfo,
+  options: ReceivedLibraryPageOptions = {},
+): Promise<ReceivedLibraryMediaPage> {
+  try {
+    return await listReceivedLibraryPageWithScope(
+      desktop,
+      'client',
+      options,
+      DIRECT_RECEIVED_LIBRARY_HTTP_TIMEOUT_MS,
+    );
+  } catch (directHttpError) {
+    try {
+      return nativeReceivedLibraryPage(await listReceivedFiles(), options);
+    } catch (nativeError) {
+      if (isMissingListReceivedFilesBridgeError(nativeError)) {
+        throw directHttpError;
+      }
+      throw nativeError;
+    }
+  }
+}
+
 export async function listCurrentClientReceivedLibrary(
   desktop: DesktopInfo,
 ): Promise<ReceivedLibraryMediaItem[]> {
-  try {
-    return await listReceivedFiles();
-  } catch (error) {
-    if (!isMissingListReceivedFilesBridgeError(error)) {
-      throw error;
+  if (Platform.OS !== 'android') {
+    try {
+      return await listReceivedFiles();
+    } catch (error) {
+      if (!isMissingListReceivedFilesBridgeError(error)) {
+        throw error;
+      }
+      return listReceivedLibraryWithScope(desktop, 'client');
     }
-    return listReceivedLibraryWithScope(desktop, 'client');
+  }
+
+  try {
+    return (await listReceivedLibraryWithScope(
+      desktop,
+      'client',
+      DIRECT_RECEIVED_LIBRARY_HTTP_TIMEOUT_MS,
+    )) as ReceivedLibraryMediaItem[];
+  } catch (directHttpError) {
+    try {
+      return await listReceivedFiles();
+    } catch (nativeError) {
+      if (isMissingListReceivedFilesBridgeError(nativeError)) {
+        throw directHttpError;
+      }
+      throw nativeError;
+    }
   }
 }
 

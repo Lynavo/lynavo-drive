@@ -4,6 +4,7 @@ import {
   Alert,
   NativeEventEmitter,
   NativeModules,
+  Platform,
   StyleSheet,
   type EmitterSubscription,
 } from 'react-native';
@@ -190,6 +191,7 @@ jest.mock('../../services/desktop-local-service', () => ({
   listGlobalRemoteAccessFolderContents: jest.fn(),
   listReceivedLibrary: jest.fn(),
   listCurrentClientReceivedLibrary: jest.fn(),
+  listCurrentClientReceivedLibraryPage: jest.fn(),
   downloadResource: jest.fn(),
   downloadResourceForGlobal: jest.fn(),
   downloadReceivedLibraryItem: jest.fn(),
@@ -248,6 +250,7 @@ import {
   listGlobalRemoteAccessFolderContents,
   listReceivedLibrary,
   listCurrentClientReceivedLibrary,
+  listCurrentClientReceivedLibraryPage,
   downloadResource,
   downloadResourceForGlobal,
   downloadReceivedLibraryItem,
@@ -278,6 +281,8 @@ const mockListGlobalRemoteAccessFolderContents =
 const mockListReceivedLibrary = listReceivedLibrary as jest.Mock;
 const mockListCurrentClientReceivedLibrary =
   listCurrentClientReceivedLibrary as jest.Mock;
+const mockListCurrentClientReceivedLibraryPage =
+  listCurrentClientReceivedLibraryPage as jest.Mock;
 const mockDownloadResource = downloadResource as jest.Mock;
 const mockDownloadResourceForGlobal = downloadResourceForGlobal as jest.Mock;
 const mockDownloadReceivedLibraryItem =
@@ -301,6 +306,44 @@ const mockShareGlobalRemoteAccessResources =
   shareGlobalRemoteAccessResources as jest.Mock;
 const mockRecordDownloadedFile = recordDownloadedFile as jest.Mock;
 const mockViewDocument = viewDocument as jest.Mock;
+
+function makeReceivedLibraryPage(
+  items: Array<Record<string, unknown>>,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    items,
+    page: 1,
+    pageSize: 20,
+    totalItems: items.length,
+    totalBytes: 0,
+    deviceStats: [],
+    ...overrides,
+  };
+}
+
+function mockCurrentClientReceivedLibraryPageFromLegacyList() {
+  mockListCurrentClientReceivedLibraryPage.mockImplementation(
+    async (
+      desktop: unknown,
+      options?: { page?: number; pageSize?: number },
+    ) => {
+      const items = (((await mockListCurrentClientReceivedLibrary(
+        desktop,
+      )) || []) as Array<Record<string, unknown> & { fileSize?: number }>);
+      return makeReceivedLibraryPage(items, {
+        page: options?.page ?? 1,
+        pageSize: options?.pageSize ?? 20,
+        totalItems: items.length,
+        totalBytes: items.reduce(
+          (total: number, item: { fileSize?: number }) =>
+            total + (item.fileSize ?? 0),
+          0,
+        ),
+      });
+    },
+  );
+}
 
 class TestErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -1481,6 +1524,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
       host: '192.168.1.100',
       connectionState: 'connected',
     });
+    mockCurrentClientReceivedLibraryPageFromLegacyList();
   });
 
   it('keeps an empty real received library empty unless the remote preview gate is explicit', async () => {
@@ -1505,6 +1549,85 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
     });
     expect(getByTestId('phone-sync-empty-icon')).toBeTruthy();
     expect(queryByText('IMG_8421.JPG')).toBeNull();
+  });
+
+  it('loads the next global sync-space page when the received list reaches the end', async () => {
+    mockListCurrentClientReceivedLibraryPage
+      .mockResolvedValueOnce(
+        makeReceivedLibraryPage(
+          [
+            {
+              resourceId: 'received-alpha',
+              desktopDeviceId: 'desktop-device-id',
+              clientId: 'client-001',
+              displayName: 'alpha.jpg',
+              fileKey: 'received/alpha.jpg',
+              filename: 'alpha.jpg',
+              mediaType: 'image',
+              fileSize: 1024,
+              completedAt: '2026-06-16T08:00:00.000Z',
+              shareStatus: 'shared',
+            },
+          ],
+          {
+            page: 1,
+            pageSize: 20,
+            totalItems: 41,
+            totalBytes: 8388608,
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        makeReceivedLibraryPage(
+          [
+            {
+              resourceId: 'received-beta',
+              desktopDeviceId: 'desktop-device-id',
+              clientId: 'client-001',
+              displayName: 'beta.mov',
+              fileKey: 'received/beta.mov',
+              filename: 'beta.mov',
+              mediaType: 'video',
+              fileSize: 2048,
+              completedAt: '2026-06-16T07:00:00.000Z',
+              shareStatus: 'shared',
+            },
+          ],
+          {
+            page: 2,
+            pageSize: 20,
+            totalItems: 41,
+            totalBytes: 8388608,
+          },
+        ),
+      );
+
+    const { getByTestId, getByText } = render(
+      <TestErrorBoundary>
+        <PhoneSyncSpaceGlobalScreen />
+      </TestErrorBoundary>,
+    );
+
+    await waitFor(() => {
+      expect(mockListCurrentClientReceivedLibraryPage).toHaveBeenNthCalledWith(
+        1,
+        { host: '192.168.1.100', port: 39394 },
+        { page: 1, pageSize: 20 },
+      );
+      expect(getByText('alpha.jpg')).toBeTruthy();
+      expect(getByText(/41 个/)).toBeTruthy();
+    });
+
+    fireEvent(getByTestId('phone-sync-section-list'), 'onEndReached');
+
+    await waitFor(() => {
+      expect(mockListCurrentClientReceivedLibraryPage).toHaveBeenNthCalledWith(
+        2,
+        { host: '192.168.1.100', port: 39394 },
+        { page: 2, pageSize: 20 },
+      );
+      expect(getByText('beta.mov')).toBeTruthy();
+    });
   });
 
   it('shows a load error instead of the empty state when the global phone sync listing fails', async () => {
@@ -1994,6 +2117,113 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
     );
     expect(queryByText('folder-open-outline')).toBeNull();
     expect(queryByText('document-text')).toBeNull();
+  });
+
+  it('renders the global sync-space sort sheet in-tree on Android', async () => {
+    const originalPlatformOS = Platform.OS;
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'android',
+    });
+
+    try {
+      mockListCurrentClientReceivedLibrary.mockResolvedValueOnce([
+        {
+          resourceId: 'received-doc',
+          desktopDeviceId: 'desktop-device-id',
+          clientId: 'client-001',
+          displayName: 'notes.pdf',
+          fileKey: 'received/notes.pdf',
+          filename: 'notes.pdf',
+          mediaType: 'document',
+          fileSize: 512,
+          completedAt: '2026-06-16T06:00:00.000Z',
+          shareStatus: 'shared',
+        },
+      ]);
+
+      const {
+        getByTestId,
+        getByText,
+        UNSAFE_queryAllByProps,
+      } = render(
+        <TestErrorBoundary>
+          <PhoneSyncSpaceGlobalScreen />
+        </TestErrorBoundary>,
+      );
+
+      await waitFor(() => {
+        expect(getByText('notes.pdf')).toBeTruthy();
+      });
+
+      fireEvent.press(getByText('时间'));
+
+      expect(getByText('排序方式')).toBeTruthy();
+      expect(getByTestId('phone-sync-sort-sheet-layer')).toBeTruthy();
+      expect(UNSAFE_queryAllByProps({ transparent: true })).toHaveLength(0);
+    } finally {
+      Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: originalPlatformOS,
+      });
+    }
+  });
+
+  it('uses the default visible-range list rendering on Android without a six-row cap', async () => {
+    const originalPlatformOS = Platform.OS;
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'android',
+    });
+
+    try {
+      mockListCurrentClientReceivedLibraryPage.mockResolvedValueOnce(
+        makeReceivedLibraryPage(
+          [
+            {
+              resourceId: 'received-doc',
+              desktopDeviceId: 'desktop-device-id',
+              clientId: 'client-001',
+              displayName: 'notes.pdf',
+              fileKey: 'received/notes.pdf',
+              filename: 'notes.pdf',
+              mediaType: 'document',
+              fileSize: 512,
+              completedAt: '2026-06-16T06:00:00.000Z',
+              shareStatus: 'shared',
+            },
+          ],
+          {
+            page: 1,
+            pageSize: 20,
+            totalItems: 1,
+            totalBytes: 512,
+          },
+        ),
+      );
+
+      const { getByTestId, getByText } = render(
+        <TestErrorBoundary>
+          <PhoneSyncSpaceGlobalScreen />
+        </TestErrorBoundary>,
+      );
+
+      await waitFor(() => {
+        expect(getByText('notes.pdf')).toBeTruthy();
+      });
+
+      const listProps = getByTestId('phone-sync-section-list').props;
+      expect(listProps.initialNumToRender).toBeUndefined();
+      expect(listProps.maxToRenderPerBatch).toBeUndefined();
+      expect(listProps.updateCellsBatchingPeriod).toBeUndefined();
+      expect(listProps.windowSize).toBeUndefined();
+      expect(listProps.removeClippedSubviews).toBeUndefined();
+    } finally {
+      Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: originalPlatformOS,
+      });
+    }
   });
 });
 

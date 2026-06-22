@@ -1,6 +1,6 @@
 import React from 'react';
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
-import { NativeModules, Alert, Linking, Platform } from 'react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { NativeModules, Alert, Platform } from 'react-native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { LoginGlobalScreen } from '../LoginGlobalScreen';
 
@@ -11,10 +11,6 @@ jest.mock('@react-navigation/native', () => ({
 }));
 
 jest.mock('@react-navigation/stack', () => ({}));
-
-jest.mock('../../services/config', () => ({
-  getBaseUrl: () => 'https://api.vividrop.com',
-}));
 
 jest.mock('@react-native-google-signin/google-signin', () => ({
   GoogleSignin: {
@@ -55,6 +51,10 @@ describe('LoginGlobalScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'ios',
+    });
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     mockAppleLogin.mockResolvedValue({ accessToken: 'a', refreshToken: 'r' });
     mockGoogleLogin.mockResolvedValue({ accessToken: 'a', refreshToken: 'r' });
@@ -94,6 +94,22 @@ describe('LoginGlobalScreen', () => {
     expect(queryByText(/手机号|验证码|短信/)).toBeNull();
     expect(queryByText('Continue')).toBeNull();
     expect(queryByPlaceholderText('Phone number')).toBeNull();
+  });
+
+  it('hides Apple Sign-In on Android', () => {
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'android',
+    });
+
+    const { getByText, queryByText, queryByTestId } = render(
+      <LoginGlobalScreen />,
+    );
+
+    expect(getByText('使用 Google 继续')).toBeTruthy();
+    expect(getByText('使用邮箱登录')).toBeTruthy();
+    expect(queryByText('使用 Apple 继续')).toBeNull();
+    expect(queryByTestId('global-auth-apple-provider-button')).toBeNull();
   });
 
   it('requires terms agreement before provider authorization', () => {
@@ -181,85 +197,6 @@ describe('LoginGlobalScreen', () => {
       });
       expect(mockLogin).toHaveBeenCalledWith('a', 'r');
     });
-  });
-
-  it('rejects Android Apple Sign-In callbacks with mismatched state and removes the listener', async () => {
-    Object.defineProperty(Platform, 'OS', {
-      configurable: true,
-      value: 'android',
-    });
-    const removeListener = jest.fn();
-    let deepLinkHandler: ((event: { url: string }) => void) | null = null;
-    const linkingSubscription = {
-      remove: removeListener,
-    } as unknown as ReturnType<typeof Linking.addEventListener>;
-    jest
-      .spyOn(Linking, 'addEventListener')
-      .mockImplementation((event, handler) => {
-        expect(event).toBe('url');
-        deepLinkHandler = handler as (event: { url: string }) => void;
-        return linkingSubscription;
-      });
-    jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
-
-    const { getByRole, getByText } = render(<LoginGlobalScreen />);
-    fireEvent.press(getByRole('checkbox'));
-    fireEvent.press(getByText('使用 Apple 继续'));
-    fireEvent.press(getByText('继续授权'));
-
-    await waitFor(() => expect(Linking.openURL).toHaveBeenCalledTimes(1));
-    expect(deepLinkHandler).not.toBeNull();
-
-    await act(async () => {
-      deepLinkHandler?.({
-        url: 'vividrop://auth/apple/callback?state=wrong&access_token=a&refresh_token=r',
-      });
-    });
-
-    await waitFor(() => {
-      expect(Alert.alert).toHaveBeenCalledWith(
-        'Sign In Failed',
-        'Apple Sign-In state mismatch.',
-      );
-    });
-    expect(mockLogin).not.toHaveBeenCalled();
-    expect(removeListener).toHaveBeenCalledTimes(1);
-  });
-
-  it('times out Android Apple Sign-In callbacks and removes the listener', async () => {
-    jest.useFakeTimers();
-    Object.defineProperty(Platform, 'OS', {
-      configurable: true,
-      value: 'android',
-    });
-    const removeListener = jest.fn();
-    const linkingSubscription = {
-      remove: removeListener,
-    } as unknown as ReturnType<typeof Linking.addEventListener>;
-    jest
-      .spyOn(Linking, 'addEventListener')
-      .mockReturnValue(linkingSubscription);
-    jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
-
-    const { getByRole, getByText } = render(<LoginGlobalScreen />);
-    fireEvent.press(getByRole('checkbox'));
-    fireEvent.press(getByText('使用 Apple 继续'));
-    fireEvent.press(getByText('继续授权'));
-
-    await waitFor(() => expect(Linking.openURL).toHaveBeenCalledTimes(1));
-
-    await act(async () => {
-      await jest.advanceTimersByTimeAsync(120000);
-    });
-
-    await waitFor(() => {
-      expect(Alert.alert).toHaveBeenCalledWith(
-        'Sign In Failed',
-        'Apple Sign-In timed out.',
-      );
-    });
-    expect(mockLogin).not.toHaveBeenCalled();
-    expect(removeListener).toHaveBeenCalledTimes(1);
   });
 
   it('switches to email login screen and requires terms agreement before sending code or logging in', async () => {

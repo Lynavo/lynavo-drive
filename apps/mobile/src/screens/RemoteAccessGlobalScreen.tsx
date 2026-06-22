@@ -43,6 +43,7 @@ import {
 
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/globalColors';
+import { androidBoxShadow } from '../utils/androidShadow';
 import { formatBytes } from '../utils/format';
 import { Icon } from '../components/Icon';
 import { GlobalGradientBackground } from '../components/GlobalGradientBackground';
@@ -2196,6 +2197,11 @@ const glassShadow = {
   shadowOpacity: 0.08,
   shadowRadius: 34,
   elevation: 3,
+  ...androidBoxShadow({
+    offsetY: 12,
+    blurRadius: 34,
+    color: 'rgba(70, 96, 138, 0.08)',
+  }),
 };
 
 const styles = StyleSheet.create({
@@ -2396,6 +2402,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 8,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 4,
+      blurRadius: 8,
+      color: 'rgba(70, 96, 138, 0.12)',
+    }),
   },
   selectionActions: {
     flexDirection: 'row',
@@ -2501,6 +2512,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 28,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 12,
+      blurRadius: 28,
+      color: 'rgba(70, 96, 138, 0.10)',
+    }),
   },
   remoteResourceGlyphCenter: {
     ...StyleSheet.absoluteFillObject,
@@ -2581,6 +2597,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 2,
     elevation: 1,
+    ...androidBoxShadow({
+      offsetY: 1,
+      blurRadius: 2,
+      color: 'rgba(70, 96, 138, 0.12)',
+    }),
   },
   videoPlayIcon: {
     marginLeft: 2,
@@ -2704,6 +2725,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 30,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 16,
+      blurRadius: 30,
+      color: 'rgba(70, 96, 138, 0.12)',
+    }),
   },
   emptyArtworkCorner: {
     position: 'absolute',

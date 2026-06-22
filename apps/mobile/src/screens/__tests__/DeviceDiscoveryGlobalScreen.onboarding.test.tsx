@@ -1,5 +1,10 @@
 import React from 'react';
-import { Alert, NativeEventEmitter, NativeModules } from 'react-native';
+import {
+  Alert,
+  NativeEventEmitter,
+  NativeModules,
+  Platform,
+} from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 
 const mockDispatch = jest.fn();
@@ -170,12 +175,15 @@ const mockPairDevice = pairDevice as jest.Mock;
 const mockNativeSyncEngine = {
   startDiscovery: jest.fn().mockResolvedValue(undefined),
   stopDiscovery: jest.fn().mockResolvedValue(undefined),
+  getDiscoveryPermissionStatus: jest.fn().mockResolvedValue('granted'),
   getBindingState: mockGetBindingState,
   getKnownDeviceIds: mockGetKnownDeviceIds,
   pairDevice: jest.fn().mockResolvedValue(undefined),
   addListener: jest.fn(),
   removeListeners: jest.fn(),
 };
+
+const originalPlatformOS = Platform.OS;
 
 function expectPreviewText(screen: ReturnType<typeof render>, text: string) {
   expect(
@@ -192,6 +200,10 @@ function expectPreviewTestId(screen: ReturnType<typeof render>, testID: string) 
 describe('DeviceDiscoveryGlobalScreen onboarding', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: originalPlatformOS,
+    });
     mockCanGoBack.mockReturnValue(false);
     mockRouteParams = { mode: 'initial' };
     mockHasSeenUnconnectedGuide.mockResolvedValue(false);
@@ -203,6 +215,9 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     mockUpdateAuthStatus.mockResolvedValue(undefined);
     mockGetBindingState.mockResolvedValue(null);
     mockGetKnownDeviceIds.mockResolvedValue([]);
+    mockNativeSyncEngine.getDiscoveryPermissionStatus.mockResolvedValue(
+      'granted',
+    );
     NativeModules.NativeSyncEngine = mockNativeSyncEngine;
     jest
       .spyOn(NativeEventEmitter.prototype, 'addListener')
@@ -211,6 +226,10 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
   });
 
   afterEach(() => {
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: originalPlatformOS,
+    });
     jest.restoreAllMocks();
   });
 
@@ -272,6 +291,33 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     expect(screen.queryByText('openimdeMac-mini')).toBeNull();
     expect(mockNativeSyncEngine.stopDiscovery).not.toHaveBeenCalled();
     expect(mockNativeSyncEngine.startDiscovery).not.toHaveBeenCalled();
+  });
+
+  it('does not request Android nearby-device permission on first render', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'android',
+    });
+    mockHasSeenUnconnectedGuide.mockResolvedValue(true);
+    mockNativeSyncEngine.getDiscoveryPermissionStatus.mockResolvedValue(
+      'required',
+    );
+
+    const screen = render(<DeviceDiscoveryGlobalScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('允许查找附近设备')).toBeTruthy();
+    });
+
+    expect(screen.getByText('等待授权')).toBeTruthy();
+    expect(mockNativeSyncEngine.getDiscoveryPermissionStatus).toHaveBeenCalled();
+    expect(mockNativeSyncEngine.startDiscovery).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByText('开始扫描'));
+
+    await waitFor(() => {
+      expect(mockNativeSyncEngine.startDiscovery).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('steps through the six feature-entry guide without navigating real pages', async () => {
