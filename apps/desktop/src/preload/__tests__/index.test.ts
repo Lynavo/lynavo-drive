@@ -42,6 +42,12 @@ const exposed = vi.hoisted(() => ({
   removeListener: vi.fn(),
 }));
 
+const platformCapabilities = vi.hoisted(() => ({
+  isLinuxPlatform: vi.fn((): boolean => false),
+  supportsAppleAuth: vi.fn((): boolean => true),
+  usesTitleBarOverlayControls: vi.fn((): boolean => false),
+}));
+
 vi.mock('electron', () => ({
   contextBridge: {
     exposeInMainWorld: vi.fn((_key: string, value: unknown) => {
@@ -55,6 +61,8 @@ vi.mock('electron', () => ({
   },
 }));
 
+vi.mock('../../shared/platform-capabilities', () => platformCapabilities);
+
 describe('preload electronAPI', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -62,6 +70,12 @@ describe('preload electronAPI', () => {
     exposed.invoke.mockReset();
     exposed.on.mockReset();
     exposed.removeListener.mockReset();
+    platformCapabilities.isLinuxPlatform.mockReset();
+    platformCapabilities.isLinuxPlatform.mockReturnValue(false);
+    platformCapabilities.supportsAppleAuth.mockReset();
+    platformCapabilities.supportsAppleAuth.mockReturnValue(true);
+    platformCapabilities.usesTitleBarOverlayControls.mockReset();
+    platformCapabilities.usesTitleBarOverlayControls.mockReturnValue(false);
   });
 
   it('maps gift card redeem calls to the IPC channel', async () => {
@@ -200,9 +214,13 @@ describe('preload electronAPI', () => {
     expect(exposed.invoke).toHaveBeenCalledWith('power-save:set-prevent-sleep', false);
   });
 
-  it('exposes whether the current platform is Linux', async () => {
+  it('delegates Linux platform detection through platform capabilities', async () => {
+    platformCapabilities.isLinuxPlatform.mockReturnValueOnce(true).mockReturnValueOnce(false);
+
     await import('../index');
 
-    expect(exposed.api?.platform.isLinux()).toBe(process.platform === 'linux');
+    expect(exposed.api?.platform.isLinux()).toBe(true);
+    expect(exposed.api?.platform.isLinux()).toBe(false);
+    expect(platformCapabilities.isLinuxPlatform).toHaveBeenCalledTimes(2);
   });
 });
