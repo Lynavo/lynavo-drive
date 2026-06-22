@@ -46,15 +46,21 @@ test('keeps review profiles on the review server while preserving market', () =>
 });
 
 test('parses targets predictably', () => {
-  assert.deepEqual(parseTargets('ios,android,mac,win'), ['ios', 'android', 'mac', 'win']);
-  assert.deepEqual(parseTargets(' android , mac , win '), ['android', 'mac', 'win']);
-  assert.throws(() => parseTargets('linux'), /Unsupported release target/);
+  assert.deepEqual(parseTargets('ios,android,mac,win,linux'), [
+    'ios',
+    'android',
+    'mac',
+    'win',
+    'linux',
+  ]);
+  assert.deepEqual(parseTargets(' android , mac , linux '), ['android', 'mac', 'linux']);
+  assert.throws(() => parseTargets('freebsd'), /Unsupported release target/);
 });
 
 test('builds commands and env from the selected profile', () => {
   const plan = buildReleasePlan({
     profileName: 'global-review',
-    targets: ['ios', 'android', 'mac', 'win'],
+    targets: ['ios', 'android', 'mac', 'win', 'linux'],
   });
 
   assert.equal(plan.profile.name, 'global-review');
@@ -80,6 +86,7 @@ test('builds commands and env from the selected profile', () => {
       ['android', 'bash', ['-lc', 'cd apps/mobile/android && ./gradlew assembleGlobalRelease bundleGlobalRelease']],
       ['mac', 'pnpm', ['package:desktop:signed']],
       ['win', 'pnpm', ['--filter', '@syncflow/desktop', 'package:win:global']],
+      ['linux', 'pnpm', ['--filter', '@syncflow/desktop', 'package:linux:global']],
     ],
   );
 });

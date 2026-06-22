@@ -1,6 +1,6 @@
 export const REVIEW_API_BASE_URL = 'https://review-api.vividrop.cn';
 
-const TARGETS = new Set(['ios', 'android', 'mac', 'win']);
+const TARGETS = new Set(['ios', 'android', 'mac', 'win', 'linux']);
 
 const RELEASE_PROFILES = Object.freeze({
   'cn-prod': Object.freeze({
@@ -10,6 +10,7 @@ const RELEASE_PROFILES = Object.freeze({
     apiBaseUrl: 'https://api.vividrop.cn',
     electronBuilderConfig: 'electron-builder.cn.yml',
     desktopWinScript: 'package:win:cn',
+    desktopLinuxScript: 'package:linux:cn',
   }),
   'global-prod': Object.freeze({
     name: 'global-prod',
@@ -18,6 +19,7 @@ const RELEASE_PROFILES = Object.freeze({
     apiBaseUrl: 'https://global-api.vividrop.cn',
     electronBuilderConfig: 'electron-builder.global.yml',
     desktopWinScript: 'package:win:global',
+    desktopLinuxScript: 'package:linux:global',
   }),
   'cn-review': Object.freeze({
     name: 'cn-review',
@@ -26,6 +28,7 @@ const RELEASE_PROFILES = Object.freeze({
     apiBaseUrl: REVIEW_API_BASE_URL,
     electronBuilderConfig: 'electron-builder.cn.yml',
     desktopWinScript: 'package:win:cn',
+    desktopLinuxScript: 'package:linux:cn',
   }),
   'global-review': Object.freeze({
     name: 'global-review',
@@ -34,6 +37,7 @@ const RELEASE_PROFILES = Object.freeze({
     apiBaseUrl: REVIEW_API_BASE_URL,
     electronBuilderConfig: 'electron-builder.global.yml',
     desktopWinScript: 'package:win:global',
+    desktopLinuxScript: 'package:linux:global',
   }),
 });
 
@@ -64,7 +68,7 @@ export function parseTargets(value = 'ios,mac,win') {
   for (const target of targets) {
     if (!TARGETS.has(target)) {
       throw new Error(
-        `Unsupported release target "${target}". Supported targets: ios, android, mac, win`,
+        `Unsupported release target "${target}". Supported targets: ios, android, mac, win, linux`,
       );
     }
   }
@@ -135,6 +139,13 @@ function buildTargetStep(profile, target) {
       target,
       command: 'pnpm',
       args: ['package:desktop:signed'],
+    };
+  }
+  if (target === 'linux') {
+    return {
+      target,
+      command: 'pnpm',
+      args: ['--filter', '@syncflow/desktop', profile.desktopLinuxScript],
     };
   }
   return {

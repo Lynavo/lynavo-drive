@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
-function runReleaseDryRun(profile, targets = 'ios,android,win') {
+function runReleaseDryRun(profile, targets = 'ios,android,win,linux') {
   return spawnSync(
     process.execPath,
     ['scripts/release/release.mjs', '--profile', profile, '--targets', targets, '--dry-run'],
@@ -31,6 +31,7 @@ test('prints the cn-review release plan without running build commands in dry-ru
   );
   assert.match(result.stdout, /bash -lc cd apps\/mobile\/android && \.\/gradlew assembleCnRelease bundleCnRelease/);
   assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:win:cn/);
+  assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:linux:cn/);
 });
 
 test('prints the global-review release plan without running build commands in dry-run mode', () => {
@@ -54,6 +55,7 @@ test('prints the global-review release plan without running build commands in dr
     /bash -lc cd apps\/mobile\/android && \.\/gradlew assembleGlobalRelease bundleGlobalRelease/,
   );
   assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:win:global/);
+  assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:linux:global/);
 });
 
 test('rejects missing profile', () => {
