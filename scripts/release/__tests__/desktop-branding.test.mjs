@@ -9,6 +9,10 @@ function readDesktopConfig(name) {
   return readFileSync(resolve(repoRoot, 'apps/desktop', name), 'utf8');
 }
 
+function readDesktopPackageJson() {
+  return JSON.parse(readDesktopConfig('package.json'));
+}
+
 function readTopLevelSection(config, sectionName) {
   const startMarker = `${sectionName}:`;
   const startIndex = config.indexOf(startMarker);
@@ -26,6 +30,17 @@ function readTopLevelSection(config, sectionName) {
 
   return rest.slice(0, startMarker.length + nextSectionMatch.index);
 }
+
+test('desktop app package metadata satisfies Linux deb packaging', () => {
+  const packageJson = readDesktopPackageJson();
+
+  assert.equal(packageJson.description, 'Vivi Drop desktop app for local mobile media sync.');
+  assert.equal(packageJson.homepage, 'https://www.vividrop.cn');
+  assert.deepEqual(packageJson.author, {
+    name: 'Vivi Drop',
+    email: 'support@vividrop.cn',
+  });
+});
 
 test('global desktop builder config uses Vivi Drop for visible package branding', () => {
   const config = readDesktopConfig('electron-builder.global.yml');
@@ -68,8 +83,11 @@ test('desktop builder configs define Linux deb packaging', () => {
     const linuxConfig = readTopLevelSection(readDesktopConfig(name), 'linux');
 
     assert.match(linuxConfig, /^linux:$/m);
-    assert.match(linuxConfig, /^  artifactName: ViviDrop-\$\{version\}-linux-\$\{arch\}\.\$\{ext\}$/m);
-    assert.match(linuxConfig, /^  executableName: Vivi Drop$/m);
+    assert.match(
+      linuxConfig,
+      /^  artifactName: ViviDrop-\$\{version\}-linux-\$\{arch\}\.\$\{ext\}$/m,
+    );
+    assert.match(linuxConfig, /^  executableName: vivi-drop$/m);
     assert.match(linuxConfig, /^  category: Utility$/m);
     assert.match(linuxConfig, /^  icon: resources\/icon-1024\.png$/m);
     assert.match(linuxConfig, /^    - target: deb$/m);

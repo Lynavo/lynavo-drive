@@ -1,8 +1,14 @@
 {
   "name": "@syncflow/desktop",
   "productName": "Vivi Drop",
+  "description": "Vivi Drop desktop app for local mobile media sync.",
   "version": "1.0.1",
   "syncflowBuildNumber": "51",
+  "homepage": "https://www.vividrop.cn",
+  "author": {
+    "name": "Vivi Drop",
+    "email": "support@vividrop.cn"
+  },
   "private": true,
   "main": "./out/main/index.js",
   "scripts": {

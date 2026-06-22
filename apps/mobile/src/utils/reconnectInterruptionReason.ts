@@ -1,5 +1,7 @@
+import type { DeviceType } from '@syncflow/contracts';
+
 interface ReconnectInterruptionReasonEvidence {
-  deviceType?: 'mac' | 'win';
+  deviceType?: DeviceType;
   isWaitingForNetworkRecovery: boolean;
   lastErrorCode?: string | null;
 }

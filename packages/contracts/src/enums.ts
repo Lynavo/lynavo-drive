@@ -1,4 +1,4 @@
-export type DeviceType = 'mac' | 'win';
+export type DeviceType = 'mac' | 'win' | 'linux';
 
 /** Used for Mobile BindingStateDTO.connectionState and device discovery list */
 export type ConnectionState =

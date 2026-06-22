@@ -70,7 +70,7 @@ linux:
         - x64
         - arm64
   category: Utility
-  executableName: Vivi Drop
+  executableName: vivi-drop
   icon: resources/icon-1024.png
   extraResources:
     - from: resources/syncflow-sidecar

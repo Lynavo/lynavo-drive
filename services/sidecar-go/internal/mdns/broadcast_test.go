@@ -86,8 +86,8 @@ func TestDeviceTypeForGOOS(t *testing.T) {
 	if got := DeviceTypeForGOOS("darwin"); got != "mac" {
 		t.Fatalf("DeviceTypeForGOOS(darwin) = %q, want mac", got)
 	}
-	if got := DeviceTypeForGOOS("linux"); got != "mac" {
-		t.Fatalf("DeviceTypeForGOOS(linux) = %q, want mac fallback", got)
+	if got := DeviceTypeForGOOS("linux"); got != "linux" {
+		t.Fatalf("DeviceTypeForGOOS(linux) = %q, want linux", got)
 	}
 }
 

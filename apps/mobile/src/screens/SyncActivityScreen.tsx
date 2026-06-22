@@ -26,6 +26,7 @@ import type {
   UploadTaskSource,
   AutoUploadState,
   DesktopSyncRecordDTO,
+  DeviceType,
 } from '@syncflow/contracts';
 import { colors } from '../theme/colors';
 import { Icon } from '../components/Icon';
@@ -137,7 +138,7 @@ interface BindingState {
   deviceId: string;
   deviceName: string;
   deviceAlias?: string;
-  deviceType?: 'mac' | 'win';
+  deviceType?: DeviceType;
   host: string;
   connectionState:
     | 'bound'

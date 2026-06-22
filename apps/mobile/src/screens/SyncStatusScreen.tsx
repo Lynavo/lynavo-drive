@@ -28,6 +28,7 @@ import { shouldTreatReconnectAsWaitingForNetworkRecovery } from '../utils/reconn
 import { getReconnectInterruptionReason } from '../utils/reconnectInterruptionReason';
 import { formatQueueCountDisplay } from '../utils/queueCountDisplay';
 import { SyncPerformanceHint } from './components/SyncPerformanceHint';
+import type { DeviceType } from '@syncflow/contracts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -84,7 +85,7 @@ interface BindingState {
   deviceId: string;
   deviceName: string;
   deviceAlias?: string;
-  deviceType?: 'mac' | 'win';
+  deviceType?: DeviceType;
   host: string;
   connectionState:
     | 'bound'

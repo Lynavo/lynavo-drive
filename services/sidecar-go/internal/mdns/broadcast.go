@@ -34,7 +34,7 @@ var (
 type BroadcastConfig struct {
 	DeviceID     string
 	DeviceName   string
-	DeviceType   string // "mac" | "win"
+	DeviceType   string // "mac" | "win" | "linux"
 	DeviceIP     string
 	TCPPort      int // 39393
 	Proto        int // 2
@@ -78,6 +78,9 @@ func BuildTXTRecords(cfg BroadcastConfig) []string {
 func DeviceTypeForGOOS(goos string) string {
 	if goos == "windows" {
 		return "win"
+	}
+	if goos == "linux" {
+		return "linux"
 	}
 	return "mac"
 }
