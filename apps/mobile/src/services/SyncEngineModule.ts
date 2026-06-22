@@ -497,6 +497,13 @@ export async function listReceivedFiles(): Promise<ReceivedLibraryItemDTO[]> {
   return (result ?? []) as ReceivedLibraryItemDTO[];
 }
 
+export async function listGlobalReceivedFiles(): Promise<
+  ReceivedLibraryItemDTO[]
+> {
+  const result = await NativeSyncEngine.listGlobalReceivedFiles();
+  return (result ?? []) as ReceivedLibraryItemDTO[];
+}
+
 export async function getReceivedFilePreviewUrl(
   fileKey: string,
   kind: 'download' | 'preview' | 'thumbnail' | 'stream',

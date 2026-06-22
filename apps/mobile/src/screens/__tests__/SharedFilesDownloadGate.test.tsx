@@ -197,6 +197,7 @@ jest.mock('../../services/desktop-local-service', () => ({
   listReceivedLibrary: jest.fn(),
   listCurrentClientReceivedLibrary: jest.fn(),
   listCurrentClientReceivedLibraryPage: jest.fn(),
+  listGlobalReceivedLibraryPage: jest.fn(),
   downloadResource: jest.fn(),
   downloadResourceForGlobal: jest.fn(),
   downloadReceivedLibraryItem: jest.fn(),
@@ -242,6 +243,10 @@ jest.mock('../../services/download-records-service', () => ({
   recordDownloadedFile: jest.fn(),
 }));
 
+jest.mock('../../services/diagnostics-log-service', () => ({
+  recordDiagnosticsLog: jest.fn(),
+}));
+
 import {
   SharedFilesScreen,
   normalizeDirectoryPath,
@@ -255,7 +260,7 @@ import {
   listGlobalRemoteAccessFolderContents,
   listReceivedLibrary,
   listCurrentClientReceivedLibrary,
-  listCurrentClientReceivedLibraryPage,
+  listGlobalReceivedLibraryPage,
   downloadResource,
   downloadResourceForGlobal,
   downloadReceivedLibraryItem,
@@ -271,6 +276,7 @@ import {
   shareGlobalRemoteAccessResources,
 } from '../../services/desktop-local-service';
 import { recordDownloadedFile } from '../../services/download-records-service';
+import { recordDiagnosticsLog } from '../../services/diagnostics-log-service';
 import { viewDocument } from '@react-native-documents/viewer';
 import { SharedFilesGlobalScreen } from '../SharedFilesGlobalScreen';
 import { RemoteAccessGlobalScreen } from '../RemoteAccessGlobalScreen';
@@ -286,8 +292,8 @@ const mockListGlobalRemoteAccessFolderContents =
 const mockListReceivedLibrary = listReceivedLibrary as jest.Mock;
 const mockListCurrentClientReceivedLibrary =
   listCurrentClientReceivedLibrary as jest.Mock;
-const mockListCurrentClientReceivedLibraryPage =
-  listCurrentClientReceivedLibraryPage as jest.Mock;
+const mockListGlobalReceivedLibraryPage =
+  listGlobalReceivedLibraryPage as jest.Mock;
 const mockDownloadResource = downloadResource as jest.Mock;
 const mockDownloadResourceForGlobal = downloadResourceForGlobal as jest.Mock;
 const mockDownloadReceivedLibraryItem =
@@ -310,6 +316,7 @@ const mockShareResources = shareResources as jest.Mock;
 const mockShareGlobalRemoteAccessResources =
   shareGlobalRemoteAccessResources as jest.Mock;
 const mockRecordDownloadedFile = recordDownloadedFile as jest.Mock;
+const mockRecordDiagnosticsLog = recordDiagnosticsLog as jest.Mock;
 const mockViewDocument = viewDocument as jest.Mock;
 
 function makeReceivedLibraryPage(
@@ -328,7 +335,7 @@ function makeReceivedLibraryPage(
 }
 
 function mockCurrentClientReceivedLibraryPageFromLegacyList() {
-  mockListCurrentClientReceivedLibraryPage.mockImplementation(
+  mockListGlobalReceivedLibraryPage.mockImplementation(
     async (
       desktop: unknown,
       options?: { page?: number; pageSize?: number },
@@ -410,6 +417,11 @@ describe('SharedFilesScreen V2 (Landing Menu)', () => {
 
     fireEvent.press(getByText('手機同步空間'));
     expect(mockNavigate).toHaveBeenCalledWith('PhoneSyncSpace');
+    expect(mockRecordDiagnosticsLog).toHaveBeenCalledWith(
+      'PhoneSyncSpace',
+      'entry pressed',
+      { market: 'cn', screen: 'SharedFilesScreen' },
+    );
   });
 
   it('navigates to RemoteAccess on card press', () => {
@@ -437,6 +449,20 @@ describe('SharedFilesGlobalScreen', () => {
 
     expect(getByText('同步后显示')).toBeTruthy();
     expect(queryByText('今日 5 个')).toBeNull();
+  });
+
+  it('records diagnostics before opening PhoneSyncSpace', () => {
+    const { getByText } = render(
+      <SharedFilesGlobalScreen showBottomTabBar={false} />,
+    );
+
+    fireEvent.press(getByText('手機同步空間'));
+    expect(mockNavigate).toHaveBeenCalledWith('PhoneSyncSpace');
+    expect(mockRecordDiagnosticsLog).toHaveBeenCalledWith(
+      'PhoneSyncSpace',
+      'entry pressed',
+      { market: 'global', screen: 'SharedFilesGlobalScreen' },
+    );
   });
 });
 
@@ -1601,7 +1627,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
   });
 
   it('loads the next global sync-space page when the received list reaches the end', async () => {
-    mockListCurrentClientReceivedLibraryPage
+    mockListGlobalReceivedLibraryPage
       .mockResolvedValueOnce(
         makeReceivedLibraryPage(
           [
@@ -1658,7 +1684,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
     );
 
     await waitFor(() => {
-      expect(mockListCurrentClientReceivedLibraryPage).toHaveBeenNthCalledWith(
+      expect(mockListGlobalReceivedLibraryPage).toHaveBeenNthCalledWith(
         1,
         { host: '192.168.1.100', port: 39394 },
         { page: 1, pageSize: 20 },
@@ -1670,7 +1696,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
     fireEvent(getByTestId('phone-sync-section-list'), 'onEndReached');
 
     await waitFor(() => {
-      expect(mockListCurrentClientReceivedLibraryPage).toHaveBeenNthCalledWith(
+      expect(mockListGlobalReceivedLibraryPage).toHaveBeenNthCalledWith(
         2,
         { host: '192.168.1.100', port: 39394 },
         { page: 2, pageSize: 20 },
@@ -2280,7 +2306,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
     });
 
     try {
-      mockListCurrentClientReceivedLibraryPage.mockResolvedValueOnce(
+      mockListGlobalReceivedLibraryPage.mockResolvedValueOnce(
         makeReceivedLibraryPage(
           [
             {

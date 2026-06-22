@@ -228,8 +228,7 @@ enum SharedFilesRoutePolicy {
         if normalizedRoute == "turn_relay" ||
             normalizedRoute == "ipv6_direct" ||
             normalizedRoute == "public_ipv4_direct" ||
-            normalizedRoute == "direct_reflexive" ||
-            normalizedRoute == "link_local_direct" {
+            normalizedRoute == "direct_reflexive" {
             return true
         }
         return hasReachableLANHost

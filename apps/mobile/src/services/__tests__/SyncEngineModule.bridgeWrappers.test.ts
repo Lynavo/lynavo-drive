@@ -236,6 +236,31 @@ describe('SyncEngineModule shared bridge wrappers', () => {
     expect(nativeSyncEngine.listReceivedFiles).toHaveBeenCalledTimes(1);
   });
 
+  it('forwards global received library listing to the native bridge', async () => {
+    const items = [
+      {
+        resourceId: '',
+        desktopDeviceId: 'desktop-001',
+        clientId: 'account-a-client',
+        displayName: 'Account A photo',
+        fileKey: '2026/06/17/account-a-image',
+        filename: 'IMG_ACCOUNT_A.JPG',
+        mediaType: 'image',
+        fileSize: 4096,
+        completedAt: '2026-06-17T08:00:00.000Z',
+        shareStatus: 'not_shared',
+      },
+    ];
+    const nativeSyncEngine = {
+      listGlobalReceivedFiles: jest.fn().mockResolvedValue(items),
+    };
+    const syncEngine = loadModule(nativeSyncEngine);
+
+    await expect(syncEngine.listGlobalReceivedFiles()).resolves.toEqual(items);
+
+    expect(nativeSyncEngine.listGlobalReceivedFiles).toHaveBeenCalledTimes(1);
+  });
+
   it('forwards received file preview URL resolution to the native bridge', async () => {
     const nativeSyncEngine = {
       getReceivedFilePreviewUrl: jest

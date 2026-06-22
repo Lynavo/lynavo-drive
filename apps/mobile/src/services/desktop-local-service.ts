@@ -15,9 +15,11 @@ import {
   getClientId,
   getDirectoryFileStreamUrl,
   getReceivedFilePreviewUrl as getNativeReceivedFilePreviewUrl,
+  listGlobalReceivedFiles,
   listReceivedFiles,
   prepareDirectoryFilePreview,
 } from './SyncEngineModule';
+import { recordDiagnosticsLog } from './diagnostics-log-service';
 
 const { NativeSyncEngine } = NativeModules;
 
@@ -70,6 +72,13 @@ const SHARED_FOLDER_ENTRY_PREFIX = 'shared-folder-entry:';
 const PERSONAL_DIRECTORY_RESOURCE_PREFIX = 'personal-dir:';
 const PERSONAL_DIRECTORY_DESKTOP_ID = 'personal-dir';
 const DIRECT_RECEIVED_LIBRARY_HTTP_TIMEOUT_MS = 1500;
+
+function receivedLibraryErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
 
 export function isDownloadSavedLocally(
   result: ResourceDownloadResult,
@@ -452,15 +461,16 @@ function normalizeLocalDownloadResult(result: {
   };
 }
 
-function withCurrentClientReceivedMediaUrls(
+function withReceivedMediaUrlsForPairedClient(
   desktop: DesktopInfo,
   items: ReceivedLibraryMediaItem[],
   clientId: string,
   clientName: string,
+  currentClientOnly: boolean,
 ): ReceivedLibraryMediaItem[] {
   return items.map(item => {
     const fileKey = item.fileKey?.trim();
-    if (!fileKey || item.clientId !== clientId) {
+    if (!fileKey || (currentClientOnly && item.clientId !== clientId)) {
       return item;
     }
     const next: ReceivedLibraryMediaItem = {
@@ -507,6 +517,36 @@ function withCurrentClientReceivedMediaUrls(
     }
     return next;
   });
+}
+
+function withCurrentClientReceivedMediaUrls(
+  desktop: DesktopInfo,
+  items: ReceivedLibraryMediaItem[],
+  clientId: string,
+  clientName: string,
+): ReceivedLibraryMediaItem[] {
+  return withReceivedMediaUrlsForPairedClient(
+    desktop,
+    items,
+    clientId,
+    clientName,
+    true,
+  );
+}
+
+function withGlobalReceivedMediaUrls(
+  desktop: DesktopInfo,
+  items: ReceivedLibraryMediaItem[],
+  clientId: string,
+  clientName: string,
+): ReceivedLibraryMediaItem[] {
+  return withReceivedMediaUrlsForPairedClient(
+    desktop,
+    items,
+    clientId,
+    clientName,
+    false,
+  );
 }
 
 function receivedLibraryListUrl(
@@ -672,13 +712,14 @@ async function listReceivedLibraryWithScope(
 
 async function listReceivedLibraryPageWithScope(
   desktop: DesktopInfo,
-  scope: 'client',
+  scope: 'client' | undefined,
   options: ReceivedLibraryPageOptions,
   timeoutMs?: number,
 ): Promise<ReceivedLibraryMediaPage> {
   const clientId = await getClientId();
   const clientName =
     (await NativeSyncEngine?.getClientDisplayName?.()) || clientId;
+  const diagnosticScope = scope ?? 'all';
   const url = receivedLibraryListUrl(
     desktop,
     clientId,
@@ -686,6 +727,13 @@ async function listReceivedLibraryPageWithScope(
     scope,
     options,
   );
+  recordDiagnosticsLog('PhoneSyncSpace', 'direct received page start', {
+    host: desktop.host,
+    port: desktop.port,
+    scope: diagnosticScope,
+    page: options.page ?? 1,
+    pageSize: options.pageSize ?? 0,
+  });
   const responsePromise = fetch(url);
   const res =
     typeof timeoutMs === 'number'
@@ -696,20 +744,37 @@ async function listReceivedLibraryPageWithScope(
         )
       : await responsePromise;
   if (!res.ok) {
+    recordDiagnosticsLog('PhoneSyncSpace', 'direct received page failed', {
+      host: desktop.host,
+      scope: diagnosticScope,
+      status: res.status,
+    });
     throw new Error(`Failed to list received library: ${res.statusText}`);
   }
   const data = (await res.json()) as Partial<ReceivedLibraryPageDTO> & {
     items?: ReceivedLibraryMediaItem[];
   };
   const page = normalizeReceivedLibraryPage(data, options);
+  recordDiagnosticsLog('PhoneSyncSpace', 'direct received page success', {
+    host: desktop.host,
+    scope: diagnosticScope,
+    page: page.page,
+    pageSize: page.pageSize,
+    itemCount: page.items.length,
+    totalItems: page.totalItems,
+    deviceStats: page.deviceStats.length,
+  });
   return {
     ...page,
-    items: withCurrentClientReceivedMediaUrls(
-      desktop,
-      page.items,
-      clientId,
-      clientName,
-    ),
+    items:
+      scope === 'client'
+        ? withCurrentClientReceivedMediaUrls(
+            desktop,
+            page.items,
+            clientId,
+            clientName,
+          )
+        : withGlobalReceivedMediaUrls(desktop, page.items, clientId, clientName),
   };
 }
 
@@ -719,7 +784,8 @@ function isMissingListReceivedFilesBridgeError(error: unknown): boolean {
   }
   const message = error.message.toLowerCase();
   return (
-    message.includes('listreceivedfiles') &&
+    (message.includes('listreceivedfiles') ||
+      message.includes('listglobalreceivedfiles')) &&
     message.includes('is not a function')
   );
 }
@@ -763,8 +829,50 @@ export async function listCurrentClientReceivedLibraryPage(
       DIRECT_RECEIVED_LIBRARY_HTTP_TIMEOUT_MS,
     );
   } catch (directHttpError) {
+    recordDiagnosticsLog('PhoneSyncSpace', 'native current received fallback', {
+      reason: receivedLibraryErrorMessage(directHttpError),
+    });
     try {
-      return nativeReceivedLibraryPage(await listReceivedFiles(), options);
+      const page = nativeReceivedLibraryPage(await listReceivedFiles(), options);
+      recordDiagnosticsLog('PhoneSyncSpace', 'native current received success', {
+        itemCount: page.items.length,
+        totalItems: page.totalItems,
+      });
+      return page;
+    } catch (nativeError) {
+      if (isMissingListReceivedFilesBridgeError(nativeError)) {
+        throw directHttpError;
+      }
+      throw nativeError;
+    }
+  }
+}
+
+export async function listGlobalReceivedLibraryPage(
+  desktop: DesktopInfo,
+  options: ReceivedLibraryPageOptions = {},
+): Promise<ReceivedLibraryMediaPage> {
+  try {
+    return await listReceivedLibraryPageWithScope(
+      desktop,
+      undefined,
+      options,
+      DIRECT_RECEIVED_LIBRARY_HTTP_TIMEOUT_MS,
+    );
+  } catch (directHttpError) {
+    recordDiagnosticsLog('PhoneSyncSpace', 'native global received fallback', {
+      reason: receivedLibraryErrorMessage(directHttpError),
+    });
+    try {
+      const page = nativeReceivedLibraryPage(
+        await listGlobalReceivedFiles(),
+        options,
+      );
+      recordDiagnosticsLog('PhoneSyncSpace', 'native global received success', {
+        itemCount: page.items.length,
+        totalItems: page.totalItems,
+      });
+      return page;
     } catch (nativeError) {
       if (isMissingListReceivedFilesBridgeError(nativeError)) {
         throw directHttpError;

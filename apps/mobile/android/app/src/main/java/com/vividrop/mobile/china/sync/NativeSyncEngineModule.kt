@@ -1572,7 +1572,15 @@ class NativeSyncEngineModule(
   fun listReceivedFiles(promise: Promise) {
     runAsync(promise) {
       recordNativeLog("SharedFiles", "listReceivedFiles requested")
-      promise.resolve(fetchReceivedFiles())
+      promise.resolve(fetchReceivedFiles(currentClientOnly = true))
+    }
+  }
+
+  @ReactMethod
+  fun listGlobalReceivedFiles(promise: Promise) {
+    runAsync(promise) {
+      recordNativeLog("SharedFiles", "listGlobalReceivedFiles requested")
+      promise.resolve(fetchReceivedFiles(currentClientOnly = false))
     }
   }
 
@@ -3054,17 +3062,21 @@ class NativeSyncEngineModule(
     }
   }
 
-  private fun fetchReceivedFiles(): WritableArray {
+  private fun fetchReceivedFiles(currentClientOnly: Boolean): WritableArray {
+    val action = if (currentClientOnly) "listReceivedFiles" else "listGlobalReceivedFiles"
+    val receivedScope = if (currentClientOnly) "client" else "all"
     var route = receivedListRoute(
       resolveSharedFileRoute(
         scope = "team",
         kind = "list",
         path = "received",
         requestAccessToken = "",
-        reason = "list_received_files",
+        reason = if (currentClientOnly) "list_received_files" else "list_global_received_files",
       ),
+      currentClientOnly = currentClientOnly,
     )
-    logSharedFileRoute("listReceivedFiles", route)
+    logSharedFileRoute(action, route)
+    recordNativeLog("SharedFiles", "$action scope=$receivedScope")
     val json = try {
       JSONObject(readHttpString(route))
     } catch (err: Throwable) {
@@ -3077,17 +3089,19 @@ class NativeSyncEngineModule(
           kind = "list",
           path = "received",
           requestAccessToken = "",
-          reason = "list_received_files",
+          reason = if (currentClientOnly) "list_received_files" else "list_global_received_files",
           error = err,
         ),
+        currentClientOnly = currentClientOnly,
       )
-      logSharedFileRoute("listReceivedFiles", route, retry = true)
+      logSharedFileRoute(action, route, retry = true)
+      recordNativeLog("SharedFiles", "$action retry scope=$receivedScope")
       JSONObject(readHttpString(route))
     }
     updateSharedFilesReachability(
       state = "available",
       route = route,
-      reason = "list_received_files_success",
+      reason = if (currentClientOnly) "list_received_files_success" else "list_global_received_files_success",
     )
 
     val items = Arguments.createArray()
@@ -3820,12 +3834,15 @@ class NativeSyncEngineModule(
       route,
     )
 
-  private fun receivedListRoute(route: SharedFileRoute): SharedFileRoute {
-    val query = listOf(
+  private fun receivedListRoute(route: SharedFileRoute, currentClientOnly: Boolean = true): SharedFileRoute {
+    val queryItems = mutableListOf(
       "clientId" to getOrCreateClientId(),
       "clientName" to getClientDisplayNameValue(),
-      "scope" to "client",
-    ).joinToString("&") { (name, value) ->
+    )
+    if (currentClientOnly) {
+      queryItems.add("scope" to "client")
+    }
+    val query = queryItems.joinToString("&") { (name, value) ->
       "$name=${URLEncoder.encode(value, "UTF-8")}"
     }
     return route.copy(

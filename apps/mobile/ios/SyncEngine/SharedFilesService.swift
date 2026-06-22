@@ -382,15 +382,24 @@ class SharedFilesService {
 
     func listReceivedFiles(
         clientId: String,
-        clientName: String
+        clientName: String,
+        scope: String? = "client"
     ) async throws -> [[String: Any]] {
+        var queryItems = [
+            URLQueryItem(name: "clientId", value: clientId),
+            URLQueryItem(name: "clientName", value: clientName),
+        ]
+        if let scope {
+            queryItems.append(URLQueryItem(name: "scope", value: scope))
+        }
         let url = try buildURL(
             path: "/resources/mobile/received",
-            queryItems: [
-                URLQueryItem(name: "clientId", value: clientId),
-                URLQueryItem(name: "clientName", value: clientName),
-                URLQueryItem(name: "scope", value: "client"),
-            ]
+            queryItems: queryItems
+        )
+        let diagnosticScope = scope ?? "all"
+        syncDiagnosticsLog(
+            "SharedFiles",
+            "listReceivedFiles request path=/resources/mobile/received scope=\(diagnosticScope)"
         )
 
         var request = URLRequest(url: url)
@@ -401,7 +410,14 @@ class SharedFilesService {
         try validateHTTPResponse(response, path: "/resources/mobile/received")
 
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
-        return json["items"] as? [[String: Any]] ?? []
+        let items = json["items"] as? [[String: Any]] ?? []
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+        let totalItems = json["totalItems"] as? Int ?? items.count
+        syncDiagnosticsLog(
+            "SharedFiles",
+            "listReceivedFiles response scope=\(diagnosticScope) status=\(statusCode) item_count=\(items.count) total_items=\(totalItems)"
+        )
+        return items
     }
 
     func getReceivedFileMediaUrl(

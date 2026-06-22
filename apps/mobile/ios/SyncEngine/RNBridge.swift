@@ -857,6 +857,18 @@ class NativeSyncEngineModule: RCTEventEmitter {
     }
 
     @objc
+    func listGlobalReceivedFiles(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        Task {
+            do {
+                let result = try await SyncEngineManager.shared.listGlobalReceivedFiles()
+                resolve(result)
+            } catch {
+                reject("LIST_GLOBAL_RECEIVED_FILES_ERROR", error.localizedDescription, error)
+            }
+        }
+    }
+
+    @objc
     func getReceivedFilePreviewUrl(_ fileKey: NSString, kind: NSString, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         Task {
             do {

@@ -8,6 +8,7 @@ import {
   getGlobalRemoteAccessPreviewUrl,
   getReceivedLibraryPreviewUrl,
   getResourcePreviewUrl,
+  listGlobalReceivedLibraryPage,
   isDownloadSavedLocally,
   listCurrentClientReceivedLibraryPage,
   listGlobalRemoteAccessFolderContents,
@@ -30,6 +31,7 @@ import {
   getDirectoryFileStreamUrl,
   getClientId,
   getReceivedFilePreviewUrl,
+  listGlobalReceivedFiles,
   listReceivedFiles,
   prepareDirectoryFilePreview,
 } from '../SyncEngineModule';
@@ -55,6 +57,7 @@ jest.mock('../SyncEngineModule', () => ({
   downloadDirectoryFile: jest.fn(),
   getDirectoryFileStreamUrl: jest.fn(),
   getReceivedFilePreviewUrl: jest.fn(),
+  listGlobalReceivedFiles: jest.fn(),
   listReceivedFiles: jest.fn(),
   prepareDirectoryFilePreview: jest.fn(),
 }));
@@ -78,6 +81,8 @@ const mockedGetReceivedFilePreviewUrl =
   getReceivedFilePreviewUrl as jest.MockedFunction<
     typeof getReceivedFilePreviewUrl
   >;
+const mockedListGlobalReceivedFiles =
+  listGlobalReceivedFiles as jest.MockedFunction<typeof listGlobalReceivedFiles>;
 const mockedListReceivedFiles = listReceivedFiles as jest.MockedFunction<
   typeof listReceivedFiles
 >;
@@ -691,6 +696,109 @@ describe('desktop-local-service', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       'http://192.168.10.20:39394/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&scope=client&page=2&pageSize=20',
     );
+    expect(mockedListReceivedFiles).not.toHaveBeenCalled();
+  });
+
+  it('requests global received library pages without current-client scoping', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      statusText: 'OK',
+      json: jest.fn().mockResolvedValue({
+        items: [
+          {
+            resourceId: '',
+            desktopDeviceId: 'desktop-001',
+            clientId: 'account-a-client',
+            displayName: 'A account photo',
+            fileKey: '2026/06/17/account-a-image',
+            filename: 'IMG_ACCOUNT_A.JPG',
+            mediaType: 'image',
+            fileSize: 4096,
+            completedAt: '2026-06-16T08:00:00.000Z',
+            shareStatus: 'not_shared',
+          },
+        ],
+        page: 1,
+        pageSize: 20,
+        totalItems: 1,
+        totalBytes: 4096,
+        deviceStats: [],
+      }),
+    });
+
+    await expect(
+      listGlobalReceivedLibraryPage(
+        { host: '192.168.10.20', port: 39394 },
+        { page: 1, pageSize: 20 },
+      ),
+    ).resolves.toMatchObject({
+      page: 1,
+      pageSize: 20,
+      totalItems: 1,
+      items: [
+        {
+          clientId: 'account-a-client',
+          fileKey: '2026/06/17/account-a-image',
+          previewUrl:
+            'http://192.168.10.20:39394/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Faccount-a-image',
+          thumbnailUrl:
+            'http://192.168.10.20:39394/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Faccount-a-image',
+        },
+      ],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://192.168.10.20:39394/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&page=1&pageSize=20',
+    );
+    expect(mockedListReceivedFiles).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the native unscoped received library for global pages', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('LAN route unavailable'));
+    mockedListGlobalReceivedFiles.mockResolvedValueOnce([
+      {
+        resourceId: '',
+        desktopDeviceId: 'desktop-001',
+        clientId: 'account-a-client',
+        displayName: 'A account photo',
+        fileKey: '2026/06/17/native-account-a-image',
+        filename: 'IMG_ACCOUNT_A_NATIVE.JPG',
+        mediaType: 'image',
+        fileSize: 4096,
+        completedAt: '2026-06-16T08:00:00.000Z',
+        shareStatus: 'not_shared',
+        previewUrl:
+          'http://127.0.0.1:49394/resources/mobile/received/preview?fileKey=native-account-a-image',
+        thumbnailUrl:
+          'http://127.0.0.1:49394/resources/mobile/received/thumbnail?fileKey=native-account-a-image',
+      },
+    ]);
+
+    await expect(
+      listGlobalReceivedLibraryPage(
+        { host: '192.168.10.20', port: 39394 },
+        { page: 1, pageSize: 20 },
+      ),
+    ).resolves.toMatchObject({
+      page: 1,
+      pageSize: 20,
+      totalItems: 1,
+      items: [
+        {
+          clientId: 'account-a-client',
+          fileKey: '2026/06/17/native-account-a-image',
+          previewUrl:
+            'http://127.0.0.1:49394/resources/mobile/received/preview?fileKey=native-account-a-image',
+          thumbnailUrl:
+            'http://127.0.0.1:49394/resources/mobile/received/thumbnail?fileKey=native-account-a-image',
+        },
+      ],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://192.168.10.20:39394/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&page=1&pageSize=20',
+    );
+    expect(mockedListGlobalReceivedFiles).toHaveBeenCalledTimes(1);
     expect(mockedListReceivedFiles).not.toHaveBeenCalled();
   });
 

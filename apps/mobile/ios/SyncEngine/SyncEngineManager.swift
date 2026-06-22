@@ -8564,6 +8564,29 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     }
 
     func listReceivedFiles() async throws -> [[String: Any]] {
+        try await listReceivedFiles(
+            httpScope: "client",
+            diagnosticScope: "client",
+            operationName: "listReceivedFiles",
+            reason: "list_received_files"
+        )
+    }
+
+    func listGlobalReceivedFiles() async throws -> [[String: Any]] {
+        try await listReceivedFiles(
+            httpScope: nil,
+            diagnosticScope: "all",
+            operationName: "listGlobalReceivedFiles",
+            reason: "list_global_received_files"
+        )
+    }
+
+    private func listReceivedFiles(
+        httpScope: String?,
+        diagnosticScope: String,
+        operationName: String,
+        reason: String
+    ) async throws -> [[String: Any]] {
         let allowWake = SharedFilesRoutePolicy.shouldAttemptWake(
             scope: SharedDirectoryScope.team.rawValue,
             path: "received",
@@ -8571,22 +8594,23 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         )
         syncDiagnosticsLog(
             "SharedFiles",
-            "wake decision scope=received path=received operation=list allowWake=\(allowWake) \(wakeCapabilityLogSummary(uploadStore?.getBinding()?.wake))"
+            "wake decision scope=received path=received operation=list received_scope=\(diagnosticScope) allowWake=\(allowWake) \(wakeCapabilityLogSummary(uploadStore?.getBinding()?.wake))"
         )
-        var route = try await prepareSharedFilesRoute(reason: "list_received_files", allowWake: allowWake)
-        slog("[SharedFiles] listReceivedFiles resolved_host=%@ is_tunnel=%@", route.host, String(route.isTunnel))
-        syncDiagnosticsLog("SharedFiles", "listReceivedFiles resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
+        var route = try await prepareSharedFilesRoute(reason: reason, allowWake: allowWake)
+        slog("[SharedFiles] %@ resolved_host=%@ is_tunnel=%@ scope=%@", operationName, route.host, String(route.isTunnel), diagnosticScope)
+        syncDiagnosticsLog("SharedFiles", "\(operationName) resolved_host=\(route.host) is_tunnel=\(route.isTunnel) scope=\(diagnosticScope)")
 
         let items: [[String: Any]]
         do {
             items = try await withSharedFileTunnelOperation(
                 path: "received",
-                reason: "list_received_files",
+                reason: reason,
                 isTunnelRoute: route.isTunnel
             ) {
                 try await sharedFilesService.listReceivedFiles(
                     clientId: getClientId(),
-                    clientName: getClientDisplayName()
+                    clientName: getClientDisplayName(),
+                    scope: httpScope
                 )
             }
         } catch {
@@ -8595,19 +8619,20 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             }
             route = try await recoverSharedFilesTunnelAfterRouteFailure(
                 path: "received",
-                reason: "list_received_files",
+                reason: reason,
                 error: error
             )
-            slog("[SharedFiles] listReceivedFiles retry resolved_host=%@ is_tunnel=%@", route.host, String(route.isTunnel))
-            syncDiagnosticsLog("SharedFiles", "listReceivedFiles retry resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
+            slog("[SharedFiles] %@ retry resolved_host=%@ is_tunnel=%@ scope=%@", operationName, route.host, String(route.isTunnel), diagnosticScope)
+            syncDiagnosticsLog("SharedFiles", "\(operationName) retry resolved_host=\(route.host) is_tunnel=\(route.isTunnel) scope=\(diagnosticScope)")
             items = try await withSharedFileTunnelOperation(
                 path: "received",
-                reason: "list_received_files_retry",
+                reason: "\(reason)_retry",
                 isTunnelRoute: route.isTunnel
             ) {
                 try await sharedFilesService.listReceivedFiles(
                     clientId: getClientId(),
-                    clientName: getClientDisplayName()
+                    clientName: getClientDisplayName(),
+                    scope: httpScope
                 )
             }
         }
@@ -8616,15 +8641,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         updateSharedFilesReachability(
             .available,
             route: reachabilityRoute,
-            reason: "list_received_files_success"
+            reason: "\(reason)_success"
         )
         if !route.isTunnel && bindingConnectionState != .connected {
-            updateBindingConnectionState(.connected, reason: "list_received_files_success")
+            updateBindingConnectionState(.connected, reason: "\(reason)_success")
         }
 
         let clientId = getClientId()
         let clientName = getClientDisplayName()
-        return items.map { item in
+        let enrichedItems = items.map { item in
             ReceivedLibraryMediaURLPolicy.enrich(item: item) { fileKey, kind in
                 try? sharedFilesService.getReceivedFileMediaUrl(
                     fileKey: fileKey,
@@ -8634,6 +8659,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 ).absoluteString
             }
         }
+        syncDiagnosticsLog(
+            "SharedFiles",
+            "\(operationName) success scope=\(diagnosticScope) item_count=\(items.count) enriched_item_count=\(enrichedItems.count)"
+        )
+        return enrichedItems
     }
 
     func getReceivedFilePreviewUrl(fileKey: String, kind: String) async throws -> String {

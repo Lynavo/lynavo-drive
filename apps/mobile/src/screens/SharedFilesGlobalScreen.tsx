@@ -8,6 +8,7 @@ import { Icon } from '../components/Icon';
 import { GlobalGradientBackground } from '../components/GlobalGradientBackground';
 import { GlobalBottomTabBar } from '../components/GlobalBottomTabBar';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { recordDiagnosticsLog } from '../services/diagnostics-log-service';
 import { colors } from '../theme/globalColors';
 import { androidBoxShadow } from '../utils/androidShadow';
 
@@ -22,6 +23,14 @@ export function SharedFilesGlobalScreen({
 }: SharedFilesGlobalScreenProps) {
   const navigation = useNavigation<NavigationProp>();
   const { t } = useTranslation();
+
+  const openPhoneSyncSpace = () => {
+    recordDiagnosticsLog('PhoneSyncSpace', 'entry pressed', {
+      market: 'global',
+      screen: 'SharedFilesGlobalScreen',
+    });
+    navigation.navigate('PhoneSyncSpace');
+  };
 
   return (
     <GlobalGradientBackground>
@@ -39,7 +48,7 @@ export function SharedFilesGlobalScreen({
           <TouchableOpacity
             style={styles.card}
             activeOpacity={0.8}
-            onPress={() => navigation.navigate('PhoneSyncSpace')}
+            onPress={openPhoneSyncSpace}
           >
             <View
               style={[

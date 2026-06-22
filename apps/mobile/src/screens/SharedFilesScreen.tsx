@@ -8,12 +8,21 @@ import { Icon } from '../components/Icon';
 import { GradientBackground } from '../components/GradientBackground';
 import { BottomTabBar } from '../components/BottomTabBar';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { recordDiagnosticsLog } from '../services/diagnostics-log-service';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'SharedFiles'>;
 
 export function SharedFilesScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { t } = useTranslation();
+
+  const openPhoneSyncSpace = () => {
+    recordDiagnosticsLog('PhoneSyncSpace', 'entry pressed', {
+      market: 'cn',
+      screen: 'SharedFilesScreen',
+    });
+    navigation.navigate('PhoneSyncSpace');
+  };
 
   return (
     <GradientBackground>
@@ -26,7 +35,7 @@ export function SharedFilesScreen() {
           <TouchableOpacity
             style={styles.card}
             activeOpacity={0.8}
-            onPress={() => navigation.navigate('PhoneSyncSpace')}
+            onPress={openPhoneSyncSpace}
           >
             <View style={[styles.iconWrapper, { backgroundColor: 'rgba(59, 130, 246, 0.08)' }]}>
               <Icon name="phone-portrait-outline" size={36} color="#3b82f6" />
@@ -144,4 +153,3 @@ export function parentDirectoryPath(path: string): string {
   parts.pop();
   return parts.join('/');
 }
-

@@ -126,13 +126,23 @@ expect(
 )
 
 expect(
-    SharedFilesRoutePolicy.shouldAcceptActiveP2PTunnelRoute(
+    !SharedFilesRoutePolicy.shouldAcceptActiveP2PTunnelRoute(
         isTunnelActive: true,
         hasTunnelPort: true,
         selectedICERoute: "link_local_direct",
         hasReachableLANHost: false
     ),
-    "shared files must accept an already-active link-local P2P tunnel even when LAN health probes time out"
+    "shared files must reject a link-local P2P tunnel when LAN health probes time out so relay fallback can run"
+)
+
+expect(
+    !SharedFilesRoutePolicy.shouldAcceptActiveP2PTunnelRoute(
+        isTunnelActive: true,
+        hasTunnelPort: true,
+        selectedICERoute: "link_local_reflexive",
+        hasReachableLANHost: false
+    ),
+    "shared files must reject a link-local reflexive P2P tunnel when LAN is not reachable"
 )
 
 expect(

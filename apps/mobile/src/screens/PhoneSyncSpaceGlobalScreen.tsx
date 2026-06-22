@@ -40,13 +40,14 @@ import { androidBoxShadow } from '../utils/androidShadow';
 import { formatBytes } from '../utils/format';
 import { GlobalGradientBackground } from '../components/GlobalGradientBackground';
 import { ModalBlurBackdrop } from '../components/shared/ModalBlurBackdrop';
+import { recordDiagnosticsLog } from '../services/diagnostics-log-service';
 import {
   type DesktopInfo,
   downloadReceivedLibraryItem,
   getReceivedLibraryPreviewUrl,
   isDownloadSavedLocally,
   isDownloadSavedToPhotos,
-  listCurrentClientReceivedLibraryPage,
+  listGlobalReceivedLibraryPage,
   prepareReceivedLibraryPreview,
   type ReceivedLibraryMediaPage,
   type ReceivedLibraryMediaItem,
@@ -370,10 +371,14 @@ export function PhoneSyncSpaceGlobalScreen() {
   const loadData = useCallback(async () => {
     setLoadError(false);
     setLoadingMore(false);
+    recordDiagnosticsLog('PhoneSyncSpace', 'global screen load start');
     try {
       const { NativeSyncEngine } = NativeModules;
       if (!NativeSyncEngine) {
         const previewItems = getPreviewReceivedItems();
+        recordDiagnosticsLog('PhoneSyncSpace', 'global screen native missing', {
+          previewItems: previewItems.length,
+        });
         setItems(previewItems);
         setCurrentPage(1);
         setHasMorePages(false);
@@ -388,8 +393,16 @@ export function PhoneSyncSpaceGlobalScreen() {
 
       const bindingState = await NativeSyncEngine.getBindingState();
       setBinding(bindingState);
+      recordDiagnosticsLog('PhoneSyncSpace', 'global screen binding loaded', {
+        hasBinding: Boolean(bindingState),
+        hasHost: Boolean(bindingState?.host),
+        connectionState: bindingState?.connectionState ?? 'unknown',
+      });
       if (!bindingState || !bindingState.host) {
         const previewItems = getPreviewReceivedItems();
+        recordDiagnosticsLog('PhoneSyncSpace', 'global screen no host', {
+          previewItems: previewItems.length,
+        });
         setItems(previewItems);
         setCurrentPage(1);
         setHasMorePages(false);
@@ -403,13 +416,24 @@ export function PhoneSyncSpaceGlobalScreen() {
       }
 
       const desktop = { host: bindingState.host, port: SIDECAR_HTTP_PORT };
-      const result = await listCurrentClientReceivedLibraryPage(desktop, {
+      recordDiagnosticsLog('PhoneSyncSpace', 'global screen list request', {
+        host: desktop.host,
+        page: 1,
+        pageSize: RECEIVED_LIBRARY_PAGE_SIZE,
+      });
+      const result = await listGlobalReceivedLibraryPage(desktop, {
         page: 1,
         pageSize: RECEIVED_LIBRARY_PAGE_SIZE,
       });
       const receivedItems = result.items ?? [];
       const previewItems = getPreviewReceivedItems();
       const nextItems = receivedItems.length > 0 ? receivedItems : previewItems;
+      recordDiagnosticsLog('PhoneSyncSpace', 'global screen list result', {
+        itemCount: receivedItems.length,
+        totalItems: result.totalItems,
+        totalBytes: result.totalBytes,
+        previewFallback: receivedItems.length === 0 && previewItems.length > 0,
+      });
       setItems(nextItems);
       setCurrentPage(result.page);
       setHasMorePages(
@@ -427,6 +451,10 @@ export function PhoneSyncSpaceGlobalScreen() {
     } catch (e) {
       console.warn('[PhoneSyncSpaceGlobalScreen] Failed to load data:', e);
       const previewItems = getPreviewReceivedItems();
+      recordDiagnosticsLog('PhoneSyncSpace', 'global screen load failed', {
+        error: e instanceof Error ? e.message : String(e),
+        previewItems: previewItems.length,
+      });
       setItems(previewItems);
       setCurrentPage(1);
       setHasMorePages(false);
@@ -488,9 +516,19 @@ export function PhoneSyncSpaceGlobalScreen() {
     setLoadingMore(true);
     try {
       const desktop = { host: binding.host, port: SIDECAR_HTTP_PORT };
-      const result = await listCurrentClientReceivedLibraryPage(desktop, {
+      recordDiagnosticsLog('PhoneSyncSpace', 'global screen next page request', {
+        host: desktop.host,
         page: currentPage + 1,
         pageSize: RECEIVED_LIBRARY_PAGE_SIZE,
+      });
+      const result = await listGlobalReceivedLibraryPage(desktop, {
+        page: currentPage + 1,
+        pageSize: RECEIVED_LIBRARY_PAGE_SIZE,
+      });
+      recordDiagnosticsLog('PhoneSyncSpace', 'global screen next page result', {
+        itemCount: result.items?.length ?? 0,
+        totalItems: result.totalItems,
+        page: result.page,
       });
       setItems(currentItems =>
         mergeReceivedLibraryItems(currentItems, result.items ?? []),
@@ -502,6 +540,9 @@ export function PhoneSyncSpaceGlobalScreen() {
       setLoadError(false);
     } catch (e) {
       console.warn('[PhoneSyncSpaceGlobalScreen] Failed to load next page:', e);
+      recordDiagnosticsLog('PhoneSyncSpace', 'global screen next page failed', {
+        error: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       setLoadingMore(false);
     }

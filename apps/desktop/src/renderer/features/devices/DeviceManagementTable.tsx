@@ -14,11 +14,13 @@ import {
 } from '@renderer/components/ui/dialog';
 
 export function DeviceManagementTable({
+  actionsDisabled = false,
   dashboardDevices: dashboardDevicesOverride,
   devices,
   onBlock,
   onUnblock,
 }: {
+  actionsDisabled?: boolean;
   dashboardDevices?: DashboardDeviceDTO[];
   devices: DesktopManagedDeviceDTO[];
   onBlock: (clientId: string) => void;
@@ -43,7 +45,7 @@ export function DeviceManagementTable({
   };
 
   const confirmBlockDevice = () => {
-    if (!blockTarget) {
+    if (!blockTarget || actionsDisabled) {
       return;
     }
     onBlock(blockTarget.clientId);
@@ -147,6 +149,7 @@ export function DeviceManagementTable({
                   {isBlocked ? (
                     <Button
                       type="button"
+                      disabled={actionsDisabled}
                       onClick={() => onUnblock(device.clientId)}
                       className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#eaf6ff] px-3 text-xs font-semibold text-[#1677d2] transition hover:bg-[#dcefff] active:scale-[0.98]"
                     >
@@ -156,6 +159,7 @@ export function DeviceManagementTable({
                   ) : (
                     <Button
                       type="button"
+                      disabled={actionsDisabled}
                       onClick={() => setBlockTarget(device)}
                       className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#fff0eb] px-3 text-xs font-semibold text-[#b42318] transition hover:bg-[#ffe2da] active:scale-[0.98]"
                     >
