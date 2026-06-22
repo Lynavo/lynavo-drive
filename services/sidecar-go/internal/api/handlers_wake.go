@@ -27,7 +27,7 @@ type proxyWakeRequest struct {
 // only one sleeping computer. The endpoint may only send Wake-on-LAN magic
 // packets for authenticated, paired clients and bounded wake targets.
 func (s *Server) handleProxyWake(w http.ResponseWriter, r *http.Request) {
-	accountID, ok := s.authorizePersonalRequestAccountID(w, r)
+	accountID, ok := s.authorizePersonalAccountRequestAccountID(w, r)
 	if !ok {
 		return
 	}

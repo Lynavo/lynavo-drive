@@ -294,6 +294,7 @@ class SharedFilesService {
         scope: SharedDirectoryScope = .team,
         path: String = "",
         accessToken: String = "",
+        pairingToken: String = "",
         clientID: String = "",
         clientName: String = ""
     ) async throws -> SharedDirectory {
@@ -310,6 +311,12 @@ class SharedFilesService {
         request.httpMethod = "GET"
         request.timeoutInterval = SharedFilesRoutePolicy.sharedFileListRequestTimeout
         applyAuthorizationIfNeeded(to: &request, scope: scope, accessToken: accessToken)
+        applyPersonalAccessSignatureIfNeeded(
+            to: &request,
+            scope: scope,
+            pairingToken: pairingToken,
+            clientID: clientID
+        )
 
         let (data, response) = try await urlSession.data(for: request)
         try validateHTTPResponse(response, path: endpoint)
@@ -327,6 +334,7 @@ class SharedFilesService {
         scope: SharedDirectoryScope = .team,
         path: String,
         accessToken: String = "",
+        pairingToken: String = "",
         clientID: String = "",
         clientName: String = "",
         onProgress: SharedFileDownloadProgressHandler? = nil
@@ -340,6 +348,8 @@ class SharedFilesService {
             mediaType: nil,
             scope: scope,
             accessToken: accessToken,
+            pairingToken: pairingToken,
+            clientID: clientID,
             onProgress: onProgress
         )
     }
@@ -364,6 +374,8 @@ class SharedFilesService {
             mediaType: mediaType,
             scope: .team,
             accessToken: "",
+            pairingToken: "",
+            clientID: "",
             onProgress: onProgress
         )
     }
@@ -427,6 +439,8 @@ class SharedFilesService {
         mediaType: String?,
         scope: SharedDirectoryScope,
         accessToken: String,
+        pairingToken: String,
+        clientID: String,
         onProgress: SharedFileDownloadProgressHandler?
     ) async throws -> DownloadResult {
         let partialURL = try partialDownloadURL(path: partialKey)
@@ -468,6 +482,8 @@ class SharedFilesService {
                 metadata: partialMetadata,
                 resumeOffset: resumeOffset,
                 queryItems: queryItems,
+                pairingToken: pairingToken,
+                clientID: clientID,
                 onProgress: onProgress
             )
         } catch SharedFilePartialDownloadError.invalidPartial(_) {
@@ -483,6 +499,8 @@ class SharedFilesService {
                 metadata: partialMetadata,
                 resumeOffset: resumeOffset,
                 queryItems: queryItems,
+                pairingToken: pairingToken,
+                clientID: clientID,
                 onProgress: onProgress
             )
         }
@@ -517,6 +535,7 @@ class SharedFilesService {
         scope: SharedDirectoryScope = .team,
         path: String,
         accessToken: String = "",
+        pairingToken: String = "",
         filename: String = "",
         clientID: String = "",
         clientName: String = ""
@@ -562,6 +581,8 @@ class SharedFilesService {
                 metadata: partialMetadata,
                 resumeOffset: resumeOffset,
                 queryItems: queryItems,
+                pairingToken: pairingToken,
+                clientID: clientID,
                 onProgress: nil
             )
         } catch SharedFilePartialDownloadError.invalidPartial(_) {
@@ -577,6 +598,8 @@ class SharedFilesService {
                 metadata: partialMetadata,
                 resumeOffset: resumeOffset,
                 queryItems: queryItems,
+                pairingToken: pairingToken,
+                clientID: clientID,
                 onProgress: nil
             )
         }
@@ -722,6 +745,8 @@ class SharedFilesService {
         metadata: SharedFilePartialDownloadMetadata?,
         resumeOffset: Int64,
         queryItems: [URLQueryItem] = [],
+        pairingToken: String,
+        clientID: String,
         onProgress: SharedFileDownloadProgressHandler?
     ) async throws -> (URL, URLResponse) {
         let url = try buildURL(path: endpoint, queryItems: queryItems)
@@ -730,6 +755,12 @@ class SharedFilesService {
         request.httpMethod = "GET"
         request.timeoutInterval = SharedFilesRoutePolicy.sharedFileDownloadRequestTimeout
         applyAuthorizationIfNeeded(to: &request, scope: scope, accessToken: accessToken)
+        applyPersonalAccessSignatureIfNeeded(
+            to: &request,
+            scope: scope,
+            pairingToken: pairingToken,
+            clientID: clientID
+        )
         if SharedFilesRoutePolicy.shouldUseRangeRequest(resumeOffset: resumeOffset) {
             request.setValue("bytes=\(resumeOffset)-", forHTTPHeaderField: "Range")
             if let validator = metadata?.validator {
@@ -835,6 +866,7 @@ class SharedFilesService {
         scope: SharedDirectoryScope = .team,
         path: String,
         accessToken: String = "",
+        pairingToken: String = "",
         clientID: String = "",
         clientName: String = ""
     ) -> URL? {
@@ -842,6 +874,7 @@ class SharedFilesService {
             path: "\(scope.endpointPrefix)/stream/\(SharedFilesRoutePolicy.encodedSharedFilePath(path))",
             scope: scope,
             accessToken: accessToken,
+            pairingToken: pairingToken,
             clientID: clientID,
             clientName: clientName
         )
@@ -854,6 +887,7 @@ class SharedFilesService {
         scope: SharedDirectoryScope = .team,
         path: String,
         accessToken: String = "",
+        pairingToken: String = "",
         clientID: String = "",
         clientName: String = ""
     ) -> URL? {
@@ -861,6 +895,7 @@ class SharedFilesService {
             path: "\(scope.endpointPrefix)/thumbnail/\(SharedFilesRoutePolicy.encodedSharedFilePath(path))",
             scope: scope,
             accessToken: accessToken,
+            pairingToken: pairingToken,
             clientID: clientID,
             clientName: clientName
         )
@@ -896,6 +931,7 @@ class SharedFilesService {
         path: String,
         scope: SharedDirectoryScope,
         accessToken: String,
+        pairingToken: String,
         clientID: String,
         clientName: String
     ) throws -> URL {
@@ -912,6 +948,15 @@ class SharedFilesService {
             }
             components.queryItems = (components.queryItems ?? [])
                 + personalAccessQueryItems(scope: scope, clientID: clientID, clientName: clientName)
+            if let signatureItems = personalAccessSignatureQueryItems(
+                scope: scope,
+                pairingToken: pairingToken,
+                method: "GET",
+                escapedPath: components.percentEncodedPath,
+                clientID: clientID
+            ) {
+                components.queryItems = (components.queryItems ?? []) + signatureItems
+            }
         }
         return components.url ?? baseURL
     }
@@ -940,6 +985,67 @@ class SharedFilesService {
         let token = accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !token.isEmpty else { return }
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    }
+
+    private func applyPersonalAccessSignatureIfNeeded(
+        to request: inout URLRequest,
+        scope: SharedDirectoryScope,
+        pairingToken: String,
+        clientID: String
+    ) {
+        guard let url = request.url,
+              let signatureItems = personalAccessSignatureQueryItems(
+                scope: scope,
+                pairingToken: pairingToken,
+                method: request.httpMethod ?? "GET",
+                escapedPath: percentEncodedPath(for: url),
+                clientID: clientID
+              ) else {
+            return
+        }
+        for item in signatureItems {
+            request.setValue(item.value, forHTTPHeaderField: item.name)
+        }
+    }
+
+    private func personalAccessSignatureQueryItems(
+        scope: SharedDirectoryScope,
+        pairingToken: String,
+        method: String,
+        escapedPath: String,
+        clientID: String
+    ) -> [URLQueryItem]? {
+        guard scope == .personal else { return nil }
+        let token = pairingToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedID = clientID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !token.isEmpty, !trimmedID.isEmpty else { return nil }
+
+        let timestamp = Self.personalAccessTimestamp()
+        let nonce = HMACAuthHelper.randomHexNonce()
+        let signature = HMACAuthHelper.personalAccessSignature(
+            pairingToken: token,
+            method: method,
+            escapedPath: escapedPath,
+            clientId: trimmedID,
+            timestamp: timestamp,
+            nonce: nonce
+        )
+        return [
+            URLQueryItem(name: "X-SyncFlow-Auth", value: signature),
+            URLQueryItem(name: "X-SyncFlow-Auth-Timestamp", value: timestamp),
+            URLQueryItem(name: "X-SyncFlow-Auth-Nonce", value: nonce),
+        ]
+    }
+
+    private func percentEncodedPath(for url: URL) -> String {
+        URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedPath ?? url.path
+    }
+
+    private static func personalAccessTimestamp(date: Date = Date()) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        return formatter.string(from: date)
     }
 
     private func validateHTTPResponse(_ response: URLResponse, path: String) throws {

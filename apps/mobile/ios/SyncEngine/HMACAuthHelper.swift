@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import Security
 
 /// Shared HMAC auth helper for sidecar HTTP endpoints that use the
 /// `keyBytes = SHA256(pairingToken)` signing scheme (POST /upload/<cid>,
@@ -33,6 +34,44 @@ enum HMACAuthHelper {
         out.append(timestamp); out.append("\n")
         out.append(nonce)
         return out
+    }
+
+    /// GET /personal/* — 5-line canonical, LF separators, no trailing LF after
+    /// `nonce` (matches sidecar personalAccessSignature).
+    static func canonicalPersonalAccess(
+        method: String,
+        escapedPath: String,
+        clientId: String,
+        timestamp: String,
+        nonce: String
+    ) -> String {
+        var out = ""
+        out.append(method.uppercased()); out.append("\n")
+        out.append(escapedPath); out.append("\n")
+        out.append(clientId); out.append("\n")
+        out.append(timestamp); out.append("\n")
+        out.append(nonce)
+        return out
+    }
+
+    static func personalAccessSignature(
+        pairingToken: String,
+        method: String,
+        escapedPath: String,
+        clientId: String,
+        timestamp: String,
+        nonce: String
+    ) -> String {
+        hmacSHA256Hex(
+            pairingToken: pairingToken,
+            canonical: canonicalPersonalAccess(
+                method: method,
+                escapedPath: escapedPath,
+                clientId: clientId,
+                timestamp: timestamp,
+                nonce: nonce
+            )
+        )
     }
 
     /// HMAC-SHA256 of `canonical`, keyed by SHA256(pairingToken) as raw

@@ -1,7 +1,10 @@
 package api_test
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"image"
 	"image/color"
@@ -10,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -261,6 +265,108 @@ func insertPairedDeviceWithOptionalStableID(
 	); err != nil {
 		t.Fatalf("insert paired device %q: %v", clientID, err)
 	}
+}
+
+func insertHMACPairedDevice(t *testing.T, st *store.Store, clientID, clientName, pairingToken string) {
+	t.Helper()
+
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	tokenHash := sha256.Sum256([]byte(pairingToken))
+	if err := st.UpsertPairedDevice(store.PairedDevice{
+		ClientID:         clientID,
+		ClientName:       clientName,
+		Platform:         "ios",
+		PairingID:        "pair-" + clientID,
+		PairingTokenHash: hex.EncodeToString(tokenHash[:]),
+		CreatedAt:        now,
+		LastSeenAt:       now,
+	}); err != nil {
+		t.Fatalf("UpsertPairedDevice(%q): %v", clientID, err)
+	}
+}
+
+func signedPersonalGET(t *testing.T, srv *httptest.Server, path, clientID, clientName, pairingToken string) *http.Response {
+	t.Helper()
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+withPersonalClient(path, clientID, clientName), nil)
+	if err != nil {
+		t.Fatalf("new signed personal request: %v", err)
+	}
+	addSignedPersonalHeaders(t, req, clientID, pairingToken)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET signed personal %s: %v", path, err)
+	}
+	return resp
+}
+
+func signedPersonalGETWithQuery(t *testing.T, srv *httptest.Server, path, clientID, clientName, pairingToken string) *http.Response {
+	t.Helper()
+
+	signedURL := signedPersonalURLWithQuery(t, srv, path, clientID, clientName, pairingToken)
+
+	resp, err := http.Get(signedURL)
+	if err != nil {
+		t.Fatalf("GET signed personal query %s: %v", path, err)
+	}
+	return resp
+}
+
+func signedPersonalURLWithQuery(t *testing.T, srv *httptest.Server, path, clientID, clientName, pairingToken string) string {
+	t.Helper()
+
+	requestURL := srv.URL + withPersonalClient(path, clientID, clientName)
+	parsed, err := url.Parse(requestURL)
+	if err != nil {
+		t.Fatalf("parse personal request URL: %v", err)
+	}
+	timestamp := time.Now().UTC().Format(time.RFC3339Nano)
+	nonce := "test-nonce-query"
+	signature := personalAccessSignature(t, http.MethodGet, parsed.EscapedPath(), clientID, timestamp, nonce, pairingToken)
+	query := parsed.Query()
+	query.Set("X-SyncFlow-Auth", signature)
+	query.Set("X-SyncFlow-Auth-Timestamp", timestamp)
+	query.Set("X-SyncFlow-Auth-Nonce", nonce)
+	parsed.RawQuery = query.Encode()
+
+	return parsed.String()
+}
+
+func addSignedPersonalHeaders(t *testing.T, req *http.Request, clientID, pairingToken string) {
+	t.Helper()
+
+	timestamp := time.Now().UTC().Format(time.RFC3339Nano)
+	nonce := "test-nonce-header"
+	signature := personalAccessSignature(t, req.Method, req.URL.EscapedPath(), clientID, timestamp, nonce, pairingToken)
+	req.Header.Set("X-SyncFlow-Auth", signature)
+	req.Header.Set("X-SyncFlow-Auth-Timestamp", timestamp)
+	req.Header.Set("X-SyncFlow-Auth-Nonce", nonce)
+}
+
+func personalAccessSignature(t *testing.T, method, escapedPath, clientID, timestamp, nonce, pairingToken string) string {
+	t.Helper()
+
+	tokenHash := sha256.Sum256([]byte(pairingToken))
+	mac := hmac.New(sha256.New, tokenHash[:])
+	_, _ = mac.Write([]byte(strings.Join([]string{
+		strings.ToUpper(method),
+		escapedPath,
+		clientID,
+		timestamp,
+		nonce,
+	}, "\n")))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func withPersonalClient(path, clientID, clientName string) string {
+	separator := "?"
+	if strings.Contains(path, "?") {
+		separator = "&"
+	}
+	query := url.Values{}
+	query.Set("clientId", clientID)
+	query.Set("clientName", clientName)
+	return path + separator + query.Encode()
 }
 
 type fakeClientStates map[string]string
@@ -614,6 +720,47 @@ func TestProxyWakeRequiresAccountAuthorization(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("status=%d, want 401", resp.StatusCode)
+	}
+}
+
+func TestProxyWakeRejectsPairedDeviceHMACWithoutAccountBearer(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	const (
+		clientID     = "mobile-hmac-wake"
+		clientName   = "HMAC Wake Phone"
+		pairingToken = "pairing-token-secret"
+	)
+	insertHMACPairedDevice(t, st, clientID, clientName, pairingToken)
+	apiSrv, handler := api.NewServer(st, cfg, hub, nil)
+	apiSrv.SetWakeProvider(fixedWakeProvider{capability: testWakeCapability()})
+	sender := &recordingWakePacketSender{}
+	apiSrv.SetWakePacketSender(sender)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	reqBody := `{"clientId":"mobile-hmac-wake","macAddress":"aa:bb:cc:dd:ee:ff","broadcastAddress":"192.168.1.255","ports":[9]}`
+	req, err := http.NewRequest(
+		http.MethodPost,
+		srv.URL+withPersonalClient("/wake/proxy", clientID, clientName),
+		strings.NewReader(reqBody),
+	)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	addSignedPersonalHeaders(t, req, clientID, pairingToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST /wake/proxy: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status=%d, want 401 body=%s", resp.StatusCode, string(body))
+	}
+	if got := len(sender.packets); got != 0 {
+		t.Fatalf("sent packets=%d, want 0", got)
 	}
 }
 
@@ -2506,6 +2653,120 @@ func TestPersonalListRequiresBearerAccountToken(t *testing.T) {
 
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", resp.StatusCode)
+	}
+}
+
+func TestPersonalAccessAcceptsPairedDeviceHMACWithoutAccountBearer(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cfg.PersonalDir(), "notes.txt"), []byte("personal notes"), 0o644); err != nil {
+		t.Fatalf("write personal file: %v", err)
+	}
+	const (
+		clientID     = "phone-hmac"
+		clientName   = "Pairing Phone"
+		pairingToken = "pairing-token-secret"
+	)
+	insertHMACPairedDevice(t, st, clientID, clientName, pairingToken)
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp := signedPersonalGET(t, srv, "/personal/list", clientID, clientName, pairingToken)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("signed personal list status=%d, want 200 body=%s", resp.StatusCode, string(body))
+	}
+
+	resp = signedPersonalGETWithQuery(t, srv, "/personal/download/notes.txt", clientID, clientName, pairingToken)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("signed personal download status=%d, want 200 body=%s", resp.StatusCode, string(body))
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read signed download body: %v", err)
+	}
+	if string(data) != "personal notes" {
+		t.Fatalf("download body=%q, want personal notes", string(data))
+	}
+}
+
+func TestPersonalAccessRejectsReplayedPairedDeviceHMACNonce(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cfg.PersonalDir(), "notes.txt"), []byte("personal notes"), 0o644); err != nil {
+		t.Fatalf("write personal file: %v", err)
+	}
+	const (
+		clientID     = "phone-replay-hmac"
+		clientName   = "Replay Phone"
+		pairingToken = "pairing-token-secret"
+	)
+	insertHMACPairedDevice(t, st, clientID, clientName, pairingToken)
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	signedURL := signedPersonalURLWithQuery(t, srv, "/personal/download/notes.txt", clientID, clientName, pairingToken)
+	resp, err := http.Get(signedURL)
+	if err != nil {
+		t.Fatalf("first signed personal download: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("first signed personal download status=%d, want 200 body=%s", resp.StatusCode, string(body))
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+
+	resp, err = http.Get(signedURL)
+	if err != nil {
+		t.Fatalf("replayed signed personal download: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("replayed signed personal download status=%d, want 401 body=%s", resp.StatusCode, string(body))
+	}
+}
+
+func TestPersonalAccessRejectsBlockedPairedDeviceHMAC(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	const (
+		clientID     = "phone-blocked-hmac"
+		clientName   = "Blocked Phone"
+		pairingToken = "pairing-token-secret"
+	)
+	insertHMACPairedDevice(t, st, clientID, clientName, pairingToken)
+	desktopDeviceID, err := st.GetDeviceID()
+	if err != nil {
+		t.Fatalf("GetDeviceID: %v", err)
+	}
+	if err := st.BlockDevice(desktopDeviceID, clientID); err != nil {
+		t.Fatalf("BlockDevice: %v", err)
+	}
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp := signedPersonalGET(t, srv, "/personal/list", clientID, clientName, pairingToken)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("signed personal list status=%d, want 403 body=%s", resp.StatusCode, string(body))
 	}
 }
 

@@ -8302,6 +8302,15 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         (error as? SharedFileHTTPStatusError)?.statusCode
     }
 
+    private func personalAccessPairingToken(for scope: SharedDirectoryScope) -> String {
+        guard scope == .personal,
+              let binding = uploadStore?.getBinding(),
+              let token = resolvedPairingToken(for: binding) else {
+            return ""
+        }
+        return token
+    }
+
     func browseSharedFiles(scope scopeRaw: String, path: String, accessToken: String) async throws -> [String: Any] {
         let scope = SharedDirectoryScope(rawValue: scopeRaw) ?? .team
         let allowWake = SharedFilesRoutePolicy.shouldAttemptWake(
@@ -8326,8 +8335,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         )
         let accessClientID = scope == .personal ? getClientId() : ""
         let accessClientName = scope == .personal ? getClientDisplayName() : ""
+        let accessPairingToken = personalAccessPairingToken(for: scope)
         slog("[SharedFiles] browseSharedFiles scope=%@ path=%@ resolved_host=%@ is_tunnel=%@", scope.rawValue, path, route.host, String(route.isTunnel))
-        syncDiagnosticsLog("SharedFiles", "browseSharedFiles scope=\(scope.rawValue) path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
+        syncDiagnosticsLog("SharedFiles", "browseSharedFiles scope=\(scope.rawValue) path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel) has_pairing_signature=\(!accessPairingToken.isEmpty)")
 
         let directory: SharedDirectory
         do {
@@ -8340,6 +8350,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     scope: scope,
                     path: path,
                     accessToken: accessToken,
+                    pairingToken: accessPairingToken,
                     clientID: accessClientID,
                     clientName: accessClientName
                 )
@@ -8364,6 +8375,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     scope: scope,
                     path: path,
                     accessToken: accessToken,
+                    pairingToken: accessPairingToken,
                     clientID: accessClientID,
                     clientName: accessClientName
                 )
@@ -8392,6 +8404,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 scope: scope,
                 path: file.path,
                 accessToken: accessToken,
+                pairingToken: accessPairingToken,
                 clientID: accessClientID,
                 clientName: accessClientName
             ) {
@@ -8401,6 +8414,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 scope: scope,
                 path: file.path,
                 accessToken: accessToken,
+                pairingToken: accessPairingToken,
                 clientID: accessClientID,
                 clientName: accessClientName
             ) {
@@ -8430,8 +8444,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         var route = try await prepareSharedFilesRoute(reason: "download_shared_file", allowWake: allowWake)
         let accessClientID = scope == .personal ? getClientId() : ""
         let accessClientName = scope == .personal ? getClientDisplayName() : ""
+        let accessPairingToken = personalAccessPairingToken(for: scope)
         slog("[SharedFiles] downloadSharedFile scope=%@ path=%@ resolved_host=%@ is_tunnel=%@", scope.rawValue, path, route.host, String(route.isTunnel))
-        syncDiagnosticsLog("SharedFiles", "downloadSharedFile scope=\(scope.rawValue) path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
+        syncDiagnosticsLog("SharedFiles", "downloadSharedFile scope=\(scope.rawValue) path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel) has_pairing_signature=\(!accessPairingToken.isEmpty)")
 
         let progressHandler: SharedFileDownloadProgressHandler = { bytesWritten, totalBytes, progress in
             NativeSyncEngineModule.shared?.emitSharedFileDownloadProgress(
@@ -8455,6 +8470,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                         scope: scope,
                         path: path,
                         accessToken: accessToken,
+                        pairingToken: accessPairingToken,
                         clientID: accessClientID,
                         clientName: accessClientName,
                         onProgress: progressHandler
@@ -8805,10 +8821,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     func getSharedFileStreamUrl(scope scopeRaw: String, path: String, accessToken: String) -> String? {
         let scope = SharedDirectoryScope(rawValue: scopeRaw) ?? .team
+        let accessPairingToken = personalAccessPairingToken(for: scope)
         return sharedFilesService.getStreamUrl(
             scope: scope,
             path: path,
             accessToken: accessToken,
+            pairingToken: accessPairingToken,
             clientID: scope == .personal ? getClientId() : "",
             clientName: scope == .personal ? getClientDisplayName() : ""
         )?.absoluteString
@@ -8828,8 +8846,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         var route = try await prepareSharedFilesRoute(reason: "preview_shared_file", allowWake: allowWake)
         let accessClientID = scope == .personal ? getClientId() : ""
         let accessClientName = scope == .personal ? getClientDisplayName() : ""
+        let accessPairingToken = personalAccessPairingToken(for: scope)
         slog("[SharedFiles] prepareSharedFilePreview scope=%@ path=%@ resolved_host=%@ is_tunnel=%@", scope.rawValue, path, route.host, String(route.isTunnel))
-        syncDiagnosticsLog("SharedFiles", "prepareSharedFilePreview scope=\(scope.rawValue) path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel)")
+        syncDiagnosticsLog("SharedFiles", "prepareSharedFilePreview scope=\(scope.rawValue) path=\(path) resolved_host=\(route.host) is_tunnel=\(route.isTunnel) has_pairing_signature=\(!accessPairingToken.isEmpty)")
 
         var previewURL: URL?
         var lastError: Error?
@@ -8845,6 +8864,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                         scope: scope,
                         path: path,
                         accessToken: accessToken,
+                        pairingToken: accessPairingToken,
                         filename: filename,
                         clientID: accessClientID,
                         clientName: accessClientName
