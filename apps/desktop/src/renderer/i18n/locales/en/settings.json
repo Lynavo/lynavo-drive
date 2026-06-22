@@ -133,6 +133,7 @@
     "validating": "Checking sharing status",
     "validatingDetail": "Checking Windows sharing settings.",
     "validatingDetailMac": "Checking macOS file sharing settings.",
+    "validatingDetailLinux": "Checking system file sharing settings.",
     "ready": "Sharing is ready",
     "readyDetail": "{{shareName}} is accessible to devices on the same LAN.",
     "needsManualEnable": "Manual sharing setup required",

@@ -133,6 +133,7 @@
     "validating": "正在偵測共享狀態",
     "validatingDetail": "正在檢查 Windows 共享設定。",
     "validatingDetailMac": "正在檢查 macOS 檔案共享設定。",
+    "validatingDetailLinux": "正在檢查系統檔案共享設定。",
     "ready": "共享已就緒",
     "readyDetail": "{{shareName}} 可以被同一個區域網路內的裝置存取。",
     "needsManualEnable": "需要手動開啟共享",

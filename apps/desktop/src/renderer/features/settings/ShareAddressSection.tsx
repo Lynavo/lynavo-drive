@@ -40,7 +40,9 @@ export function ShareAddressSection() {
       label: t('settings.shareAddress.validating'),
       detail: isMac
         ? t('settings.shareAddress.validatingDetailMac')
-        : t('settings.shareAddress.validatingDetail'),
+        : isWindows
+          ? t('settings.shareAddress.validatingDetail')
+          : t('settings.shareAddress.validatingDetailLinux'),
       tone: 'text-amber-700 bg-amber-50 border-amber-200',
       icon: Loader2,
       iconClassName: 'animate-spin',

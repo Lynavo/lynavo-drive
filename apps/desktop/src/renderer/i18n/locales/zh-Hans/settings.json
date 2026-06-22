@@ -133,6 +133,7 @@
     "validating": "正在检测共享状态",
     "validatingDetail": "正在检查 Windows 共享配置。",
     "validatingDetailMac": "正在检查 macOS 文件共享配置。",
+    "validatingDetailLinux": "正在检查系统文件共享配置。",
     "ready": "共享已就绪",
     "readyDetail": "{{shareName}} 可以被同一局域网内的设备访问。",
     "needsManualEnable": "需要手动开启共享",

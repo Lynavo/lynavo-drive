@@ -70,6 +70,20 @@ describe('ShareAddressSection', () => {
     expect(screen.queryByText('系统指引')).not.toBeInTheDocument();
   });
 
+  it('uses neutral Linux copy while validating sharing status', () => {
+    setElectronAPI({ isMac: false, isWindows: false, isLinux: true });
+    useSettingsStore.setState({
+      validatingShare: true,
+    });
+
+    render(<ShareAddressSection />);
+
+    expect(screen.getByText('正在检测共享状态')).toBeInTheDocument();
+    expect(screen.getByText('正在检查系统文件共享配置。')).toBeInTheDocument();
+    expect(screen.queryByText('正在检查 Windows 共享配置。')).not.toBeInTheDocument();
+    expect(screen.queryByText('Windows 快速配置')).not.toBeInTheDocument();
+  });
+
   it('uses neutral Linux copy when the share is registered', () => {
     setElectronAPI({ isMac: false, isWindows: false, isLinux: true });
     useSettingsStore.setState({
