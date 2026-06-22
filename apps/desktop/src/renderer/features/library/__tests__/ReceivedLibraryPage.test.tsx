@@ -129,11 +129,11 @@ describe('ReceivedLibraryPage', () => {
     const { container } = render(<ReceivedLibraryPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('4 台设备')).toBeInTheDocument();
+      expect(screen.getByText('0 台设备')).toBeInTheDocument();
     });
 
     const header = container.querySelector('header');
-    expect(header).not.toHaveTextContent('4 台设备');
+    expect(header).not.toHaveTextContent('0 台设备');
   });
 
   it('keeps the title and summary fixed while device and file lists scroll independently', () => {
@@ -220,13 +220,15 @@ describe('ReceivedLibraryPage', () => {
     expect(getReceivedLibrary).toHaveBeenNthCalledWith(2, { page: 2, pageSize: 30 });
   });
 
-  it('displays preview sync records when no real items exist in development', async () => {
+  it('displays the real empty state instead of preview sync records when no real items exist', async () => {
     render(<ReceivedLibraryPage />);
     await waitFor(() => {
-      expect(screen.getAllByText('iPhone 15 Pro').length).toBeGreaterThan(0);
+      expect(screen.getByText('尚无同步记录')).toBeInTheDocument();
     });
-    expect(screen.getAllByText('Galaxy S24 Ultra').length).toBeGreaterThan(0);
-    expect(screen.queryByText('尚无同步记录')).not.toBeInTheDocument();
+    expect(screen.getByText('0 台设备')).toBeInTheDocument();
+    expect(screen.queryByText('iPhone 15 Pro')).not.toBeInTheDocument();
+    expect(screen.queryByText('Galaxy S24 Ultra')).not.toBeInTheDocument();
+    expect(screen.queryByText('IMG_20260610_Office.mov')).not.toBeInTheDocument();
   });
 
   it('displays error state', async () => {

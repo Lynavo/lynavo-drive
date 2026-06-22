@@ -6,11 +6,6 @@ import { useManagementStore } from '@renderer/stores/management-store';
 import { useDashboardStore } from '@renderer/stores/dashboard-store';
 import { DeviceManagementTable } from './DeviceManagementTable';
 import { Skeleton } from '@renderer/components/ui/skeleton';
-import {
-  previewDashboardDevices,
-  previewManagedDevices,
-  shouldUsePreviewData,
-} from '@renderer/features/preview/demo-data';
 
 type DeviceStatusFilter = 'all' | 'blocked' | 'connected';
 
@@ -33,12 +28,8 @@ export function DevicesPage() {
     void fetchDashboard();
   }, [loadDevices, fetchDashboard]);
 
-  const usingPreviewDevices = !loading && !error && shouldUsePreviewData(devices.length > 0);
-  const visibleDevices = usingPreviewDevices ? previewManagedDevices : devices;
-  const visibleDashboardDevices =
-    usingPreviewDevices && dashboardDevices.length === 0
-      ? previewDashboardDevices
-      : dashboardDevices;
+  const visibleDevices = devices;
+  const visibleDashboardDevices = dashboardDevices;
 
   const totalDevices = visibleDevices.length;
   const blockedDevices = visibleDevices.filter((d) => d.blockStatus === 'active').length;

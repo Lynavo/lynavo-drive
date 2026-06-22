@@ -107,12 +107,12 @@ describe('DevicesPage', () => {
     expect(screen.getByRole('button', { name: '取消禁用' })).toBeInTheDocument();
   });
 
-  it('renders preview devices when the real device list is empty in development', () => {
+  it('renders the real empty state when the device list is empty in development', () => {
     render(<DevicesPage />);
 
-    expect(screen.getByText('iPhone 15 Pro')).toBeInTheDocument();
-    expect(screen.getByText('Galaxy S24 Ultra')).toBeInTheDocument();
-    expect(screen.queryByText('尚无设备')).not.toBeInTheDocument();
+    expect(screen.getByText('暂无设备')).toBeInTheDocument();
+    expect(screen.queryByText('iPhone 15 Pro')).not.toBeInTheDocument();
+    expect(screen.queryByText('Galaxy S24 Ultra')).not.toBeInTheDocument();
   });
 
   it('opens a confirmation dialog before disabling an active device', () => {

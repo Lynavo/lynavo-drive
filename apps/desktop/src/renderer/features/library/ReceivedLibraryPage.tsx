@@ -16,12 +16,6 @@ import { useManagementStore } from '@renderer/stores/management-store';
 import { formatBytes, formatSmartDate } from '@renderer/lib/format';
 import { FileIcon } from '@renderer/components/shared/FileIcon';
 import { Skeleton } from '@renderer/components/ui/skeleton';
-import {
-  previewDashboardDevices,
-  previewManagedDevices,
-  previewReceivedLibraryItems,
-  shouldUsePreviewData,
-} from '@renderer/features/preview/demo-data';
 import type { ReceivedLibraryItemDTO } from '@syncflow/contracts';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -200,13 +194,9 @@ export function ReceivedLibraryPage() {
     void fetchDashboard();
   }, [loadReceivedLibrary, loadDevices, fetchDashboard]);
 
-  const usingPreviewItems =
-    !receivedLoading && !receivedError && shouldUsePreviewData(receivedItems.length > 0);
-  const visibleReceivedItems = usingPreviewItems ? previewReceivedLibraryItems : receivedItems;
-  const visibleManagedDevices =
-    usingPreviewItems && managedDevices.length === 0 ? previewManagedDevices : managedDevices;
-  const visibleDashboardDevices =
-    usingPreviewItems && dashboardDevices.length === 0 ? previewDashboardDevices : dashboardDevices;
+  const visibleReceivedItems = receivedItems;
+  const visibleManagedDevices = managedDevices;
+  const visibleDashboardDevices = dashboardDevices;
 
   // Build a clientId → displayName map
   const deviceNameMap = new Map<string, string>(
@@ -221,7 +211,6 @@ export function ReceivedLibraryPage() {
 
   useEffect(() => {
     if (
-      usingPreviewItems ||
       receivedLoading ||
       receivedLoadingMore ||
       !receivedHasMore ||
@@ -247,58 +236,24 @@ export function ReceivedLibraryPage() {
 
     observer.observe(target);
     return () => observer.disconnect();
-  }, [
-    usingPreviewItems,
-    receivedLoading,
-    receivedLoadingMore,
-    receivedHasMore,
-    loadMoreReceivedLibrary,
-  ]);
+  }, [receivedLoading, receivedLoadingMore, receivedHasMore, loadMoreReceivedLibrary]);
 
   // Calculations for stats cards
-  const totalFiles = usingPreviewItems ? visibleReceivedItems.length : receivedTotalItems;
-  const totalOccupiedSpace = usingPreviewItems
-    ? visibleReceivedItems.reduce((sum, item) => sum + item.fileSize, 0)
-    : receivedTotalBytes;
+  const totalFiles = receivedTotalItems;
+  const totalOccupiedSpace = receivedTotalBytes;
 
   // Group received items by device (clientId)
-  const statsByDevice = usingPreviewItems
-    ? visibleReceivedItems.reduce(
-        (acc, item) => {
-          const cid = item.clientId;
-          if (!acc[cid]) {
-            acc[cid] = {
-              photoCount: 0,
-              fileCount: 0,
-              totalBytes: 0,
-            };
-          }
-          const isMedia =
-            item.mediaType === 'image' ||
-            item.mediaType === 'video' ||
-            item.mediaType?.startsWith('image/') ||
-            item.mediaType?.startsWith('video/');
-          if (isMedia) {
-            acc[cid].photoCount += 1;
-          } else {
-            acc[cid].fileCount += 1;
-          }
-          acc[cid].totalBytes += item.fileSize;
-          return acc;
-        },
-        {} as Record<string, { photoCount: number; fileCount: number; totalBytes: number }>,
-      )
-    : receivedDeviceStats.reduce(
-        (acc, stat) => {
-          acc[stat.clientId] = {
-            photoCount: stat.photoCount,
-            fileCount: stat.fileCount,
-            totalBytes: stat.totalBytes,
-          };
-          return acc;
-        },
-        {} as Record<string, { photoCount: number; fileCount: number; totalBytes: number }>,
-      );
+  const statsByDevice = receivedDeviceStats.reduce(
+    (acc, stat) => {
+      acc[stat.clientId] = {
+        photoCount: stat.photoCount,
+        fileCount: stat.fileCount,
+        totalBytes: stat.totalBytes,
+      };
+      return acc;
+    },
+    {} as Record<string, { photoCount: number; fileCount: number; totalBytes: number }>,
+  );
 
   // Managed devices provide metadata; received stats provide fallback rows while management is loading.
   const managedDeviceIds = new Set(visibleManagedDevices.map((d) => d.clientId));
@@ -494,7 +449,7 @@ export function ReceivedLibraryPage() {
               <div className="mb-2 flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-[#3d4653]">所有文件</h2>
                 <span className="text-xs font-semibold text-[#7b8490]">
-                  {usingPreviewItems || visibleReceivedItems.length >= totalFiles
+                  {visibleReceivedItems.length >= totalFiles
                     ? `${visibleReceivedItems.length} 个文件`
                     : `已加载 ${visibleReceivedItems.length} / ${totalFiles}`}
                 </span>
@@ -516,7 +471,7 @@ export function ReceivedLibraryPage() {
                     />
                   ))
                 )}
-                {!usingPreviewItems && receivedHasMore ? (
+                {receivedHasMore ? (
                   <div
                     ref={loadMoreRef}
                     data-testid="received-library-load-more-sentinel"
