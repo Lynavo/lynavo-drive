@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SettingsPage } from '../SettingsPage';
 import { useAuthStore } from '@renderer/stores/auth-store';
+import { useSettingsStore } from '@renderer/stores/settings-store';
 import { toast } from 'sonner';
 
 vi.mock('sonner', () => ({
@@ -13,9 +14,19 @@ vi.mock('sonner', () => ({
   },
 }));
 
-function setElectronPlatform() {
+function setElectronPlatform(
+  platform: { isMac: boolean; isWindows: boolean; isLinux: boolean } = {
+    isMac: true,
+    isWindows: false,
+    isLinux: false,
+  },
+) {
   (window as Window & { electronAPI?: unknown }).electronAPI = {
     platform: {
+      isMac: () => platform.isMac,
+      isWindows: () => platform.isWindows,
+      isLinux: () => platform.isLinux,
+      getHostName: () => 'STUDIO-PC',
       getLocalIPs: () => ['192.168.0.227'],
     },
     power: {
@@ -35,6 +46,8 @@ function setElectronPlatform() {
     },
     files: {
       openExternal: vi.fn().mockResolvedValue(null),
+      openFolder: vi.fn().mockResolvedValue(null),
+      copyToClipboard: vi.fn().mockResolvedValue(null),
     },
     events: {
       onSidecarEvent: vi.fn(() => vi.fn()),
@@ -53,6 +66,27 @@ describe('SettingsPage', () => {
         email: 'test@vividrop.app',
         phone: '',
       },
+    });
+    useSettingsStore.setState({
+      settings: {
+        deviceName: 'Studio PC',
+        connectionCode: '',
+        rootPath: '',
+        receivePath: '/Users/alice/Vivi Drop/received',
+        personalPath: '/Users/alice/Vivi Drop/personal',
+        sharedPath: '/Users/alice/Vivi Drop/shared',
+        shareAddress: '',
+        shareStatus: 'unknown',
+        shareName: 'SyncFlow',
+      },
+      shareStatusInfo: {
+        enabled: false,
+        smbUrl: null,
+        status: 'unknown',
+        shareName: 'SyncFlow',
+      },
+      validatingShare: false,
+      copiedField: null,
     });
   });
 
@@ -108,6 +142,30 @@ describe('SettingsPage', () => {
     render(<SettingsPage />);
     expect(screen.getByText('本机 IP')).toBeInTheDocument();
     expect(screen.getByText('192.168.0.227')).toBeInTheDocument();
+  });
+
+  it('renders neutral Linux sharing guidance on the real settings page', () => {
+    setElectronPlatform({ isMac: false, isWindows: false, isLinux: true });
+    useSettingsStore.setState({
+      settings: {
+        ...useSettingsStore.getState().settings,
+        shareStatus: 'needs_manual_enable',
+      },
+      shareStatusInfo: {
+        ...useSettingsStore.getState().shareStatusInfo,
+        status: 'needs_manual_enable',
+      },
+    });
+
+    render(<SettingsPage />);
+
+    expect(screen.getByText('请在系统中手动配置文件共享后重新检测。')).toBeInTheDocument();
+    expect(screen.getByText('Linux 文件共享')).toBeInTheDocument();
+    expect(
+      screen.getByText('在系统中手动配置 Samba 或文件共享后，回到 Vivi Drop 重新检测。'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Windows 快速配置')).not.toBeInTheDocument();
+    expect(screen.queryByText('Windows 文件共享')).not.toBeInTheDocument();
   });
 
   it('renders check for updates and triggers check updates action', async () => {

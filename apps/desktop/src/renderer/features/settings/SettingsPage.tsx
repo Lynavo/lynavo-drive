@@ -35,6 +35,8 @@ import {
 } from '@renderer/components/ui/dialog';
 import { Label } from '@renderer/components/ui/label';
 import type { PowerSaveState } from '../../../preload/api';
+import { ShareAddressSection } from './ShareAddressSection';
+import { SystemGuideSection } from './SystemGuideSection';
 
 type Tone = 'blue' | 'sky' | 'green' | 'amber' | 'rose' | 'slate';
 type AppInfo = Awaited<ReturnType<NonNullable<Window['electronAPI']>['support']['getAppInfo']>>;
@@ -256,6 +258,10 @@ export function SettingsPage() {
             <SettingsCard title="本机">
               <SettingsItem icon={Wifi} tone="blue" title="本机 IP" caption={localIp} />
             </SettingsCard>
+
+            <ShareAddressSection />
+
+            <SystemGuideSection />
           </div>
 
           <div className="space-y-5">
