@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { NativeModules, Alert, Platform } from 'react-native';
+import { NativeModules, Alert, Platform, StyleSheet } from 'react-native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { LoginGlobalScreen } from '../LoginGlobalScreen';
 
@@ -110,6 +110,36 @@ describe('LoginGlobalScreen', () => {
     expect(getByText('使用邮箱登录')).toBeTruthy();
     expect(queryByText('使用 Apple 继续')).toBeNull();
     expect(queryByTestId('global-auth-apple-provider-button')).toBeNull();
+  });
+
+  it('keeps Android email inputs vertically centered without font-scale clipping', () => {
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'android',
+    });
+
+    const { getByText, getByPlaceholderText } = render(<LoginGlobalScreen />);
+
+    fireEvent.press(getByText('使用邮箱登录'));
+
+    const emailInput = getByPlaceholderText('请输入电子邮箱');
+    const codeInput = getByPlaceholderText('6 位数验证码');
+    const emailInputStyle = StyleSheet.flatten(emailInput.props.style);
+    const codeInputStyle = StyleSheet.flatten(codeInput.props.style);
+
+    expect(emailInput.props.allowFontScaling).toBe(false);
+    expect(emailInput.props.maxFontSizeMultiplier).toBe(1);
+    expect(codeInput.props.allowFontScaling).toBe(false);
+    expect(codeInput.props.maxFontSizeMultiplier).toBe(1);
+    expect(emailInputStyle.height).toBe(40);
+    expect(emailInputStyle.paddingVertical).toBe(0);
+    expect(emailInputStyle.paddingTop).toBe(0);
+    expect(emailInputStyle.paddingBottom).toBe(0);
+    expect(emailInputStyle.lineHeight).toBe(20);
+    expect(emailInputStyle.includeFontPadding).toBe(false);
+    expect(emailInputStyle.textAlignVertical).toBe('center');
+    expect(codeInputStyle.paddingVertical).toBe(0);
+    expect(codeInputStyle.textAlignVertical).toBe('center');
   });
 
   it('requires terms agreement before provider authorization', () => {

@@ -23,7 +23,10 @@ import {
   GLOBAL_AUTH_COLORS as AUTH_COLORS,
   GlobalAuthScreenShell,
 } from '../components/auth/GlobalAuthScreenShell';
-import { authTextScalingProps } from '../components/auth/authPlatformStyles';
+import {
+  authTextScalingProps,
+  getAuthTextScalingProps,
+} from '../components/auth/authPlatformStyles';
 import { appleLogin, googleLogin, sendEmailCode, emailLogin } from '../services/auth-service';
 import { useAuth } from '../stores/auth-store';
 import { PRIVACY_POLICY_URL, USER_AGREEMENT_URL } from '../constants/legal';
@@ -90,6 +93,8 @@ export function LoginGlobalScreen() {
   const [emailFocused, setEmailFocused] = useState(false);
   const [codeFocused, setCodeFocused] = useState(false);
   const showAppleSignIn = Platform.OS === 'ios';
+  const textInputScalingProps =
+    Platform.OS === 'android' ? getAuthTextScalingProps('android') : {};
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -334,6 +339,7 @@ export function LoginGlobalScreen() {
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>电子邮箱</Text>
                 <TextInput
+                  {...textInputScalingProps}
                   accessibilityLabel="请输入电子邮箱"
                   placeholder="请输入电子邮箱"
                   placeholderTextColor="#7B8490"
@@ -345,7 +351,11 @@ export function LoginGlobalScreen() {
                   onFocus={() => setEmailFocused(true)}
                   onBlur={() => setEmailFocused(false)}
                   editable={!isLoggingIn && !isSendingCode}
-                  style={[styles.input, emailFocused ? styles.inputFocused : null]}
+                  style={[
+                    styles.input,
+                    Platform.OS === 'android' ? styles.androidInputText : null,
+                    emailFocused ? styles.inputFocused : null,
+                  ]}
                 />
               </View>
 
@@ -353,6 +363,7 @@ export function LoginGlobalScreen() {
                 <Text style={styles.inputLabel}>验证码</Text>
                 <View style={styles.codeInputRow}>
                   <TextInput
+                    {...textInputScalingProps}
                     accessibilityLabel="6 位数验证码"
                     placeholder="6 位数验证码"
                     placeholderTextColor="#7B8490"
@@ -366,6 +377,7 @@ export function LoginGlobalScreen() {
                     style={[
                       styles.input,
                       styles.codeInput,
+                      Platform.OS === 'android' ? styles.androidInputText : null,
                       codeFocused ? styles.inputFocused : null,
                     ]}
                   />
@@ -1137,6 +1149,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 14,
     color: AUTH_COLORS.text,
+  },
+  androidInputText: {
+    paddingVertical: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    lineHeight: 20,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   inputFocused: {
     borderColor: '#17191c',
