@@ -27,6 +27,7 @@ export function ShareAddressSection() {
   const refreshShareStatus = useSettingsStore((s) => s.refreshShareStatus);
   const isMac = window.electronAPI?.platform.isMac() ?? true;
   const isWindows = window.electronAPI?.platform.isWindows?.() ?? false;
+  const isLinux = window.electronAPI?.platform.isLinux?.() ?? false;
   const hostName = window.electronAPI?.platform.getHostName?.() ?? '';
 
   const effectiveStatus = validatingShare ? 'validating' : (shareStatusInfo.status ?? shareStatus);
@@ -55,7 +56,9 @@ export function ShareAddressSection() {
       label: t('settings.shareAddress.needsManualEnable'),
       detail: isMac
         ? t('settings.shareAddress.needsManualEnableDetailMac')
-        : t('settings.shareAddress.needsManualEnableDetailWindows'),
+        : isLinux
+          ? t('settings.shareAddress.needsManualEnableDetailLinux')
+          : t('settings.shareAddress.needsManualEnableDetailWindows'),
       tone: 'text-amber-700 bg-amber-50 border-amber-200',
       icon: Settings2,
       iconClassName: '',
@@ -65,7 +68,9 @@ export function ShareAddressSection() {
       label: t('settings.shareAddress.shareRegistered'),
       detail: isMac
         ? t('settings.shareAddress.shareRegisteredDetailMac')
-        : t('settings.shareAddress.shareRegisteredDetailWindows'),
+        : isLinux
+          ? t('settings.shareAddress.shareRegisteredDetailLinux')
+          : t('settings.shareAddress.shareRegisteredDetailWindows'),
       tone: 'text-sky-700 bg-sky-50 border-sky-200',
       icon: Link2,
       iconClassName: '',
