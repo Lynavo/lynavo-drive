@@ -58,7 +58,8 @@ Keep existing preload compatibility methods:
 
 Add Linux-aware platform capability without forcing every renderer caller to branch on `process.platform`:
 
-- Either add `platform.isLinux()`, or add a normalized platform kind such as `platform.kind(): 'mac' | 'windows' | 'linux' | 'unknown'`.
+- Add `platform.isLinux()` to the preload API and its type declaration.
+- Do not add a normalized `platform.kind()` in the first implementation pass; the existing boolean capability style is already used throughout the renderer.
 - Apple OAuth remains macOS-only.
 - Non-macOS titlebar overlay behavior applies to both Windows and Linux unless Linux testing shows a desktop-environment-specific issue.
 - Application menu hiding remains non-macOS.
@@ -172,7 +173,8 @@ Linux should behave like a first-class desktop platform but avoid platform-speci
 
 - Apple sign-in is hidden.
 - Windows advanced sharing buttons and `ms-settings:` links are hidden.
-- Mac file sharing guide remains Mac-only or becomes a neutral help section; it should not be presented as Linux guidance.
+- Mac file sharing guide remains Mac-only.
+- Linux uses a neutral manual sharing/help state; Mac and Windows help text must not be presented as Linux guidance.
 - Receive, shared, and personal paths should remain visible and openable through the preload bridge.
 - If Linux share detection returns `needs_manual_enable`, the settings UI should present a neutral manual sharing state rather than Windows-only instructions.
 
