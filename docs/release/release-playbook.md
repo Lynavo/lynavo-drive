@@ -1,6 +1,6 @@
 # Vivi Drop Beta 發佈手冊
 
-本文件是目前 beta 發佈的總入口。iOS TestFlight、Android Debug 構建驗證、desktop 安裝包（macOS / Windows）和 beta tag 都按這裡的順序執行。
+本文件是目前 beta 發佈的總入口。iOS TestFlight、Android Debug 構建驗證、desktop 安裝包（macOS / Windows / Linux）和 beta tag 都按這裡的順序執行。
 
 詳細步驟仍然分別落在：
 
@@ -8,7 +8,7 @@
 - `docs/release/macos-desktop-signing.md`
 - `docs/release/market-release-flow.md`
 
-Windows 桌面包目前直接走根目錄指令碼 `pnpm package:desktop:win`，詳細約束以目前程式碼和本文件為準。
+desktop 桌面包可用根目錄指令碼分平台打包；正式打包仍必須優先走 `pnpm release --profile <profile> --targets ...`，不要手動拼接 release 環境變數。
 
 ## 1. 目前版本規則
 
@@ -91,6 +91,8 @@ config 內的 `APP_REVIEW_PHONE`。不一致會直接失敗，避免 App Review 
 
 ## 5. 出 desktop 安裝包
 
+正式發佈打包優先使用 release profile，例如 `pnpm release --profile global-prod --targets mac,win,linux`。下列根目錄指令碼可用於對應平台的本地打包或單平台驗證。
+
 ### 5.1 macOS signed DMG
 
 從倉庫根目錄執行：
@@ -140,6 +142,28 @@ pnpm package:desktop:win
 2. `resources\vivi-drop-sidecar.exe` 已隨包落地並能被 desktop 拉起
 3. 安裝器已寫入 `SyncFlow Sidecar TCP`、`SyncFlow Sidecar HTTP` 和 `SyncFlow mDNS UDP` 防火牆規則，分別放行 `39393/TCP`、`39394/TCP` 和 `5353/UDP`
 4. 設定頁能看到 Bonjour 執行時資訊，缺少 Bonjour 時 fallback 狀態可解釋
+
+### 5.3 Linux `.deb`
+
+Ubuntu 22.04+ Linux 桌面包提供 `.deb`，覆蓋 `amd64` / `x64` 和 `arm64`。
+
+從倉庫根目錄執行：
+
+```bash
+pnpm package:desktop:linux
+```
+
+產物位置：
+
+- `apps/desktop/release/ViviDrop-0.1.0-linux-amd64.deb`
+- `apps/desktop/release/ViviDrop-0.1.0-linux-arm64.deb`
+
+發佈前至少確認：
+
+1. 在 Ubuntu 22.04+ `amd64` / `x64` 和 `arm64` 上 fresh install `.deb`
+2. app 能從桌面啟動器或終端正常啟動
+3. sidecar 已隨包落地並能被 desktop 拉起
+4. `39393/TCP`、`39394/TCP` 和 `5353/UDP` 網路放行條件已確認
 
 ## 6. 打 beta tag
 
@@ -191,10 +215,11 @@ git push origin beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION>
 4. 跑 Android Debug build
 5. 出 macOS signed DMG
 6. 如本輪包含 Windows，出 Windows NSIS / ZIP
-7. 給 SyncFlow 和 vivi-drop-server 打同一個 beta tag
-8. 確認工作區乾淨
-9. 推程式碼和 tag
-10. 等 TestFlight processing 完成後再擴大測試範圍
+7. 如本輪包含 Linux，出 Ubuntu 22.04+ `.deb`
+8. 給 SyncFlow 和 vivi-drop-server 打同一個 beta tag
+9. 確認工作區乾淨
+10. 推程式碼和 tag
+11. 等 TestFlight processing 完成後再擴大測試範圍
 
 ## 8. 發佈後的最小冒煙
 
@@ -234,13 +259,24 @@ git push origin beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION>
 5. 設定頁 Bonjour 執行時 / fallback 文案正常
 6. 診斷包匯出正常
 
+### 8.5 Linux
+
+1. 從 `ViviDrop-*-linux-*.deb` fresh install
+2. app 正常啟動
+3. sidecar 正常監聽 `39393/TCP` 與 `39394/TCP`
+4. mDNS / zeroconf 廣播可被真機 mobile 發現，網路允許 `5353/UDP`
+5. 設定頁 Linux 共享提示不顯示 macOS 或 Windows 專屬操作
+6. iOS 真機可配對並完成一輪真實素材上傳
+7. Android 真機可配對並完成一輪真實素材上傳
+8. 重啟 desktop 後 paired state、history、received library 正常保留
+
 ## 9. 發佈物與記錄
 
 建議每次 beta 都在發佈記錄裡明確寫出：
 
 1. iOS build：例如 `0.1.0 (6)`
 2. Android build：註明 Debug build 版本與提交
-3. desktop build：例如 `0.1.0 (6)`，並註明平台（macOS / Windows）
+3. desktop build：例如 `0.1.0 (6)`，並註明平台（macOS / Windows / Linux）
 4. git tag：例如 `beta/v0.1.0-b6`
 5. 對應提交 SHA
 6. 本輪重點驗證項
@@ -248,25 +284,25 @@ git push origin beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION>
 
 ## 10. 目前已指令碼化的入口
 
-正式打包、Review 打包、TestFlight 上傳、Android APK 與 desktop DMG/EXE 打包都必須先選 release profile：
+正式打包、Review 打包、TestFlight 上傳、Android APK 與 desktop DMG/EXE/DEB 打包都必須先選 release profile：
 
 ```bash
-pnpm release --profile cn-prod --targets ios,mac,win
-pnpm release --profile global-prod --targets ios,mac,win
-pnpm release --profile cn-review --targets ios,mac,win
-pnpm release --profile global-review --targets ios,mac,win
+pnpm release --profile cn-prod --targets ios,mac,win,linux
+pnpm release --profile global-prod --targets ios,mac,win,linux
+pnpm release --profile cn-review --targets ios,mac,win,linux
+pnpm release --profile global-review --targets ios,mac,win,linux
 ```
 
 Android APK & AAB 可加入 `android` target：
 
 ```bash
-pnpm release --profile global-review --targets android,mac,win
+pnpm release --profile global-review --targets android,mac,win,linux
 ```
 
 可用 `--dry-run` 檢查實際會執行的 market、base URL 與命令，不會打包或上傳：
 
 ```bash
-pnpm release --profile global-review --targets ios,mac,win --dry-run
+pnpm release --profile global-review --targets ios,mac,win,linux --dry-run
 ```
 
 AI 或人工發佈時不得手動拼接 `SYNCFLOW_API_BASE_URL`、`VIVIDROP_API_BASE_URL`、`SYNCFLOW_MARKET` 來代替 profile。`*-prod` profile 不允許使用 Review Server；`*-review` profile 的 backend URL 必須是 `https://review-api.vividrop.cn`。
@@ -278,7 +314,8 @@ SERVER_ENV_FILE=/path/to/vivi-drop-server/.env.prod pnpm package:mobile:testflig
 pnpm build:mobile:android
 pnpm package:desktop:signed
 pnpm package:desktop:win
+pnpm package:desktop:linux
 pnpm tag:beta
 ```
 
-這些指令碼就是目前 beta 階段標準路徑，不再建議臨時發明另一套手工步驟。
+上述根目錄指令碼是目前 beta 階段可用入口；正式 / Review 發佈仍以 release profile 統一調度，不再建議臨時發明另一套手工步驟。

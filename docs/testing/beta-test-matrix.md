@@ -116,7 +116,7 @@ bash /Volumes/workspace/work/sync-flow/scripts/ios/syncflow_upload_eval.sh \
 
 ### 4.1 首次安装
 
-1. 安装 desktop（macOS DMG 或 Windows NSIS）+ sidecar
+1. 安装 desktop（macOS DMG / Windows NSIS / Linux `.deb`）+ sidecar
 2. 安装 mobile app（iOS / Android）
 3. 配对成功
 4. 首页显示已连接
@@ -152,7 +152,18 @@ bash /Volumes/workspace/work/sync-flow/scripts/ios/syncflow_upload_eval.sh \
 4. mobile 能发现并配对
 5. 触发一轮真实素材同步
 
-### 4.6 iOS thermal 回归
+### 4.6 Linux desktop 冒烟
+
+1. 在 Ubuntu 22.04 arm64 fresh install `ViviDrop-*-linux-arm64.deb`
+2. 在 Ubuntu 22.04 amd64 fresh install `ViviDrop-*-linux-amd64.deb`
+3. 启动 app，确认 sidecar health 进入 healthy
+4. 确认 `ss -ltnup` 能看到 `39393/TCP`、`39394/TCP`，并允许 `5353/UDP`
+5. 设置页显示 Linux 手动共享提示，不显示 Apple Bonjour 安装或 Windows 高级共享按钮
+6. iOS 真机发现 Linux desktop、配对并上传一轮素材
+7. Android 真机发现 Linux desktop、配对并上传一轮素材
+8. 重启 app 后确认历史、received library、paired devices 保持
+
+### 4.7 iOS thermal 回归
 
 1. 用长视频或大文件触发一轮持续上传
 2. 在上传过程中手动制造高热场景，确认同步不断开但速度下降
@@ -174,7 +185,7 @@ bash /Volumes/workspace/work/sync-flow/scripts/ios/syncflow_upload_eval.sh \
    - incremental rescan 日志显示 `deferring incremental rescan`
 9. Android 需完成基础构建与冒烟验证；iOS thermal 专属策略按本节验证
 
-### 4.7 Same-LAN Wake-on-LAN 回歸
+### 4.8 Same-LAN Wake-on-LAN 回歸
 
 本節只驗證 Phase 1 same-LAN wake。VPN 只作 fallback 情境，不作主流程；公網 router Wake-on-WAN / router helper 尚不是本階段驗收項。
 
@@ -209,19 +220,19 @@ bash /Volumes/workspace/work/sync-flow/scripts/ios/syncflow_upload_eval.sh \
 
 補充驗收情境：
 
-| 類別 | 情境 | 前置條件 / 操作 | 驗收口徑 |
-| --- | --- | --- | --- |
-| Shared files wake | macOS sleep -> mobile opens My Computer | Enable `Wake for network access`，bind mobile，let Mac sleep，open `我的電腦` | Mac wakes 或 mobile shows unavailable after bounded wake attempt；diagnostics show `wake packets sent packets=<n>` and either `wake LAN reachable host=<ip>` / `wake recovered LAN host` or `wake polling exhausted` |
-| Shared files wake | Windows sleep -> mobile opens My Computer | Enable BIOS/NIC WoL，bind mobile，let PC sleep，open `我的電腦` | PC wakes 或 mobile shows unavailable after bounded wake attempt；diagnostics show `wake packets sent packets=<n>` and probe result |
-| Metadata missing | Shared files opens without cached wake targets | 清掉或避免建立 bound desktop wake metadata，open `我的電腦` | 不送 wake packet；diagnostics show `wake skipped reason=<reason> metadata_missing_or_unusable`；fallback 行為不改動 pending queue |
-| Metadata missing | Sync status reconnect without cached wake targets | 清掉或避免建立 bound desktop wake metadata，tap `重新連接` | 不送 wake packet；diagnostics show `wake skipped reason=manual_lan_reconnect metadata_missing_or_unusable`；UI 維持既有 offline/backoff |
-| Router Wake-on-WAN follow-up | mobile outside LAN -> router public wake target configured -> mobile opens My Computer | Configure router directed broadcast / UDP forwarding or router WoL helper before desktop sleeps | Mobile sends configured public wake target first；diagnostics identify router/public target path before fallback guidance |
-| Peer proxy follow-up | macOS sleep -> mobile has online authenticated Win Vivi Drop Desktop peer -> mobile opens My Computer | Windows peer is authenticated, awake, online, and on the same LAN/VPN as the Mac；let Mac sleep，open `我的電腦` | 目前若 mobile 沒有 multi-desktop peer source，diagnostics show `peer proxy skipped reason=no_multi_desktop_binding_source`；後續完成 peer source / orchestration 後，Mac 才應 via Windows peer proxy wake，並出現 `wake packets sent via peer proxy to host=<peer>` |
-| Peer proxy skipped | No eligible Vivi Drop Desktop peer | Target desktop sleeps；no other authenticated awake Vivi Drop Desktop exists on same LAN/VPN | 不把任意 LAN device 當 relay；diagnostics show `peer proxy skipped reason=<reason>` |
-| Third-party helper follow-up | macOS sleep -> router-connected NAS/OpenWrt/Home Assistant exists but no helper is configured | Keep third-party device awake but do not configure supported helper / webhook / router API | Mobile does not treat the device as a peer proxy；diagnostics show helper not configured or no eligible Vivi Drop Desktop peer |
-| Sync status LAN reconnect wake | macOS/Windows sleep -> mobile shows offline -> user taps Reconnect | Enable platform WoL settings，bind mobile，let desktop sleep，open Sync Status，tap `重新連接` on same LAN or VPN-LAN | Desktop wakes or mobile remains offline after bounded LAN wake attempt；diagnostics include `lan_reconnect` reason；此入口是 LAN/VPN-LAN retry, not public Wake-on-WAN |
-| Passive offline display | macOS/Windows sleep -> mobile app opens and shows offline | Bind mobile，let desktop sleep，open mobile app without tapping `重新連接` or `我的電腦` | No wake packets are sent；desktop remains asleep until explicit user action |
-| Unsupported WoL path | Network or device blocks broadcast / magic packet wake | Disable NIC wake or use network that blocks broadcast | Mobile does not hang；existing P2P/direct fallback and unavailable UI remain usable；diagnostics show `wake polling exhausted` / `wake probe timed out` when packet send was attempted |
+| 類別                           | 情境                                                                                                  | 前置條件 / 操作                                                                                                       | 驗收口徑                                                                                                                                                                                                                                                            |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shared files wake              | macOS sleep -> mobile opens My Computer                                                               | Enable `Wake for network access`，bind mobile，let Mac sleep，open `我的電腦`                                         | Mac wakes 或 mobile shows unavailable after bounded wake attempt；diagnostics show `wake packets sent packets=<n>` and either `wake LAN reachable host=<ip>` / `wake recovered LAN host` or `wake polling exhausted`                                                |
+| Shared files wake              | Windows sleep -> mobile opens My Computer                                                             | Enable BIOS/NIC WoL，bind mobile，let PC sleep，open `我的電腦`                                                       | PC wakes 或 mobile shows unavailable after bounded wake attempt；diagnostics show `wake packets sent packets=<n>` and probe result                                                                                                                                  |
+| Metadata missing               | Shared files opens without cached wake targets                                                        | 清掉或避免建立 bound desktop wake metadata，open `我的電腦`                                                           | 不送 wake packet；diagnostics show `wake skipped reason=<reason> metadata_missing_or_unusable`；fallback 行為不改動 pending queue                                                                                                                                   |
+| Metadata missing               | Sync status reconnect without cached wake targets                                                     | 清掉或避免建立 bound desktop wake metadata，tap `重新連接`                                                            | 不送 wake packet；diagnostics show `wake skipped reason=manual_lan_reconnect metadata_missing_or_unusable`；UI 維持既有 offline/backoff                                                                                                                             |
+| Router Wake-on-WAN follow-up   | mobile outside LAN -> router public wake target configured -> mobile opens My Computer                | Configure router directed broadcast / UDP forwarding or router WoL helper before desktop sleeps                       | Mobile sends configured public wake target first；diagnostics identify router/public target path before fallback guidance                                                                                                                                           |
+| Peer proxy follow-up           | macOS sleep -> mobile has online authenticated Win Vivi Drop Desktop peer -> mobile opens My Computer | Windows peer is authenticated, awake, online, and on the same LAN/VPN as the Mac；let Mac sleep，open `我的電腦`      | 目前若 mobile 沒有 multi-desktop peer source，diagnostics show `peer proxy skipped reason=no_multi_desktop_binding_source`；後續完成 peer source / orchestration 後，Mac 才應 via Windows peer proxy wake，並出現 `wake packets sent via peer proxy to host=<peer>` |
+| Peer proxy skipped             | No eligible Vivi Drop Desktop peer                                                                    | Target desktop sleeps；no other authenticated awake Vivi Drop Desktop exists on same LAN/VPN                          | 不把任意 LAN device 當 relay；diagnostics show `peer proxy skipped reason=<reason>`                                                                                                                                                                                 |
+| Third-party helper follow-up   | macOS sleep -> router-connected NAS/OpenWrt/Home Assistant exists but no helper is configured         | Keep third-party device awake but do not configure supported helper / webhook / router API                            | Mobile does not treat the device as a peer proxy；diagnostics show helper not configured or no eligible Vivi Drop Desktop peer                                                                                                                                      |
+| Sync status LAN reconnect wake | macOS/Windows sleep -> mobile shows offline -> user taps Reconnect                                    | Enable platform WoL settings，bind mobile，let desktop sleep，open Sync Status，tap `重新連接` on same LAN or VPN-LAN | Desktop wakes or mobile remains offline after bounded LAN wake attempt；diagnostics include `lan_reconnect` reason；此入口是 LAN/VPN-LAN retry, not public Wake-on-WAN                                                                                              |
+| Passive offline display        | macOS/Windows sleep -> mobile app opens and shows offline                                             | Bind mobile，let desktop sleep，open mobile app without tapping `重新連接` or `我的電腦`                              | No wake packets are sent；desktop remains asleep until explicit user action                                                                                                                                                                                         |
+| Unsupported WoL path           | Network or device blocks broadcast / magic packet wake                                                | Disable NIC wake or use network that blocks broadcast                                                                 | Mobile does not hang；existing P2P/direct fallback and unavailable UI remain usable；diagnostics show `wake polling exhausted` / `wake probe timed out` when packet send was attempted                                                                              |
 
 ## 5. 当前已覆盖的重点场景
 
@@ -248,8 +259,9 @@ bash /Volumes/workspace/work/sync-flow/scripts/ios/syncflow_upload_eval.sh \
 5. `batch + recovery-sidecar + recovery-late-sidecar + recovery-app` 至少各过 1 轮
 6. 真实设备上手工验证一次：后台上传 + 断网恢复
 7. 如本轮包含 Windows 桌面包，至少完成一次 NSIS fresh install + 配对上传冒烟
-8. 如本轮包含 iOS thermal 策略改动，至少完成一次 serious/critical thermal 手工回归并导出 mobile diagnostics
-9. 如本輪包含 Wake-on-LAN 相關改動，至少完成一次 same-LAN `我的電腦` 喚醒回歸，並確認 `重新連接` 仍是 LAN / VPN-LAN retry，不是公網 wake
+8. 如本轮包含 Linux 桌面包，至少完成 Ubuntu 22.04 arm64 和 amd64 `.deb` fresh install + iOS / Android 真机配对上传冒烟
+9. 如本轮包含 iOS thermal 策略改动，至少完成一次 serious/critical thermal 手工回归并导出 mobile diagnostics
+10. 如本輪包含 Wake-on-LAN 相關改動，至少完成一次 same-LAN `我的電腦` 喚醒回歸，並確認 `重新連接` 仍是 LAN / VPN-LAN retry，不是公網 wake
 
 ## 7. 日志与产物
 
