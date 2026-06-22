@@ -1,4 +1,4 @@
-import { app, BrowserWindow, powerMonitor, powerSaveBlocker } from 'electron';
+import { app, BrowserWindow, powerMonitor, powerSaveBlocker, screen } from 'electron';
 import log from 'electron-log';
 import { join } from 'path';
 import { registerIpcHandlers } from './ipc-handlers';
@@ -14,8 +14,10 @@ import { sidecarClient } from './sidecar-client';
 import { checkForUpdatesOnStartup } from './startup-update-check';
 import { createVideoThumbnailEventHandler } from './video-thumbnail-generator';
 import { WsBridge } from './ws-bridge';
+import { getMainWindowChromeOptions, getMainWindowSizeOptions } from './window-chrome';
 import type { SidecarRuntimeState } from '../shared/sidecar-runtime';
 import { getProductName } from '../shared/market';
+import { shouldHideApplicationMenu } from '../shared/platform-capabilities';
 
 // Prevent crash on broken pipe (sidecar stdout/stderr)
 process.on('uncaughtException', (err) => {
@@ -62,14 +64,12 @@ sidecar.on('state', (state: SidecarRuntimeState) => {
 });
 
 export async function createMainWindow() {
+  const { workAreaSize } = screen.getPrimaryDisplay();
   mainWindow = new BrowserWindow({
     title: getProductName(),
-    width: 1200,
-    height: 800,
-    minWidth: 1200,
-    minHeight: 800,
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    ...getMainWindowSizeOptions(workAreaSize),
     backgroundColor: '#f4f8fb',
+    ...getMainWindowChromeOptions(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -78,6 +78,9 @@ export async function createMainWindow() {
     },
   });
   attachRendererLogging(mainWindow);
+  if (shouldHideApplicationMenu()) {
+    mainWindow.setMenuBarVisibility(false);
+  }
 
   if (isDev && process.env['ELECTRON_RENDERER_URL']) {
     await mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);

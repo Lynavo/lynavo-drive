@@ -437,13 +437,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private let albumBrowserQueueKey = DispatchSpecificKey<Void>()
 
     private func preferredSidecarHost(probedHost: String?, device: DiscoveredDevice?) -> String? {
-        if let probedHost, !probedHost.isEmpty, !probedHost.contains(":") {
-            return probedHost
-        }
-        if let device, !device.ip.isEmpty {
-            return device.ip
-        }
-        return probedHost
+        SidecarHostResolutionPolicy.preferredHost(
+            probedHost: probedHost,
+            deviceHost: device?.ip
+        )
     }
 
     private func diagnosticsTimestamp() -> String {
@@ -1229,6 +1226,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         fallbackHost: String? = nil,
         fallbackPort: UInt16? = nil
     ) async throws {
+        let usableFallbackHost = SidecarHostResolutionPolicy.usableFallbackHost(fallbackHost)
+
         if let forcedTarget = resolvedForcedSidecarTarget() {
             try await session.connect(host: forcedTarget.host, port: forcedTarget.port)
             return
@@ -1244,14 +1243,23 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             return
         }
 
+        if SidecarHostResolutionPolicy.isLoopbackHost(device?.ip),
+           let usableFallbackHost {
+            try await session.connect(
+                host: usableFallbackHost,
+                port: fallbackPort ?? 39393
+            )
+            return
+        }
+
         if let endpoint = device?.endpoint {
             try await session.connect(endpoint: endpoint)
             return
         }
 
-        if let fallbackHost, !fallbackHost.isEmpty {
+        if let usableFallbackHost {
             try await session.connect(
-                host: fallbackHost,
+                host: usableFallbackHost,
                 port: fallbackPort ?? 39393
             )
             return
@@ -4343,12 +4351,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         protocolSession = session
         activeUploadSession = session
         let wasConnectedBeforeUpload = bindingConnectionState == .connected
-        let trimmedBindingHost = binding.host.trimmingCharacters(in: .whitespacesAndNewlines)
+        let usableBindingHost = SidecarHostResolutionPolicy.usableFallbackHost(binding.host)
         let roundTargetDeviceType = uploadTargetDeviceType(for: binding)
         let hasForcedSidecarTarget = resolvedForcedSidecarTarget() != nil
         let canUseKnownConnectedHost =
             wasConnectedBeforeUpload &&
-            !trimmedBindingHost.isEmpty &&
+            usableBindingHost != nil &&
             !hasForcedSidecarTarget
         if !recoveryMode {
             updateBindingConnectionState(.connecting, reason: "connect_and_upload_started")
@@ -4427,7 +4435,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             discoveryService.startBrowsing()
             syncDiagnosticsLog(
                 "SyncPipeline",
-                "using connected binding host without blocking discovery host=\(trimmedBindingHost)"
+                "using connected binding host without blocking discovery host=\(usableBindingHost ?? "nil")"
             )
         } else if targetDevice == nil && !hasForcedSidecarTarget {
             discoveryService.startBrowsing()
@@ -4448,7 +4456,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         )
         try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
         sidecarHost = preferredSidecarHost(probedHost: newTransport.remoteHost, device: targetDevice)
-            ?? (trimmedBindingHost.isEmpty ? nil : trimmedBindingHost)
+            ?? usableBindingHost
         slog("[SyncPipeline] TCP connected to %@", sidecarHost ?? "unknown")
         syncDiagnosticsLog("SyncPipeline", "TCP connected to \(sidecarHost ?? "unknown")")
 
@@ -5820,8 +5828,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             return
         }
 
-        if await canReachSharedFilesLANHost(binding.host, timeout: 1.5) {
-            sidecarHost = binding.host
+        if let usableBindingHost = SidecarHostResolutionPolicy.usableFallbackHost(binding.host),
+           await canReachSharedFilesLANHost(usableBindingHost, timeout: 1.5) {
+            sidecarHost = usableBindingHost
             updateBindingConnectionState(.connected, reason: "manual_lan_reconnect_succeeded")
             startSync()
             return
@@ -6544,6 +6553,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         )
         try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
         sidecarHost = preferredSidecarHost(probedHost: transport.remoteHost, device: targetDevice)
+            ?? SidecarHostResolutionPolicy.usableFallbackHost(binding.host)
         slog("[SyncPipeline] resolved sidecar host: %@", sidecarHost ?? "nil")
 
         // Auth so sidecar registers us as connected

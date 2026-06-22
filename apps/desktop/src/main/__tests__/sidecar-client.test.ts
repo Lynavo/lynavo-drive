@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { logInfoMock, logWarnMock, logErrorMock } = vi.hoisted(() => ({
+const { electronAppState, logInfoMock, logWarnMock, logErrorMock } = vi.hoisted(() => ({
+  electronAppState: { isPackaged: false },
   logInfoMock: vi.fn(),
   logWarnMock: vi.fn(),
   logErrorMock: vi.fn(),
@@ -22,6 +23,9 @@ vi.mock('electron', () => {
   } catch {}
   return {
     app: {
+      get isPackaged() {
+        return electronAppState.isPackaged;
+      },
       getAppPath: () => appPath,
       getName: () => 'Vivi Drop',
       getVersion: () => '0.1.0',
@@ -95,6 +99,7 @@ describe('sidecarClient', () => {
       } catch {}
     }
     vi.clearAllMocks();
+    electronAppState.isPackaged = false;
   });
 
   it('fetches client config from the public API without user auth', async () => {
@@ -2480,6 +2485,65 @@ describe('sidecarClient', () => {
         '[sidecar-client] Clearing sidecar account context and tunnel credentials: no active auth session or access token.',
         expect.anything(),
       );
+
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    });
+
+    it('allows packaged QA builds to skip auth only when explicitly enabled', async () => {
+      const sidecarPayloads: unknown[] = [];
+      const httpRequest = vi.fn((options: RequestOptions, callback: (res: unknown) => void) => {
+        const req = new EventEmitter() as EventEmitter & {
+          on: typeof EventEmitter.prototype.on;
+          write: ReturnType<typeof vi.fn>;
+          end: ReturnType<typeof vi.fn>;
+        };
+        req.write = vi.fn((chunk: string) => {
+          sidecarPayloads.push({
+            path: options.path,
+            body: JSON.parse(chunk),
+          });
+        });
+        req.end = vi.fn();
+        callback(
+          createResponse(200, JSON.stringify({ ok: true, message: 'account context synced' })),
+        );
+        return req;
+      });
+      const httpsRequest = vi.fn();
+
+      vi.doMock('node:http', () => ({
+        default: { request: httpRequest },
+        request: httpRequest,
+      }));
+      vi.doMock('node:https', () => ({
+        default: { request: httpsRequest },
+        request: httpsRequest,
+      }));
+
+      vi.resetModules();
+      electronAppState.isPackaged = true;
+      vi.stubEnv('SYNCFLOW_QA_SKIP_AUTH', '1');
+      vi.stubEnv('SYNCFLOW_QA_SKIP_AUTH_EMAIL', 'qa-windows@example.com');
+      const { sidecarClient: client, syncCredentialsToSidecar } = await import('../sidecar-client');
+
+      await expect(client.getAuthSessionView()).resolves.toEqual({
+        loggedIn: true,
+        email: 'qa-windows@example.com',
+        accountLabel: 'qa-windows@example.com',
+      });
+      await expect(syncCredentialsToSidecar()).resolves.toBe(true);
+      expect(sidecarPayloads).toEqual([
+        {
+          path: '/account/context',
+          body: {
+            authBaseUrl: 'dev-sandbox://auth',
+            accessToken: 'mock-sandbox-access-token:qa-windows@example.com',
+            accountId: '99999',
+          },
+        },
+      ]);
+      expect(httpsRequest).not.toHaveBeenCalled();
 
       vi.unstubAllEnvs();
       vi.resetModules();

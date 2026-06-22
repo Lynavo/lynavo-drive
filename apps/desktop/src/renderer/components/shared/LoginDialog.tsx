@@ -10,6 +10,7 @@ import vividropLogo from '@renderer/assets/vividrop-logo-cutout.png';
 import { Button } from '@renderer/components/ui/button';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
+import { shouldShowAppleOAuth } from '@renderer/lib/oauth-platform';
 import {
   Dialog,
   DialogContent,
@@ -301,6 +302,7 @@ export function LoginDialog({
 }: LoginDialogProps) {
   const { t, i18n } = useTranslation();
   const isGlobal = isGlobalMarket();
+  const showAppleOAuth = shouldShowAppleOAuth(window.electronAPI?.platform);
 
   const [selectedCountry, setSelectedCountry] = useState<CountryCodeInfo>(() =>
     resolveDefaultCountry({
@@ -553,22 +555,24 @@ export function LoginDialog({
                   </>
                 )}
               </Button>
-              <Button
-                variant="outline"
-                type="button"
-                onClick={() => void handleOAuthLogin('apple')}
-                disabled={isLoggingIn || isSendingCode}
-                className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-white/70 bg-white/58 text-sm font-semibold text-[#17191c] shadow-[0_10px_30px_rgba(90,120,170,0.08)] transition hover:bg-white/82"
-              >
-                {isLoggingIn ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    <AppleIcon className="h-4 w-4" />
-                    {t('settings.giftCard.phoneLogin.oauth.continueWithApple')}
-                  </>
-                )}
-              </Button>
+              {showAppleOAuth ? (
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => void handleOAuthLogin('apple')}
+                  disabled={isLoggingIn || isSendingCode}
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-white/70 bg-white/58 text-sm font-semibold text-[#17191c] shadow-[0_10px_30px_rgba(90,120,170,0.08)] transition hover:bg-white/82"
+                >
+                  {isLoggingIn ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <AppleIcon className="h-4 w-4" />
+                      {t('settings.giftCard.phoneLogin.oauth.continueWithApple')}
+                    </>
+                  )}
+                </Button>
+              ) : null}
               <div className="my-2 flex items-center">
                 <div className="h-[1px] flex-grow bg-white/70" />
                 <span className="mx-3 text-[11px] font-semibold text-[#8d96a3]">

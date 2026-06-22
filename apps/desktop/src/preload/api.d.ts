@@ -11,7 +11,6 @@ import type {
   DeviceFileLedgerPageDTO,
   DeviceFileSortField,
   ReceivedLibraryPageDTO,
-  ReceivedLibraryItemDTO,
   SettingsDTO,
   SharedDirectoryDTO,
   ShareStatusDTO,
@@ -161,6 +160,9 @@ export interface ElectronAPI {
   platform: {
     isMac(): boolean;
     isWindows(): boolean;
+    supportsAppleAuth(): boolean;
+    usesTitleBarOverlayControls(): boolean;
+    isAuthBypassEnabled(): boolean;
     getHomeDir(): string;
     getHostName(): string;
     getLocalIPs(): string[];

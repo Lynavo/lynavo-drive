@@ -55,6 +55,8 @@ const ReceivedLibraryPage = lazy(() =>
   })),
 );
 
+const TITLE_BAR_OVERLAY_CONTROLS_INSET = 154;
+
 function PageFallback() {
   return <Skeleton className="flex-1" />;
 }
@@ -270,7 +272,11 @@ export function AppShell() {
   const logout = useAuthStore((s) => s.logout);
   const [downloadPanelOpen, setDownloadPanelOpen] = useState(false);
   const [authInitialized, setAuthInitialized] = useState(false);
-  const [connectionSetupComplete, setConnectionSetupComplete] = useState(false);
+  const authBypassEnabled = window.electronAPI?.platform?.isAuthBypassEnabled?.() ?? false;
+  const [connectionSetupComplete, setConnectionSetupComplete] = useState(authBypassEnabled);
+  const usesTitleBarOverlay =
+    window.electronAPI?.platform?.usesTitleBarOverlayControls?.() ??
+    !(window.electronAPI?.platform?.isMac?.() ?? true);
 
   useEffect(() => {
     let active = true;
@@ -286,9 +292,16 @@ export function AppShell() {
 
   useEffect(() => {
     if (!session) {
-      setConnectionSetupComplete(false);
+      if (!authBypassEnabled) {
+        setConnectionSetupComplete(false);
+      }
+      return;
     }
-  }, [session]);
+
+    if (authBypassEnabled) {
+      setConnectionSetupComplete(true);
+    }
+  }, [authBypassEnabled, session]);
 
   useEffect(() => {
     if (!session) return;
@@ -436,8 +449,14 @@ export function AppShell() {
       >
         {/* Global top-right header */}
         <div
-          className="fixed right-7 top-6 z-50"
-          style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
+          data-testid="global-top-actions"
+          className="fixed top-6 z-50"
+          style={
+            {
+              WebkitAppRegion: 'no-drag',
+              right: usesTitleBarOverlay ? TITLE_BAR_OVERLAY_CONTROLS_INSET : 28,
+            } as CSSProperties
+          }
         >
           <div className="flex items-center justify-end gap-2">
             <button

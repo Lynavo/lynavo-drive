@@ -10,16 +10,10 @@ private func isIPv4Address(_ host: String) -> Bool {
 }
 
 private func preferredDiscoveryHost(advertisedIP: String, probedHost: String) -> String {
-    if isIPv4Address(probedHost) {
-        return probedHost
-    }
-    if isIPv4Address(advertisedIP) {
-        return advertisedIP
-    }
-    if !probedHost.isEmpty {
-        return probedHost
-    }
-    return advertisedIP
+    SidecarHostResolutionPolicy.preferredHost(
+        probedHost: probedHost,
+        deviceHost: advertisedIP
+    ) ?? ""
 }
 
 private func endpointDebugDescription(_ endpoint: NWEndpoint?) -> String {

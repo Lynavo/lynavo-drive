@@ -162,8 +162,20 @@ function isDevSkipAuthEnabled(): boolean {
   return app.isPackaged !== true && process.env.SYNCFLOW_DEV_SKIP_AUTH === '1';
 }
 
-function getDevSkipAuthEmail(): string {
-  return process.env.SYNCFLOW_DEV_SKIP_AUTH_EMAIL?.trim() || 'qa@example.com';
+function isQaSkipAuthEnabled(): boolean {
+  return process.env.SYNCFLOW_QA_SKIP_AUTH === '1';
+}
+
+function isSkipAuthEnabled(): boolean {
+  return isDevSkipAuthEnabled() || isQaSkipAuthEnabled();
+}
+
+function getSkipAuthEmail(): string {
+  return (
+    process.env.SYNCFLOW_QA_SKIP_AUTH_EMAIL?.trim() ||
+    process.env.SYNCFLOW_DEV_SKIP_AUTH_EMAIL?.trim() ||
+    'qa@example.com'
+  );
 }
 
 function parsePositiveInteger(value: string | undefined, fallback: number): number {
@@ -264,7 +276,7 @@ function loadSession(): AuthSession | null {
 
 function ensureSessionLoaded(): void {
   if (!authSessionLoaded) {
-    authSession = isDevSkipAuthEnabled() ? createDevSkipAuthSession() : loadSession();
+    authSession = isSkipAuthEnabled() ? createSkipAuthSession() : loadSession();
     authSessionLoaded = true;
   }
 }
@@ -344,8 +356,8 @@ function createAuthSession(
   };
 }
 
-function createDevSkipAuthSession(): AuthSession {
-  const email = getDevSkipAuthEmail();
+function createSkipAuthSession(): AuthSession {
+  const email = getSkipAuthEmail();
   return createAuthSession(
     `${DEV_SANDBOX_ACCESS_TOKEN_PREFIX}:${email}`,
     DEV_SANDBOX_REFRESH_TOKEN,

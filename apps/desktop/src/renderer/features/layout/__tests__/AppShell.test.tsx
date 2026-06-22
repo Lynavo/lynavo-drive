@@ -57,6 +57,7 @@ vi.mock('@renderer/features/directory/DirectoryPage', () => ({
 
 function installElectronAPI(
   session: AuthSessionView | null = { loggedIn: true, email: 'ada@example.com' },
+  platform: Partial<Window['electronAPI']['platform']> = {},
 ) {
   let sidecarEventCallback: ((event: SidecarEvent) => void) | null = null;
   const onSidecarEvent = vi.fn((callback: (event: SidecarEvent) => void) => {
@@ -89,6 +90,15 @@ function installElectronAPI(
     auth: {
       getAuthSession: vi.fn().mockResolvedValue(session),
       logout: vi.fn().mockResolvedValue({ ok: true }),
+    },
+    platform: {
+      isMac: vi.fn(() => true),
+      isWindows: vi.fn(() => false),
+      usesTitleBarOverlayControls: vi.fn(() => false),
+      getHomeDir: vi.fn(() => '/Users/ada'),
+      getHostName: vi.fn(() => 'Ada-MacBook-Pro'),
+      getLocalIPs: vi.fn(() => ['192.168.1.10']),
+      ...platform,
     },
   } as unknown as Window['electronAPI'];
 
@@ -160,6 +170,18 @@ describe('AppShell', () => {
     });
     expect(getAuthSession).not.toHaveBeenCalled();
     expect(onSidecarEvent).toHaveBeenCalled();
+  });
+
+  it('enters the desktop shell immediately when auth bypass is enabled for QA', async () => {
+    installElectronAPI(undefined, {
+      isAuthBypassEnabled: vi.fn(() => true),
+    } as Partial<Window['electronAPI']['platform']>);
+
+    render(<AppShell />);
+
+    expect(await screen.findByTestId('sidebar')).toBeInTheDocument();
+    expect(await screen.findByText('DashboardPage')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '设置连接码' })).not.toBeInTheDocument();
   });
 
   it('renders the connection code setup page after authentication before the desktop shell', async () => {
@@ -269,5 +291,18 @@ describe('AppShell', () => {
     expect(screen.getByText('扫码下载移动端')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'App Store' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Android' })).toBeInTheDocument();
+  });
+
+  it('keeps top actions clear of non-macOS native caption buttons', async () => {
+    installElectronAPI(undefined, {
+      isMac: vi.fn(() => false),
+      isWindows: vi.fn(() => false),
+      usesTitleBarOverlayControls: vi.fn(() => true),
+    });
+
+    render(<AppShell />);
+
+    await completeConnectionCodeSetup();
+    expect(await screen.findByTestId('global-top-actions')).toHaveStyle({ right: '154px' });
   });
 });

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import vividropLogo from '@renderer/assets/vividrop-logo-cutout.png';
+import { shouldShowAppleOAuth } from '@renderer/lib/oauth-platform';
 
 type AuthProvider = 'google' | 'apple';
 
@@ -54,6 +55,7 @@ function getOAuthErrorMessage(result: AuthResult, provider: AuthProvider): strin
 }
 
 export function AuthPage({ onAuthenticated }: AuthPageProps) {
+  const showAppleOAuth = shouldShowAppleOAuth(window.electronAPI?.platform);
   const [agreedToPrivacy, setAgreedToPrivacy] = useState(false);
   const [showAgreementHint, setShowAgreementHint] = useState(false);
   const [loadingProvider, setLoadingProvider] = useState<AuthProvider | null>(null);
@@ -220,19 +222,21 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
                 )}
                 使用 Google 继续
               </button>
-              <button
-                type="button"
-                onClick={() => void handleProviderClick('apple')}
-                disabled={loadingProvider !== null}
-                className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-white/70 bg-white/58 text-sm font-semibold text-[#17191c] shadow-[0_10px_30px_rgba(90,120,170,0.08)] transition hover:bg-white/82 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {loadingProvider === 'apple' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <AppleIcon className="h-4 w-4 shrink-0 text-[#17191c]" />
-                )}
-                使用 Apple 继续
-              </button>
+              {showAppleOAuth ? (
+                <button
+                  type="button"
+                  onClick={() => void handleProviderClick('apple')}
+                  disabled={loadingProvider !== null}
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-white/70 bg-white/58 text-sm font-semibold text-[#17191c] shadow-[0_10px_30px_rgba(90,120,170,0.08)] transition hover:bg-white/82 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {loadingProvider === 'apple' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <AppleIcon className="h-4 w-4 shrink-0 text-[#17191c]" />
+                  )}
+                  使用 Apple 继续
+                </button>
+              ) : null}
 
               <div className="my-2 flex items-center">
                 <div className="h-[1px] flex-grow bg-[#cfd6df]/40" />

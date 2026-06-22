@@ -16,10 +16,12 @@ function setAuthAPI({
   sendSMSCode = vi.fn().mockResolvedValue({ ok: true }),
   loginWithSMSCode = vi.fn().mockResolvedValue({ ok: true }),
   loginWithOAuth = vi.fn().mockResolvedValue({ ok: true }),
+  platform = {},
 }: {
   sendSMSCode?: ReturnType<typeof vi.fn>;
   loginWithSMSCode?: ReturnType<typeof vi.fn>;
   loginWithOAuth?: ReturnType<typeof vi.fn>;
+  platform?: Partial<Window['electronAPI']['platform']>;
 } = {}) {
   Object.defineProperty(window, 'electronAPI', {
     configurable: true,
@@ -28,6 +30,15 @@ function setAuthAPI({
         sendSMSCode,
         loginWithSMSCode,
         loginWithOAuth,
+      },
+      platform: {
+        isMac: vi.fn(() => true),
+        isWindows: vi.fn(() => false),
+        supportsAppleAuth: vi.fn(() => true),
+        getHomeDir: vi.fn(() => '/Users/ada'),
+        getHostName: vi.fn(() => 'Ada-MacBook-Pro'),
+        getLocalIPs: vi.fn(() => ['192.168.1.10']),
+        ...platform,
       },
     } as unknown as Window['electronAPI'],
   });
@@ -238,5 +249,40 @@ describe('LoginDialog', () => {
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Google 登入失敗');
     });
+  });
+
+  it('hides Apple OAuth when the desktop platform does not support Apple auth', () => {
+    vi.stubEnv('SYNCFLOW_MARKET', 'global');
+    setAuthAPI({
+      platform: {
+        isMac: vi.fn(() => false),
+        isWindows: vi.fn(() => false),
+        supportsAppleAuth: vi.fn(() => false),
+      },
+    });
+
+    renderLoginDialog();
+
+    expect(screen.getByRole('button', { name: '使用 Google 继续' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '使用 Apple 继续' })).not.toBeInTheDocument();
+  });
+
+  it('hides Apple OAuth when platform capability detection is unavailable', () => {
+    vi.stubEnv('SYNCFLOW_MARKET', 'global');
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        auth: {
+          sendSMSCode: vi.fn().mockResolvedValue({ ok: true }),
+          loginWithSMSCode: vi.fn().mockResolvedValue({ ok: true }),
+          loginWithOAuth: vi.fn().mockResolvedValue({ ok: true }),
+        },
+      } as unknown as Window['electronAPI'],
+    });
+
+    renderLoginDialog();
+
+    expect(screen.getByRole('button', { name: '使用 Google 继续' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '使用 Apple 继续' })).not.toBeInTheDocument();
   });
 });
