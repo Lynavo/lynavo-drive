@@ -86,10 +86,13 @@ function CameraQRScannerScreen() {
             const ipMatch = value.match(/ip=([^&"]+)/);
             const codeMatch = value.match(/code=([^&"]+)/);
             const nameMatch = value.match(/name=([^&"]+)/);
+            const deviceMatch = value.match(/device=([^&"]+)/);
             if (ipMatch && codeMatch) {
-              ip = ipMatch[1].trim();
-              code = codeMatch[1].trim();
-              if (nameMatch) deviceName = decodeURIComponent(nameMatch[1]).trim();
+              ip = decodeURIComponent(ipMatch[1]).trim();
+              code = decodeURIComponent(codeMatch[1]).trim();
+              const displayNameMatch = nameMatch || deviceMatch;
+              if (displayNameMatch)
+                deviceName = decodeURIComponent(displayNameMatch[1]).trim();
               isValid = true;
             }
           }

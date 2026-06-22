@@ -490,7 +490,7 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     expect(screen.queryByText('已发现 1 台')).toBeNull();
   });
 
-  it('directly reconnects a known discovered desktop in switch mode', async () => {
+  it('opens connection code entry for a known discovered desktop in switch mode', async () => {
     mockRouteParams = { mode: 'switch' };
     mockGetBindingState.mockResolvedValue({
       deviceId: 'other-desktop',
@@ -524,29 +524,15 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     });
 
     await waitFor(() => {
-      expect(mockPairDevice).toHaveBeenCalledWith({
-        deviceId: 'studio-mac',
-        host: '192.168.31.8',
-        port: 39393,
-        connectionCode: '',
-      });
+      expect(screen.getByPlaceholderText('例如 A8X2K9')).toBeTruthy();
     });
-    expect(mockAddDesktop).toHaveBeenCalledWith({
-      desktopDeviceId: 'studio-mac',
-      desktopName: 'Studio Mac',
-      host: '192.168.31.8',
-      port: 39393,
-      authorizationStatus: 'authorized',
-    });
+    expect(mockPairDevice).not.toHaveBeenCalled();
+    expect(mockAddDesktop).not.toHaveBeenCalled();
     expect(screen.queryByText('选择连接方式')).toBeNull();
-    expect(mockDispatch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'RESET',
-      }),
-    );
+    expect(mockDispatch).not.toHaveBeenCalled();
   });
 
-  it('shows a failure state when direct switch to a discovered desktop fails', async () => {
+  it('does not direct-reconnect a discovered desktop before entering a code', async () => {
     mockRouteParams = { mode: 'switch' };
     mockGetBindingState.mockResolvedValue({
       deviceId: 'other-desktop',
@@ -554,9 +540,6 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
       connectionState: 'connected',
     });
     mockGetKnownDeviceIds.mockResolvedValue(['studio-mac']);
-    mockPairDevice.mockRejectedValueOnce(
-      new PairingError('Pair token invalid', 'unknown'),
-    );
     jest
       .spyOn(NativeEventEmitter.prototype, 'addListener')
       .mockImplementation((_event, listener) => {
@@ -583,11 +566,9 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('连接失败')).toBeTruthy();
+      expect(screen.getByPlaceholderText('例如 A8X2K9')).toBeTruthy();
     });
-    expect(
-      screen.getByText('连接失败，请确认电脑端在线后重试。'),
-    ).toBeTruthy();
+    expect(mockPairDevice).not.toHaveBeenCalled();
     expect(screen.queryByText('选择连接方式')).toBeNull();
     expect(mockDispatch).not.toHaveBeenCalled();
   });
@@ -606,7 +587,7 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     expect(screen.queryByText('选择连接方式')).toBeNull();
   });
 
-  it('opens manual pairing after the guide is dismissed', async () => {
+  it('opens manual pairing options after the guide is dismissed', async () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
@@ -622,6 +603,40 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     fireEvent.press(screen.getByText('手动配对'));
 
     expect(screen.queryByText('先连接电脑')).toBeNull();
+    expect(screen.getByText('扫码配对')).toBeTruthy();
+    expect(screen.getByText('手动输入 IP')).toBeTruthy();
+  });
+
+  it('opens camera permission prompt from the manual scan pairing option', async () => {
+    mockHasSeenUnconnectedGuide.mockResolvedValue(true);
+
+    const screen = render(<DeviceDiscoveryGlobalScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('手动配对')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText('手动配对'));
+    fireEvent.press(screen.getByText('扫码配对'));
+
+    await waitFor(() => {
+      expect(screen.getByText('允许相机访问')).toBeTruthy();
+    });
+    expect(screen.getByText('允许')).toBeTruthy();
+  });
+
+  it('opens manual IP input from the manual pairing options', async () => {
+    mockHasSeenUnconnectedGuide.mockResolvedValue(true);
+
+    const screen = render(<DeviceDiscoveryGlobalScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('手动配对')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText('手动配对'));
+    fireEvent.press(screen.getByText('手动输入 IP'));
+
     expect(screen.getByPlaceholderText('192.168.31.21')).toBeTruthy();
   });
 
@@ -680,10 +695,9 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
       });
     });
     await waitFor(() => {
-      expect(screen.getByText('选择连接方式')).toBeTruthy();
+      expect(screen.getByPlaceholderText('例如 A8X2K9')).toBeTruthy();
     });
-    expect(screen.getByText('扫码连接')).toBeTruthy();
-    expect(screen.getByText('输入连接码')).toBeTruthy();
+    expect(screen.queryByText('选择连接方式')).toBeNull();
     expect(mockDispatch).not.toHaveBeenCalled();
   });
 
@@ -697,6 +711,7 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     });
 
     fireEvent.press(screen.getByText('手动配对'));
+    fireEvent.press(screen.getByText('手动输入 IP'));
     fireEvent.changeText(
       screen.getByPlaceholderText('192.168.31.21'),
       '192.168.31.44',
@@ -759,6 +774,7 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
       });
 
       fireEvent.press(screen.getByText('手动配对'));
+      fireEvent.press(screen.getByText('手动输入 IP'));
       fireEvent.changeText(
         screen.getByPlaceholderText('192.168.31.21'),
         '192.168.31.44',

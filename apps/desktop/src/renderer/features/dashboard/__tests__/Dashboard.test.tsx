@@ -13,6 +13,20 @@ vi.mock('sonner', () => ({
   },
 }));
 
+vi.mock('qrcode.react', () => ({
+  QRCodeSVG: ({
+    value,
+    title,
+  }: {
+    value: string;
+    title?: string;
+  }) => (
+    <svg data-testid="connection-qr-code" data-value={value}>
+      {title ? <title>{title}</title> : null}
+    </svg>
+  ),
+}));
+
 describe('Dashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -71,7 +85,7 @@ describe('Dashboard', () => {
         isWindows: vi.fn().mockReturnValue(false),
         getHomeDir: vi.fn().mockReturnValue('/home/test'),
         getHostName: vi.fn().mockReturnValue('test-host'),
-        getLocalIPs: vi.fn().mockReturnValue([]),
+        getLocalIPs: vi.fn().mockReturnValue(['192.168.31.8']),
       },
     };
 
@@ -107,6 +121,20 @@ describe('Dashboard', () => {
 
     expect(screen.getByText('手机扫码配对该电脑')).toBeInTheDocument();
     expect(screen.getByTitle('ViviDrop 连接二维码')).toBeInTheDocument();
+  });
+
+  it('includes the desktop LAN IP in the connection QR code payload', () => {
+    render(<Dashboard />);
+
+    fireEvent.click(screen.getByRole('button', { name: '显示连接二维码' }));
+
+    const qrValue = screen
+      .getByTestId('connection-qr-code')
+      .getAttribute('data-value');
+
+    expect(qrValue).toBe(
+      'vividrop://connect?ip=192.168.31.8&device=Test%20PC&code=998877',
+    );
   });
 
   it('triggers copy connection code', async () => {

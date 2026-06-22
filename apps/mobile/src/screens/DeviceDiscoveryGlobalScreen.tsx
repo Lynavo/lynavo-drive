@@ -708,8 +708,8 @@ export function DeviceDiscoveryGlobalScreen() {
     }
   }, [mode, navigation]);
 
-  const openMethodModal = useCallback(
-    async (device: DiscoveredDevice) => {
+  const openDeviceCodeModal = useCallback(
+    (device: DiscoveredDevice) => {
       if (showGuide) {
         return;
       }
@@ -726,61 +726,10 @@ export function DeviceDiscoveryGlobalScreen() {
         return;
       }
 
-      if (mode === 'switch' && knownDeviceIds.has(device.deviceId)) {
-        setSelectedDevice(device);
-        setConnectionCode('');
-        setCodeError(null);
-        setConnectionFailure(null);
-        setConnectionStatus('ready');
-        setVerifying(true);
-
-        try {
-          await pairDevice({
-            deviceId: device.deviceId,
-            host: device.ip,
-            port: device.port || 39393,
-            connectionCode: '',
-          });
-          await addDesktop({
-            desktopDeviceId: device.deviceId,
-            desktopName: device.name,
-            host: device.ip,
-            port: device.port || 39393,
-            authorizationStatus: 'authorized',
-          });
-          setVerifying(false);
-          setConnectionModalStep(null);
-          navigation.dispatch(
-            CommonActions.reset({
-              index: 0,
-              routes: [{ name: 'SyncActivity' }],
-            }),
-          );
-        } catch (error) {
-          const failure = normalizeConnectionFailure(error);
-          console.warn(
-            '[DeviceDiscoveryGlobalScreen] known desktop reconnect failed',
-            error,
-          );
-          setVerifying(false);
-          setConnectionFailure(failure);
-          setConnectionModalStep(null);
-          setConnectionStatus('failed');
-        }
-        return;
-      }
-
       setConnectionStatus('ready');
-      setConnectionModalStep('method');
+      setConnectionModalStep('code');
     },
-    [
-      addDesktop,
-      currentDeviceId,
-      knownDeviceIds,
-      mode,
-      navigation,
-      showGuide,
-    ],
+    [currentDeviceId, mode, showGuide],
   );
 
   const openRecentDesktop = useCallback(
@@ -847,7 +796,7 @@ export function DeviceDiscoveryGlobalScreen() {
           error,
         );
         setVerifying(false);
-        setConnectionModalStep('method');
+        setConnectionModalStep('code');
       }
     },
     [addDesktop, currentDeviceId, devices, mode, navigation, showGuide],
@@ -987,7 +936,8 @@ export function DeviceDiscoveryGlobalScreen() {
           onAction: () => {
             setManualHost('');
             setManualError(null);
-            setConnectionModalStep('manualPair');
+            setSelectedDevice(null);
+            setConnectionModalStep('method');
           },
         }
       : !isShowingSkeleton && connectionStatus === 'permissionRequired'
@@ -1035,13 +985,16 @@ export function DeviceDiscoveryGlobalScreen() {
                 onAction: () => {
                   setConnectionCode('');
                   setCodeError(null);
-                  setConnectionModalStep('code');
+                  setConnectionModalStep(selectedDevice ? 'code' : 'method');
                 },
               }
             : null;
 
   const activeConnectionModalStep =
-    connectionModalStep === 'manualPair' || selectedDevice !== null
+    connectionModalStep === 'manualPair' ||
+    connectionModalStep === 'method' ||
+    connectionModalStep === 'cameraPermission' ||
+    selectedDevice !== null
       ? connectionModalStep
       : null;
 
@@ -1150,7 +1103,7 @@ export function DeviceDiscoveryGlobalScreen() {
                                 : 'desktop-outline'
                             }
                             availability={device.availability ?? 'available'}
-                            onPress={() => openMethodModal(device)}
+                            onPress={() => openDeviceCodeModal(device)}
                           />
                         );
                       })
@@ -1187,10 +1140,11 @@ export function DeviceDiscoveryGlobalScreen() {
                     activeOpacity={0.76}
                     style={styles.manualPairRow}
                     onPress={() => {
+                      setSelectedDevice(null);
                       setManualHost('');
                       setManualError(null);
                       setConnectionFailure(null);
-                      setConnectionModalStep('manualPair');
+                      setConnectionModalStep('method');
                     }}
                   >
                     <View style={styles.rowIcon}>
@@ -1258,6 +1212,12 @@ export function DeviceDiscoveryGlobalScreen() {
               setCodeError(null);
               setConnectionFailure(null);
               setConnectionModalStep('code');
+            }}
+            onManual={() => {
+              setManualHost('');
+              setManualError(null);
+              setConnectionFailure(null);
+              setConnectionModalStep('manualPair');
             }}
             onManualHostChange={value => {
               setManualHost(value);
@@ -1887,6 +1847,7 @@ function ConnectionFlowModal({
   onClose,
   onScan,
   onCode,
+  onManual,
   onManualHostChange,
   onManualSubmit,
   onDeny,
@@ -1904,6 +1865,7 @@ function ConnectionFlowModal({
   onClose: () => void;
   onScan: () => void;
   onCode: () => void;
+  onManual: () => void;
   onManualHostChange: (value: string) => void;
   onManualSubmit: () => void;
   onDeny: () => void;
@@ -1917,6 +1879,7 @@ function ConnectionFlowModal({
   let content: React.ReactNode;
 
   if (step === 'method') {
+    const isManualPairing = !deviceName;
     content = (
       <>
         <View style={styles.modalHeader}>
@@ -1924,8 +1887,14 @@ function ConnectionFlowModal({
             <Icon name="desktop-outline" size={22} color="#1677D2" />
           </View>
           <View style={styles.modalTitleStack}>
-            <Text style={styles.modalTitle}>选择连接方式</Text>
-            <Text style={styles.modalSubtitle}>已选择 {deviceName}</Text>
+            <Text style={styles.modalTitle}>
+              {isManualPairing ? '手动配对' : '选择连接方式'}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              {isManualPairing
+                ? '选择扫码配对，或输入电脑 IP 后继续输入连接码。'
+                : `已选择 ${deviceName}`}
+            </Text>
           </View>
         </View>
         <TouchableOpacity
@@ -1937,7 +1906,7 @@ function ConnectionFlowModal({
             <Icon name="scan-outline" size={20} color="#1677D2" />
           </View>
           <View style={styles.optionCopy}>
-            <Text style={styles.optionTitle}>扫码连接</Text>
+            <Text style={styles.optionTitle}>扫码配对</Text>
             <Text style={styles.optionBody}>扫描电脑端显示的二维码</Text>
           </View>
           <Icon name="chevron-forward" size={18} color="#9AA3AE" />
@@ -1945,14 +1914,24 @@ function ConnectionFlowModal({
         <TouchableOpacity
           activeOpacity={0.78}
           style={styles.optionRow}
-          onPress={onCode}
+          onPress={isManualPairing ? onManual : onCode}
         >
           <View style={styles.optionIconPurple}>
-            <Icon name="link-outline" size={20} color="#746AA8" />
+            <Icon
+              name={isManualPairing ? 'create-outline' : 'link-outline'}
+              size={20}
+              color="#746AA8"
+            />
           </View>
           <View style={styles.optionCopy}>
-            <Text style={styles.optionTitle}>输入连接码</Text>
-            <Text style={styles.optionBody}>手动输入电脑端的 6 位连接码</Text>
+            <Text style={styles.optionTitle}>
+              {isManualPairing ? '手动输入 IP' : '输入连接码'}
+            </Text>
+            <Text style={styles.optionBody}>
+              {isManualPairing
+                ? '输入电脑 IP 和连接码连接'
+                : '手动输入电脑端的 6 位连接码'}
+            </Text>
           </View>
           <Icon name="chevron-forward" size={18} color="#9AA3AE" />
         </TouchableOpacity>

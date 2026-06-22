@@ -28,12 +28,13 @@ jest.mock('react-native-vision-camera', () => {
 });
 
 const mockNavigate = jest.fn();
+const mockReplace = jest.fn();
 
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({
     goBack: jest.fn(),
     navigate: mockNavigate,
-    replace: jest.fn(),
+    replace: mockReplace,
   }),
 }));
 
@@ -51,6 +52,7 @@ jest.mock('../../components/Icon', () => ({
 
 import i18n from '../../i18n';
 import { QRScannerScreen } from '../QRScannerScreen';
+import { useCodeScanner } from 'react-native-vision-camera';
 
 describe('QRScannerScreen', () => {
   beforeAll(async () => {
@@ -59,6 +61,7 @@ describe('QRScannerScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useRealTimers();
     Object.defineProperty(Platform, 'OS', {
       configurable: true,
       value: 'ios',
@@ -97,5 +100,37 @@ describe('QRScannerScreen', () => {
     fireEvent.press(getByText('查看詳細圖文教程 >'));
 
     expect(mockNavigate).toHaveBeenCalledWith('ConnectionTutorial');
+  });
+
+  it('navigates to code verification after scanning a desktop connection QR', async () => {
+    jest.useFakeTimers();
+
+    render(<QRScannerScreen />);
+
+    await waitFor(() => {
+      expect(useCodeScanner).toHaveBeenCalled();
+    });
+
+    const scannerConfig = (useCodeScanner as jest.Mock).mock.results.at(-1)
+      ?.value as {
+      onCodeScanned: (codes: Array<{ value?: string | null }>) => void;
+    };
+
+    scannerConfig.onCodeScanned([
+      {
+        value:
+          'vividrop://connect?ip=192.168.31.8&device=Studio%20Mac&code=A8X2K9',
+      },
+    ]);
+
+    jest.advanceTimersByTime(200);
+
+    expect(mockReplace).toHaveBeenCalledWith('CodeVerify', {
+      deviceId: 'qr-192-168-31-8',
+      host: '192.168.31.8',
+      port: 39393,
+      deviceName: 'Studio Mac',
+      prefilledCode: 'A8X2K9',
+    });
   });
 });

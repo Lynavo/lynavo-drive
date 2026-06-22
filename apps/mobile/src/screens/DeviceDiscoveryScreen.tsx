@@ -436,7 +436,7 @@ export function DeviceDiscoveryScreen() {
       setSelectedDevice(device);
       setConnectionCode('');
       setCodeError(null);
-      setShowMethodModal(true);
+      setShowCodeModal(true);
     },
     [currentDeviceId, t],
   );

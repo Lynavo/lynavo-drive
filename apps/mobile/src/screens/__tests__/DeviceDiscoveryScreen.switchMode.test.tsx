@@ -142,7 +142,9 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
     mockNativeSyncEngine.getKnownDeviceIds.mockResolvedValueOnce(['server-known']);
     mockNativeSyncEngine.getBindingState.mockResolvedValueOnce({ deviceId: 'server-current' });
 
-    const { getByText, getByPlaceholderText } = render(<DeviceDiscoveryScreen />);
+    const { getByText, getByPlaceholderText, queryByText } = render(
+      <DeviceDiscoveryScreen />,
+    );
 
     // Wait for switch-mode bootstrap to settle BEFORE injecting the device
     // event, so handleDevicePress sees the populated knownDeviceIds set.
@@ -168,16 +170,12 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
 
     fireEvent.press(getByText('Studio Mac'));
 
-    // Select "輸入連接碼" connection method
-    await waitFor(() => {
-      expect(getByText('輸入連接碼')).toBeTruthy();
-    });
-    fireEvent.press(getByText('輸入連接碼'));
-
-    // Input code in CodeModal and press "連接"
     await waitFor(() => {
       expect(getByPlaceholderText('輸入連接碼')).toBeTruthy();
     });
+    expect(queryByText('選擇連接方式')).toBeNull();
+    expect(queryByText('掃碼連接')).toBeNull();
+
     fireEvent.changeText(getByPlaceholderText('輸入連接碼'), '123456');
     fireEvent.press(getByText('連接'));
 
@@ -204,7 +202,9 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
     mockNativeSyncEngine.getBindingState.mockResolvedValueOnce({ deviceId: 'server-current' });
     mockNativeSyncEngine.pairDevice.mockRejectedValueOnce(new Error('PAIR_CODE_REQUIRED'));
 
-    const { getByText, getByPlaceholderText } = render(<DeviceDiscoveryScreen />);
+    const { getByText, getByPlaceholderText, queryByText } = render(
+      <DeviceDiscoveryScreen />,
+    );
 
     await waitFor(() => {
       expect(mockNativeSyncEngine.getKnownDeviceIds).toHaveBeenCalled();
@@ -225,16 +225,12 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
     await waitFor(() => getByText('Studio Mac'));
     fireEvent.press(getByText('Studio Mac'));
 
-    // Select "輸入連接碼" connection method
-    await waitFor(() => {
-      expect(getByText('輸入連接碼')).toBeTruthy();
-    });
-    fireEvent.press(getByText('輸入連接碼'));
-
-    // Input code in CodeModal and press "連接"
     await waitFor(() => {
       expect(getByPlaceholderText('輸入連接碼')).toBeTruthy();
     });
+    expect(queryByText('選擇連接方式')).toBeNull();
+    expect(queryByText('掃碼連接')).toBeNull();
+
     fireEvent.changeText(getByPlaceholderText('輸入連接碼'), '111111');
     fireEvent.press(getByText('連接'));
 
@@ -251,11 +247,13 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
     expect(mockDispatch).not.toHaveBeenCalled();
   });
 
-  it('pairs unknown device through method modal', async () => {
+  it('pairs unknown device by opening connection code directly', async () => {
     mockNativeSyncEngine.getKnownDeviceIds.mockResolvedValueOnce([]);
     mockNativeSyncEngine.getBindingState.mockResolvedValueOnce(null);
 
-    const { getByText, getByPlaceholderText } = render(<DeviceDiscoveryScreen />);
+    const { getByText, getByPlaceholderText, queryByText } = render(
+      <DeviceDiscoveryScreen />,
+    );
 
     await waitFor(() => {
       expect(mockNativeSyncEngine.getKnownDeviceIds).toHaveBeenCalled();
@@ -275,16 +273,12 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
     await waitFor(() => getByText('New PC'));
     fireEvent.press(getByText('New PC'));
 
-    // Select "輸入連接碼" connection method
-    await waitFor(() => {
-      expect(getByText('輸入連接碼')).toBeTruthy();
-    });
-    fireEvent.press(getByText('輸入連接碼'));
-
-    // Input code in CodeModal and press "連接"
     await waitFor(() => {
       expect(getByPlaceholderText('輸入連接碼')).toBeTruthy();
     });
+    expect(queryByText('選擇連接方式')).toBeNull();
+    expect(queryByText('掃碼連接')).toBeNull();
+
     fireEvent.changeText(getByPlaceholderText('輸入連接碼'), '654321');
     fireEvent.press(getByText('連接'));
 

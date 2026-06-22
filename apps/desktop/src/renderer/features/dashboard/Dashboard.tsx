@@ -170,6 +170,14 @@ export function Dashboard() {
 
   const connectionCode = settings.connectionCode || '000000';
   const localDeviceName = settings.deviceName || 'ViviDrop';
+  const localIp =
+    window.electronAPI?.platform?.getLocalIPs?.()[0] || '127.0.0.1';
+  const connectionQrPayload = `vividrop://connect?ip=${encodeURIComponent(
+    localIp,
+  )}&device=${encodeURIComponent(localDeviceName)}&code=${connectionCode.replace(
+    /\s/g,
+    '',
+  )}`;
 
   return (
     <div className="h-full overflow-auto">
@@ -252,9 +260,7 @@ export function Dashboard() {
                 <div className="mt-5 rounded-lg border border-white/70 bg-white/68 p-4 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.68)]">
                   <div className="mx-auto flex h-[152px] w-[152px] items-center justify-center rounded-lg bg-white p-2 shadow-[0_12px_28px_rgba(70,96,138,0.12)]">
                     <QRCodeSVG
-                      value={`vividrop://connect?device=${encodeURIComponent(
-                        localDeviceName,
-                      )}&code=${connectionCode.replace(/\s/g, '')}`}
+                      value={connectionQrPayload}
                       size={132}
                       bgColor="#ffffff"
                       fgColor="#17191c"
