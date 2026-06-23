@@ -702,7 +702,7 @@ func TestPairDeviceWithDirName_ReusesReceiveDirForSameStableDevice(t *testing.T)
 	}
 }
 
-func TestPairDeviceWithDirName_CreatesNewReceiveDirForSameStableDeviceWithDifferentName(t *testing.T) {
+func TestPairDeviceWithDirName_ReusesReceiveDirForSameStableDeviceWithDifferentAccountAndName(t *testing.T) {
 	st := newTestStoreForDir(t)
 	receiveDir := t.TempDir()
 	stableID := "stable-ios-device-001"
@@ -723,59 +723,49 @@ func TestPairDeviceWithDirName_CreatesNewReceiveDirForSameStableDeviceWithDiffer
 	if err != nil {
 		t.Fatalf("PairDeviceWithDirName: %v", err)
 	}
-	if got != "Bob iPhone" {
-		t.Fatalf("expected same stable device with different name to create receive dir %q, got %q", "Bob iPhone", got)
+	if got != "Alice iPhone" {
+		t.Fatalf("expected same stable device to reuse receive dir %q, got %q", "Alice iPhone", got)
 	}
 	if _, err := os.Stat(filepath.Join(receiveDir, "Alice iPhone")); err != nil {
-		t.Fatalf("old receive dir should remain: %v", err)
+		t.Fatalf("receive dir should remain: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(receiveDir, "Bob iPhone")); err != nil {
-		t.Fatalf("new receive dir should be created: %v", err)
+	if _, err := os.Stat(filepath.Join(receiveDir, "Bob iPhone")); !os.IsNotExist(err) {
+		t.Fatalf("same stable device must not create Bob iPhone dir, stat err=%v", err)
 	}
 
 	stored, err := st.GetPairedDevice("account-b-client")
 	if err != nil {
 		t.Fatalf("GetPairedDevice new: %v", err)
 	}
-	if stored.ReceiveDirName == nil || *stored.ReceiveDirName != "Bob iPhone" {
-		t.Fatalf("expected persisted new receive_dir_name, got %v", stored.ReceiveDirName)
+	if stored.ReceiveDirName == nil || *stored.ReceiveDirName != "Alice iPhone" {
+		t.Fatalf("expected persisted reused receive_dir_name, got %v", stored.ReceiveDirName)
 	}
 }
 
-func TestPairDeviceWithDirName_ReusesMatchingReceiveDirForSameStableDevice(t *testing.T) {
+func TestPairDeviceWithDirName_CreatesUniqueReceiveDirForDifferentStableDeviceWithSameName(t *testing.T) {
 	st := newTestStoreForDir(t)
 	receiveDir := t.TempDir()
-	stableID := "stable-ios-device-001"
+	stableA := "stable-ios-device-001"
+	stableB := "stable-ios-device-002"
 
 	mkDir(t, receiveDir, "Alice iPhone")
-	mkDir(t, receiveDir, "Bob iPhone")
-
-	aliceDevice := newPairDevice("account-a-client", "Alice iPhone", nil)
-	aliceDevice.StableDeviceID = &stableID
-	if err := st.UpsertPairedDevice(aliceDevice); err != nil {
-		t.Fatalf("UpsertPairedDevice alice: %v", err)
+	oldDevice := newPairDevice("client-a", "Alice iPhone", nil)
+	oldDevice.StableDeviceID = &stableA
+	if err := st.UpsertPairedDevice(oldDevice); err != nil {
+		t.Fatalf("UpsertPairedDevice old: %v", err)
 	}
-	if err := st.UpdateReceiveDirName("account-a-client", "Alice iPhone"); err != nil {
-		t.Fatalf("UpdateReceiveDirName alice: %v", err)
+	if err := st.UpdateReceiveDirName("client-a", "Alice iPhone"); err != nil {
+		t.Fatalf("UpdateReceiveDirName old: %v", err)
 	}
 
-	bobOldDevice := newPairDevice("account-b-old-client", "Bob iPhone", nil)
-	bobOldDevice.StableDeviceID = &stableID
-	if err := st.UpsertPairedDevice(bobOldDevice); err != nil {
-		t.Fatalf("UpsertPairedDevice bob old: %v", err)
-	}
-	if err := st.UpdateReceiveDirName("account-b-old-client", "Bob iPhone"); err != nil {
-		t.Fatalf("UpdateReceiveDirName bob old: %v", err)
-	}
-
-	bobNewDevice := newPairDevice("account-b-new-client", "Bob iPhone", nil)
-	bobNewDevice.StableDeviceID = &stableID
-	got, err := PairDeviceWithDirName(st, receiveDir, bobNewDevice)
+	newDevice := newPairDevice("client-b", "Alice iPhone", nil)
+	newDevice.StableDeviceID = &stableB
+	got, err := PairDeviceWithDirName(st, receiveDir, newDevice)
 	if err != nil {
 		t.Fatalf("PairDeviceWithDirName: %v", err)
 	}
-	if got != "Bob iPhone" {
-		t.Fatalf("expected matching same-stable receive dir %q, got %q", "Bob iPhone", got)
+	if got != "Alice iPhone (2)" {
+		t.Fatalf("expected unique dir %q for different stable device, got %q", "Alice iPhone (2)", got)
 	}
 }
 

@@ -163,8 +163,6 @@ func stableDeviceReceiveDirName(st *store.Store, receiveDir string, device *stor
 		return "", false, fmt.Errorf("list paired devices for stable-device dir reuse: %w", err)
 	}
 
-	preferredDirName := preferredReceiveDirName(device)
-
 	for _, candidate := range devices {
 		if candidate.ClientID == device.ClientID || candidate.ReceiveDirName == nil || *candidate.ReceiveDirName == "" {
 			continue
@@ -173,9 +171,6 @@ func stableDeviceReceiveDirName(st *store.Store, receiveDir string, device *stor
 			continue
 		}
 		dirName := *candidate.ReceiveDirName
-		if dirName != preferredDirName {
-			continue
-		}
 		if !dirExists(receiveDir, dirName) {
 			continue
 		}
