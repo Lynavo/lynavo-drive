@@ -28,7 +28,9 @@ const dynamicRendererKeys = [
 ];
 const hardcodedUserFacingCopyFiles = [
   'components/shared/AuthPage.tsx',
+  'components/shared/LoginDialog.tsx',
   'features/dashboard/Dashboard.tsx',
+  'features/dashboard/DiskWarningBanner.tsx',
   'features/devices/DeviceDetailPanel.tsx',
   'features/help/HelpDialog.tsx',
   'features/layout/AppShell.tsx',

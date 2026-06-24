@@ -10,6 +10,7 @@
     "remainingSpace": "Remaining device space"
   },
   "diskWarning": "The receive disk has less than 500 MB remaining. New receive tasks are paused.",
+  "dismissDiskWarning": "Dismiss disk warning",
   "deviceCard": {
     "recent": "Recent {{date}}",
     "today": "Today",

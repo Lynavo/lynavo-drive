@@ -51,7 +51,7 @@ function renderLoginDialog() {
 }
 
 function agreeToLoginTerms() {
-  fireEvent.click(screen.getByRole('checkbox', { name: /隐私政策|隱私政策/ }));
+  fireEvent.click(screen.getByRole('checkbox', { name: /隐私政策|隱私權政策/ }));
 }
 
 describe('resolveDefaultCountryCode', () => {
@@ -116,7 +116,8 @@ describe('LoginDialog', () => {
     expect(screen.getByText('或')).toBeInTheDocument();
     expect(screen.getByLabelText('手機號碼')).toBeInTheDocument();
     expect(screen.getByLabelText('驗證碼')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: /隱私政策/ })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /隱私權政策/ })).toBeInTheDocument();
+    expect(screen.getByText('未註冊的帳號將自動註冊')).toBeInTheDocument();
   });
 
   it('uses the reference login agreement gate before sending credentials', () => {

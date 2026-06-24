@@ -106,6 +106,8 @@
       "loginSuccess": "Signed in. Continuing redeem",
       "loginSuccessGeneric": "Signed in successfully",
       "logoutSuccess": "Signed out successfully",
+      "logoutFailed": "Sign out failed",
+      "logoutError": "Sign out error",
       "accountStatus": "Account Status",
       "loggedInAs": "Signed in",
       "notLoggedIn": "Not signed in",

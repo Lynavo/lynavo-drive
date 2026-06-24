@@ -336,8 +336,6 @@ export function LoginDialog({
     }
   }, [i18n.language, i18n.resolvedLanguage, isGlobal, open]);
 
-  const termsCopy = getTermsCopy(i18n.resolvedLanguage || i18n.language);
-
   const ensureAgreementAccepted = useCallback(() => {
     if (agreedToPrivacy) {
       setShowAgreementHint(false);
@@ -657,7 +655,7 @@ export function LoginDialog({
                 type="button"
                 role="checkbox"
                 aria-checked={agreedToPrivacy}
-                aria-label={termsCopy.checkboxLabel}
+                aria-label={t('common.authPage.agreementAriaLabel')}
                 onClick={() => {
                   setAgreedToPrivacy((prev) => !prev);
                   setShowAgreementHint(false);
@@ -671,25 +669,27 @@ export function LoginDialog({
                 <Check className="h-3 w-3" strokeWidth={3} />
               </button>
               <span>
-                {termsCopy.prefix}
+                {t('common.authPage.agreementPrefix')}
                 <button
                   type="button"
                   className="font-semibold text-[#17191c] underline-offset-2 hover:underline"
                 >
-                  {termsCopy.privacy}
+                  {t('common.authPage.privacyPolicy')}
                 </button>
-                {termsCopy.middle}
+                {t('common.authPage.agreementConjunction')}
                 <button
                   type="button"
                   className="font-semibold text-[#17191c] underline-offset-2 hover:underline"
                 >
-                  {termsCopy.terms}
+                  {t('common.authPage.userAgreement')}
                 </button>
               </span>
             </div>
 
             {showAgreementHint ? (
-              <p className="text-center text-xs font-medium text-[#d92d20]">{termsCopy.hint}</p>
+              <p className="text-center text-xs font-medium text-[#d92d20]">
+                {t('common.authPage.agreementRequired')}
+              </p>
             ) : null}
           </div>
 
@@ -707,42 +707,11 @@ export function LoginDialog({
               )}
             </Button>
           </DialogFooter>
-          <p className="mt-4 text-center text-xs text-[#7b8490]">未注册的账号将自动注册</p>
+          <p className="mt-4 text-center text-xs text-[#7b8490]">
+            {t('common.authPage.autoRegisterHint')}
+          </p>
         </div>
       </DialogContent>
     </Dialog>
   );
-}
-
-function getTermsCopy(locale: string) {
-  if (locale.startsWith('zh-Hant')) {
-    return {
-      checkboxLabel: '我已閱讀並同意《隱私政策》和《用戶協議》',
-      hint: '請先勾選同意隱私政策後再登入',
-      middle: '和',
-      prefix: '我已閱讀並同意',
-      privacy: '《隱私政策》',
-      terms: '《用戶協議》',
-    };
-  }
-
-  if (locale.startsWith('en')) {
-    return {
-      checkboxLabel: 'I have read and agree to the Privacy Policy and User Agreement',
-      hint: 'Please agree to the privacy policy before logging in',
-      middle: ' and ',
-      prefix: 'I have read and agree to ',
-      privacy: 'Privacy Policy',
-      terms: 'User Agreement',
-    };
-  }
-
-  return {
-    checkboxLabel: '我已阅读并同意《隐私政策》和《用户协议》',
-    hint: '请先勾选同意隐私政策后再登录',
-    middle: '和',
-    prefix: '我已阅读并同意',
-    privacy: '《隐私政策》',
-    terms: '《用户协议》',
-  };
 }

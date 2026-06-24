@@ -31,7 +31,7 @@ export function DiskWarningBanner() {
         onClick={dismissDiskWarning}
         className="ml-auto flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-[background-color,transform] duration-150 ease-out hover:bg-red-100 active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
         style={{ color: colors.errorText }}
-        aria-label="dismiss"
+        aria-label={t('dashboard.dismissDiskWarning')}
       >
         <X className="h-3.5 w-3.5" />
       </button>

@@ -96,21 +96,19 @@ export function GiftCardSection() {
   const handleConfirmLogout = useCallback(async () => {
     setShowLogoutConfirm(false);
     if (!window.electronAPI?.auth?.logout) {
-      toast.error('Auth API unavailable');
+      toast.error(t('errors.settings.authUnavailable'));
       return;
     }
     try {
       const res = await logout();
       if (res.ok) {
-        toast.success(
-          t('settings.giftCard.phoneLogin.logoutSuccess', { defaultValue: '已成功登出' }),
-        );
+        toast.success(t('settings.giftCard.phoneLogin.logoutSuccess'));
       } else {
-        toast.error('Logout failed');
+        toast.error(t('settings.giftCard.phoneLogin.logoutFailed'));
       }
     } catch (error) {
-      toast.error('Logout error', {
-        description: extractErrorText(error, 'Logout error'),
+      toast.error(t('settings.giftCard.phoneLogin.logoutError'), {
+        description: extractErrorText(error, t('settings.giftCard.phoneLogin.logoutError')),
       });
     }
   }, [logout, t]);
@@ -193,22 +191,22 @@ export function GiftCardSection() {
       <div className="mb-5 flex items-center justify-between border-b border-border/50 pb-4">
         <div className="flex flex-col">
           <span className="text-xs font-semibold text-foreground">
-            {t('settings.giftCard.phoneLogin.accountStatus', { defaultValue: '帳號狀態' })}
+            {t('settings.giftCard.phoneLogin.accountStatus')}
           </span>
           <span className="text-xs text-muted-foreground mt-0.5">
             {session ? (
               <>
-                {t('settings.giftCard.phoneLogin.loggedInAs', { defaultValue: '已登入' })}
+                {t('settings.giftCard.phoneLogin.loggedInAs')}
                 {session.phone ? ` (${session.phone})` : session.email ? ` (${session.email})` : ''}
               </>
             ) : (
-              t('settings.giftCard.phoneLogin.notLoggedIn', { defaultValue: '尚未登入' })
+              t('settings.giftCard.phoneLogin.notLoggedIn')
             )}
           </span>
         </div>
         {session ? (
           <Button type="button" variant="outline" size="sm" onClick={() => void handleLogout()}>
-            {t('settings.giftCard.phoneLogin.logout', { defaultValue: '登出' })}
+            {t('settings.giftCard.phoneLogin.logout')}
           </Button>
         ) : null}
       </div>

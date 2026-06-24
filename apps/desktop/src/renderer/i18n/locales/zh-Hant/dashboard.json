@@ -10,6 +10,7 @@
     "remainingSpace": "裝置剩餘空間"
   },
   "diskWarning": "接收磁碟剩餘空間小於 500MB，已暫停新的接收任務",
+  "dismissDiskWarning": "關閉磁碟空間提醒",
   "deviceCard": {
     "recent": "最近 {{date}}",
     "today": "今日",

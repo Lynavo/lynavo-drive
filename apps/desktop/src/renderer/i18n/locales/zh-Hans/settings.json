@@ -106,6 +106,8 @@
       "loginSuccess": "登入成功，正在继续兑换",
       "loginSuccessGeneric": "登入成功",
       "logoutSuccess": "已成功登出",
+      "logoutFailed": "登出失败",
+      "logoutError": "登出出错",
       "accountStatus": "账号状态",
       "loggedInAs": "已登入",
       "notLoggedIn": "尚未登入",

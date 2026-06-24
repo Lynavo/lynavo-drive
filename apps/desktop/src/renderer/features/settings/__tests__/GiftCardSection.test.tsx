@@ -202,6 +202,26 @@ describe('GiftCardSection', () => {
     expect(screen.queryByRole('button', { name: '登入' })).not.toBeInTheDocument();
   });
 
+  it('shows localized logout failure feedback', async () => {
+    const redeemGiftCard = vi.fn().mockResolvedValue({ ok: true });
+    setElectronAPI(redeemGiftCard, {
+      logout: vi.fn().mockResolvedValue({ ok: false }),
+    });
+    useAuthStore.setState({
+      session: { loggedIn: true, phone: '+8613800138000' },
+      loading: false,
+    });
+
+    render(<GiftCardSection />);
+
+    fireEvent.click(screen.getByRole('button', { name: '登出' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认退出' }));
+
+    await waitFor(() => {
+      expect(toastFns.error).toHaveBeenCalledWith('登出失败');
+    });
+  });
+
   it('shows the thrown error detail and fallback toast', async () => {
     const redeemGiftCard = vi.fn().mockRejectedValue(new Error('offline'));
     setElectronAPI(redeemGiftCard);
