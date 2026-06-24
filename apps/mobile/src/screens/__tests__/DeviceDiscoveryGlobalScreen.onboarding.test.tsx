@@ -492,6 +492,10 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     ).toBeTruthy();
     expect(screen.getByText('手动配对')).toBeTruthy();
     expect(screen.getByText('Studio Mac')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('手动配对'));
+
+    expect(screen.getByText('扫码配对')).toBeTruthy();
   });
 
   it('marks the current desktop in switch mode and blocks reconnecting it', async () => {
