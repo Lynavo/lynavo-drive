@@ -953,6 +953,50 @@ class AndroidSyncPrimitivesTest {
   }
 
   @Test
+  fun pairingInvalidationClearRequiresCurrentBindingToMatchExpectedBinding() {
+    assertTrue(
+      AndroidSyncPrimitives.shouldClearCurrentBindingForPairingInvalidation(
+        currentDeviceId = "desktop-1",
+        currentPairingToken = "token-1",
+        expectedDeviceId = "desktop-1",
+        expectedPairingToken = "token-1",
+        existingInvalidationReason = null,
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldClearCurrentBindingForPairingInvalidation(
+        currentDeviceId = "desktop-2",
+        currentPairingToken = "token-2",
+        expectedDeviceId = "desktop-1",
+        expectedPairingToken = "token-1",
+        existingInvalidationReason = null,
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldClearCurrentBindingForPairingInvalidation(
+        currentDeviceId = "desktop-1",
+        currentPairingToken = "new-token",
+        expectedDeviceId = "desktop-1",
+        expectedPairingToken = null,
+        existingInvalidationReason = null,
+      ),
+    )
+  }
+
+  @Test
+  fun pairingInvalidationClearIsIdempotentAfterBindingAlreadyCleared() {
+    assertFalse(
+      AndroidSyncPrimitives.shouldClearCurrentBindingForPairingInvalidation(
+        currentDeviceId = null,
+        currentPairingToken = null,
+        expectedDeviceId = "desktop-1",
+        expectedPairingToken = "token-1",
+        existingInvalidationReason = "presence_unpaired",
+      ),
+    )
+  }
+
+  @Test
   fun lanWakeReachabilityDoesNotPromoteConnectionUntilPresenceConfirmsPairing() {
     assertEquals(
       "offline",

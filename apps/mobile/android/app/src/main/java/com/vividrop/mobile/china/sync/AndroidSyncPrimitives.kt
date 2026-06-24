@@ -656,6 +656,35 @@ object AndroidSyncPrimitives {
     return false
   }
 
+  fun shouldClearCurrentBindingForPairingInvalidation(
+    currentDeviceId: String?,
+    currentPairingToken: String?,
+    expectedDeviceId: String?,
+    expectedPairingToken: String?,
+    existingInvalidationReason: String?,
+  ): Boolean {
+    if (!existingInvalidationReason.isNullOrBlank()) {
+      return false
+    }
+
+    val normalizedCurrentDeviceId = currentDeviceId?.trim().orEmpty()
+    val normalizedExpectedDeviceId = expectedDeviceId?.trim().orEmpty()
+    if (normalizedCurrentDeviceId.isBlank() ||
+      normalizedExpectedDeviceId.isBlank() ||
+      normalizedCurrentDeviceId != normalizedExpectedDeviceId
+    ) {
+      return false
+    }
+
+    val normalizedCurrentPairingToken = currentPairingToken?.trim().orEmpty()
+    val normalizedExpectedPairingToken = expectedPairingToken?.trim().orEmpty()
+    if (normalizedExpectedPairingToken.isBlank()) {
+      return normalizedCurrentPairingToken.isBlank()
+    }
+
+    return normalizedCurrentPairingToken == normalizedExpectedPairingToken
+  }
+
   fun resolveDiscoveryProbeCandidate(
     probeGeneration: Long,
     currentGeneration: Long,

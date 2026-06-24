@@ -626,7 +626,11 @@ class NativeSyncEngineModule(
             authRejected = true,
           )
         ) {
-          invalidateCurrentPairing("pair_token_invalid")
+          invalidateCurrentPairing(
+            reason = "pair_token_invalid",
+            expectedDeviceId = previousBinding?.deviceId,
+            expectedPairingToken = previousBinding?.pairingToken,
+          )
         }
         throw error
       }
@@ -710,9 +714,16 @@ class NativeSyncEngineModule(
         )
       ) {
         val reason = "pairing_token_missing"
-        invalidateCurrentPairing(reason)
-        promise.resolve(bindingInvalidationState(reason))
-        return@runAsync
+        if (
+          invalidateCurrentPairing(
+            reason = reason,
+            expectedDeviceId = binding?.deviceId,
+            expectedPairingToken = binding?.pairingToken,
+          )
+        ) {
+          promise.resolve(bindingInvalidationState(reason))
+          return@runAsync
+        }
       }
 
       promise.resolve(null)
@@ -2551,7 +2562,11 @@ class NativeSyncEngineModule(
     val nonce = helloResponse.optString("nonce")
     if (nonce.isNotBlank()) {
       if (refreshedBinding.pairingToken.isBlank()) {
-        invalidateCurrentPairing("pairing_token_missing")
+        invalidateCurrentPairing(
+          reason = "pairing_token_missing",
+          expectedDeviceId = refreshedBinding.deviceId,
+          expectedPairingToken = refreshedBinding.pairingToken,
+        )
         throw IllegalStateException("Desktop requires re-pairing")
       }
       writeJsonFrame(
@@ -2574,14 +2589,22 @@ class NativeSyncEngineModule(
           errorCode == "PAIR_TOKEN_INVALID" &&
           shouldInvalidateForSyncAuthRejected(refreshedBinding, helloResponse)
         ) {
-          invalidateCurrentPairing("pair_token_invalid")
+          invalidateCurrentPairing(
+            reason = "pair_token_invalid",
+            expectedDeviceId = refreshedBinding.deviceId,
+            expectedPairingToken = refreshedBinding.pairingToken,
+          )
         }
         throw IllegalStateException("Desktop authentication failed")
       }
       recordNativeLog("SyncPipeline", "auth successful", Log.INFO)
     } else if (helloResponse.optBoolean("authRequired", false)) {
       if (refreshedBinding.pairingToken.isBlank()) {
-        invalidateCurrentPairing("pairing_token_missing")
+        invalidateCurrentPairing(
+          reason = "pairing_token_missing",
+          expectedDeviceId = refreshedBinding.deviceId,
+          expectedPairingToken = refreshedBinding.pairingToken,
+        )
       }
       throw IllegalStateException("Desktop requires re-pairing")
     }
@@ -2597,7 +2620,11 @@ class NativeSyncEngineModule(
       error.nativeCode == "PAIR_TOKEN_INVALID" &&
       shouldInvalidateForSyncAuthRejected(binding, helloResponse)
     ) {
-      invalidateCurrentPairing("pair_token_invalid")
+      invalidateCurrentPairing(
+        reason = "pair_token_invalid",
+        expectedDeviceId = binding.deviceId,
+        expectedPairingToken = binding.pairingToken,
+      )
     }
   }
 
@@ -4901,9 +4928,30 @@ class NativeSyncEngineModule(
     return updated
   }
 
-  private fun invalidateCurrentPairing(reason: String) {
+  private fun invalidateCurrentPairing(
+    reason: String,
+    expectedDeviceId: String?,
+    expectedPairingToken: String?,
+  ): Boolean {
     val normalizedReason = reason.trim().ifBlank { "pairing_invalidated" }
     val binding = loadBinding()
+    val existingReason = loadBindingInvalidationReason()
+    if (
+      !AndroidSyncPrimitives.shouldClearCurrentBindingForPairingInvalidation(
+        currentDeviceId = binding?.deviceId,
+        currentPairingToken = binding?.pairingToken,
+        expectedDeviceId = expectedDeviceId,
+        expectedPairingToken = expectedPairingToken,
+        existingInvalidationReason = existingReason,
+      )
+    ) {
+      recordDiagnosticsLog(
+        "Pairing",
+        "ignored pairing invalidation reason=$normalizedReason expectedDeviceId=${expectedDeviceId ?: "nil"} currentDeviceId=${binding?.deviceId ?: "nil"} existingReason=${existingReason ?: "nil"}",
+      )
+      return false
+    }
+
     recordDiagnosticsLog(
       "Pairing",
       "invalidating current pairing reason=$normalizedReason deviceId=${binding?.deviceId ?: "nil"}",
@@ -4926,6 +4974,7 @@ class NativeSyncEngineModule(
     } else {
       emitIdleSyncState(null)
     }
+    return true
   }
 
   private fun wakeManualUploadAfterReconnectIfNeeded(
@@ -5082,7 +5131,11 @@ class NativeSyncEngineModule(
         authRejected = false,
       )
     ) {
-      invalidateCurrentPairing("pairing_token_missing")
+      invalidateCurrentPairing(
+        reason = "pairing_token_missing",
+        expectedDeviceId = binding.deviceId,
+        expectedPairingToken = binding.pairingToken,
+      )
       return false
     }
     if (binding.host.isBlank()) {
@@ -5137,7 +5190,11 @@ class NativeSyncEngineModule(
             "Presence",
             "heartbeat invalidated pairing host=${binding.host} status=$statusCode expectedServerId=${binding.deviceId} responseServerId=${responseServerId ?: "nil"} pairedPresent=$pairedPresent paired=${responsePaired ?: "nil"}",
           )
-          invalidateCurrentPairing("presence_unpaired")
+          invalidateCurrentPairing(
+            reason = "presence_unpaired",
+            expectedDeviceId = binding.deviceId,
+            expectedPairingToken = binding.pairingToken,
+          )
           return false
         }
         val rejectionReason = if (responsePaired == false) {
