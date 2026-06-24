@@ -87,21 +87,6 @@ func syncFlowStringSetting(envKey: String, userDefaultsKey: String) -> String? {
     #endif
 }
 
-private func syncFlowGenericClientName(_ rawName: String) -> Bool {
-    let normalized = rawName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    if normalized.isEmpty {
-        return true
-    }
-    let genericNames = [
-        "iphone",
-        "ipad",
-        "ipod",
-        "ipod touch",
-        UIDevice.current.model.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-    ]
-    return genericNames.contains(normalized)
-}
-
 private func syncFlowPreferredClientIPv4() -> String? {
     var addressList: UnsafeMutablePointer<ifaddrs>?
     guard getifaddrs(&addressList) == 0, let firstAddress = addressList else {
@@ -2668,14 +2653,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     private func defaultClientDisplayName() -> String {
         let rawName = UIDevice.current.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard syncFlowGenericClientName(rawName) else {
-            return rawName
-        }
-
-        let clientId = bindingService.getOrCreateClientId().replacingOccurrences(of: "-", with: "")
-        let suffix = String(clientId.suffix(4)).uppercased()
         let model = UIDevice.current.model.trimmingCharacters(in: .whitespacesAndNewlines)
-        return suffix.isEmpty ? model : "\(model) \(suffix)"
+        return syncFlowResolvedDefaultClientDisplayName(
+            rawName: rawName,
+            model: model
+        )
     }
 
     private func localDateKey(for date: Date = Date()) -> String {
@@ -6916,27 +6898,48 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     }
 
     func getClientDisplayName() -> String {
+        let rawName = UIDevice.current.name
+        let model = UIDevice.current.model
+        let clientId = bindingService.getOrCreateClientId()
+        var clearedPersistedName = false
         if let stored = bindingService.getClientDisplayName()?
             .trimmingCharacters(in: .whitespacesAndNewlines),
            !stored.isEmpty
         {
-            return stored
+            if syncFlowGenericClientName(stored, model: model) ||
+                syncFlowLegacyGeneratedClientName(stored, model: model, clientId: clientId)
+            {
+                bindingService.clearClientDisplayName()
+                clearedPersistedName = true
+            } else {
+                return stored
+            }
         }
 
         let defaults = UserDefaults.standard
         if let legacy = defaults.string(forKey: Self.legacyClientNameKey)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
-           !legacy.isEmpty,
-           !syncFlowGenericClientName(legacy)
+           !legacy.isEmpty
         {
-            bindingService.saveClientDisplayName(legacy)
-            defaults.removeObject(forKey: Self.legacyClientNameKey)
-            return legacy
+            if !syncFlowGenericClientName(legacy, model: model),
+               !syncFlowLegacyGeneratedClientName(legacy, model: model, clientId: clientId)
+            {
+                bindingService.saveClientDisplayName(legacy)
+                defaults.removeObject(forKey: Self.legacyClientNameKey)
+                if clearedPersistedName {
+                    pushClientMetadataUpdateIfPossible()
+                }
+                return legacy
+            }
+            clearedPersistedName = true
         }
 
-        let generated = defaultClientDisplayName()
         defaults.removeObject(forKey: Self.legacyClientNameKey)
-        return generated
+        let resolved = syncFlowResolvedDefaultClientDisplayName(rawName: rawName, model: model)
+        if clearedPersistedName {
+            pushClientMetadataUpdateIfPossible()
+        }
+        return resolved
     }
 
     func getClientId() -> String {

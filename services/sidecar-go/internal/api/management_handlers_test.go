@@ -88,6 +88,77 @@ func TestManagementDevicesListsBlockStateAndUnblocksDevice(t *testing.T) {
 	}
 }
 
+func TestManagementDevicesDeduplicatesStableDeviceID(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	stableDeviceID := "stable-ios-device-001"
+	oldSeen := "2026-06-14T08:00:00Z"
+	newSeen := "2026-06-14T09:00:00Z"
+	insertPairedDeviceWithStableID(t, st, "client-old", "Alice iPhone", "Alice iPhone", stableDeviceID, oldSeen)
+	insertPairedDeviceWithStableID(t, st, "client-new", "Alice iPhone", "Alice iPhone", stableDeviceID, newSeen)
+
+	if err := st.UpsertUpload(store.Upload{
+		FileKey:              "file-old",
+		ClientID:             "client-old",
+		OriginalFilename:     "old.jpg",
+		MediaType:            "image/jpeg",
+		FileSize:             100,
+		Status:               "completed",
+		CommittedBytes:       100,
+		ActiveTransmissionMs: 100,
+		CompletedAt:          &oldSeen,
+		UpdatedAt:            oldSeen,
+	}); err != nil {
+		t.Fatalf("UpsertUpload old: %v", err)
+	}
+	if err := st.UpsertUpload(store.Upload{
+		FileKey:              "file-new",
+		ClientID:             "client-new",
+		OriginalFilename:     "new.jpg",
+		MediaType:            "image/jpeg",
+		FileSize:             200,
+		Status:               "completed",
+		CommittedBytes:       200,
+		ActiveTransmissionMs: 200,
+		CompletedAt:          &newSeen,
+		UpdatedAt:            newSeen,
+	}); err != nil {
+		t.Fatalf("UpsertUpload new: %v", err)
+	}
+
+	_, handler := api.NewServer(st, cfg, hub, nil)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/management/devices")
+	if err != nil {
+		t.Fatalf("GET /management/devices: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /management/devices status=%d, want 200", resp.StatusCode)
+	}
+
+	var listBody struct {
+		Items []store.ManagedDevice `json:"items"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&listBody); err != nil {
+		t.Fatalf("decode devices: %v", err)
+	}
+	if len(listBody.Items) != 1 {
+		t.Fatalf("expected one managed device for one stableDeviceId, got %d: %+v", len(listBody.Items), listBody.Items)
+	}
+	got := listBody.Items[0]
+	if got.ClientID != "client-new" {
+		t.Fatalf("expected newest client as representative, got %q", got.ClientID)
+	}
+	if got.StableDeviceID == nil || *got.StableDeviceID != stableDeviceID {
+		t.Fatalf("stableDeviceId=%v, want %q", got.StableDeviceID, stableDeviceID)
+	}
+	if got.TotalFileCount != 2 || got.TotalBytes != 300 {
+		t.Fatalf("expected merged totals count=2 bytes=300, got count=%d bytes=%d", got.TotalFileCount, got.TotalBytes)
+	}
+}
+
 func TestManagementRejectsInvalidClientID(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	_, handler := api.NewServer(st, cfg, hub, nil)

@@ -27,6 +27,7 @@
 		D4E1CA012F91000100000001 /* SilentAudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1CA002F91000100000001 /* SilentAudioService.swift */; };
 		D4E1CA112F96000100000001 /* ReceivedLibraryMediaURLPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1CA102F96000100000001 /* ReceivedLibraryMediaURLPolicy.swift */; };
 		D4E1CA042FA0000100000001 /* SidecarHostResolutionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1CA032FA0000100000001 /* SidecarHostResolutionPolicy.swift */; };
+		D4E1CA212FA1000100000001 /* ClientDisplayNameResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1CA202FA1000100000001 /* ClientDisplayNameResolver.swift */; };
 		DB862C6CA16A33F1996C19AF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		F099B4D807822DF27768C5E5 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 7906572870B674B3935AF6FD /* GoogleService-Info.plist */; };
 		FC3ECC2E2F6F05B5000460F8 /* RNBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC252F6F05B5000460F8 /* RNBridge.m */; };
@@ -85,6 +86,7 @@
 		D4E1CA002F91000100000001 /* SilentAudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SilentAudioService.swift; sourceTree = "<group>"; };
 		D4E1CA102F96000100000001 /* ReceivedLibraryMediaURLPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceivedLibraryMediaURLPolicy.swift; sourceTree = "<group>"; };
 		D4E1CA032FA0000100000001 /* SidecarHostResolutionPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidecarHostResolutionPolicy.swift; sourceTree = "<group>"; };
+		D4E1CA202FA1000100000001 /* ClientDisplayNameResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientDisplayNameResolver.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		FC3ECC1F2F6F05B5000460F8 /* AssetExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetExportService.swift; sourceTree = "<group>"; };
 		FC3ECC202F6F05B5000460F8 /* BackgroundExecutionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundExecutionService.swift; sourceTree = "<group>"; };
@@ -206,6 +208,7 @@
 				FC3ECCB12F8A0001000460F8 /* UploadResetStateMachine.swift */,
 				FC3ECCC12F8A0002000460F8 /* BackgroundTransitionRefCount.swift */,
 				FC3ECC212F6F05B5000460F8 /* BindingService.swift */,
+				D4E1CA202FA1000100000001 /* ClientDisplayNameResolver.swift */,
 				FC3ECC222F6F05B5000460F8 /* DiscoveryService.swift */,
 				FC3ECC232F6F05B5000460F8 /* HistoryLedgerStore.swift */,
 				FC3ECC242F6F05B5000460F8 /* PhotoScanner.swift */,
@@ -420,6 +423,7 @@
 				D4E1C9F82F8B000100000001 /* SharedFilesRoutePolicy.swift in Sources */,
 				D4E1C9FA2F94000100000001 /* PresenceReconnectPolicy.swift in Sources */,
 				D4E1CA042FA0000100000001 /* SidecarHostResolutionPolicy.swift in Sources */,
+				D4E1CA212FA1000100000001 /* ClientDisplayNameResolver.swift in Sources */,
 				D4E1C9FE2F95000100000001 /* WakeMetadata.swift in Sources */,
 				D4E1C9FC2F95000100000001 /* WakeOnLanService.swift in Sources */,
 				0DAC8ECE3480320FE184A423 /* SharedFilesService.swift in Sources */,

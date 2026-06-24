@@ -255,16 +255,46 @@ func (s *Store) ClearConnectionAttempts(desktopDeviceID, clientID string) error 
 
 func (s *Store) ListManagedDevices(desktopDeviceID string) ([]ManagedDevice, error) {
 	rows, err := s.db.Query(`
+		WITH paired_identity AS (
+			SELECT
+				p.*,
+				COALESCE(NULLIF(TRIM(p.stable_device_id), ''), p.client_id) AS identity_key,
+				ROW_NUMBER() OVER (
+					PARTITION BY COALESCE(NULLIF(TRIM(p.stable_device_id), ''), p.client_id)
+					ORDER BY p.last_seen_at DESC, p.client_id DESC
+				) AS row_rank
+			FROM paired_devices p
+		),
+		upload_stats AS (
+			SELECT
+				pi.identity_key,
+				COUNT(u.file_key) AS total_file_count,
+				COALESCE(SUM(u.file_size), 0) AS total_bytes,
+				COUNT(CASE WHEN DATE(u.updated_at, 'localtime') = DATE('now', 'localtime') THEN u.file_key END) AS today_file_count,
+				COALESCE(SUM(CASE WHEN DATE(u.updated_at, 'localtime') = DATE('now', 'localtime') THEN u.file_size ELSE 0 END), 0) AS today_bytes
+			FROM paired_identity pi
+			LEFT JOIN uploads u ON u.client_id = pi.client_id AND u.status = 'completed'
+			GROUP BY pi.identity_key
+		),
+		identity_clients AS (
+			SELECT
+				identity_key,
+				GROUP_CONCAT(client_id, char(31)) AS client_ids
+			FROM paired_identity
+			GROUP BY identity_key
+		)
 		SELECT
 			p.client_id, p.client_name, p.device_alias, p.last_ip, p.platform, p.created_at,
 			p.last_seen_at, p.revoked_at, p.stable_device_id,
-			COUNT(u.file_key),
-			COALESCE(SUM(u.file_size), 0),
-			COUNT(CASE WHEN DATE(u.updated_at, 'localtime') = DATE('now', 'localtime') THEN u.file_key END),
-			COALESCE(SUM(CASE WHEN DATE(u.updated_at, 'localtime') = DATE('now', 'localtime') THEN u.file_size ELSE 0 END), 0)
-		FROM paired_devices p
-		LEFT JOIN uploads u ON u.client_id = p.client_id AND u.status = 'completed'
-		GROUP BY p.client_id
+			COALESCE(us.total_file_count, 0),
+			COALESCE(us.total_bytes, 0),
+			COALESCE(us.today_file_count, 0),
+			COALESCE(us.today_bytes, 0),
+			COALESCE(ic.client_ids, p.client_id)
+		FROM paired_identity p
+		LEFT JOIN upload_stats us ON us.identity_key = p.identity_key
+		LEFT JOIN identity_clients ic ON ic.identity_key = p.identity_key
+		WHERE p.row_rank = 1
 		ORDER BY p.last_seen_at DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("list managed devices: %w", err)
@@ -277,10 +307,12 @@ func (s *Store) ListManagedDevices(desktopDeviceID string) ([]ManagedDevice, err
 		var device ManagedDevice
 		var alias *string
 		var revokedAt *string
+		var identityClientIDs string
 		if err := rows.Scan(
 			&device.ClientID, &device.DisplayName, &alias, &device.LastIP, &device.Platform,
 			&device.AuthorizedAt, &device.LastSeenAt, &revokedAt, &device.StableDeviceID,
 			&device.TotalFileCount, &device.TotalBytes, &device.TodayFileCount, &device.TodayBytes,
+			&identityClientIDs,
 		); err != nil {
 			return nil, fmt.Errorf("scan managed device: %w", err)
 		}
@@ -305,7 +337,11 @@ func (s *Store) ListManagedDevices(desktopDeviceID string) ([]ManagedDevice, err
 		device.BlockedAt = block.BlockedAt
 		device.BlockReason = block.Reason
 		devices = append(devices, device)
-		seen[device.ClientID] = struct{}{}
+		for _, clientID := range strings.Split(identityClientIDs, string(rune(31))) {
+			if clientID != "" {
+				seen[clientID] = struct{}{}
+			}
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate managed devices: %w", err)

@@ -279,3 +279,114 @@ func TestPairingBlockedDeviceAppearsInListManagedDevices(t *testing.T) {
 		t.Fatalf("expected pairing block cleared, still active: %+v", block)
 	}
 }
+
+func TestListManagedDevicesDeduplicatesStableDeviceID(t *testing.T) {
+	s := newTestStore(t)
+	desktopID, err := s.GetDeviceID()
+	if err != nil {
+		t.Fatalf("GetDeviceID: %v", err)
+	}
+	stableID := "stable-ios-device-001"
+	oldSeen := "2026-06-14T08:00:00Z"
+	newSeen := "2026-06-14T09:00:00Z"
+
+	insertManagedDevice(t, s, "client-old", "Alice iPhone", stableID, oldSeen)
+	insertManagedDevice(t, s, "client-new", "Alice iPhone", stableID, newSeen)
+	insertManagedCompletedUpload(t, s, "file-old", "client-old", 100, oldSeen)
+	insertManagedCompletedUpload(t, s, "file-new", "client-new", 200, newSeen)
+
+	devices, err := s.ListManagedDevices(desktopID)
+	if err != nil {
+		t.Fatalf("ListManagedDevices: %v", err)
+	}
+	if len(devices) != 1 {
+		t.Fatalf("expected one managed device for one stableDeviceId, got %d: %+v", len(devices), devices)
+	}
+	got := devices[0]
+	if got.ClientID != "client-new" {
+		t.Fatalf("expected newest client as representative, got %q", got.ClientID)
+	}
+	if got.StableDeviceID == nil || *got.StableDeviceID != stableID {
+		t.Fatalf("stableDeviceId=%v, want %q", got.StableDeviceID, stableID)
+	}
+	if got.TotalFileCount != 2 || got.TotalBytes != 300 {
+		t.Fatalf("expected merged totals count=2 bytes=300, got count=%d bytes=%d", got.TotalFileCount, got.TotalBytes)
+	}
+}
+
+func TestListManagedDevicesDoesNotAppendBlockedOldClientForSameStableDeviceID(t *testing.T) {
+	s := newTestStore(t)
+	desktopID, err := s.GetDeviceID()
+	if err != nil {
+		t.Fatalf("GetDeviceID: %v", err)
+	}
+	stableID := "stable-ios-device-001"
+
+	insertManagedDevice(t, s, "client-old", "Alice iPhone", stableID, "2026-06-14T08:00:00Z")
+	insertManagedDevice(t, s, "client-new", "Alice iPhone", stableID, "2026-06-14T09:00:00Z")
+	if err := s.BlockDevice(desktopID, "client-old"); err != nil {
+		t.Fatalf("BlockDevice old client: %v", err)
+	}
+
+	devices, err := s.ListManagedDevices(desktopID)
+	if err != nil {
+		t.Fatalf("ListManagedDevices: %v", err)
+	}
+	if len(devices) != 1 {
+		t.Fatalf("expected one managed device even with old client block, got %d: %+v", len(devices), devices)
+	}
+	if devices[0].ClientID != "client-new" {
+		t.Fatalf("expected newest client as representative, got %q", devices[0].ClientID)
+	}
+}
+
+func TestListManagedDevicesKeepsDifferentStableDeviceIDsSeparate(t *testing.T) {
+	s := newTestStore(t)
+	desktopID, err := s.GetDeviceID()
+	if err != nil {
+		t.Fatalf("GetDeviceID: %v", err)
+	}
+
+	insertManagedDevice(t, s, "client-a", "Alice iPhone", "stable-a", "2026-06-14T08:00:00Z")
+	insertManagedDevice(t, s, "client-b", "Alice iPhone", "stable-b", "2026-06-14T09:00:00Z")
+
+	devices, err := s.ListManagedDevices(desktopID)
+	if err != nil {
+		t.Fatalf("ListManagedDevices: %v", err)
+	}
+	if len(devices) != 2 {
+		t.Fatalf("expected two managed devices for different stableDeviceIds, got %d: %+v", len(devices), devices)
+	}
+}
+
+func insertManagedDevice(t *testing.T, s *Store, clientID string, clientName string, stableDeviceID string, lastSeenAt string) {
+	t.Helper()
+	device := PairedDevice{
+		ClientID:         clientID,
+		ClientName:       clientName,
+		Platform:         "ios",
+		PairingID:        "pair-" + clientID,
+		PairingTokenHash: "hash-" + clientID,
+		CreatedAt:        lastSeenAt,
+		LastSeenAt:       lastSeenAt,
+	}
+	if strings.TrimSpace(stableDeviceID) != "" {
+		device.StableDeviceID = &stableDeviceID
+	}
+	if err := s.UpsertPairedDevice(device); err != nil {
+		t.Fatalf("UpsertPairedDevice %s: %v", clientID, err)
+	}
+}
+
+func insertManagedCompletedUpload(t *testing.T, s *Store, fileKey string, clientID string, size int64, updatedAt string) {
+	t.Helper()
+	upload := sampleUpload(fileKey, clientID)
+	upload.FileSize = size
+	upload.Status = "completed"
+	upload.CommittedBytes = size
+	upload.CompletedAt = &updatedAt
+	upload.UpdatedAt = updatedAt
+	if err := s.UpsertUpload(upload); err != nil {
+		t.Fatalf("UpsertUpload %s: %v", fileKey, err)
+	}
+}
