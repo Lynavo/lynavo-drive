@@ -261,6 +261,7 @@ class NativeSyncEngineModule: RCTEventEmitter {
             "onQueueUpdated",
             "onHistoryUpdated",
             "onBindingStateChanged",
+            "onPairingInvalidated",
             "onPhotoLibraryChanged",
             "onError",
             // H8 Phase 2 (L805-830): UploadStore.needs_repair surfaced to RN so
@@ -308,6 +309,10 @@ class NativeSyncEngineModule: RCTEventEmitter {
 
     func emitBindingStateChanged(_ binding: [String: Any]?) {
         sendEventOnMain(withName: "onBindingStateChanged", body: binding)
+    }
+
+    func emitPairingInvalidated(_ payload: [String: Any]) {
+        sendEventOnMain(withName: "onPairingInvalidated", body: payload)
     }
 
     func emitSharedFilesReachabilityChanged(_ state: [String: Any]?) {
@@ -479,6 +484,12 @@ class NativeSyncEngineModule: RCTEventEmitter {
             let state = await SyncEngineManager.shared.getBindingState()
             resolve(state)
         }
+    }
+
+    @objc
+    func getBindingInvalidationState(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        let state = SyncEngineManager.shared.getBindingInvalidationStateForBridge()
+        resolve(state ?? NSNull())
     }
 
     @objc

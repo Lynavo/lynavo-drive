@@ -50,6 +50,14 @@ enum PresenceReconnectPolicy {
         return !expected.isEmpty && actual == expected
     }
 
+    static func shouldInvalidatePairing(
+        responsePaired: Bool?,
+        tokenMissingForPersistedBinding: Bool,
+        authRejected: Bool
+    ) -> Bool {
+        responsePaired == false || tokenMissingForPersistedBinding || authRejected
+    }
+
     private static func isOfflineReconnectState(_ bindingState: String) -> Bool {
         bindingState == "offline" || bindingState == "bound"
     }

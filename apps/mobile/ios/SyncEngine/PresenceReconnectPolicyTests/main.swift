@@ -113,6 +113,42 @@ expect(
 )
 
 expect(
+    PresenceReconnectPolicy.shouldInvalidatePairing(
+        responsePaired: false,
+        tokenMissingForPersistedBinding: false,
+        authRejected: false
+    ),
+    "presence paired:false is explicit invalidation evidence"
+)
+
+expect(
+    PresenceReconnectPolicy.shouldInvalidatePairing(
+        responsePaired: nil,
+        tokenMissingForPersistedBinding: true,
+        authRejected: false
+    ),
+    "missing pairing token for a persisted binding is explicit invalidation evidence"
+)
+
+expect(
+    PresenceReconnectPolicy.shouldInvalidatePairing(
+        responsePaired: nil,
+        tokenMissingForPersistedBinding: false,
+        authRejected: true
+    ),
+    "stored-token auth rejection is explicit invalidation evidence"
+)
+
+expect(
+    !PresenceReconnectPolicy.shouldInvalidatePairing(
+        responsePaired: nil,
+        tokenMissingForPersistedBinding: false,
+        authRejected: false
+    ),
+    "generic offline evidence must not invalidate pairing"
+)
+
+expect(
     PresenceReconnectPolicy.delayedProbeIntervalAfterRecoveryExhausted(consecutiveDelayedProbeFailures: 0) == 5,
     "first delayed LAN probe after recovery exhaustion should run quickly"
 )

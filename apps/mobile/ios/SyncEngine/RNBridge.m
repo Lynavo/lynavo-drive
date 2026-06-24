@@ -12,6 +12,7 @@ RCT_EXTERN_METHOD(stopDiscovery:(RCTPromiseResolveBlock)resolve reject:(RCTPromi
 RCT_EXTERN_METHOD(pairDevice:(NSDictionary *)params resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(disconnectAndUnbind:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(getBindingState:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(getBindingInvalidationState:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(getSyncOverview:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(getReadOnlyQueue:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(getHistoryDays:(id)cursor resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
