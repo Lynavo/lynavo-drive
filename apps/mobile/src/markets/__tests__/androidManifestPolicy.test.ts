@@ -15,6 +15,14 @@ const path = require('path') as PathModule;
 const BATTERY_OPTIMIZATION_PERMISSION =
   'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS';
 
+const PHONE_ONLY_SCREEN_DECLARATIONS = [
+  'android:smallScreens="true"',
+  'android:normalScreens="true"',
+  'android:largeScreens="false"',
+  'android:xlargeScreens="false"',
+  'android:requiresSmallestWidthDp="320"',
+] as const;
+
 function readManifest(sourceSet: 'main' | 'cn' | 'global'): string | null {
   const manifestPath = path.join(
     process.cwd(),
@@ -42,5 +50,20 @@ describe('Android manifest market policy', () => {
     expect(readManifest('global') ?? '').not.toContain(
       BATTERY_OPTIMIZATION_PERMISSION,
     );
+  });
+
+  it('declares mobile phone screen support without tablet screens in the shared manifest', () => {
+    const manifest = readManifest('main') ?? '';
+
+    for (const declaration of PHONE_ONLY_SCREEN_DECLARATIONS) {
+      expect(manifest).toContain(declaration);
+    }
+  });
+
+  it('overrides China payment SDK tablet support declarations for phone-only release builds', () => {
+    expect(readManifest('cn')).toContain(
+      'tools:replace="android:largeScreens"',
+    );
+    expect(readManifest('global') ?? '').not.toContain('tools:replace=');
   });
 });

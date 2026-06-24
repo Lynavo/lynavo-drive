@@ -41,8 +41,10 @@ cd services/sidecar-go && go test ./...
 
 1. iOS Debug / Release build 通過
 2. Android Debug build 通過
-3. 關鍵真機回歸過一輪
-4. 目前工作區乾淨
+3. iOS 發佈範圍維持 iPhone-only：Xcode target `TARGETED_DEVICE_FAMILY = 1`，App Store Connect 不勾選 iPad 發佈
+4. Android 發佈範圍維持 phone-only：`AndroidManifest.xml` 宣告不支援 `largeScreens` / `xlargeScreens`，Google Play Device catalog 不開放 tablet form factor
+5. 關鍵真機回歸過一輪
+6. 目前工作區乾淨
 
 回歸基線見：
 
@@ -251,6 +253,7 @@ git push origin beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION>
 4. 切背景繼續上傳
 5. 中途斷網恢復
 6. 歷史和設定頁狀態正常
+7. App Store Connect 裝置支援範圍確認只發布 iPhone，不發布 iPad / tablet
 
 ### 8.2 Android
 
@@ -260,6 +263,7 @@ git push origin beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION>
 4. 切背景繼續上傳
 5. 中途斷網恢復
 6. 歷史和設定頁狀態正常
+7. Google Play Device catalog 確認只發布 mobile phones，不發布 tablet form factor
 
 ### 8.3 macOS
 
