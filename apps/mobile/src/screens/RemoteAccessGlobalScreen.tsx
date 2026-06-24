@@ -118,6 +118,7 @@ const REMOTE_ACCESS_REQUEST_TIMEOUT_MS = 30_000;
 const REMOTE_ACCESS_TIMEOUT_ERROR_MESSAGE = 'Remote access request timed out';
 const REMOTE_ACCESS_READY_RETRY_ATTEMPTS = 2;
 const REMOTE_ACCESS_READY_RETRY_DELAY_MS = 1_200;
+const DEFAULT_SHARE_TARGETS = ['微信', 'QQ', '企業微信', '更多'];
 const REMOTE_RESOURCE_ICON_GRADIENTS: Record<
   RemoteResourceIconType,
   RemoteResourceGradientStop[]
@@ -539,6 +540,21 @@ function nonEmptyString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0
     ? value.trim()
     : null;
+}
+
+function normalizeShareTargets(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return DEFAULT_SHARE_TARGETS;
+  }
+
+  const targets = value
+    .filter(
+      (target): target is string =>
+        typeof target === 'string' && target.trim().length > 0,
+    )
+    .map(target => target.trim());
+
+  return targets.length > 0 ? targets : DEFAULT_SHARE_TARGETS;
 }
 
 function normalizeSharedFilesReachability(
@@ -1304,27 +1320,22 @@ export function RemoteAccessGlobalScreen() {
   );
 
   const renderItem = ({ item }: { item: RemoteResourceItem }) => {
-    return layoutMode === 'grid'
-      ? renderGridItem({
-          item,
-          downloadingId,
-          onDownload: handleDownload,
-          onOpenFile: handleOpenFile,
-          onOpenFolder: openFolder,
-          onToggleSelection: toggleSelection,
-          selected: selectedIds.includes(item.resourceId),
-          selectionMode,
-        })
-      : renderListItem({
-          item,
-          downloadingId,
-          onDownload: handleDownload,
-          onOpenFile: handleOpenFile,
-          onOpenFolder: openFolder,
-          onToggleSelection: toggleSelection,
-          selected: selectedIds.includes(item.resourceId),
-          selectionMode,
-        });
+    const itemProps: RemoteResourceItemProps = {
+      item,
+      downloadingId,
+      onDownload: handleDownload,
+      onOpenFile: handleOpenFile,
+      onOpenFolder: openFolder,
+      onToggleSelection: toggleSelection,
+      selected: selectedIds.includes(item.resourceId),
+      selectionMode,
+    };
+
+    return layoutMode === 'grid' ? (
+      <RemoteResourceGridItem {...itemProps} />
+    ) : (
+      <RemoteResourceListItem {...itemProps} />
+    );
   };
 
   return (
@@ -1745,16 +1756,7 @@ function RemoteResourceGlyph({ type }: { type: RemoteResourceIconType }) {
   );
 }
 
-function renderListItem({
-  item,
-  downloadingId,
-  onDownload,
-  onOpenFile,
-  onOpenFolder,
-  onToggleSelection,
-  selected,
-  selectionMode,
-}: {
+type RemoteResourceItemProps = {
   item: RemoteResourceItem;
   downloadingId: string | null;
   onDownload: (item: RemoteResourceItem) => void;
@@ -1763,7 +1765,18 @@ function renderListItem({
   onToggleSelection: (item: RemoteResourceItem) => void;
   selected: boolean;
   selectionMode: boolean;
-}) {
+};
+
+function RemoteResourceListItem({
+  item,
+  downloadingId,
+  onDownload,
+  onOpenFile,
+  onOpenFolder,
+  onToggleSelection,
+  selected,
+  selectionMode,
+}: RemoteResourceItemProps) {
   const { t } = useTranslation();
   const folder = isFolder(item);
   const iconType = getItemIconType(item);
@@ -1829,7 +1842,7 @@ function renderListItem({
   );
 }
 
-function renderGridItem({
+function RemoteResourceGridItem({
   item,
   downloadingId,
   onDownload,
@@ -1838,16 +1851,7 @@ function renderGridItem({
   onToggleSelection,
   selected,
   selectionMode,
-}: {
-  item: RemoteResourceItem;
-  downloadingId: string | null;
-  onDownload: (item: RemoteResourceItem) => void;
-  onOpenFile: (item: RemoteResourceItem) => void;
-  onOpenFolder: (item: RemoteResourceItem) => void;
-  onToggleSelection: (item: RemoteResourceItem) => void;
-  selected: boolean;
-  selectionMode: boolean;
-}) {
+}: RemoteResourceItemProps) {
   const { t } = useTranslation();
   const folder = isFolder(item);
   const iconType = getItemIconType(item);
@@ -2227,7 +2231,9 @@ function ShareSheet({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const targets = (t('sharedFiles.remoteAccess.shareTargets', { returnObjects: true }) as string[]) || ['微信', 'QQ', '企业微信', '更多'];
+  const targets = normalizeShareTargets(
+    t('sharedFiles.remoteAccess.shareTargets', { returnObjects: true }),
+  );
 
   return (
     <Modal

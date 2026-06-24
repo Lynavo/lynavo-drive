@@ -24,64 +24,74 @@ jest.mock('react-native-localize', () => ({
   ],
 }));
 
-jest.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, options?: any) => {
-      const map: Record<string, string> = {
-        'sharedFiles.loading': '載入中...',
-        'sharedFiles.deviceUnavailable.title': '設備不可用',
-        'sharedFiles.deviceUnavailable.message': '請先連接設備',
-        'sharedFiles.emptyState.title': '目前沒有內容',
-        'sharedFiles.emptyState.message': '同步完成後，檔案將顯示在這裡',
-        'sharedFiles.dialogs.downloadComplete': '下載完成',
-        'sharedFiles.scopes.team': '檔案共享',
-        'sharedFiles.scopes.shared': '已分享的資源',
-        'sharedFiles.scopes.received': '已接收的檔案',
-        'sharedFiles.networkError.title': '載入失敗',
-        'sharedFiles.networkError.message': '請稍後重試',
-        'sharedFiles.dialogs.downloadFailed': '下載失敗',
-        'sharedFiles.dialogs.downloadFailedMessage': '無法下載檔案，请稍後重試',
-        'sharedFiles.dialogs.savedLocationPhotos': '相簿',
-        'sharedFiles.dialogs.previewFailed': '預覽失敗',
-        'sharedFiles.dialogs.previewFailedMessage': '無法取得檔案預覽',
-        'sharedFiles.dialogs.previewUnsupported': '無法預覽',
-        'sharedFiles.dialogs.previewUnsupportedMessage':
-          '此檔案類型目前無法預覽，請先下載後再用其他 App 開啟',
-        'sharedFiles.dialogs.openWithOtherApp': '用其他 App 開啟',
-        'sharedFiles.dialogs.cancel': '取消',
-        'sharedFiles.title': '遠端資源',
-        'sharedFiles.phoneSyncSpace.title': '手機同步空間',
-        'sharedFiles.phoneSyncSpace.desc': '檢視已同步至电脑的檔案與上传来源',
-        'sharedFiles.phoneSyncSpace.empty': '尚無同步檔案',
-        'sharedFiles.phoneSyncSpace.desktopDeleted': '電腦已刪除',
-        'sharedFiles.phoneSyncSpace.desktopDeletedMessage':
-          '此檔案已從電腦刪除',
-        'sharedFiles.phoneSyncSpace.deletedDownloadMessage':
-          '無法下載已刪除的檔案',
-        'sharedFiles.remoteAccess.title': '遠端訪問電腦',
-        'sharedFiles.remoteAccess.desc': '流覽電腦端共享的目錄結構並下載文件',
-        'sharedFiles.remoteAccess.empty': '此資料夾為空',
-        'sharedFiles.remoteAccess.select': '選擇',
-        'sharedFiles.remoteAccess.done': '完成',
-        'sharedFiles.remoteAccess.download': '下載',
-        'sharedFiles.remoteAccess.share': '分享',
-        'sharedFiles.remoteAccess.selectedCount': `已選擇 ${
-          options?.count ?? 0
-        } 個`,
+jest.mock('react-i18next', () => {
+  const ReactInner = require('react');
+  const TranslationContext = ReactInner.createContext(null);
+  return {
+    useTranslation: () => {
+      ReactInner.useContext(TranslationContext);
+      return {
+        t: (key: string, options?: any) => {
+          const map: Record<string, string> = {
+            'sharedFiles.loading': '載入中...',
+            'sharedFiles.deviceUnavailable.title': '設備不可用',
+            'sharedFiles.deviceUnavailable.message': '請先連接設備',
+            'sharedFiles.emptyState.title': '目前沒有內容',
+            'sharedFiles.emptyState.message': '同步完成後，檔案將顯示在這裡',
+            'sharedFiles.dialogs.downloadComplete': '下載完成',
+            'sharedFiles.scopes.team': '檔案共享',
+            'sharedFiles.scopes.shared': '已分享的資源',
+            'sharedFiles.scopes.received': '已接收的檔案',
+            'sharedFiles.networkError.title': '載入失敗',
+            'sharedFiles.networkError.message': '請稍後重試',
+            'sharedFiles.dialogs.downloadFailed': '下載失敗',
+            'sharedFiles.dialogs.downloadFailedMessage': '無法下載檔案，请稍後重試',
+            'sharedFiles.dialogs.savedLocationPhotos': '相簿',
+            'sharedFiles.dialogs.previewFailed': '預覽失敗',
+            'sharedFiles.dialogs.previewFailedMessage': '無法取得檔案預覽',
+            'sharedFiles.dialogs.previewUnsupported': '無法預覽',
+            'sharedFiles.dialogs.previewUnsupportedMessage':
+              '此檔案類型目前無法預覽，請先下載後再用其他 App 開啟',
+            'sharedFiles.dialogs.openWithOtherApp': '用其他 App 開啟',
+            'sharedFiles.dialogs.cancel': '取消',
+            'sharedFiles.title': '遠端資源',
+            'sharedFiles.phoneSyncSpace.title': '手機同步空間',
+            'sharedFiles.phoneSyncSpace.desc': '檢視已同步至电脑的檔案與上传来源',
+            'sharedFiles.phoneSyncSpace.empty': '尚無同步檔案',
+            'sharedFiles.phoneSyncSpace.desktopDeleted': '電腦已刪除',
+            'sharedFiles.phoneSyncSpace.desktopDeletedMessage':
+              '此檔案已從電腦刪除',
+            'sharedFiles.phoneSyncSpace.deletedDownloadMessage':
+              '無法下載已刪除的檔案',
+            'sharedFiles.remoteAccess.title': '遠端訪問電腦',
+            'sharedFiles.remoteAccess.desc': '流覽電腦端共享的目錄結構並下載文件',
+            'sharedFiles.remoteAccess.empty': '此資料夾為空',
+            'sharedFiles.remoteAccess.select': '選擇',
+            'sharedFiles.remoteAccess.done': '完成',
+            'sharedFiles.remoteAccess.download': '下載',
+            'sharedFiles.remoteAccess.share': '分享',
+            'sharedFiles.remoteAccess.selectedCount': `已選擇 ${
+              options?.count ?? 0
+            } 個`,
+          };
+          if (
+            key === 'sharedFiles.dialogs.downloadSavedToPhotos' &&
+            options?.name
+          ) {
+            return `${options.name} 已儲存到${options.location ?? ''}`;
+          }
+          if (
+            key === 'sharedFiles.dialogs.downloadSavedToFiles' &&
+            options?.name
+          ) {
+            return `${options.name} 已儲存到檔案`;
+          }
+          return map[key] || key;
+        },
       };
-      if (
-        key === 'sharedFiles.dialogs.downloadSavedToPhotos' &&
-        options?.name
-      ) {
-        return `${options.name} 已儲存到${options.location ?? ''}`;
-      }
-      if (key === 'sharedFiles.dialogs.downloadSavedToFiles' && options?.name) {
-        return `${options.name} 已儲存到檔案`;
-      }
-      return map[key] || key;
     },
-  }),
-}));
+  };
+});
 
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
@@ -505,6 +515,38 @@ describe('RemoteAccessGlobalScreen', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     jest.useRealTimers();
+  });
+
+  it('does not crash when share target translations are unavailable on initial render', async () => {
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([]);
+
+    expect(() => {
+      render(<RemoteAccessGlobalScreen />);
+    }).not.toThrow();
+
+    await waitFor(() => {
+      expect(mockListGlobalRemoteAccessResources).toHaveBeenCalledWith();
+    });
+  });
+
+  it('renders remote access list items without calling hooks from renderItem helpers', async () => {
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([
+      {
+        resourceId: 'personal-dir:Project%20Files',
+        desktopDeviceId: 'desktop-device-id',
+        displayName: 'Project Files',
+        kind: 'shared_folder',
+        status: 'available',
+        addedAt: '2026-06-16T08:00:00.000Z',
+        downloadCount: 0,
+      },
+    ]);
+
+    const { getByText } = render(<RemoteAccessGlobalScreen />);
+
+    await waitFor(() => {
+      expect(getByText('Project Files')).toBeTruthy();
+    });
   });
 
   it('keeps an empty real response empty unless the remote preview gate is explicit', async () => {
