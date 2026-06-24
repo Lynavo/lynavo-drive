@@ -67,6 +67,7 @@ import {
   isVideoFile,
   openFileWithOtherApp,
 } from '../utils/file-preview';
+import { recordDiagnosticsLog } from '../services/diagnostics-log-service';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'RemoteAccess'>;
 type LayoutMode = 'list' | 'grid';
@@ -1063,6 +1064,16 @@ export function RemoteAccessGlobalScreen() {
           return;
         }
 
+        recordDiagnosticsLog('RemoteAccess', 'record download source', {
+          resourceId: item.resourceId,
+          filename: item.displayName,
+          mediaType: item.mediaType,
+          savedToPhotos: result.savedToPhotos,
+          hasLocalPath: Boolean(result.localPath?.trim()),
+          hasThumbnailUrl: Boolean(item.thumbnailUrl?.trim()),
+          hasPreviewUrl: Boolean(item.previewUrl?.trim()),
+          hasStreamUrl: Boolean(item.streamUrl?.trim()),
+        });
         await recordDownloadedFile({
           resourceId: item.resourceId,
           filename: item.displayName,

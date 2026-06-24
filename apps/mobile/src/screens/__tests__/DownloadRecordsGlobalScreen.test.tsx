@@ -265,6 +265,8 @@ describe('DownloadRecordsGlobalScreen', () => {
         thumbnailUrl: 'https://desktop.local/thumb.jpg',
       },
     ]);
+    const recordDiagnosticsLog = jest.fn();
+    NativeModules.NativeSyncEngine.recordDiagnosticsLog = recordDiagnosticsLog;
 
     const { getByTestId } = render(<DownloadRecordsGlobalScreen />);
 
@@ -276,6 +278,14 @@ describe('DownloadRecordsGlobalScreen', () => {
       {
         uri: 'https://desktop.local/full.jpg',
       },
+    );
+    expect(recordDiagnosticsLog).toHaveBeenCalledWith(
+      'DownloadRecords',
+      expect.stringContaining('thumbnail render state'),
+    );
+    expect(recordDiagnosticsLog).toHaveBeenCalledWith(
+      'DownloadRecords',
+      expect.stringContaining('thumbnailSource=previewUrl'),
     );
   });
 

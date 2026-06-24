@@ -7,6 +7,7 @@ import {
   recordDownloadedFile,
 } from '../download-records-service';
 import { clearUserScopedStorage } from '../../utils/clearUserScopedStorage';
+import { recordDiagnosticsLog } from '../diagnostics-log-service';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
@@ -19,7 +20,12 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   },
 }));
 
+jest.mock('../diagnostics-log-service', () => ({
+  recordDiagnosticsLog: jest.fn(),
+}));
+
 const mockedAsyncStorage = AsyncStorage as jest.Mocked<typeof AsyncStorage>;
+const mockedRecordDiagnosticsLog = recordDiagnosticsLog as jest.Mock;
 
 describe('download-records-service', () => {
   beforeEach(() => {
@@ -121,6 +127,36 @@ describe('download-records-service', () => {
     expect(mockedAsyncStorage.setItem).toHaveBeenCalledWith(
       'syncflow:download-records:v1',
       JSON.stringify([record]),
+    );
+  });
+
+  it('records diagnostic details for persisted download preview sources', async () => {
+    mockedAsyncStorage.getItem.mockResolvedValueOnce('[]');
+
+    await recordDownloadedFile({
+      resourceId: 'photo-resource',
+      filename: 'Photo.jpg',
+      mediaType: 'image/jpeg',
+      thumbnailUrl: ' https://desktop.local/thumb.jpg ',
+      previewUrl: ' https://desktop.local/preview.jpg ',
+      streamUrl: ' https://desktop.local/stream.jpg ',
+      localPath: null,
+      savedToPhotos: true,
+    });
+
+    expect(mockedRecordDiagnosticsLog).toHaveBeenCalledWith(
+      'DownloadRecords',
+      'record persisted',
+      expect.objectContaining({
+        resourceId: 'photo-resource',
+        filename: 'Photo.jpg',
+        mediaType: 'image/jpeg',
+        savedToPhotos: true,
+        hasLocalPath: false,
+        hasThumbnailUrl: true,
+        hasPreviewUrl: true,
+        hasStreamUrl: true,
+      }),
     );
   });
 

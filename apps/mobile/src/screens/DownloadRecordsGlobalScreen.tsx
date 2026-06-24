@@ -39,6 +39,7 @@ import {
   listDownloadRecords,
   type DownloadRecord,
 } from '../services/download-records-service';
+import { recordDiagnosticsLog } from '../services/diagnostics-log-service';
 import { colors } from '../theme/globalColors';
 import { androidBoxShadow } from '../utils/androidShadow';
 import {
@@ -401,6 +402,19 @@ function DownloadRecordPreviewThumbnail({
       return;
     }
     console.info('[video-thumbnail][mobile] download record thumbnail state', {
+      id: record.id,
+      filename: record.filename,
+      mediaType: record.mediaType,
+      kind,
+      hasThumbnailUrl: Boolean(thumbnailUri),
+      renderingImage: Boolean(thumbnailUri && !thumbnailFailed),
+      thumbnailFailed,
+      thumbnailSource,
+      hasPreviewUrl: Boolean(record.previewUrl?.trim()),
+      hasStreamUrl: Boolean(record.streamUrl?.trim()),
+      hasOriginalThumbnailUrl: Boolean(record.thumbnailUrl?.trim()),
+    });
+    recordDiagnosticsLog('DownloadRecords', 'thumbnail render state', {
       id: record.id,
       filename: record.filename,
       mediaType: record.mediaType,

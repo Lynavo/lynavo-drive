@@ -1466,6 +1466,19 @@ describe('RemoteAccessGlobalScreen', () => {
         'http://192.168.1.100:39394/personal/stream/Album/photo.jpg',
       savedToPhotos: false,
     });
+    expect(mockRecordDiagnosticsLog).toHaveBeenCalledWith(
+      'RemoteAccess',
+      'record download source',
+      expect.objectContaining({
+        resourceId: 'personal-dir:Album/photo.jpg',
+        filename: 'photo.jpg',
+        mediaType: 'image',
+        savedToPhotos: false,
+        hasThumbnailUrl: true,
+        hasPreviewUrl: true,
+        hasStreamUrl: true,
+      }),
+    );
 
     alertSpy.mockRestore();
   });

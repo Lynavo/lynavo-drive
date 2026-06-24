@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { recordDiagnosticsLog } from './diagnostics-log-service';
+
 export interface DownloadRecord {
   id: string;
   resourceId: string;
@@ -136,6 +138,17 @@ export async function recordDownloadedFile(
     DOWNLOAD_RECORDS_STORAGE_KEY,
     JSON.stringify(nextRecords),
   );
+  recordDiagnosticsLog('DownloadRecords', 'record persisted', {
+    resourceId: record.resourceId,
+    filename: record.filename,
+    mediaType: record.mediaType,
+    savedToPhotos: record.savedToPhotos,
+    hasLocalPath: Boolean(record.localPath?.trim()),
+    hasThumbnailUrl: Boolean(record.thumbnailUrl?.trim()),
+    hasPreviewUrl: Boolean(record.previewUrl?.trim()),
+    hasStreamUrl: Boolean(record.streamUrl?.trim()),
+    recordCount: nextRecords.length,
+  });
   return record;
 }
 
