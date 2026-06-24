@@ -111,6 +111,8 @@
     "connectionCodeError": "连接码错误",
     "connectionFailed": "连接失败",
     "connectionFailedDesc": "连接失败，请确认电脑端在线后重试。",
+    "pairingInvalidatedTitle": "需要重新配对这台电脑",
+    "pairingInvalidatedDesc": "这台电脑已更新连接码。请重新配对后继续同步。",
     "onboarding": {
       "step1Title": "先连接电脑",
       "step1Desc": "选择一台电脑完成连接。后续引导只预览关键功能入口，不会跳转真实页面或创建假数据。",

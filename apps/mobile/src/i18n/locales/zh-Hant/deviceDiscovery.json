@@ -111,6 +111,8 @@
     "connectionCodeError": "連線碼錯誤",
     "connectionFailed": "連線失敗",
     "connectionFailedDesc": "連線失敗，請確認電腦端在線後重試。",
+    "pairingInvalidatedTitle": "需要重新配對這台電腦",
+    "pairingInvalidatedDesc": "這台電腦已更新連線碼。請重新配對後繼續同步。",
     "onboarding": {
       "step1Title": "先連接電腦",
       "step1Desc": "選擇一台電腦完成連接。後續引導只預覽關鍵功能入口，不會跳轉真實頁面或建立假資料。",

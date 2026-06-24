@@ -19,7 +19,9 @@ const mockForgetDesktop = jest.fn().mockResolvedValue(undefined);
 const mockUpdateAuthStatus = jest.fn().mockResolvedValue(undefined);
 const mockGetBindingState = jest.fn().mockResolvedValue(null);
 const mockGetKnownDeviceIds = jest.fn().mockResolvedValue([]);
-let mockRouteParams: { mode?: 'initial' | 'switch' } | undefined = {
+let mockRouteParams:
+  | { mode?: 'initial' | 'switch'; reason?: 'pairing_invalidated' }
+  | undefined = {
   mode: 'initial',
 };
 
@@ -473,6 +475,23 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
       expect(mockHasSeenUnconnectedGuide).not.toHaveBeenCalled();
     });
     expect(screen.queryByText('先连接电脑')).toBeNull();
+  });
+
+  it('shows pairing invalidated notice while keeping pairing choices visible', async () => {
+    mockRouteParams = { reason: 'pairing_invalidated' };
+    mockHasSeenUnconnectedGuide.mockResolvedValue(true);
+
+    const screen = render(<DeviceDiscoveryGlobalScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('需要重新配对这台电脑')).toBeTruthy();
+    });
+
+    expect(
+      screen.getByText('这台电脑已更新连接码。请重新配对后继续同步。'),
+    ).toBeTruthy();
+    expect(screen.getByText('手动配对')).toBeTruthy();
+    expect(screen.getByText('Studio Mac')).toBeTruthy();
   });
 
   it('marks the current desktop in switch mode and blocks reconnecting it', async () => {

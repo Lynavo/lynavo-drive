@@ -128,10 +128,10 @@ type ConnectionGuideStep = {
 type FlowStateContent = {
   title: string;
   description: string;
-  actionLabel: string;
+  actionLabel?: string;
   icon: string;
   tone: FlowStateTone;
-  onAction: () => void;
+  onAction?: () => void;
 };
 
 type SpotlightLayout = {
@@ -390,6 +390,8 @@ export function DeviceDiscoveryGlobalScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'DeviceDiscovery'>>();
   const insets = useSafeAreaInsets();
   const mode = route.params?.mode ?? 'initial';
+  const showPairingInvalidatedNotice =
+    route.params?.reason === 'pairing_invalidated';
   const { recentDesktops, addDesktop } = useRecentDesktops();
 
   const getVisualQaDevices = useCallback(() => {
@@ -1102,6 +1104,19 @@ export function DeviceDiscoveryGlobalScreen() {
               </Text>
             </View>
 
+            {showPairingInvalidatedNotice ? (
+              <FlowStateCard
+                state={{
+                  title: t('deviceDiscovery.global.pairingInvalidatedTitle'),
+                  description: t(
+                    'deviceDiscovery.global.pairingInvalidatedDesc',
+                  ),
+                  icon: 'key-outline',
+                  tone: 'warning',
+                }}
+              />
+            ) : null}
+
             <View
               ref={devicesCardRef}
               style={styles.devicesCard}
@@ -1372,15 +1387,17 @@ function FlowStateCard({ state }: { state: FlowStateContent }) {
       <View style={styles.flowStateCopy}>
         <View style={styles.flowStateTopRow}>
           <Text style={styles.flowStateTitle}>{state.title}</Text>
-          <TouchableOpacity
-            activeOpacity={0.76}
-            style={[styles.flowAction, toneStyle.action]}
-            onPress={state.onAction}
-          >
-            <Text style={[styles.flowActionText, toneStyle.actionText]}>
-              {state.actionLabel}
-            </Text>
-          </TouchableOpacity>
+          {state.actionLabel && state.onAction ? (
+            <TouchableOpacity
+              activeOpacity={0.76}
+              style={[styles.flowAction, toneStyle.action]}
+              onPress={state.onAction}
+            >
+              <Text style={[styles.flowActionText, toneStyle.actionText]}>
+                {state.actionLabel}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
         <Text style={styles.flowStateDescription}>{state.description}</Text>
       </View>

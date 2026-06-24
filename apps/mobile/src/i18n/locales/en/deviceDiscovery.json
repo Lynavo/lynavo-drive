@@ -111,6 +111,8 @@
     "connectionCodeError": "Connection Code Error",
     "connectionFailed": "Connection Failed",
     "connectionFailedDesc": "Connection failed. Please check if the computer is online and try again.",
+    "pairingInvalidatedTitle": "Pair this desktop again",
+    "pairingInvalidatedDesc": "This desktop changed its pairing code. Pair again to continue.",
     "onboarding": {
       "step1Title": "Connect Computer First",
       "step1Desc": "Select a computer to connect. The guide only previews features without creating real data.",
