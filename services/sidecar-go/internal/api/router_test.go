@@ -1365,6 +1365,74 @@ func TestSharedDownloadSupportsRangeRequests(t *testing.T) {
 	}
 }
 
+func TestPersonalStreamAllowsRepeatedSignedMovRangeRequests(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	cfg.PersonalShareDir = filepath.Join(t.TempDir(), "Personal Share")
+	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cfg.PersonalDir(), "clip.mov"), []byte("0123456789"), 0o644); err != nil {
+		t.Fatalf("write mov: %v", err)
+	}
+
+	const (
+		clientID     = "phone-video-hmac"
+		clientName   = "Video Phone"
+		pairingToken = "pairing-token-secret"
+	)
+	insertHMACPairedDevice(t, st, clientID, clientName, pairingToken)
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	signedURL := signedPersonalURLWithQuery(t, srv, "/personal/stream/clip.mov", clientID, clientName, pairingToken)
+
+	resp, err := http.Get(signedURL)
+	if err != nil {
+		t.Fatalf("first signed personal stream: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("personal stream status=%d, want 200", resp.StatusCode)
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	if contentType := resp.Header.Get("Content-Type"); !strings.HasPrefix(contentType, "video/quicktime") {
+		t.Fatalf("Content-Type=%q, want video/quicktime", contentType)
+	}
+	if got := resp.Header.Get("Accept-Ranges"); got != "bytes" {
+		t.Fatalf("Accept-Ranges=%q, want bytes", got)
+	}
+
+	rangeReq, err := http.NewRequest(http.MethodGet, signedURL, nil)
+	if err != nil {
+		t.Fatalf("new range request: %v", err)
+	}
+	rangeReq.Header.Set("Range", "bytes=4-")
+	rangeResp, err := http.DefaultClient.Do(rangeReq)
+	if err != nil {
+		t.Fatalf("GET /personal/stream/clip.mov range: %v", err)
+	}
+	defer rangeResp.Body.Close()
+
+	if rangeResp.StatusCode != http.StatusPartialContent {
+		t.Fatalf("range status=%d, want 206", rangeResp.StatusCode)
+	}
+	if contentType := rangeResp.Header.Get("Content-Type"); !strings.HasPrefix(contentType, "video/quicktime") {
+		t.Fatalf("range Content-Type=%q, want video/quicktime", contentType)
+	}
+	if got := rangeResp.Header.Get("Content-Range"); got != "bytes 4-9/10" {
+		t.Fatalf("Content-Range=%q, want bytes 4-9/10", got)
+	}
+	body, err := io.ReadAll(rangeResp.Body)
+	if err != nil {
+		t.Fatalf("read range body: %v", err)
+	}
+	if string(body) != "456789" {
+		t.Fatalf("range body=%q, want 456789", string(body))
+	}
+}
+
 func TestDashboardDevicesIncludesStableIdentityMetadataWithoutHidingRows(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 

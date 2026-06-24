@@ -162,11 +162,15 @@ func (s *Server) authorizePersonalPairedDeviceRequest(r *http.Request) (string, 
 	if !hmac.Equal([]byte(strings.ToLower(signature)), []byte(expected)) {
 		return "", false, true, http.StatusUnauthorized, "paired device signature is invalid"
 	}
-	if !s.rememberPersonalAccessNonce(client.ClientID, nonce, signedAt.Add(personalAccessSignatureMaxSkew)) {
+	if !isPersonalStreamRequestPath(r.URL.EscapedPath()) && !s.rememberPersonalAccessNonce(client.ClientID, nonce, signedAt.Add(personalAccessSignatureMaxSkew)) {
 		return "", false, true, http.StatusUnauthorized, "paired device signature nonce replayed"
 	}
 
 	return "paired:" + client.ClientID, true, true, http.StatusOK, ""
+}
+
+func isPersonalStreamRequestPath(escapedPath string) bool {
+	return strings.HasPrefix(escapedPath, "/personal/stream/")
 }
 
 func (s *Server) rememberPersonalAccessNonce(clientID, nonce string, expiresAt time.Time) bool {
