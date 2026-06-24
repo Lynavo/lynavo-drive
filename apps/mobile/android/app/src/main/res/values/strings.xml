@@ -1,3 +1,12 @@
 <resources>
     <string name="app_name">Vivi Drop</string>
+    <string name="background_sync_notification_channel_name">Background sync</string>
+    <string name="background_sync_notification_channel_description">Persistent notification shown while Vivi Drop uploads files in the background.</string>
+    <string name="background_sync_notification_title">Vivi Drop is syncing in the background</string>
+    <string name="background_sync_notification_stopping_title">Vivi Drop is stopping sync</string>
+    <string name="background_sync_notification_stopping_text">The current file will be interrupted and kept in the queue.</string>
+    <string name="background_sync_notification_manual_text">Uploading files from the queue.</string>
+    <string name="background_sync_notification_reconnect_text">Continuing unfinished uploads after reconnecting.</string>
+    <string name="background_sync_notification_auto_text">Automatically uploading new album files.</string>
+    <string name="background_sync_notification_stop_action">Stop</string>
 </resources>

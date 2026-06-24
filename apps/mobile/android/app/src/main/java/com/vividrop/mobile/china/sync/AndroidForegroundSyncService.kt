@@ -33,8 +33,8 @@ class AndroidForegroundSyncService : Service() {
       startForeground(
         NOTIFICATION_ID,
         buildNotification(
-          title = "Vivi Drop 正在停止同步",
-          text = "目前檔案會中斷並保留在佇列中。",
+          title = getString(R.string.background_sync_notification_stopping_title),
+          text = getString(R.string.background_sync_notification_stopping_text),
         ),
       )
       return START_NOT_STICKY
@@ -44,7 +44,7 @@ class AndroidForegroundSyncService : Service() {
     startForeground(
       NOTIFICATION_ID,
       buildNotification(
-        title = "Vivi Drop 正在背景同步",
+        title = getString(R.string.background_sync_notification_title),
         text = notificationTextForReason(reason),
       ),
     )
@@ -59,10 +59,10 @@ class AndroidForegroundSyncService : Service() {
     val manager = getSystemService(NotificationManager::class.java) ?: return
     val channel = NotificationChannel(
       CHANNEL_ID,
-      "背景同步",
+      getString(R.string.background_sync_notification_channel_name),
       NotificationManager.IMPORTANCE_LOW,
     ).apply {
-      description = "Vivi Drop 背景上傳檔案時顯示的常駐通知。"
+      description = getString(R.string.background_sync_notification_channel_description)
       setShowBadge(false)
     }
     manager.createNotificationChannel(channel)
@@ -93,15 +93,22 @@ class AndroidForegroundSyncService : Service() {
       .setOnlyAlertOnce(true)
       .setCategory(NotificationCompat.CATEGORY_PROGRESS)
       .setPriority(NotificationCompat.PRIORITY_LOW)
-      .addAction(R.drawable.ic_stat_vividrop_sync, "停止", stopIntent)
+      .addAction(
+        R.drawable.ic_stat_vividrop_sync,
+        getString(R.string.background_sync_notification_stop_action),
+        stopIntent,
+      )
       .build()
   }
 
   private fun notificationTextForReason(reason: String): String =
     when (reason) {
-      "manual_upload", "manual_trigger" -> "正在上傳佇列中的檔案。"
-      "manual_reconnect" -> "重新連線後繼續上傳未完成檔案。"
-      else -> "正在自動上傳新的相簿檔案。"
+      "manual_upload", "manual_trigger" ->
+        getString(R.string.background_sync_notification_manual_text)
+      "manual_reconnect" ->
+        getString(R.string.background_sync_notification_reconnect_text)
+      else ->
+        getString(R.string.background_sync_notification_auto_text)
     }
 
   companion object {

@@ -1,0 +1,11 @@
+<resources>
+    <string name="background_sync_notification_channel_name">后台同步</string>
+    <string name="background_sync_notification_channel_description">Vivi Drop 在后台上传文件时显示的常驻通知。</string>
+    <string name="background_sync_notification_title">Vivi Drop 正在后台同步</string>
+    <string name="background_sync_notification_stopping_title">Vivi Drop 正在停止同步</string>
+    <string name="background_sync_notification_stopping_text">当前文件会中断并保留在队列中。</string>
+    <string name="background_sync_notification_manual_text">正在上传队列中的文件。</string>
+    <string name="background_sync_notification_reconnect_text">重新连接后继续上传未完成文件。</string>
+    <string name="background_sync_notification_auto_text">正在自动上传新的相册文件。</string>
+    <string name="background_sync_notification_stop_action">停止</string>
+</resources>
