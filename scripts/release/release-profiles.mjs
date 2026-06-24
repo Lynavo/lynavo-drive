@@ -130,7 +130,7 @@ function buildTargetStep(profile, target) {
       command: 'bash',
       args: [
         '-lc',
-        `cd apps/mobile/android && ./gradlew assemble${capitalize(profile.market)}Release bundle${capitalize(profile.market)}Release`,
+        `cd apps/mobile/android && ./gradlew assemble${capitalize(profile.market)}Release bundle${capitalize(profile.market)}Release -PreactNativeArchitectures=arm64-v8a,x86_64`,
       ],
     };
   }

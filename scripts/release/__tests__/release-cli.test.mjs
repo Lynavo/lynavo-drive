@@ -43,7 +43,10 @@ test('prints the cn-review release plan without running build commands in dry-ru
     result.stdout,
     /bash apps\/mobile\/ios\/scripts\/testflight-release\.sh archive-upload cn/,
   );
-  assert.match(result.stdout, /bash -lc cd apps\/mobile\/android && \.\/gradlew assembleCnRelease bundleCnRelease/);
+  assert.match(
+    result.stdout,
+    /bash -lc cd apps\/mobile\/android && \.\/gradlew assembleCnRelease bundleCnRelease -PreactNativeArchitectures=arm64-v8a,x86_64/,
+  );
   assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:win:cn/);
   assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:linux:cn/);
 });
@@ -66,7 +69,7 @@ test('prints the global-review release plan without running build commands in dr
   );
   assert.match(
     result.stdout,
-    /bash -lc cd apps\/mobile\/android && \.\/gradlew assembleGlobalRelease bundleGlobalRelease/,
+    /bash -lc cd apps\/mobile\/android && \.\/gradlew assembleGlobalRelease bundleGlobalRelease -PreactNativeArchitectures=arm64-v8a,x86_64/,
   );
   assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:win:global/);
   assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:linux:global/);
