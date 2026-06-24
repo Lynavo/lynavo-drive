@@ -272,6 +272,7 @@ export interface SettingsDTO {
   shareStatus: ShareStatus;
   shareName: string;
   remoteAccessEnabled?: boolean;
+  allowCrossDeviceReceivedAccess?: boolean;
 }
 
 export interface ShareStatusDTO {

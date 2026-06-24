@@ -702,6 +702,73 @@ func TestPairDeviceWithDirName_ReusesReceiveDirForSameStableDevice(t *testing.T)
 	}
 }
 
+func TestPairDeviceWithDirName_ReusesReceiveDirForSameStableDeviceWithDifferentAccountAndName(t *testing.T) {
+	st := newTestStoreForDir(t)
+	receiveDir := t.TempDir()
+	stableID := "stable-ios-device-001"
+
+	mkDir(t, receiveDir, "Alice iPhone")
+	oldDevice := newPairDevice("account-a-client", "Alice iPhone", nil)
+	oldDevice.StableDeviceID = &stableID
+	if err := st.UpsertPairedDevice(oldDevice); err != nil {
+		t.Fatalf("UpsertPairedDevice old: %v", err)
+	}
+	if err := st.UpdateReceiveDirName("account-a-client", "Alice iPhone"); err != nil {
+		t.Fatalf("UpdateReceiveDirName old: %v", err)
+	}
+
+	newDevice := newPairDevice("account-b-client", "Bob iPhone", nil)
+	newDevice.StableDeviceID = &stableID
+	got, err := PairDeviceWithDirName(st, receiveDir, newDevice)
+	if err != nil {
+		t.Fatalf("PairDeviceWithDirName: %v", err)
+	}
+	if got != "Alice iPhone" {
+		t.Fatalf("expected same stable device to reuse receive dir %q, got %q", "Alice iPhone", got)
+	}
+	if _, err := os.Stat(filepath.Join(receiveDir, "Alice iPhone")); err != nil {
+		t.Fatalf("receive dir should remain: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(receiveDir, "Bob iPhone")); !os.IsNotExist(err) {
+		t.Fatalf("same stable device must not create Bob iPhone dir, stat err=%v", err)
+	}
+
+	stored, err := st.GetPairedDevice("account-b-client")
+	if err != nil {
+		t.Fatalf("GetPairedDevice new: %v", err)
+	}
+	if stored.ReceiveDirName == nil || *stored.ReceiveDirName != "Alice iPhone" {
+		t.Fatalf("expected persisted reused receive_dir_name, got %v", stored.ReceiveDirName)
+	}
+}
+
+func TestPairDeviceWithDirName_CreatesUniqueReceiveDirForDifferentStableDeviceWithSameName(t *testing.T) {
+	st := newTestStoreForDir(t)
+	receiveDir := t.TempDir()
+	stableA := "stable-ios-device-001"
+	stableB := "stable-ios-device-002"
+
+	mkDir(t, receiveDir, "Alice iPhone")
+	oldDevice := newPairDevice("client-a", "Alice iPhone", nil)
+	oldDevice.StableDeviceID = &stableA
+	if err := st.UpsertPairedDevice(oldDevice); err != nil {
+		t.Fatalf("UpsertPairedDevice old: %v", err)
+	}
+	if err := st.UpdateReceiveDirName("client-a", "Alice iPhone"); err != nil {
+		t.Fatalf("UpdateReceiveDirName old: %v", err)
+	}
+
+	newDevice := newPairDevice("client-b", "Alice iPhone", nil)
+	newDevice.StableDeviceID = &stableB
+	got, err := PairDeviceWithDirName(st, receiveDir, newDevice)
+	if err != nil {
+		t.Fatalf("PairDeviceWithDirName: %v", err)
+	}
+	if got != "Alice iPhone (2)" {
+		t.Fatalf("expected unique dir %q for different stable device, got %q", "Alice iPhone (2)", got)
+	}
+}
+
 func TestPairDeviceWithDirName_DoesNotReuseHistoricalUploadDirReservedByAnotherDevice(t *testing.T) {
 	st := newTestStoreForDir(t)
 	receiveDir := t.TempDir()

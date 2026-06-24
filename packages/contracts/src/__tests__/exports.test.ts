@@ -4,6 +4,7 @@ import {
   type BlockedPairingClientDTO,
   type ConnectionDeviceDTO,
   type ConnectionDevicesSettingsDTO,
+  type SettingsDTO,
   type PairingAttemptDTO,
   type PairingErrorMetadataDTO,
 } from '../index';
@@ -146,6 +147,23 @@ describe('@syncflow/contracts exports', () => {
   });
   it('exports BACKOFF_RETRY_MS', () => {
     expect(contracts.BACKOFF_RETRY_MS).toEqual([5000, 15000, 30000]);
+  });
+  it('exports desktop settings DTOs', () => {
+    const settings: SettingsDTO = {
+      deviceName: 'Office Mac',
+      connectionCode: '123456',
+      rootPath: '/Users/alice/ViviDrop',
+      receivePath: '/Users/alice/ViviDrop/received',
+      personalPath: '/Users/alice',
+      sharedPath: '/Users/alice/ViviDrop/shared',
+      shareAddress: '',
+      shareStatus: 'ready',
+      shareName: 'Office Mac',
+      remoteAccessEnabled: true,
+      allowCrossDeviceReceivedAccess: true,
+    };
+
+    expect(settings.allowCrossDeviceReceivedAccess).toBe(true);
   });
   it('exports mobile country code data', () => {
     expect(contracts.COUNTRY_CODES.find((country) => country.iso === 'CN')?.code).toBe('+86');

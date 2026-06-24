@@ -3,6 +3,8 @@ package store
 import (
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -115,6 +117,64 @@ func TestReceivedLibraryForClientFiltersCompletedUploads(t *testing.T) {
 	}
 }
 
+func TestListReceivedLibraryPageForStableDeviceIncludesSameStableClients(t *testing.T) {
+	s := newTestStore(t)
+	desktopID := "desktop-1"
+	stableID := "stable-ios-device-001"
+	otherStableID := "stable-ios-device-002"
+
+	insertPairedDeviceForReceivedLibrary(t, s, "client-a", "Alice iPhone", stableID, "Alice iPhone")
+	insertPairedDeviceForReceivedLibrary(t, s, "client-b", "Alice Work", stableID, "Alice iPhone")
+	insertPairedDeviceForReceivedLibrary(t, s, "client-c", "Bob iPhone", otherStableID, "Bob iPhone")
+	insertCompletedUploadForReceivedLibrary(t, s, "file-a", "client-a", "a.jpg", "Alice iPhone/a.jpg")
+	insertCompletedUploadForReceivedLibrary(t, s, "file-b", "client-b", "b.jpg", "Alice iPhone/b.jpg")
+	insertCompletedUploadForReceivedLibrary(t, s, "file-c", "client-c", "c.jpg", "Bob iPhone/c.jpg")
+
+	page, err := s.ListReceivedLibraryPageForStableDeviceWithReceiveDir(desktopID, stableID, "client-a", 1, 30, "")
+	if err != nil {
+		t.Fatalf("ListReceivedLibraryPageForStableDeviceWithReceiveDir: %v", err)
+	}
+
+	got := receivedLibraryFileKeys(page.Items)
+	want := []string{"file-b", "file-a"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("file keys mismatch\nwant=%v\n got=%v", want, got)
+	}
+	if page.TotalItems != 2 {
+		t.Fatalf("expected total items 2, got %d", page.TotalItems)
+	}
+	if gotStats := receivedLibraryDeviceStatClientIDs(page.DeviceStats); !reflect.DeepEqual(gotStats, []string{"client-a", "client-b"}) {
+		t.Fatalf("device stats clients mismatch: %v", gotStats)
+	}
+}
+
+func TestListReceivedLibraryPageForStableDeviceFallsBackToClientWhenStableIDMissing(t *testing.T) {
+	s := newTestStore(t)
+	desktopID := "desktop-1"
+
+	insertPairedDeviceForReceivedLibrary(t, s, "client-a", "Alice iPhone", "", "Alice iPhone")
+	insertPairedDeviceForReceivedLibrary(t, s, "client-b", "Alice Work", "", "Alice Work")
+	insertCompletedUploadForReceivedLibrary(t, s, "file-a", "client-a", "a.jpg", "Alice iPhone/a.jpg")
+	insertCompletedUploadForReceivedLibrary(t, s, "file-b", "client-b", "b.jpg", "Alice Work/b.jpg")
+
+	page, err := s.ListReceivedLibraryPageForStableDeviceWithReceiveDir(desktopID, "", "client-a", 1, 30, "")
+	if err != nil {
+		t.Fatalf("ListReceivedLibraryPageForStableDeviceWithReceiveDir: %v", err)
+	}
+
+	got := receivedLibraryFileKeys(page.Items)
+	want := []string{"file-a"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("file keys mismatch\nwant=%v\n got=%v", want, got)
+	}
+	if page.TotalItems != 1 {
+		t.Fatalf("expected total items 1, got %d", page.TotalItems)
+	}
+	if gotStats := receivedLibraryDeviceStatClientIDs(page.DeviceStats); !reflect.DeepEqual(gotStats, []string{"client-a"}) {
+		t.Fatalf("device stats clients mismatch: %v", gotStats)
+	}
+}
+
 func TestReceivedLibraryMarksDeletedFiles(t *testing.T) {
 	s := newTestStore(t)
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -179,6 +239,62 @@ func TestReceivedLibraryMarksDeletedFiles(t *testing.T) {
 	if byKey["legacy-file"].FileStatus != "available" {
 		t.Fatalf("expected legacy fileStatus to stay available, got %+v", byKey["legacy-file"])
 	}
+}
+
+func insertPairedDeviceForReceivedLibrary(t *testing.T, s *Store, clientID string, clientName string, stableDeviceID string, receiveDirName string) {
+	t.Helper()
+	now := time.Now().UTC().Format(time.RFC3339)
+	device := PairedDevice{
+		ClientID:         clientID,
+		ClientName:       clientName,
+		Platform:         "ios",
+		PairingID:        "pair-" + clientID,
+		PairingTokenHash: "hash-" + clientID,
+		CreatedAt:        now,
+		LastSeenAt:       now,
+	}
+	if strings.TrimSpace(stableDeviceID) != "" {
+		device.StableDeviceID = &stableDeviceID
+	}
+	if strings.TrimSpace(receiveDirName) != "" {
+		device.ReceiveDirName = &receiveDirName
+	}
+	if err := s.UpsertPairedDevice(device); err != nil {
+		t.Fatalf("UpsertPairedDevice %s: %v", clientID, err)
+	}
+}
+
+func insertCompletedUploadForReceivedLibrary(t *testing.T, s *Store, fileKey string, clientID string, filename string, finalPath string) {
+	t.Helper()
+	now := time.Now().UTC().Format(time.RFC3339)
+	upload := sampleUpload(fileKey, clientID)
+	upload.OriginalFilename = filename
+	upload.MediaType = "image/jpeg"
+	upload.FileSize = 1024
+	upload.Status = "completed"
+	upload.FinalPath = &finalPath
+	upload.CommittedBytes = 1024
+	upload.CompletedAt = &now
+	upload.UpdatedAt = now
+	if err := s.UpsertUpload(upload); err != nil {
+		t.Fatalf("UpsertUpload %s: %v", fileKey, err)
+	}
+}
+
+func receivedLibraryFileKeys(items []ReceivedLibraryItem) []string {
+	keys := make([]string, 0, len(items))
+	for _, item := range items {
+		keys = append(keys, item.FileKey)
+	}
+	return keys
+}
+
+func receivedLibraryDeviceStatClientIDs(stats []ReceivedLibraryDeviceStat) []string {
+	clientIDs := make([]string, 0, len(stats))
+	for _, stat := range stats {
+		clientIDs = append(clientIDs, stat.ClientID)
+	}
+	return clientIDs
 }
 
 func TestReceivedLibraryUsesFinalPathBasenameForDisplayFilename(t *testing.T) {

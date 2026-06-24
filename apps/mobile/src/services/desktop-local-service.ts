@@ -468,6 +468,9 @@ function withReceivedMediaUrlsForPairedClient(
   clientName: string,
   currentClientOnly: boolean,
 ): ReceivedLibraryMediaItem[] {
+  const needsMediaUrl = (url: string | undefined): boolean =>
+    typeof url !== 'string' || url.trim().length === 0;
+
   return items.map(item => {
     const fileKey = item.fileKey?.trim();
     if (!fileKey || (currentClientOnly && item.clientId !== clientId)) {
@@ -477,43 +480,53 @@ function withReceivedMediaUrlsForPairedClient(
       ...item,
     };
     if (isImageMedia(item.mediaType, item.filename)) {
-      next.previewUrl = buildReceivedMediaUrl(
-        desktop,
-        'preview',
-        clientId,
-        clientName,
-        fileKey,
-      );
-      next.thumbnailUrl = buildReceivedMediaUrl(
-        desktop,
-        'thumbnail',
-        clientId,
-        clientName,
-        fileKey,
-      );
+      if (needsMediaUrl(next.previewUrl)) {
+        next.previewUrl = buildReceivedMediaUrl(
+          desktop,
+          'preview',
+          clientId,
+          clientName,
+          fileKey,
+        );
+      }
+      if (needsMediaUrl(next.thumbnailUrl)) {
+        next.thumbnailUrl = buildReceivedMediaUrl(
+          desktop,
+          'thumbnail',
+          clientId,
+          clientName,
+          fileKey,
+        );
+      }
     }
     if (isVideoMedia(item.mediaType, item.filename)) {
-      next.previewUrl = buildReceivedMediaUrl(
-        desktop,
-        'preview',
-        clientId,
-        clientName,
-        fileKey,
-      );
-      next.thumbnailUrl = buildReceivedMediaUrl(
-        desktop,
-        'thumbnail',
-        clientId,
-        clientName,
-        fileKey,
-      );
-      next.streamUrl = buildReceivedMediaUrl(
-        desktop,
-        'stream',
-        clientId,
-        clientName,
-        fileKey,
-      );
+      if (needsMediaUrl(next.previewUrl)) {
+        next.previewUrl = buildReceivedMediaUrl(
+          desktop,
+          'preview',
+          clientId,
+          clientName,
+          fileKey,
+        );
+      }
+      if (needsMediaUrl(next.thumbnailUrl)) {
+        next.thumbnailUrl = buildReceivedMediaUrl(
+          desktop,
+          'thumbnail',
+          clientId,
+          clientName,
+          fileKey,
+        );
+      }
+      if (needsMediaUrl(next.streamUrl)) {
+        next.streamUrl = buildReceivedMediaUrl(
+          desktop,
+          'stream',
+          clientId,
+          clientName,
+          fileKey,
+        );
+      }
     }
     return next;
   });

@@ -8,6 +8,12 @@ import (
 	"github.com/nicksyncflow/sidecar/internal/uploadfs"
 )
 
+type receivedLibraryScope struct {
+	ClientID         *string
+	StableDeviceID   *string
+	FallbackClientID string
+}
+
 func (s *Store) ListSyncRecords(desktopDeviceID string, clientID *string) ([]DesktopSyncRecord, error) {
 	query := `
 		SELECT
@@ -58,7 +64,7 @@ func (s *Store) ListReceivedLibrary(desktopDeviceID string) ([]ReceivedLibraryIt
 }
 
 func (s *Store) ListReceivedLibraryWithReceiveDir(desktopDeviceID string, receiveDir string) ([]ReceivedLibraryItem, error) {
-	return s.listAllReceivedLibrary(desktopDeviceID, nil, receiveDir)
+	return s.listAllReceivedLibrary(desktopDeviceID, receivedLibraryScope{}, receiveDir)
 }
 
 func (s *Store) ListReceivedLibraryForClient(desktopDeviceID string, clientID string) ([]ReceivedLibraryItem, error) {
@@ -66,18 +72,28 @@ func (s *Store) ListReceivedLibraryForClient(desktopDeviceID string, clientID st
 }
 
 func (s *Store) ListReceivedLibraryForClientWithReceiveDir(desktopDeviceID string, clientID string, receiveDir string) ([]ReceivedLibraryItem, error) {
-	return s.listAllReceivedLibrary(desktopDeviceID, &clientID, receiveDir)
+	return s.listAllReceivedLibrary(desktopDeviceID, receivedLibraryScope{ClientID: &clientID}, receiveDir)
 }
 
-func (s *Store) listAllReceivedLibrary(desktopDeviceID string, clientID *string, receiveDir string) ([]ReceivedLibraryItem, error) {
-	page, err := s.listReceivedLibraryPage(desktopDeviceID, clientID, 1, 1, receiveDir)
+func (s *Store) ListReceivedLibraryForStableDeviceWithReceiveDir(desktopDeviceID string, stableDeviceID string, fallbackClientID string, receiveDir string) ([]ReceivedLibraryItem, error) {
+	stableDeviceID = strings.TrimSpace(stableDeviceID)
+	fallbackClientID = strings.TrimSpace(fallbackClientID)
+	scope := receivedLibraryScope{
+		StableDeviceID:   &stableDeviceID,
+		FallbackClientID: fallbackClientID,
+	}
+	return s.listAllReceivedLibrary(desktopDeviceID, scope, receiveDir)
+}
+
+func (s *Store) listAllReceivedLibrary(desktopDeviceID string, scope receivedLibraryScope, receiveDir string) ([]ReceivedLibraryItem, error) {
+	page, err := s.listReceivedLibraryPage(desktopDeviceID, scope, 1, 1, receiveDir)
 	if err != nil {
 		return nil, err
 	}
 	if page.TotalItems == 0 {
 		return []ReceivedLibraryItem{}, nil
 	}
-	fullPage, err := s.listReceivedLibraryPage(desktopDeviceID, clientID, 1, page.TotalItems, receiveDir)
+	fullPage, err := s.listReceivedLibraryPage(desktopDeviceID, scope, 1, page.TotalItems, receiveDir)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +105,7 @@ func (s *Store) ListReceivedLibraryPage(desktopDeviceID string, page, pageSize i
 }
 
 func (s *Store) ListReceivedLibraryPageWithReceiveDir(desktopDeviceID string, page, pageSize int, receiveDir string) (ReceivedLibraryPage, error) {
-	return s.listReceivedLibraryPage(desktopDeviceID, nil, page, pageSize, receiveDir)
+	return s.listReceivedLibraryPage(desktopDeviceID, receivedLibraryScope{}, page, pageSize, receiveDir)
 }
 
 func (s *Store) ListReceivedLibraryPageForClient(desktopDeviceID string, clientID string, page, pageSize int) (ReceivedLibraryPage, error) {
@@ -97,10 +113,20 @@ func (s *Store) ListReceivedLibraryPageForClient(desktopDeviceID string, clientI
 }
 
 func (s *Store) ListReceivedLibraryPageForClientWithReceiveDir(desktopDeviceID string, clientID string, page, pageSize int, receiveDir string) (ReceivedLibraryPage, error) {
-	return s.listReceivedLibraryPage(desktopDeviceID, &clientID, page, pageSize, receiveDir)
+	return s.listReceivedLibraryPage(desktopDeviceID, receivedLibraryScope{ClientID: &clientID}, page, pageSize, receiveDir)
 }
 
-func (s *Store) listReceivedLibraryPage(desktopDeviceID string, clientID *string, page, pageSize int, receiveDir string) (ReceivedLibraryPage, error) {
+func (s *Store) ListReceivedLibraryPageForStableDeviceWithReceiveDir(desktopDeviceID string, stableDeviceID string, fallbackClientID string, page, pageSize int, receiveDir string) (ReceivedLibraryPage, error) {
+	stableDeviceID = strings.TrimSpace(stableDeviceID)
+	fallbackClientID = strings.TrimSpace(fallbackClientID)
+	scope := receivedLibraryScope{
+		StableDeviceID:   &stableDeviceID,
+		FallbackClientID: fallbackClientID,
+	}
+	return s.listReceivedLibraryPage(desktopDeviceID, scope, page, pageSize, receiveDir)
+}
+
+func (s *Store) listReceivedLibraryPage(desktopDeviceID string, scope receivedLibraryScope, page, pageSize int, receiveDir string) (ReceivedLibraryPage, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -113,7 +139,7 @@ func (s *Store) listReceivedLibraryPage(desktopDeviceID string, clientID *string
 		PageSize: pageSize,
 	}
 
-	whereSQL, whereArgs := receivedLibraryWhere(clientID)
+	whereSQL, whereArgs := receivedLibraryWhere(scope)
 	countQuery := fmt.Sprintf(`
 		SELECT COUNT(*), COALESCE(SUM(file_size), 0)
 		FROM uploads u
@@ -122,7 +148,7 @@ func (s *Store) listReceivedLibraryPage(desktopDeviceID string, clientID *string
 		return ReceivedLibraryPage{}, fmt.Errorf("count received library: %w", err)
 	}
 
-	deviceStats, err := s.listReceivedLibraryDeviceStats(clientID)
+	deviceStats, err := s.listReceivedLibraryDeviceStats(scope)
 	if err != nil {
 		return ReceivedLibraryPage{}, err
 	}
@@ -219,18 +245,34 @@ func receivedLibraryFileStatus(receiveDir string, finalPath *string) string {
 	return "deleted"
 }
 
-func receivedLibraryWhere(clientID *string) (string, []any) {
+func receivedLibraryWhere(scope receivedLibraryScope) (string, []any) {
 	clauses := []string{"u.status = 'completed'"}
 	args := []any{}
-	if clientID != nil {
+	if scope.ClientID != nil {
 		clauses = append(clauses, "u.client_id = ?")
-		args = append(args, *clientID)
+		args = append(args, strings.TrimSpace(*scope.ClientID))
+		return strings.Join(clauses, " AND "), args
+	}
+	if scope.StableDeviceID != nil {
+		stableDeviceID := strings.TrimSpace(*scope.StableDeviceID)
+		if stableDeviceID == "" {
+			clauses = append(clauses, "u.client_id = ?")
+			args = append(args, strings.TrimSpace(scope.FallbackClientID))
+			return strings.Join(clauses, " AND "), args
+		}
+		clauses = append(clauses, `EXISTS (
+			SELECT 1
+			FROM paired_devices p_scope
+			WHERE p_scope.client_id = u.client_id
+				AND p_scope.stable_device_id = ?
+		)`)
+		args = append(args, stableDeviceID)
 	}
 	return strings.Join(clauses, " AND "), args
 }
 
-func (s *Store) listReceivedLibraryDeviceStats(clientID *string) ([]ReceivedLibraryDeviceStat, error) {
-	whereSQL, args := receivedLibraryWhere(clientID)
+func (s *Store) listReceivedLibraryDeviceStats(scope receivedLibraryScope) ([]ReceivedLibraryDeviceStat, error) {
+	whereSQL, args := receivedLibraryWhere(scope)
 	query := fmt.Sprintf(`
 		SELECT
 			u.client_id,
@@ -249,7 +291,8 @@ func (s *Store) listReceivedLibraryDeviceStats(clientID *string) ([]ReceivedLibr
 			COALESCE(SUM(u.file_size), 0) AS total_bytes
 		FROM uploads u
 		WHERE %s
-		GROUP BY u.client_id`, whereSQL)
+		GROUP BY u.client_id
+		ORDER BY u.client_id`, whereSQL)
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list received library device stats: %w", err)

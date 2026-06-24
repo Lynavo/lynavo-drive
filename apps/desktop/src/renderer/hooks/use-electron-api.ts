@@ -13,6 +13,7 @@ const defaultSettings: SettingsDTO = {
   shareAddress: '',
   shareStatus: 'unknown',
   shareName: 'SyncFlow',
+  allowCrossDeviceReceivedAccess: true,
 };
 
 const mockSidecar: ElectronAPI['sidecar'] = {

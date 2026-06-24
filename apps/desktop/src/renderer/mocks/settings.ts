@@ -10,4 +10,5 @@ export const mockSettings: SettingsDTO = {
   shareAddress: 'smb://192.168.1.100/SyncFlow',
   shareStatus: 'ready',
   shareName: 'SyncFlow',
+  allowCrossDeviceReceivedAccess: true,
 };

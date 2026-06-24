@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -756,6 +757,144 @@ func TestMobileResourceAccessNormalizesLegacyResourceKind(t *testing.T) {
 		if !isContractAccessAction(record.Action) || !isContractAccessResult(record.Result) {
 			t.Fatalf("legacy access record must match contracts enums, got %+v", record)
 		}
+	}
+}
+
+type resourcesTestServer struct {
+	store      *store.Store
+	receiveDir string
+	handler    http.Handler
+}
+
+func newResourcesTestServer(t *testing.T) *resourcesTestServer {
+	t.Helper()
+	st, cfg, hub := testEnv(t)
+	_, handler := api.NewServer(st, cfg, hub, nil)
+	return &resourcesTestServer{
+		store:      st,
+		receiveDir: cfg.ReceiveDir,
+		handler:    handler,
+	}
+}
+
+func (s *resourcesTestServer) router() http.Handler {
+	return s.handler
+}
+
+func insertCompletedReceivedUploadForResources(t *testing.T, srv *resourcesTestServer, fileKey string, clientID string, filename string, finalPath string) {
+	t.Helper()
+	absPath := filepath.Join(srv.receiveDir, finalPath)
+	if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
+		t.Fatalf("mkdir received path: %v", err)
+	}
+	if err := os.WriteFile(absPath, []byte("received fixture"), 0o644); err != nil {
+		t.Fatalf("write received fixture: %v", err)
+	}
+	info, err := os.Stat(absPath)
+	if err != nil {
+		t.Fatalf("stat received fixture: %v", err)
+	}
+	completedAt := "2026-06-14T09:00:00Z"
+	if err := srv.store.UpsertUpload(store.Upload{
+		FileKey:              fileKey,
+		ClientID:             clientID,
+		OriginalFilename:     filename,
+		MediaType:            "image/jpeg",
+		FileSize:             info.Size(),
+		Status:               "completed",
+		FinalPath:            &finalPath,
+		CommittedBytes:       info.Size(),
+		ActiveTransmissionMs: 250,
+		CompletedAt:          &completedAt,
+		UpdatedAt:            completedAt,
+	}); err != nil {
+		t.Fatalf("UpsertUpload %s: %v", fileKey, err)
+	}
+}
+
+func receivedLibraryFileKeysForAPI(items []store.ReceivedLibraryItem) []string {
+	keys := make([]string, 0, len(items))
+	for _, item := range items {
+		keys = append(keys, item.FileKey)
+	}
+	return keys
+}
+
+func TestMobileReceivedResourcesAllowsAllPairedClientsWhenCrossDeviceAccessEnabled(t *testing.T) {
+	srv := newResourcesTestServer(t)
+	insertPairedDeviceWithStableID(t, srv.store, "client-a", "Alice iPhone", "Alice iPhone", "stable-001", "2026-06-14T08:00:00Z")
+	insertPairedDeviceWithStableID(t, srv.store, "client-b", "Bob iPhone", "Bob iPhone", "stable-002", "2026-06-14T08:00:00Z")
+	insertCompletedReceivedUploadForResources(t, srv, "file-a", "client-a", "a.jpg", "Alice iPhone/a.jpg")
+	insertCompletedReceivedUploadForResources(t, srv, "file-b", "client-b", "b.jpg", "Bob iPhone/b.jpg")
+
+	req := httptest.NewRequest(http.MethodGet, "/resources/mobile/received?clientId=client-a&clientName=Alice%20iPhone&page=1&pageSize=20", nil)
+	rec := httptest.NewRecorder()
+	srv.router().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var page store.ReceivedLibraryPage
+	if err := json.Unmarshal(rec.Body.Bytes(), &page); err != nil {
+		t.Fatalf("decode page: %v", err)
+	}
+	got := receivedLibraryFileKeysForAPI(page.Items)
+	want := []string{"file-b", "file-a"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("file keys mismatch\nwant=%v\n got=%v", want, got)
+	}
+	for _, item := range page.Items {
+		if strings.TrimSpace(item.PreviewURL) == "" {
+			t.Fatalf("expected preview URL for %s", item.FileKey)
+		}
+	}
+}
+
+func TestMobileReceivedResourcesRestrictsToStableDeviceWhenCrossDeviceAccessDisabled(t *testing.T) {
+	srv := newResourcesTestServer(t)
+	if err := srv.store.SetSetting("allow_cross_device_received_access", "false"); err != nil {
+		t.Fatalf("SetSetting: %v", err)
+	}
+	insertPairedDeviceWithStableID(t, srv.store, "client-a", "Alice Personal", "Alice iPhone", "stable-001", "2026-06-14T08:00:00Z")
+	insertPairedDeviceWithStableID(t, srv.store, "client-b", "Alice Work", "Alice iPhone", "stable-001", "2026-06-14T08:01:00Z")
+	insertPairedDeviceWithStableID(t, srv.store, "client-c", "Bob iPhone", "Bob iPhone", "stable-002", "2026-06-14T08:02:00Z")
+	insertCompletedReceivedUploadForResources(t, srv, "file-a", "client-a", "a.jpg", "Alice iPhone/a.jpg")
+	insertCompletedReceivedUploadForResources(t, srv, "file-b", "client-b", "b.jpg", "Alice iPhone/b.jpg")
+	insertCompletedReceivedUploadForResources(t, srv, "file-c", "client-c", "c.jpg", "Bob iPhone/c.jpg")
+
+	req := httptest.NewRequest(http.MethodGet, "/resources/mobile/received?clientId=client-a&clientName=Alice%20Personal&page=1&pageSize=20", nil)
+	rec := httptest.NewRecorder()
+	srv.router().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var page store.ReceivedLibraryPage
+	if err := json.Unmarshal(rec.Body.Bytes(), &page); err != nil {
+		t.Fatalf("decode page: %v", err)
+	}
+	got := receivedLibraryFileKeysForAPI(page.Items)
+	want := []string{"file-b", "file-a"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("file keys mismatch\nwant=%v\n got=%v", want, got)
+	}
+}
+
+func TestMobileReceivedDownloadRejectsDifferentStableDeviceWhenCrossDeviceAccessDisabled(t *testing.T) {
+	srv := newResourcesTestServer(t)
+	if err := srv.store.SetSetting("allow_cross_device_received_access", "false"); err != nil {
+		t.Fatalf("SetSetting: %v", err)
+	}
+	insertPairedDeviceWithStableID(t, srv.store, "client-a", "Alice iPhone", "Alice iPhone", "stable-001", "2026-06-14T08:00:00Z")
+	insertPairedDeviceWithStableID(t, srv.store, "client-c", "Bob iPhone", "Bob iPhone", "stable-002", "2026-06-14T08:01:00Z")
+	insertCompletedReceivedUploadForResources(t, srv, "file-c", "client-c", "c.jpg", "Bob iPhone/c.jpg")
+
+	req := httptest.NewRequest(http.MethodGet, "/resources/mobile/received/download?clientId=client-a&clientName=Alice%20iPhone&fileKey=file-c", nil)
+	rec := httptest.NewRecorder()
+	srv.router().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d body=%s", rec.Code, rec.Body.String())
 	}
 }
 

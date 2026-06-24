@@ -718,7 +718,7 @@ describe('desktop-local-service', () => {
             shareStatus: 'not_shared',
           },
         ],
-        page: 1,
+        page: 2,
         pageSize: 20,
         totalItems: 1,
         totalBytes: 4096,
@@ -729,10 +729,10 @@ describe('desktop-local-service', () => {
     await expect(
       listGlobalReceivedLibraryPage(
         { host: '192.168.10.20', port: 39394 },
-        { page: 1, pageSize: 20 },
+        { page: 2, pageSize: 20 },
       ),
     ).resolves.toMatchObject({
-      page: 1,
+      page: 2,
       pageSize: 20,
       totalItems: 1,
       items: [
@@ -746,6 +746,62 @@ describe('desktop-local-service', () => {
         },
       ],
     });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://192.168.10.20:39394/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&page=2&pageSize=20',
+    );
+    expect(mockedListReceivedFiles).not.toHaveBeenCalled();
+  });
+
+  it('preserves server-generated media URLs for cross-device global received items', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      statusText: 'OK',
+      json: jest.fn().mockResolvedValue({
+        items: [
+          {
+            resourceId: '',
+            desktopDeviceId: 'desktop-001',
+            clientId: 'other-device-client',
+            displayName: 'Other device video',
+            fileKey: 'file-from-other-device',
+            filename: 'OTHER_DEVICE.MOV',
+            mediaType: 'video',
+            fileSize: 8192,
+            completedAt: '2026-06-16T08:00:00.000Z',
+            shareStatus: 'not_shared',
+            previewUrl:
+              '/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=file-from-other-device',
+            thumbnailUrl:
+              '/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=file-from-other-device',
+            streamUrl:
+              '/resources/mobile/received/stream?clientId=client-001&clientName=Alice%20iPhone&fileKey=file-from-other-device',
+          },
+        ],
+        page: 1,
+        pageSize: 20,
+        totalItems: 1,
+        totalBytes: 8192,
+        deviceStats: [],
+      }),
+    });
+
+    const result = await listGlobalReceivedLibraryPage(
+      { host: '192.168.10.20', port: 39394 },
+      { page: 1, pageSize: 20 },
+    );
+
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        fileKey: 'file-from-other-device',
+        previewUrl:
+          '/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=file-from-other-device',
+        thumbnailUrl:
+          '/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=file-from-other-device',
+        streamUrl:
+          '/resources/mobile/received/stream?clientId=client-001&clientName=Alice%20iPhone&fileKey=file-from-other-device',
+      }),
+    );
 
     expect(fetchMock).toHaveBeenCalledWith(
       'http://192.168.10.20:39394/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&page=1&pageSize=20',

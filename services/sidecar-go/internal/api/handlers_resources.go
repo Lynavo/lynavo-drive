@@ -1,6 +1,7 @@
 package api
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -364,6 +365,11 @@ func (s *Server) handleMobileReceivedResources(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusInternalServerError, "failed to load desktop device id")
 		return
 	}
+	policy, err := s.mobileReceivedAccessPolicy(client)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to resolve received access policy")
+		return
+	}
 	scopedToClient := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("scope")), "client")
 	hasPageParams := strings.TrimSpace(r.URL.Query().Get("page")) != "" ||
 		strings.TrimSpace(r.URL.Query().Get("pageSize")) != ""
@@ -376,16 +382,16 @@ func (s *Server) handleMobileReceivedResources(w http.ResponseWriter, r *http.Re
 		var result store.ReceivedLibraryPage
 		if scopedToClient {
 			result, err = s.store.ListReceivedLibraryPageForClientWithReceiveDir(desktopDeviceID, client.ClientID, page, pageSize, s.config.ReceiveDir)
-		} else {
+		} else if policy.AllowCrossDeviceReceivedAccess {
 			result, err = s.store.ListReceivedLibraryPageWithReceiveDir(desktopDeviceID, page, pageSize, s.config.ReceiveDir)
+		} else {
+			result, err = s.store.ListReceivedLibraryPageForStableDeviceWithReceiveDir(desktopDeviceID, policy.StableDeviceID, client.ClientID, page, pageSize, s.config.ReceiveDir)
 		}
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "failed to list received library")
 			return
 		}
-		if scopedToClient {
-			enrichMobileReceivedPreviewURLs(result.Items, client)
-		}
+		enrichMobileReceivedPreviewURLs(result.Items, client)
 		slog.Info(
 			"mobile received library listed",
 			"clientID", client.ClientID,
@@ -408,16 +414,16 @@ func (s *Server) handleMobileReceivedResources(w http.ResponseWriter, r *http.Re
 	var items []store.ReceivedLibraryItem
 	if scopedToClient {
 		items, err = s.store.ListReceivedLibraryForClientWithReceiveDir(desktopDeviceID, client.ClientID, s.config.ReceiveDir)
-	} else {
+	} else if policy.AllowCrossDeviceReceivedAccess {
 		items, err = s.store.ListReceivedLibraryWithReceiveDir(desktopDeviceID, s.config.ReceiveDir)
+	} else {
+		items, err = s.store.ListReceivedLibraryForStableDeviceWithReceiveDir(desktopDeviceID, policy.StableDeviceID, client.ClientID, s.config.ReceiveDir)
 	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list received library")
 		return
 	}
-	if scopedToClient {
-		enrichMobileReceivedPreviewURLs(items, client)
-	}
+	enrichMobileReceivedPreviewURLs(items, client)
 	slog.Info(
 		"mobile received library listed",
 		"clientID", client.ClientID,
@@ -443,7 +449,7 @@ func countDeletedReceivedLibraryItems(items []store.ReceivedLibraryItem) int {
 
 func enrichMobileReceivedPreviewURLs(items []store.ReceivedLibraryItem, client mobileAccessClient) {
 	for i := range items {
-		if items[i].ClientID != client.ClientID || strings.TrimSpace(items[i].FileKey) == "" {
+		if strings.TrimSpace(items[i].FileKey) == "" {
 			continue
 		}
 		if items[i].FileStatus == "deleted" {
@@ -614,6 +620,28 @@ func (s *Server) resolveMobileReceivedUploadWithClient(
 		writeError(w, http.StatusNotFound, "received file not found")
 		return mobileAccessClient{}, nil, "", nil, false
 	}
+	policy, err := s.mobileReceivedAccessPolicy(client)
+	if err != nil {
+		slog.Warn("resolveMobileReceivedUpload: access policy failed", "clientID", client.ClientID, "err", err)
+		writeError(w, http.StatusInternalServerError, "failed to resolve received access policy")
+		return mobileAccessClient{}, nil, "", nil, false
+	}
+	if !policy.AllowCrossDeviceReceivedAccess {
+		allowed, err := s.mobileReceivedUploadAllowedForPolicy(policy, upload)
+		if err != nil {
+			slog.Warn("resolveMobileReceivedUpload: authorization failed", "clientID", client.ClientID, "fileKey", upload.FileKey, "err", err)
+			writeError(w, http.StatusInternalServerError, "failed to authorize received file")
+			return mobileAccessClient{}, nil, "", nil, false
+		}
+		if !allowed {
+			desktopDeviceID, err := s.store.GetDeviceID()
+			if err == nil {
+				_, _ = s.recordResourceAccess(desktopDeviceID, client, upload.FileKey, "received_file", upload.OriginalFilename, "view", "denied")
+			}
+			writeError(w, http.StatusForbidden, "received file not authorized")
+			return mobileAccessClient{}, nil, "", nil, false
+		}
+	}
 	resolvedPath, ok := uploadfs.ResolveFinalPath(s.config.ReceiveDir, upload.FinalPath)
 	if !ok {
 		slog.Warn("resolveMobileReceivedUpload: ResolveFinalPath failed", "fileKey", fileKey)
@@ -632,6 +660,54 @@ func (s *Server) resolveMobileReceivedUploadWithClient(
 		return mobileAccessClient{}, nil, "", nil, false
 	}
 	return client, upload, resolvedPath, info, true
+}
+
+type mobileReceivedAccessPolicy struct {
+	Client                         mobileAccessClient
+	AllowCrossDeviceReceivedAccess bool
+	StableDeviceID                 string
+}
+
+func (s *Server) mobileReceivedAccessPolicy(client mobileAccessClient) (mobileReceivedAccessPolicy, error) {
+	allowCrossDeviceReceivedAccess := true
+	if val, err := s.store.GetSetting(allowCrossDeviceReceivedAccessSettingKey); err == nil {
+		allowCrossDeviceReceivedAccess = (val == "true")
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return mobileReceivedAccessPolicy{}, err
+	}
+
+	stableDeviceID := ""
+	if device, err := s.store.GetPairedDevice(client.ClientID); err == nil && device.StableDeviceID != nil {
+		stableDeviceID = strings.TrimSpace(*device.StableDeviceID)
+	} else if err != nil {
+		return mobileReceivedAccessPolicy{}, err
+	}
+
+	return mobileReceivedAccessPolicy{
+		Client:                         client,
+		AllowCrossDeviceReceivedAccess: allowCrossDeviceReceivedAccess,
+		StableDeviceID:                 stableDeviceID,
+	}, nil
+}
+
+func (s *Server) mobileReceivedUploadAllowedForPolicy(policy mobileReceivedAccessPolicy, upload *store.Upload) (bool, error) {
+	if upload.ClientID == policy.Client.ClientID {
+		return true, nil
+	}
+	if strings.TrimSpace(policy.StableDeviceID) == "" {
+		return false, nil
+	}
+	owner, err := s.store.GetPairedDevice(upload.ClientID)
+	if err != nil {
+		if errors.Is(err, store.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	if owner.StableDeviceID == nil {
+		return false, nil
+	}
+	return strings.TrimSpace(*owner.StableDeviceID) == policy.StableDeviceID, nil
 }
 
 func isValidReceivedFileKey(value string) bool {

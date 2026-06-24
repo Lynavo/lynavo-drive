@@ -38,6 +38,7 @@ const initialSettings: SettingsDTO = {
   shareStatus: 'unknown' as const,
   shareName: '',
   remoteAccessEnabled: true,
+  allowCrossDeviceReceivedAccess: true,
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

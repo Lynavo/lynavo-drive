@@ -16,29 +16,32 @@ import (
 )
 
 type settingsDTO struct {
-	DeviceName          string `json:"deviceName"`
-	ConnectionCode      string `json:"connectionCode"`
-	RootPath            string `json:"rootPath"`
-	ReceivePath         string `json:"receivePath"`
-	PersonalPath        string `json:"personalPath"`
-	PersonalMode        string `json:"personalPathMode,omitempty"`
-	SharedPath          string `json:"sharedPath"`
-	ShareAddress        string `json:"shareAddress"`
-	ShareStatus         string `json:"shareStatus"`
-	ShareName           string `json:"shareName"`
-	RemoteAccessEnabled bool   `json:"remoteAccessEnabled"`
+	DeviceName                     string `json:"deviceName"`
+	ConnectionCode                 string `json:"connectionCode"`
+	RootPath                       string `json:"rootPath"`
+	ReceivePath                    string `json:"receivePath"`
+	PersonalPath                   string `json:"personalPath"`
+	PersonalMode                   string `json:"personalPathMode,omitempty"`
+	SharedPath                     string `json:"sharedPath"`
+	ShareAddress                   string `json:"shareAddress"`
+	ShareStatus                    string `json:"shareStatus"`
+	ShareName                      string `json:"shareName"`
+	RemoteAccessEnabled            bool   `json:"remoteAccessEnabled"`
+	AllowCrossDeviceReceivedAccess bool   `json:"allowCrossDeviceReceivedAccess"`
 }
 
 type updateSettingsRequest struct {
-	DeviceName          *string `json:"deviceName,omitempty"`
-	RootPath            *string `json:"rootPath,omitempty"`
-	ReceivePath         *string `json:"receivePath,omitempty"`
-	PersonalPath        *string `json:"personalPath,omitempty"`
-	RemoteAccessEnabled *bool   `json:"remoteAccessEnabled,omitempty"`
+	DeviceName                     *string `json:"deviceName,omitempty"`
+	RootPath                       *string `json:"rootPath,omitempty"`
+	ReceivePath                    *string `json:"receivePath,omitempty"`
+	PersonalPath                   *string `json:"personalPath,omitempty"`
+	RemoteAccessEnabled            *bool   `json:"remoteAccessEnabled,omitempty"`
+	AllowCrossDeviceReceivedAccess *bool   `json:"allowCrossDeviceReceivedAccess,omitempty"`
 }
 
 const personalShareRootSettingKey = "personal_share_root"
 const remoteAccessEnabledSettingKey = "remote_access_enabled"
+const allowCrossDeviceReceivedAccessSettingKey = "allow_cross_device_received_access"
 
 func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 	dto, err := s.assembleSettingsDTO()
@@ -223,6 +226,19 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		slog.Info("remote access setting updated", "enabled", val)
 	}
 
+	if req.AllowCrossDeviceReceivedAccess != nil {
+		val := "false"
+		if *req.AllowCrossDeviceReceivedAccess {
+			val = "true"
+		}
+		if err := s.store.SetSetting(allowCrossDeviceReceivedAccessSettingKey, val); err != nil {
+			slog.Error("update cross-device received access setting", "err", err)
+			writeError(w, http.StatusInternalServerError, "failed to update settings")
+			return
+		}
+		slog.Info("cross-device received access setting updated", "enabled", val)
+	}
+
 	dto, err := s.assembleSettingsDTO()
 	if err != nil {
 		slog.Error("get updated settings", "err", err)
@@ -267,23 +283,31 @@ func (s *Server) assembleSettingsDTO() (*settingsDTO, error) {
 		return nil, err
 	}
 
+	allowCrossDeviceReceivedAccess := true
+	if val, err := s.store.GetSetting(allowCrossDeviceReceivedAccessSettingKey); err == nil {
+		allowCrossDeviceReceivedAccess = (val == "true")
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+
 	personalMode := ""
 	if usesWindowsPersonalVirtualDrivesForPath(pathConfig.PersonalDir()) {
 		personalMode = personalPathModeWindowsDrives
 	}
 
 	return &settingsDTO{
-		DeviceName:          deviceName,
-		ConnectionCode:      code,
-		RootPath:            pathConfig.RootDir(),
-		ReceivePath:         pathConfig.ReceiveDir,
-		PersonalPath:        pathConfig.PersonalDir(),
-		PersonalMode:        personalMode,
-		SharedPath:          pathConfig.SharedDir(),
-		ShareAddress:        shareConfig.ShareURL,
-		ShareStatus:         shareConfig.ShareStatus,
-		ShareName:           shareConfig.ShareName,
-		RemoteAccessEnabled: remoteAccessEnabled,
+		DeviceName:                     deviceName,
+		ConnectionCode:                 code,
+		RootPath:                       pathConfig.RootDir(),
+		ReceivePath:                    pathConfig.ReceiveDir,
+		PersonalPath:                   pathConfig.PersonalDir(),
+		PersonalMode:                   personalMode,
+		SharedPath:                     pathConfig.SharedDir(),
+		ShareAddress:                   shareConfig.ShareURL,
+		ShareStatus:                    shareConfig.ShareStatus,
+		ShareName:                      shareConfig.ShareName,
+		RemoteAccessEnabled:            remoteAccessEnabled,
+		AllowCrossDeviceReceivedAccess: allowCrossDeviceReceivedAccess,
 	}, nil
 }
 

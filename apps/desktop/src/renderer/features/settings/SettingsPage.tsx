@@ -25,6 +25,7 @@ import {
   type SupportedLocale,
 } from '@renderer/i18n/locale-resolver';
 import { useAuthStore } from '@renderer/stores/auth-store';
+import { useSettingsStore } from '@renderer/stores/settings-store';
 import {
   Dialog,
   DialogContent,
@@ -59,6 +60,8 @@ const languageOptions = SUPPORTED_LOCALES.map((locale) => ({
 export function SettingsPage() {
   const { t, i18n } = useTranslation();
   const session = useAuthStore((s) => s.session);
+  const settings = useSettingsStore((s) => s.settings);
+  const updateSettings = useSettingsStore((s) => s.updateSettings);
   const accountEmail =
     session?.email || session?.phone || session?.accountLabel || 'vividrop@studio.example';
 
@@ -89,6 +92,7 @@ export function SettingsPage() {
     );
   }, [languageKeyword]);
   const preventStandbyVal = powerState?.preventSleepDuringTransfer ?? false;
+  const crossDeviceReceivedAccessEnabled = settings.allowCrossDeviceReceivedAccess !== false;
   const localIp = localIps[0] || '192.168.0.227';
   const feedbackReady = feedbackText.trim().length > 0;
   const showLocalShareGuidance = !isGlobalMarket();
@@ -161,6 +165,19 @@ export function SettingsPage() {
       }
     } catch {
       toast.error(t('settings.profile.toasts.preventSleepFailed'));
+    }
+  };
+
+  const handleToggleCrossDeviceReceivedAccess = async (next: boolean) => {
+    try {
+      const updated = await window.electronAPI?.sidecar.updateSettings({
+        allowCrossDeviceReceivedAccess: next,
+      });
+      if (updated) {
+        updateSettings(updated);
+      }
+    } catch {
+      toast.error('修改已接收檔案瀏覽權限失敗');
     }
   };
 
@@ -379,6 +396,38 @@ export function SettingsPage() {
                     <span
                       className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
                         preventStandbyVal ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                }
+              />
+              <SettingsItem
+                icon={Smartphone}
+                tone="sky"
+                title="允許已配對手機瀏覽所有已接收檔案"
+                caption={
+                  crossDeviceReceivedAccessEnabled
+                    ? '已配對手機可瀏覽與下載這台電腦的全部 received 內容'
+                    : '手機只能瀏覽同一實體設備同步到這台電腦的檔案'
+                }
+                action={
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-label="允許已配對手機瀏覽所有已接收檔案"
+                    aria-checked={crossDeviceReceivedAccessEnabled}
+                    onClick={() =>
+                      void handleToggleCrossDeviceReceivedAccess(
+                        !crossDeviceReceivedAccessEnabled,
+                      )
+                    }
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      crossDeviceReceivedAccessEnabled ? 'bg-[#17191c]' : 'bg-slate-200'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                        crossDeviceReceivedAccessEnabled ? 'translate-x-5' : 'translate-x-0'
                       }`}
                     />
                   </button>

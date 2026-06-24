@@ -87,6 +87,14 @@ func ensureReceiveDirName(st *store.Store, receiveDir string, clientID string, s
 	return result, nil
 }
 
+func preferredReceiveDirName(device *store.PairedDevice) string {
+	candidate := SanitizeDirName(pickBestName(device))
+	if candidate == "" {
+		return "Unknown"
+	}
+	return candidate
+}
+
 // resolveReceiveDirName tries legacy claim first (unless skipped), then generates a new unique name.
 func resolveReceiveDirName(st *store.Store, receiveDir string, device *store.PairedDevice, skipLegacyClaim bool) (string, error) {
 	if candidate, ok, err := historicalUploadDirName(st, receiveDir, device); err != nil {
@@ -132,11 +140,7 @@ func resolveReceiveDirName(st *store.Store, receiveDir string, device *store.Pai
 	}
 
 	// --- 2b. Generate new name — no legacy dir found (or legacy claim skipped). ---
-	bestName := pickBestName(device)
-	candidate := SanitizeDirName(bestName)
-	if candidate == "" {
-		candidate = "Unknown"
-	}
+	candidate := preferredReceiveDirName(device)
 
 	unique, err := makeUnique(st, receiveDir, candidate)
 	if err != nil {

@@ -2220,6 +2220,84 @@ func TestGetSettings(t *testing.T) {
 	}
 }
 
+func TestSettingsIncludeCrossDeviceReceivedAccessDefault(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	_, handler := api.NewServer(st, cfg, hub, nil)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/settings")
+	if err != nil {
+		t.Fatalf("GET /settings: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+	var body struct {
+		AllowCrossDeviceReceivedAccess bool `json:"allowCrossDeviceReceivedAccess"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode settings: %v", err)
+	}
+	if !body.AllowCrossDeviceReceivedAccess {
+		t.Fatalf("expected allowCrossDeviceReceivedAccess to default true")
+	}
+}
+
+func TestUpdateSettingsPersistsCrossDeviceReceivedAccess(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	_, handler := api.NewServer(st, cfg, hub, nil)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	req, err := http.NewRequest(
+		http.MethodPut,
+		srv.URL+"/settings",
+		strings.NewReader(`{"allowCrossDeviceReceivedAccess":false}`),
+	)
+	if err != nil {
+		t.Fatalf("NewRequest PUT /settings: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("PUT /settings: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected update status 200, got %d", resp.StatusCode)
+	}
+	var updateBody struct {
+		AllowCrossDeviceReceivedAccess bool `json:"allowCrossDeviceReceivedAccess"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&updateBody); err != nil {
+		t.Fatalf("decode update settings: %v", err)
+	}
+	if updateBody.AllowCrossDeviceReceivedAccess {
+		t.Fatalf("expected update response to return false")
+	}
+
+	getResp, err := http.Get(srv.URL + "/settings")
+	if err != nil {
+		t.Fatalf("GET /settings after update: %v", err)
+	}
+	defer getResp.Body.Close()
+	if getResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected get status 200, got %d", getResp.StatusCode)
+	}
+	var getBody struct {
+		AllowCrossDeviceReceivedAccess bool `json:"allowCrossDeviceReceivedAccess"`
+	}
+	if err := json.NewDecoder(getResp.Body).Decode(&getBody); err != nil {
+		t.Fatalf("decode get settings: %v", err)
+	}
+	if getBody.AllowCrossDeviceReceivedAccess {
+		t.Fatalf("expected persisted allowCrossDeviceReceivedAccess false")
+	}
+}
+
 func TestGetSettingsDerivesManagedLayoutPaths(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	root := t.TempDir()
