@@ -24,6 +24,7 @@ enum LMUPMessageType: UInt16 {
     case error        = 0x0011
     case authReq      = 0x0012
     case authRes      = 0x0013
+    case pairingInvalidated = 0x0014
 }
 
 // MARK: - Delegate

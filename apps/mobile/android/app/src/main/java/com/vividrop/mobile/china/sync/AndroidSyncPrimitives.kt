@@ -685,6 +685,20 @@ object AndroidSyncPrimitives {
     return normalizedCurrentPairingToken == normalizedExpectedPairingToken
   }
 
+  fun shouldApplyPairingInvalidationStorageMutation(
+    currentDeviceId: String?,
+    currentPairingToken: String?,
+    expectedDeviceId: String?,
+    expectedPairingToken: String?,
+    existingInvalidationReason: String?,
+  ): Boolean = shouldClearCurrentBindingForPairingInvalidation(
+    currentDeviceId = currentDeviceId,
+    currentPairingToken = currentPairingToken,
+    expectedDeviceId = expectedDeviceId,
+    expectedPairingToken = expectedPairingToken,
+    existingInvalidationReason = existingInvalidationReason,
+  )
+
   fun resolveDiscoveryProbeCandidate(
     probeGeneration: Long,
     currentGeneration: Long,
@@ -731,6 +745,54 @@ object AndroidSyncPrimitives {
     syncInProgress: Boolean,
   ): Boolean =
     connectionState.trim() == "connected" && !syncInProgress
+
+  fun shouldMaintainPairingControlConnection(
+    connectionState: String,
+    syncInProgress: Boolean,
+    bindingDeviceId: String?,
+    bindingPairingToken: String?,
+    activeControlDeviceId: String?,
+    activeControlPairingToken: String?,
+  ): Boolean {
+    if (connectionState.trim() != "connected" || syncInProgress) {
+      return false
+    }
+
+    val deviceId = bindingDeviceId?.trim().orEmpty()
+    val pairingToken = bindingPairingToken?.trim().orEmpty()
+    if (deviceId.isBlank() || pairingToken.isBlank()) {
+      return false
+    }
+
+    val activeDeviceId = activeControlDeviceId?.trim().orEmpty()
+    val activePairingToken = activeControlPairingToken?.trim().orEmpty()
+    if (activeDeviceId.isBlank() && activePairingToken.isBlank()) {
+      return true
+    }
+
+    return activeDeviceId == deviceId && activePairingToken == pairingToken
+  }
+
+  fun shouldRunScheduledPairingControlRestart(
+    scheduledGenerationMatchesCurrent: Boolean,
+    currentDeviceId: String?,
+    currentPairingToken: String?,
+    expectedDeviceId: String?,
+    expectedPairingToken: String?,
+  ): Boolean {
+    if (!scheduledGenerationMatchesCurrent) {
+      return false
+    }
+
+    val currentDevice = currentDeviceId?.trim().orEmpty()
+    val currentToken = currentPairingToken?.trim().orEmpty()
+    val expectedDevice = expectedDeviceId?.trim().orEmpty()
+    val expectedToken = expectedPairingToken?.trim().orEmpty()
+    return currentDevice.isNotBlank() &&
+      currentToken.isNotBlank() &&
+      currentDevice == expectedDevice &&
+      currentToken == expectedToken
+  }
 
   fun wakeLanReachableReason(baseReason: String): String = "${baseReason}_wake_lan_reachable"
 
@@ -816,6 +878,14 @@ object AndroidSyncPrimitives {
       return false
     }
     return connectionState.trim() == "offline" && reason == "presence_recovery_exhausted"
+  }
+
+  fun isPairingInvalidationControlReason(reason: String?): Boolean {
+    return when (reason?.trim()) {
+      "connection_code_regenerated",
+      "connection_code_set" -> true
+      else -> false
+    }
   }
 
   fun shouldRetainSharedFilesTunnelReachabilityOnBindingOffline(

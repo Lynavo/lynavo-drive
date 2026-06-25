@@ -135,6 +135,101 @@ class AndroidSyncPrimitivesTest {
   }
 
   @Test
+  fun pairingControlConnectionRunsOnlyForIdleConnectedCurrentBinding() {
+    assertTrue(
+      AndroidSyncPrimitives.shouldMaintainPairingControlConnection(
+        connectionState = "connected",
+        syncInProgress = false,
+        bindingDeviceId = "desktop-1",
+        bindingPairingToken = "token-1",
+        activeControlDeviceId = null,
+        activeControlPairingToken = null,
+      ),
+    )
+    assertTrue(
+      AndroidSyncPrimitives.shouldMaintainPairingControlConnection(
+        connectionState = "connected",
+        syncInProgress = false,
+        bindingDeviceId = "desktop-1",
+        bindingPairingToken = "token-1",
+        activeControlDeviceId = "desktop-1",
+        activeControlPairingToken = "token-1",
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldMaintainPairingControlConnection(
+        connectionState = "connected",
+        syncInProgress = true,
+        bindingDeviceId = "desktop-1",
+        bindingPairingToken = "token-1",
+        activeControlDeviceId = "desktop-1",
+        activeControlPairingToken = "token-1",
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldMaintainPairingControlConnection(
+        connectionState = "offline",
+        syncInProgress = false,
+        bindingDeviceId = "desktop-1",
+        bindingPairingToken = "token-1",
+        activeControlDeviceId = null,
+        activeControlPairingToken = null,
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldMaintainPairingControlConnection(
+        connectionState = "connected",
+        syncInProgress = false,
+        bindingDeviceId = "desktop-1",
+        bindingPairingToken = "token-1",
+        activeControlDeviceId = "desktop-2",
+        activeControlPairingToken = "token-1",
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldMaintainPairingControlConnection(
+        connectionState = "connected",
+        syncInProgress = false,
+        bindingDeviceId = "desktop-1",
+        bindingPairingToken = "token-1",
+        activeControlDeviceId = "desktop-1",
+        activeControlPairingToken = "token-2",
+      ),
+    )
+  }
+
+  @Test
+  fun scheduledPairingControlRestartRequiresCurrentGenerationAndBindingIdentity() {
+    assertTrue(
+      AndroidSyncPrimitives.shouldRunScheduledPairingControlRestart(
+        scheduledGenerationMatchesCurrent = true,
+        currentDeviceId = "desktop-1",
+        currentPairingToken = "token-1",
+        expectedDeviceId = "desktop-1",
+        expectedPairingToken = "token-1",
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldRunScheduledPairingControlRestart(
+        scheduledGenerationMatchesCurrent = false,
+        currentDeviceId = "desktop-1",
+        currentPairingToken = "token-1",
+        expectedDeviceId = "desktop-1",
+        expectedPairingToken = "token-1",
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldRunScheduledPairingControlRestart(
+        scheduledGenerationMatchesCurrent = true,
+        currentDeviceId = "desktop-1",
+        currentPairingToken = "token-2",
+        expectedDeviceId = "desktop-1",
+        expectedPairingToken = "token-1",
+      ),
+    )
+  }
+
+  @Test
   fun validWakeTargetsRequireMacBroadcastAndPort() {
     val targets = listOf(
       AndroidWakeTarget(
@@ -994,6 +1089,28 @@ class AndroidSyncPrimitivesTest {
         existingInvalidationReason = "presence_unpaired",
       ),
     )
+  }
+
+  @Test
+  fun pairingInvalidationStorageMutationRequiresCurrentBindingToStillMatchExpectedBinding() {
+    assertFalse(
+      AndroidSyncPrimitives.shouldApplyPairingInvalidationStorageMutation(
+        currentDeviceId = "desktop-1",
+        currentPairingToken = "new-token",
+        expectedDeviceId = "desktop-1",
+        expectedPairingToken = "old-token",
+        existingInvalidationReason = null,
+      ),
+    )
+  }
+
+  @Test
+  fun pairingInvalidationControlReasonsRequireRePairing() {
+    assertTrue(AndroidSyncPrimitives.isPairingInvalidationControlReason("connection_code_regenerated"))
+    assertTrue(AndroidSyncPrimitives.isPairingInvalidationControlReason(" connection_code_set "))
+    assertFalse(AndroidSyncPrimitives.isPairingInvalidationControlReason(""))
+    assertFalse(AndroidSyncPrimitives.isPairingInvalidationControlReason("offline"))
+    assertFalse(AndroidSyncPrimitives.isPairingInvalidationControlReason(null))
   }
 
   @Test

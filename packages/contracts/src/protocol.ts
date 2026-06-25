@@ -31,5 +31,8 @@ export const MessageType = {
   PING: 0x000f,
   PONG: 0x0010,
   ERROR: 0x0011,
+  AUTH_REQ: 0x0012,
+  AUTH_RES: 0x0013,
+  PAIRING_INVALIDATED: 0x0014,
 } as const;
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];

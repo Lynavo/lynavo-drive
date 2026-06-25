@@ -126,7 +126,7 @@ func (c *connection) handle() {
 		c.stopAckTimer()
 		c.conn.Close()
 		if c.clientID != "" && c.server != nil {
-			hasActiveConnections := c.server.UnregisterClientConnection(c.clientID, c.conn)
+			hasActiveConnections := c.server.UnregisterClientConnection(c.clientID, c)
 			if !hasActiveConnections {
 				c.server.RemoveClient(c.clientID)
 				status := c.server.DisconnectBroadcastStatus(c.clientID)
@@ -506,6 +506,12 @@ func (c *connection) sendError(code, msg string) error {
 	return c.sendJSON(protocol.TypeError, protocol.ErrorMsg{
 		Code:    code,
 		Message: msg,
+	})
+}
+
+func (c *connection) sendPairingInvalidated(reason string) error {
+	return c.sendJSON(protocol.TypePairingInvalidated, map[string]string{
+		"reason": reason,
 	})
 }
 

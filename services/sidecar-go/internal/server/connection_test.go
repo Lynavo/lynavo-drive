@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -1156,7 +1157,8 @@ func TestDisconnectClientsClosesActiveConnection(t *testing.T) {
 	defer server.Close()
 
 	tcpSrv := NewTCPServer(nil, nil, events.NewHub())
-	tcpSrv.RegisterClientConnection(testClientID, server)
+	conn := newConnection(server, nil, nil, events.NewHub(), tcpSrv)
+	tcpSrv.RegisterClientConnection(testClientID, conn)
 	if disconnected := tcpSrv.DisconnectClients([]string{testClientID}, "connection_code_changed"); disconnected != 1 {
 		t.Fatalf("DisconnectClients closed %d connections, want 1", disconnected)
 	}
@@ -1164,6 +1166,119 @@ func TestDisconnectClientsClosesActiveConnection(t *testing.T) {
 	client.SetReadDeadline(time.Now().Add(testReadTimeout))
 	if hdr, _, err := protocol.ReadFrame(client); err == nil {
 		t.Fatalf("expected connection close, got frame 0x%04x", hdr.Type)
+	}
+}
+
+func TestDisconnectClientsSendsPairingInvalidatedForConnectionCodeReset(t *testing.T) {
+	testDisconnectClientsSendsPairingInvalidated(t, "connection_code_regenerated")
+}
+
+func TestDisconnectClientsSendsPairingInvalidatedForConnectionCodeSet(t *testing.T) {
+	testDisconnectClientsSendsPairingInvalidated(t, "connection_code_set")
+}
+
+func TestDisconnectClientsSendsPairingInvalidatedToAllActiveConnectionsForClient(t *testing.T) {
+	firstClient, firstServer := net.Pipe()
+	defer firstClient.Close()
+	defer firstServer.Close()
+	secondClient, secondServer := net.Pipe()
+	defer secondClient.Close()
+	defer secondServer.Close()
+
+	tcpSrv := NewTCPServer(nil, nil, events.NewHub())
+	firstConn := newConnection(firstServer, nil, nil, events.NewHub(), tcpSrv)
+	secondConn := newConnection(secondServer, nil, nil, events.NewHub(), tcpSrv)
+	tcpSrv.RegisterClientConnection(testClientID, firstConn)
+	tcpSrv.RegisterClientConnection(testClientID, secondConn)
+
+	done := make(chan int, 1)
+	go func() {
+		done <- tcpSrv.DisconnectClients([]string{testClientID}, "connection_code_regenerated")
+	}()
+
+	type readResult struct {
+		name   string
+		reason string
+		err    error
+	}
+	results := make(chan readResult, 2)
+	readInvalidation := func(name string, client net.Conn) {
+		client.SetReadDeadline(time.Now().Add(testReadTimeout))
+		var payload map[string]string
+		hdr, body, err := protocol.ReadFrame(client)
+		if err != nil {
+			results <- readResult{name: name, err: err}
+			return
+		}
+		if hdr.Type != protocol.TypePairingInvalidated {
+			results <- readResult{name: name, err: fmt.Errorf("frame type=0x%04x", hdr.Type)}
+			return
+		}
+		if err := json.Unmarshal(body, &payload); err != nil {
+			results <- readResult{name: name, err: err}
+			return
+		}
+		results <- readResult{name: name, reason: payload["reason"]}
+	}
+
+	go readInvalidation("first", firstClient)
+	go readInvalidation("second", secondClient)
+
+	for range 2 {
+		result := <-results
+		if result.err != nil {
+			t.Fatalf("%s connection did not receive pairing invalidation: %v", result.name, result.err)
+		}
+		if result.reason != "connection_code_regenerated" {
+			t.Fatalf("%s connection pairing invalidated reason=%q, want connection_code_regenerated", result.name, result.reason)
+		}
+	}
+
+	select {
+	case disconnected := <-done:
+		if disconnected != 2 {
+			t.Fatalf("DisconnectClients closed %d connections, want 2", disconnected)
+		}
+	case <-time.After(testReadTimeout):
+		t.Fatal("DisconnectClients did not return after sending pairing invalidation to all connections")
+	}
+}
+
+func testDisconnectClientsSendsPairingInvalidated(t *testing.T, reason string) {
+	t.Helper()
+
+	client, server := net.Pipe()
+	defer client.Close()
+	defer server.Close()
+
+	tcpSrv := NewTCPServer(nil, nil, events.NewHub())
+	conn := newConnection(server, nil, nil, events.NewHub(), tcpSrv)
+	tcpSrv.RegisterClientConnection(testClientID, conn)
+
+	done := make(chan int, 1)
+	go func() {
+		done <- tcpSrv.DisconnectClients([]string{testClientID}, reason)
+	}()
+
+	client.SetReadDeadline(time.Now().Add(testReadTimeout))
+	var payload map[string]string
+	recvJSON(t, client, protocol.TypePairingInvalidated, &payload)
+	if payload["reason"] != reason {
+		t.Fatalf("pairing invalidated reason=%q, want %s", payload["reason"], reason)
+	}
+
+	select {
+	case disconnected := <-done:
+		if disconnected != 1 {
+			t.Fatalf("DisconnectClients closed %d connections, want 1", disconnected)
+		}
+	case <-time.After(testReadTimeout):
+		t.Fatal("DisconnectClients did not return after sending pairing invalidation")
+	}
+
+	client.SetReadDeadline(time.Now().Add(testReadTimeout))
+	if hdr, _, err := protocol.ReadFrame(client); err == nil {
+		t.Fatalf("expected connection close after pairing invalidation, got frame 0x%04x", hdr.Type)
 	}
 }
 
@@ -1176,11 +1291,13 @@ func TestUnregisterOneOfMultipleConnectionsKeepsClientState(t *testing.T) {
 	defer secondServer.Close()
 
 	tcpSrv := NewTCPServer(nil, nil, events.NewHub())
-	tcpSrv.RegisterClientConnection(testClientID, firstServer)
-	tcpSrv.RegisterClientConnection(testClientID, secondServer)
+	firstConn := newConnection(firstServer, nil, nil, events.NewHub(), tcpSrv)
+	secondConn := newConnection(secondServer, nil, nil, events.NewHub(), tcpSrv)
+	tcpSrv.RegisterClientConnection(testClientID, firstConn)
+	tcpSrv.RegisterClientConnection(testClientID, secondConn)
 	tcpSrv.SetClientState(testClientID, "connected")
 
-	tcpSrv.UnregisterClientConnection(testClientID, firstServer)
+	tcpSrv.UnregisterClientConnection(testClientID, firstConn)
 	tcpSrv.RemoveClient(testClientID)
 
 	if got := tcpSrv.GetClientState(testClientID); got != "connected" {

@@ -50,6 +50,7 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.Socket
+import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.URLEncoder
 import java.nio.ByteBuffer
@@ -82,6 +83,10 @@ private class NativeStructuredError(
   val userInfo: WritableMap,
 ) : Exception(message)
 
+private class PairingInvalidatedFrameException(
+  val invalidationReason: String,
+) : Exception("Pairing invalidated: $invalidationReason")
+
 private data class PickedDocumentMetadata(
   val name: String,
   val size: Long,
@@ -107,6 +112,13 @@ class NativeSyncEngineModule(
   private val presenceHeartbeatLock = Any()
   private var presenceHeartbeatExecutor: ScheduledExecutorService? = null
   private var presenceHeartbeatFuture: ScheduledFuture<*>? = null
+  private val pairingControlLock = Any()
+  private var pairingControlExecutor: ScheduledExecutorService? = null
+  private var pairingControlFuture: ScheduledFuture<*>? = null
+  private var pairingControlConnection: ProtocolConnection? = null
+  private var pairingControlGeneration = 0L
+  private var pairingControlDeviceId: String? = null
+  private var pairingControlPairingToken: String? = null
   private val presenceRecoveryLock = Any()
   private var presenceRecoveryGeneration = 0L
   private var presenceRecoveryFuture: ScheduledFuture<*>? = null
@@ -137,6 +149,7 @@ class NativeSyncEngineModule(
   private var accessToken: String? = null
   private var tunnelIceServersJSON: String = ""
   @Volatile private var sharedFilesReachability: SharedFilesReachability? = null
+  private val bindingMutationLock = Any()
   init {
     foregroundSyncStopCallback = foregroundSyncStopHandler
     registerNetworkAvailabilityMonitor()
@@ -158,6 +171,7 @@ class NativeSyncEngineModule(
     stopDiscoveryInternal(emitUpdate = false)
     cancelPresenceRecoveryProbe(reason = "module_invalidated")
     stopPresenceHeartbeatTimer()
+    stopPairingControlSession(reason = "module_invalidated")
     stopP2PTunnel()
     unregisterNetworkAvailabilityMonitor()
     if (foregroundSyncStopCallback === foregroundSyncStopHandler) {
@@ -635,18 +649,21 @@ class NativeSyncEngineModule(
         throw error
       }
 
-      resetAutoUploadAfterPairingDeviceSwitch(previousBinding, resolvedBinding)
-      saveBinding(resolvedBinding)
-      recordNativeLog(
-        "Pairing",
-        "pairDevice successful deviceId=${resolvedBinding.deviceId} host=${resolvedBinding.host} shareEnabled=${resolvedBinding.shareEnabled}",
-        Log.INFO,
-      )
-      emitBindingStateChanged(resolvedBinding)
-      emitIdleSyncState(resolvedBinding)
-      emitQueueUpdated(Arguments.createArray())
-      sendPresenceHeartbeatAsync(resolvedBinding, reason = "pairing_confirmed", recoverOnFailure = true)
-      startPresenceHeartbeatTimer(resolvedBinding)
+      synchronized(bindingMutationLock) {
+        resetAutoUploadAfterPairingDeviceSwitch(previousBinding, resolvedBinding)
+        saveBinding(resolvedBinding)
+        recordNativeLog(
+          "Pairing",
+          "pairDevice successful deviceId=${resolvedBinding.deviceId} host=${resolvedBinding.host} shareEnabled=${resolvedBinding.shareEnabled}",
+          Log.INFO,
+        )
+        emitBindingStateChanged(resolvedBinding)
+        emitIdleSyncState(resolvedBinding)
+        emitQueueUpdated(Arguments.createArray())
+        sendPresenceHeartbeatAsync(resolvedBinding, reason = "pairing_confirmed", recoverOnFailure = true)
+        startPresenceHeartbeatTimer(resolvedBinding)
+        startPairingControlSessionIfNeeded(resolvedBinding, reason = "pairing_confirmed")
+      }
       promise.resolve(null)
     }
   }
@@ -677,6 +694,7 @@ class NativeSyncEngineModule(
     cancelPresenceRecoveryProbe(reason = "unbind")
     stopP2PTunnel()
     stopPresenceHeartbeatTimer()
+    stopPairingControlSession(reason = "unbind")
     clearBindingInvalidationReason()
     clearBinding()
     clearSharedFilesReachability(reason = "disconnectAndUnbind")
@@ -2292,9 +2310,12 @@ class NativeSyncEngineModule(
       syncInProgress = true
       clearForegroundSyncStopRequest()
     }
+    stopPairingControlSession(reason = "sync_round_started")
     var foregroundServiceStarted = false
+    var roundBinding: StoredBinding? = null
     try {
       var binding = loadBinding()
+      roundBinding = binding
       if (binding == null) {
         recordDiagnosticsLog("Sync", "round paused reason=$reason no binding")
         emitSyncState(null, "paused_no_target")
@@ -2375,11 +2396,14 @@ class NativeSyncEngineModule(
         totalBytes = totalBytes,
       )
       binding = updateBindingConnectionState(binding, "connecting") ?: binding
+      roundBinding = binding
       recordNativeLog("SyncPipeline", "TCP connecting to ${binding.host}:${binding.port}")
       ProtocolConnection.open(binding).use { connection ->
         recordNativeLog("SyncPipeline", "TCP connected to ${binding.host}:${binding.port}", Log.INFO)
         binding = authenticateConnection(connection, binding)
+        roundBinding = binding
         binding = updateBindingConnectionState(binding, "connected") ?: binding
+        roundBinding = binding
         val beginPayload = JSONObject().apply {
           put("sessionId", sessionId)
           put("queueTotalCount", pending.size)
@@ -2480,6 +2504,21 @@ class NativeSyncEngineModule(
         emitIdleSyncState(loadBinding())
         return
       }
+      if (error is PairingInvalidatedFrameException) {
+        val invalidatedBinding = roundBinding
+        recordDiagnosticsLog(
+          "Pairing",
+          "sync round received pairing invalidation frame reason=${error.invalidationReason} deviceId=${invalidatedBinding?.deviceId ?: "nil"}",
+        )
+        if (invalidatedBinding != null) {
+          invalidateCurrentPairing(
+            reason = error.invalidationReason,
+            expectedDeviceId = invalidatedBinding.deviceId,
+            expectedPairingToken = invalidatedBinding.pairingToken,
+          )
+        }
+        return
+      }
       val message = error.message ?: "Android sync failed"
       recordDiagnosticsLog("Sync", "sync failed: $message")
       emitError("ANDROID_SYNC_FAILED", message)
@@ -2499,6 +2538,7 @@ class NativeSyncEngineModule(
         ?.let {
           sendPresenceHeartbeatAsync(it, reason = "sync_round_finished", recoverOnFailure = true)
           startPresenceHeartbeatTimer(it)
+          startPairingControlSessionIfNeeded(it, reason = "sync_round_finished")
         }
       clearForegroundSyncStopRequest()
       if (foregroundServiceStarted) {
@@ -3117,13 +3157,23 @@ class NativeSyncEngineModule(
       throw IllegalStateException("Invalid frame size: $bodyLength")
     }
 
-    if (bodyLength == 0) {
-      return JsonFrame(actualType, JSONObject())
+    val payload = if (bodyLength == 0) {
+      JSONObject()
+    } else {
+      val body = ByteArray(bodyLength)
+      input.readFully(body)
+      JSONObject(String(body, StandardCharsets.UTF_8))
     }
 
-    val body = ByteArray(bodyLength)
-    input.readFully(body)
-    return JsonFrame(actualType, JSONObject(String(body, StandardCharsets.UTF_8)))
+    if (actualType == TYPE_PAIRING_INVALIDATED) {
+      val reason = payload.optString("reason").trim()
+      if (AndroidSyncPrimitives.isPairingInvalidationControlReason(reason)) {
+        throw PairingInvalidatedFrameException(reason)
+      }
+      throw IllegalStateException("Unexpected pairing invalidation reason: ${reason.ifBlank { "<empty>" }}")
+    }
+
+    return JsonFrame(actualType, payload)
   }
 
   private fun writeFileDataFrame(
@@ -4904,6 +4954,7 @@ class NativeSyncEngineModule(
     if (connectionState == "connected") {
       cancelPresenceRecoveryProbe(reason = reason ?: "state_connected")
       startPresenceHeartbeatTimer(updated)
+      startPairingControlSessionIfNeeded(updated, reason = reason ?: "state_connected")
       startP2PTunnelIfNeeded(updated)
       wakeManualUploadAfterReconnectIfNeeded(
         previousConnectionState = binding.connectionState,
@@ -4913,6 +4964,7 @@ class NativeSyncEngineModule(
     } else if (connectionState == "offline") {
       cancelPresenceRecoveryProbe(reason = reason ?: "state_offline")
       stopPresenceHeartbeatTimer()
+      stopPairingControlSession(reason = reason ?: "state_offline")
       if (retainSharedFilesTunnel) {
         recordNativeLog("SharedFiles", "retained P2P tunnel while binding offline (${reason ?: "state_offline"})")
       } else {
@@ -4920,9 +4972,11 @@ class NativeSyncEngineModule(
       }
     } else if (connectionState != "connecting") {
       stopPresenceHeartbeatTimer()
+      stopPairingControlSession(reason = reason ?: "state_$connectionState")
       stopP2PTunnel()
     } else {
       stopPresenceHeartbeatTimer()
+      stopPairingControlSession(reason = reason ?: "state_connecting")
       stopP2PTunnel()
     }
     return updated
@@ -4932,12 +4986,12 @@ class NativeSyncEngineModule(
     reason: String,
     expectedDeviceId: String?,
     expectedPairingToken: String?,
-  ): Boolean {
+  ): Boolean = synchronized(bindingMutationLock) {
     val normalizedReason = reason.trim().ifBlank { "pairing_invalidated" }
     val binding = loadBinding()
     val existingReason = loadBindingInvalidationReason()
     if (
-      !AndroidSyncPrimitives.shouldClearCurrentBindingForPairingInvalidation(
+      !AndroidSyncPrimitives.shouldApplyPairingInvalidationStorageMutation(
         currentDeviceId = binding?.deviceId,
         currentPairingToken = binding?.pairingToken,
         expectedDeviceId = expectedDeviceId,
@@ -4949,7 +5003,7 @@ class NativeSyncEngineModule(
         "Pairing",
         "ignored pairing invalidation reason=$normalizedReason expectedDeviceId=${expectedDeviceId ?: "nil"} currentDeviceId=${binding?.deviceId ?: "nil"} existingReason=${existingReason ?: "nil"}",
       )
-      return false
+      return@synchronized false
     }
 
     recordDiagnosticsLog(
@@ -4958,6 +5012,7 @@ class NativeSyncEngineModule(
     )
     cancelPresenceRecoveryProbe(reason = normalizedReason)
     stopPresenceHeartbeatTimer()
+    stopPairingControlSession(reason = normalizedReason)
     stopP2PTunnel()
     clearSharedFilesReachability(reason = normalizedReason)
     clearBinding()
@@ -4974,7 +5029,7 @@ class NativeSyncEngineModule(
     } else {
       emitIdleSyncState(null)
     }
-    return true
+    true
   }
 
   private fun wakeManualUploadAfterReconnectIfNeeded(
@@ -5082,6 +5137,7 @@ class NativeSyncEngineModule(
       )
     }
     recordDiagnosticsLog("Presence", "heartbeat timer started deviceId=${binding.deviceId}")
+    startPairingControlSessionIfNeeded(binding, reason = "presence_heartbeat_started")
   }
 
   private fun stopPresenceHeartbeatTimer() {
@@ -5090,6 +5146,235 @@ class NativeSyncEngineModule(
       presenceHeartbeatFuture = null
     }
   }
+
+  private fun startPairingControlSessionIfNeeded(binding: StoredBinding, reason: String) {
+    val pairingToken = binding.pairingToken.trim()
+    if (
+      !AndroidSyncPrimitives.shouldMaintainPairingControlConnection(
+        connectionState = binding.connectionState,
+        syncInProgress = syncInProgress,
+        bindingDeviceId = binding.deviceId,
+        bindingPairingToken = pairingToken,
+        activeControlDeviceId = null,
+        activeControlPairingToken = null,
+      )
+    ) {
+      stopPairingControlSession(reason = "${reason}_not_eligible")
+      return
+    }
+
+    val generation: Long
+    val existingFuture: ScheduledFuture<*>?
+    val existingConnection: ProtocolConnection?
+    synchronized(pairingControlLock) {
+      if (
+        AndroidSyncPrimitives.shouldMaintainPairingControlConnection(
+          connectionState = binding.connectionState,
+          syncInProgress = syncInProgress,
+          bindingDeviceId = binding.deviceId,
+          bindingPairingToken = pairingToken,
+          activeControlDeviceId = pairingControlDeviceId,
+          activeControlPairingToken = pairingControlPairingToken,
+        ) &&
+        pairingControlFuture?.isDone == false
+      ) {
+        return
+      }
+      existingFuture = pairingControlFuture
+      existingConnection = pairingControlConnection
+      pairingControlGeneration += 1
+      generation = pairingControlGeneration
+      pairingControlFuture = null
+      pairingControlConnection = null
+      pairingControlDeviceId = binding.deviceId
+      pairingControlPairingToken = pairingToken
+    }
+
+    existingFuture?.cancel(true)
+    existingConnection?.closeQuietly()
+
+    val task = Runnable {
+      runPairingControlSession(
+        binding = binding,
+        pairingToken = pairingToken,
+        generation = generation,
+        startReason = reason,
+      )
+    }
+    val future = pairingControlExecutor().schedule(task, 0, TimeUnit.MILLISECONDS)
+    synchronized(pairingControlLock) {
+      if (pairingControlGeneration == generation) {
+        pairingControlFuture = future
+      } else {
+        future.cancel(true)
+      }
+    }
+    recordDiagnosticsLog(
+      "PairingControl",
+      "control session starting deviceId=${binding.deviceId} reason=$reason",
+    )
+  }
+
+  private fun stopPairingControlSession(reason: String) {
+    val future: ScheduledFuture<*>?
+    val connection: ProtocolConnection?
+    val hadSession: Boolean
+    synchronized(pairingControlLock) {
+      pairingControlGeneration += 1
+      future = pairingControlFuture
+      connection = pairingControlConnection
+      hadSession = future != null || connection != null
+      pairingControlFuture = null
+      pairingControlConnection = null
+      pairingControlDeviceId = null
+      pairingControlPairingToken = null
+    }
+    future?.cancel(true)
+    connection?.closeQuietly()
+    if (hadSession) {
+      recordDiagnosticsLog("PairingControl", "control session stopped reason=$reason")
+    }
+  }
+
+  private fun installPairingControlConnection(connection: ProtocolConnection, generation: Long): Boolean =
+    synchronized(pairingControlLock) {
+      if (pairingControlGeneration != generation) {
+        false
+      } else {
+        pairingControlConnection = connection
+        true
+      }
+    }
+
+  private fun finishPairingControlSession(generation: Long, reason: String) {
+    val shouldLog = synchronized(pairingControlLock) {
+      if (pairingControlGeneration != generation) {
+        false
+      } else {
+        pairingControlFuture = null
+        pairingControlConnection = null
+        pairingControlDeviceId = null
+        pairingControlPairingToken = null
+        true
+      }
+    }
+    if (shouldLog) {
+      recordDiagnosticsLog("PairingControl", "control session finished reason=$reason")
+    }
+  }
+
+  private fun schedulePairingControlRestartIfCurrent(
+    binding: StoredBinding,
+    pairingToken: String,
+    generation: Long,
+    reason: String,
+  ) {
+    pairingControlExecutor().schedule(
+      {
+        val current = loadBinding() ?: return@schedule
+        val currentGeneration = synchronized(pairingControlLock) { pairingControlGeneration }
+        if (
+          !AndroidSyncPrimitives.shouldRunScheduledPairingControlRestart(
+            scheduledGenerationMatchesCurrent = currentGeneration == generation,
+            currentDeviceId = current.deviceId,
+            currentPairingToken = current.pairingToken,
+            expectedDeviceId = binding.deviceId,
+            expectedPairingToken = pairingToken,
+          )
+        ) {
+          return@schedule
+        }
+        startPairingControlSessionIfNeeded(current, reason = "restart_after_$reason")
+      },
+      PAIRING_CONTROL_RESTART_DELAY_MS,
+      TimeUnit.MILLISECONDS,
+    )
+  }
+
+  private fun runPairingControlSession(
+    binding: StoredBinding,
+    pairingToken: String,
+    generation: Long,
+    startReason: String,
+  ) {
+    var connection: ProtocolConnection? = null
+    var finishReason = "completed"
+    var shouldRestart = false
+    try {
+      if (Thread.currentThread().isInterrupted) {
+        finishReason = "cancelled"
+        return
+      }
+      val openedConnection = ProtocolConnection.open(binding, readTimeoutMs = PAIRING_CONTROL_READ_TIMEOUT_MS)
+      connection = openedConnection
+      if (!installPairingControlConnection(openedConnection, generation)) {
+        finishReason = "stale_generation"
+        return
+      }
+      val authenticatedBinding = authenticateConnection(openedConnection, binding)
+      if (authenticatedBinding.deviceId != binding.deviceId || authenticatedBinding.pairingToken.trim() != pairingToken) {
+        finishReason = "binding_changed"
+        return
+      }
+      recordDiagnosticsLog(
+        "PairingControl",
+        "control session authenticated deviceId=${binding.deviceId} reason=$startReason",
+      )
+
+      while (!Thread.currentThread().isInterrupted) {
+        val frame = readJsonFrameAny(openedConnection.input)
+        when (frame.type) {
+          TYPE_PING -> writeEmptyFrame(openedConnection.output, TYPE_PONG)
+          TYPE_ERROR -> throw IllegalStateException(frame.payload.optString("message", "Desktop returned protocol error"))
+          else -> recordDiagnosticsLog("PairingControl", "ignored control frame type=${frame.type}")
+        }
+      }
+      finishReason = "cancelled"
+    } catch (error: PairingInvalidatedFrameException) {
+      finishReason = "pairing_invalidated"
+      recordDiagnosticsLog(
+        "PairingControl",
+        "received pairing invalidation reason=${error.invalidationReason} deviceId=${binding.deviceId}",
+      )
+      invalidateCurrentPairing(
+        reason = error.invalidationReason,
+        expectedDeviceId = binding.deviceId,
+        expectedPairingToken = pairingToken,
+      )
+    } catch (_: InterruptedException) {
+      finishReason = "cancelled"
+      Thread.currentThread().interrupt()
+    } catch (error: Throwable) {
+      finishReason = if (error is SocketTimeoutException) "read_timeout" else "error"
+      shouldRestart = !Thread.currentThread().isInterrupted
+      recordDiagnosticsLog(
+        "PairingControl",
+        "control session ended reason=$finishReason error=${error.message ?: error.javaClass.simpleName}",
+      )
+    } finally {
+      connection?.closeQuietly()
+      finishPairingControlSession(generation = generation, reason = finishReason)
+      if (shouldRestart) {
+        schedulePairingControlRestartIfCurrent(
+          binding = binding,
+          pairingToken = pairingToken,
+          generation = generation,
+          reason = finishReason,
+        )
+      }
+    }
+  }
+
+  private fun pairingControlExecutor(): ScheduledExecutorService =
+    synchronized(pairingControlLock) {
+      val existing = pairingControlExecutor
+      if (existing != null && !existing.isShutdown) {
+        return@synchronized existing
+      }
+      Executors.newSingleThreadScheduledExecutor { runnable ->
+        Thread(runnable, "NativeSyncEnginePairingControl").apply { isDaemon = true }
+      }.also { pairingControlExecutor = it }
+    }
 
   private fun presenceHeartbeatExecutor(): ScheduledExecutorService =
     synchronized(presenceHeartbeatLock) { presenceHeartbeatExecutorLocked() }
@@ -5604,41 +5889,53 @@ class NativeSyncEngineModule(
       put("autoPending", autoPending)
     }
 
-  private fun loadBinding(): StoredBinding? {
-    val raw = prefs.getString(PREF_BINDING, null) ?: return null
-    return try {
-      StoredBinding.fromJson(JSONObject(raw))
-    } catch (_: Throwable) {
-      null
+  private fun loadBinding(): StoredBinding? =
+    synchronized(bindingMutationLock) {
+      val raw = prefs.getString(PREF_BINDING, null) ?: return@synchronized null
+      try {
+        StoredBinding.fromJson(JSONObject(raw))
+      } catch (_: Throwable) {
+        null
+      }
     }
-  }
 
   private fun saveBinding(binding: StoredBinding) {
-    prefs.edit()
-      .putString(PREF_BINDING, binding.toJson().toString())
-      .remove(PREF_BINDING_INVALIDATION_REASON)
-      .apply()
-    rememberKnownDeviceId(binding.deviceId)
+    synchronized(bindingMutationLock) {
+      prefs.edit()
+        .putString(PREF_BINDING, binding.toJson().toString())
+        .remove(PREF_BINDING_INVALIDATION_REASON)
+        .apply()
+      rememberKnownDeviceId(binding.deviceId)
+    }
   }
 
   private fun clearBinding() {
     cancelPresenceRecoveryProbe(reason = "binding_cleared")
     stopPresenceHeartbeatTimer()
+    stopPairingControlSession(reason = "binding_cleared")
     clearSharedFilesReachability(reason = "binding_cleared")
-    prefs.edit().remove(PREF_BINDING).apply()
+    synchronized(bindingMutationLock) {
+      prefs.edit().remove(PREF_BINDING).apply()
+    }
   }
 
   private fun loadBindingInvalidationReason(): String? =
-    prefs.getString(PREF_BINDING_INVALIDATION_REASON, null)
-      ?.trim()
-      ?.takeIf { it.isNotBlank() }
+    synchronized(bindingMutationLock) {
+      prefs.getString(PREF_BINDING_INVALIDATION_REASON, null)
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+    }
 
   private fun persistBindingInvalidationReason(reason: String) {
-    prefs.edit().putString(PREF_BINDING_INVALIDATION_REASON, reason.trim()).apply()
+    synchronized(bindingMutationLock) {
+      prefs.edit().putString(PREF_BINDING_INVALIDATION_REASON, reason.trim()).apply()
+    }
   }
 
   private fun clearBindingInvalidationReason() {
-    prefs.edit().remove(PREF_BINDING_INVALIDATION_REASON).apply()
+    synchronized(bindingMutationLock) {
+      prefs.edit().remove(PREF_BINDING_INVALIDATION_REASON).apply()
+    }
   }
 
   private fun bindingInvalidationState(reason: String): WritableMap =
@@ -6732,11 +7029,18 @@ class NativeSyncEngineModule(
       socket.close()
     }
 
+    fun closeQuietly() {
+      try {
+        close()
+      } catch (_: Throwable) {
+      }
+    }
+
     companion object {
-      fun open(binding: StoredBinding): ProtocolConnection {
+      fun open(binding: StoredBinding, readTimeoutMs: Int = AndroidSyncPrimitives.syncSocketReadTimeoutMs(SOCKET_TIMEOUT_MS)): ProtocolConnection {
         val socket = Socket()
         socket.connect(InetSocketAddress(binding.host, binding.port), SOCKET_TIMEOUT_MS)
-        socket.soTimeout = AndroidSyncPrimitives.syncSocketReadTimeoutMs(SOCKET_TIMEOUT_MS)
+        socket.soTimeout = readTimeoutMs
         return ProtocolConnection(
           socket = socket,
           input = DataInputStream(socket.getInputStream()),
@@ -7030,6 +7334,8 @@ class NativeSyncEngineModule(
     private const val PRESENCE_HEARTBEAT_INTERVAL_MS = 30_000L
     private const val PRESENCE_RECOVERY_MAX_ATTEMPTS = 60
     private const val PRESENCE_RECOVERY_INTERVAL_MS = 1_000L
+    private const val PAIRING_CONTROL_READ_TIMEOUT_MS = 60_000
+    private const val PAIRING_CONTROL_RESTART_DELAY_MS = 10_000L
     private const val HEADER_SIZE = 12
     private const val MAX_BODY_LENGTH = 64 * 1024 * 1024
     private const val DEFAULT_PROTOCOL_PORT = 39_393
@@ -7074,6 +7380,7 @@ class NativeSyncEngineModule(
     private const val TYPE_ERROR = 0x0011
     private const val TYPE_AUTH_REQ = 0x0012
     private const val TYPE_AUTH_RES = 0x0013
+    private const val TYPE_PAIRING_INVALIDATED = 0x0014
     private val ACTIVE_UPLOAD_STATUSES = setOf(
       "queued",
       "discovered",

@@ -432,7 +432,7 @@ func (c *connection) handleAuth(body []byte) error {
 	slog.Info("client authenticated via HMAC", "clientID", c.clientID)
 	c.state = stateAuthenticated
 	if c.server != nil {
-		c.server.RegisterClientConnection(c.clientID, c.conn)
+		c.server.RegisterClientConnection(c.clientID, c)
 		c.server.SetClientState(c.clientID, "connected")
 		if c.hub != nil {
 			c.hub.Broadcast(events.Event{
@@ -606,7 +606,7 @@ func (c *connection) handlePair(body []byte) error {
 	slog.Info("device paired successfully", "clientID", req.ClientID, "pairingID", pairingID)
 	c.state = stateAuthenticated
 	if c.server != nil {
-		c.server.RegisterClientConnection(c.clientID, c.conn)
+		c.server.RegisterClientConnection(c.clientID, c)
 		c.server.SetClientState(c.clientID, "connected")
 		if onPairedDevicesChanged := c.server.OnPairedDevicesChanged; onPairedDevicesChanged != nil {
 			go onPairedDevicesChanged("device_paired")

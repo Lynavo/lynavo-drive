@@ -162,6 +162,126 @@ expect(
 )
 
 expect(
+    PresenceReconnectPolicy.isPairingInvalidationControlReason("connection_code_regenerated"),
+    "desktop regenerated pairing code control frame should invalidate pairing"
+)
+
+expect(
+    PresenceReconnectPolicy.isPairingInvalidationControlReason(" connection_code_set "),
+    "desktop set pairing code control frame should invalidate pairing"
+)
+
+expect(
+    !PresenceReconnectPolicy.isPairingInvalidationControlReason("offline"),
+    "generic offline control reason must not invalidate pairing"
+)
+
+expect(
+    !PresenceReconnectPolicy.isPairingInvalidationControlReason(""),
+    "blank control reason must not invalidate pairing"
+)
+
+expect(
+    PresenceReconnectPolicy.shouldMaintainPairingControlConnection(
+        connectionState: "connected",
+        syncInProgress: false,
+        bindingDeviceId: "desktop-1",
+        bindingPairingToken: "token-1",
+        activeControlDeviceId: nil,
+        activeControlPairingToken: nil
+    ),
+    "idle connected bindings should maintain a pairing control connection"
+)
+
+expect(
+    PresenceReconnectPolicy.shouldMaintainPairingControlConnection(
+        connectionState: "connected",
+        syncInProgress: false,
+        bindingDeviceId: "desktop-1",
+        bindingPairingToken: "token-1",
+        activeControlDeviceId: "desktop-1",
+        activeControlPairingToken: "token-1"
+    ),
+    "the current pairing control connection should remain valid for the same binding identity"
+)
+
+expect(
+    !PresenceReconnectPolicy.shouldMaintainPairingControlConnection(
+        connectionState: "connected",
+        syncInProgress: true,
+        bindingDeviceId: "desktop-1",
+        bindingPairingToken: "token-1",
+        activeControlDeviceId: "desktop-1",
+        activeControlPairingToken: "token-1"
+    ),
+    "active sync upload sessions already receive pairing invalidation frames"
+)
+
+expect(
+    !PresenceReconnectPolicy.shouldMaintainPairingControlConnection(
+        connectionState: "offline",
+        syncInProgress: false,
+        bindingDeviceId: "desktop-1",
+        bindingPairingToken: "token-1",
+        activeControlDeviceId: nil,
+        activeControlPairingToken: nil
+    ),
+    "offline bindings should not keep an idle pairing control connection open"
+)
+
+expect(
+    !PresenceReconnectPolicy.shouldMaintainPairingControlConnection(
+        connectionState: "connected",
+        syncInProgress: false,
+        bindingDeviceId: "desktop-1",
+        bindingPairingToken: "token-1",
+        activeControlDeviceId: "desktop-2",
+        activeControlPairingToken: "token-1"
+    ),
+    "a pairing control connection for another desktop is stale"
+)
+
+expect(
+    PresenceReconnectPolicy.shouldSuppressGenericSyncPipelineErrorAfterPairingInvalidation(
+        receivedPairingInvalidationControlFrame: true
+    ),
+    "pairing invalidation should terminate the upload round without a generic sync pipeline error"
+)
+
+expect(
+    PresenceReconnectPolicy.shouldRunScheduledPairingControlRestart(
+        scheduledGenerationMatchesCurrent: true,
+        currentDeviceId: "desktop-1",
+        currentPairingToken: "token-1",
+        expectedDeviceId: "desktop-1",
+        expectedPairingToken: "token-1"
+    ),
+    "scheduled pairing control restart should run when generation and binding identity still match"
+)
+
+expect(
+    !PresenceReconnectPolicy.shouldRunScheduledPairingControlRestart(
+        scheduledGenerationMatchesCurrent: false,
+        currentDeviceId: "desktop-1",
+        currentPairingToken: "token-1",
+        expectedDeviceId: "desktop-1",
+        expectedPairingToken: "token-1"
+    ),
+    "scheduled pairing control restart must not run after a newer generation superseded it"
+)
+
+expect(
+    !PresenceReconnectPolicy.shouldRunScheduledPairingControlRestart(
+        scheduledGenerationMatchesCurrent: true,
+        currentDeviceId: "desktop-1",
+        currentPairingToken: "token-2",
+        expectedDeviceId: "desktop-1",
+        expectedPairingToken: "token-1"
+    ),
+    "scheduled pairing control restart must not run after the binding token changed"
+)
+
+expect(
     PresenceReconnectPolicy.authRejectionMatchesCurrentBinding(
         pairingTargetDeviceId: "desktop-1",
         currentBindingDeviceId: "desktop-1"
@@ -183,6 +303,39 @@ expect(
         currentBindingDeviceId: nil
     ),
     "stored-token auth rejection without a current binding must not invalidate the current binding"
+)
+
+expect(
+    !PresenceReconnectPolicy.shouldApplyPairingInvalidationStorageMutation(
+        currentDeviceId: "desktop-1",
+        currentPairingToken: "new-token",
+        expectedDeviceId: "desktop-1",
+        expectedPairingToken: "old-token",
+        existingInvalidationReason: nil
+    ),
+    "pairing invalidation storage mutation must not clear a newly re-paired binding for the same desktop"
+)
+
+expect(
+    PresenceReconnectPolicy.shouldApplyPairingInvalidationStorageMutation(
+        currentDeviceId: "desktop-1",
+        currentPairingToken: "token-1",
+        expectedDeviceId: "desktop-1",
+        expectedPairingToken: "token-1",
+        existingInvalidationReason: nil
+    ),
+    "pairing invalidation storage mutation should clear the current binding when device and token still match"
+)
+
+expect(
+    !PresenceReconnectPolicy.shouldApplyPairingInvalidationStorageMutation(
+        currentDeviceId: nil,
+        currentPairingToken: nil,
+        expectedDeviceId: "desktop-1",
+        expectedPairingToken: "token-1",
+        existingInvalidationReason: "presence_unpaired"
+    ),
+    "pairing invalidation storage mutation should be idempotent after the binding was already cleared"
 )
 
 expect(

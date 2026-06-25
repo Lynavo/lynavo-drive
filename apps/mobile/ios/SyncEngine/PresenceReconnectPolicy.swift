@@ -75,6 +75,114 @@ enum PresenceReconnectPolicy {
         return !target.isEmpty && target == current
     }
 
+    static func isPairingInvalidationControlReason(_ reason: String?) -> Bool {
+        switch reason?.trimmingCharacters(in: .whitespacesAndNewlines) {
+        case "connection_code_regenerated", "connection_code_set":
+            return true
+        default:
+            return false
+        }
+    }
+
+    static func shouldMaintainPairingControlConnection(
+        connectionState: String,
+        syncInProgress: Bool,
+        bindingDeviceId: String?,
+        bindingPairingToken: String?,
+        activeControlDeviceId: String?,
+        activeControlPairingToken: String?
+    ) -> Bool {
+        guard connectionState.trimmingCharacters(in: .whitespacesAndNewlines) == "connected",
+              !syncInProgress else {
+            return false
+        }
+
+        let deviceId = bindingDeviceId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let pairingToken = bindingPairingToken?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !deviceId.isEmpty, !pairingToken.isEmpty else {
+            return false
+        }
+
+        let activeDeviceId = activeControlDeviceId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let activePairingToken = activeControlPairingToken?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if activeDeviceId.isEmpty && activePairingToken.isEmpty {
+            return true
+        }
+
+        return activeDeviceId == deviceId && activePairingToken == pairingToken
+    }
+
+    static func shouldSuppressGenericSyncPipelineErrorAfterPairingInvalidation(
+        receivedPairingInvalidationControlFrame: Bool
+    ) -> Bool {
+        receivedPairingInvalidationControlFrame
+    }
+
+    static func shouldRunScheduledPairingControlRestart(
+        scheduledGenerationMatchesCurrent: Bool,
+        currentDeviceId: String?,
+        currentPairingToken: String?,
+        expectedDeviceId: String?,
+        expectedPairingToken: String?
+    ) -> Bool {
+        guard scheduledGenerationMatchesCurrent else {
+            return false
+        }
+
+        let currentDevice = currentDeviceId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let currentToken = currentPairingToken?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let expectedDevice = expectedDeviceId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let expectedToken = expectedPairingToken?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return !currentDevice.isEmpty &&
+            !currentToken.isEmpty &&
+            currentDevice == expectedDevice &&
+            currentToken == expectedToken
+    }
+
+    static func shouldClearCurrentBindingForPairingInvalidation(
+        currentDeviceId: String?,
+        currentPairingToken: String?,
+        expectedDeviceId: String?,
+        expectedPairingToken: String?,
+        existingInvalidationReason: String?
+    ) -> Bool {
+        if existingInvalidationReason?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            return false
+        }
+
+        let currentDevice = currentDeviceId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let expectedDevice = expectedDeviceId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !currentDevice.isEmpty,
+              !expectedDevice.isEmpty,
+              currentDevice == expectedDevice else {
+            return false
+        }
+
+        let currentToken = currentPairingToken?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let expectedToken = expectedPairingToken?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if expectedToken.isEmpty {
+            return currentToken.isEmpty
+        }
+
+        return currentToken == expectedToken
+    }
+
+    static func shouldApplyPairingInvalidationStorageMutation(
+        currentDeviceId: String?,
+        currentPairingToken: String?,
+        expectedDeviceId: String?,
+        expectedPairingToken: String?,
+        existingInvalidationReason: String?
+    ) -> Bool {
+        shouldClearCurrentBindingForPairingInvalidation(
+            currentDeviceId: currentDeviceId,
+            currentPairingToken: currentPairingToken,
+            expectedDeviceId: expectedDeviceId,
+            expectedPairingToken: expectedPairingToken,
+            existingInvalidationReason: existingInvalidationReason
+        )
+    }
+
     private static func isOfflineReconnectState(_ bindingState: String) -> Bool {
         bindingState == "offline" || bindingState == "bound"
     }

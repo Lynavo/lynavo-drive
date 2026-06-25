@@ -87,7 +87,8 @@ describe('@syncflow/contracts exports', () => {
   it('exports all MessageType values', () => {
     expect(contracts.MessageType.HELLO_REQ).toBe(0x0001);
     expect(contracts.MessageType.ERROR).toBe(0x0011);
-    expect(Object.keys(contracts.MessageType)).toHaveLength(17);
+    expect(contracts.MessageType.PAIRING_INVALIDATED).toBe(0x0014);
+    expect(Object.keys(contracts.MessageType)).toHaveLength(20);
   });
   it('exports all ErrorCode values', () => {
     expect(contracts.ErrorCode.PAIR_CODE_INVALID).toBe('PAIR_CODE_INVALID');

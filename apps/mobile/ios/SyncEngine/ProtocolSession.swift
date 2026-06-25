@@ -1,6 +1,14 @@
 import Foundation
 import Network
 
+struct PairingInvalidatedControlFrameError: Error, CustomStringConvertible {
+    let reason: String
+
+    var description: String {
+        "Pairing invalidated: \(reason)"
+    }
+}
+
 /// Wraps TcpTransport delegate callbacks into async/await using CheckedContinuation.
 ///
 /// The LMUP/2 protocol is request/response, so ProtocolSession serializes
@@ -88,7 +96,7 @@ class ProtocolSession: NSObject, TcpTransportDelegate {
             lock.lock()
             if let disconnectedError {
                 lock.unlock()
-                cont.resume(throwing: SyncEngineError.networkError("Disconnected: \(disconnectedError)"))
+                cont.resume(throwing: disconnectedStateError(disconnectedError))
                 return
             }
             pendingContinuation = cont
@@ -144,7 +152,7 @@ class ProtocolSession: NSObject, TcpTransportDelegate {
             lock.lock()
             if let disconnectedError {
                 lock.unlock()
-                cont.resume(throwing: SyncEngineError.networkError("Disconnected: \(disconnectedError)"))
+                cont.resume(throwing: disconnectedStateError(disconnectedError))
                 return
             }
             if !bufferedMessages.isEmpty {
@@ -156,6 +164,36 @@ class ProtocolSession: NSObject, TcpTransportDelegate {
             pendingContinuation = cont
             lock.unlock()
         }
+    }
+
+    private func disconnectedStateError(_ error: Error) -> Error {
+        if error is PairingInvalidatedControlFrameError {
+            return error
+        }
+        return SyncEngineError.networkError("Disconnected: \(error)")
+    }
+
+    private func pairingInvalidationFrameError(body: Data) -> Error {
+        let payload = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any]
+        let reason = payload?["reason"] as? String
+        if PresenceReconnectPolicy.isPairingInvalidationControlReason(reason) {
+            return PairingInvalidatedControlFrameError(
+                reason: reason?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            )
+        }
+        return SyncEngineError.networkError(
+            "Unexpected PAIRING_INVALIDATED reason: \(reason ?? "nil")"
+        )
+    }
+
+    private func abortPendingResponses(error: Error) -> CheckedContinuation<(LMUPMessageType, Data), Error>? {
+        lock.lock()
+        disconnectedError = error
+        let msgCont = pendingContinuation
+        pendingContinuation = nil
+        bufferedMessages.removeAll(keepingCapacity: false)
+        lock.unlock()
+        return msgCont
     }
 
     func debugBufferedMessageCount() -> Int {
@@ -177,11 +215,18 @@ class ProtocolSession: NSObject, TcpTransportDelegate {
     }
 
     func transportDidDisconnect(error: Error?) {
-        let err = error ?? SyncEngineError.networkError("Disconnected")
-        slog("[ProtocolSession] TCP disconnected: \(err)")
+        let incomingError = error ?? SyncEngineError.networkError("Disconnected")
+        slog("[ProtocolSession] TCP disconnected: \(incomingError)")
 
         lock.lock()
-        disconnectedError = err
+        let err: Error
+        if let existing = disconnectedError,
+           existing is PairingInvalidatedControlFrameError {
+            err = existing
+        } else {
+            err = incomingError
+            disconnectedError = err
+        }
         let connCont = connectContinuation
         connectContinuation = nil
         let msgCont = pendingContinuation
@@ -190,10 +235,17 @@ class ProtocolSession: NSObject, TcpTransportDelegate {
         lock.unlock()
 
         connCont?.resume(throwing: SyncEngineError.networkError("Connection failed: \(err)"))
-        msgCont?.resume(throwing: SyncEngineError.networkError("Disconnected: \(err)"))
+        msgCont?.resume(throwing: disconnectedStateError(err))
     }
 
     func transportDidReceive(type: LMUPMessageType, body: Data) {
+        if type == .pairingInvalidated {
+            let error = pairingInvalidationFrameError(body: body)
+            let cont = abortPendingResponses(error: error)
+            cont?.resume(throwing: error)
+            return
+        }
+
         // Heartbeats are transport-level concerns and should not consume message continuations.
         if type == .pong {
             return

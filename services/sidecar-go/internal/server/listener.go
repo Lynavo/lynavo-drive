@@ -18,6 +18,7 @@ import (
 const (
 	tcpSocketBufferBytes          = 16 * 1024 * 1024
 	disconnectPresenceGraceWindow = 75 * time.Second
+	pairingInvalidationWriteWait  = 500 * time.Millisecond
 )
 
 // TCPServer listens for incoming LMUP/2 connections from mobile clients.
@@ -31,7 +32,7 @@ type TCPServer struct {
 
 	mu               sync.RWMutex
 	connectedClients map[string]string // clientID → state ("authenticated"|"syncing")
-	activeConns      map[string]map[net.Conn]struct{}
+	activeConns      map[string]map[*connection]struct{}
 
 	OnPairedDevicesChanged func(reason string)
 }
@@ -58,7 +59,7 @@ func NewTCPServer(s *store.Store, cfg *config.Config, hub *events.Hub) *TCPServe
 		hub:              hub,
 		wake:             defaultWakeProvider{},
 		connectedClients: make(map[string]string),
-		activeConns:      make(map[string]map[net.Conn]struct{}),
+		activeConns:      make(map[string]map[*connection]struct{}),
 	}
 }
 
@@ -132,22 +133,22 @@ func (s *TCPServer) SetClientState(clientID, state string) {
 	}
 }
 
-func (s *TCPServer) RegisterClientConnection(clientID string, conn net.Conn) {
+func (s *TCPServer) RegisterClientConnection(clientID string, conn *connection) {
 	if clientID == "" || conn == nil {
 		return
 	}
 	s.mu.Lock()
 	if s.activeConns == nil {
-		s.activeConns = make(map[string]map[net.Conn]struct{})
+		s.activeConns = make(map[string]map[*connection]struct{})
 	}
 	if s.activeConns[clientID] == nil {
-		s.activeConns[clientID] = make(map[net.Conn]struct{})
+		s.activeConns[clientID] = make(map[*connection]struct{})
 	}
 	s.activeConns[clientID][conn] = struct{}{}
 	s.mu.Unlock()
 }
 
-func (s *TCPServer) UnregisterClientConnection(clientID string, conn net.Conn) bool {
+func (s *TCPServer) UnregisterClientConnection(clientID string, conn *connection) bool {
 	if clientID == "" || conn == nil {
 		return false
 	}
@@ -192,7 +193,7 @@ func (s *TCPServer) DisconnectClients(clientIDs []string, reason string) int {
 		return 0
 	}
 
-	conns := make([]net.Conn, 0, len(clientIDs))
+	conns := make([]*connection, 0, len(clientIDs))
 	s.mu.RLock()
 	for _, clientID := range clientIDs {
 		for conn := range s.activeConns[clientID] {
@@ -202,11 +203,31 @@ func (s *TCPServer) DisconnectClients(clientIDs []string, reason string) int {
 	s.mu.RUnlock()
 
 	for _, conn := range conns {
-		if err := conn.Close(); err != nil {
-			slog.Debug("failed to close client connection", "reason", reason, "remote", conn.RemoteAddr(), "err", err)
+		if shouldSendPairingInvalidated(reason) {
+			if err := conn.conn.SetWriteDeadline(time.Now().Add(pairingInvalidationWriteWait)); err != nil {
+				slog.Debug("failed to set pairing invalidation write deadline", "reason", reason, "remote", conn.conn.RemoteAddr(), "err", err)
+			}
+			if err := conn.sendPairingInvalidated(reason); err != nil {
+				slog.Debug("failed to send pairing invalidation", "reason", reason, "remote", conn.conn.RemoteAddr(), "err", err)
+			}
+			if err := conn.conn.SetWriteDeadline(time.Time{}); err != nil {
+				slog.Debug("failed to clear pairing invalidation write deadline", "reason", reason, "remote", conn.conn.RemoteAddr(), "err", err)
+			}
+		}
+		if err := conn.conn.Close(); err != nil {
+			slog.Debug("failed to close client connection", "reason", reason, "remote", conn.conn.RemoteAddr(), "err", err)
 		}
 	}
 	return len(conns)
+}
+
+func shouldSendPairingInvalidated(reason string) bool {
+	switch reason {
+	case "connection_code_regenerated", "connection_code_set":
+		return true
+	default:
+		return false
+	}
 }
 
 // anyClientSyncingLocked checks if any connected client is in syncing state.

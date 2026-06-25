@@ -248,6 +248,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     /// restore paths via `persistBinding(_:)`. Cleared by `clearBinding` /
     /// wipe / logout paths.
     private(set) var currentBinding: StoredBinding?
+    private let bindingMutationLock = NSRecursiveLock()
     private var sharedFilesReachabilityPayload: [String: Any]?
     /// Set while the app is transitioning to background. The foreground TCP
     /// upload loop observes this between files and breaks out so the
@@ -353,6 +354,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     }()
     private var bindingConnectionState: BindingConnectionState = .offline
     private var presenceHeartbeatTimer: DispatchSourceTimer?
+    private let pairingControlLock = NSLock()
+    private var pairingControlTask: Task<Void, Never>?
+    private var pairingControlSession: ProtocolSession?
+    private var pairingControlGeneration = UUID()
+    private var pairingControlDeviceId: String?
+    private var pairingControlPairingToken: String?
     private let presenceRecoveryQueue = DispatchQueue(
         label: "com.syncflow.presence-recovery",
         qos: .utility
@@ -1445,6 +1452,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
         if !isSyncing {
             stopPresenceHeartbeatTimer()
+            stopPairingControlSession(reason: "app_entered_background")
             cancelPresenceRecoveryProbe(reason: "app_entered_background")
         }
         guard isSyncing else { return }
@@ -1669,6 +1677,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     private static let bindingInvalidationReasonKey = "vivi_binding_invalidation_reason"
 
+    private func withBindingMutationLock<T>(_ body: () throws -> T) rethrows -> T {
+        bindingMutationLock.lock()
+        defer { bindingMutationLock.unlock() }
+        return try body()
+    }
+
     private func persistBindingInvalidation(reason: String) {
         UserDefaults.standard.set(reason, forKey: Self.bindingInvalidationReasonKey)
         UserDefaults.standard.synchronize()
@@ -1725,42 +1739,84 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         NativeSyncEngineModule.shared?.emitBindingStateChanged(bindingStatePayload())
     }
 
-    private func invalidateCurrentPairing(reason: String) {
-        let existingReason = UserDefaults.standard.string(forKey: Self.bindingInvalidationReasonKey)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let hasBindingToClear = uploadStore?.getBinding() != nil || currentBinding != nil
-        if existingReason == reason && !hasBindingToClear {
-            syncDiagnosticsLog("SyncEngine", "pairing invalidated already cleared reason=\(reason)")
-            return
+    private func currentPairingIdentityForInvalidation() -> (
+        deviceId: String?,
+        pairingToken: String?,
+        pairingTokenKeychainRef: String?
+    ) {
+        if let binding = uploadStore?.getBinding() {
+            return (
+                deviceId: binding.deviceId,
+                pairingToken: resolvedPairingToken(for: binding),
+                pairingTokenKeychainRef: binding.pairingTokenKeychainRef
+            )
         }
-
-        slog("[SyncEngine] pairing invalidated reason=%@", reason)
-        syncDiagnosticsLog("SyncEngine", "pairing invalidated reason=\(reason)")
-        persistBindingInvalidation(reason: reason)
-
-        stopPresenceHeartbeatTimer()
-        cancelPresenceRecoveryProbe(reason: reason)
-        stopP2PTunnel(reason: reason)
-        clearSharedFilesReachability(reason: reason)
-
-        if let pairingTokenKeychainRef = uploadStore?.getBinding()?.pairingTokenKeychainRef ?? currentBinding?.pairingTokenKeychainRef,
-           !pairingTokenKeychainRef.isEmpty {
-            bindingService.clearPairingToken(forKey: pairingTokenKeychainRef)
+        if let binding = currentBinding {
+            return (
+                deviceId: binding.serverId,
+                pairingToken: resolvedPairingToken(for: binding),
+                pairingTokenKeychainRef: binding.pairingTokenKeychainRef
+            )
         }
-        bindingService.clearPairingToken()
-        try? uploadStore?.clearBinding()
+        return (deviceId: nil, pairingToken: nil, pairingTokenKeychainRef: nil)
+    }
 
-        currentBinding = nil
-        sidecarHost = nil
-        bindingConnectionState = .offline
-        isSyncing = false
-        protocolSession?.disconnect()
-        protocolSession = nil
-        transport.disconnect()
-        stopSyncLifecycle(finalState: .idle)
+    private func invalidateCurrentPairing(
+        reason: String,
+        expectedDeviceId: String?,
+        expectedPairingToken: String?
+    ) {
+        withBindingMutationLock {
+            let existingReason = UserDefaults.standard.string(forKey: Self.bindingInvalidationReasonKey)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let currentIdentity = currentPairingIdentityForInvalidation()
+            guard PresenceReconnectPolicy.shouldApplyPairingInvalidationStorageMutation(
+                currentDeviceId: currentIdentity.deviceId,
+                currentPairingToken: currentIdentity.pairingToken,
+                expectedDeviceId: expectedDeviceId,
+                expectedPairingToken: expectedPairingToken,
+                existingInvalidationReason: existingReason
+            ) else {
+                if existingReason == reason && currentIdentity.deviceId == nil {
+                    syncDiagnosticsLog("SyncEngine", "pairing invalidated already cleared reason=\(reason)")
+                } else {
+                    syncDiagnosticsLog(
+                        "SyncEngine",
+                        "skip stale pairing invalidation reason=\(reason) expectedDevice=\(expectedDeviceId ?? "nil") currentDevice=\(currentIdentity.deviceId ?? "nil") existingReason=\(existingReason ?? "nil")"
+                    )
+                }
+                return
+            }
 
-        NativeSyncEngineModule.shared?.emitPairingInvalidated(["reason": reason])
-        NativeSyncEngineModule.shared?.emitBindingStateChanged(nil)
+            slog("[SyncEngine] pairing invalidated reason=%@", reason)
+            syncDiagnosticsLog("SyncEngine", "pairing invalidated reason=\(reason)")
+            persistBindingInvalidation(reason: reason)
+
+            stopPresenceHeartbeatTimer()
+            stopPairingControlSession(reason: reason)
+            cancelPresenceRecoveryProbe(reason: reason)
+            stopP2PTunnel(reason: reason)
+            clearSharedFilesReachability(reason: reason)
+
+            if let pairingTokenKeychainRef = currentIdentity.pairingTokenKeychainRef,
+               !pairingTokenKeychainRef.isEmpty {
+                bindingService.clearPairingToken(forKey: pairingTokenKeychainRef)
+            }
+            bindingService.clearPairingToken()
+            try? uploadStore?.clearBinding()
+
+            currentBinding = nil
+            sidecarHost = nil
+            bindingConnectionState = .offline
+            isSyncing = false
+            protocolSession?.disconnect()
+            protocolSession = nil
+            transport.disconnect()
+            stopSyncLifecycle(finalState: .idle)
+
+            NativeSyncEngineModule.shared?.emitPairingInvalidated(["reason": reason])
+            NativeSyncEngineModule.shared?.emitBindingStateChanged(nil)
+        }
     }
 
     private func updateSharedFilesReachability(
@@ -1910,10 +1966,17 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             cancelPresenceRecoveryProbe(reason: "state_\(newState.rawValue)")
             startPresenceHeartbeatTimer()
             if newState == .connected {
+                if let binding = uploadStore?.getBinding() {
+                    startPairingControlSessionIfNeeded(
+                        binding: binding,
+                        reason: "state_connected"
+                    )
+                }
                 startP2PTunnelIfNeeded(reason: "state_connected")
             }
         } else {
             stopPresenceHeartbeatTimer()
+            stopPairingControlSession(reason: "state_\(newState.rawValue)")
             if newState == .offline {
                 if retainSharedFilesTunnel {
                     syncDiagnosticsLog(
@@ -1974,6 +2037,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         syncDiagnosticsLog("SyncEngine", "binding connection state remains connected (\(reason))")
         cancelPresenceRecoveryProbe(reason: reason)
         startPresenceHeartbeatTimer()
+        if let binding = uploadStore?.getBinding() {
+            startPairingControlSessionIfNeeded(binding: binding, reason: reason)
+        }
         startP2PTunnelIfNeeded(reason: reason)
         emitBindingStateChanged()
     }
@@ -2205,7 +2271,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 tokenMissingForPersistedBinding: true,
                 authRejected: false
             ) {
-                invalidateCurrentPairing(reason: "pairing_token_missing")
+                invalidateCurrentPairing(
+                    reason: "pairing_token_missing",
+                    expectedDeviceId: binding.deviceId,
+                    expectedPairingToken: nil
+                )
             }
             return
         }
@@ -2400,6 +2470,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
         timer.resume()
         presenceHeartbeatTimer = timer
+        if let binding = uploadStore?.getBinding() {
+            startPairingControlSessionIfNeeded(
+                binding: binding,
+                reason: "presence_heartbeat_started"
+            )
+        }
         slog("[SyncEngine] standalone presence heartbeat timer started")
         syncDiagnosticsLog("SyncEngine", "standalone presence heartbeat timer started")
     }
@@ -2411,6 +2487,245 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             slog("[SyncEngine] standalone presence heartbeat timer stopped")
             syncDiagnosticsLog("SyncEngine", "standalone presence heartbeat timer stopped")
         }
+    }
+
+    private func startPairingControlSessionIfNeeded(binding: BindingRecord, reason: String) {
+        let token = resolvedPairingToken(for: binding)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard PresenceReconnectPolicy.shouldMaintainPairingControlConnection(
+            connectionState: bindingConnectionState.rawValue,
+            syncInProgress: isSyncing || activeUploadSession != nil,
+            bindingDeviceId: binding.deviceId,
+            bindingPairingToken: token,
+            activeControlDeviceId: nil,
+            activeControlPairingToken: nil
+        ) else {
+            stopPairingControlSession(reason: "\(reason)_not_eligible")
+            return
+        }
+
+        pairingControlLock.lock()
+        if PresenceReconnectPolicy.shouldMaintainPairingControlConnection(
+            connectionState: bindingConnectionState.rawValue,
+            syncInProgress: isSyncing || activeUploadSession != nil,
+            bindingDeviceId: binding.deviceId,
+            bindingPairingToken: token,
+            activeControlDeviceId: pairingControlDeviceId,
+            activeControlPairingToken: pairingControlPairingToken
+        ), pairingControlTask != nil {
+            pairingControlLock.unlock()
+            return
+        }
+
+        let previousTask = pairingControlTask
+        let previousSession = pairingControlSession
+        let generation = UUID()
+        pairingControlGeneration = generation
+        pairingControlTask = nil
+        pairingControlSession = nil
+        pairingControlDeviceId = binding.deviceId
+        pairingControlPairingToken = token
+        pairingControlLock.unlock()
+
+        previousTask?.cancel()
+        previousSession?.disconnect()
+
+        let task = Task.detached(priority: .utility) { [weak self] in
+            guard let self else { return }
+            await self.runPairingControlSession(
+                binding: binding,
+                pairingToken: token,
+                generation: generation,
+                startReason: reason
+            )
+        }
+
+        pairingControlLock.lock()
+        if pairingControlGeneration == generation {
+            pairingControlTask = task
+        } else {
+            task.cancel()
+        }
+        pairingControlLock.unlock()
+
+        syncDiagnosticsLog(
+            "PairingControl",
+            "control session starting deviceId=\(binding.deviceId) reason=\(reason)"
+        )
+    }
+
+    private func stopPairingControlSession(reason: String) {
+        pairingControlLock.lock()
+        pairingControlGeneration = UUID()
+        let task = pairingControlTask
+        let session = pairingControlSession
+        let hadSession = task != nil || session != nil
+        pairingControlTask = nil
+        pairingControlSession = nil
+        pairingControlDeviceId = nil
+        pairingControlPairingToken = nil
+        pairingControlLock.unlock()
+
+        task?.cancel()
+        session?.disconnect()
+        if hadSession {
+            syncDiagnosticsLog("PairingControl", "control session stopped reason=\(reason)")
+        }
+    }
+
+    private func installPairingControlSession(
+        _ session: ProtocolSession,
+        generation: UUID
+    ) -> Bool {
+        pairingControlLock.lock()
+        defer { pairingControlLock.unlock() }
+        guard pairingControlGeneration == generation else {
+            return false
+        }
+        pairingControlSession = session
+        return true
+    }
+
+    private func finishPairingControlSession(generation: UUID, reason: String) {
+        pairingControlLock.lock()
+        let isCurrent = pairingControlGeneration == generation
+        if isCurrent {
+            pairingControlTask = nil
+            pairingControlSession = nil
+            pairingControlDeviceId = nil
+            pairingControlPairingToken = nil
+        }
+        pairingControlLock.unlock()
+
+        if isCurrent {
+            syncDiagnosticsLog("PairingControl", "control session finished reason=\(reason)")
+        }
+    }
+
+    private func schedulePairingControlRestartIfCurrent(
+        binding: BindingRecord,
+        pairingToken: String,
+        generation: UUID,
+        reason: String
+    ) {
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 10) { [weak self] in
+            guard let self else { return }
+            guard let current = self.uploadStore?.getBinding(),
+                  PresenceReconnectPolicy.shouldRunScheduledPairingControlRestart(
+                    scheduledGenerationMatchesCurrent: self.currentPairingControlGeneration() == generation,
+                    currentDeviceId: current.deviceId,
+                    currentPairingToken: self.resolvedPairingToken(for: current),
+                    expectedDeviceId: binding.deviceId,
+                    expectedPairingToken: pairingToken
+                  ) else {
+                return
+            }
+            self.startPairingControlSessionIfNeeded(
+                binding: current,
+                reason: "restart_after_\(reason)"
+            )
+        }
+    }
+
+    private func runPairingControlSession(
+        binding: BindingRecord,
+        pairingToken: String,
+        generation: UUID,
+        startReason: String
+    ) async {
+        let transport = TcpTransport()
+        let session = ProtocolSession(transport: transport)
+        guard installPairingControlSession(session, generation: generation) else {
+            session.disconnect()
+            return
+        }
+
+        var shouldRestart = false
+        var finishReason = "completed"
+        defer {
+            session.disconnect()
+            finishPairingControlSession(generation: generation, reason: finishReason)
+            if shouldRestart {
+                schedulePairingControlRestartIfCurrent(
+                    binding: binding,
+                    pairingToken: pairingToken,
+                    generation: generation,
+                    reason: finishReason
+                )
+            }
+        }
+
+        do {
+            try Task.checkCancellation()
+            try await connectSession(
+                session,
+                device: discoveredDevices[binding.deviceId],
+                fallbackHost: binding.host,
+                fallbackPort: UInt16(binding.port)
+            )
+            try Task.checkCancellation()
+            try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
+
+            let clientId = bindingService.getOrCreateClientId()
+            let (helloType, helloRes) = try await session.sendAndReceive(
+                type: .helloReq,
+                payload: await buildClientHelloPayload(clientId: clientId, pairingToken: pairingToken)
+            )
+            try throwIfHelloErrorFrame(type: helloType, payload: helloRes)
+            guard helloType == .helloRes else {
+                throw SyncEngineError.networkError("Expected HELLO_RES")
+            }
+            try throwIfIncompatibleDesktopAppVersion(payload: helloRes)
+            if let nonce = helloRes["nonce"] as? String {
+                let hmac = transport.computeHMAC(token: pairingToken, nonce: nonce)
+                let (authType, _) = try await session.sendAndReceive(type: .authReq, payload: [
+                    "clientId": clientId,
+                    "auth": hmac,
+                ])
+                if authType == .error {
+                    throw SyncEngineError.pairingError("HMAC auth failed")
+                }
+            }
+
+            syncDiagnosticsLog(
+                "PairingControl",
+                "control session authenticated deviceId=\(binding.deviceId) reason=\(startReason)"
+            )
+
+            while !Task.isCancelled {
+                let (messageType, _) = try await session.waitForNextMessage()
+                syncDiagnosticsLog(
+                    "PairingControl",
+                    "ignored control frame type=\(messageType.rawValue)"
+                )
+            }
+            finishReason = "cancelled"
+        } catch is CancellationError {
+            finishReason = "cancelled"
+        } catch let error as PairingInvalidatedControlFrameError {
+            finishReason = "pairing_invalidated"
+            syncDiagnosticsLog(
+                "PairingControl",
+                "received pairing invalidation reason=\(error.reason) deviceId=\(binding.deviceId)"
+            )
+            invalidateCurrentPairing(
+                reason: error.reason,
+                expectedDeviceId: binding.deviceId,
+                expectedPairingToken: pairingToken
+            )
+        } catch {
+            finishReason = "error"
+            shouldRestart = !Task.isCancelled
+            syncDiagnosticsLog(
+                "PairingControl",
+                "control session ended error=\(error)"
+            )
+        }
+    }
+
+    private func currentPairingControlGeneration() -> UUID {
+        pairingControlLock.lock()
+        defer { pairingControlLock.unlock() }
+        return pairingControlGeneration
     }
 
     private func cancelPresenceRecoveryProbe(reason: String) {
@@ -3139,52 +3454,54 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     /// binding even immediately after pairing and before SQLite has caught
     /// up.
     private func persistBinding(_ binding: BindingRecord) throws {
-        try uploadStore?.saveBinding(binding)
-        clearBindingInvalidation()
-        if let sharedFilesDeviceId = sharedFilesReachabilityPayload?["deviceId"] as? String,
-           sharedFilesDeviceId != binding.deviceId {
-            clearSharedFilesReachability(reason: "binding_changed")
-        }
-        let stored = StoredBinding(
-            serverId: binding.deviceId,
-            sidecarHost: binding.host,
-            port: binding.port,
-            pairingTokenKeychainRef: binding.pairingTokenKeychainRef
-        )
-        currentBinding = stored
-        // Best-effort — last_known_binding is a cache; a write failure just
-        // means we fall back to the SQLite binding row on cold relaunch.
-        do {
-            try uploadStore?.updateLastKnownBinding(stored)
-        } catch {
-            NSLog("[SyncEngine] updateLastKnownBinding failed: %@", "\(error)")
-        }
-        // H2 — bump the monotonic binding version so any background
-        // URLSession task enqueued after this point carries the new
-        // version and any in-flight callback from the previous binding
-        // fails the `applyBackgroundCompletion` predicate. Best-effort:
-        // a nil return just means no upload store was wired yet (tests).
-        if let newVersion = bindingService.bumpBindingVersion() {
-            NSLog("[SyncEngine] bindingVersion bumped to %d (persistBinding)", newVersion)
-        }
-        // H8 Phase 2 (L805-830): a successful re-pair is the only legitimate
-        // exit from `needs_repair=true`. Clear the flag + reason only on the
-        // actual true→false transition so we don't persist a no-op write and
-        // emit a no-op event on every initial pair. The emit is likewise
-        // gated — RN's reducer memoises on value equality so a redundant
-        // event is harmless, but emitting only on real transitions keeps
-        // the native → RN channel noise-free and easier to trace.
-        let previousRepair = uploadStore?.getNeedsRepair()
-        if previousRepair?.flag == true {
-            do {
-                try uploadStore?.setNeedsRepair(value: false, reason: nil)
-            } catch {
-                NSLog("[SyncEngine] clearNeedsRepair (persistBinding) failed: %@", "\(error)")
+        try withBindingMutationLock {
+            try uploadStore?.saveBinding(binding)
+            clearBindingInvalidation()
+            if let sharedFilesDeviceId = sharedFilesReachabilityPayload?["deviceId"] as? String,
+               sharedFilesDeviceId != binding.deviceId {
+                clearSharedFilesReachability(reason: "binding_changed")
             }
-            NativeSyncEngineModule.shared?.emitRepairStateChanged(
-                needsRepair: false,
-                reason: nil
+            let stored = StoredBinding(
+                serverId: binding.deviceId,
+                sidecarHost: binding.host,
+                port: binding.port,
+                pairingTokenKeychainRef: binding.pairingTokenKeychainRef
             )
+            currentBinding = stored
+            // Best-effort — last_known_binding is a cache; a write failure just
+            // means we fall back to the SQLite binding row on cold relaunch.
+            do {
+                try uploadStore?.updateLastKnownBinding(stored)
+            } catch {
+                NSLog("[SyncEngine] updateLastKnownBinding failed: %@", "\(error)")
+            }
+            // H2 — bump the monotonic binding version so any background
+            // URLSession task enqueued after this point carries the new
+            // version and any in-flight callback from the previous binding
+            // fails the `applyBackgroundCompletion` predicate. Best-effort:
+            // a nil return just means no upload store was wired yet (tests).
+            if let newVersion = bindingService.bumpBindingVersion() {
+                NSLog("[SyncEngine] bindingVersion bumped to %d (persistBinding)", newVersion)
+            }
+            // H8 Phase 2 (L805-830): a successful re-pair is the only legitimate
+            // exit from `needs_repair=true`. Clear the flag + reason only on the
+            // actual true→false transition so we don't persist a no-op write and
+            // emit a no-op event on every initial pair. The emit is likewise
+            // gated — RN's reducer memoises on value equality so a redundant
+            // event is harmless, but emitting only on real transitions keeps
+            // the native → RN channel noise-free and easier to trace.
+            let previousRepair = uploadStore?.getNeedsRepair()
+            if previousRepair?.flag == true {
+                do {
+                    try uploadStore?.setNeedsRepair(value: false, reason: nil)
+                } catch {
+                    NSLog("[SyncEngine] clearNeedsRepair (persistBinding) failed: %@", "\(error)")
+                }
+                NativeSyncEngineModule.shared?.emitRepairStateChanged(
+                    needsRepair: false,
+                    reason: nil
+                )
+            }
         }
     }
 
@@ -3797,6 +4114,24 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 updateBindingConnectionState(.offline, reason: "pipeline_cancelled")
             }
             stopSyncLifecycle(finalState: .idle)
+        } catch let error as PairingInvalidatedControlFrameError {
+            syncDiagnosticsLog(
+                "SyncEngine",
+                "sync pipeline stopped after pairing invalidation reason=\(error.reason)"
+            )
+            protocolSession?.disconnect()
+            protocolSession = nil
+            clearResolvedSidecarHost()
+            stopSyncLifecycle(finalState: .idle)
+            if !PresenceReconnectPolicy.shouldSuppressGenericSyncPipelineErrorAfterPairingInvalidation(
+                receivedPairingInvalidationControlFrame: true
+            ) {
+                recordRecentError(code: "SYNC_PIPELINE_ERROR", message: "\(error)")
+                NativeSyncEngineModule.shared?.emitError([
+                    "code": "SYNC_PIPELINE_ERROR",
+                    "message": "\(error)",
+                ])
+            }
         } catch let error as SyncEngineError {
             switch error {
             case .autoUploadInterrupted:
@@ -3956,7 +4291,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 tokenMissingForPersistedBinding: true,
                 authRejected: false
             ) {
-                invalidateCurrentPairing(reason: "pairing_token_missing")
+                invalidateCurrentPairing(
+                    reason: "pairing_token_missing",
+                    expectedDeviceId: binding.deviceId,
+                    expectedPairingToken: nil
+                )
             }
             return
         }
@@ -4002,7 +4341,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     tokenMissingForPersistedBinding: true,
                     authRejected: false
                 ) {
-                    invalidateCurrentPairing(reason: "pairing_token_missing")
+                    invalidateCurrentPairing(
+                        reason: "pairing_token_missing",
+                        expectedDeviceId: binding.deviceId,
+                        expectedPairingToken: nil
+                    )
                 }
                 return
             }
@@ -4443,6 +4786,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         var uploadRoundInterruptedByUser = false
         var uploadRoundCancelledByUser = false
         var uploadRoundStoppedForBindingChange = false
+        var uploadRoundInvalidatedPairing = false
 
         defer {
             if let activeSessionId, sessionService.currentSessionId == activeSessionId {
@@ -4465,6 +4809,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 maintainConnectedBindingState(reason: "upload_round_manual_cancelled")
             } else if uploadRoundStoppedForBindingChange {
                 syncDiagnosticsLog("SyncEngine", "upload round stopped after binding changed")
+            } else if uploadRoundInvalidatedPairing {
+                syncDiagnosticsLog("SyncEngine", "upload round stopped after pairing invalidation")
             } else {
                 if !uploadRoundCompleted {
                     if uploadRoundPausedForLowDisk {
@@ -4484,113 +4830,114 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             }
         }
 
-        try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
+        do {
+            try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
 
-        // Find target device — only match by the binding's deviceId; do NOT fall back to
-        // an arbitrary mDNS device so we never upload to the wrong machine.
-        func findDevice() -> DiscoveredDevice? {
-            return discoveredDevices[binding.deviceId]
-        }
+            // Find target device — only match by the binding's deviceId; do NOT fall back to
+            // an arbitrary mDNS device so we never upload to the wrong machine.
+            func findDevice() -> DiscoveredDevice? {
+                return discoveredDevices[binding.deviceId]
+            }
 
-        var targetDevice = findDevice()
-        if targetDevice == nil && canUseKnownConnectedHost {
-            discoveryService.startBrowsing()
-            syncDiagnosticsLog(
-                "SyncPipeline",
-                "using connected binding host without blocking discovery host=\(usableBindingHost ?? "nil")"
-            )
-        } else if targetDevice == nil && !hasForcedSidecarTarget {
-            discoveryService.startBrowsing()
-            for _ in 0..<20 {
-                try await Task.sleep(nanoseconds: 500_000_000)
-                if let found = findDevice() {
-                    targetDevice = found
-                    break
+            var targetDevice = findDevice()
+            if targetDevice == nil && canUseKnownConnectedHost {
+                discoveryService.startBrowsing()
+                syncDiagnosticsLog(
+                    "SyncPipeline",
+                    "using connected binding host without blocking discovery host=\(usableBindingHost ?? "nil")"
+                )
+            } else if targetDevice == nil && !hasForcedSidecarTarget {
+                discoveryService.startBrowsing()
+                for _ in 0..<20 {
+                    try await Task.sleep(nanoseconds: 500_000_000)
+                    if let found = findDevice() {
+                        targetDevice = found
+                        break
+                    }
                 }
             }
-        }
 
-        try await connectSession(
-            session,
-            device: targetDevice,
-            fallbackHost: binding.host,
-            fallbackPort: UInt16(binding.port)
-        )
-        try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
-        sidecarHost = preferredSidecarHost(probedHost: newTransport.remoteHost, device: targetDevice)
-            ?? usableBindingHost
-        slog("[SyncPipeline] TCP connected to %@", sidecarHost ?? "unknown")
-        syncDiagnosticsLog("SyncPipeline", "TCP connected to \(sidecarHost ?? "unknown")")
+            try await connectSession(
+                session,
+                device: targetDevice,
+                fallbackHost: binding.host,
+                fallbackPort: UInt16(binding.port)
+            )
+            try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
+            sidecarHost = preferredSidecarHost(probedHost: newTransport.remoteHost, device: targetDevice)
+                ?? usableBindingHost
+            slog("[SyncPipeline] TCP connected to %@", sidecarHost ?? "unknown")
+            syncDiagnosticsLog("SyncPipeline", "TCP connected to \(sidecarHost ?? "unknown")")
 
-        let (helloType, helloRes) = try await session.sendAndReceive(
-            type: .helloReq,
-            payload: await buildClientHelloPayload(clientId: clientId, pairingToken: token)
-        )
-        try throwIfHelloErrorFrame(type: helloType, payload: helloRes)
-        guard helloType == .helloRes else {
-            throw SyncEngineError.networkError("Expected HELLO_RES")
-        }
-        try throwIfIncompatibleDesktopAppVersion(payload: helloRes)
-        try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
-        refreshBoundServerMetadata(
-            expectedDeviceId: binding.deviceId,
-            serverName: helloRes["serverName"] as? String,
-            shareName: helloRes["serverCapabilities"]
-                .flatMap { ($0 as? [String: Any])?["shareName"] as? String },
-            host: sidecarHost,
-            wake: wakeCapability(fromHelloPayload: helloRes)
-        )
-        if let nonce = helloRes["nonce"] as? String {
-            let hmac = newTransport.computeHMAC(token: token, nonce: nonce)
-            let (authType, _) = try await session.sendAndReceive(type: .authReq, payload: [
-                "clientId": clientId,
-                "auth": hmac,
-            ])
-            if authType == .error {
-                throw SyncEngineError.pairingError("HMAC auth failed")
+            let (helloType, helloRes) = try await session.sendAndReceive(
+                type: .helloReq,
+                payload: await buildClientHelloPayload(clientId: clientId, pairingToken: token)
+            )
+            try throwIfHelloErrorFrame(type: helloType, payload: helloRes)
+            guard helloType == .helloRes else {
+                throw SyncEngineError.networkError("Expected HELLO_RES")
             }
-            slog("[SyncPipeline] auth successful")
-            syncDiagnosticsLog("SyncPipeline", "auth successful")
-        }
-        try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
-        updateBindingConnectionState(.connected, reason: "auth_success")
+            try throwIfIncompatibleDesktopAppVersion(payload: helloRes)
+            try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
+            refreshBoundServerMetadata(
+                expectedDeviceId: binding.deviceId,
+                serverName: helloRes["serverName"] as? String,
+                shareName: helloRes["serverCapabilities"]
+                    .flatMap { ($0 as? [String: Any])?["shareName"] as? String },
+                host: sidecarHost,
+                wake: wakeCapability(fromHelloPayload: helloRes)
+            )
+            if let nonce = helloRes["nonce"] as? String {
+                let hmac = newTransport.computeHMAC(token: token, nonce: nonce)
+                let (authType, _) = try await session.sendAndReceive(type: .authReq, payload: [
+                    "clientId": clientId,
+                    "auth": hmac,
+                ])
+                if authType == .error {
+                    throw SyncEngineError.pairingError("HMAC auth failed")
+                }
+                slog("[SyncPipeline] auth successful")
+                syncDiagnosticsLog("SyncPipeline", "auth successful")
+            }
+            try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
+            updateBindingConnectionState(.connected, reason: "auth_success")
 
-        // SYNC_BEGIN
-        let sessionId = sessionService.startNewSession()
-        activeSessionId = sessionId
-        let (beginType, beginRes) = try await session.sendAndReceive(type: .syncBeginReq, payload: [
-            "sessionId": sessionId,
-            "queueTotalCount": assets.count,
-            "queueTotalBytes": 0,
-        ])
-        let syncOk: Bool
-        if let b = beginRes["ok"] as? Bool { syncOk = b }
-        else if let n = beginRes["ok"] as? NSNumber { syncOk = n.boolValue }
-        else { syncOk = (beginType == .syncBeginRes) }
+            // SYNC_BEGIN
+            let sessionId = sessionService.startNewSession()
+            activeSessionId = sessionId
+            let (beginType, beginRes) = try await session.sendAndReceive(type: .syncBeginReq, payload: [
+                "sessionId": sessionId,
+                "queueTotalCount": assets.count,
+                "queueTotalBytes": 0,
+            ])
+            let syncOk: Bool
+            if let b = beginRes["ok"] as? Bool { syncOk = b }
+            else if let n = beginRes["ok"] as? NSNumber { syncOk = n.boolValue }
+            else { syncOk = (beginType == .syncBeginRes) }
 
-        guard syncOk else {
-            throw SyncEngineError.networkError("SYNC_BEGIN rejected")
-        }
-        try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
+            guard syncOk else {
+                throw SyncEngineError.networkError("SYNC_BEGIN rejected")
+            }
+            try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
 
-        slog("[SyncPipeline] uploading %d files", assets.count)
-        syncDiagnosticsLog("SyncPipeline", "uploading \(assets.count) files")
+            slog("[SyncPipeline] uploading %d files", assets.count)
+            syncDiagnosticsLog("SyncPipeline", "uploading \(assets.count) files")
 
-        var tuning = resolvedUploadTuning(targetDeviceType: roundTargetDeviceType)
-        slog(
-            "[SyncPipeline] upload tuning profile=%@ target=%@ chunkMiB=%.1f windowMiB=%.1f pipeline=%d prefetch=%@ throttleMiBps=%.1f",
-            tuning.profileLabel,
-            roundTargetDeviceType ?? "unknown",
-            Double(tuning.chunkSizeBytes) / (1024 * 1024),
-            Double(tuning.targetInFlightBytes) / (1024 * 1024),
-            tuning.maxPipelineChunks,
-            tuning.prefetchNextFile ? "on" : "off",
-            Double(tuning.throttleBytesPerSec) / (1024 * 1024)
-        )
-        syncDiagnosticsLog(
-            "SyncPipeline",
-            "upload tuning profile=\(tuning.profileLabel) target=\(roundTargetDeviceType ?? "unknown") chunkMiB=\(String(format: "%.1f", Double(tuning.chunkSizeBytes) / (1024 * 1024))) windowMiB=\(String(format: "%.1f", Double(tuning.targetInFlightBytes) / (1024 * 1024))) pipeline=\(tuning.maxPipelineChunks) prefetch=\(tuning.prefetchNextFile ? "on" : "off") throttleMiBps=\(String(format: "%.1f", Double(tuning.throttleBytesPerSec) / (1024 * 1024)))"
-        )
+            var tuning = resolvedUploadTuning(targetDeviceType: roundTargetDeviceType)
+            slog(
+                "[SyncPipeline] upload tuning profile=%@ target=%@ chunkMiB=%.1f windowMiB=%.1f pipeline=%d prefetch=%@ throttleMiBps=%.1f",
+                tuning.profileLabel,
+                roundTargetDeviceType ?? "unknown",
+                Double(tuning.chunkSizeBytes) / (1024 * 1024),
+                Double(tuning.targetInFlightBytes) / (1024 * 1024),
+                tuning.maxPipelineChunks,
+                tuning.prefetchNextFile ? "on" : "off",
+                Double(tuning.throttleBytesPerSec) / (1024 * 1024)
+            )
+            syncDiagnosticsLog(
+                "SyncPipeline",
+                "upload tuning profile=\(tuning.profileLabel) target=\(roundTargetDeviceType ?? "unknown") chunkMiB=\(String(format: "%.1f", Double(tuning.chunkSizeBytes) / (1024 * 1024))) windowMiB=\(String(format: "%.1f", Double(tuning.targetInFlightBytes) / (1024 * 1024))) pipeline=\(tuning.maxPipelineChunks) prefetch=\(tuning.prefetchNextFile ? "on" : "off") throttleMiBps=\(String(format: "%.1f", Double(tuning.throttleBytesPerSec) / (1024 * 1024)))"
+            )
 
         // Exporting the next asset while the current one is uploading improves peak
         // throughput, but it also doubles sustained PhotoKit/disk/network pressure for
@@ -4932,17 +5279,30 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             }
         }
 
-        // Clean up any remaining prefetch on normal loop exit.
-        await prefetchTask?.value
-        if let remaining = nextExport {
-            exportService.cleanup(tempURL: remaining.tempURL)
-        }
+            // Clean up any remaining prefetch on normal loop exit.
+            await prefetchTask?.value
+            if let remaining = nextExport {
+                exportService.cleanup(tempURL: remaining.tempURL)
+            }
 
-        // SYNC_END — then TCP will be closed as this function returns
-        let (_, _) = try await session.sendAndReceive(type: .syncEndReq, payload: [:])
-        uploadRoundCompleted = true
-        slog("[SyncPipeline] upload round complete, disconnecting TCP")
-        syncDiagnosticsLog("SyncPipeline", "upload round complete, disconnecting TCP")
+            // SYNC_END — then TCP will be closed as this function returns
+            let (_, _) = try await session.sendAndReceive(type: .syncEndReq, payload: [:])
+            uploadRoundCompleted = true
+            slog("[SyncPipeline] upload round complete, disconnecting TCP")
+            syncDiagnosticsLog("SyncPipeline", "upload round complete, disconnecting TCP")
+        } catch let error as PairingInvalidatedControlFrameError {
+            uploadRoundInvalidatedPairing = true
+            syncDiagnosticsLog(
+                "SyncEngine",
+                "upload round received pairing invalidation reason=\(error.reason)"
+            )
+            invalidateCurrentPairing(
+                reason: error.reason,
+                expectedDeviceId: binding.deviceId,
+                expectedPairingToken: token
+            )
+            throw error
+        }
     }
 
     // MARK: - Single File Upload (spec Sections 7.3, 7.4)
@@ -5938,10 +6298,18 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     /// Retrieves the pairing token for the given binding, falling back to the
     /// legacy single-key entry for bindings created before per-device storage.
     private func resolvedPairingToken(for binding: BindingRecord) -> String? {
-        let token = bindingService.getPairingToken(forKey: binding.pairingTokenKeychainRef)
+        return resolvedPairingToken(pairingTokenKeychainRef: binding.pairingTokenKeychainRef)
+    }
+
+    private func resolvedPairingToken(for binding: StoredBinding) -> String? {
+        return resolvedPairingToken(pairingTokenKeychainRef: binding.pairingTokenKeychainRef)
+    }
+
+    private func resolvedPairingToken(pairingTokenKeychainRef: String) -> String? {
+        let token = bindingService.getPairingToken(forKey: pairingTokenKeychainRef)
         if token != nil { return token }
         // Fallback: old binding used the global key — try it once for migration.
-        if binding.pairingTokenKeychainRef != BindingService.legacyPairingTokenKey {
+        if pairingTokenKeychainRef != BindingService.legacyPairingTokenKey {
             return bindingService.getPairingToken(forKey: BindingService.legacyPairingTokenKey)
         }
         return nil
@@ -6051,7 +6419,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                    tokenMissingForPersistedBinding: false,
                    authRejected: true
                ) {
-                invalidateCurrentPairing(reason: "pairing_auth_rejected")
+                invalidateCurrentPairing(
+                    reason: "pairing_auth_rejected",
+                    expectedDeviceId: deviceId,
+                    expectedPairingToken: storedToken
+                )
             }
             throw error
         }
@@ -6846,10 +7218,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         updateStateOnFailure: Bool = true,
         completion: ((Bool) -> Void)? = nil
     ) {
-        guard let expectedDeviceId = uploadStore?.getBinding()?.deviceId,
+        guard let binding = uploadStore?.getBinding(),
               let host = currentPresenceHeartbeatHost() else {
             return
         }
+        let expectedDeviceId = binding.deviceId
+        let expectedPairingToken = resolvedPairingToken(for: binding)
         let hostPart = host.contains(":") ? "[\(host)]" : host
         let portPart = 39394
         let usedTunnelRoute = false
@@ -6937,7 +7311,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                         "heartbeat rejected host=\(host) status=\(statusCode.map(String.init) ?? "nil") expectedServerId=\(expectedDeviceId) responseServerId=\(responseServerId ?? "nil") paired=\(responsePaired.map(String.init) ?? "nil") reason=\(rejectionReason)"
                     )
                     if shouldInvalidatePairing {
-                        self.invalidateCurrentPairing(reason: rejectionReason)
+                        self.invalidateCurrentPairing(
+                            reason: rejectionReason,
+                            expectedDeviceId: expectedDeviceId,
+                            expectedPairingToken: expectedPairingToken
+                        )
                     } else if updateStateOnFailure {
                         self.updateBindingConnectionState(.offline, reason: rejectionReason)
                     }
@@ -9352,7 +9730,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
               ) else {
             return bindingInvalidationState()
         }
-        invalidateCurrentPairing(reason: "pairing_token_missing")
+        invalidateCurrentPairing(
+            reason: "pairing_token_missing",
+            expectedDeviceId: binding.deviceId,
+            expectedPairingToken: nil
+        )
         return ["reason": "pairing_token_missing"]
     }
 }

@@ -24,25 +24,26 @@ var bodyPool = sync.Pool{
 
 // Message type constants matching @syncflow/contracts
 const (
-	TypeHelloReq     uint16 = 0x0001
-	TypeHelloRes     uint16 = 0x0002
-	TypePairReq      uint16 = 0x0003
-	TypePairRes      uint16 = 0x0004
-	TypeSyncBeginReq uint16 = 0x0005
-	TypeSyncBeginRes uint16 = 0x0006
-	TypeFileInitReq  uint16 = 0x0007
-	TypeFileInitRes  uint16 = 0x0008
-	TypeFileData     uint16 = 0x0009
-	TypeFileAck      uint16 = 0x000A
-	TypeFileEndReq   uint16 = 0x000B
-	TypeFileEndRes   uint16 = 0x000C
-	TypeSyncEndReq   uint16 = 0x000D
-	TypeSyncEndRes   uint16 = 0x000E
-	TypePing         uint16 = 0x000F
-	TypePong         uint16 = 0x0010
-	TypeError        uint16 = 0x0011
-	TypeAuthReq      uint16 = 0x0012 // nonce-HMAC auth request from client
-	TypeAuthRes      uint16 = 0x0013 // auth result from server
+	TypeHelloReq           uint16 = 0x0001
+	TypeHelloRes           uint16 = 0x0002
+	TypePairReq            uint16 = 0x0003
+	TypePairRes            uint16 = 0x0004
+	TypeSyncBeginReq       uint16 = 0x0005
+	TypeSyncBeginRes       uint16 = 0x0006
+	TypeFileInitReq        uint16 = 0x0007
+	TypeFileInitRes        uint16 = 0x0008
+	TypeFileData           uint16 = 0x0009
+	TypeFileAck            uint16 = 0x000A
+	TypeFileEndReq         uint16 = 0x000B
+	TypeFileEndRes         uint16 = 0x000C
+	TypeSyncEndReq         uint16 = 0x000D
+	TypeSyncEndRes         uint16 = 0x000E
+	TypePing               uint16 = 0x000F
+	TypePong               uint16 = 0x0010
+	TypeError              uint16 = 0x0011
+	TypeAuthReq            uint16 = 0x0012 // nonce-HMAC auth request from client
+	TypeAuthRes            uint16 = 0x0013 // auth result from server
+	TypePairingInvalidated uint16 = 0x0014 // explicit pairing invalidation from server
 )
 
 // FrameHeader represents the parsed header of an LMUP/2 frame.
