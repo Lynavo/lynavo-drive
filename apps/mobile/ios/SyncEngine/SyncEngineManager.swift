@@ -8822,8 +8822,50 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         return token
     }
 
+    private func sharedFilesDesktopSnapshot(from device: DiscoveredDevice?) -> SharedFilesAccessPolicy.DesktopSnapshot? {
+        guard let device else {
+            return nil
+        }
+        return SharedFilesAccessPolicy.DesktopSnapshot(
+            deviceId: device.deviceId,
+            name: device.name,
+            shareEnabled: device.shareEnabled
+        )
+    }
+
+    private func throwIfPersonalSharedFilesAccessDisabled(scope: SharedDirectoryScope) throws {
+        guard scope == .personal,
+              let binding = uploadStore?.getBinding()
+        else {
+            return
+        }
+        let candidateSnapshots = discoveryService.candidateDevicesSnapshot().map {
+            SharedFilesAccessPolicy.DesktopSnapshot(
+                deviceId: $0.deviceId,
+                name: $0.name,
+                shareEnabled: $0.shareEnabled
+            )
+        }
+        guard SharedFilesAccessPolicy.isRemoteAccessDisabled(
+            scopeRaw: scope.rawValue,
+            bindingDeviceId: binding.deviceId,
+            bindingDeviceName: binding.deviceName,
+            bindingDeviceAlias: binding.deviceAlias,
+            discoveredDevice: sharedFilesDesktopSnapshot(from: discoveredDevices[binding.deviceId]),
+            candidateDevices: candidateSnapshots
+        ) else {
+            return
+        }
+        syncDiagnosticsLog(
+            "SharedFiles",
+            "personal remote access disabled by Bonjour share state device=\(binding.deviceId) candidates=\(candidateSnapshots.count)"
+        )
+        throw SyncEngineError.networkError(SharedFilesAccessPolicy.remoteAccessDisabledMessage)
+    }
+
     func browseSharedFiles(scope scopeRaw: String, path: String, accessToken: String) async throws -> [String: Any] {
         let scope = SharedDirectoryScope(rawValue: scopeRaw) ?? .team
+        try throwIfPersonalSharedFilesAccessDisabled(scope: scope)
         let allowWake = SharedFilesRoutePolicy.shouldAttemptWake(
             scope: scope.rawValue,
             path: path,

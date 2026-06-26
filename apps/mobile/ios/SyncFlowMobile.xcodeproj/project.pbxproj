@@ -25,6 +25,7 @@
 		D4E1C9FC2F95000100000001 /* WakeOnLanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9FB2F95000100000001 /* WakeOnLanService.swift */; };
 		D4E1C9FE2F95000100000001 /* WakeMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9FD2F95000100000001 /* WakeMetadata.swift */; };
 		D4E1CA012F91000100000001 /* SilentAudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1CA002F91000100000001 /* SilentAudioService.swift */; };
+		D4E1CA312FA2000100000001 /* SharedFilesAccessPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1CA302FA2000100000001 /* SharedFilesAccessPolicy.swift */; };
 		D4E1CA112F96000100000001 /* ReceivedLibraryMediaURLPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1CA102F96000100000001 /* ReceivedLibraryMediaURLPolicy.swift */; };
 		D4E1CA042FA0000100000001 /* SidecarHostResolutionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1CA032FA0000100000001 /* SidecarHostResolutionPolicy.swift */; };
 		D4E1CA212FA1000100000001 /* ClientDisplayNameResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1CA202FA1000100000001 /* ClientDisplayNameResolver.swift */; };
@@ -84,6 +85,7 @@
 		D4E1C9FB2F95000100000001 /* WakeOnLanService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeOnLanService.swift; sourceTree = "<group>"; };
 		D4E1C9FD2F95000100000001 /* WakeMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeMetadata.swift; sourceTree = "<group>"; };
 		D4E1CA002F91000100000001 /* SilentAudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SilentAudioService.swift; sourceTree = "<group>"; };
+		D4E1CA302FA2000100000001 /* SharedFilesAccessPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedFilesAccessPolicy.swift; sourceTree = "<group>"; };
 		D4E1CA102F96000100000001 /* ReceivedLibraryMediaURLPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceivedLibraryMediaURLPolicy.swift; sourceTree = "<group>"; };
 		D4E1CA032FA0000100000001 /* SidecarHostResolutionPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidecarHostResolutionPolicy.swift; sourceTree = "<group>"; };
 		D4E1CA202FA1000100000001 /* ClientDisplayNameResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientDisplayNameResolver.swift; sourceTree = "<group>"; };
@@ -230,6 +232,7 @@
 				35E00EC8EDE5044F9DE0BFDA /* AlbumBrowserService.swift */,
 				D380A808E5707AB54A6BAD29 /* AutoUploadConfigStore.swift */,
 				42E22EE10B6D2552C83E31BB /* ManualUploadService.swift */,
+				D4E1CA302FA2000100000001 /* SharedFilesAccessPolicy.swift */,
 				D4E1C9F72F8B000100000001 /* SharedFilesRoutePolicy.swift */,
 				D2C0A4C610F1EE6DEAF9DAB0 /* SharedFilesService.swift */,
 				FC3ECC602F6F0B00000460F8 /* NetworkPathObserver.swift */,
@@ -420,6 +423,7 @@
 				9AAE6A8410E525480D8CD473 /* AlbumBrowserService.swift in Sources */,
 				A02C8AC4F1D2121BB74AD3E9 /* AutoUploadConfigStore.swift in Sources */,
 				BEA438F6884C0C6D0918C25E /* ManualUploadService.swift in Sources */,
+				D4E1CA312FA2000100000001 /* SharedFilesAccessPolicy.swift in Sources */,
 				D4E1C9F82F8B000100000001 /* SharedFilesRoutePolicy.swift in Sources */,
 				D4E1C9FA2F94000100000001 /* PresenceReconnectPolicy.swift in Sources */,
 				D4E1CA042FA0000100000001 /* SidecarHostResolutionPolicy.swift in Sources */,
