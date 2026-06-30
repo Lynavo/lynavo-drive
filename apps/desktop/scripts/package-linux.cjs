@@ -6,29 +6,13 @@ const projectRoot = path.resolve(__dirname, '..');
 const scriptsRoot = path.join(projectRoot, 'scripts');
 
 function resolvePackageLinuxOptions(args = process.argv.slice(2), processInfo = process) {
-  let builderConfig = null;
   const archArgs = [];
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
 
-    if (arg === '--config') {
-      const value = args[index + 1];
-      if (!value || value.startsWith('-')) {
-        throw new Error('--config requires an electron-builder config filename.');
-      }
-      builderConfig = value;
-      index += 1;
-      continue;
-    }
-
-    if (arg.startsWith('--config=')) {
-      const value = arg.slice('--config='.length);
-      if (!value) {
-        throw new Error('--config requires an electron-builder config filename.');
-      }
-      builderConfig = value;
-      continue;
+    if (arg === '--config' || arg.startsWith('--config=')) {
+      throw new Error('Linux packaging uses the single electron-builder.yml config.');
     }
 
     if (arg.startsWith('--arch=')) {
@@ -45,17 +29,10 @@ function resolvePackageLinuxOptions(args = process.argv.slice(2), processInfo = 
 
   return {
     arch: resolveLinuxArch(archArgs, processInfo.arch),
-    builderConfig,
   };
 }
 
-function buildPackageLinuxCommands({ arch, builderConfig }) {
-  const builderArgs = [];
-  if (builderConfig) {
-    builderArgs.push('--config', builderConfig);
-  }
-  builderArgs.push('--linux', 'deb', `--${arch}`);
-
+function buildPackageLinuxCommands({ arch }) {
   return [
     {
       script: 'run-workspace-pnpm.cjs',
@@ -67,7 +44,7 @@ function buildPackageLinuxCommands({ arch, builderConfig }) {
     },
     {
       script: 'run-electron-builder.cjs',
-      args: builderArgs,
+      args: ['--linux', 'deb', `--${arch}`],
     },
   ];
 }

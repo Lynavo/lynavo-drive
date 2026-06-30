@@ -3,11 +3,7 @@ import os from 'node:os';
 import type { ElectronAPI } from './api';
 import type { SidecarEvent } from '@syncflow/contracts';
 import type { SidecarRuntimeState } from '../shared/sidecar-runtime';
-import {
-  isLinuxPlatform,
-  supportsAppleAuth,
-  usesTitleBarOverlayControls,
-} from '../shared/platform-capabilities';
+import { isLinuxPlatform, usesTitleBarOverlayControls } from '../shared/platform-capabilities';
 
 // IPC channel constants — duplicated from main/ipc-handlers.ts
 // because electron-vite builds preload and main as separate targets.
@@ -23,15 +19,6 @@ const IPC = {
   SIDECAR_CONNECTION_DEVICES: 'sidecar:connection-devices',
   SIDECAR_REVOKE_CONNECTION_DEVICE: 'sidecar:revoke-connection-device',
   SIDECAR_CLEAR_BLOCKED_CLIENT: 'sidecar:clear-blocked-client',
-  SIDECAR_CLIENT_CONFIG: 'sidecar:client-config',
-  SIDECAR_REDEEM_GIFT_CARD: 'sidecar:redeem-gift-card',
-  AUTH_SEND_SMS_CODE: 'auth:send-sms-code',
-  AUTH_LOGIN_WITH_SMS_CODE: 'auth:login-with-sms-code',
-  AUTH_SEND_EMAIL_CODE: 'auth:send-email-code',
-  AUTH_LOGIN_WITH_EMAIL_CODE: 'auth:login-with-email-code',
-  AUTH_GET_SESSION: 'auth:get-session',
-  AUTH_LOGOUT: 'auth:logout',
-  AUTH_LOGIN_WITH_OAUTH: 'auth:login-with-oauth',
   SIDECAR_SET_CONNECTION_CODE: 'sidecar:set-connection-code',
   SIDECAR_REGENERATE_CODE: 'sidecar:regenerate-code',
   SIDECAR_RUNTIME_STATE: 'sidecar:runtime-state',
@@ -92,9 +79,6 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC.SIDECAR_REVOKE_CONNECTION_DEVICE, clientId),
     clearBlockedClient: (clientId: string) =>
       ipcRenderer.invoke(IPC.SIDECAR_CLEAR_BLOCKED_CLIENT, clientId),
-    getClientConfig: () => ipcRenderer.invoke(IPC.SIDECAR_CLIENT_CONFIG),
-    redeemGiftCard: (payload: { code: string }) =>
-      ipcRenderer.invoke(IPC.SIDECAR_REDEEM_GIFT_CARD, payload),
     setConnectionCode: (code: string) => ipcRenderer.invoke(IPC.SIDECAR_SET_CONNECTION_CODE, code),
     regenerateConnectionCode: () => ipcRenderer.invoke(IPC.SIDECAR_REGENERATE_CODE),
     getRuntimeState: () => ipcRenderer.invoke(IPC.SIDECAR_RUNTIME_STATE),
@@ -127,20 +111,6 @@ const electronAPI: ElectronAPI = {
     checkFolderPermission: () => ipcRenderer.invoke(IPC.FILES_CHECK_FOLDER_PERMISSION),
     requestFolderPermission: () => ipcRenderer.invoke(IPC.FILES_REQUEST_FOLDER_PERMISSION),
   },
-  auth: {
-    sendSMSCode: (payload: { phone: string }) =>
-      ipcRenderer.invoke(IPC.AUTH_SEND_SMS_CODE, payload),
-    loginWithSMSCode: (payload: { phone: string; code: string }) =>
-      ipcRenderer.invoke(IPC.AUTH_LOGIN_WITH_SMS_CODE, payload),
-    sendEmailCode: (payload: { email: string }) =>
-      ipcRenderer.invoke(IPC.AUTH_SEND_EMAIL_CODE, payload),
-    loginWithEmailCode: (payload: { email: string; code: string }) =>
-      ipcRenderer.invoke(IPC.AUTH_LOGIN_WITH_EMAIL_CODE, payload),
-    getAuthSession: () => ipcRenderer.invoke(IPC.AUTH_GET_SESSION),
-    logout: () => ipcRenderer.invoke(IPC.AUTH_LOGOUT),
-    loginWithOAuth: (payload: { provider: 'google' | 'apple' }) =>
-      ipcRenderer.invoke(IPC.AUTH_LOGIN_WITH_OAUTH, payload),
-  },
   events: {
     onSidecarEvent: (callback) => {
       const handler = (_event: IpcRendererEvent, data: SidecarEvent) => callback(data);
@@ -161,10 +131,7 @@ const electronAPI: ElectronAPI = {
     isMac: () => process.platform === 'darwin',
     isWindows: () => process.platform === 'win32',
     isLinux: () => isLinuxPlatform(),
-    supportsAppleAuth: () => supportsAppleAuth(),
     usesTitleBarOverlayControls: () => usesTitleBarOverlayControls(),
-    isAuthBypassEnabled: () =>
-      process.env.SYNCFLOW_QA_SKIP_AUTH === '1' || process.env.SYNCFLOW_DEV_SKIP_AUTH === '1',
     getHomeDir: () => os.homedir(),
     getHostName: () => os.hostname(),
     setModalOverlayActive: (active: boolean) =>

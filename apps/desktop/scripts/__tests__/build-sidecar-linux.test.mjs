@@ -41,13 +41,13 @@ test('builds a CGO Linux sidecar environment while preserving the base env', () 
     GOARCH: '386',
     GOOS: 'darwin',
     PATH: '/usr/bin',
-    SYNCFLOW_MARKET: 'global',
+    LYNAVO_RELEASE_CHANNEL: 'prod',
   };
 
   const env = buildLinuxSidecarEnv('x64', baseEnv);
 
   assert.equal(env.PATH, '/usr/bin');
-  assert.equal(env.SYNCFLOW_MARKET, 'global');
+  assert.equal(env.LYNAVO_RELEASE_CHANNEL, 'prod');
   assert.equal(env.GOOS, 'linux');
   assert.equal(env.GOARCH, 'amd64');
   assert.equal(env.CGO_ENABLED, '1');

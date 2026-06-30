@@ -47,7 +47,6 @@ vi.mock('../sidecar-client', async () => {
     sidecarClient: {
       ...actual.sidecarClient,
       getHealth: vi.fn(),
-      getAuthSession: vi.fn(),
     },
   };
 });
@@ -58,16 +57,6 @@ function compatibleHealth(capabilities?: { connectionDeviceManagement?: boolean 
     service: 'syncflow-sidecar',
     appCompatibilityVersion: APP_COMPATIBILITY_VERSION,
     ...(capabilities ? { capabilities } : {}),
-  };
-}
-
-function healthWithRefreshRequired() {
-  return {
-    ...compatibleHealth({ connectionDeviceManagement: true }),
-    tunnel: {
-      signalingAuthState: 'refresh_required',
-      credentialRefreshRequired: true,
-    },
   };
 }
 
@@ -97,10 +86,6 @@ describe('SidecarManager', () => {
     vi.clearAllMocks();
     spawnMock.mockReturnValue(createChildProcessStub());
     syncCredentialsToSidecarMock.mockResolvedValue(true);
-    vi.mocked(sidecarClient.getAuthSession).mockReturnValue({
-      accessToken: 'access-token',
-      refreshToken: 'refresh-token',
-    });
     execFileMock.mockImplementation(
       (
         _file: string,
@@ -155,39 +140,29 @@ describe('SidecarManager', () => {
     expect(manager.getState().status).toBe('healthy');
   });
 
-  it('waits for the initial credentials sync before resolving startup', async () => {
-    vi.mocked(sidecarClient.getHealth).mockResolvedValue(compatibleHealth());
-
-    let resolveCredentialsSync: (value: boolean) => void = () => {};
-    syncCredentialsToSidecarMock.mockReturnValue(
-      new Promise<boolean>((resolve) => {
-        resolveCredentialsSync = resolve;
-      }),
-    );
-
-    const manager = new SidecarManager();
-    let startupResolved = false;
-    const startup = manager.start().then(() => {
-      startupResolved = true;
-    });
-
-    await vi.advanceTimersByTimeAsync(0);
-    expect(manager.getState().status).toBe('healthy');
-    expect(syncCredentialsToSidecar).toHaveBeenCalledTimes(1);
-    expect(startupResolved).toBe(false);
-
-    resolveCredentialsSync(true);
-    await startup;
-
-    expect(startupResolved).toBe(true);
-  });
-
-  it('clears credentials refresh interval when the sidecar exits before scheduling restart', async () => {
+  it('does not sync commercial credentials during OSS sidecar startup', async () => {
     vi.mocked(sidecarClient.getHealth).mockResolvedValue(compatibleHealth());
 
     const manager = new SidecarManager();
     await manager.start();
-    expect(vi.getTimerCount()).toBe(2);
+
+    expect(manager.getState().status).toBe('healthy');
+    expect(syncCredentialsToSidecar).not.toHaveBeenCalled();
+  });
+
+  it('only keeps the health interval when the sidecar starts', async () => {
+    vi.mocked(sidecarClient.getHealth).mockResolvedValue(compatibleHealth());
+
+    const manager = new SidecarManager();
+    await manager.start();
+    expect(vi.getTimerCount()).toBe(1);
+  });
+
+  it('keeps only restart scheduling timers when the sidecar exits', async () => {
+    vi.mocked(sidecarClient.getHealth).mockResolvedValue(compatibleHealth());
+
+    const manager = new SidecarManager();
+    await manager.start();
 
     const child = spawnMock.mock.results[0]?.value as ReturnType<typeof createChildProcessStub>;
     child.emit('exit', 1);
@@ -197,30 +172,35 @@ describe('SidecarManager', () => {
     expect(vi.getTimerCount()).toBe(1);
   });
 
-  it('does not schedule credentials refresh interval without an active session', async () => {
+  it('does not schedule commercial credentials refresh without an active session', async () => {
     vi.mocked(sidecarClient.getHealth).mockResolvedValue(compatibleHealth());
-    vi.mocked(sidecarClient.getAuthSession).mockReturnValue(null);
 
     const manager = new SidecarManager();
     await manager.start();
 
-    expect(syncCredentialsToSidecar).toHaveBeenCalledTimes(1);
+    expect(syncCredentialsToSidecar).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(1);
   });
 
-  it('refreshes credentials immediately when sidecar reports invalid signaling token', async () => {
+  it('ignores commercial signaling refresh requests in the OSS desktop runtime', async () => {
     vi.mocked(sidecarClient.getHealth)
       .mockResolvedValueOnce(compatibleHealth({ connectionDeviceManagement: true }))
-      .mockResolvedValueOnce(healthWithRefreshRequired())
+      .mockResolvedValueOnce({
+        ...compatibleHealth({ connectionDeviceManagement: true }),
+        tunnel: {
+          signalingAuthState: 'refresh_required',
+          credentialRefreshRequired: true,
+        },
+      })
       .mockResolvedValue(compatibleHealth({ connectionDeviceManagement: true }));
 
     const manager = new SidecarManager();
     await manager.start();
-    expect(syncCredentialsToSidecar).toHaveBeenCalledTimes(1);
+    expect(syncCredentialsToSidecar).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(3000);
 
-    expect(syncCredentialsToSidecar).toHaveBeenCalledTimes(2);
+    expect(syncCredentialsToSidecar).not.toHaveBeenCalled();
     expect(manager.getState().status).toBe('healthy');
   });
 

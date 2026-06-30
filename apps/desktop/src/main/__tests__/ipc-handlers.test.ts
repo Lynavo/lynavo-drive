@@ -1,6 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { get as httpGet } from 'node:http';
-import { shell } from 'electron';
 import {
   APP_COMPATIBILITY_VERSION,
   type DesktopAccessRecordDTO,
@@ -11,7 +9,7 @@ import {
 } from '@syncflow/contracts';
 import { IPC, registerIpcHandlers } from '../ipc-handlers';
 import { checkForUpdates, uploadDiagnostics } from '../diagnostics';
-import { sidecarClient, syncCredentialsToSidecar } from '../sidecar-client';
+import { sidecarClient } from '../sidecar-client';
 
 type IpcHandler = (...args: unknown[]) => unknown;
 
@@ -91,12 +89,6 @@ const receivedLibraryFixture: ReceivedLibraryItemDTO = {
 };
 
 const electronMockState = vi.hoisted(() => {
-  let appleBeforeRequest:
-    | ((
-        details: { method: string; uploadData?: Array<{ bytes: Buffer }> },
-        callback: (result: unknown) => void,
-      ) => void)
-    | null = null;
   const browserWindowInstance = {
     once: vi.fn((event: string, callback: () => void) => {
       if (event === 'ready-to-show') {
@@ -108,23 +100,6 @@ const electronMockState = vi.hoisted(() => {
     destroy: vi.fn(),
     loadURL: vi.fn().mockResolvedValue(undefined),
     setTitleBarOverlay: vi.fn(),
-    webContents: {
-      session: {
-        webRequest: {
-          onBeforeRequest: vi.fn(
-            (
-              _filter: unknown,
-              callback: (
-                details: { method: string; uploadData?: Array<{ bytes: Buffer }> },
-                callback: (result: unknown) => void,
-              ) => void,
-            ) => {
-              appleBeforeRequest = callback;
-            },
-          ),
-        },
-      },
-    },
   };
   return {
     BrowserWindow: vi.fn(function BrowserWindowMock() {
@@ -132,10 +107,6 @@ const electronMockState = vi.hoisted(() => {
     }),
     fromWebContents: vi.fn(() => browserWindowInstance),
     browserWindowInstance,
-    getAppleBeforeRequest: () => appleBeforeRequest,
-    resetAppleBeforeRequest: () => {
-      appleBeforeRequest = null;
-    },
   };
 });
 
@@ -155,7 +126,6 @@ vi.mock('electron', () => ({
       handlers.set(channel, handler);
     }),
   },
-  net: { fetch: vi.fn() },
   shell: { openExternal: vi.fn(), openPath: vi.fn() },
 }));
 
@@ -173,7 +143,6 @@ vi.mock('../sidecar-client', async () => {
   const actual = await vi.importActual<typeof import('../sidecar-client')>('../sidecar-client');
   return {
     ...actual,
-    syncCredentialsToSidecar: vi.fn().mockResolvedValue(true),
     sidecarClient: {
       ...actual.sidecarClient,
       getHealth: vi.fn(),
@@ -201,16 +170,6 @@ vi.mock('../sidecar-client', async () => {
       addSharedResource: vi.fn(),
       removeSharedResource: vi.fn(),
       getReceivedLibrary: vi.fn(),
-      getClientConfig: vi.fn(),
-      redeemGiftCard: vi.fn(),
-      sendSMSCode: vi.fn(),
-      loginWithSMSCode: vi.fn(),
-      sendEmailCode: vi.fn(),
-      loginWithEmailCode: vi.fn(),
-      getAuthSessionView: vi.fn(),
-      logout: vi.fn(),
-      loginWithGoogle: vi.fn(),
-      loginWithApple: vi.fn(),
     },
   };
 });
@@ -222,20 +181,6 @@ function compatibleHealth(capabilities?: { connectionDeviceManagement?: boolean 
     appCompatibilityVersion: APP_COMPATIBILITY_VERSION,
     ...(capabilities ? { capabilities } : {}),
   };
-}
-
-function createUnsignedIdToken(payload: Record<string, unknown>): string {
-  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
-  return `${encode({ alg: 'none' })}.${encode(payload)}.`;
-}
-
-function requestLocalUrl(url: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    httpGet(url, (res) => {
-      res.resume();
-      res.on('end', resolve);
-    }).on('error', reject);
-  });
 }
 
 vi.mock('../diagnostics', () => ({
@@ -253,13 +198,11 @@ describe('registerIpcHandlers', () => {
     vi.unstubAllGlobals();
     platformCapabilitiesMock.usesTitleBarOverlayControls.mockReset();
     platformCapabilitiesMock.usesTitleBarOverlayControls.mockReturnValue(true);
-    electronMockState.resetAppleBeforeRequest();
   });
 
   function registerWithManager() {
     const manager = {
       retryStart: vi.fn().mockResolvedValue(undefined),
-      startCredentialsSyncInterval: vi.fn(),
     };
     registerIpcHandlers(manager as never);
     const handler = handlers.get(IPC.SIDECAR_REGENERATE_CODE);
@@ -282,7 +225,7 @@ describe('registerIpcHandlers', () => {
   it('sets the connection code through IPC', async () => {
     vi.mocked(sidecarClient.setConnectionCode).mockResolvedValue({ code: '238416' });
 
-    const manager = { retryStart: vi.fn(), startCredentialsSyncInterval: vi.fn() };
+    const manager = { retryStart: vi.fn() };
     registerIpcHandlers(manager as never);
     const handler = handlers.get(IPC.SIDECAR_SET_CONNECTION_CODE);
     if (!handler) {
@@ -315,34 +258,18 @@ describe('registerIpcHandlers', () => {
     });
   });
 
-  it('registers gift card redeem IPC', async () => {
-    vi.mocked(sidecarClient.redeemGiftCard).mockResolvedValue({
-      ok: true,
-      message: 'done',
-    });
-
+  it('does not register commercial gift-card, client-config, or auth IPC handlers', async () => {
     registerIpcHandlers({ retryStart: vi.fn() } as never);
-    const handler = handlers.get(IPC.SIDECAR_REDEEM_GIFT_CARD);
 
-    await expect(handler?.(undefined, { code: 'ABCD-EFGH-IJKL' })).resolves.toEqual({
-      ok: true,
-      message: 'done',
-    });
-    expect(sidecarClient.redeemGiftCard).toHaveBeenCalledWith({ code: 'ABCD-EFGH-IJKL' });
-  });
-
-  it('registers client config IPC', async () => {
-    vi.mocked(sidecarClient.getClientConfig).mockResolvedValue({
-      features: { giftCard: { enabled: true } },
-    });
-
-    registerIpcHandlers({ retryStart: vi.fn() } as never);
-    const handler = handlers.get(IPC.SIDECAR_CLIENT_CONFIG);
-
-    await expect(handler?.(undefined)).resolves.toEqual({
-      features: { giftCard: { enabled: true } },
-    });
-    expect(sidecarClient.getClientConfig).toHaveBeenCalledTimes(1);
+    expect(handlers.has('sidecar:redeem-gift-card')).toBe(false);
+    expect(handlers.has('sidecar:client-config')).toBe(false);
+    expect(handlers.has('auth:send-sms-code')).toBe(false);
+    expect(handlers.has('auth:login-with-sms-code')).toBe(false);
+    expect(handlers.has('auth:send-email-code')).toBe(false);
+    expect(handlers.has('auth:login-with-email-code')).toBe(false);
+    expect(handlers.has('auth:get-session')).toBe(false);
+    expect(handlers.has('auth:logout')).toBe(false);
+    expect(handlers.has('auth:login-with-oauth')).toBe(false);
   });
 
   it('updates the native title bar overlay while renderer modals are open', async () => {
@@ -465,194 +392,6 @@ describe('registerIpcHandlers', () => {
     });
     expect(sidecarClient.removeSharedResource).toHaveBeenCalledWith('res-1');
     expect(sidecarClient.getReceivedLibrary).toHaveBeenCalledWith({ page: 2, pageSize: 30 });
-  });
-
-  it('registers phone auth IPC for SMS send and login', async () => {
-    vi.mocked(sidecarClient.sendSMSCode).mockResolvedValue({ ok: true });
-    vi.mocked(sidecarClient.loginWithSMSCode).mockResolvedValue({ ok: true });
-
-    const manager = {
-      retryStart: vi.fn(),
-      startCredentialsSyncInterval: vi.fn(),
-    };
-    registerIpcHandlers(manager as never);
-    const sendHandler = handlers.get(IPC.AUTH_SEND_SMS_CODE);
-    const loginHandler = handlers.get(IPC.AUTH_LOGIN_WITH_SMS_CODE);
-
-    await expect(sendHandler?.(undefined, { phone: '13800138000' })).resolves.toEqual({
-      ok: true,
-    });
-    await expect(
-      loginHandler?.(undefined, { phone: '13800138000', code: '123456' }),
-    ).resolves.toEqual({
-      ok: true,
-    });
-    expect(sidecarClient.sendSMSCode).toHaveBeenCalledWith({ phone: '13800138000' });
-    expect(sidecarClient.loginWithSMSCode).toHaveBeenCalledWith({
-      phone: '13800138000',
-      code: '123456',
-    });
-    await Promise.resolve();
-    expect(syncCredentialsToSidecar).toHaveBeenCalledTimes(1);
-    expect(manager.startCredentialsSyncInterval).toHaveBeenCalledTimes(1);
-  });
-
-  it('registers email auth IPC for send and login', async () => {
-    vi.mocked(sidecarClient.sendEmailCode).mockResolvedValue({ ok: true });
-    vi.mocked(sidecarClient.loginWithEmailCode).mockResolvedValue({ ok: true });
-
-    const manager = {
-      retryStart: vi.fn(),
-      startCredentialsSyncInterval: vi.fn(),
-    };
-    registerIpcHandlers(manager as never);
-    const sendHandler = handlers.get(IPC.AUTH_SEND_EMAIL_CODE);
-    const loginHandler = handlers.get(IPC.AUTH_LOGIN_WITH_EMAIL_CODE);
-
-    await expect(sendHandler?.(undefined, { email: 'ada@example.com' })).resolves.toEqual({
-      ok: true,
-    });
-    await expect(
-      loginHandler?.(undefined, { email: 'ada@example.com', code: '123456' }),
-    ).resolves.toEqual({
-      ok: true,
-    });
-    expect(sidecarClient.sendEmailCode).toHaveBeenCalledWith({ email: 'ada@example.com' });
-    expect(sidecarClient.loginWithEmailCode).toHaveBeenCalledWith({
-      email: 'ada@example.com',
-      code: '123456',
-    });
-    await Promise.resolve();
-    expect(syncCredentialsToSidecar).toHaveBeenCalledTimes(1);
-    expect(manager.startCredentialsSyncInterval).toHaveBeenCalledTimes(1);
-  });
-
-  it('returns only the sanitized auth session through renderer IPC', async () => {
-    vi.mocked(sidecarClient.getAuthSessionView).mockResolvedValue({
-      loggedIn: true,
-      phone: '+8613800138000',
-    });
-
-    registerIpcHandlers({ retryStart: vi.fn() } as never);
-    const handler = handlers.get(IPC.AUTH_GET_SESSION);
-
-    await expect(handler?.()).resolves.toEqual({
-      loggedIn: true,
-      phone: '+8613800138000',
-    });
-    expect(sidecarClient.getAuthSessionView).toHaveBeenCalledTimes(1);
-  });
-
-  it('runs Google OAuth through system browser loopback and syncs credentials', async () => {
-    vi.stubEnv('GOOGLE_CLIENT_ID', 'desktop-client.apps.googleusercontent.com');
-    vi.stubEnv('GOOGLE_CLIENT_SECRET', 'desktop-secret');
-    vi.mocked(sidecarClient.loginWithGoogle).mockResolvedValue({ ok: true });
-    const fetchMock = vi.mocked((await import('electron')).net.fetch);
-
-    const manager = {
-      retryStart: vi.fn(),
-      startCredentialsSyncInterval: vi.fn(),
-    };
-    registerIpcHandlers(manager as never);
-    const handler = handlers.get(IPC.AUTH_LOGIN_WITH_OAUTH);
-    const loginPromise = handler?.(undefined, { provider: 'google' }) as Promise<unknown>;
-
-    await vi.waitFor(() => {
-      expect(shell.openExternal).toHaveBeenCalledTimes(1);
-    });
-
-    const authUrl = new URL(vi.mocked(shell.openExternal).mock.calls[0]?.[0] as string);
-    const redirectUri = authUrl.searchParams.get('redirect_uri');
-    const state = authUrl.searchParams.get('state');
-    const nonce = authUrl.searchParams.get('nonce');
-    expect(authUrl.searchParams.get('response_type')).toBe('code');
-    expect(authUrl.searchParams.get('code_challenge_method')).toBe('S256');
-    expect(redirectUri).toBeTruthy();
-    expect(new URL(redirectUri ?? '').hostname).toBe('127.0.0.1');
-    expect(state).toBeTruthy();
-    expect(nonce).toBeTruthy();
-
-    const idToken = createUnsignedIdToken({ nonce: nonce ?? '' });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: vi.fn().mockResolvedValue({
-        id_token: idToken,
-      }),
-    } as unknown as Response);
-    await requestLocalUrl(`${redirectUri}?code=google-code&state=${state}`);
-
-    await expect(loginPromise).resolves.toEqual({ ok: true });
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://oauth2.googleapis.com/token',
-      expect.objectContaining({
-        method: 'POST',
-      }),
-    );
-    const tokenRequest = fetchMock.mock.calls[0]?.[1] as { body: URLSearchParams };
-    expect(tokenRequest.body.get('grant_type')).toBe('authorization_code');
-    expect(tokenRequest.body.get('code')).toBe('google-code');
-    expect(tokenRequest.body.get('client_secret')).toBe('desktop-secret');
-    expect(sidecarClient.loginWithGoogle).toHaveBeenCalledWith({
-      identityToken: idToken,
-    });
-    expect(syncCredentialsToSidecar).toHaveBeenCalledTimes(1);
-    expect(manager.startCredentialsSyncInterval).toHaveBeenCalledTimes(1);
-  });
-
-  it('runs Apple OAuth form_post through BrowserWindow and syncs credentials', async () => {
-    vi.stubEnv('SYNCFLOW_APPLE_CLIENT_ID', 'com.vividrop.global.signin');
-    vi.stubEnv('SYNCFLOW_APPLE_REDIRECT_URI', 'https://global-api.vividrop.cn/auth/apple/callback');
-    vi.mocked(sidecarClient.loginWithApple).mockResolvedValue({ ok: true });
-
-    const manager = {
-      retryStart: vi.fn(),
-      startCredentialsSyncInterval: vi.fn(),
-    };
-    registerIpcHandlers(manager as never);
-    const handler = handlers.get(IPC.AUTH_LOGIN_WITH_OAUTH);
-    const loginPromise = handler?.(undefined, { provider: 'apple' }) as Promise<unknown>;
-
-    await vi.waitFor(() => {
-      expect(
-        electronMockState.browserWindowInstance.webContents.session.webRequest.onBeforeRequest,
-      ).toHaveBeenCalledTimes(1);
-    });
-
-    const loadedUrl = new URL(
-      electronMockState.browserWindowInstance.loadURL.mock.calls[0]?.[0] as string,
-    );
-    const state = loadedUrl.searchParams.get('state') ?? '';
-    const nonce = loadedUrl.searchParams.get('nonce') ?? '';
-    const idToken = createUnsignedIdToken({ nonce });
-    const body = new URLSearchParams({
-      state,
-      code: 'apple-code',
-      id_token: idToken,
-      user: JSON.stringify({ name: { firstName: 'Ada', lastName: 'Lovelace' } }),
-    }).toString();
-    const firstChunk = body.slice(0, 32);
-    const secondChunk = body.slice(32);
-
-    const callback = vi.fn();
-    electronMockState.getAppleBeforeRequest()?.(
-      {
-        method: 'POST',
-        uploadData: [{ bytes: Buffer.from(firstChunk) }, { bytes: Buffer.from(secondChunk) }],
-      },
-      callback,
-    );
-
-    expect(callback).toHaveBeenCalledWith({ cancel: true });
-    expect(electronMockState.browserWindowInstance.destroy).toHaveBeenCalledTimes(1);
-    await expect(loginPromise).resolves.toEqual({ ok: true });
-    expect(sidecarClient.loginWithApple).toHaveBeenCalledWith({
-      identityToken: idToken,
-      authorizationCode: 'apple-code',
-      fullName: 'Ada Lovelace',
-    });
-    expect(syncCredentialsToSidecar).toHaveBeenCalledTimes(1);
-    expect(manager.startCredentialsSyncInterval).toHaveBeenCalledTimes(1);
   });
 
   it('registers update-check IPC', async () => {

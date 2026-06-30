@@ -11,8 +11,6 @@
     "powerSaveDescription": "同步時保持桌面端可用",
     "shareAddress": "區域網路共享",
     "shareAddressDescription": "偵測這台電腦的 SMB 共享狀態，供手機讀取共享目錄",
-    "giftCard": "禮品卡",
-    "giftCardDescription": "兌換禮品卡可提升配額、功能或同步時長",
     "bonjour": "Windows Bonjour 廣播",
     "bonjourDescription": "用於讓手機在同一個區域網路內發現這台電腦"
   },
@@ -66,56 +64,6 @@
     "blockingSleep": "正在保持喚醒",
     "idle": "未啟用"
   },
-  "giftCard": {
-    "title": "禮品卡兌換",
-    "description": "請輸入服務提供的禮品卡序號",
-    "codeLabel": "禮品卡序號",
-    "placeholder": "例如：VF-GIFT-XXXX",
-    "redeem": "兌換",
-    "redeemSuccess": "禮品卡已兌換成功",
-    "phoneLogin": {
-      "title": "手機登入",
-      "globalTitle": "登入或註冊",
-      "description": "請輸入手機號碼並完成驗證碼登入後繼續兌換。",
-      "globalDescription": "登入後可使用遠端同步與帳號功能。",
-      "phoneLabel": "手機號碼",
-      "phonePlaceholder": "請輸入手機號碼",
-      "codeLabel": "驗證碼",
-      "codePlaceholder": "6 位驗證碼",
-      "countryCodePlaceholder": "區碼",
-      "countryCodes": {
-        "china": "中國大陸",
-        "northAmerica": "美國/加拿大",
-        "taiwan": "台灣",
-        "hongKong": "香港",
-        "japan": "日本",
-        "singapore": "新加坡"
-      },
-      "oauth": {
-        "continueWithGoogle": "使用 Google 繼續",
-        "continueWithApple": "使用 Apple 繼續",
-        "divider": "或",
-        "providers": {
-          "google": "Google",
-          "apple": "Apple"
-        }
-      },
-      "sendCode": "傳送驗證碼",
-      "loginAndRedeem": "登入並兌換",
-      "loginRequired": "請先用手機號碼登入後繼續兌換禮品卡",
-      "codeSent": "驗證碼已傳送",
-      "loginSuccess": "登入成功，正在繼續兌換",
-      "loginSuccessGeneric": "登入成功",
-      "logoutSuccess": "已成功登出",
-      "logoutFailed": "登出失敗",
-      "logoutError": "登出發生錯誤",
-      "accountStatus": "帳號狀態",
-      "loggedInAs": "已登入",
-      "notLoggedIn": "尚未登入",
-      "logout": "登出",
-      "login": "登入"
-    }
-  },
   "filePath": {
     "receiveAddress": "接收目錄",
     "personalAddress": "個人共享目錄",
@@ -126,9 +74,7 @@
     "openShared": "開啟團隊共享目錄",
     "windowsDrives": "本機磁碟",
     "windowsDrivesWithPath": "本機磁碟（{{path}}）",
-    "restoreWindowsDrives": "恢復本機磁碟",
-    "remoteFeaturePrompt": "遠端同步與傳輸",
-    "remoteFeaturePromptDetail": "登入後可使用 P2P 遠端同步功能"
+    "restoreWindowsDrives": "恢復本機磁碟"
   },
   "shareAddress": {
     "label": "區域網路共享位址",
@@ -191,23 +137,11 @@
   "profile": {
     "title": "我的",
     "cards": {
-      "account": "帳戶",
+      "community": "開源本地同步",
       "localMachine": "本機",
       "general": "一般",
       "version": "版本",
       "support": "支援"
-    },
-    "account": {
-      "title": "我的帳戶",
-      "bindingInfo": "綁定資訊",
-      "accountLabel": "帳號",
-      "loginMethod": "登入方式",
-      "accountLogin": "帳號登入",
-      "currentComputer": "目前電腦"
-    },
-    "membership": {
-      "title": "會員狀態",
-      "free": "免費版"
     },
     "localIp": "本機 IP",
     "language": {
@@ -256,6 +190,12 @@
       "diagnosticsUploaded": "診斷包上傳成功，感謝您的回饋",
       "diagnosticsUploadFailed": "診斷包上傳失敗，請稍後再試",
       "feedbackOpened": "已開啟郵件回饋"
+    },
+    "community": {
+      "title": "本地區域網路存取",
+      "caption": "同一區域網路內可直接配對、發現並自動同步。",
+      "devicesTitle": "已配對裝置",
+      "devicesCaption": "手機會繼續使用本地配對權杖和已配對裝置授權存取區域網路能力。"
     }
   },
   "support": {

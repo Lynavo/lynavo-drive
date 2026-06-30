@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState, type CSSProperties, type FormEvent
 import { useTranslation } from 'react-i18next';
 import { Download, HelpCircle, Loader2, QrCode, RefreshCw, Smartphone } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { LYNAVO_WEB_BASE_URL } from '@syncflow/contracts';
 import { Skeleton } from '@renderer/components/ui/skeleton';
 import { persistLocale } from '@renderer/i18n';
 import {
@@ -14,9 +15,6 @@ import { useDashboardStore } from '@renderer/stores/dashboard-store';
 import { useSettingsStore } from '@renderer/stores/settings-store';
 import { useSidecarRuntimeStore } from '@renderer/stores/sidecar-runtime-store';
 import { useResourcesStore } from '@renderer/stores/resources-store';
-import { useAuthStore } from '@renderer/stores/auth-store';
-import { AuthPage } from '@renderer/components/shared/AuthPage';
-import { LogoutConfirmDialog } from '@renderer/components/shared/LogoutConfirmDialog';
 import { installScrollbarActivityTracker } from '@renderer/hooks/scrollbar-activity';
 import { Sidebar } from './Sidebar';
 import { SidecarStatusBanner } from './SidecarStatusBanner';
@@ -69,6 +67,18 @@ const setupLocaleLabels: Record<SupportedLocale, string> = {
   'zh-Hans': '简体中文',
   'zh-Hant': '繁體中文',
 };
+const mobileDownloadLinks = [
+  {
+    platform: 'iOS',
+    label: 'App Store',
+    url: new URL('/download/ios', LYNAVO_WEB_BASE_URL).toString(),
+  },
+  {
+    platform: 'Android',
+    label: 'Android',
+    url: new URL('/download/android', LYNAVO_WEB_BASE_URL).toString(),
+  },
+] as const;
 
 export function getTopActionsRight(usesTitleBarOverlay: boolean): CSSProperties['right'] {
   if (!usesTitleBarOverlay) {
@@ -88,21 +98,18 @@ function normalizeConnectionCode(value: string): string {
 
 type ConnectionCodeSetupPageProps = {
   onComplete(): void;
-  onLogout(): void | Promise<void>;
 };
 
-function ConnectionCodeSetupPage({ onComplete, onLogout }: ConnectionCodeSetupPageProps) {
+function ConnectionCodeSetupPage({ onComplete }: ConnectionCodeSetupPageProps) {
   const { t, i18n } = useTranslation();
   const settings = useSettingsStore((s) => s.settings);
   const updateSettings = useSettingsStore((s) => s.updateSettings);
-  const session = useAuthStore((s) => s.session);
   const [draftCode, setDraftCode] = useState(() =>
     normalizeConnectionCode(settings.connectionCode || ''),
   );
   const [hasEdited, setHasEdited] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const deviceName =
     settings.deviceName || window.electronAPI?.platform?.getHostName?.() || 'ViviDrop';
   const currentLocale = isSupportedLocale(i18n.resolvedLanguage) ? i18n.resolvedLanguage : 'en';
@@ -211,13 +218,6 @@ function ConnectionCodeSetupPage({ onComplete, onLogout }: ConnectionCodeSetupPa
                 </option>
               ))}
             </select>
-            <button
-              type="button"
-              onClick={() => setShowLogoutConfirm(true)}
-              className="inline-flex h-8 items-center justify-center rounded-md bg-white/58 px-3 text-xs font-medium text-[#687380] transition hover:bg-white/90 hover:text-[#17191c]"
-            >
-              {t('layout.account.logout')}
-            </button>
           </div>
         </div>
 
@@ -273,10 +273,7 @@ function ConnectionCodeSetupPage({ onComplete, onLogout }: ConnectionCodeSetupPa
           </div>
 
           <div className="mt-6 flex justify-center gap-8">
-            {[
-              ['iOS', 'App Store', 'https://vividrop.app/download/ios'],
-              ['Android', 'Android', 'https://vividrop.app/download/android'],
-            ].map(([platform, label, url]) => (
+            {mobileDownloadLinks.map(({ platform, label, url }) => (
               <div key={platform} className="flex w-[112px] flex-col items-center">
                 <p className="mb-2 text-xs font-semibold text-[#17191c]">{platform}</p>
                 <button
@@ -300,17 +297,6 @@ function ConnectionCodeSetupPage({ onComplete, onLogout }: ConnectionCodeSetupPa
         </div>
       </section>
 
-      <LogoutConfirmDialog
-        isOpen={showLogoutConfirm}
-        onClose={() => setShowLogoutConfirm(false)}
-        onConfirm={() => {
-          setShowLogoutConfirm(false);
-          void onLogout();
-        }}
-        accountLabel={
-          session?.phone?.trim() || session?.email?.trim() || session?.accountLabel?.trim() || ''
-        }
-      />
     </div>
   );
 }
@@ -321,13 +307,8 @@ export function AppShell() {
   const isHelpOpen = useAppStore((s) => s.isHelpOpen);
   const setHelpOpen = useAppStore((s) => s.setHelpOpen);
   const sidecarStatus = useSidecarRuntimeStore((s) => s.runtime.status);
-  const session = useAuthStore((s) => s.session);
-  const refreshSession = useAuthStore((s) => s.refreshSession);
-  const logout = useAuthStore((s) => s.logout);
   const [downloadPanelOpen, setDownloadPanelOpen] = useState(false);
-  const [authInitialized, setAuthInitialized] = useState(false);
-  const authBypassEnabled = window.electronAPI?.platform?.isAuthBypassEnabled?.() ?? false;
-  const [connectionSetupComplete, setConnectionSetupComplete] = useState(authBypassEnabled);
+  const [connectionSetupComplete, setConnectionSetupComplete] = useState(false);
   const usesTitleBarOverlay =
     window.electronAPI?.platform?.usesTitleBarOverlayControls?.() ??
     !(window.electronAPI?.platform?.isMac?.() ?? true);
@@ -346,33 +327,6 @@ export function AppShell() {
   }, [isHelpOpen, usesTitleBarOverlay]);
 
   useEffect(() => {
-    let active = true;
-    void refreshSession().finally(() => {
-      if (active) {
-        setAuthInitialized(true);
-      }
-    });
-    return () => {
-      active = false;
-    };
-  }, [refreshSession]);
-
-  useEffect(() => {
-    if (!session) {
-      if (!authBypassEnabled) {
-        setConnectionSetupComplete(false);
-      }
-      return;
-    }
-
-    if (authBypassEnabled) {
-      setConnectionSetupComplete(true);
-    }
-  }, [authBypassEnabled, session]);
-
-  useEffect(() => {
-    if (!session) return;
-
     const api = window.electronAPI;
     if (!api) return;
 
@@ -397,12 +351,10 @@ export function AppShell() {
     });
 
     return unsub;
-  }, [session]);
+  }, []);
 
   // Subscribe to sidecar events for real-time updates
   useEffect(() => {
-    if (!session) return;
-
     const api = window.electronAPI;
     if (!api) return;
     const unsub = api.events.onSidecarEvent((event) => {
@@ -441,11 +393,11 @@ export function AppShell() {
       }
     });
     return unsub;
-  }, [session]);
+  }, []);
 
   // Periodic polling fallback in case WebSocket events are missed
   useEffect(() => {
-    if (!session || sidecarStatus !== 'healthy') {
+    if (sidecarStatus !== 'healthy') {
       return;
     }
 
@@ -453,7 +405,7 @@ export function AppShell() {
       useDashboardStore.getState().fetchDashboard();
     }, 10_000);
     return () => clearInterval(interval);
-  }, [session, sidecarStatus]);
+  }, [sidecarStatus]);
 
   useEffect(() => {
     const openDownloadPanel = () => setDownloadPanelOpen(true);
@@ -463,36 +415,8 @@ export function AppShell() {
     };
   }, []);
 
-  if (!authInitialized) {
-    return (
-      <div
-        className="vividrop-window-drag-region flex h-screen items-center justify-center text-[#17191c]"
-        style={{
-          backgroundColor: '#f7fbff',
-          backgroundImage:
-            'linear-gradient(135deg, rgba(255,252,247,0.98) 0%, rgba(247,252,255,0.92) 38%, rgba(239,248,255,0.92) 68%, rgba(255,248,220,0.72) 100%), repeating-linear-gradient(0deg, rgba(23,25,28,0.024) 0 1px, transparent 1px 3px)',
-          backgroundBlendMode: 'normal, overlay',
-        }}
-      >
-        <Skeleton className="h-10 w-44 rounded-lg bg-white/60" />
-      </div>
-    );
-  }
-
-  if (!session) {
-    return <AuthPage onAuthenticated={refreshSession} />;
-  }
-
   if (!connectionSetupComplete) {
-    return (
-      <ConnectionCodeSetupPage
-        onComplete={() => setConnectionSetupComplete(true)}
-        onLogout={async () => {
-          setConnectionSetupComplete(false);
-          await logout();
-        }}
-      />
-    );
+    return <ConnectionCodeSetupPage onComplete={() => setConnectionSetupComplete(true)} />;
   }
 
   return (
@@ -560,7 +484,7 @@ export function AppShell() {
                   <div className="text-xs font-semibold text-[#17191c]">iOS</div>
                   <div className="flex h-[88px] w-[88px] items-center justify-center rounded-md border border-white/80 bg-white p-1.5">
                     <QRCodeSVG
-                      value="https://vividrop.app/download/ios"
+                      value={mobileDownloadLinks[0].url}
                       size={74}
                       bgColor="#ffffff"
                       fgColor="#17191c"
@@ -570,9 +494,7 @@ export function AppShell() {
                   <button
                     type="button"
                     onClick={() =>
-                      void window.electronAPI?.files?.openExternal(
-                        'https://vividrop.app/download/ios',
-                      )
+                      void window.electronAPI?.files?.openExternal(mobileDownloadLinks[0].url)
                     }
                     className="inline-flex min-h-7 w-full items-center justify-center rounded-md bg-white/70 px-2 text-[11px] font-semibold text-[#59616d] transition hover:bg-white/90 hover:text-[#17191c]"
                   >
@@ -583,7 +505,7 @@ export function AppShell() {
                   <div className="text-xs font-semibold text-[#17191c]">Android</div>
                   <div className="flex h-[88px] w-[88px] items-center justify-center rounded-md border border-white/80 bg-white p-1.5">
                     <QRCodeSVG
-                      value="https://vividrop.app/download/android"
+                      value={mobileDownloadLinks[1].url}
                       size={74}
                       bgColor="#ffffff"
                       fgColor="#17191c"
@@ -593,9 +515,7 @@ export function AppShell() {
                   <button
                     type="button"
                     onClick={() =>
-                      void window.electronAPI?.files?.openExternal(
-                        'https://vividrop.app/download/android',
-                      )
+                      void window.electronAPI?.files?.openExternal(mobileDownloadLinks[1].url)
                     }
                     className="inline-flex min-h-7 w-full items-center justify-center rounded-md bg-white/70 px-2 text-[11px] font-semibold text-[#59616d] transition hover:bg-white/90 hover:text-[#17191c]"
                   >

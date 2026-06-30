@@ -27,20 +27,6 @@
       "description": "Connection, authorization, blocklist, and sync history will be available here."
     }
   },
-  "account": {
-    "promptTitle": "Sign in",
-    "login": "Sign in",
-    "logout": "Sign out",
-    "signedIn": "Signed in",
-    "connected": "Account connected",
-    "dialogTitle": "Sign in",
-    "dialogDescription": "Sign in to use remote transfer.",
-    "logoutConfirmTitle": "Sign Out",
-    "logoutConfirmDescription": "Are you sure you want to sign out of the current account {{account}}? You will need to sign in again to use the sync features.",
-    "logoutConfirmCancel": "Cancel",
-    "logoutConfirmOk": "Confirm",
-    "businessMember": "Business member"
-  },
   "connectionSetup": {
     "title": "Set pairing code",
     "connectionCodeLabel": "Pairing code",
@@ -62,8 +48,8 @@
         "description": "Enter this pairing code on the phone to connect this computer. Photos and files sync automatically on the same LAN."
       },
       "remoteAccess": {
-        "title": "Remotely access computer files",
-        "description": "After pairing succeeds, your phone can remotely access files on this computer"
+        "title": "Browse local computer files",
+        "description": "After pairing succeeds, phones on the same LAN can browse local files shared by this computer."
       }
     }
   },

@@ -1,25 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AuthSessionView } from '../../../../preload/api';
 import { useAppStore } from '@renderer/stores/app-store';
-import { useAuthStore } from '@renderer/stores/auth-store';
 import { Sidebar } from '../Sidebar';
-
-function setAuthSession(session: AuthSessionView | null) {
-  const logout = vi.fn().mockResolvedValue({ ok: true });
-  useAuthStore.setState({ session, loading: false });
-  (window as Window & { electronAPI?: unknown }).electronAPI = {
-    auth: {
-      logout,
-    },
-  } as unknown as Window['electronAPI'];
-  return { logout };
-}
 
 describe('Sidebar', () => {
   beforeEach(() => {
     Reflect.deleteProperty(window, 'electronAPI');
-    useAuthStore.setState({ session: null, loading: false });
     useAppStore.setState({
       currentView: 'dashboard',
       selectedDevice: null,
@@ -28,62 +14,41 @@ describe('Sidebar', () => {
   });
 
   it('does not expose sign-in controls inside the desktop shell', () => {
-    setAuthSession(null);
-
     render(<Sidebar />);
 
     expect(screen.queryByText('登录后可使用远端传输。')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '登录' })).not.toBeInTheDocument();
   });
 
-  it('shows the authenticated account instead of the sign-in prompt', async () => {
-    setAuthSession({ loggedIn: true, phone: '+8613800138000' });
-
+  it('does not render an authenticated account card in the OSS shell', async () => {
     render(<Sidebar />);
 
-    await waitFor(() => {
-      expect(screen.getByText('+8613800138000')).toBeInTheDocument();
-    });
+    expect(screen.queryByText('+8613800138000')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('登出')).not.toBeInTheDocument();
     expect(screen.queryByText('登录后可使用远端传输。')).not.toBeInTheDocument();
   });
 
-  it('shows the authenticated email when it is available', async () => {
-    setAuthSession({ loggedIn: true, email: 'ada@example.com' });
-
+  it('does not render authenticated email account state', async () => {
     render(<Sidebar />);
 
-    expect(await screen.findByText('ada@example.com')).toBeInTheDocument();
+    expect(screen.queryByText('ada@example.com')).not.toBeInTheDocument();
     expect(screen.queryByText('登录后可使用远端传输。')).not.toBeInTheDocument();
   });
 
-  it('shows the authenticated account label when it is provided by the session view', async () => {
-    setAuthSession({ loggedIn: true, accountLabel: 'ada@example.com' });
-
+  it('does not render authenticated account labels', async () => {
     render(<Sidebar />);
 
-    expect(await screen.findByText('ada@example.com')).toBeInTheDocument();
+    expect(screen.queryByText('ada@example.com')).not.toBeInTheDocument();
     expect(screen.queryByText('登录后可使用远端传输。')).not.toBeInTheDocument();
   });
 
-  it('signs out from the authenticated account card', async () => {
-    const { logout } = setAuthSession({ loggedIn: true, phone: '+8613800138000' });
-
+  it('does not expose sign-out from the OSS sidebar', async () => {
     render(<Sidebar />);
 
-    fireEvent.click(await screen.findByTitle('登出'));
-
-    // Click confirm button in the confirmation dialog
-    const confirmButton = await screen.findByRole('button', { name: '确认退出' });
-    fireEvent.click(confirmButton);
-
-    await waitFor(() => {
-      expect(logout).toHaveBeenCalledTimes(1);
-    });
+    expect(screen.queryByTitle('登出')).not.toBeInTheDocument();
   });
 
   it('exposes the desktop-local navigation entries and hides legacy folder management', async () => {
-    setAuthSession(null);
-
     render(<Sidebar />);
 
     expect(screen.getByRole('button', { name: '共享管理' })).toBeInTheDocument();
@@ -95,8 +60,6 @@ describe('Sidebar', () => {
   });
 
   it('uses the reference navigation icon mapping', async () => {
-    setAuthSession(null);
-
     const { container } = render(<Sidebar />);
 
     expect(container.querySelector('button svg.lucide-hard-drive')).toBeInTheDocument();
@@ -107,8 +70,6 @@ describe('Sidebar', () => {
   });
 
   it('switches to each desktop-local view from the sidebar', async () => {
-    setAuthSession(null);
-
     render(<Sidebar />);
 
     fireEvent.click(screen.getByRole('button', { name: '设备管理' }));

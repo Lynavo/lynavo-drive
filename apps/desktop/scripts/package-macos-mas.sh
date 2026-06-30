@@ -7,10 +7,10 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../../.." && pwd)"
 IOS_WORKSPACE="${REPO_ROOT}/apps/mobile/ios/SyncFlowMobile.xcworkspace"
 IOS_SCHEME="SyncFlowMobile"
 
-# Default MAS Apple API Key (same as Developer ID for simplicity)
-DEFAULT_API_KEY="${REPO_ROOT}/AuthKey_HY8CAHGPW9.p8"
-DEFAULT_API_KEY_ID="HY8CAHGPW9"
-DEFAULT_API_ISSUER="54cad458-4184-4fc6-a1c7-cb4b0c6ded0e"
+# Default Lynavo MAS Apple API Key (same as Developer ID for simplicity)
+DEFAULT_API_KEY="${REPO_ROOT}/AuthKey_AMY9XVV3LD.p8"
+DEFAULT_API_KEY_ID="AMY9XVV3LD"
+DEFAULT_API_ISSUER="8de17ec0-4bff-4ab2-8c01-ace1f9307147"
 
 resolve_build_number() {
   xcodebuild -workspace "${IOS_WORKSPACE}" -scheme "${IOS_SCHEME}" -showBuildSettings 2>/dev/null \

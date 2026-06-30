@@ -40,22 +40,6 @@ export type UpdateCheckResult = {
   checkedAt: string;
 };
 
-export type AuthLoginResult = {
-  ok: boolean;
-  message?: string;
-  reason?: string;
-  userId?: number;
-  isNewUser?: boolean;
-  merged?: boolean;
-};
-
-export type AuthSessionView = {
-  loggedIn: true;
-  phone?: string;
-  email?: string;
-  accountLabel?: string;
-};
-
 export type PowerSaveState = {
   preventSleepDuringTransfer: boolean;
   blockingSleep: boolean;
@@ -84,24 +68,6 @@ export interface ElectronAPI {
     getConnectionDevices(): Promise<ConnectionDevicesSettingsDTO>;
     revokeConnectionDevice(clientId: string): Promise<{ ok: boolean }>;
     clearBlockedClient(clientId: string): Promise<{ ok: boolean }>;
-    getClientConfig(): Promise<{
-      features: {
-        giftCard: {
-          enabled: boolean;
-        };
-      };
-    }>;
-    redeemGiftCard(payload: { code: string }): Promise<{
-      ok: boolean;
-      message?: string;
-      reason?:
-        | 'auth_required'
-        | 'invalid_code'
-        | 'expired'
-        | 'not_available'
-        | 'already_redeemed'
-        | 'plan_mismatch';
-    }>;
     setConnectionCode(code: string): Promise<{ code: string }>;
     regenerateConnectionCode(): Promise<{ code: string }>;
     getRuntimeState(): Promise<SidecarRuntimeState>;
@@ -136,23 +102,6 @@ export interface ElectronAPI {
     requestFolderPermission(): Promise<{ granted: boolean }>;
   };
 
-  auth: {
-    sendSMSCode(payload: { phone: string }): Promise<{
-      ok: boolean;
-      message?: string;
-      reason?: 'phone_invalid' | 'sms_too_frequent' | 'sms_send_failed';
-    }>;
-    loginWithSMSCode(payload: { phone: string; code: string }): Promise<AuthLoginResult>;
-    sendEmailCode(payload: { email: string }): Promise<{
-      ok: boolean;
-      message?: string;
-      reason?: 'email_invalid' | 'email_too_frequent' | 'email_send_failed';
-    }>;
-    loginWithEmailCode(payload: { email: string; code: string }): Promise<AuthLoginResult>;
-    getAuthSession(): Promise<AuthSessionView | null>;
-    logout(): Promise<{ ok: boolean }>;
-    loginWithOAuth(payload: { provider: 'google' | 'apple' }): Promise<AuthLoginResult>;
-  };
   events: {
     onSidecarEvent(callback: (event: SidecarEvent) => void): () => void;
     onSidecarRuntimeState(callback: (state: SidecarRuntimeState) => void): () => void;
@@ -161,9 +110,7 @@ export interface ElectronAPI {
     isMac(): boolean;
     isWindows(): boolean;
     isLinux(): boolean;
-    supportsAppleAuth(): boolean;
     usesTitleBarOverlayControls(): boolean;
-    isAuthBypassEnabled(): boolean;
     getHomeDir(): string;
     getHostName(): string;
     setModalOverlayActive(active: boolean): Promise<void>;

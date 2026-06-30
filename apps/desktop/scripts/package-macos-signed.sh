@@ -8,13 +8,11 @@ TARGET="${1:-dmg}"
 IOS_WORKSPACE="${REPO_ROOT}/apps/mobile/ios/SyncFlowMobile.xcworkspace"
 IOS_SCHEME="SyncFlowMobile"
 DESKTOP_PACKAGE_JSON="${REPO_ROOT}/apps/desktop/package.json"
+ELECTRON_BUILDER_CONFIG="electron-builder.yml"
 
-DEFAULT_CN_API_KEY_ID="HY8CAHGPW9"
-DEFAULT_CN_API_ISSUER="54cad458-4184-4fc6-a1c7-cb4b0c6ded0e"
-DEFAULT_GLOBAL_API_KEY_ID="AMY9XVV3LD"
-DEFAULT_GLOBAL_API_ISSUER="8de17ec0-4bff-4ab2-8c01-ace1f9307147"
-DEFAULT_CN_CSC_TEAM_ID="GKN7JQNCMC"
-DEFAULT_GLOBAL_CSC_TEAM_ID="S44ANBLMF9"
+DEFAULT_API_KEY_ID="AMY9XVV3LD"
+DEFAULT_API_ISSUER="8de17ec0-4bff-4ab2-8c01-ace1f9307147"
+DEFAULT_CSC_TEAM_ID="S44ANBLMF9"
 
 usage() {
   cat <<'EOF'
@@ -30,8 +28,8 @@ Environment overrides:
   APPLE_API_KEY      Path to App Store Connect API key (.p8)
   APPLE_API_KEY_ID   App Store Connect API key id
   APPLE_API_ISSUER   App Store Connect issuer id
-  ELECTRON_BUILDER_CONFIG
-                    Optional electron-builder config file, e.g. electron-builder.global.yml
+  ELECTRON_BUILDER_CONFIG is intentionally ignored; this script always uses
+                    electron-builder.yml.
 EOF
 }
 
@@ -72,13 +70,7 @@ detect_identity_for_team() {
 }
 
 resolve_expected_csc_team_id() {
-  local market="${SYNCFLOW_MARKET:-cn}"
-
-  if [[ "${market}" == "global" ]]; then
-    echo "${DEFAULT_GLOBAL_CSC_TEAM_ID}"
-  else
-    echo "${DEFAULT_CN_CSC_TEAM_ID}"
-  fi
+  echo "${CSC_TEAM_ID:-${DEFAULT_CSC_TEAM_ID}}"
 }
 
 resolve_ios_build_number() {
@@ -94,23 +86,14 @@ resolve_desktop_package_field() {
 }
 
 configure_app_store_connect_key() {
-  local market="${SYNCFLOW_MARKET:-cn}"
-
-  if [[ "${market}" == "global" ]]; then
-    APPLE_API_KEY_ID="${APPLE_API_KEY_ID:-${DEFAULT_GLOBAL_API_KEY_ID}}"
-    APPLE_API_ISSUER="${APPLE_API_ISSUER:-${DEFAULT_GLOBAL_API_ISSUER}}"
-  else
-    APPLE_API_KEY_ID="${APPLE_API_KEY_ID:-${DEFAULT_CN_API_KEY_ID}}"
-    APPLE_API_ISSUER="${APPLE_API_ISSUER:-${DEFAULT_CN_API_ISSUER}}"
-  fi
+  APPLE_API_KEY_ID="${APPLE_API_KEY_ID:-${DEFAULT_API_KEY_ID}}"
+  APPLE_API_ISSUER="${APPLE_API_ISSUER:-${DEFAULT_API_ISSUER}}"
 
   if [[ -z "${APPLE_API_KEY:-}" ]]; then
     if [[ -f "${REPO_ROOT}/AuthKey_${APPLE_API_KEY_ID}.p8" ]]; then
       APPLE_API_KEY="${REPO_ROOT}/AuthKey_${APPLE_API_KEY_ID}.p8"
-    elif [[ -f "${REPO_ROOT}/AuthKey_China_${APPLE_API_KEY_ID}.p8" ]]; then
-      APPLE_API_KEY="${REPO_ROOT}/AuthKey_China_${APPLE_API_KEY_ID}.p8"
-    elif [[ -f "${REPO_ROOT}/AuthKey_Global_${APPLE_API_KEY_ID}.p8" ]]; then
-      APPLE_API_KEY="${REPO_ROOT}/AuthKey_Global_${APPLE_API_KEY_ID}.p8"
+    elif [[ -f "${REPO_ROOT}/AuthKey_Lynavo_${APPLE_API_KEY_ID}.p8" ]]; then
+      APPLE_API_KEY="${REPO_ROOT}/AuthKey_Lynavo_${APPLE_API_KEY_ID}.p8"
     else
       APPLE_API_KEY="${REPO_ROOT}/AuthKey_${APPLE_API_KEY_ID}.p8"
     fi
@@ -151,7 +134,7 @@ fi
 
 if [[ "${CSC_NAME}" != *"(${EXPECTED_CSC_TEAM_ID})"* ]]; then
   echo "Selected CSC_NAME does not match expected Team ID ${EXPECTED_CSC_TEAM_ID}: ${CSC_NAME}" >&2
-  echo "Set SYNCFLOW_MARKET correctly or install/export a matching Developer ID Application identity." >&2
+  echo "Install/export a matching Developer ID Application identity or set CSC_TEAM_ID/CSC_NAME explicitly." >&2
   exit 1
 fi
 
@@ -178,9 +161,7 @@ echo "Expected Team ID: ${EXPECTED_CSC_TEAM_ID}"
 echo "API key path: ${APPLE_API_KEY}"
 echo "Build number: ${SYNCFLOW_BUILD_NUMBER}"
 echo "Target: ${TARGET}"
-if [[ -n "${ELECTRON_BUILDER_CONFIG:-}" ]]; then
-  echo "Electron builder config: ${ELECTRON_BUILDER_CONFIG}"
-fi
+echo "Electron builder config: ${ELECTRON_BUILDER_CONFIG}"
 
 cd "${REPO_ROOT}"
 
@@ -188,13 +169,11 @@ pnpm --filter @syncflow/desktop build
 pnpm --filter @syncflow/desktop build:sidecar:mac
 
 BUILD_ARGS=(
+  "--config"
+  "${ELECTRON_BUILDER_CONFIG}"
   "-c.buildVersion=${SYNCFLOW_BUILD_NUMBER}"
   "-c.extraMetadata.syncflowBuildNumber=${SYNCFLOW_BUILD_NUMBER}"
 )
-
-if [[ -n "${ELECTRON_BUILDER_CONFIG:-}" ]]; then
-  BUILD_ARGS=("--config" "${ELECTRON_BUILDER_CONFIG}" "${BUILD_ARGS[@]}")
-fi
 
 build_macos_arch() {
   local target="$1"
@@ -211,7 +190,7 @@ build_macos_arch() {
 
 validate_dmg_payload() {
   local arch="$1"
-  local dmg_path="${REPO_ROOT}/apps/desktop/release/ViviDrop-${DESKTOP_VERSION}-${arch}.dmg"
+  local dmg_path="${REPO_ROOT}/apps/desktop/release/LynavoDrive-${DESKTOP_VERSION}-${arch}.dmg"
   local mount_dir
   local app_path
   local volume_name
@@ -226,7 +205,7 @@ validate_dmg_payload() {
     return 1
   fi
 
-  mount_dir="$(mktemp -d "${TMPDIR:-/tmp}/vividrop-dmg-${arch}.XXXXXX")"
+  mount_dir="$(mktemp -d "${TMPDIR:-/tmp}/lynavo-drive-dmg-${arch}.XXXXXX")"
   app_path="${mount_dir}/${DESKTOP_PRODUCT_NAME}.app"
 
   if ! hdiutil attach -quiet -nobrowse -readonly -mountpoint "${mount_dir}" "${dmg_path}"; then
@@ -266,7 +245,7 @@ validate_dmg_payload() {
 
 remove_stale_dmg_blockmap() {
   local arch="$1"
-  local blockmap_path="${REPO_ROOT}/apps/desktop/release/ViviDrop-${DESKTOP_VERSION}-${arch}.dmg.blockmap"
+  local blockmap_path="${REPO_ROOT}/apps/desktop/release/LynavoDrive-${DESKTOP_VERSION}-${arch}.dmg.blockmap"
 
   if [[ -f "${blockmap_path}" ]]; then
     rm -f "${blockmap_path}"
@@ -276,7 +255,7 @@ remove_stale_dmg_blockmap() {
 
 finalize_dmg_volume_name() (
   local arch="$1"
-  local dmg_path="${REPO_ROOT}/apps/desktop/release/ViviDrop-${DESKTOP_VERSION}-${arch}.dmg"
+  local dmg_path="${REPO_ROOT}/apps/desktop/release/LynavoDrive-${DESKTOP_VERSION}-${arch}.dmg"
   local staging_dir
   local rw_dmg
   local renamed_dmg
@@ -287,9 +266,9 @@ finalize_dmg_volume_name() (
     exit 1
   fi
 
-  staging_dir="$(mktemp -d "${TMPDIR:-/tmp}/vividrop-dmg-finalize-${arch}.XXXXXX")"
-  rw_dmg="${staging_dir}/ViviDrop-${DESKTOP_VERSION}-${arch}.rw.dmg"
-  renamed_dmg="${staging_dir}/ViviDrop-${DESKTOP_VERSION}-${arch}.dmg"
+  staging_dir="$(mktemp -d "${TMPDIR:-/tmp}/lynavo-drive-dmg-finalize-${arch}.XXXXXX")"
+  rw_dmg="${staging_dir}/LynavoDrive-${DESKTOP_VERSION}-${arch}.rw.dmg"
+  renamed_dmg="${staging_dir}/LynavoDrive-${DESKTOP_VERSION}-${arch}.dmg"
 
   cleanup_finalize_dmg() {
     hdiutil detach "${mount_dir}" >/dev/null 2>&1 || true
@@ -312,7 +291,7 @@ rebuild_dmg_from_app() (
   local arch="$1"
   local release_dir="${REPO_ROOT}/apps/desktop/release"
   local app_dir="${release_dir}/mac/${DESKTOP_PRODUCT_NAME}.app"
-  local dmg_path="${release_dir}/ViviDrop-${DESKTOP_VERSION}-${arch}.dmg"
+  local dmg_path="${release_dir}/LynavoDrive-${DESKTOP_VERSION}-${arch}.dmg"
   local rw_dmg
   local staging_dir
   local mount_dir
@@ -326,8 +305,8 @@ rebuild_dmg_from_app() (
     exit 1
   fi
 
-  staging_dir="$(mktemp -d "${TMPDIR:-/tmp}/vividrop-dmg-rebuild-${arch}.XXXXXX")"
-  rw_dmg="${staging_dir}/ViviDrop-${DESKTOP_VERSION}-${arch}.rw.dmg"
+  staging_dir="$(mktemp -d "${TMPDIR:-/tmp}/lynavo-drive-dmg-rebuild-${arch}.XXXXXX")"
+  rw_dmg="${staging_dir}/LynavoDrive-${DESKTOP_VERSION}-${arch}.rw.dmg"
   mount_dir="/Volumes/${DMG_CREATE_VOLUME_NAME}"
 
   cleanup_rebuild_dmg() {

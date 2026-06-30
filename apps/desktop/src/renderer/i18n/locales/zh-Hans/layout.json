@@ -27,20 +27,6 @@
       "description": "连接、授权、封锁与同步记录将在这里查询。"
     }
   },
-  "account": {
-    "promptTitle": "登录账号",
-    "login": "登录",
-    "logout": "登出",
-    "signedIn": "已登录",
-    "connected": "账号已连接",
-    "dialogTitle": "登录账号",
-    "dialogDescription": "登录后可使用远端传输。",
-    "logoutConfirmTitle": "退出登录",
-    "logoutConfirmDescription": "确定要退出当前账号 {{account}} 吗？退出后需重新登录才能使用同步功能。",
-    "logoutConfirmCancel": "取消",
-    "logoutConfirmOk": "确认退出",
-    "businessMember": "商务会员"
-  },
   "connectionSetup": {
     "title": "设置连接码",
     "connectionCodeLabel": "连接码",
@@ -62,8 +48,8 @@
         "description": "在手机端输入此连接码即可连接此电脑，同一局域网下自动同步手机相册和文件到此电脑"
       },
       "remoteAccess": {
-        "title": "远程访问电脑文件",
-        "description": "连接码连接成功后，手机可远程访问这台电脑的文件"
+        "title": "浏览电脑本地文件",
+        "description": "配对成功后，同一局域网内的手机可以浏览这台电脑共享的本地文件。"
       }
     }
   },

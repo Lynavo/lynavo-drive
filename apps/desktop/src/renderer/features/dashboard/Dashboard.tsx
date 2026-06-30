@@ -85,26 +85,6 @@ export function Dashboard() {
     });
   }, []);
 
-  const toggleRemoteAccess = async () => {
-    const next = !settings.remoteAccessEnabled;
-    try {
-      const updated = await window.electronAPI?.sidecar.updateSettings({
-        remoteAccessEnabled: next,
-      });
-      if (updated) {
-        useSettingsStore.getState().updateSettings(updated);
-        toast.success(
-          next
-            ? t('dashboard.share.toast.remoteAccessEnabled')
-            : t('dashboard.share.toast.remoteAccessDisabled'),
-        );
-      }
-    } catch (err) {
-      console.error('Failed to toggle remote access:', err);
-      toast.error(t('dashboard.share.toast.remoteAccessUpdateFailed'));
-    }
-  };
-
   const handleRequestFolderPermission = async () => {
     const api = window.electronAPI;
     if (!api) return;
@@ -340,20 +320,6 @@ export function Dashboard() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={toggleRemoteAccess}
-                aria-label={t('dashboard.share.remoteAccess.toggle')}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  settings.remoteAccessEnabled ? 'bg-[#17191c]' : 'bg-slate-200'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                    settings.remoteAccessEnabled ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
             </div>
 
             {/* macOS Files & Folders permission banner */}

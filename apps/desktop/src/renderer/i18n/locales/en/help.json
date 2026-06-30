@@ -27,7 +27,7 @@
           },
           {
             "title": "How to access the shared folder",
-            "body": "Tap Shared Folder on the home screen to browse the shared folder on the desktop. Image and video preview are supported, and subscribers can download files to the phone."
+            "body": "Tap Shared Folder on the home screen to browse the shared folder on the desktop. Image and video preview and downloads use the local LAN connection."
           }
         ]
       },
@@ -47,7 +47,7 @@
           },
           {
             "title": "View the shared folder",
-            "body": "Tap the Shared Folder card on the home screen to browse files in the desktop shared folder. You can preview images and videos, and subscribers can download files."
+            "body": "Tap the Shared Folder card on the home screen to browse files in the desktop shared folder. You can preview images and videos and download allowed files over the LAN."
           }
         ]
       },
@@ -59,7 +59,7 @@
           },
           {
             "title": "received folder and shared folder",
-            "body": "The received folder stores all media uploaded from phones to the computer and is the default upload destination. The shared folder is configured on the desktop; phones can browse and preview it, and subscribers can download files."
+            "body": "The received folder stores all media uploaded from phones to the computer and is the default upload destination. The shared folder is configured on the desktop; phones can browse, preview, and download allowed files over the LAN."
           },
           {
             "title": "Shared folder access is read-only",
@@ -86,12 +86,12 @@
             "body": "Confirm the phone and computer are on the same LAN, check whether the desktop firewall blocks ViviDrop, then try restarting the desktop app or connecting with the QR code."
           },
           {
-            "title": "How long is the trial?",
-            "body": "New users can try all features for 7 days after registration. A subscription is required after the trial ends."
+            "title": "Do I need an account or subscription?",
+            "body": "No. The open-source desktop runtime supports local LAN pairing, discovery, automatic uploads, and shared-folder browsing without official account or subscription bootstrap."
           },
           {
-            "title": "How do I manage my subscription?",
-            "body": "Go to Settings -> Manage Subscription to view the current subscription status and expiration date, or purchase again."
+            "title": "Does the OSS edition include official remote access?",
+            "body": "No. Official TURN, signaling, purchase, and account services are not part of the OSS runtime. Keep the phone and computer on the same LAN for sync and browsing."
           }
         ]
       },

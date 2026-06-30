@@ -7,7 +7,6 @@ import { GlassCard } from '@renderer/components/shared/GlassCard';
 import { CopyButton } from '@renderer/components/shared/CopyButton';
 import { useSettingsStore } from '@renderer/stores/settings-store';
 import { isWindowsDriveRootPath } from '@renderer/lib/windows-path';
-import { isGlobalMarket } from '../../../shared/market';
 
 const colors = {
   title: '#1a2a3a',
@@ -23,7 +22,6 @@ const colors = {
 
 export function DirectoryPathCard() {
   const { t } = useTranslation();
-  const isGlobalBuild = isGlobalMarket();
   const settings = useSettingsStore((s) => s.settings);
   const updateSettings = useSettingsStore((s) => s.updateSettings);
   const [saving, setSaving] = useState(false);
@@ -219,9 +217,7 @@ export function DirectoryPathCard() {
       </GlassCard>
 
       {/* Sub-directory cards */}
-      <div
-        className={`grid grid-cols-1 gap-4 ${isGlobalBuild ? 'lg:grid-cols-2' : 'lg:grid-cols-3'}`}
-      >
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Received directory */}
         <GlassCard className="space-y-3 p-4">
           <div className="flex items-center gap-3">
@@ -256,40 +252,38 @@ export function DirectoryPathCard() {
           </code>
         </GlassCard>
 
-        {!isGlobalBuild && (
-          <GlassCard className="space-y-3 p-4">
-            <div className="flex items-center gap-3">
-              <div
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-                style={{ background: colors.iconSharedBg }}
-              >
-                <FolderSymlink className="h-4.5 w-4.5" style={{ color: colors.iconShared }} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h4 className="text-sm font-semibold" style={{ color: colors.title }}>
-                  {t('directory.pathCard.sharedDirectory')}
-                </h4>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleOpenFolder(sharedPath)}
-                disabled={!sharedPath}
-                className="shrink-0"
-              >
-                <FolderOpen className="mr-1 h-3.5 w-3.5" />
-                {t('common.actions.open')}
-              </Button>
-            </div>
-            <code
-              className="block w-full truncate rounded-md px-2.5 py-1.5 text-xs font-mono text-muted-foreground"
-              style={{ background: colors.pathBg }}
-              title={sharedPath}
+        <GlassCard className="space-y-3 p-4">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+              style={{ background: colors.iconSharedBg }}
             >
-              {sharedPath || '--'}
-            </code>
-          </GlassCard>
-        )}
+              <FolderSymlink className="h-4.5 w-4.5" style={{ color: colors.iconShared }} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-sm font-semibold" style={{ color: colors.title }}>
+                {t('directory.pathCard.sharedDirectory')}
+              </h4>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleOpenFolder(sharedPath)}
+              disabled={!sharedPath}
+              className="shrink-0"
+            >
+              <FolderOpen className="mr-1 h-3.5 w-3.5" />
+              {t('common.actions.open')}
+            </Button>
+          </div>
+          <code
+            className="block w-full truncate rounded-md px-2.5 py-1.5 text-xs font-mono text-muted-foreground"
+            style={{ background: colors.pathBg }}
+            title={sharedPath}
+          >
+            {sharedPath || '--'}
+          </code>
+        </GlassCard>
 
         {/* Personal directory */}
         <GlassCard className="space-y-3 p-4">
@@ -305,11 +299,7 @@ export function DirectoryPathCard() {
                 className="whitespace-nowrap text-sm font-semibold"
                 style={{ color: colors.title }}
               >
-                {t(
-                  isGlobalBuild
-                    ? 'directory.pathCard.globalPersonalDirectory'
-                    : 'directory.pathCard.personalDirectory',
-                )}
+                {t('directory.pathCard.globalPersonalDirectory')}
               </h4>
             </div>
             <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">

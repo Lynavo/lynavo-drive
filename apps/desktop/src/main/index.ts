@@ -16,7 +16,7 @@ import { createVideoThumbnailEventHandler } from './video-thumbnail-generator';
 import { WsBridge } from './ws-bridge';
 import { getMainWindowChromeOptions, getMainWindowSizeOptions } from './window-chrome';
 import type { SidecarRuntimeState } from '../shared/sidecar-runtime';
-import { getProductName } from '../shared/market';
+import { APP_STORAGE_IDENTITY_NAME, getProductName } from '../shared/product';
 import { shouldHideApplicationMenu } from '../shared/platform-capabilities';
 
 // Prevent crash on broken pipe (sidecar stdout/stderr)
@@ -27,9 +27,13 @@ process.on('uncaughtException', (err) => {
 
 let mainWindow: BrowserWindow | null = null;
 
-if (process.platform === 'darwin') {
-  app.setName(getProductName());
+type ElectronApp = typeof app;
+
+export function configureElectronStorageIdentity(electronApp: ElectronApp) {
+  electronApp.setPath('userData', join(electronApp.getPath('appData'), APP_STORAGE_IDENTITY_NAME));
 }
+
+configureElectronStorageIdentity(app);
 const sidecar = new SidecarManager();
 let wsBridge: WsBridge;
 const powerSaveManager = new PowerSaveManager(powerSaveBlocker);

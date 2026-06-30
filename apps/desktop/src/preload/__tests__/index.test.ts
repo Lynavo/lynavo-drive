@@ -5,8 +5,6 @@ const exposed = vi.hoisted(() => ({
     | undefined
     | {
         sidecar: {
-          getClientConfig(): Promise<unknown>;
-          redeemGiftCard(payload: { code: string }): Promise<unknown>;
           getConnectionDevices(): Promise<unknown>;
           revokeConnectionDevice(clientId: string): Promise<unknown>;
           clearBlockedClient(clientId: string): Promise<unknown>;
@@ -22,12 +20,6 @@ const exposed = vi.hoisted(() => ({
         files: {
           selectFile(): Promise<unknown>;
           revealPath(path: string): Promise<unknown>;
-        };
-        auth: {
-          sendSMSCode(payload: { phone: string }): Promise<unknown>;
-          loginWithSMSCode(payload: { phone: string; code: string }): Promise<unknown>;
-          getAuthSession(): Promise<unknown>;
-          logout(): Promise<unknown>;
         };
         power: {
           getState(): Promise<unknown>;
@@ -45,7 +37,6 @@ const exposed = vi.hoisted(() => ({
 
 const platformCapabilities = vi.hoisted(() => ({
   isLinuxPlatform: vi.fn((): boolean => false),
-  supportsAppleAuth: vi.fn((): boolean => true),
   usesTitleBarOverlayControls: vi.fn((): boolean => false),
 }));
 
@@ -73,34 +64,18 @@ describe('preload electronAPI', () => {
     exposed.removeListener.mockReset();
     platformCapabilities.isLinuxPlatform.mockReset();
     platformCapabilities.isLinuxPlatform.mockReturnValue(false);
-    platformCapabilities.supportsAppleAuth.mockReset();
-    platformCapabilities.supportsAppleAuth.mockReturnValue(true);
     platformCapabilities.usesTitleBarOverlayControls.mockReset();
     platformCapabilities.usesTitleBarOverlayControls.mockReturnValue(false);
   });
 
-  it('maps gift card redeem calls to the IPC channel', async () => {
+  it('does not expose commercial gift-card, client-config, or auth bridges', async () => {
     exposed.invoke.mockResolvedValue({ ok: true });
 
     await import('../index');
 
-    await expect(exposed.api?.sidecar.redeemGiftCard({ code: 'ABCD-EFGH-IJKL' })).resolves.toEqual({
-      ok: true,
-    });
-    expect(exposed.invoke).toHaveBeenCalledWith('sidecar:redeem-gift-card', {
-      code: 'ABCD-EFGH-IJKL',
-    });
-  });
-
-  it('maps client config calls to the IPC channel', async () => {
-    exposed.invoke.mockResolvedValue({ features: { giftCard: { enabled: true } } });
-
-    await import('../index');
-
-    await expect(exposed.api?.sidecar.getClientConfig()).resolves.toEqual({
-      features: { giftCard: { enabled: true } },
-    });
-    expect(exposed.invoke).toHaveBeenCalledWith('sidecar:client-config');
+    expect(exposed.api?.sidecar).not.toHaveProperty('redeemGiftCard');
+    expect(exposed.api?.sidecar).not.toHaveProperty('getClientConfig');
+    expect(exposed.api).not.toHaveProperty('auth');
   });
 
   it('maps desktop-local sidecar calls to IPC channels', async () => {
@@ -162,42 +137,6 @@ describe('preload electronAPI', () => {
     expect(exposed.invoke).toHaveBeenCalledWith('files:reveal-path', '/tmp/photo.jpg');
   });
 
-  it('maps phone auth calls to IPC channels', async () => {
-    exposed.invoke.mockResolvedValue({ ok: true });
-
-    await import('../index');
-
-    await expect(exposed.api?.auth.sendSMSCode({ phone: '13800138000' })).resolves.toEqual({
-      ok: true,
-    });
-    await expect(
-      exposed.api?.auth.loginWithSMSCode({ phone: '13800138000', code: '123456' }),
-    ).resolves.toEqual({ ok: true });
-    expect(exposed.invoke).toHaveBeenCalledWith('auth:send-sms-code', {
-      phone: '13800138000',
-    });
-    expect(exposed.invoke).toHaveBeenCalledWith('auth:login-with-sms-code', {
-      phone: '13800138000',
-      code: '123456',
-    });
-  });
-
-  it('maps renderer auth session calls to sanitized session IPC', async () => {
-    exposed.invoke
-      .mockResolvedValueOnce({ loggedIn: true, email: 'ada@example.com' })
-      .mockResolvedValueOnce({ ok: true });
-
-    await import('../index');
-
-    await expect(exposed.api?.auth.getAuthSession()).resolves.toEqual({
-      loggedIn: true,
-      email: 'ada@example.com',
-    });
-    await expect(exposed.api?.auth.logout()).resolves.toEqual({ ok: true });
-    expect(exposed.invoke).toHaveBeenCalledWith('auth:get-session');
-    expect(exposed.invoke).toHaveBeenCalledWith('auth:logout');
-  });
-
   it('maps power save calls to IPC channels', async () => {
     exposed.invoke.mockResolvedValue({ preventSleepDuringTransfer: true, blockingSleep: false });
 
@@ -223,6 +162,12 @@ describe('preload electronAPI', () => {
     expect(exposed.api?.platform.isLinux()).toBe(true);
     expect(exposed.api?.platform.isLinux()).toBe(false);
     expect(platformCapabilities.isLinuxPlatform).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not expose official Apple auth platform capability in OSS preload', async () => {
+    await import('../index');
+
+    expect(exposed.api?.platform).not.toHaveProperty('supportsAppleAuth');
   });
 
   it('maps modal title bar overlay updates to IPC', async () => {

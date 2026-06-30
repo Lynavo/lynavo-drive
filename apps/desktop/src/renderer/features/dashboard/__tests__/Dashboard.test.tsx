@@ -92,11 +92,13 @@ describe('Dashboard', () => {
 
   });
 
-  it('renders the 3 main cards: 连接码, 远程访问, 接收目录', () => {
+  it('renders the local LAN cards without a remote access toggle', () => {
     render(<Dashboard />);
 
     expect(screen.getByText('连接码')).toBeInTheDocument();
-    expect(screen.getByText('远程访问')).toBeInTheDocument();
+    expect(screen.getByText('本地文件访问')).toBeInTheDocument();
+    expect(screen.queryByText('远程访问')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '远程访问开关' })).not.toBeInTheDocument();
     expect(screen.getByText('接收目录')).toBeInTheDocument();
   });
 

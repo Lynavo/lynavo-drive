@@ -11,8 +11,6 @@
     "powerSaveDescription": "同步时保持桌面端可用",
     "shareAddress": "局域网共享",
     "shareAddressDescription": "检测这台电脑的 SMB 共享状态，供手机读取共享目录",
-    "giftCard": "礼品卡",
-    "giftCardDescription": "兑换礼品卡可提升额度、功能或同步时长",
     "bonjour": "Windows Bonjour 广播",
     "bonjourDescription": "用于让手机在同一局域网内发现这台电脑"
   },
@@ -66,56 +64,6 @@
     "blockingSleep": "正在保持唤醒",
     "idle": "未启用"
   },
-  "giftCard": {
-    "title": "礼品卡兑换",
-    "description": "请输入服务提供的礼品卡编号",
-    "codeLabel": "礼品卡编号",
-    "placeholder": "例如：VF-GIFT-XXXX",
-    "redeem": "兑换",
-    "redeemSuccess": "礼品卡兑换成功",
-    "phoneLogin": {
-      "title": "手机登入",
-      "globalTitle": "登入或注册",
-      "description": "请输入手机号并完成验证码登入后继续兑换。",
-      "globalDescription": "登入后可使用远端同步与账号功能。",
-      "phoneLabel": "手机号",
-      "phonePlaceholder": "请输入手机号",
-      "codeLabel": "验证码",
-      "codePlaceholder": "6 位验证码",
-      "countryCodePlaceholder": "区号",
-      "countryCodes": {
-        "china": "中国大陆",
-        "northAmerica": "美国/加拿大",
-        "taiwan": "中国台湾",
-        "hongKong": "中国香港",
-        "japan": "日本",
-        "singapore": "新加坡"
-      },
-      "oauth": {
-        "continueWithGoogle": "使用 Google 继续",
-        "continueWithApple": "使用 Apple 继续",
-        "divider": "或",
-        "providers": {
-          "google": "Google",
-          "apple": "Apple"
-        }
-      },
-      "sendCode": "发送验证码",
-      "loginAndRedeem": "登入并兑换",
-      "loginRequired": "请先用手机号登入后继续兑换礼品卡",
-      "codeSent": "验证码已发送",
-      "loginSuccess": "登入成功，正在继续兑换",
-      "loginSuccessGeneric": "登入成功",
-      "logoutSuccess": "已成功登出",
-      "logoutFailed": "登出失败",
-      "logoutError": "登出出错",
-      "accountStatus": "账号状态",
-      "loggedInAs": "已登入",
-      "notLoggedIn": "尚未登入",
-      "logout": "登出",
-      "login": "登入"
-    }
-  },
   "filePath": {
     "receiveAddress": "接收目录",
     "personalAddress": "个人共享目录",
@@ -126,9 +74,7 @@
     "openShared": "打开团队共享目录",
     "windowsDrives": "本机磁盘",
     "windowsDrivesWithPath": "本机磁盘（{{path}}）",
-    "restoreWindowsDrives": "恢复本机磁盘",
-    "remoteFeaturePrompt": "远端同步与传输",
-    "remoteFeaturePromptDetail": "登入后可使用 P2P 远端同步功能"
+    "restoreWindowsDrives": "恢复本机磁盘"
   },
   "shareAddress": {
     "label": "局域网共享地址",
@@ -191,23 +137,11 @@
   "profile": {
     "title": "我的",
     "cards": {
-      "account": "账户",
+      "community": "开源本地同步",
       "localMachine": "本机",
       "general": "通用",
       "version": "版本",
       "support": "支持"
-    },
-    "account": {
-      "title": "我的账户",
-      "bindingInfo": "绑定信息",
-      "accountLabel": "账号",
-      "loginMethod": "登入方式",
-      "accountLogin": "账号登入",
-      "currentComputer": "当前电脑"
-    },
-    "membership": {
-      "title": "会员状态",
-      "free": "免费版"
     },
     "localIp": "本机 IP",
     "language": {
@@ -256,6 +190,12 @@
       "diagnosticsUploaded": "诊断包上传成功！感谢您的反馈",
       "diagnosticsUploadFailed": "诊断包上传失败，请稍后重试",
       "feedbackOpened": "已打开邮件反馈"
+    },
+    "community": {
+      "title": "本地局域网访问",
+      "caption": "同一局域网内可直接配对、发现并自动同步。",
+      "devicesTitle": "已配对设备",
+      "devicesCaption": "手机继续使用本地配对令牌和已配对设备授权访问局域网能力。"
     }
   },
   "support": {

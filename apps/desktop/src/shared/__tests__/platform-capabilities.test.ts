@@ -2,17 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   isLinuxPlatform,
   shouldHideApplicationMenu,
-  supportsAppleAuth,
   usesTitleBarOverlayControls,
 } from '../platform-capabilities';
 
 describe('platform capabilities', () => {
-  it('only enables Apple auth on macOS', () => {
-    expect(supportsAppleAuth('darwin')).toBe(true);
-    expect(supportsAppleAuth('win32')).toBe(false);
-    expect(supportsAppleAuth('linux')).toBe(false);
-  });
-
   it('detects Linux only on Linux', () => {
     expect(isLinuxPlatform('darwin')).toBe(false);
     expect(isLinuxPlatform('win32')).toBe(false);

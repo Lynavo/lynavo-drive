@@ -10,9 +10,9 @@
 !define SF_RULE_TCP  "Vivi Drop Sidecar TCP"
 !define SF_RULE_HTTP "Vivi Drop Sidecar HTTP"
 !define SF_RULE_MDNS "Vivi Drop mDNS UDP"
-!define SF_LEGACY_RULE_TCP  "SyncFlow Sidecar TCP"
-!define SF_LEGACY_RULE_HTTP "SyncFlow Sidecar HTTP"
-!define SF_LEGACY_RULE_MDNS "SyncFlow mDNS UDP"
+!define SF_LEGACY_SYNCFLOW_RULE_TCP  "SyncFlow Sidecar TCP"
+!define SF_LEGACY_SYNCFLOW_RULE_HTTP "SyncFlow Sidecar HTTP"
+!define SF_LEGACY_SYNCFLOW_RULE_MDNS "SyncFlow mDNS UDP"
 
 ; -------------------------------------------------------------
 ; Install / Upgrade
@@ -31,16 +31,15 @@
   nsExec::ExecToStack 'netsh advfirewall firewall delete rule name="${SF_RULE_MDNS}"'
   Pop $R0
   Pop $R1
-  nsExec::ExecToStack 'netsh advfirewall firewall delete rule name="${SF_LEGACY_RULE_TCP}"'
+  nsExec::ExecToStack 'netsh advfirewall firewall delete rule name="${SF_LEGACY_SYNCFLOW_RULE_TCP}"'
   Pop $R0
   Pop $R1
-  nsExec::ExecToStack 'netsh advfirewall firewall delete rule name="${SF_LEGACY_RULE_HTTP}"'
+  nsExec::ExecToStack 'netsh advfirewall firewall delete rule name="${SF_LEGACY_SYNCFLOW_RULE_HTTP}"'
   Pop $R0
   Pop $R1
-  nsExec::ExecToStack 'netsh advfirewall firewall delete rule name="${SF_LEGACY_RULE_MDNS}"'
+  nsExec::ExecToStack 'netsh advfirewall firewall delete rule name="${SF_LEGACY_SYNCFLOW_RULE_MDNS}"'
   Pop $R0
   Pop $R1
-
   ; TCP 39393 – mobile → sidecar file-transfer.
   ; remoteip is intentionally unrestricted: in a typical home or office LAN the
   ; port is not exposed to the internet (NAT blocks it), so allowing any local
@@ -96,13 +95,13 @@
   nsExec::ExecToStack 'netsh advfirewall firewall delete rule name="${SF_RULE_MDNS}"'
   Pop $R0
   Pop $R1
-  nsExec::ExecToStack 'netsh advfirewall firewall delete rule name="${SF_LEGACY_RULE_TCP}"'
+  nsExec::ExecToStack 'netsh advfirewall firewall delete rule name="${SF_LEGACY_SYNCFLOW_RULE_TCP}"'
   Pop $R0
   Pop $R1
-  nsExec::ExecToStack 'netsh advfirewall firewall delete rule name="${SF_LEGACY_RULE_HTTP}"'
+  nsExec::ExecToStack 'netsh advfirewall firewall delete rule name="${SF_LEGACY_SYNCFLOW_RULE_HTTP}"'
   Pop $R0
   Pop $R1
-  nsExec::ExecToStack 'netsh advfirewall firewall delete rule name="${SF_LEGACY_RULE_MDNS}"'
+  nsExec::ExecToStack 'netsh advfirewall firewall delete rule name="${SF_LEGACY_SYNCFLOW_RULE_MDNS}"'
   Pop $R0
   Pop $R1
 !macroend

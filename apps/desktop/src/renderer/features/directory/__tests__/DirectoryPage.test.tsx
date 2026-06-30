@@ -3,7 +3,6 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { DirectoryPage } from '../DirectoryPage';
 import { useDirectoryStore } from '@renderer/stores/directory-store';
 import { useSettingsStore } from '@renderer/stores/settings-store';
-import { useAuthStore } from '@renderer/stores/auth-store';
 import { mockSettings } from '@renderer/mocks/settings';
 import { DirectoryPathCard } from '../DirectoryPathCard';
 import { ReceivedFileList } from '../ReceivedFileList';
@@ -67,7 +66,6 @@ describe('DirectoryPage', () => {
     vi.unstubAllEnvs();
     Reflect.deleteProperty(window, 'electronAPI');
     useDirectoryStore.setState(useDirectoryStore.getInitialState());
-    useAuthStore.setState({ session: null, loading: false });
     useSettingsStore.setState({
       settings: mockSettings,
       shareStatusInfo: {
@@ -87,33 +85,36 @@ describe('DirectoryPage', () => {
     expect(screen.getByText('目录管理')).toBeInTheDocument();
   });
 
-  it('renders two tab buttons', () => {
+  it('renders local received and shared tabs in the OSS product', () => {
     render(<DirectoryPage />);
-    // Tab buttons are within the GlassCard tab bar; use getAllBy to handle label appearing in other places
     const receivedMatches = screen.getAllByText(/接收目录/);
-    const sharedMatches = screen.getAllByText(/团队共享/);
-    // At least one of each should be a button element
     expect(receivedMatches.some((el) => el.closest('button'))).toBe(true);
-    expect(sharedMatches.some((el) => el.closest('button'))).toBe(true);
+    expect(screen.getByRole('button', { name: /团队共享/ })).toBeInTheDocument();
   });
 
-  it('clicking shared tab switches the active tab', () => {
+  it('allows switching to the local shared tab', async () => {
+    const fetchSharedFiles = vi.fn().mockResolvedValue(undefined);
+    useDirectoryStore.setState({
+      fetchSharedFiles,
+    });
+
     render(<DirectoryPage />);
 
-    // Find the tab button specifically (not the heading in DirectoryPathCard)
-    const sharedButtons = screen.getAllByText(/团队共享/);
-    const sharedTabButton = sharedButtons.find((el) => el.tagName === 'BUTTON')!;
-    fireEvent.click(sharedTabButton);
+    await waitFor(() => {
+      expect(fetchSharedFiles).toHaveBeenCalled();
+    });
+    fetchSharedFiles.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: /团队共享/ }));
 
     expect(useDirectoryStore.getState().activeTab).toBe('shared');
+    expect(fetchSharedFiles).toHaveBeenCalledTimes(1);
   });
 
-  it('hides the team shared directory tab in global builds', () => {
-    vi.stubEnv('SYNCFLOW_MARKET', 'global');
-
+  it('keeps the local shared tab visible without reading market env', () => {
     render(<DirectoryPage />);
 
-    expect(screen.queryByText(/团队共享/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /团队共享/ })).toBeInTheDocument();
   });
 
   it('polls the active tab while the page stays visible', async () => {
@@ -130,11 +131,46 @@ describe('DirectoryPage', () => {
     });
 
     render(<DirectoryPage />);
+    fetchReceivedFiles.mockClear();
 
     await vi.advanceTimersByTimeAsync(3000);
 
     expect(fetchReceivedFiles).toHaveBeenCalledTimes(1);
     expect(fetchSharedFiles).not.toHaveBeenCalled();
+  });
+
+  it('refreshes local received and shared files on focus and visibility changes', async () => {
+    const fetchReceivedFiles = vi.fn().mockResolvedValue(undefined);
+    const fetchSharedFiles = vi.fn().mockResolvedValue(undefined);
+    const fetchAll = vi.fn().mockResolvedValue(undefined);
+    useDirectoryStore.setState({
+      activeTab: 'received',
+      fetchReceivedFiles,
+      fetchSharedFiles,
+      fetchAll,
+    });
+
+    const visibilityStateSpy = vi
+      .spyOn(document, 'visibilityState', 'get')
+      .mockReturnValue('visible');
+
+    render(<DirectoryPage />);
+
+    await waitFor(() => {
+      expect(fetchAll).toHaveBeenCalled();
+    });
+    fetchReceivedFiles.mockClear();
+    fetchSharedFiles.mockClear();
+    fetchAll.mockClear();
+
+    window.dispatchEvent(new Event('focus'));
+    document.dispatchEvent(new Event('visibilitychange'));
+
+    expect(fetchAll).toHaveBeenCalledTimes(2);
+    expect(fetchReceivedFiles).not.toHaveBeenCalled();
+    expect(fetchSharedFiles).not.toHaveBeenCalled();
+
+    visibilityStateSpy.mockRestore();
   });
 });
 
@@ -143,7 +179,6 @@ describe('DirectoryPathCard', () => {
     vi.useRealTimers();
     vi.unstubAllEnvs();
     Reflect.deleteProperty(window, 'electronAPI');
-    useAuthStore.setState({ session: null, loading: false });
     useSettingsStore.setState({
       settings: mockSettings,
       shareStatusInfo: {
@@ -172,23 +207,21 @@ describe('DirectoryPathCard', () => {
     expect(screen.getByText('接收目录')).toBeInTheDocument();
   });
 
-  it('renders shared directory label', () => {
+  it('renders shared directory label in the OSS product', () => {
     render(<DirectoryPathCard />);
     expect(screen.getByText('团队共享目录')).toBeInTheDocument();
   });
 
-  it('renders personal directory label', () => {
+  it('renders the Lynavo personal directory label', () => {
     render(<DirectoryPathCard />);
-    expect(screen.getByText('个人共享目录')).toBeInTheDocument();
+    expect(screen.getByText('我的电脑')).toBeInTheDocument();
   });
 
-  it('renames personal directory and hides team shared directory in global builds', () => {
-    vi.stubEnv('SYNCFLOW_MARKET', 'global');
-
+  it('renders personal and team shared directories without reading market env', () => {
     render(<DirectoryPathCard />);
 
     expect(screen.getByText('我的电脑')).toBeInTheDocument();
-    expect(screen.queryByText('团队共享目录')).not.toBeInTheDocument();
+    expect(screen.getByText('团队共享目录')).toBeInTheDocument();
   });
 
   it('renders selected Windows drive root in personal virtual drives mode', () => {
@@ -209,7 +242,7 @@ describe('DirectoryPathCard', () => {
 
     render(<DirectoryPathCard />);
 
-    const personalCard = screen.getByText('个人共享目录').closest('.rounded-2xl');
+    const personalCard = screen.getByText('我的电脑').closest('.rounded-2xl');
     expect(personalCard).not.toBeNull();
     expect(within(personalCard as HTMLElement).getByText('本机磁盘（C:\\）')).toBeInTheDocument();
     expect(
@@ -231,7 +264,7 @@ describe('DirectoryPathCard', () => {
 
     render(<DirectoryPathCard />);
 
-    const personalCard = screen.getByText('个人共享目录').closest('.rounded-2xl');
+    const personalCard = screen.getByText('我的电脑').closest('.rounded-2xl');
     expect(personalCard).not.toBeNull();
     expect(
       within(personalCard as HTMLElement).queryByRole('button', { name: '恢复本机磁盘' }),
@@ -256,7 +289,7 @@ describe('DirectoryPathCard', () => {
 
     render(<DirectoryPathCard />);
 
-    const personalCard = screen.getByText('个人共享目录').closest('.rounded-2xl');
+    const personalCard = screen.getByText('我的电脑').closest('.rounded-2xl');
     expect(personalCard).not.toBeNull();
     expect(within(personalCard as HTMLElement).getByText('本机磁盘')).toBeInTheDocument();
     expect(
@@ -298,7 +331,7 @@ describe('DirectoryPathCard', () => {
 
     render(<DirectoryPathCard />);
 
-    const personalCard = screen.getByText('个人共享目录').closest('.rounded-2xl');
+    const personalCard = screen.getByText('我的电脑').closest('.rounded-2xl');
     expect(personalCard).not.toBeNull();
     fireEvent.click(
       within(personalCard as HTMLElement).getByRole('button', { name: '恢复本机磁盘' }),
@@ -311,23 +344,22 @@ describe('DirectoryPathCard', () => {
     expect(useSettingsStore.getState().settings.personalPathMode).toBe('windowsDrives');
   });
 
-  it('renders team shared directory before personal shared directory', () => {
+  it('renders received directory before the Lynavo personal directory', () => {
     render(<DirectoryPathCard />);
 
-    const sharedLabel = screen.getByText('团队共享目录');
-    const personalLabel = screen.getByText('个人共享目录');
+    const receivedLabel = screen.getByText('接收目录');
+    const personalLabel = screen.getByText('我的电脑');
 
     expect(
-      sharedLabel.compareDocumentPosition(personalLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
+      receivedLabel.compareDocumentPosition(personalLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 
   it('does not render account login or logout controls in the personal directory card', () => {
-    useAuthStore.setState({ session: { loggedIn: true, phone: '+8613800138000' }, loading: false });
 
     render(<DirectoryPathCard />);
 
-    const personalCard = screen.getByText('个人共享目录').closest('.rounded-2xl');
+    const personalCard = screen.getByText('我的电脑').closest('.rounded-2xl');
     expect(personalCard).not.toBeNull();
     expect(
       within(personalCard as HTMLElement).queryByText('远端同步与传输'),
@@ -345,7 +377,7 @@ describe('DirectoryPathCard', () => {
     expect(screen.getByText('根目录路径')).toBeInTheDocument();
   });
 
-  it('derives root and shared path when receivePath ends with lowercase received', () => {
+  it('derives root path and keeps the shared path when receivePath ends with lowercase received', () => {
     useSettingsStore.setState({
       settings: {
         ...mockSettings,
@@ -357,7 +389,6 @@ describe('DirectoryPathCard', () => {
 
     // Root should be /Users/alice/SyncFlow
     expect(screen.getByText('/Users/alice/SyncFlow')).toBeInTheDocument();
-    // Shared should be /Users/alice/SyncFlow/shared
     expect(screen.getByText('/Users/alice/SyncFlow/shared')).toBeInTheDocument();
   });
 

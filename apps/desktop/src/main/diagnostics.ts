@@ -6,7 +6,7 @@ import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs
 import { hostname, networkInterfaces, release, tmpdir, type } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
-import { VIVIDROP_API_BASE_URL, VIVIDROP_REVIEW_API_BASE_URL } from '@syncflow/contracts';
+import { LYNAVO_API_BASE_URL, LYNAVO_REVIEW_API_BASE_URL } from '@syncflow/contracts';
 import { desktopClientHeaders, getAppInfo, type AppInfo } from './app-info';
 import { sidecarClient } from './sidecar-client';
 import type { SidecarManager } from './sidecar-manager';
@@ -471,15 +471,12 @@ async function listDesktopLogFiles(activeLogPath: string): Promise<string[]> {
 }
 
 function defaultApiBaseUrl(): string {
-  return app.isPackaged ? VIVIDROP_API_BASE_URL : VIVIDROP_REVIEW_API_BASE_URL;
+  return app.isPackaged ? LYNAVO_API_BASE_URL : LYNAVO_REVIEW_API_BASE_URL;
 }
 
 function configuredApiBase(): { baseUrl: string; source: string } {
-  const vividropBase = process.env.VIVIDROP_API_BASE_URL?.trim();
-  if (vividropBase) return { baseUrl: vividropBase, source: 'VIVIDROP_API_BASE_URL' };
-
-  const syncflowBase = process.env.SYNCFLOW_API_BASE_URL?.trim();
-  if (syncflowBase) return { baseUrl: syncflowBase, source: 'SYNCFLOW_API_BASE_URL' };
+  const lynavoBase = process.env.LYNAVO_API_BASE_URL?.trim();
+  if (lynavoBase) return { baseUrl: lynavoBase, source: 'LYNAVO_API_BASE_URL' };
 
   return {
     baseUrl: defaultApiBaseUrl(),
@@ -487,9 +484,11 @@ function configuredApiBase(): { baseUrl: string; source: string } {
   };
 }
 
-function configuredUrl(envName: string, fallbackPath: string): string {
-  const explicit = process.env[envName]?.trim();
-  if (explicit) return explicit;
+function configuredUrl(envNames: readonly string[], fallbackPath: string): string {
+  for (const envName of envNames) {
+    const explicit = process.env[envName]?.trim();
+    if (explicit) return explicit;
+  }
   const { baseUrl: base } = configuredApiBase();
   return new URL(fallbackPath, base.endsWith('/') ? base : `${base}/`).toString();
 }
@@ -511,16 +510,18 @@ function redactUrlForDiagnostics(value: string): string {
 }
 
 function diagnosticsUploadUrl(): string {
-  return configuredUrl('VIVIDROP_DIAGNOSTICS_UPLOAD_URL', '/api/v1/diagnostics/upload');
+  return configuredUrl(['LYNAVO_DIAGNOSTICS_UPLOAD_URL'], '/api/v1/diagnostics/upload');
 }
 
 function updateCheckUrl(): string {
-  return configuredUrl('VIVIDROP_DESKTOP_UPDATE_URL', '/api/v1/desktop/update-check');
+  return configuredUrl(['LYNAVO_DESKTOP_UPDATE_URL'], '/api/v1/desktop/update-check');
 }
 
 function optionalApiToken(): string | null {
   return (
-    process.env.VIVIDROP_DIAGNOSTICS_TOKEN?.trim() || process.env.VIVIDROP_API_TOKEN?.trim() || null
+    process.env.LYNAVO_DIAGNOSTICS_TOKEN?.trim() ||
+    process.env.LYNAVO_API_TOKEN?.trim() ||
+    null
   );
 }
 

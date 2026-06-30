@@ -11,8 +11,6 @@
     "powerSaveDescription": "Keep desktop available during sync",
     "shareAddress": "LAN sharing",
     "shareAddressDescription": "Checks this computer's SMB sharing status for mobile access to the shared folder",
-    "giftCard": "Gift card",
-    "giftCardDescription": "Redeem your gift card to unlock more features or storage capacity",
     "bonjour": "Windows Bonjour broadcast",
     "bonjourDescription": "Allows phones on the same LAN to discover this computer"
   },
@@ -66,56 +64,6 @@
     "blockingSleep": "Keeping awake",
     "idle": "Disabled"
   },
-  "giftCard": {
-    "title": "Gift card redeem",
-    "description": "Enter the gift card code provided by the service team.",
-    "codeLabel": "Gift card code",
-    "placeholder": "For example: VF-GIFT-XXXX",
-    "redeem": "Redeem",
-    "redeemSuccess": "Gift card redeemed successfully",
-    "phoneLogin": {
-      "title": "Phone sign-in",
-      "globalTitle": "Sign in or create account",
-      "description": "Enter your phone number and SMS code to continue redeeming.",
-      "globalDescription": "Sign in to enable remote sync and account features.",
-      "phoneLabel": "Phone number",
-      "phonePlaceholder": "Enter phone number",
-      "codeLabel": "SMS code",
-      "codePlaceholder": "6-digit code",
-      "countryCodePlaceholder": "Code",
-      "countryCodes": {
-        "china": "China",
-        "northAmerica": "US/Canada",
-        "taiwan": "Taiwan",
-        "hongKong": "Hong Kong",
-        "japan": "Japan",
-        "singapore": "Singapore"
-      },
-      "oauth": {
-        "continueWithGoogle": "Continue with Google",
-        "continueWithApple": "Continue with Apple",
-        "divider": "OR",
-        "providers": {
-          "google": "Google",
-          "apple": "Apple"
-        }
-      },
-      "sendCode": "Send code",
-      "loginAndRedeem": "Sign in and redeem",
-      "loginRequired": "Sign in with your phone number to continue redeeming the gift card",
-      "codeSent": "SMS code sent",
-      "loginSuccess": "Signed in. Continuing redeem",
-      "loginSuccessGeneric": "Signed in successfully",
-      "logoutSuccess": "Signed out successfully",
-      "logoutFailed": "Sign out failed",
-      "logoutError": "Sign out error",
-      "accountStatus": "Account Status",
-      "loggedInAs": "Signed in",
-      "notLoggedIn": "Not signed in",
-      "logout": "Sign out",
-      "login": "Sign in"
-    }
-  },
   "filePath": {
     "receiveAddress": "Receive folder",
     "personalAddress": "Personal shared folder",
@@ -126,9 +74,7 @@
     "openShared": "Open team shared folder",
     "windowsDrives": "Local disks",
     "windowsDrivesWithPath": "Local disks ({{path}})",
-    "restoreWindowsDrives": "Restore local disks",
-    "remoteFeaturePrompt": "Remote Sync & Share",
-    "remoteFeaturePromptDetail": "Sign in to enable P2P remote syncing"
+    "restoreWindowsDrives": "Restore local disks"
   },
   "shareAddress": {
     "label": "LAN share address",
@@ -191,23 +137,11 @@
   "profile": {
     "title": "Me",
     "cards": {
-      "account": "Account",
+      "community": "Open-source local sync",
       "localMachine": "This computer",
       "general": "General",
       "version": "Version",
       "support": "Support"
-    },
-    "account": {
-      "title": "My account",
-      "bindingInfo": "Binding information",
-      "accountLabel": "Account",
-      "loginMethod": "Sign-in method",
-      "accountLogin": "Account sign-in",
-      "currentComputer": "Current computer"
-    },
-    "membership": {
-      "title": "Membership status",
-      "free": "Free plan"
     },
     "localIp": "Local IP",
     "language": {
@@ -256,6 +190,12 @@
       "diagnosticsUploaded": "Diagnostics bundle uploaded. Thanks for your feedback.",
       "diagnosticsUploadFailed": "Unable to upload diagnostics bundle",
       "feedbackOpened": "Feedback email opened"
+    },
+    "community": {
+      "title": "Local LAN access",
+      "caption": "Pair, discover, and sync automatically on the same LAN. No official account or subscription is required.",
+      "devicesTitle": "Paired devices",
+      "devicesCaption": "Phones continue to use local pairing tokens and paired-device authorization for LAN access."
     }
   },
   "support": {

@@ -34,9 +34,9 @@
     "toast": {
       "connectionCodeCopied": "連線碼已複製",
       "copyFailed": "複製失敗",
-      "remoteAccessEnabled": "遠端存取已開啟",
-      "remoteAccessDisabled": "遠端存取已關閉",
-      "remoteAccessUpdateFailed": "修改遠端存取狀態失敗",
+      "remoteAccessEnabled": "本地檔案存取已可用",
+      "remoteAccessDisabled": "本地檔案存取已關閉",
+      "remoteAccessUpdateFailed": "無法更新本地檔案存取狀態",
       "folderPermissionGranted": "資料夾存取權限已授權",
       "folderPermissionDenied": "未取得資料夾權限，請在系統設定中手動授權",
       "folderPermissionRequestFailed": "權限請求失敗",
@@ -64,10 +64,10 @@
       "downloadInstruction": "，在同一個 Wi-Fi 下掃描，選擇此裝置，掃碼或輸入連線碼連接裝置"
     },
     "remoteAccess": {
-      "title": "遠端存取",
-      "description": "開啟後，手機可遠端存取這台電腦的檔案",
-      "toggle": "遠端存取開關",
-      "folderPermissionWarning": "尚未取得資料夾存取權限，手機將無法瀏覽這台電腦的檔案",
+      "title": "本地檔案存取",
+      "description": "同一區域網路內的已配對手機可以瀏覽這台電腦分享的檔案。",
+      "toggle": "本地檔案存取狀態",
+      "folderPermissionWarning": "尚未授予資料夾存取權限，手機暫時無法瀏覽這台電腦的本地共享檔案。",
       "authorize": "授權存取"
     },
     "receiveFolder": {

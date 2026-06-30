@@ -1,9 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SidecarEvent } from '@syncflow/contracts';
-import type { AuthSessionView } from '../../../../preload/api';
 import { useAppStore } from '@renderer/stores/app-store';
-import { useAuthStore } from '@renderer/stores/auth-store';
 import { useDirectoryStore } from '@renderer/stores/directory-store';
 import { useSettingsStore } from '@renderer/stores/settings-store';
 import { useSidecarRuntimeStore } from '@renderer/stores/sidecar-runtime-store';
@@ -61,10 +59,11 @@ vi.mock('@renderer/hooks/scrollbar-activity', () => ({
 }));
 
 function installElectronAPI(
-  session: AuthSessionView | null = { loggedIn: true, email: 'ada@example.com' },
+  _session: unknown = null,
   platform: Partial<Window['electronAPI']['platform']> = {},
 ) {
   let sidecarEventCallback: ((event: SidecarEvent) => void) | null = null;
+  const openExternal = vi.fn().mockResolvedValue(undefined);
   const onSidecarEvent = vi.fn((callback: (event: SidecarEvent) => void) => {
     sidecarEventCallback = callback;
     return vi.fn();
@@ -92,10 +91,6 @@ function installElectronAPI(
       onSidecarEvent,
       onSidecarRuntimeState,
     },
-    auth: {
-      getAuthSession: vi.fn().mockResolvedValue(session),
-      logout: vi.fn().mockResolvedValue({ ok: true }),
-    },
     platform: {
       isMac: vi.fn(() => true),
       isWindows: vi.fn(() => false),
@@ -105,6 +100,9 @@ function installElectronAPI(
       getHostName: vi.fn(() => 'Ada-MacBook-Pro'),
       getLocalIPs: vi.fn(() => ['192.168.1.10']),
       ...platform,
+    },
+    files: {
+      openExternal,
     },
   } as unknown as Window['electronAPI'];
 
@@ -116,6 +114,8 @@ function installElectronAPI(
       sidecarEventCallback(event);
     },
     onSidecarEvent,
+    onSidecarRuntimeState,
+    openExternal,
   };
 }
 
@@ -138,7 +138,6 @@ describe('AppShell', () => {
       isHelpOpen: false,
     });
     useSidecarRuntimeStore.setState({ runtime: INITIAL_SIDECAR_RUNTIME_STATE });
-    useAuthStore.setState({ session: null, loading: false });
     useSettingsStore.setState({
       settings: mockSettings,
       shareStatusInfo: {
@@ -155,62 +154,62 @@ describe('AppShell', () => {
     vi.mocked(installScrollbarActivityTracker).mockReturnValue(vi.fn());
   });
 
-  it('renders the full-page login screen instead of the desktop shell when not authenticated', async () => {
-    installElectronAPI(null);
+  it('renders the local desktop shell instead of the full-page login screen when not authenticated', async () => {
+    const { onSidecarEvent } = installElectronAPI(null);
 
     render(<AppShell />);
 
-    expect(await screen.findByRole('heading', { name: '登录' })).toBeInTheDocument();
-    expect(screen.queryByTestId('sidebar')).not.toBeInTheDocument();
-    expect(screen.queryByText('DashboardPage')).not.toBeInTheDocument();
+    await completeConnectionCodeSetup();
+
+    expect(screen.queryByRole('heading', { name: '登录' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('sidebar')).toBeInTheDocument();
+    expect(screen.getByText('DashboardPage')).toBeInTheDocument();
+    expect(onSidecarEvent).toHaveBeenCalled();
   });
 
-  it('keeps the auth initialization screen draggable while session lookup is pending', () => {
+  it('subscribes to sidecar runtime updates while running as a local guest', async () => {
+    const { onSidecarEvent, onSidecarRuntimeState } = installElectronAPI(null);
+
+    render(<AppShell />);
+
+    await waitFor(() => {
+      expect(window.electronAPI?.sidecar.getRuntimeState).toHaveBeenCalledTimes(1);
+    });
+
+    expect(onSidecarRuntimeState).toHaveBeenCalledTimes(1);
+    expect(onSidecarEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not bootstrap official auth before showing local pairing setup', async () => {
     installElectronAPI();
-    const getAuthSession = window.electronAPI?.auth.getAuthSession as ReturnType<typeof vi.fn>;
-    getAuthSession.mockReturnValue(new Promise<AuthSessionView | null>(() => {}));
 
-    const { container } = render(<AppShell />);
+    render(<AppShell />);
 
-    expect(container.firstElementChild).toHaveClass('vividrop-window-drag-region');
+    expect(await screen.findByRole('heading', { name: '设置连接码' })).toBeInTheDocument();
+    expect(window.electronAPI).not.toHaveProperty('auth');
   });
 
-  it('uses the dev skip-auth session without calling the real auth bridge', async () => {
+  it('ignores dev skip-auth for official auth while keeping local pairing setup available', async () => {
     process.env.SYNCFLOW_DEV_SKIP_AUTH = '1';
     process.env.SYNCFLOW_DEV_SKIP_AUTH_EMAIL = 'functional@example.com';
     const { onSidecarEvent } = installElectronAPI(null);
-    const getAuthSession = window.electronAPI?.auth.getAuthSession as ReturnType<typeof vi.fn>;
 
     render(<AppShell />);
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: '设置连接码' })).toBeInTheDocument();
     });
-    expect(getAuthSession).not.toHaveBeenCalled();
     expect(onSidecarEvent).toHaveBeenCalled();
-  });
-
-  it('enters the desktop shell immediately when auth bypass is enabled for QA', async () => {
-    installElectronAPI(undefined, {
-      isAuthBypassEnabled: vi.fn(() => true),
-    } as Partial<Window['electronAPI']['platform']>);
-
-    render(<AppShell />);
-
-    expect(await screen.findByTestId('sidebar')).toBeInTheDocument();
-    expect(await screen.findByText('DashboardPage')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '设置连接码' })).not.toBeInTheDocument();
   });
 
   it('installs the scrollbar activity tracker for the shell lifetime', async () => {
     const cleanup = vi.fn();
     vi.mocked(installScrollbarActivityTracker).mockReturnValue(cleanup);
-    installElectronAPI(undefined, {
-      isAuthBypassEnabled: vi.fn(() => true),
-    } as Partial<Window['electronAPI']['platform']>);
+    installElectronAPI();
 
     const { unmount } = render(<AppShell />);
 
+    await completeConnectionCodeSetup();
     expect(await screen.findByTestId('sidebar')).toBeInTheDocument();
     expect(installScrollbarActivityTracker).toHaveBeenCalledTimes(1);
 
@@ -218,8 +217,8 @@ describe('AppShell', () => {
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
 
-  it('renders the connection code setup page after authentication before the desktop shell', async () => {
-    installElectronAPI();
+  it('renders the connection code setup page before the desktop shell', async () => {
+    installElectronAPI(null);
 
     const { container } = render(<AppShell />);
 
@@ -393,6 +392,22 @@ describe('AppShell', () => {
     expect(screen.getByText('扫码下载移动端')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'App Store' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Android' })).toBeInTheDocument();
+  });
+
+  it('opens Lynavo mobile download URLs from setup and the QR panel', async () => {
+    const { openExternal } = installElectronAPI();
+
+    render(<AppShell />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'iOS 下载二维码' }));
+    expect(openExternal).toHaveBeenLastCalledWith('https://www.lynavo.com/download/ios');
+
+    await completeConnectionCodeSetup();
+    fireEvent.click(await screen.findByRole('button', { name: '下载移动端' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Android' }));
+
+    expect(openExternal).toHaveBeenLastCalledWith('https://www.lynavo.com/download/android');
+    expect(openExternal).not.toHaveBeenCalledWith(expect.stringContaining('vividrop.app'));
   });
 
   it('keeps top actions clear of non-macOS native caption buttons', async () => {

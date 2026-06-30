@@ -9,7 +9,6 @@ import { useSettingsStore } from '@renderer/stores/settings-store';
 import { DirectoryPathCard } from './DirectoryPathCard';
 import { ReceivedFileList } from './ReceivedFileList';
 import { SharedFileList } from './SharedFileList';
-import { isGlobalMarket } from '../../../shared/market';
 
 const colors = {
   title: '#1a2a3a',
@@ -48,15 +47,11 @@ function TabButton({
 
 export function DirectoryPage() {
   const { t } = useTranslation();
-  const isGlobalBuild = isGlobalMarket();
   const activeTab = useDirectoryStore((s) => s.activeTab);
-  const effectiveActiveTab: DirectoryTab =
-    isGlobalBuild && activeTab === 'shared' ? 'received' : activeTab;
   const setTab = useDirectoryStore((s) => s.setTab);
   const receivedFiles = useDirectoryStore((s) => s.receivedFiles);
   const sharedFiles = useDirectoryStore((s) => s.sharedFiles);
   const fetchAll = useDirectoryStore((s) => s.fetchAll);
-  const fetchReceivedFiles = useDirectoryStore((s) => s.fetchReceivedFiles);
   const receivedError = useDirectoryStore((s) => s.receivedError);
   const sharedError = useDirectoryStore((s) => s.sharedError);
   const loading = useDirectoryStore((s) => s.loading);
@@ -64,22 +59,13 @@ export function DirectoryPage() {
 
   useEffect(() => {
     void fetchSettings();
-    if (isGlobalBuild) {
-      void fetchReceivedFiles();
-    } else {
-      void fetchAll();
-    }
-  }, [fetchSettings, fetchAll, fetchReceivedFiles, isGlobalBuild]);
-
-  useEffect(() => {
-    if (isGlobalBuild && activeTab === 'shared') {
-      setTab('received');
-    }
-  }, [activeTab, isGlobalBuild, setTab]);
+    void fetchAll();
+  }, [fetchSettings, fetchAll]);
 
   useEffect(() => {
     const refreshDirectory = () => {
-      void useDirectoryStore.getState().fetchAll();
+      const { fetchAll } = useDirectoryStore.getState();
+      void fetchAll();
     };
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -106,7 +92,7 @@ export function DirectoryPage() {
         fetchReceivedFiles,
         fetchSharedFiles,
       } = useDirectoryStore.getState();
-      if (isGlobalBuild || currentTab === 'received') {
+      if (currentTab === 'received') {
         void fetchReceivedFiles();
       } else {
         void fetchSharedFiles();
@@ -117,12 +103,9 @@ export function DirectoryPage() {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [activeTab, isGlobalBuild]);
+  }, [activeTab]);
 
   const handleTabChange = (tab: DirectoryTab) => {
-    if (isGlobalBuild && tab === 'shared') {
-      return;
-    }
     setTab(tab);
     if (tab === 'received') {
       void useDirectoryStore.getState().fetchReceivedFiles();
@@ -140,7 +123,7 @@ export function DirectoryPage() {
             {t('directory.title')}
           </h1>
           <p className="mt-1 text-sm" style={{ color: colors.subtitle }}>
-            {t(isGlobalBuild ? 'directory.globalSubtitle' : 'directory.subtitle')}
+            {t('directory.subtitle')}
           </p>
         </div>
 
@@ -154,27 +137,25 @@ export function DirectoryPage() {
           {/* Tab bar */}
           <div className="mb-4 flex gap-1">
             <TabButton
-              active={effectiveActiveTab === 'received'}
+              active={activeTab === 'received'}
               label={t('directory.tabs.received')}
               count={receivedFiles.length}
               icon={FolderInput}
               onClick={() => handleTabChange('received')}
             />
-            {!isGlobalBuild && (
-              <TabButton
-                active={effectiveActiveTab === 'shared'}
-                label={t('directory.tabs.shared')}
-                count={sharedFiles.length}
-                icon={Globe}
-                onClick={() => handleTabChange('shared')}
-              />
-            )}
+            <TabButton
+              active={activeTab === 'shared'}
+              label={t('directory.tabs.shared')}
+              count={sharedFiles.length}
+              icon={Globe}
+              onClick={() => handleTabChange('shared')}
+            />
           </div>
 
           {/* Tab description with background */}
           <div className="mb-4 rounded-xl bg-blue-50/60 px-4 py-2.5">
             <p className="text-xs text-muted-foreground">
-              {effectiveActiveTab === 'received'
+              {activeTab === 'received'
                 ? t('directory.tabs.receivedDescription')
                 : t('directory.tabs.sharedDescription')}
             </p>
@@ -182,13 +163,13 @@ export function DirectoryPage() {
 
           {/* Tab content */}
           {(() => {
-            const tabError = effectiveActiveTab === 'received' ? receivedError : sharedError;
+            const tabError = activeTab === 'received' ? receivedError : sharedError;
             if (tabError && !loading) {
               return (
                 <ErrorState
                   message={tabError}
                   onRetry={() => {
-                    if (effectiveActiveTab === 'received') {
+                    if (activeTab === 'received') {
                       void useDirectoryStore.getState().fetchReceivedFiles();
                     } else {
                       void useDirectoryStore.getState().fetchSharedFiles();
@@ -199,8 +180,8 @@ export function DirectoryPage() {
             }
             return (
               <>
-                {effectiveActiveTab === 'received' && <ReceivedFileList />}
-                {effectiveActiveTab === 'shared' && <SharedFileList />}
+                {activeTab === 'received' && <ReceivedFileList />}
+                {activeTab === 'shared' && <SharedFileList />}
               </>
             );
           })()}

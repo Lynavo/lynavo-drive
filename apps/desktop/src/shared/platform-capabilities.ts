@@ -1,7 +1,3 @@
-export function supportsAppleAuth(platform: NodeJS.Platform = process.platform): boolean {
-  return platform === 'darwin';
-}
-
 export function isLinuxPlatform(platform: NodeJS.Platform = process.platform): boolean {
   return platform === 'linux';
 }

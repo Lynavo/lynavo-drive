@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@renderer/components/ui/button';
 import { CopyButton } from '@renderer/components/shared/CopyButton';
 import { useSettingsStore } from '@renderer/stores/settings-store';
-import { getProductName } from '../../../shared/market';
+import { getProductName } from '../../../shared/product';
 
 const MAC_SHARING_GUIDE_URL =
   'https://support.apple.com/guide/mac-help/set-up-file-sharing-on-mac-mh17131/mac';

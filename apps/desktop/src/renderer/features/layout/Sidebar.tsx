@@ -4,19 +4,13 @@ import {
   FolderOpen,
   History,
   Settings,
-  LogOut,
-  User,
-  Crown,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useState, type CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import vividropLogo from '@renderer/assets/vividrop-logo-cutout.png';
 import { useAppStore, type AppView } from '@renderer/stores/app-store';
-import { useAuthStore } from '@renderer/stores/auth-store';
-import { useSettingsStore } from '@renderer/stores/settings-store';
-import { getProductName } from '../../../shared/market';
-import { LogoutConfirmDialog } from '@renderer/components/shared/LogoutConfirmDialog';
+import { getProductName } from '../../../shared/product';
 
 const navItems: { key: AppView; labelKey: string; icon: LucideIcon }[] = [
   { key: 'dashboard', labelKey: 'layout.nav.dashboard', icon: HardDrive },
@@ -39,23 +33,6 @@ export function Sidebar() {
   const { t } = useTranslation();
   const currentView = useAppStore((s) => s.currentView);
   const setView = useAppStore((s) => s.setView);
-  const session = useAuthStore((s) => s.session);
-  const logout = useAuthStore((s) => s.logout);
-  const deviceName = useSettingsStore((s) => s.settings.deviceName);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-
-  const handleLogout = useCallback(() => {
-    setShowLogoutConfirm(true);
-  }, []);
-
-  const handleConfirmLogout = useCallback(() => {
-    setShowLogoutConfirm(false);
-    void logout();
-  }, [logout]);
-
-  const accountIdentifier =
-    session?.phone?.trim() || session?.email?.trim() || session?.accountLabel?.trim();
-  const accountLabel = accountIdentifier || t('layout.account.connected');
 
   return (
     <aside
@@ -101,52 +78,6 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* User Account / Profile at bottom */}
-      {session ? (
-        <div className="px-3 pb-4" style={noDragRegionStyle}>
-          <div className="group relative flex w-full items-center gap-2.5 rounded-lg border border-[#b8dfff] bg-[#e4f5ff] p-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_14px_34px_rgba(38,128,190,0.12)]">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#f3fbff] text-[#1b78c2] ring-1 ring-white/80">
-              <User className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1">
-                <span className="truncate text-[13px] font-semibold leading-tight text-[#1d5f93]">
-                  {deviceName || 'macOS'}
-                </span>
-                <span
-                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white/82 text-[#1b78c2] shadow-[0_4px_10px_rgba(38,128,190,0.14)] ring-1 ring-white/90"
-                  aria-label={t('layout.account.businessMember')}
-                  title={t('layout.account.businessMember')}
-                >
-                  <Crown className="h-2.5 w-2.5" />
-                </span>
-              </div>
-              <p
-                className="mt-0.5 truncate text-[12px] leading-tight text-[#327db3]"
-                title={accountLabel}
-              >
-                {accountLabel}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/80 hover:text-rose-500"
-              title={t('layout.account.logout')}
-              aria-label={t('layout.account.logout')}
-            >
-              <LogOut className="h-4 w-4 shrink-0" />
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      <LogoutConfirmDialog
-        isOpen={showLogoutConfirm}
-        onClose={() => setShowLogoutConfirm(false)}
-        onConfirm={handleConfirmLogout}
-        accountLabel={accountLabel}
-      />
     </aside>
   );
 }

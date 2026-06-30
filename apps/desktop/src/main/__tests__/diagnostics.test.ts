@@ -85,6 +85,8 @@ describe('checkForUpdates', () => {
 
   beforeEach(() => {
     appState.isPackaged = false;
+    delete process.env.LYNAVO_API_BASE_URL;
+    delete process.env.LYNAVO_DESKTOP_UPDATE_URL;
     delete process.env.VIVIDROP_API_BASE_URL;
     delete process.env.SYNCFLOW_API_BASE_URL;
     delete process.env.VIVIDROP_DESKTOP_UPDATE_URL;
@@ -111,7 +113,7 @@ describe('checkForUpdates', () => {
 
     const requestUrl = fetchMock.mock.calls[0]?.[0];
     expect(requestUrl).toEqual(
-      `https://review-api.vividrop.cn/api/v1/desktop/update-check?${updateCheckQuery}`,
+      `https://review-api.lynavo.com/api/v1/desktop/update-check?${updateCheckQuery}`,
     );
   });
 
@@ -133,12 +135,12 @@ describe('checkForUpdates', () => {
 
     const requestUrl = fetchMock.mock.calls[0]?.[0];
     expect(requestUrl).toEqual(
-      `https://api.vividrop.cn/api/v1/desktop/update-check?${updateCheckQuery}`,
+      `https://api.lynavo.com/api/v1/desktop/update-check?${updateCheckQuery}`,
     );
   });
 
-  it('prefers an explicit API base URL over the development default', async () => {
-    process.env.VIVIDROP_API_BASE_URL = 'http://localhost:9090';
+  it('prefers an explicit Lynavo API base URL over the development default', async () => {
+    process.env.LYNAVO_API_BASE_URL = 'http://localhost:9090';
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: vi.fn().mockResolvedValue({
@@ -158,11 +160,82 @@ describe('checkForUpdates', () => {
       `http://localhost:9090/api/v1/desktop/update-check?${updateCheckQuery}`,
     );
   });
+
+  it('prefers the Lynavo API base URL over legacy VIVIDROP_API_BASE_URL', async () => {
+    process.env.LYNAVO_API_BASE_URL = 'http://lynavo.localhost:9090';
+    process.env.VIVIDROP_API_BASE_URL = 'http://legacy.localhost:9090';
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        update_available: false,
+        latest_version: '0.1.0',
+        checked_at: '2026-05-08T08:00:00Z',
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { checkForUpdates } = await import('../diagnostics');
+
+    await checkForUpdates();
+
+    const requestUrl = fetchMock.mock.calls[0]?.[0];
+    expect(requestUrl).toEqual(
+      `http://lynavo.localhost:9090/api/v1/desktop/update-check?${updateCheckQuery}`,
+    );
+  });
+
+  it('ignores legacy API base URLs when no Lynavo base URL is configured', async () => {
+    process.env.VIVIDROP_API_BASE_URL = 'http://legacy-vividrop.localhost:9090';
+    process.env.SYNCFLOW_API_BASE_URL = 'http://legacy-syncflow.localhost:9090';
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        update_available: false,
+        latest_version: '0.1.0',
+        checked_at: '2026-05-08T08:00:00Z',
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { checkForUpdates } = await import('../diagnostics');
+
+    await checkForUpdates();
+
+    const requestUrl = fetchMock.mock.calls[0]?.[0];
+    expect(requestUrl).toEqual(
+      `https://review-api.lynavo.com/api/v1/desktop/update-check?${updateCheckQuery}`,
+    );
+  });
+
+  it('ignores legacy desktop update URL env', async () => {
+    process.env.VIVIDROP_DESKTOP_UPDATE_URL = 'https://legacy.example/update';
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        update_available: false,
+        latest_version: '0.1.0',
+        checked_at: '2026-05-08T08:00:00Z',
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { checkForUpdates } = await import('../diagnostics');
+
+    await checkForUpdates();
+
+    const requestUrl = fetchMock.mock.calls[0]?.[0];
+    expect(requestUrl).toEqual(
+      `https://review-api.lynavo.com/api/v1/desktop/update-check?${updateCheckQuery}`,
+    );
+  });
 });
 
 describe('exportDiagnostics', () => {
   beforeEach(() => {
     appState.isPackaged = false;
+    delete process.env.LYNAVO_API_BASE_URL;
+    delete process.env.LYNAVO_DESKTOP_UPDATE_URL;
+    delete process.env.LYNAVO_DIAGNOSTICS_UPLOAD_URL;
     delete process.env.VIVIDROP_API_BASE_URL;
     delete process.env.SYNCFLOW_API_BASE_URL;
     delete process.env.VIVIDROP_DESKTOP_UPDATE_URL;
@@ -176,6 +249,9 @@ describe('exportDiagnostics', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    delete process.env.LYNAVO_API_BASE_URL;
+    delete process.env.LYNAVO_DESKTOP_UPDATE_URL;
+    delete process.env.LYNAVO_DIAGNOSTICS_UPLOAD_URL;
     delete process.env.VIVIDROP_API_BASE_URL;
     delete process.env.SYNCFLOW_API_BASE_URL;
     delete process.env.VIVIDROP_DESKTOP_UPDATE_URL;
@@ -353,9 +429,9 @@ describe('exportDiagnostics', () => {
   it('redacts credentials in API URLs written to diagnostics.json', async () => {
     const tempRoot = mkdtempSync(join(tmpdir(), 'syncflow-diagnostics-test-'));
     const archivePath = join(tempRoot, 'diagnostics.zip');
-    process.env.VIVIDROP_DESKTOP_UPDATE_URL =
+    process.env.LYNAVO_DESKTOP_UPDATE_URL =
       'https://user:secret@example.test/update?token=abc&keep=ok';
-    process.env.VIVIDROP_DIAGNOSTICS_UPLOAD_URL = 'https://example.test/upload?api_key=abc&keep=ok';
+    process.env.LYNAVO_DIAGNOSTICS_UPLOAD_URL = 'https://example.test/upload?api_key=abc&keep=ok';
     vi.mocked(dialog.showSaveDialog).mockResolvedValue({
       canceled: false,
       filePath: archivePath,
@@ -437,10 +513,17 @@ describe('writePowerDiagnostics', () => {
 describe('uploadDiagnostics', () => {
   beforeEach(() => {
     appState.isPackaged = false;
+    delete process.env.LYNAVO_API_BASE_URL;
+    delete process.env.LYNAVO_DESKTOP_UPDATE_URL;
+    delete process.env.LYNAVO_DIAGNOSTICS_UPLOAD_URL;
+    delete process.env.LYNAVO_DIAGNOSTICS_TOKEN;
+    delete process.env.LYNAVO_API_TOKEN;
     delete process.env.VIVIDROP_API_BASE_URL;
     delete process.env.SYNCFLOW_API_BASE_URL;
     delete process.env.VIVIDROP_DESKTOP_UPDATE_URL;
     delete process.env.VIVIDROP_DIAGNOSTICS_UPLOAD_URL;
+    delete process.env.VIVIDROP_DIAGNOSTICS_TOKEN;
+    delete process.env.VIVIDROP_API_TOKEN;
     rmSync('/tmp/vividrop-app', { recursive: true, force: true });
     rmSync('/tmp/vividrop-user-data', { recursive: true, force: true });
     rmSync('/tmp/vividrop-main.log', { force: true });
@@ -451,10 +534,17 @@ describe('uploadDiagnostics', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    delete process.env.LYNAVO_API_BASE_URL;
+    delete process.env.LYNAVO_DESKTOP_UPDATE_URL;
+    delete process.env.LYNAVO_DIAGNOSTICS_UPLOAD_URL;
+    delete process.env.LYNAVO_DIAGNOSTICS_TOKEN;
+    delete process.env.LYNAVO_API_TOKEN;
     delete process.env.VIVIDROP_API_BASE_URL;
     delete process.env.SYNCFLOW_API_BASE_URL;
     delete process.env.VIVIDROP_DESKTOP_UPDATE_URL;
     delete process.env.VIVIDROP_DIAGNOSTICS_UPLOAD_URL;
+    delete process.env.VIVIDROP_DIAGNOSTICS_TOKEN;
+    delete process.env.VIVIDROP_API_TOKEN;
     rmSync('/tmp/vividrop-app', { recursive: true, force: true });
     rmSync('/tmp/vividrop-user-data', { recursive: true, force: true });
     rmSync('/tmp/vividrop-main.log', { force: true });
@@ -510,5 +600,37 @@ describe('uploadDiagnostics', () => {
     expect(uploadedSidecarLog.byteLength).toBeLessThan(280 * 1024);
 
     rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  it('ignores legacy diagnostics upload URL and token env', async () => {
+    process.env.VIVIDROP_DIAGNOSTICS_UPLOAD_URL = 'https://legacy.example/diagnostics';
+    process.env.VIVIDROP_API_TOKEN = 'legacy-token';
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => {
+      return new Response(
+        JSON.stringify({ ref_id: 'DIA-LEGACY', uploaded_at: '2026-05-18T09:00:00Z' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { uploadDiagnostics } = await import('../diagnostics');
+
+    await uploadDiagnostics(
+      {
+        getState: () => ({ status: 'healthy' }),
+      } as unknown as SidecarManager,
+      { description: 'legacy env ignored', locale: 'en' },
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'https://review-api.lynavo.com/api/v1/diagnostics/upload',
+    );
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers;
+    const authorization =
+      headers instanceof Headers
+        ? headers.get('Authorization')
+        : (headers as Record<string, string> | undefined)?.Authorization;
+    expect(authorization).toBeUndefined();
   });
 });

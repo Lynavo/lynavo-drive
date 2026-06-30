@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SettingsPage } from '../SettingsPage';
-import { useAuthStore } from '@renderer/stores/auth-store';
 import { useSettingsStore } from '@renderer/stores/settings-store';
 import { toast } from 'sonner';
 
@@ -64,13 +63,6 @@ describe('SettingsPage', () => {
     vi.unstubAllEnvs();
     vi.clearAllMocks();
     setElectronPlatform();
-    useAuthStore.setState({
-      session: {
-        loggedIn: true,
-        email: 'test@vividrop.app',
-        phone: '',
-      },
-    });
     useSettingsStore.setState({
       settings: {
         deviceName: 'Studio PC',
@@ -100,12 +92,16 @@ describe('SettingsPage', () => {
     expect(screen.getByText('我的')).toBeInTheDocument();
   });
 
-  it('renders the "我的账户" section with membership status', () => {
+  it('renders the community local LAN section without account or membership CTAs', () => {
     render(<SettingsPage />);
-    expect(screen.getByText('我的账户')).toBeInTheDocument();
-    expect(screen.getByText('test@vividrop.app')).toBeInTheDocument();
-    expect(screen.getByText('会员状态')).toBeInTheDocument();
-    expect(screen.getByText('Pro')).toBeInTheDocument();
+
+    expect(screen.getByText('开源本地同步')).toBeInTheDocument();
+    expect(screen.getByText('同一局域网内可直接配对、发现并自动同步。')).toBeInTheDocument();
+    expect(screen.queryByText('我的账户')).not.toBeInTheDocument();
+    expect(screen.queryByText('test@vividrop.app')).not.toBeInTheDocument();
+    expect(screen.queryByText('会员状态')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pro')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '登入' })).not.toBeInTheDocument();
   });
 
   it('renders the prevent sleep standby option', async () => {
@@ -188,8 +184,7 @@ describe('SettingsPage', () => {
     expect(screen.getByText('192.168.0.227')).toBeInTheDocument();
   });
 
-  it('hides local share address guidance in global builds', () => {
-    vi.stubEnv('SYNCFLOW_MARKET', 'global');
+  it('hides local share address guidance in the Lynavo global product', () => {
     setElectronPlatform({ isMac: false, isWindows: false, isLinux: true });
 
     render(<SettingsPage />);
@@ -199,7 +194,7 @@ describe('SettingsPage', () => {
     expect(screen.queryByRole('button', { name: /打开团队共享目录/ })).not.toBeInTheDocument();
   });
 
-  it('renders neutral Linux sharing guidance on the real settings page', () => {
+  it('keeps Linux sharing guidance hidden in the Lynavo global product', () => {
     setElectronPlatform({ isMac: false, isWindows: false, isLinux: true });
     useSettingsStore.setState({
       settings: {
@@ -214,11 +209,8 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    expect(screen.getByText('请在系统中手动配置文件共享后重新检测。')).toBeInTheDocument();
-    expect(screen.getByText('Linux 文件共享')).toBeInTheDocument();
-    expect(
-      screen.getByText('在系统中手动配置 Samba 或文件共享后，回到 Vivi Drop 重新检测。'),
-    ).toBeInTheDocument();
+    expect(screen.queryByText('请在系统中手动配置文件共享后重新检测。')).not.toBeInTheDocument();
+    expect(screen.queryByText('Linux 文件共享')).not.toBeInTheDocument();
     expect(screen.queryByText('Windows 快速配置')).not.toBeInTheDocument();
     expect(screen.queryByText('Windows 文件共享')).not.toBeInTheDocument();
   });
@@ -241,6 +233,13 @@ describe('SettingsPage', () => {
     expect(
       await screen.findByText('v1.0.1 (56) · 当前版本已安装'),
     ).toBeInTheDocument();
+  });
+
+  it('renders the product helper name in the version card', async () => {
+    render(<SettingsPage />);
+
+    expect(await screen.findByText('Lynavo Drive')).toBeInTheDocument();
+    expect(screen.queryByText('ViviDrop Desktop')).not.toBeInTheDocument();
   });
 
   it('renders support section and handles log upload', async () => {

@@ -44,8 +44,6 @@ const mockSidecar: ElectronAPI['sidecar'] = {
   }),
   revokeConnectionDevice: async () => ({ ok: true }),
   clearBlockedClient: async () => ({ ok: true }),
-  getClientConfig: async () => ({ features: { giftCard: { enabled: false } } }),
-  redeemGiftCard: async () => ({ ok: true }),
   setConnectionCode: async (code: string) => ({ code }),
   regenerateConnectionCode: async () => ({ code: '000000' }),
   getRuntimeState: async () => ({
@@ -116,16 +114,6 @@ const mockFiles: ElectronAPI['files'] = {
   requestFolderPermission: async () => ({ granted: true }),
 };
 
-const mockAuth: ElectronAPI['auth'] = {
-  sendSMSCode: async () => ({ ok: true }),
-  loginWithSMSCode: async () => ({ ok: true }),
-  sendEmailCode: async () => ({ ok: true }),
-  loginWithEmailCode: async () => ({ ok: true }),
-  getAuthSession: async () => null,
-  logout: async () => ({ ok: true }),
-  loginWithOAuth: async () => ({ ok: true }),
-};
-
 const mockEvents: ElectronAPI['events'] = {
   onSidecarEvent: () => () => {},
   onSidecarRuntimeState: () => () => {},
@@ -135,9 +123,7 @@ const mockPlatform: ElectronAPI['platform'] = {
   isMac: () => true,
   isWindows: () => false,
   isLinux: () => false,
-  supportsAppleAuth: () => true,
   usesTitleBarOverlayControls: () => false,
-  isAuthBypassEnabled: () => false,
   getHomeDir: () => '/Users/alice',
   getHostName: () => 'localhost',
   setModalOverlayActive: async () => {},
@@ -158,7 +144,6 @@ const mockPower: ElectronAPI['power'] = {
 const mockAPI: ElectronAPI = {
   sidecar: mockSidecar,
   files: mockFiles,
-  auth: mockAuth,
   events: mockEvents,
   platform: mockPlatform,
   power: mockPower,

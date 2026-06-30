@@ -4,16 +4,13 @@ import {
   BadgeCheck,
   ChevronDown,
   ChevronRight,
-  Crown,
   FileUp,
-  Globe,
   Languages,
   Mail,
   Power,
   RefreshCw,
   Send,
   Smartphone,
-  UserCircle,
   Wifi,
   type LucideIcon,
 } from 'lucide-react';
@@ -24,7 +21,6 @@ import {
   SUPPORTED_LOCALES,
   type SupportedLocale,
 } from '@renderer/i18n/locale-resolver';
-import { useAuthStore } from '@renderer/stores/auth-store';
 import { useSettingsStore } from '@renderer/stores/settings-store';
 import {
   Dialog,
@@ -36,7 +32,7 @@ import {
 } from '@renderer/components/ui/dialog';
 import { Label } from '@renderer/components/ui/label';
 import type { PowerSaveState } from '../../../preload/api';
-import { isGlobalMarket } from '../../../shared/market';
+import { getProductName, isLynavoGlobalProduct } from '../../../shared/product';
 import { ShareAddressSection } from './ShareAddressSection';
 import { SystemGuideSection } from './SystemGuideSection';
 
@@ -59,23 +55,19 @@ const languageOptions = SUPPORTED_LOCALES.map((locale) => ({
 
 export function SettingsPage() {
   const { t, i18n } = useTranslation();
-  const session = useAuthStore((s) => s.session);
   const settings = useSettingsStore((s) => s.settings);
   const updateSettings = useSettingsStore((s) => s.updateSettings);
-  const accountEmail =
-    session?.email || session?.phone || session?.accountLabel || 'vividrop@studio.example';
 
   const [localIps, setLocalIps] = useState<string[]>([]);
   const [powerState, setPowerState] = useState<PowerSaveState | null>(null);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [uploadingLogs, setUploadingLogs] = useState(false);
   const [powerLoading, setPowerLoading] = useState(true);
-  const [accountOpen, setAccountOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
   const [languageSearch, setLanguageSearch] = useState('');
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
-  const [feedbackContact, setFeedbackContact] = useState(accountEmail);
+  const [feedbackContact, setFeedbackContact] = useState('');
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [diagnosticsDescription, setDiagnosticsDescription] = useState('');
@@ -95,7 +87,8 @@ export function SettingsPage() {
   const crossDeviceReceivedAccessEnabled = settings.allowCrossDeviceReceivedAccess !== false;
   const localIp = localIps[0] || '192.168.0.227';
   const feedbackReady = feedbackText.trim().length > 0;
-  const showLocalShareGuidance = !isGlobalMarket();
+  const showLocalShareGuidance = !isLynavoGlobalProduct();
+  const productName = getProductName();
   const installedVersionLabel = appInfo
     ? `${appInfo.version}${appInfo.buildNumber ? ` (${appInfo.buildNumber})` : ''}`
     : installedVersionFallback;
@@ -114,10 +107,6 @@ export function SettingsPage() {
       .then(setAppInfo)
       .catch(() => undefined);
   }, []);
-
-  useEffect(() => {
-    setFeedbackContact(accountEmail);
-  }, [accountEmail]);
 
   const refreshPowerState = useCallback(async () => {
     try {
@@ -247,56 +236,23 @@ export function SettingsPage() {
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,0.96fr)_minmax(0,1.04fr)]">
           <div className="space-y-5">
-            <SettingsCard title={t('settings.profile.cards.account')}>
+            <SettingsCard title={t('settings.profile.cards.community')}>
               <SettingsItem
-                asButton
-                icon={UserCircle}
-                tone="rose"
-                title={t('settings.profile.account.title')}
-                caption={accountEmail}
-                onClick={() => setAccountOpen((open) => !open)}
+                icon={Wifi}
+                tone="green"
+                title={t('settings.profile.community.title')}
+                caption={t('settings.profile.community.caption')}
                 action={
-                  <ChevronRight
-                    className={`h-4 w-4 text-[#9aa3af] transition ${
-                      accountOpen ? 'rotate-90' : ''
-                    }`}
-                  />
-                }
-              />
-              {accountOpen && (
-                <div className="mx-4 mb-4 rounded-lg border border-white/70 bg-white/50 p-4">
-                  <p className="text-xs font-semibold text-[#858b96]">
-                    {t('settings.profile.account.bindingInfo')}
-                  </p>
-                  <ul className="mt-2 flex flex-col gap-2.5">
-                    <AccountFact
-                      icon={Mail}
-                      label={t('settings.profile.account.accountLabel')}
-                      value={accountEmail}
-                    />
-                    <AccountFact
-                      icon={Globe}
-                      label={t('settings.profile.account.loginMethod')}
-                      value={t('settings.profile.account.accountLogin')}
-                    />
-                    <AccountFact
-                      icon={Smartphone}
-                      label={t('settings.profile.account.currentComputer')}
-                      value={localIp}
-                    />
-                  </ul>
-                </div>
-              )}
-              <SettingsItem
-                icon={Crown}
-                tone="amber"
-                title={t('settings.profile.membership.title')}
-                caption={t('settings.profile.membership.free')}
-                action={
-                  <span className="rounded-md bg-[#eaf6ff] px-2.5 py-1 text-xs font-semibold text-[#1677d2]">
-                    Pro
+                  <span className="rounded-md bg-[#e9f8ee] px-2.5 py-1 text-xs font-semibold text-[#2d8f54]">
+                    OSS
                   </span>
                 }
+              />
+              <SettingsItem
+                icon={Smartphone}
+                tone="sky"
+                title={t('settings.profile.community.devicesTitle')}
+                caption={t('settings.profile.community.devicesCaption')}
               />
             </SettingsCard>
 
@@ -439,7 +395,7 @@ export function SettingsPage() {
               <SettingsItem
                 icon={BadgeCheck}
                 tone="green"
-                title="ViviDrop Desktop"
+                title={productName}
                 caption={t('settings.profile.version.caption', {
                   version: installedVersionLabel,
                 })}
@@ -662,20 +618,6 @@ function SettingsItem({
   }
 
   return <div className={className}>{content}</div>;
-}
-
-function AccountFact({ icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
-  const Icon = icon;
-
-  return (
-    <li className="flex items-center justify-between gap-3">
-      <span className="flex items-center gap-2 text-[13px] text-[#17191c]">
-        <Icon className="h-3.5 w-3.5 shrink-0 text-[#9aa2ad]" />
-        {label}
-      </span>
-      <span className="truncate text-[13px] text-[#59616d]">{value}</span>
-    </li>
-  );
 }
 
 function ToneIcon({ icon: Icon, tone }: { icon: LucideIcon; tone: Tone }) {

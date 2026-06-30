@@ -27,8 +27,6 @@ const dynamicRendererKeys = [
   'layout.sidecar.runtimeMessages.failedCheckExecutable',
 ];
 const hardcodedUserFacingCopyFiles = [
-  'components/shared/AuthPage.tsx',
-  'components/shared/LoginDialog.tsx',
   'features/dashboard/Dashboard.tsx',
   'features/dashboard/DiskWarningBanner.tsx',
   'features/devices/DeviceDetailPanel.tsx',
