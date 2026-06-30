@@ -2,19 +2,29 @@ package api
 
 import (
 	"bytes"
-	"encoding/base64"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nicksyncflow/sidecar/internal/config"
 	"github.com/nicksyncflow/sidecar/internal/events"
 	"github.com/nicksyncflow/sidecar/internal/store"
+)
+
+const (
+	windowsPersonalClientID     = "windows-personal-phone"
+	windowsPersonalClientName   = "Windows Personal Phone"
+	windowsPersonalPairingToken = "windows-personal-pairing-token"
 )
 
 func TestWindowsPersonalVirtualRootListsDrives(t *testing.T) {
@@ -367,10 +377,8 @@ func newWindowsPersonalTestServer(t *testing.T, roots []personalDriveRoot, perso
 		t.Fatalf("mkdir receive: %v", err)
 	}
 
-	authSrv := profileAuthServerForPersonalWindows(t, "account-1")
-	t.Cleanup(authSrv.Close)
-	apiServer, handler := NewServer(st, cfg, events.NewHub(), nil)
-	apiServer.setDesktopAuthContext("account-1", authSrv.URL)
+	insertWindowsPersonalHMACPairedDevice(t, st)
+	_, handler := NewServer(st, cfg, events.NewHub(), nil)
 	return httptest.NewServer(handler)
 }
 
@@ -381,7 +389,7 @@ func getPersonal(t *testing.T, url string) *http.Response {
 	if err != nil {
 		t.Fatalf("new request: %v", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWTForPersonalWindows("account-1"))
+	addSignedWindowsPersonalHeaders(t, req)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("GET %s: %v", url, err)
@@ -397,36 +405,42 @@ func withPersonalWindowsClientQuery(rawURL string) string {
 	if strings.Contains(rawURL, "?") {
 		separator = "&"
 	}
-	return rawURL + separator + "clientId=test-client&clientName=Test%20Phone"
+	return rawURL + separator + "clientId=" + windowsPersonalClientID + "&clientName=Windows%20Personal%20Phone"
 }
 
-func profileAuthServerForPersonalWindows(t *testing.T, accountID string) *httptest.Server {
+func insertWindowsPersonalHMACPairedDevice(t *testing.T, st *store.Store) {
 	t.Helper()
 
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/user/profile" {
-			http.NotFound(w, r)
-			return
-		}
-		if strings.TrimSpace(r.Header.Get("Authorization")) == "" {
-			http.Error(w, "missing authorization", http.StatusUnauthorized)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]any{
-			"code": 0,
-			"data": map[string]any{
-				"id": accountID,
-			},
-		}); err != nil {
-			t.Fatalf("encode profile: %v", err)
-		}
-	}))
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	tokenHash := sha256.Sum256([]byte(windowsPersonalPairingToken))
+	if err := st.UpsertPairedDevice(store.PairedDevice{
+		ClientID:         windowsPersonalClientID,
+		ClientName:       windowsPersonalClientName,
+		Platform:         "ios",
+		PairingID:        "pair-" + windowsPersonalClientID,
+		PairingTokenHash: hex.EncodeToString(tokenHash[:]),
+		CreatedAt:        now,
+		LastSeenAt:       now,
+	}); err != nil {
+		t.Fatalf("UpsertPairedDevice(%q): %v", windowsPersonalClientID, err)
+	}
 }
 
-func fakeAccountJWTForPersonalWindows(accountID string) string {
-	encode := base64.RawURLEncoding.EncodeToString
-	header := encode([]byte(`{"alg":"none","typ":"JWT"}`))
-	payload := encode([]byte(`{"user_id":"` + accountID + `"}`))
-	return header + "." + payload + ".signature"
+func addSignedWindowsPersonalHeaders(t *testing.T, req *http.Request) {
+	t.Helper()
+
+	timestamp := time.Now().UTC().Format(time.RFC3339Nano)
+	nonce := "windows-personal-test-nonce-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	tokenHash := sha256.Sum256([]byte(windowsPersonalPairingToken))
+	mac := hmac.New(sha256.New, tokenHash[:])
+	_, _ = mac.Write([]byte(strings.Join([]string{
+		req.Method,
+		req.URL.EscapedPath(),
+		windowsPersonalClientID,
+		timestamp,
+		nonce,
+	}, "\n")))
+	req.Header.Set("X-SyncFlow-Auth", hex.EncodeToString(mac.Sum(nil)))
+	req.Header.Set("X-SyncFlow-Auth-Timestamp", timestamp)
+	req.Header.Set("X-SyncFlow-Auth-Nonce", nonce)
 }

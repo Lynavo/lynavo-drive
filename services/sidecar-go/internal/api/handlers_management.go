@@ -78,6 +78,7 @@ func (s *Server) handleManagementBlockDevice(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusInternalServerError, "failed to block device")
 		return
 	}
+	s.disconnectClients([]string{clientID}, "device_blocked")
 	state, err := s.store.GetDeviceBlockState(desktopDeviceID, clientID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to load block state")

@@ -44,7 +44,6 @@ func (s *Server) handleSetConnectionCode(w http.ResponseWriter, r *http.Request)
 	}
 	connectedClientIDs := s.connectedClientIDs()
 	s.disconnectClients(connectedClientIDs, "connection_code_set")
-	s.RefreshTunnelPairings("connection_code_set")
 	s.hub.Broadcast(events.Event{Type: "dashboard.updated", Payload: nil})
 	slog.Info("connection code set")
 
@@ -63,7 +62,6 @@ func (s *Server) handleRegenerateCode(w http.ResponseWriter, _ *http.Request) {
 	}
 	connectedClientIDs := s.connectedClientIDs()
 	s.disconnectClients(connectedClientIDs, "connection_code_regenerated")
-	s.RefreshTunnelPairings("connection_code_regenerated")
 	s.hub.Broadcast(events.Event{Type: "dashboard.updated", Payload: nil})
 	slog.Info("connection code regenerated")
 

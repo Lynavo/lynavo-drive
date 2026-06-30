@@ -105,7 +105,6 @@ func main() {
 	// Create API server (uses tcpSrv for live client state)
 	apiSrv, handler := api.NewServer(st, cfg, hub, tcpSrv)
 	tcpSrv.SetPresenceProvider(apiSrv.PresenceTracker())
-	tcpSrv.OnPairedDevicesChanged = apiSrv.RefreshTunnelPairings
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
 		Handler: handler,
@@ -277,12 +276,6 @@ func bonjourShareMetadata(st *store.Store) (bool, string) {
 		}
 	} else if err != nil {
 		slog.Warn("failed to read share config for bonjour", "err", err)
-	}
-	if val, err := st.GetSetting("remote_access_enabled"); err == nil {
-		shareEnabled = val == "true"
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		slog.Warn("failed to read remote access setting for bonjour", "err", err)
-		shareEnabled = false
 	}
 	return shareEnabled, shareName
 }

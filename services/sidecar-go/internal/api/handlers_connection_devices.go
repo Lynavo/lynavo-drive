@@ -169,8 +169,8 @@ func (s *Server) handleRevokeConnectionDevice(w http.ResponseWriter, r *http.Req
 		writeError(w, http.StatusInternalServerError, "failed to revoke device")
 		return
 	}
+	s.disconnectClients([]string{clientID}, "device_revoked")
 
-	s.RefreshTunnelPairings("connection_device_revoked")
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 

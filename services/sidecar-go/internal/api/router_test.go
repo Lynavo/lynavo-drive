@@ -33,6 +33,9 @@ import (
 const (
 	directoryThumbnailMaxEdge     = 256
 	directoryThumbnailJPEGQuality = 80
+	testPersonalClientID          = "test-client"
+	testPersonalClientName        = "Test Phone"
+	testPersonalPairingToken      = "test-pairing-token"
 )
 
 type videoThumbnailRequestEvent struct {
@@ -118,22 +121,12 @@ func authenticatePersonalAPITestServer(
 	hub *events.Hub,
 ) *httptest.Server {
 	t.Helper()
-	authSrv := profileAuthServer(t, "account-1")
-	t.Cleanup(authSrv.Close)
 
 	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 
-	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1","iceServers":[]}`
-	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /tunnel/credentials: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
-	}
+	insertHMACPairedDevice(t, st, testPersonalClientID, testPersonalClientName, testPersonalPairingToken)
 
 	return srv
 }
@@ -152,7 +145,7 @@ func authorizedPersonalGETPath(t *testing.T, srv *httptest.Server, path string) 
 	if err != nil {
 		t.Fatalf("new personal request: %v", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
+	addSignedPersonalHeaders(t, req, testPersonalClientID, testPersonalPairingToken)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("GET %s: %v", path, err)
@@ -332,11 +325,21 @@ func signedPersonalURLWithQuery(t *testing.T, srv *httptest.Server, path, client
 	return parsed.String()
 }
 
+func signedPersonalGETWithQueryURL(t *testing.T, signedURL string) *http.Response {
+	t.Helper()
+
+	resp, err := http.Get(signedURL)
+	if err != nil {
+		t.Fatalf("GET signed personal query %s: %v", signedURL, err)
+	}
+	return resp
+}
+
 func addSignedPersonalHeaders(t *testing.T, req *http.Request, clientID, pairingToken string) {
 	t.Helper()
 
 	timestamp := time.Now().UTC().Format(time.RFC3339Nano)
-	nonce := "test-nonce-header"
+	nonce := "test-nonce-header-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	signature := personalAccessSignature(t, req.Method, req.URL.EscapedPath(), clientID, timestamp, nonce, pairingToken)
 	req.Header.Set("X-SyncFlow-Auth", signature)
 	req.Header.Set("X-SyncFlow-Auth-Timestamp", timestamp)
@@ -442,15 +445,6 @@ func testWakeCapability() *protocol.WakeCapability {
 	}
 }
 
-type fixedProxyWakeTargetProvider struct {
-	targets map[string][]protocol.WakeTarget
-}
-
-func (f fixedProxyWakeTargetProvider) ProxyWakeTargets(accountID string) []protocol.WakeTarget {
-	targets := f.targets[accountID]
-	return append([]protocol.WakeTarget(nil), targets...)
-}
-
 func fakeAccountJWT(t *testing.T, accountID string) string {
 	t.Helper()
 
@@ -460,37 +454,6 @@ func fakeAccountJWT(t *testing.T, accountID string) string {
 	return header + "." + payload + ".signature"
 }
 
-func fakePaddedAccountJWT(t *testing.T, accountID string) string {
-	t.Helper()
-
-	encode := base64.URLEncoding.EncodeToString
-	header := encode([]byte(`{"alg":"none","typ":"JWT"}`))
-	payload := encode([]byte(`{"user_id":"` + accountID + `"}`))
-	return header + "." + payload + ".signature"
-}
-
-func profileAuthServer(t *testing.T, accountID string) *httptest.Server {
-	t.Helper()
-
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/user/profile" {
-			http.NotFound(w, r)
-			return
-		}
-		if strings.TrimSpace(r.Header.Get("Authorization")) == "" {
-			http.Error(w, "missing authorization", http.StatusUnauthorized)
-			return
-		}
-		writeTestJSON(t, w, map[string]any{
-			"code":    0,
-			"message": "success",
-			"data": map[string]any{
-				"id": accountID,
-			},
-		})
-	}))
-}
-
 func writeTestJSON(t *testing.T, w http.ResponseWriter, payload any) {
 	t.Helper()
 
@@ -498,6 +461,58 @@ func writeTestJSON(t *testing.T, w http.ResponseWriter, payload any) {
 	if err := json.NewEncoder(w).Encode(payload); err != nil {
 		t.Fatalf("encode json: %v", err)
 	}
+}
+
+func assertErrorReason(t *testing.T, resp *http.Response, wantStatus int, wantReason string) {
+	t.Helper()
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read error response: %v", err)
+	}
+	if resp.StatusCode != wantStatus {
+		t.Fatalf("status=%d, want %d body=%s", resp.StatusCode, wantStatus, string(body))
+	}
+	var decoded map[string]string
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		t.Fatalf("decode error body: %v body=%s", err, string(body))
+	}
+	if decoded["reason"] != wantReason {
+		t.Fatalf("reason=%q, want %q body=%s", decoded["reason"], wantReason, string(body))
+	}
+}
+
+func assertRecorderErrorReason(t *testing.T, resp *httptest.ResponseRecorder, wantStatus int, wantReason string) {
+	t.Helper()
+	if resp.Code != wantStatus {
+		t.Fatalf("status=%d, want %d body=%s", resp.Code, wantStatus, resp.Body.String())
+	}
+	var decoded map[string]string
+	if err := json.Unmarshal(resp.Body.Bytes(), &decoded); err != nil {
+		t.Fatalf("decode error body: %v body=%s", err, resp.Body.String())
+	}
+	if decoded["reason"] != wantReason {
+		t.Fatalf("reason=%q, want %q body=%s", decoded["reason"], wantReason, resp.Body.String())
+	}
+}
+
+const ossCommercialDisabledReason = "oss_commercial_disabled"
+
+func tunnelCredentialsBody(signalingURL, accessToken, accountID string) string {
+	accountPart := ""
+	if accountID != "" {
+		accountPart = `,"accountId":` + strconv.Quote(accountID)
+	}
+	return `{"signalingUrl":` + strconv.Quote(signalingURL) +
+		`,"accessToken":` + strconv.Quote(accessToken) +
+		accountPart + `,"iceServers":[]}`
+}
+
+func accountContextBody(authBaseURL, accessToken, accountID string) string {
+	return `{"authBaseUrl":` + strconv.Quote(authBaseURL) +
+		`,"accessToken":` + strconv.Quote(accessToken) +
+		`,"accountId":` + strconv.Quote(accountID) + `}`
 }
 
 func TestHealthEndpoint(t *testing.T) {
@@ -558,63 +573,37 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 }
 
-func TestHealthEndpointExposesTunnelCredentialRefreshRequired(t *testing.T) {
+func TestHealthEndpointReportsTunnelDisabledInOSS(t *testing.T) {
 	st, cfg, hub := testEnv(t)
-	signalingSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/tunnel/signaling" {
-			http.NotFound(w, r)
-			return
-		}
-		http.Error(w, `{"error":"invalid signaling token"}`, http.StatusUnauthorized)
-	}))
-	defer signalingSrv.Close()
-
-	apiSrv, handler := api.NewServer(st, cfg, hub, nil)
+	_, handler := api.NewServer(st, cfg, hub, nil)
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
-	t.Cleanup(func() {
-		_, _ = http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(`{"signalingUrl":"","accessToken":"","iceServers":[]}`))
-	})
 
-	reqBody := `{"signalingUrl":"` + signalingSrv.URL + `","accessToken":"expired-token","iceServers":[]}`
-	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
+	resp, err := http.Get(srv.URL + "/health")
 	if err != nil {
-		t.Fatalf("POST /tunnel/credentials: %v", err)
+		t.Fatalf("GET /health: %v", err)
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
+		t.Fatalf("GET /health status=%d, want 200", resp.StatusCode)
 	}
 
-	deadline := time.After(2 * time.Second)
-	for {
-		resp, err := http.Get(srv.URL + "/health")
-		if err != nil {
-			t.Fatalf("GET /health: %v", err)
-		}
-		var body map[string]any
-		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-			resp.Body.Close()
-			t.Fatalf("decode health: %v", err)
-		}
-		resp.Body.Close()
-
-		tunnel, ok := body["tunnel"].(map[string]any)
-		if ok && tunnel["signalingAuthState"] == "refresh_required" {
-			if tunnel["credentialRefreshRequired"] != true {
-				t.Fatalf("expected credentialRefreshRequired=true, got %v", tunnel["credentialRefreshRequired"])
-			}
-			if apiSrv == nil {
-				t.Fatal("api server should remain available")
-			}
-			return
-		}
-
-		select {
-		case <-deadline:
-			t.Fatalf("expected tunnel signalingAuthState=refresh_required, got %#v", body["tunnel"])
-		case <-time.After(10 * time.Millisecond):
-		}
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	tunnel, ok := body["tunnel"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing tunnel object in %#v", body)
+	}
+	if tunnel["enabled"] != false {
+		t.Fatalf("tunnel enabled=%v, want false", tunnel["enabled"])
+	}
+	if tunnel["signalingAuthState"] != "disabled" {
+		t.Fatalf("signalingAuthState=%v, want disabled", tunnel["signalingAuthState"])
+	}
+	if tunnel["credentialRefreshRequired"] != false {
+		t.Fatalf("credentialRefreshRequired=%v, want false", tunnel["credentialRefreshRequired"])
 	}
 }
 
@@ -752,7 +741,74 @@ func TestPresenceIncludesPowerSnapshotOnlyForPairedClient(t *testing.T) {
 	}
 }
 
-func TestProxyWakeRequiresAccountAuthorization(t *testing.T) {
+func TestPresenceBlockedPairedClientDoesNotTouchBroadcastOrExposeMetadata(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	now := time.Now().UTC().Format(time.RFC3339)
+	insertPairedDeviceWithStableID(t, st, "client-1", "Nick iPhone", "client-1", "stable-1", now)
+	desktopDeviceID, err := st.GetDeviceID()
+	if err != nil {
+		t.Fatalf("GetDeviceID: %v", err)
+	}
+	if err := st.BlockDevice(desktopDeviceID, "client-1"); err != nil {
+		t.Fatalf("BlockDevice: %v", err)
+	}
+
+	apiSrv, handler := api.NewServer(st, cfg, hub, nil)
+	apiSrv.SetWakeProvider(fixedWakeProvider{capability: testWakeCapability()})
+	apiSrv.UpdatePowerSnapshot(api.PowerEventSnapshot{
+		Event:        "resume",
+		State:        "awake",
+		LastResumeAt: "2026-06-11T03:50:00Z",
+		UpdatedAt:    "2026-06-11T03:50:00Z",
+	})
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/events/stream"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial ws: %v", err)
+	}
+	defer conn.Close()
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/presence/client-1", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST blocked presence: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("blocked presence status=%d, want 200", resp.StatusCode)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode blocked presence: %v", err)
+	}
+	if body["paired"] != false {
+		t.Fatalf("blocked presence paired=%v, want false", body["paired"])
+	}
+	if _, ok := body["wake"]; ok {
+		t.Fatal("blocked presence must not expose wake metadata")
+	}
+	if _, ok := body["power"]; ok {
+		t.Fatal("blocked presence must not expose power metadata")
+	}
+	if apiSrv.PresenceTracker().IsAlive("client-1", time.Minute) {
+		t.Fatal("blocked presence must not update presence tracker")
+	}
+
+	conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+	if _, message, err := conn.ReadMessage(); err == nil {
+		t.Fatalf("blocked presence must not broadcast connected_idle event, got %s", string(message))
+	}
+}
+
+func TestProxyWakeDisabledInOSS(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	_, handler := api.NewServer(st, cfg, hub, nil)
 	srv := httptest.NewServer(handler)
@@ -762,415 +818,7 @@ func TestProxyWakeRequiresAccountAuthorization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST /wake/proxy: %v", err)
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("status=%d, want 401", resp.StatusCode)
-	}
-}
-
-func TestProxyWakeRejectsPairedDeviceHMACWithoutAccountBearer(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	const (
-		clientID     = "mobile-hmac-wake"
-		clientName   = "HMAC Wake Phone"
-		pairingToken = "pairing-token-secret"
-	)
-	insertHMACPairedDevice(t, st, clientID, clientName, pairingToken)
-	apiSrv, handler := api.NewServer(st, cfg, hub, nil)
-	apiSrv.SetWakeProvider(fixedWakeProvider{capability: testWakeCapability()})
-	sender := &recordingWakePacketSender{}
-	apiSrv.SetWakePacketSender(sender)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	reqBody := `{"clientId":"mobile-hmac-wake","macAddress":"aa:bb:cc:dd:ee:ff","broadcastAddress":"192.168.1.255","ports":[9]}`
-	req, err := http.NewRequest(
-		http.MethodPost,
-		srv.URL+withPersonalClient("/wake/proxy", clientID, clientName),
-		strings.NewReader(reqBody),
-	)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	addSignedPersonalHeaders(t, req, clientID, pairingToken)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("POST /wake/proxy: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusUnauthorized {
-		body, _ := io.ReadAll(resp.Body)
-		t.Fatalf("status=%d, want 401 body=%s", resp.StatusCode, string(body))
-	}
-	if got := len(sender.packets); got != 0 {
-		t.Fatalf("sent packets=%d, want 0", got)
-	}
-}
-
-func TestProxyWakeRejectsUnpairedClient(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	authSrv := profileAuthServer(t, "acct-1")
-	defer authSrv.Close()
-	_, handler := api.NewServer(st, cfg, hub, nil)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-	syncAccountContextForTest(t, srv.URL, authSrv.URL, "acct-1")
-
-	reqBody := `{"clientId":"unknown-mobile","macAddress":"aa:bb:cc:dd:ee:ff","broadcastAddress":"192.168.1.255","ports":[9]}`
-	req, err := http.NewRequest(http.MethodPost, srv.URL+"/wake/proxy", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "acct-1"))
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("POST /wake/proxy: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusForbidden {
-		t.Fatalf("status=%d, want 403", resp.StatusCode)
-	}
-}
-
-func TestProxyWakeRejectsUnsafeTarget(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	authSrv := profileAuthServer(t, "acct-1")
-	defer authSrv.Close()
-	insertPairedDeviceWithStableID(t, st, "mobile-1", "Phone", "phone", "stable-mobile-1", time.Now().UTC().Format(time.RFC3339Nano))
-	_, handler := api.NewServer(st, cfg, hub, nil)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-	syncAccountContextForTest(t, srv.URL, authSrv.URL, "acct-1")
-
-	reqBody := `{"clientId":"mobile-1","macAddress":"aa:bb:cc:dd:ee:ff","broadcastAddress":"8.8.8.8","ports":[53]}`
-	req, err := http.NewRequest(http.MethodPost, srv.URL+"/wake/proxy", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "acct-1"))
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("POST /wake/proxy: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("status=%d, want 400", resp.StatusCode)
-	}
-}
-
-func TestProxyWakeSendsMagicPacketForPairedClient(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	authSrv := profileAuthServer(t, "acct-1")
-	defer authSrv.Close()
-	insertPairedDeviceWithStableID(t, st, "mobile-1", "Phone", "phone", "stable-mobile-1", time.Now().UTC().Format(time.RFC3339Nano))
-	apiSrv, handler := api.NewServer(st, cfg, hub, nil)
-	apiSrv.SetWakeProvider(fixedWakeProvider{capability: testWakeCapability()})
-	sender := &recordingWakePacketSender{}
-	apiSrv.SetWakePacketSender(sender)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-	syncAccountContextForTest(t, srv.URL, authSrv.URL, "acct-1")
-
-	reqBody := `{"clientId":"mobile-1","macAddress":"aa:bb:cc:dd:ee:ff","broadcastAddress":"192.168.1.255","ports":[9,7]}`
-	req, err := http.NewRequest(http.MethodPost, srv.URL+"/wake/proxy", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "acct-1"))
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("POST /wake/proxy: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		t.Fatalf("status=%d, want 200 body=%s", resp.StatusCode, string(body))
-	}
-	if got := len(sender.packets); got != 2 {
-		t.Fatalf("sent packets=%d, want 2", got)
-	}
-	if sender.packets[0].addr != "192.168.1.255:9" {
-		t.Fatalf("first addr=%q, want 192.168.1.255:9", sender.packets[0].addr)
-	}
-	if len(sender.packets[0].packet) != 102 {
-		t.Fatalf("packet length=%d, want 102", len(sender.packets[0].packet))
-	}
-}
-
-func TestProxyWakeRejectsUnknownPrivateBroadcastTarget(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	authSrv := profileAuthServer(t, "acct-1")
-	defer authSrv.Close()
-	insertPairedDeviceWithStableID(t, st, "mobile-1", "Phone", "phone", "stable-mobile-1", time.Now().UTC().Format(time.RFC3339Nano))
-	apiSrv, handler := api.NewServer(st, cfg, hub, nil)
-	apiSrv.SetWakeProvider(fixedWakeProvider{capability: testWakeCapability()})
-	sender := &recordingWakePacketSender{}
-	apiSrv.SetWakePacketSender(sender)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-	syncAccountContextForTest(t, srv.URL, authSrv.URL, "acct-1")
-
-	reqBody := `{"clientId":"mobile-1","macAddress":"aa:bb:cc:dd:ee:ff","broadcastAddress":"192.168.99.255","ports":[9]}`
-	req, err := http.NewRequest(http.MethodPost, srv.URL+"/wake/proxy", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "acct-1"))
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("POST /wake/proxy: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("status=%d, want 400", resp.StatusCode)
-	}
-	if got := len(sender.packets); got != 0 {
-		t.Fatalf("sent packets=%d, want 0", got)
-	}
-}
-
-func TestProxyWakeRejectsInvalidMACAddress(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	authSrv := profileAuthServer(t, "acct-1")
-	defer authSrv.Close()
-	insertPairedDeviceWithStableID(t, st, "mobile-1", "Phone", "phone", "stable-mobile-1", time.Now().UTC().Format(time.RFC3339Nano))
-	apiSrv, handler := api.NewServer(st, cfg, hub, nil)
-	apiSrv.SetWakeProvider(fixedWakeProvider{capability: testWakeCapability()})
-	sender := &recordingWakePacketSender{}
-	apiSrv.SetWakePacketSender(sender)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-	syncAccountContextForTest(t, srv.URL, authSrv.URL, "acct-1")
-
-	reqBody := `{"clientId":"mobile-1","macAddress":"not-a-mac","broadcastAddress":"192.168.1.255","ports":[9]}`
-	req, err := http.NewRequest(http.MethodPost, srv.URL+"/wake/proxy", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "acct-1"))
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("POST /wake/proxy: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("status=%d, want 400", resp.StatusCode)
-	}
-	if got := len(sender.packets); got != 0 {
-		t.Fatalf("sent packets=%d, want 0", got)
-	}
-}
-
-func TestProxyWakeRejectsDifferentSleepingTargetMAC(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	authSrv := profileAuthServer(t, "acct-1")
-	defer authSrv.Close()
-	insertPairedDeviceWithStableID(t, st, "mobile-1", "Phone", "phone", "stable-mobile-1", time.Now().UTC().Format(time.RFC3339Nano))
-	apiSrv, handler := api.NewServer(st, cfg, hub, nil)
-	apiSrv.SetWakeProvider(fixedWakeProvider{capability: testWakeCapability()})
-	sender := &recordingWakePacketSender{}
-	apiSrv.SetWakePacketSender(sender)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-	syncAccountContextForTest(t, srv.URL, authSrv.URL, "acct-1")
-
-	reqBody := `{"clientId":"mobile-1","macAddress":"00:11:22:33:44:55","broadcastAddress":"192.168.1.255","ports":[9]}`
-	req, err := http.NewRequest(http.MethodPost, srv.URL+"/wake/proxy", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "acct-1"))
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("POST /wake/proxy: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("status=%d, want 400", resp.StatusCode)
-	}
-	if got := len(sender.packets); got != 0 {
-		t.Fatalf("sent packets=%d, want 0", got)
-	}
-}
-
-func TestProxyWakeAllowsRegisteredSameAccountSleepingTargetMAC(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	authSrv := profileAuthServer(t, "acct-1")
-	defer authSrv.Close()
-	insertPairedDeviceWithStableID(t, st, "mobile-1", "Phone", "phone", "stable-mobile-1", time.Now().UTC().Format(time.RFC3339Nano))
-	apiSrv, handler := api.NewServer(st, cfg, hub, nil)
-	apiSrv.SetWakeProvider(fixedWakeProvider{capability: testWakeCapability()})
-	apiSrv.SetProxyWakeTargetProvider(fixedProxyWakeTargetProvider{
-		targets: map[string][]protocol.WakeTarget{
-			"acct-1": {
-				{
-					InterfaceName:    "en1",
-					MACAddress:       "00:11:22:33:44:55",
-					IPv4Address:      "192.168.1.30",
-					BroadcastAddress: "192.168.1.255",
-					Ports:            []int{9},
-				},
-			},
-		},
-	})
-	sender := &recordingWakePacketSender{}
-	apiSrv.SetWakePacketSender(sender)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-	syncAccountContextForTest(t, srv.URL, authSrv.URL, "acct-1")
-
-	reqBody := `{"clientId":"mobile-1","macAddress":"00:11:22:33:44:55","broadcastAddress":"192.168.1.255","ports":[9]}`
-	req, err := http.NewRequest(http.MethodPost, srv.URL+"/wake/proxy", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "acct-1"))
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("POST /wake/proxy: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		t.Fatalf("status=%d, want 200 body=%s", resp.StatusCode, string(body))
-	}
-	if got := len(sender.packets); got != 1 {
-		t.Fatalf("sent packets=%d, want 1", got)
-	}
-	if sender.packets[0].addr != "192.168.1.255:9" {
-		t.Fatalf("addr=%q, want 192.168.1.255:9", sender.packets[0].addr)
-	}
-}
-
-func TestProxyWakeRejectsRegisteredDifferentAccountSleepingTargetMAC(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	authSrv := profileAuthServer(t, "acct-1")
-	defer authSrv.Close()
-	insertPairedDeviceWithStableID(t, st, "mobile-1", "Phone", "phone", "stable-mobile-1", time.Now().UTC().Format(time.RFC3339Nano))
-	apiSrv, handler := api.NewServer(st, cfg, hub, nil)
-	apiSrv.SetWakeProvider(fixedWakeProvider{capability: &protocol.WakeCapability{
-		Supported: true,
-		UpdatedAt: "2026-06-09T03:00:00Z",
-		Targets:   []protocol.WakeTarget{},
-	}})
-	apiSrv.SetProxyWakeTargetProvider(fixedProxyWakeTargetProvider{
-		targets: map[string][]protocol.WakeTarget{
-			"acct-2": {
-				{
-					InterfaceName:    "en1",
-					MACAddress:       "00:11:22:33:44:55",
-					IPv4Address:      "192.168.1.30",
-					BroadcastAddress: "192.168.1.255",
-					Ports:            []int{9},
-				},
-			},
-		},
-	})
-	sender := &recordingWakePacketSender{}
-	apiSrv.SetWakePacketSender(sender)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-	syncAccountContextForTest(t, srv.URL, authSrv.URL, "acct-1")
-
-	reqBody := `{"clientId":"mobile-1","macAddress":"00:11:22:33:44:55","broadcastAddress":"192.168.1.255","ports":[9]}`
-	req, err := http.NewRequest(http.MethodPost, srv.URL+"/wake/proxy", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "acct-1"))
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("POST /wake/proxy: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusBadRequest {
-		body, _ := io.ReadAll(resp.Body)
-		t.Fatalf("status=%d, want 400 body=%s", resp.StatusCode, string(body))
-	}
-	if got := len(sender.packets); got != 0 {
-		t.Fatalf("sent packets=%d, want 0", got)
-	}
-}
-
-func TestProxyWakeRejectsLimitedBroadcastWhenNotInWakeTargets(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	authSrv := profileAuthServer(t, "acct-1")
-	defer authSrv.Close()
-	insertPairedDeviceWithStableID(t, st, "mobile-1", "Phone", "phone", "stable-mobile-1", time.Now().UTC().Format(time.RFC3339Nano))
-	apiSrv, handler := api.NewServer(st, cfg, hub, nil)
-	apiSrv.SetWakeProvider(fixedWakeProvider{capability: testWakeCapability()})
-	sender := &recordingWakePacketSender{}
-	apiSrv.SetWakePacketSender(sender)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-	syncAccountContextForTest(t, srv.URL, authSrv.URL, "acct-1")
-
-	reqBody := `{"clientId":"mobile-1","macAddress":"aa:bb:cc:dd:ee:ff","broadcastAddress":"255.255.255.255","ports":[9]}`
-	req, err := http.NewRequest(http.MethodPost, srv.URL+"/wake/proxy", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "acct-1"))
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("POST /wake/proxy: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("status=%d, want 400", resp.StatusCode)
-	}
-	if got := len(sender.packets); got != 0 {
-		t.Fatalf("sent packets=%d, want 0", got)
-	}
-}
-
-type recordedWakePacket struct {
-	addr   string
-	packet []byte
-}
-
-type recordingWakePacketSender struct {
-	packets []recordedWakePacket
-}
-
-func (r *recordingWakePacketSender) SendWakePacket(addr string, packet []byte) error {
-	cloned := append([]byte(nil), packet...)
-	r.packets = append(r.packets, recordedWakePacket{addr: addr, packet: cloned})
-	return nil
-}
-
-func syncAccountContextForTest(t *testing.T, serverURL string, authBaseURL string, accountID string) {
-	t.Helper()
-	reqBody := `{"authBaseUrl":"` + authBaseURL + `","accessToken":"token","accountId":"` + accountID + `"}`
-	resp, err := http.Post(serverURL+"/account/context", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /account/context: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		t.Fatalf("account context status=%d body=%s", resp.StatusCode, string(body))
-	}
+	assertErrorReason(t, resp, http.StatusForbidden, ossCommercialDisabledReason)
 }
 
 func TestPowerStateUpdateIsLocalOnly(t *testing.T) {
@@ -1251,6 +899,153 @@ func TestTunnelCredentialsSyncIsLocalOnly(t *testing.T) {
 
 	if remoteResp.Code != http.StatusForbidden {
 		t.Fatalf("remote tunnel credentials sync status = %d, want %d", remoteResp.Code, http.StatusForbidden)
+	}
+}
+
+func TestOSSCommercialSyncEndpointsAreDisabledForLocalRequests(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		body string
+	}{
+		{
+			name: "account context",
+			path: "/account/context",
+			body: accountContextBody("https://auth.example.test", "token", "acct-1"),
+		},
+		{
+			name: "account context malformed body",
+			path: "/account/context",
+			body: "{",
+		},
+		{
+			name: "tunnel credentials",
+			path: "/tunnel/credentials",
+			body: tunnelCredentialsBody("https://signaling.example.test", "token", "acct-1"),
+		},
+		{
+			name: "tunnel credentials malformed body",
+			path: "/tunnel/credentials",
+			body: "{",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st, cfg, hub := testEnv(t)
+			_, handler := api.NewServer(st, cfg, hub, nil)
+			srv := httptest.NewServer(handler)
+			defer srv.Close()
+
+			resp, err := http.Post(srv.URL+tt.path, "application/json", strings.NewReader(tt.body))
+			if err != nil {
+				t.Fatalf("POST %s: %v", tt.path, err)
+			}
+			assertErrorReason(t, resp, http.StatusForbidden, ossCommercialDisabledReason)
+		})
+	}
+}
+
+func TestOSSSettingsExposeRemoteAccessDisabledAndRejectEnable(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := st.SetSetting("remote_access_enabled", "true"); err != nil {
+		t.Fatalf("SetSetting(remote_access_enabled): %v", err)
+	}
+
+	_, handler := api.NewServer(st, cfg, hub, nil)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/settings")
+	if err != nil {
+		t.Fatalf("GET /settings: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /settings status=%d, want 200", resp.StatusCode)
+	}
+	var settings struct {
+		RemoteAccessEnabled bool `json:"remoteAccessEnabled"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
+		t.Fatalf("decode settings: %v", err)
+	}
+	if settings.RemoteAccessEnabled {
+		t.Fatal("remoteAccessEnabled=true, want false in OSS runtime")
+	}
+
+	req, err := http.NewRequest(http.MethodPut, srv.URL+"/settings", strings.NewReader(`{"remoteAccessEnabled":true}`))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("PUT /settings: %v", err)
+	}
+	assertErrorReason(t, resp, http.StatusForbidden, ossCommercialDisabledReason)
+}
+
+func TestUpdateSettingsRejectsRemoteAccessEnableBeforeMutatingOtherFields(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := st.SetDeviceName("Before Reject"); err != nil {
+		t.Fatalf("SetDeviceName: %v", err)
+	}
+
+	_, handler := api.NewServer(st, cfg, hub, nil)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	req, err := http.NewRequest(
+		http.MethodPut,
+		srv.URL+"/settings",
+		strings.NewReader(`{"deviceName":"Mutated Before Reject","remoteAccessEnabled":true}`),
+	)
+	if err != nil {
+		t.Fatalf("new settings request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("PUT /settings: %v", err)
+	}
+	assertErrorReason(t, resp, http.StatusForbidden, ossCommercialDisabledReason)
+
+	deviceName, err := st.GetDeviceName()
+	if err != nil {
+		t.Fatalf("GetDeviceName: %v", err)
+	}
+	if deviceName != "Before Reject" {
+		t.Fatalf("device name mutated to %q after rejected remote access enable", deviceName)
+	}
+}
+
+func TestRemoteGuardDoesNotBlockLocalSettingsOrPresence(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := st.SetSetting("remote_access_enabled", "false"); err != nil {
+		t.Fatalf("SetSetting(remote_access_enabled): %v", err)
+	}
+
+	_, handler := api.NewServer(st, cfg, hub, nil)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	settingsResp, err := http.Get(srv.URL + "/settings")
+	if err != nil {
+		t.Fatalf("GET /settings: %v", err)
+	}
+	settingsResp.Body.Close()
+	if settingsResp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /settings status=%d, want 200", settingsResp.StatusCode)
+	}
+
+	presenceResp, err := http.Post(srv.URL+"/presence/phone-local", "application/json", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatalf("POST /presence: %v", err)
+	}
+	presenceResp.Body.Close()
+	if presenceResp.StatusCode != http.StatusOK {
+		t.Fatalf("POST /presence status=%d, want 200", presenceResp.StatusCode)
 	}
 }
 
@@ -1475,6 +1270,43 @@ func TestPersonalStreamAllowsRepeatedSignedMovRangeRequests(t *testing.T) {
 	}
 	if string(body) != "456789" {
 		t.Fatalf("range body=%q, want 456789", string(body))
+	}
+}
+
+func TestPersonalThumbnailAllowsRepeatedSignedImageRequests(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	cfg.PersonalShareDir = filepath.Join(t.TempDir(), "Personal Share")
+	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	writeJPEGFixture(t, filepath.Join(cfg.PersonalDir(), "wide.jpg"), 640, 480)
+
+	const (
+		clientID     = "phone-thumbnail-hmac"
+		clientName   = "Thumbnail Phone"
+		pairingToken = "pairing-token-secret"
+	)
+	insertHMACPairedDevice(t, st, clientID, clientName, pairingToken)
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	signedURL := signedPersonalURLWithQuery(t, srv, "/personal/thumbnail/wide.jpg", clientID, clientName, pairingToken)
+
+	for index := 1; index <= 2; index++ {
+		resp, err := http.Get(signedURL)
+		if err != nil {
+			t.Fatalf("signed personal thumbnail request %d: %v", index, err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("signed personal thumbnail request %d status=%d, want 200 body=%s", index, resp.StatusCode, string(body))
+		}
+		if contentType := resp.Header.Get("Content-Type"); !strings.HasPrefix(contentType, "image/jpeg") {
+			t.Fatalf("signed personal thumbnail request %d Content-Type=%q, want image/jpeg", index, contentType)
+		}
 	}
 }
 
@@ -1954,70 +1786,7 @@ func TestPresenceHeartbeatBroadcastsConnectedIdleEvent(t *testing.T) {
 	}
 }
 
-func TestPresenceHeartbeatKeepsPairingButDoesNotConnectWhenDesktopLoggedOut(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	now := time.Now().UTC().Format(time.RFC3339)
-	insertPairedDeviceWithStableID(t, st, "client-1", "Nick iPhone", "client-1", "stable-1", now)
-
-	apiSrv, handler := api.NewServer(st, cfg, hub, nil)
-	apiSrv.SetWakeProvider(fixedWakeProvider{capability: testWakeCapability()})
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/events/stream"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
-	if err != nil {
-		t.Fatalf("dial ws: %v", err)
-	}
-	defer conn.Close()
-
-	resp, err := http.Post(srv.URL+"/account/context", "application/json", strings.NewReader(`{"authBaseUrl":"","accessToken":""}`))
-	if err != nil {
-		t.Fatalf("clear account context: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("clear account context status=%d, want 200", resp.StatusCode)
-	}
-
-	req, err := http.NewRequest(http.MethodPost, srv.URL+"/presence/client-1", strings.NewReader("{}"))
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("POST /presence: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-
-	var body map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		t.Fatalf("decode presence response: %v", err)
-	}
-	if body["paired"] != true {
-		t.Fatalf("paired=%v, want true", body["paired"])
-	}
-	if body["desktopAvailable"] != false {
-		t.Fatalf("desktopAvailable=%v, want false", body["desktopAvailable"])
-	}
-	if _, ok := body["wake"]; ok {
-		t.Fatal("logged-out presence must not expose wake metadata")
-	}
-	if apiSrv.PresenceTracker().IsAlive("client-1", time.Second) {
-		t.Fatal("logged-out presence must not keep the client alive")
-	}
-
-	conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
-	if _, message, err := conn.ReadMessage(); err == nil {
-		t.Fatalf("logged-out presence must not broadcast connected_idle event, got %s", string(message))
-	}
-}
-
-func TestPresenceHeartbeatAllowsDesktopWithSyncedAuthBaseURLAndOpaqueToken(t *testing.T) {
+func TestPresenceHeartbeatAllowsPairedClientWithoutAccountContext(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	now := time.Now().UTC().Format(time.RFC3339)
 	insertPairedDeviceWithStableID(t, st, "client-1", "Nick iPhone", "client-1", "stable-1", now)
@@ -2026,20 +1795,7 @@ func TestPresenceHeartbeatAllowsDesktopWithSyncedAuthBaseURLAndOpaqueToken(t *te
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
-	resp, err := http.Post(
-		srv.URL+"/account/context",
-		"application/json",
-		strings.NewReader(`{"authBaseUrl":"https://api.vividrop.test","accessToken":"opaque-token"}`),
-	)
-	if err != nil {
-		t.Fatalf("sync account context: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("sync account context status=%d, want 200", resp.StatusCode)
-	}
-
-	resp, err = http.Post(srv.URL+"/presence/client-1", "application/json", strings.NewReader("{}"))
+	resp, err := http.Post(srv.URL+"/presence/client-1", "application/json", strings.NewReader("{}"))
 	if err != nil {
 		t.Fatalf("POST /presence: %v", err)
 	}
@@ -2773,177 +2529,201 @@ func TestSharedListRejectsWindowsPathEscapes(t *testing.T) {
 	}
 }
 
-func TestPersonalListRejectsWhenRemoteAccessDisabled(t *testing.T) {
+func TestPersonalAccessRejectsInvalidPairedDeviceAuthorizationWithReason(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
 		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	const (
+		clientID     = "phone-invalid-hmac"
+		clientName   = "Invalid HMAC Phone"
+		pairingToken = "pairing-token-secret"
+	)
+	insertHMACPairedDevice(t, st, clientID, clientName, pairingToken)
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp := signedPersonalGET(t, srv, "/personal/list", clientID, clientName, "wrong-pairing-token")
+	assertErrorReason(t, resp, http.StatusUnauthorized, "invalid_device_authorization")
+}
+
+func TestPersonalAccessRejectsUnknownPairedDeviceAsInvalidAuthorization(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	const (
+		clientID     = "phone-unknown-hmac"
+		clientName   = "Unknown HMAC Phone"
+		pairingToken = "pairing-token-secret"
+	)
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp := signedPersonalGET(t, srv, "/personal/list", clientID, clientName, pairingToken)
+	assertErrorReason(t, resp, http.StatusUnauthorized, "invalid_device_authorization")
+}
+
+func TestPersonalAccessVerifiesHMACBeforeDeviceStatusDenials(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(t *testing.T, st *store.Store, clientID string)
+	}{
+		{
+			name: "revoked",
+			setup: func(t *testing.T, st *store.Store, clientID string) {
+				t.Helper()
+				if err := st.RevokePairedDevice(clientID); err != nil {
+					t.Fatalf("RevokePairedDevice: %v", err)
+				}
+			},
+		},
+		{
+			name: "blocked",
+			setup: func(t *testing.T, st *store.Store, clientID string) {
+				t.Helper()
+				desktopDeviceID, err := st.GetDeviceID()
+				if err != nil {
+					t.Fatalf("GetDeviceID: %v", err)
+				}
+				if err := st.BlockDevice(desktopDeviceID, clientID); err != nil {
+					t.Fatalf("BlockDevice: %v", err)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st, cfg, hub := testEnv(t)
+			if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+				t.Fatalf("mkdir personal dir: %v", err)
+			}
+			const (
+				clientID     = "phone-status-hmac"
+				clientName   = "Status Phone"
+				pairingToken = "pairing-token-secret"
+			)
+			insertHMACPairedDevice(t, st, clientID, clientName, pairingToken)
+			tt.setup(t, st, clientID)
+
+			handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+			srv := httptest.NewServer(handler)
+			defer srv.Close()
+
+			resp := signedPersonalGET(t, srv, "/personal/list", clientID, clientName, "wrong-pairing-token")
+			assertErrorReason(t, resp, http.StatusUnauthorized, "invalid_device_authorization")
+		})
+	}
+}
+
+func TestPersonalAccessDeniesWhenDeviceStatusChecksFail(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(t *testing.T, st *store.Store)
+	}{
+		{
+			name: "missing desktop device id",
+			setup: func(t *testing.T, st *store.Store) {
+				t.Helper()
+				if _, err := st.DB().Exec("DELETE FROM settings WHERE key = ?", "device_id"); err != nil {
+					t.Fatalf("delete device_id: %v", err)
+				}
+			},
+		},
+		{
+			name: "block state query error",
+			setup: func(t *testing.T, st *store.Store) {
+				t.Helper()
+				if _, err := st.DB().Exec("DROP TABLE device_blocks"); err != nil {
+					t.Fatalf("drop device_blocks: %v", err)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st, cfg, hub := testEnv(t)
+			if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+				t.Fatalf("mkdir personal dir: %v", err)
+			}
+			const (
+				clientID     = "phone-status-error"
+				clientName   = "Status Error Phone"
+				pairingToken = "pairing-token-secret"
+			)
+			insertHMACPairedDevice(t, st, clientID, clientName, pairingToken)
+			tt.setup(t, st)
+
+			handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+			srv := httptest.NewServer(handler)
+			defer srv.Close()
+
+			resp := signedPersonalGET(t, srv, "/personal/list", clientID, clientName, pairingToken)
+			assertErrorReason(t, resp, http.StatusForbidden, "invalid_device_authorization")
+		})
+	}
+}
+
+func TestPersonalPairedDeviceAccessDoesNotRequireAccountContext(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cfg.PersonalDir(), "notes.txt"), []byte("personal notes"), 0o644); err != nil {
+		t.Fatalf("write personal file: %v", err)
+	}
+	const (
+		clientID     = "phone-hmac-entitlement"
+		clientName   = "Entitlement Phone"
+		pairingToken = "pairing-token-secret"
+	)
+	insertHMACPairedDevice(t, st, clientID, clientName, pairingToken)
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp := signedPersonalGET(t, srv, "/personal/list", clientID, clientName, pairingToken)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("signed personal access status=%d, want 200 body=%s", resp.StatusCode, string(body))
+	}
+}
+
+func TestPersonalPairedDeviceHMACBypassesRemoteAccessSettingButAccountBearerDoesNot(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cfg.PersonalDir(), "notes.txt"), []byte("personal notes"), 0o644); err != nil {
+		t.Fatalf("write personal file: %v", err)
 	}
 	if err := st.SetSetting("remote_access_enabled", "false"); err != nil {
-		t.Fatalf("SetSetting: %v", err)
+		t.Fatalf("SetSetting(remote_access_enabled): %v", err)
 	}
+	const (
+		clientID     = "phone-hmac-local"
+		clientName   = "Local HMAC Phone"
+		pairingToken = "pairing-token-secret"
+	)
+	insertHMACPairedDevice(t, st, clientID, clientName, pairingToken)
 
 	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
-	req, err := http.NewRequest(http.MethodGet, srv.URL+withPersonalClientQuery("/personal/list"), nil)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("GET /personal/list: %v", err)
-	}
+	resp := signedPersonalGET(t, srv, "/personal/list", clientID, clientName, pairingToken)
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d", resp.StatusCode)
-	}
-}
-
-func TestPersonalListRequiresDesktopAccountIdentity(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
-		t.Fatalf("mkdir personal dir: %v", err)
-	}
-
-	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	req, err := http.NewRequest(http.MethodGet, srv.URL+withPersonalClientQuery("/personal/list"), nil)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("GET /personal/list: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("expected 401, got %d", resp.StatusCode)
-	}
-}
-
-func TestPersonalListUsesAccountContextWithoutTunnelCredentials(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
-		t.Fatalf("mkdir personal dir: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(cfg.PersonalDir(), "notes.txt"), []byte("personal"), 0o644); err != nil {
-		t.Fatalf("write personal file: %v", err)
-	}
-	authSrv := profileAuthServer(t, "account-1")
-	defer authSrv.Close()
-
-	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	reqBody := `{"authBaseUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1"}`
-	resp, err := http.Post(srv.URL+"/account/context", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /account/context: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected account context sync 200, got %d", resp.StatusCode)
-	}
-
-	req, err := http.NewRequest(http.MethodGet, srv.URL+withPersonalClientQuery("/personal/list"), nil)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
-
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("GET /personal/list: %v", err)
-	}
-	defer resp.Body.Close()
-
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		t.Fatalf("expected 200, got %d body=%s", resp.StatusCode, string(body))
-	}
-}
-
-func TestPersonalListAcceptsDevSandboxMockToken(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
-		t.Fatalf("mkdir personal dir: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(cfg.PersonalDir(), "notes.txt"), []byte("personal"), 0o644); err != nil {
-		t.Fatalf("write personal file: %v", err)
-	}
-
-	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	token := "mock-sandbox-access-token:functional@example.com"
-	reqBody := `{"authBaseUrl":"dev-sandbox://auth","accessToken":"` + token + `","accountId":"99999"}`
-	resp, err := http.Post(srv.URL+"/account/context", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /account/context: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected account context sync 200, got %d", resp.StatusCode)
-	}
-
-	req, err := http.NewRequest(http.MethodGet, srv.URL+withPersonalClientQuery("/personal/list"), nil)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("GET /personal/list: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		t.Fatalf("expected 200, got %d body=%s", resp.StatusCode, string(body))
-	}
-}
-
-func TestAccountContextClearDisablesPersonalList(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
-		t.Fatalf("mkdir personal dir: %v", err)
-	}
-	authSrv := profileAuthServer(t, "account-1")
-	defer authSrv.Close()
-
-	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	reqBody := `{"authBaseUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1"}`
-	resp, err := http.Post(srv.URL+"/account/context", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /account/context: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected account context sync 200, got %d", resp.StatusCode)
-	}
-
-	resp, err = http.Post(srv.URL+"/account/context", "application/json", strings.NewReader(`{"authBaseUrl":"","accessToken":""}`))
-	if err != nil {
-		t.Fatalf("POST /account/context clear: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected account context clear 200, got %d", resp.StatusCode)
+		t.Fatalf("signed personal access status=%d, want 200 body=%s", resp.StatusCode, string(body))
 	}
 
 	req, err := http.NewRequest(http.MethodGet, srv.URL+withPersonalClientQuery("/personal/list"), nil)
@@ -2951,49 +2731,11 @@ func TestAccountContextClearDisablesPersonalList(t *testing.T) {
 		t.Fatalf("new request: %v", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
-
 	resp, err = http.DefaultClient.Do(req)
 	if err != nil {
-		t.Fatalf("GET /personal/list: %v", err)
+		t.Fatalf("GET account personal list: %v", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("expected 401, got %d", resp.StatusCode)
-	}
-}
-
-func TestPersonalListRequiresBearerAccountToken(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
-		t.Fatalf("mkdir personal dir: %v", err)
-	}
-	authSrv := profileAuthServer(t, "account-1")
-	defer authSrv.Close()
-
-	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1","iceServers":[]}`
-	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /tunnel/credentials: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
-	}
-
-	resp, err = http.Get(srv.URL + withPersonalClientQuery("/personal/list"))
-	if err != nil {
-		t.Fatalf("GET /personal/list: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("expected 401, got %d", resp.StatusCode)
-	}
+	assertErrorReason(t, resp, http.StatusForbidden, ossCommercialDisabledReason)
 }
 
 func TestPersonalAccessAcceptsPairedDeviceHMACWithoutAccountBearer(t *testing.T) {
@@ -3035,6 +2777,26 @@ func TestPersonalAccessAcceptsPairedDeviceHMACWithoutAccountBearer(t *testing.T)
 	if string(data) != "personal notes" {
 		t.Fatalf("download body=%q, want personal notes", string(data))
 	}
+}
+
+func TestPersonalAccessRejectsQueryCredentialsOnNonMediaEndpoints(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
+		t.Fatalf("mkdir personal dir: %v", err)
+	}
+	const (
+		clientID     = "phone-query-list"
+		clientName   = "Query List Phone"
+		pairingToken = "pairing-token-secret"
+	)
+	insertHMACPairedDevice(t, st, clientID, clientName, pairingToken)
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp := signedPersonalGETWithQuery(t, srv, "/personal/list", clientID, clientName, pairingToken)
+	assertErrorReason(t, resp, http.StatusUnauthorized, "invalid_device_authorization")
 }
 
 func TestPersonalAccessRejectsReplayedPairedDeviceHMACNonce(t *testing.T) {
@@ -3110,175 +2872,6 @@ func TestPersonalAccessRejectsBlockedPairedDeviceHMAC(t *testing.T) {
 	}
 }
 
-func TestPersonalListUsesAccountIDFromPaddedJWTWhenCredentialsOmitAccountID(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
-		t.Fatalf("mkdir personal dir: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(cfg.PersonalDir(), "notes.txt"), []byte("personal"), 0o644); err != nil {
-		t.Fatalf("write personal file: %v", err)
-	}
-	authSrv := profileAuthServer(t, "account-1")
-	defer authSrv.Close()
-
-	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	desktopToken := fakePaddedAccountJWT(t, "account-1")
-	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"` + desktopToken + `","iceServers":[]}`
-	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /tunnel/credentials: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
-	}
-
-	req, err := http.NewRequest(http.MethodGet, srv.URL+withPersonalClientQuery("/personal/list"), nil)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
-
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("GET /personal/list: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		t.Fatalf("expected 200, got %d body=%s", resp.StatusCode, string(body))
-	}
-}
-
-func TestPersonalListRejectsDifferentAccount(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
-		t.Fatalf("mkdir personal dir: %v", err)
-	}
-	authSrv := profileAuthServer(t, "mobile-account")
-	defer authSrv.Close()
-
-	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"desktop-account","iceServers":[]}`
-	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /tunnel/credentials: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
-	}
-
-	req, err := http.NewRequest(http.MethodGet, srv.URL+withPersonalClientQuery("/personal/list"), nil)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "mobile-account"))
-
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("GET /personal/list: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d", resp.StatusCode)
-	}
-}
-
-func TestPersonalListRejectsTokenWhenServerValidationFails(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
-		t.Fatalf("mkdir personal dir: %v", err)
-	}
-	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "invalid token", http.StatusUnauthorized)
-	}))
-	defer authSrv.Close()
-
-	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1","iceServers":[]}`
-	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /tunnel/credentials: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
-	}
-
-	req, err := http.NewRequest(http.MethodGet, srv.URL+withPersonalClientQuery("/personal/list"), nil)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
-
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("GET /personal/list: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("expected 401, got %d", resp.StatusCode)
-	}
-}
-
-func TestPersonalListRejectsTokenWhenProfileCodeIsNonZero(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
-		t.Fatalf("mkdir personal dir: %v", err)
-	}
-	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		writeTestJSON(t, w, map[string]any{
-			"code":    1006,
-			"message": "invalid token",
-			"data":    map[string]any{},
-		})
-	}))
-	defer authSrv.Close()
-
-	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1","iceServers":[]}`
-	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /tunnel/credentials: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
-	}
-
-	req, err := http.NewRequest(http.MethodGet, srv.URL+withPersonalClientQuery("/personal/list"), nil)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
-
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("GET /personal/list: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("expected 401, got %d", resp.StatusCode)
-	}
-}
-
 func TestPersonalListReturnsSameAccountPersonalDirectory(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	cfg.ReceiveDir = filepath.Join(t.TempDir(), "received")
@@ -3296,33 +2889,9 @@ func TestPersonalListReturnsSameAccountPersonalDirectory(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(cfg.ReceiveDir, "IMG_0001.JPG"), []byte("image"), 0o644); err != nil {
 		t.Fatalf("write received file: %v", err)
 	}
-	authSrv := profileAuthServer(t, "account-1")
-	defer authSrv.Close()
 
-	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1","iceServers":[]}`
-	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /tunnel/credentials: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
-	}
-
-	req, err := http.NewRequest(http.MethodGet, srv.URL+withPersonalClientQuery("/personal/list"), nil)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
-
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("GET /personal/list: %v", err)
-	}
+	srv := authenticatePersonalAPITestServer(t, st, cfg, hub)
+	resp := authorizedPersonalGET(t, srv, "/personal/list")
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -3740,12 +3309,6 @@ func TestPersonalThumbnailGeneratesSmallCachedJPEG(t *testing.T) {
 func TestPersonalVideoThumbnailBroadcastsRequestAndServesGeneratedCache(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	cfg.PersonalShareDir = filepath.Join(t.TempDir(), "Personal Share")
-	authSrv := profileAuthServer(t, "account-1")
-	t.Cleanup(authSrv.Close)
-	_, handler := api.NewServer(st, cfg, hub, nil)
-	srv := httptest.NewServer(handler)
-	t.Cleanup(srv.Close)
-	syncAccountContextForTest(t, srv.URL, authSrv.URL, "account-1")
 
 	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
 		t.Fatalf("mkdir personal: %v", err)
@@ -3759,6 +3322,7 @@ func TestPersonalVideoThumbnailBroadcastsRequestAndServesGeneratedCache(t *testi
 		t.Fatalf("resolve video path: %v", err)
 	}
 
+	srv := authenticatePersonalAPITestServer(t, st, cfg, hub)
 	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/events/stream"
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
@@ -3774,7 +3338,7 @@ func TestPersonalVideoThumbnailBroadcastsRequestAndServesGeneratedCache(t *testi
 			errCh <- err
 			return
 		}
-		req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
+		addSignedPersonalHeaders(t, req, testPersonalClientID, testPersonalPairingToken)
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			errCh <- err
@@ -3824,12 +3388,6 @@ func TestPersonalVideoThumbnailBroadcastsRequestAndServesGeneratedCache(t *testi
 func TestPersonalVideoThumbnailReturnsNotFoundWhenCacheIsNotGenerated(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	cfg.PersonalShareDir = filepath.Join(t.TempDir(), "Personal Share")
-	authSrv := profileAuthServer(t, "account-1")
-	t.Cleanup(authSrv.Close)
-	_, handler := api.NewServer(st, cfg, hub, nil)
-	srv := httptest.NewServer(handler)
-	t.Cleanup(srv.Close)
-	syncAccountContextForTest(t, srv.URL, authSrv.URL, "account-1")
 
 	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
 		t.Fatalf("mkdir personal: %v", err)
@@ -3838,6 +3396,7 @@ func TestPersonalVideoThumbnailReturnsNotFoundWhenCacheIsNotGenerated(t *testing
 		t.Fatalf("write video: %v", err)
 	}
 
+	srv := authenticatePersonalAPITestServer(t, st, cfg, hub)
 	start := time.Now()
 	resp := authorizedPersonalGET(t, srv, "/personal/thumbnail/clip.mov")
 	defer resp.Body.Close()
@@ -3885,33 +3444,9 @@ func TestPersonalListUsesConfiguredPersonalSharePathInsteadOfReceivePath(t *test
 	if err := os.WriteFile(filepath.Join(personalRoot, "notes.txt"), []byte("personal"), 0o644); err != nil {
 		t.Fatalf("write personal file: %v", err)
 	}
-	authSrv := profileAuthServer(t, "account-1")
-	defer authSrv.Close()
 
-	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1","iceServers":[]}`
-	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /tunnel/credentials: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
-	}
-
-	req, err := http.NewRequest(http.MethodGet, srv.URL+withPersonalClientQuery("/personal/list"), nil)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
-
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("GET /personal/list: %v", err)
-	}
+	srv := authenticatePersonalAPITestServer(t, st, cfg, hub)
+	resp := authorizedPersonalGET(t, srv, "/personal/list")
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -3948,33 +3483,9 @@ func TestPersonalDownloadServesRegularDocumentFile(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(personalRoot, "notes.txt"), []byte("personal notes"), 0o644); err != nil {
 		t.Fatalf("write personal file: %v", err)
 	}
-	authSrv := profileAuthServer(t, "account-1")
-	defer authSrv.Close()
 
-	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1","iceServers":[]}`
-	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /tunnel/credentials: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
-	}
-
-	req, err := http.NewRequest(http.MethodGet, srv.URL+withPersonalClientQuery("/personal/download/notes.txt"), nil)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
-
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("GET /personal/download/notes.txt: %v", err)
-	}
+	srv := authenticatePersonalAPITestServer(t, st, cfg, hub)
+	resp := authorizedPersonalGET(t, srv, "/personal/download/notes.txt")
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -4004,14 +3515,22 @@ func TestPersonalAccessCreatesAccessRecordsWhenClientMetadataPresent(t *testing.
 	if err != nil {
 		t.Fatalf("GetDeviceID: %v", err)
 	}
+	const (
+		clientID     = "client-001"
+		clientName   = "Alice iPhone"
+		pairingToken = "pairing-token-secret"
+	)
+	insertHMACPairedDevice(t, st, clientID, clientName, pairingToken)
 
-	srv := authenticatePersonalAPITestServer(t, st, cfg, hub)
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
 	for _, path := range []string{
-		"/personal/list?clientId=client-001&clientName=Alice%20iPhone",
-		"/personal/stream/notes.txt?clientId=client-001&clientName=Alice%20iPhone",
-		"/personal/download/notes.txt?clientId=client-001&clientName=Alice%20iPhone",
+		"/personal/list",
+		"/personal/stream/notes.txt",
+		"/personal/download/notes.txt",
 	} {
-		resp := authorizedPersonalGET(t, srv, path)
+		resp := signedPersonalGET(t, srv, path, clientID, clientName, pairingToken)
 		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
@@ -4019,15 +3538,15 @@ func TestPersonalAccessCreatesAccessRecordsWhenClientMetadataPresent(t *testing.
 		}
 	}
 
-	records, err := st.ListAccessRecords(desktopDeviceID, &[]string{"client-001"}[0])
+	records, err := st.ListAccessRecords(desktopDeviceID, &[]string{clientID}[0])
 	if err != nil {
 		t.Fatalf("ListAccessRecords: %v", err)
 	}
 	seen := map[string]store.AccessRecord{}
 	for _, record := range records {
 		seen[record.Action] = record
-		if record.ClientName != "Alice iPhone" {
-			t.Fatalf("record client name=%q, want Alice iPhone: %+v", record.ClientName, record)
+		if record.ClientName != clientName {
+			t.Fatalf("record client name=%q, want %q: %+v", record.ClientName, clientName, record)
 		}
 		if record.Result != "ok" {
 			t.Fatalf("record result=%q, want ok: %+v", record.Result, record)
@@ -4044,6 +3563,52 @@ func TestPersonalAccessCreatesAccessRecordsWhenClientMetadataPresent(t *testing.
 	if seen["view"].ResourceName != "notes.txt" || seen["view"].ResourceKind != "shared_file" ||
 		seen["download"].ResourceName != "notes.txt" || seen["download"].ResourceKind != "shared_file" {
 		t.Fatalf("file access records should use filename, got view=%+v download=%+v", seen["view"], seen["download"])
+	}
+}
+
+func TestPersonalAccessRecordsUsePairedDeviceNameAfterQueryTampering(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	personalRoot := filepath.Join(t.TempDir(), "Personal Share")
+	cfg.PersonalShareDir = personalRoot
+	if err := os.MkdirAll(personalRoot, 0o755); err != nil {
+		t.Fatalf("mkdir personal share dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(personalRoot, "notes.txt"), []byte("personal notes"), 0o644); err != nil {
+		t.Fatalf("write personal file: %v", err)
+	}
+	desktopDeviceID, err := st.GetDeviceID()
+	if err != nil {
+		t.Fatalf("GetDeviceID: %v", err)
+	}
+	const (
+		clientID     = "client-tamper"
+		pairedName   = "Alice iPhone"
+		tamperedName = "Mallory Phone"
+		pairingToken = "pairing-token-secret"
+	)
+	insertHMACPairedDevice(t, st, clientID, pairedName, pairingToken)
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp := signedPersonalGET(t, srv, "/personal/download/notes.txt", clientID, tamperedName, pairingToken)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("tampered personal download status=%d, want 200 body=%s", resp.StatusCode, string(body))
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+
+	records, err := st.ListAccessRecords(desktopDeviceID, &[]string{clientID}[0])
+	if err != nil {
+		t.Fatalf("ListAccessRecords: %v", err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("records=%d, want 1: %+v", len(records), records)
+	}
+	if records[0].ClientName != pairedName {
+		t.Fatalf("record client name=%q, want paired device name %q", records[0].ClientName, pairedName)
 	}
 }
 
@@ -4082,33 +3647,9 @@ func TestPersonalListSkipsSymlinkEscapingPersonalRoot(t *testing.T) {
 	if err := os.Symlink(filepath.Join(outsideRoot, "external.txt"), filepath.Join(personalRoot, "external-link.txt")); err != nil {
 		t.Skipf("symlink unavailable: %v", err)
 	}
-	authSrv := profileAuthServer(t, "account-1")
-	defer authSrv.Close()
 
-	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1","iceServers":[]}`
-	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /tunnel/credentials: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
-	}
-
-	req, err := http.NewRequest(http.MethodGet, srv.URL+withPersonalClientQuery("/personal/list"), nil)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
-
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("GET /personal/list: %v", err)
-	}
+	srv := authenticatePersonalAPITestServer(t, st, cfg, hub)
+	resp := authorizedPersonalGET(t, srv, "/personal/list")
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -4140,38 +3681,15 @@ func TestPersonalListRejectsEscapes(t *testing.T) {
 	if err := os.MkdirAll(personalDir, 0o755); err != nil {
 		t.Fatalf("mkdir personal dir: %v", err)
 	}
-	authSrv := profileAuthServer(t, "account-1")
-	defer authSrv.Close()
 
-	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	reqBody := `{"signalingUrl":"` + authSrv.URL + `","accessToken":"token","accountId":"account-1","iceServers":[]}`
-	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /tunnel/credentials: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected credentials sync 200, got %d", resp.StatusCode)
-	}
+	srv := authenticatePersonalAPITestServer(t, st, cfg, hub)
 
 	tests := []string{
 		"/personal/list/..%5Coutside",
 		"/personal/list/C:%5CWindows",
 	}
 	for _, path := range tests {
-		req, err := http.NewRequest(http.MethodGet, srv.URL+path, nil)
-		if err != nil {
-			t.Fatalf("new request %s: %v", path, err)
-		}
-		req.Header.Set("Authorization", "Bearer "+fakeAccountJWT(t, "account-1"))
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Fatalf("GET %s: %v", path, err)
-		}
+		resp := authorizedPersonalGET(t, srv, path)
 		resp.Body.Close()
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Fatalf("GET %s status = %d, want 400", path, resp.StatusCode)
@@ -4586,61 +4104,9 @@ func TestRevokeAuthorizedDeviceEndpointDoesNotDeleteHistory(t *testing.T) {
 		t.Fatalf("UpsertDailyStats: %v", err)
 	}
 
-	registerCh := make(chan map[string]any, 2)
-	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
-	signalingSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/tunnel/signaling" {
-			http.NotFound(w, r)
-			return
-		}
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			return
-		}
-		defer conn.Close()
-
-		for {
-			_, msg, err := conn.ReadMessage()
-			if err != nil {
-				return
-			}
-			var payload map[string]any
-			if err := json.Unmarshal(msg, &payload); err != nil {
-				continue
-			}
-			if payload["type"] == "register_desktop" {
-				registerCh <- payload
-			}
-		}
-	}))
-	defer signalingSrv.Close()
-
 	_, handler := api.NewServer(st, cfg, hub, nil)
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
-	t.Cleanup(func() {
-		_, _ = http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(`{"signalingUrl":"","accessToken":"","iceServers":[]}`))
-	})
-
-	reqBody := `{"signalingUrl":"` + signalingSrv.URL + `","accessToken":"token","iceServers":[]}`
-	credentialsResp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /tunnel/credentials: %v", err)
-	}
-	credentialsResp.Body.Close()
-	if credentialsResp.StatusCode != http.StatusOK {
-		t.Fatalf("expected credentials 200, got %d", credentialsResp.StatusCode)
-	}
-
-	select {
-	case payload := <-registerCh:
-		paired, ok := payload["pairedDevices"].([]any)
-		if !ok || len(paired) != 1 {
-			t.Fatalf("initial pairedDevices=%#v, want one device", payload["pairedDevices"])
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("initial desktop registration was not sent")
-	}
 
 	resp, err := http.Post(srv.URL+"/settings/connection-devices/phone-a/revoke", "application/json", strings.NewReader("{}"))
 	if err != nil {
@@ -4649,16 +4115,6 @@ func TestRevokeAuthorizedDeviceEndpointDoesNotDeleteHistory(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-
-	select {
-	case payload := <-registerCh:
-		paired, ok := payload["pairedDevices"].([]any)
-		if !ok || len(paired) != 0 {
-			t.Fatalf("refreshed pairedDevices=%#v, want no devices", payload["pairedDevices"])
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("refreshed desktop registration was not sent after revoke")
 	}
 
 	device, err := st.GetPairedDevice("phone-a")
@@ -4674,6 +4130,39 @@ func TestRevokeAuthorizedDeviceEndpointDoesNotDeleteHistory(t *testing.T) {
 	}
 	if statsCount != 1 {
 		t.Fatalf("expected daily stats to remain, got %d", statsCount)
+	}
+}
+
+func TestRevokeAuthorizedDeviceEndpointDisconnectsRevokedClient(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	now := time.Now().UTC().Format(time.RFC3339)
+	insertPairedDeviceWithStableID(t, st, "phone-a", "Nick iPhone", "phone-a", "stable-a", now)
+	insertPairedDeviceWithStableID(t, st, "phone-b", "Bob Android", "phone-b", "stable-b", now)
+
+	clientStates := &fakeDisconnectingClientStates{
+		states: fakeClientStates{
+			"phone-a": "syncing",
+			"phone-b": "connected",
+		},
+	}
+	_, handler := api.NewServer(st, cfg, hub, clientStates)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Post(srv.URL+"/settings/connection-devices/phone-a/revoke", "application/json", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatalf("POST revoke: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	if strings.Join(clientStates.disconnected, ",") != "phone-a" {
+		t.Fatalf("disconnected clients=%v, want [phone-a]", clientStates.disconnected)
+	}
+	if clientStates.reason != "device_revoked" {
+		t.Fatalf("disconnect reason=%q, want device_revoked", clientStates.reason)
 	}
 }
 
@@ -4815,91 +4304,6 @@ func TestSetConnectionCode(t *testing.T) {
 	}
 }
 
-func TestSetConnectionCodeRefreshesTunnelPairings(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	now := time.Now().UTC().Format(time.RFC3339)
-	insertPairedDeviceWithStableID(t, st, "phone-a", "Nick iPhone", "phone-a", "stable-a", now)
-
-	registerCh := make(chan map[string]any, 2)
-	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
-	signalingSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/tunnel/signaling" {
-			http.NotFound(w, r)
-			return
-		}
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			return
-		}
-		defer conn.Close()
-
-		for {
-			_, msg, err := conn.ReadMessage()
-			if err != nil {
-				return
-			}
-			var payload map[string]any
-			if err := json.Unmarshal(msg, &payload); err != nil {
-				continue
-			}
-			if payload["type"] == "register_desktop" {
-				registerCh <- payload
-			}
-		}
-	}))
-	defer signalingSrv.Close()
-
-	_, handler := api.NewServer(st, cfg, hub, nil)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-	t.Cleanup(func() {
-		_, _ = http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(`{"signalingUrl":"","accessToken":"","iceServers":[]}`))
-	})
-
-	reqBody := `{"signalingUrl":"` + signalingSrv.URL + `","accessToken":"token","iceServers":[]}`
-	credentialsResp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /tunnel/credentials: %v", err)
-	}
-	credentialsResp.Body.Close()
-	if credentialsResp.StatusCode != http.StatusOK {
-		t.Fatalf("expected credentials 200, got %d", credentialsResp.StatusCode)
-	}
-
-	select {
-	case payload := <-registerCh:
-		paired, ok := payload["pairedDevices"].([]any)
-		if !ok || len(paired) != 1 {
-			t.Fatalf("initial pairedDevices=%#v, want one device", payload["pairedDevices"])
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("initial desktop registration was not sent")
-	}
-
-	resp, err := http.Post(
-		srv.URL+"/connection-code",
-		"application/json",
-		strings.NewReader(`{"code":"238416"}`),
-	)
-	if err != nil {
-		t.Fatalf("POST /connection-code: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-
-	select {
-	case payload := <-registerCh:
-		paired, ok := payload["pairedDevices"].([]any)
-		if !ok || len(paired) != 0 {
-			t.Fatalf("refreshed pairedDevices=%#v, want no devices", payload["pairedDevices"])
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("refreshed desktop registration was not sent after connection code change")
-	}
-}
-
 func TestSetConnectionCodeDisconnectsConnectedClients(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -4994,72 +4398,6 @@ func TestRegenerateConnectionCodeDisconnectsConnectedClients(t *testing.T) {
 	}
 	if clientStates.reason != "connection_code_regenerated" {
 		t.Fatalf("disconnect reason=%q, want connection_code_regenerated", clientStates.reason)
-	}
-}
-
-func TestClearingAccountContextDisconnectsConnectedClientsWithoutInvalidatingPairing(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	now := time.Now().UTC().Format(time.RFC3339)
-	insertPairedDeviceWithStableID(t, st, "phone-a", "Nick iPhone", "phone-a", "stable-a", now)
-
-	clientStates := &fakeDisconnectingClientStates{
-		states: fakeClientStates{"phone-a": "connected"},
-	}
-	_, handler := api.NewServer(st, cfg, hub, clientStates)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	resp, err := http.Post(
-		srv.URL+"/account/context",
-		"application/json",
-		strings.NewReader(`{"authBaseUrl":"","accessToken":""}`),
-	)
-	if err != nil {
-		t.Fatalf("POST /account/context: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-
-	if strings.Join(clientStates.disconnected, ",") != "phone-a" {
-		t.Fatalf("disconnected clients=%v, want [phone-a]", clientStates.disconnected)
-	}
-	if clientStates.reason != "desktop_signed_out" {
-		t.Fatalf("disconnect reason=%q, want desktop_signed_out", clientStates.reason)
-	}
-}
-
-func TestClearingTunnelCredentialsDisconnectsConnectedClientsWithoutInvalidatingPairing(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	now := time.Now().UTC().Format(time.RFC3339)
-	insertPairedDeviceWithStableID(t, st, "phone-a", "Nick iPhone", "phone-a", "stable-a", now)
-
-	clientStates := &fakeDisconnectingClientStates{
-		states: fakeClientStates{"phone-a": "connected"},
-	}
-	_, handler := api.NewServer(st, cfg, hub, clientStates)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	resp, err := http.Post(
-		srv.URL+"/tunnel/credentials",
-		"application/json",
-		strings.NewReader(`{"signalingUrl":"","accessToken":"","iceServers":[]}`),
-	)
-	if err != nil {
-		t.Fatalf("POST /tunnel/credentials: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-
-	if strings.Join(clientStates.disconnected, ",") != "phone-a" {
-		t.Fatalf("disconnected clients=%v, want [phone-a]", clientStates.disconnected)
-	}
-	if clientStates.reason != "desktop_signed_out" {
-		t.Fatalf("disconnect reason=%q, want desktop_signed_out", clientStates.reason)
 	}
 }
 
@@ -5244,242 +4582,5 @@ func TestShareValidate(t *testing.T) {
 	}
 	if !shareStatusChanged {
 		t.Fatal("expected share status changed callback")
-	}
-}
-
-func TestRemoteAccessSettingUpdateRestartsBonjour(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	shareStatusChangeCount := 0
-	handler := func() http.Handler {
-		srv, h := api.NewServer(st, cfg, hub, nil)
-		srv.OnShareStatusChanged = func() {
-			shareStatusChangeCount++
-		}
-		return h
-	}()
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	req, err := http.NewRequest(
-		http.MethodPut,
-		srv.URL+"/settings",
-		strings.NewReader(`{"remoteAccessEnabled":false}`),
-	)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("PUT /settings: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-	if shareStatusChangeCount != 1 {
-		t.Fatalf("share status change count=%d, want 1", shareStatusChangeCount)
-	}
-
-	req, err = http.NewRequest(
-		http.MethodPut,
-		srv.URL+"/settings",
-		strings.NewReader(`{"remoteAccessEnabled":true}`),
-	)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("PUT /settings: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-	if shareStatusChangeCount != 2 {
-		t.Fatalf("share status change count=%d, want 2", shareStatusChangeCount)
-	}
-}
-
-func TestSyncTunnelCredentials(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	reqBody := `{"signalingUrl":"https://signaling.example.com","accessToken":"token","iceServers":[]}`
-	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /tunnel/credentials: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-
-	var body map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if body["ok"] != true {
-		t.Errorf("expected ok = true, got %v", body["ok"])
-	}
-}
-
-func TestSyncTunnelCredentialsStartsDesktopSignaling(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	insertPairedDeviceWithOptionalStableID(t, st, "mobile-123", "iPhone", "iPhone", nil, time.Now().UTC().Format(time.RFC3339))
-
-	registerCh := make(chan map[string]any, 1)
-	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
-	signalingSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/tunnel/signaling" {
-			http.NotFound(w, r)
-			return
-		}
-		if r.URL.Query().Get("role") != "desktop" {
-			http.Error(w, "unexpected role", http.StatusBadRequest)
-			return
-		}
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			return
-		}
-		defer conn.Close()
-
-		_, msg, err := conn.ReadMessage()
-		if err != nil {
-			return
-		}
-		var payload map[string]any
-		if err := json.Unmarshal(msg, &payload); err != nil {
-			return
-		}
-		registerCh <- payload
-	}))
-	defer signalingSrv.Close()
-
-	_, handler := api.NewServer(st, cfg, hub, nil)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-	t.Cleanup(func() {
-		_, _ = http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(`{"signalingUrl":"","accessToken":"","iceServers":[]}`))
-	})
-
-	reqBody := `{"signalingUrl":"` + signalingSrv.URL + `","accessToken":"token","iceServers":[]}`
-	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /tunnel/credentials: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-
-	select {
-	case payload := <-registerCh:
-		if payload["type"] != "register_desktop" {
-			t.Fatalf("register type=%v, want register_desktop", payload["type"])
-		}
-		deviceID, err := st.GetDeviceID()
-		if err != nil {
-			t.Fatalf("GetDeviceID: %v", err)
-		}
-		if payload["clientId"] != deviceID {
-			t.Fatalf("clientId=%v, want %s", payload["clientId"], deviceID)
-		}
-		paired, ok := payload["pairedDevices"].([]any)
-		if !ok || len(paired) != 1 {
-			t.Fatalf("pairedDevices=%#v, want one device", payload["pairedDevices"])
-		}
-		first, ok := paired[0].(map[string]any)
-		if !ok {
-			t.Fatalf("pairedDevices[0]=%#v", paired[0])
-		}
-		if first["clientId"] != "mobile-123" {
-			t.Fatalf("paired clientId=%v, want mobile-123", first["clientId"])
-		}
-		if first["pairingToken"] != "hash-mobile-123" {
-			t.Fatalf("pairingToken=%v, want stored hash", first["pairingToken"])
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("desktop signaling registration was not sent")
-	}
-}
-
-func TestRefreshTunnelPairingsResendsDesktopRegistration(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	insertPairedDeviceWithOptionalStableID(t, st, "mobile-1", "iPhone", "iPhone", nil, time.Now().UTC().Format(time.RFC3339))
-
-	registerCh := make(chan map[string]any, 2)
-	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
-	signalingSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/tunnel/signaling" {
-			http.NotFound(w, r)
-			return
-		}
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			return
-		}
-		defer conn.Close()
-
-		for {
-			_, msg, err := conn.ReadMessage()
-			if err != nil {
-				return
-			}
-			var payload map[string]any
-			if err := json.Unmarshal(msg, &payload); err != nil {
-				continue
-			}
-			if payload["type"] == "register_desktop" {
-				registerCh <- payload
-			}
-		}
-	}))
-	defer signalingSrv.Close()
-
-	apiSrv, handler := api.NewServer(st, cfg, hub, nil)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-	t.Cleanup(func() {
-		_, _ = http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(`{"signalingUrl":"","accessToken":"","iceServers":[]}`))
-	})
-
-	reqBody := `{"signalingUrl":"` + signalingSrv.URL + `","accessToken":"token","iceServers":[]}`
-	resp, err := http.Post(srv.URL+"/tunnel/credentials", "application/json", strings.NewReader(reqBody))
-	if err != nil {
-		t.Fatalf("POST /tunnel/credentials: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-
-	select {
-	case payload := <-registerCh:
-		paired, ok := payload["pairedDevices"].([]any)
-		if !ok || len(paired) != 1 {
-			t.Fatalf("initial pairedDevices=%#v, want one device", payload["pairedDevices"])
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("initial desktop registration was not sent")
-	}
-
-	insertPairedDeviceWithOptionalStableID(t, st, "mobile-2", "iPad", "iPad", nil, time.Now().UTC().Format(time.RFC3339))
-	apiSrv.RefreshTunnelPairings("test")
-
-	select {
-	case payload := <-registerCh:
-		paired, ok := payload["pairedDevices"].([]any)
-		if !ok || len(paired) != 2 {
-			t.Fatalf("refreshed pairedDevices=%#v, want two devices", payload["pairedDevices"])
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("refreshed desktop registration was not sent")
 	}
 }

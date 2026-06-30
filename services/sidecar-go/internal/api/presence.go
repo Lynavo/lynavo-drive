@@ -65,14 +65,13 @@ func (s *Server) handlePresence(w http.ResponseWriter, r *http.Request) {
 		shareName = shareConfig.ShareName
 	}
 
-	desktopAvailable := s.isDesktopAuthAvailable()
 	body := map[string]any{
 		"ok":               true,
 		"paired":           false,
 		"serverId":         serverID,
 		"serverName":       serverName,
 		"shareName":        shareName,
-		"desktopAvailable": desktopAvailable,
+		"desktopAvailable": true,
 	}
 	device, err := s.store.GetPairedDevice(clientID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -80,34 +79,38 @@ func (s *Server) handlePresence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if device != nil && device.RevokedAt == nil {
-		body["paired"] = true
-		if !desktopAvailable {
-			slog.Info("presence response desktop unavailable", "clientID", clientID, "paired", true)
-			writeJSON(w, http.StatusOK, body)
+		blockState, err := s.store.GetDeviceBlockState(serverID, clientID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to get device block state")
 			return
 		}
-		s.presence.Touch(clientID)
-		if s.hub != nil {
-			s.hub.Broadcast(events.Event{
-				Type: "device.state.changed",
-				Payload: map[string]string{
-					"deviceId": clientID,
-					"status":   "connected_idle",
-				},
-			})
+		if !blockState.Blocked {
+			body["paired"] = true
+			s.presence.Touch(clientID)
+			if s.hub != nil {
+				s.hub.Broadcast(events.Event{
+					Type: "device.state.changed",
+					Payload: map[string]string{
+						"deviceId": clientID,
+						"status":   "connected_idle",
+					},
+				})
+			}
+			capability := s.wakeCapability()
+			if capability != nil {
+				body["wake"] = capability
+			}
+			if powerSnapshot := s.power.Snapshot(); powerSnapshot != nil {
+				body["power"] = powerSnapshot
+			}
+			attrs := append(
+				[]any{"clientID", clientID, "paired", true},
+				wakeCapabilityLogAttrs(capability)...,
+			)
+			slog.Info("presence response wake metadata", attrs...)
+		} else {
+			slog.Info("presence response omits wake metadata", "clientID", clientID, "paired", false, "blocked", true)
 		}
-		capability := s.wakeCapability()
-		if capability != nil {
-			body["wake"] = capability
-		}
-		if powerSnapshot := s.power.Snapshot(); powerSnapshot != nil {
-			body["power"] = powerSnapshot
-		}
-		attrs := append(
-			[]any{"clientID", clientID, "paired", true},
-			wakeCapabilityLogAttrs(capability)...,
-		)
-		slog.Info("presence response wake metadata", attrs...)
 	} else {
 		slog.Info("presence response omits wake metadata", "clientID", clientID, "paired", false)
 	}

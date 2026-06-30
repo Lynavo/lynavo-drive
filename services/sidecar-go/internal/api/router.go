@@ -1,7 +1,6 @@
 package api
 
 import (
-	"log/slog"
 	"net"
 	"net/http"
 	"strconv"
@@ -29,30 +28,10 @@ type WakeProvider interface {
 	WakeCapability() *protocol.WakeCapability
 }
 
-type WakePacketSender interface {
-	SendWakePacket(addr string, packet []byte) error
-}
-
-type ProxyWakeTargetProvider interface {
-	ProxyWakeTargets(accountID string) []protocol.WakeTarget
-}
-
 type defaultWakeProvider struct{}
 
 func (defaultWakeProvider) WakeCapability() *protocol.WakeCapability {
 	return wake.Metadata()
-}
-
-type udpWakePacketSender struct{}
-
-func (udpWakePacketSender) SendWakePacket(addr string, packet []byte) error {
-	conn, err := net.Dial("udp4", addr)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	_, err = conn.Write(packet)
-	return err
 }
 
 // Server holds the dependencies for the HTTP API handlers.
@@ -63,18 +42,10 @@ type Server struct {
 	clientStates           ClientStateProvider
 	presence               *PresenceTracker
 	wakeProvider           WakeProvider
-	wakeSender             WakePacketSender
-	proxyWakeTargets       ProxyWakeTargetProvider
 	power                  *PowerTracker
 	thumbnailLimiter       chan struct{}
 	videoThumbnailMu       sync.Mutex
 	videoThumbnailInflight map[string]*videoThumbnailInflight
-	tunnelMu               sync.Mutex
-	tunnel                 *protocol.P2PManager
-	accountMu              sync.RWMutex
-	desktopAccountID       string
-	authBaseURL            string
-	desktopAuthAvailable   bool
 	personalAccessNonceMu  sync.Mutex
 	personalAccessNonces   map[string]time.Time
 	OnDeviceRenamed        func(newName string) // called when device name changes, to restart Bonjour
@@ -87,14 +58,6 @@ func (s *Server) PresenceTracker() *PresenceTracker {
 
 func (s *Server) SetWakeProvider(provider WakeProvider) {
 	s.wakeProvider = provider
-}
-
-func (s *Server) SetWakePacketSender(sender WakePacketSender) {
-	s.wakeSender = sender
-}
-
-func (s *Server) SetProxyWakeTargetProvider(provider ProxyWakeTargetProvider) {
-	s.proxyWakeTargets = provider
 }
 
 func (s *Server) wakeCapability() *protocol.WakeCapability {
@@ -161,48 +124,6 @@ func intListLogSummary(values []int) string {
 	return strings.Join(parts, ",")
 }
 
-// StopTunnel stops the desktop P2P signaling listener if it is running.
-func (s *Server) StopTunnel() {
-	s.tunnelMu.Lock()
-	defer s.tunnelMu.Unlock()
-	if s.tunnel != nil {
-		s.tunnel.Stop()
-		s.tunnel = nil
-	}
-}
-
-func (s *Server) RefreshTunnelPairings(reason string) {
-	pairedDevices, err := s.pairedDevicesForSignaling()
-	if err != nil {
-		slog.Error("failed to refresh paired devices for p2p tunnel", "reason", reason, "err", err)
-		return
-	}
-
-	s.tunnelMu.Lock()
-	tunnel := s.tunnel
-	s.tunnelMu.Unlock()
-
-	if tunnel == nil {
-		slog.Debug("sync tunnel paired devices refresh skipped; tunnel not running", "reason", reason, "pairedDevices", len(pairedDevices))
-		return
-	}
-	if err := tunnel.UpdatePairedDevices(pairedDevices); err != nil {
-		slog.Warn("sync tunnel paired devices refresh failed", "reason", reason, "pairedDevices", len(pairedDevices), "err", err)
-		return
-	}
-	slog.Info("sync tunnel paired devices refreshed", "reason", reason, "pairedDevices", len(pairedDevices))
-}
-
-func (s *Server) tunnelSignalingAuthState() protocol.SignalingAuthState {
-	s.tunnelMu.Lock()
-	tunnel := s.tunnel
-	s.tunnelMu.Unlock()
-	if tunnel == nil {
-		return protocol.SignalingAuthOK
-	}
-	return tunnel.SignalingAuthState()
-}
-
 // NewServer creates a new HTTP handler with all API routes registered.
 func NewServer(s *store.Store, cfg *config.Config, hub *events.Hub, csp ClientStateProvider) (*Server, http.Handler) {
 	srv := &Server{
@@ -212,11 +133,9 @@ func NewServer(s *store.Store, cfg *config.Config, hub *events.Hub, csp ClientSt
 		clientStates:           csp,
 		presence:               NewPresenceTracker(),
 		wakeProvider:           defaultWakeProvider{},
-		wakeSender:             udpWakePacketSender{},
 		power:                  NewPowerTracker(),
 		thumbnailLimiter:       make(chan struct{}, 2),
 		videoThumbnailInflight: make(map[string]*videoThumbnailInflight),
-		desktopAuthAvailable:   true,
 		personalAccessNonces:   make(map[string]time.Time),
 	}
 	mux := http.NewServeMux()
@@ -275,8 +194,7 @@ func NewServer(s *store.Store, cfg *config.Config, hub *events.Hub, csp ClientSt
 	mux.HandleFunc("GET /shared/thumbnail/{path...}", srv.handleSharedThumbnail)
 	mux.HandleFunc("GET /shared/download/{path...}", srv.handleSharedDownload)
 	mux.HandleFunc("GET /shared/stream/{path...}", srv.handleSharedStream)
-	// Personal files are account-scoped and require the mobile bearer token to
-	// match the desktop account currently synced by the desktop app.
+	// Personal files use paired-device HMAC access in the OSS runtime.
 	mux.HandleFunc("GET /personal/list", withJSON(srv.handlePersonalList))
 	mux.HandleFunc("GET /personal/list/{path...}", withJSON(srv.handlePersonalListPath))
 	mux.HandleFunc("GET /personal/thumbnail/{path...}", srv.handlePersonalThumbnail)
@@ -285,9 +203,8 @@ func NewServer(s *store.Store, cfg *config.Config, hub *events.Hub, csp ClientSt
 	mux.HandleFunc("POST /wake/proxy", withJSON(srv.handleProxyWake))
 	// Transfer state
 	mux.HandleFunc("GET /transfer/active", withJSON(srv.handleTransferActive))
-	// Account context sync for LAN personal sharing authorization.
+	// Commercial compatibility endpoints: retained so old consumers fail closed.
 	mux.HandleFunc("POST /account/context", withJSON(srv.handleSyncAccountContext))
-	// Tunnel credentials sync for desktop P2P signaling.
 	mux.HandleFunc("POST /tunnel/credentials", withJSON(srv.handleSyncTunnelCredentials))
 	// WebSocket
 	mux.HandleFunc("GET /events/stream", srv.handleEventStream)

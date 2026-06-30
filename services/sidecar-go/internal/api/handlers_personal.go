@@ -1,14 +1,9 @@
 package api
 
 import (
-	"context"
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
-	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"path"
@@ -19,32 +14,12 @@ import (
 	"github.com/nicksyncflow/sidecar/internal/runtimefs"
 )
 
-const devSandboxAuthBaseURL = "dev-sandbox://auth"
-const devSandboxAccessTokenPrefix = "mock-sandbox-access-token:"
-const devSandboxAccountID = "99999"
 const personalAccessSignatureMaxSkew = 5 * time.Minute
 
-func (s *Server) setDesktopAuthContext(accountID string, authBaseURL string) {
-	s.accountMu.Lock()
-	defer s.accountMu.Unlock()
-	trimmedAccountID := strings.TrimSpace(accountID)
-	trimmedAuthBaseURL := strings.TrimRight(strings.TrimSpace(authBaseURL), "/")
-	s.desktopAccountID = trimmedAccountID
-	s.authBaseURL = trimmedAuthBaseURL
-	s.desktopAuthAvailable = trimmedAuthBaseURL != ""
-}
-
-func (s *Server) getDesktopAuthContext() (string, string) {
-	s.accountMu.RLock()
-	defer s.accountMu.RUnlock()
-	return s.desktopAccountID, s.authBaseURL
-}
-
-func (s *Server) isDesktopAuthAvailable() bool {
-	s.accountMu.RLock()
-	defer s.accountMu.RUnlock()
-	return s.desktopAuthAvailable
-}
+const (
+	remoteGuardReasonOSSCommercialDisabled = "oss_commercial_disabled"
+	remoteGuardReasonInvalidDeviceAuth     = "invalid_device_authorization"
+)
 
 func (s *Server) authorizePersonalRequest(w http.ResponseWriter, r *http.Request) bool {
 	_, ok := s.authorizePersonalRequestAccountID(w, r)
@@ -52,134 +27,116 @@ func (s *Server) authorizePersonalRequest(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) authorizePersonalRequestAccountID(w http.ResponseWriter, r *http.Request) (string, bool) {
-	if !s.personalRemoteAccessEnabled() {
-		writeError(w, http.StatusForbidden, "remote access is disabled")
-		return "", false
-	}
-
-	if accountID, ok, status, message := s.authorizePersonalAccountRequest(r); ok {
-		return accountID, true
-	} else if pairedAccountID, pairedOK, pairedAttempted, pairedStatus, pairedMessage := s.authorizePersonalPairedDeviceRequest(r); pairedOK {
+	if pairedAccountID, pairedOK, pairedAttempted, pairedStatus, pairedMessage, pairedReason := s.authorizePersonalPairedDeviceRequest(r); pairedOK {
 		return pairedAccountID, true
 	} else if pairedAttempted {
-		writeError(w, pairedStatus, pairedMessage)
-		return "", false
-	} else {
-		writeError(w, status, message)
-		return "", false
-	}
-}
-
-func (s *Server) authorizePersonalAccountRequestAccountID(w http.ResponseWriter, r *http.Request) (string, bool) {
-	if !s.personalRemoteAccessEnabled() {
-		writeError(w, http.StatusForbidden, "remote access is disabled")
+		s.writeRemoteGuardError(w, r, pairedStatus, pairedMessage, pairedReason, "operation", "personal.paired_device")
 		return "", false
 	}
 
-	accountID, ok, status, message := s.authorizePersonalAccountRequest(r)
-	if !ok {
-		writeError(w, status, message)
-		return "", false
-	}
-	return accountID, true
+	s.writeOSSCommercialDisabled(w, r, "personal.account")
+	return "", false
 }
 
-func (s *Server) personalRemoteAccessEnabled() bool {
-	if val, err := s.store.GetSetting("remote_access_enabled"); err == nil {
-		return val == "true"
+func (s *Server) authorizePersonalPairedDeviceRequest(r *http.Request) (string, bool, bool, int, string, string) {
+	escapedPath := r.URL.EscapedPath()
+	signature, timestamp, nonce, attempted, credentialsAllowed := personalAccessAuthValues(r, isPersonalQueryAuthAllowedPath(escapedPath))
+	if !attempted {
+		return "", false, false, http.StatusForbidden, "commercial remote access is disabled in the open-source build", remoteGuardReasonOSSCommercialDisabled
 	}
-	return true
-}
-
-func (s *Server) authorizePersonalAccountRequest(r *http.Request) (string, bool, int, string) {
-	desktopAccountID, authBaseURL := s.getDesktopAuthContext()
-	accessToken, err := requestAccessToken(r)
-	if err != nil {
-		return "", false, http.StatusUnauthorized, "account bearer token is required"
-	}
-	if desktopAccountID == "" || authBaseURL == "" {
-		return "", false, http.StatusUnauthorized, "desktop account identity is unavailable"
-	}
-
-	mobileAccountID, err := s.verifyAccessTokenAccountID(r.Context(), authBaseURL, accessToken)
-	if err != nil || mobileAccountID == "" {
-		return "", false, http.StatusUnauthorized, "account bearer token is invalid"
-	}
-	if mobileAccountID != desktopAccountID {
-		return "", false, http.StatusForbidden, "account mismatch"
-	}
-
-	return desktopAccountID, true, http.StatusOK, ""
-}
-
-func (s *Server) authorizePersonalPairedDeviceRequest(r *http.Request) (string, bool, bool, int, string) {
-	signature := personalAccessAuthValue(r, "X-SyncFlow-Auth")
-	timestamp := personalAccessAuthValue(r, "X-SyncFlow-Auth-Timestamp")
-	nonce := personalAccessAuthValue(r, "X-SyncFlow-Auth-Nonce")
-	if signature == "" && timestamp == "" && nonce == "" {
-		return "", false, false, http.StatusUnauthorized, "account bearer token is required"
+	if !credentialsAllowed {
+		return "", false, true, http.StatusUnauthorized, "paired device query credentials are not allowed for this endpoint", remoteGuardReasonInvalidDeviceAuth
 	}
 	if signature == "" || timestamp == "" || nonce == "" {
-		return "", false, true, http.StatusUnauthorized, "paired device signature is incomplete"
+		return "", false, true, http.StatusUnauthorized, "paired device signature is incomplete", remoteGuardReasonInvalidDeviceAuth
 	}
 
-	client := mobileAccessClient{
-		ClientID:   strings.TrimSpace(r.URL.Query().Get("clientId")),
-		ClientName: strings.TrimSpace(r.URL.Query().Get("clientName")),
-	}
-	if !isValidAPIID(client.ClientID) {
-		return "", false, true, http.StatusBadRequest, "invalid clientId"
-	}
-	if client.ClientName == "" {
-		client.ClientName = client.ClientID
-	}
-	if len(client.ClientName) > 128 {
-		return "", false, true, http.StatusBadRequest, "invalid clientName"
+	clientID := strings.TrimSpace(r.URL.Query().Get("clientId"))
+	if !isValidAPIID(clientID) {
+		return "", false, true, http.StatusBadRequest, "invalid clientId", remoteGuardReasonInvalidDeviceAuth
 	}
 
 	signedAt, err := time.Parse(time.RFC3339Nano, timestamp)
 	if err != nil {
-		return "", false, true, http.StatusUnauthorized, "paired device signature timestamp is invalid"
+		return "", false, true, http.StatusUnauthorized, "paired device signature timestamp is invalid", remoteGuardReasonInvalidDeviceAuth
 	}
 	if skew := time.Since(signedAt); skew > personalAccessSignatureMaxSkew || skew < -personalAccessSignatureMaxSkew {
-		return "", false, true, http.StatusUnauthorized, "paired device signature timestamp expired"
+		return "", false, true, http.StatusUnauthorized, "paired device signature timestamp expired", remoteGuardReasonInvalidDeviceAuth
 	}
 	if strings.TrimSpace(nonce) == "" || len(nonce) > 128 {
-		return "", false, true, http.StatusUnauthorized, "paired device signature nonce is invalid"
+		return "", false, true, http.StatusUnauthorized, "paired device signature nonce is invalid", remoteGuardReasonInvalidDeviceAuth
 	}
 
-	device, err := s.store.GetPairedDevice(client.ClientID)
+	device, err := s.store.GetPairedDevice(clientID)
 	if err != nil {
-		return "", false, true, http.StatusForbidden, "device not authorized"
-	}
-	if device.RevokedAt != nil {
-		return "", false, true, http.StatusForbidden, "device pairing revoked"
-	}
-	desktopDeviceID, err := s.store.GetDeviceID()
-	if err == nil {
-		block, err := s.store.GetDeviceBlockState(desktopDeviceID, client.ClientID)
-		if err == nil && block.Blocked {
-			return "", false, true, http.StatusForbidden, "device is blocked"
-		}
+		return "", false, true, http.StatusUnauthorized, "paired device signature is invalid", remoteGuardReasonInvalidDeviceAuth
 	}
 
 	tokenHashBytes, err := hex.DecodeString(strings.TrimSpace(device.PairingTokenHash))
 	if err != nil || len(tokenHashBytes) == 0 {
-		return "", false, true, http.StatusForbidden, "device pairing token is unavailable"
+		return "", false, true, http.StatusUnauthorized, "paired device signature is invalid", remoteGuardReasonInvalidDeviceAuth
 	}
-	expected := personalAccessSignature(r.Method, r.URL.EscapedPath(), client.ClientID, timestamp, nonce, tokenHashBytes)
+	expected := personalAccessSignature(r.Method, escapedPath, clientID, timestamp, nonce, tokenHashBytes)
 	if !hmac.Equal([]byte(strings.ToLower(signature)), []byte(expected)) {
-		return "", false, true, http.StatusUnauthorized, "paired device signature is invalid"
+		return "", false, true, http.StatusUnauthorized, "paired device signature is invalid", remoteGuardReasonInvalidDeviceAuth
 	}
-	if !isPersonalStreamRequestPath(r.URL.EscapedPath()) && !s.rememberPersonalAccessNonce(client.ClientID, nonce, signedAt.Add(personalAccessSignatureMaxSkew)) {
-		return "", false, true, http.StatusUnauthorized, "paired device signature nonce replayed"
+	if !isReusablePersonalQueryAuthPath(escapedPath) && !s.rememberPersonalAccessNonce(clientID, nonce, signedAt.Add(personalAccessSignatureMaxSkew)) {
+		return "", false, true, http.StatusUnauthorized, "paired device signature nonce replayed", remoteGuardReasonInvalidDeviceAuth
+	}
+	if device.RevokedAt != nil {
+		return "", false, true, http.StatusForbidden, "device pairing revoked", remoteGuardReasonInvalidDeviceAuth
+	}
+	desktopDeviceID, err := s.store.GetDeviceID()
+	if err != nil {
+		return "", false, true, http.StatusForbidden, "device authorization unavailable", remoteGuardReasonInvalidDeviceAuth
+	}
+	block, err := s.store.GetDeviceBlockState(desktopDeviceID, clientID)
+	if err != nil {
+		return "", false, true, http.StatusForbidden, "device authorization unavailable", remoteGuardReasonInvalidDeviceAuth
+	}
+	if block.Blocked {
+		return "", false, true, http.StatusForbidden, "device is blocked", remoteGuardReasonInvalidDeviceAuth
 	}
 
-	return "paired:" + client.ClientID, true, true, http.StatusOK, ""
+	return "paired:" + clientID, true, true, http.StatusOK, "", ""
 }
 
-func isPersonalStreamRequestPath(escapedPath string) bool {
-	return strings.HasPrefix(escapedPath, "/personal/stream/")
+func (s *Server) writeOSSCommercialDisabled(w http.ResponseWriter, r *http.Request, operation string) {
+	s.writeRemoteGuardError(
+		w,
+		r,
+		http.StatusForbidden,
+		"commercial remote access is disabled in the open-source build",
+		remoteGuardReasonOSSCommercialDisabled,
+		"operation",
+		operation,
+	)
+}
+
+func (s *Server) writeRemoteGuardError(w http.ResponseWriter, r *http.Request, status int, message string, reason string, attrs ...any) {
+	if reason == "" {
+		reason = remoteGuardReasonOSSCommercialDisabled
+	}
+	logAttrs := []any{
+		"reason", reason,
+		"method", r.Method,
+		"path", r.URL.Path,
+		"remote", r.RemoteAddr,
+	}
+	logAttrs = append(logAttrs, attrs...)
+	slog.Warn("remote capability request rejected", logAttrs...)
+	writeJSON(w, status, map[string]string{"error": message, "reason": reason})
+}
+
+func isReusablePersonalQueryAuthPath(escapedPath string) bool {
+	return strings.HasPrefix(escapedPath, "/personal/stream/") ||
+		strings.HasPrefix(escapedPath, "/personal/thumbnail/")
+}
+
+func isPersonalQueryAuthAllowedPath(escapedPath string) bool {
+	return strings.HasPrefix(escapedPath, "/personal/download/") ||
+		strings.HasPrefix(escapedPath, "/personal/stream/") ||
+		strings.HasPrefix(escapedPath, "/personal/thumbnail/")
 }
 
 func (s *Server) rememberPersonalAccessNonce(clientID, nonce string, expiresAt time.Time) bool {
@@ -204,11 +161,25 @@ func (s *Server) rememberPersonalAccessNonce(clientID, nonce string, expiresAt t
 	return true
 }
 
-func personalAccessAuthValue(r *http.Request, name string) string {
-	if value := strings.TrimSpace(r.Header.Get(name)); value != "" {
-		return value
+func personalAccessAuthValues(r *http.Request, allowQuery bool) (signature, timestamp, nonce string, attempted bool, credentialsAllowed bool) {
+	headerSignature := strings.TrimSpace(r.Header.Get("X-SyncFlow-Auth"))
+	headerTimestamp := strings.TrimSpace(r.Header.Get("X-SyncFlow-Auth-Timestamp"))
+	headerNonce := strings.TrimSpace(r.Header.Get("X-SyncFlow-Auth-Nonce"))
+	if headerSignature != "" || headerTimestamp != "" || headerNonce != "" {
+		return headerSignature, headerTimestamp, headerNonce, true, true
 	}
-	return strings.TrimSpace(r.URL.Query().Get(name))
+
+	query := r.URL.Query()
+	querySignature := strings.TrimSpace(query.Get("X-SyncFlow-Auth"))
+	queryTimestamp := strings.TrimSpace(query.Get("X-SyncFlow-Auth-Timestamp"))
+	queryNonce := strings.TrimSpace(query.Get("X-SyncFlow-Auth-Nonce"))
+	if querySignature == "" && queryTimestamp == "" && queryNonce == "" {
+		return "", "", "", false, true
+	}
+	if !allowQuery {
+		return "", "", "", true, false
+	}
+	return querySignature, queryTimestamp, queryNonce, true, true
 }
 
 func personalAccessSignature(method, escapedPath, clientID, timestamp, nonce string, tokenHashBytes []byte) string {
@@ -221,127 +192,6 @@ func personalAccessSignature(method, escapedPath, clientID, timestamp, nonce str
 		nonce,
 	}, "\n")))
 	return hex.EncodeToString(mac.Sum(nil))
-}
-
-func requestAccessToken(r *http.Request) (string, error) {
-	if token, err := bearerAccessToken(r.Header.Get("Authorization")); err == nil && token != "" {
-		return token, nil
-	}
-	token := strings.TrimSpace(r.URL.Query().Get("access_token"))
-	if token == "" {
-		return "", fmt.Errorf("missing bearer token")
-	}
-	return token, nil
-}
-
-func bearerAccessToken(authorization string) (string, error) {
-	const prefix = "Bearer "
-	if !strings.HasPrefix(authorization, prefix) {
-		return "", fmt.Errorf("missing bearer token")
-	}
-	token := strings.TrimSpace(strings.TrimPrefix(authorization, prefix))
-	if token == "" {
-		return "", fmt.Errorf("missing bearer token")
-	}
-	return token, nil
-}
-
-func (s *Server) verifyAccessTokenAccountID(ctx context.Context, authBaseURL string, accessToken string) (string, error) {
-	if isDevSandboxAuthBaseURL(authBaseURL) {
-		return devSandboxAccessTokenAccountID(accessToken)
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, authBaseURL+"/api/v1/user/profile", nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		io.Copy(io.Discard, resp.Body)
-		return "", fmt.Errorf("profile validation failed: status %d", resp.StatusCode)
-	}
-
-	var body struct {
-		Code int            `json:"code"`
-		Data map[string]any `json:"data"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		return "", err
-	}
-	if body.Code != 0 {
-		return "", fmt.Errorf("profile validation failed: code %d", body.Code)
-	}
-	return accountIDValue(body.Data["id"])
-}
-
-func isDevSandboxAuthBaseURL(authBaseURL string) bool {
-	return strings.TrimRight(strings.TrimSpace(authBaseURL), "/") == devSandboxAuthBaseURL
-}
-
-func devSandboxAccessTokenAccountID(accessToken string) (string, error) {
-	if strings.HasPrefix(strings.TrimSpace(accessToken), devSandboxAccessTokenPrefix) {
-		return devSandboxAccountID, nil
-	}
-	return "", fmt.Errorf("invalid dev sandbox token")
-}
-
-func accountIDValue(value any) (string, error) {
-	switch typed := value.(type) {
-	case string:
-		accountID := strings.TrimSpace(typed)
-		if accountID == "" {
-			return "", fmt.Errorf("empty account id")
-		}
-		return accountID, nil
-	case float64:
-		return fmt.Sprintf("%.0f", typed), nil
-	default:
-		return "", fmt.Errorf("account id not found")
-	}
-}
-
-func accountIDFromJWT(token string) (string, error) {
-	parts := strings.Split(token, ".")
-	if len(parts) < 2 || strings.TrimSpace(parts[1]) == "" {
-		return "", fmt.Errorf("invalid token")
-	}
-
-	payload, err := decodeBase64URL(parts[1])
-	if err != nil {
-		return "", err
-	}
-
-	var claims map[string]any
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return "", err
-	}
-
-	for _, key := range []string{"uid", "user_id", "account_id", "sub"} {
-		if value, ok := claims[key]; ok {
-			if accountID, err := accountIDValue(value); err == nil {
-				return accountID, nil
-			}
-		}
-	}
-
-	return "", fmt.Errorf("account claim not found")
-}
-
-func decodeBase64URL(input string) ([]byte, error) {
-	if payload, err := base64.RawURLEncoding.DecodeString(input); err == nil {
-		return payload, nil
-	}
-	return base64.URLEncoding.DecodeString(input)
 }
 
 func (s *Server) handlePersonalList(w http.ResponseWriter, r *http.Request) {
@@ -436,6 +286,7 @@ func (s *Server) recordPersonalAccess(client mobileAccessClient, relPath string,
 		slog.Warn("record personal access: load desktop id failed", "err", err)
 		return
 	}
+	client = s.trustedPersonalAccessClient(client)
 	resourceID := "personal"
 	normalizedPath := strings.Trim(strings.TrimSpace(relPath), "/")
 	if normalizedPath != "" {
@@ -445,6 +296,20 @@ func (s *Server) recordPersonalAccess(client mobileAccessClient, relPath string,
 	if _, err := s.recordResourceAccess(desktopDeviceID, client, resourceID, resourceKind, resourceName, action, "ok"); err != nil {
 		slog.Warn("record personal access failed", "resourceID", resourceID, "action", action, "err", err)
 	}
+}
+
+func (s *Server) trustedPersonalAccessClient(client mobileAccessClient) mobileAccessClient {
+	device, err := s.store.GetPairedDevice(client.ClientID)
+	if err != nil {
+		client.ClientName = client.ClientID
+		return client
+	}
+	if name := strings.TrimSpace(device.ClientName); name != "" {
+		client.ClientName = name
+	} else {
+		client.ClientName = client.ClientID
+	}
+	return client
 }
 
 func personalAccessResourceName(relPath string) string {

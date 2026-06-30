@@ -2,9 +2,7 @@ package api
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -12,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/nicksyncflow/sidecar/internal/events"
-	"github.com/nicksyncflow/sidecar/internal/protocol"
 )
 
 type settingsDTO struct {
@@ -42,7 +39,6 @@ type updateSettingsRequest struct {
 const personalShareRootSettingKey = "personal_share_root"
 const remoteAccessEnabledSettingKey = "remote_access_enabled"
 const allowCrossDeviceReceivedAccessSettingKey = "allow_cross_device_received_access"
-const desktopSignedOutDisconnectReason = "desktop_signed_out"
 
 func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 	dto, err := s.assembleSettingsDTO()
@@ -58,6 +54,10 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	var req updateSettingsRequest
 	if err := readJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.RemoteAccessEnabled != nil && *req.RemoteAccessEnabled {
+		s.writeOSSCommercialDisabled(w, r, "settings.remote_access")
 		return
 	}
 
@@ -215,19 +215,12 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.RemoteAccessEnabled != nil {
-		val := "false"
-		if *req.RemoteAccessEnabled {
-			val = "true"
-		}
-		if err := s.store.SetSetting(remoteAccessEnabledSettingKey, val); err != nil {
+		if err := s.store.SetSetting(remoteAccessEnabledSettingKey, "false"); err != nil {
 			slog.Error("update remote access enabled", "err", err)
 			writeError(w, http.StatusInternalServerError, "failed to update settings")
 			return
 		}
-		slog.Info("remote access setting updated", "enabled", val)
-		if s.OnShareStatusChanged != nil {
-			s.OnShareStatusChanged()
-		}
+		slog.Info("remote access setting remains disabled in OSS runtime")
 	}
 
 	if req.AllowCrossDeviceReceivedAccess != nil {
@@ -280,13 +273,6 @@ func (s *Server) assembleSettingsDTO() (*settingsDTO, error) {
 		return nil, err
 	}
 
-	remoteAccessEnabled := true
-	if val, err := s.store.GetSetting(remoteAccessEnabledSettingKey); err == nil {
-		remoteAccessEnabled = (val == "true")
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		return nil, err
-	}
-
 	allowCrossDeviceReceivedAccess := true
 	if val, err := s.store.GetSetting(allowCrossDeviceReceivedAccessSettingKey); err == nil {
 		allowCrossDeviceReceivedAccess = (val == "true")
@@ -310,33 +296,9 @@ func (s *Server) assembleSettingsDTO() (*settingsDTO, error) {
 		ShareAddress:                   shareConfig.ShareURL,
 		ShareStatus:                    shareConfig.ShareStatus,
 		ShareName:                      shareConfig.ShareName,
-		RemoteAccessEnabled:            remoteAccessEnabled,
+		RemoteAccessEnabled:            false,
 		AllowCrossDeviceReceivedAccess: allowCrossDeviceReceivedAccess,
 	}, nil
-}
-
-type syncTunnelCredentialsRequest struct {
-	SignalingURL string          `json:"signalingUrl"`
-	AccessToken  string          `json:"accessToken"`
-	AccountID    string          `json:"accountId,omitempty"`
-	ICEServers   json.RawMessage `json:"iceServers"`
-}
-
-type syncAccountContextRequest struct {
-	AuthBaseURL string `json:"authBaseUrl"`
-	AccessToken string `json:"accessToken"`
-	AccountID   string `json:"accountId,omitempty"`
-}
-
-func (req syncAccountContextRequest) resolvedAccountID() string {
-	accountID := strings.TrimSpace(req.AccountID)
-	if accountID != "" {
-		return accountID
-	}
-	if parsedAccountID, err := accountIDFromJWT(strings.TrimSpace(req.AccessToken)); err == nil {
-		return parsedAccountID
-	}
-	return ""
 }
 
 func (s *Server) handleSyncAccountContext(w http.ResponseWriter, r *http.Request) {
@@ -345,29 +307,7 @@ func (s *Server) handleSyncAccountContext(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var req syncAccountContextRequest
-	if err := readJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-
-	authBaseURL := strings.TrimSpace(req.AuthBaseURL)
-	accessToken := strings.TrimSpace(req.AccessToken)
-	if authBaseURL == "" || accessToken == "" {
-		s.setDesktopAuthContext("", "")
-		s.disconnectClients(s.connectedClientIDs(), desktopSignedOutDisconnectReason)
-		slog.Info("sync account context cleared")
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "account context cleared"})
-		return
-	}
-
-	accountID := req.resolvedAccountID()
-	s.setDesktopAuthContext(accountID, authBaseURL)
-	slog.Info("sync account context applied",
-		"authBaseUrl", authBaseURL,
-		"hasAccountId", accountID != "",
-	)
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "account context synced"})
+	s.writeOSSCommercialDisabled(w, r, "account.context")
 }
 
 func (s *Server) handleSyncTunnelCredentials(w http.ResponseWriter, r *http.Request) {
@@ -376,83 +316,5 @@ func (s *Server) handleSyncTunnelCredentials(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	var req syncTunnelCredentialsRequest
-	if err := readJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-
-	signalingURL := strings.TrimSpace(req.SignalingURL)
-	accessToken := strings.TrimSpace(req.AccessToken)
-	if signalingURL == "" || accessToken == "" {
-		s.StopTunnel()
-		s.setDesktopAuthContext("", "")
-		s.disconnectClients(s.connectedClientIDs(), desktopSignedOutDisconnectReason)
-		slog.Info("sync tunnel credentials cleared")
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "credentials cleared"})
-		return
-	}
-
-	accountID := syncAccountContextRequest{
-		AuthBaseURL: signalingURL,
-		AccessToken: accessToken,
-		AccountID:   req.AccountID,
-	}.resolvedAccountID()
-
-	deviceID, err := s.store.GetDeviceID()
-	if err != nil {
-		slog.Error("failed to get desktop device id for p2p tunnel", "err", err)
-		writeError(w, http.StatusInternalServerError, "failed to get device id")
-		return
-	}
-	pairedDevices, err := s.pairedDevicesForSignaling()
-	if err != nil {
-		slog.Error("failed to list paired devices for p2p tunnel", "err", err)
-		writeError(w, http.StatusInternalServerError, "failed to list paired devices")
-		return
-	}
-
-	manager := protocol.NewP2PManagerWithICEServers(
-		deviceID,
-		signalingURL,
-		fmt.Sprintf("127.0.0.1:%d", s.config.HTTPPort),
-		accessToken,
-		protocol.ParseICEServersJSON(string(req.ICEServers)),
-	)
-
-	s.tunnelMu.Lock()
-	if s.tunnel != nil {
-		s.tunnel.Stop()
-	}
-	s.tunnel = manager
-	s.tunnelMu.Unlock()
-	s.setDesktopAuthContext(accountID, signalingURL)
-
-	manager.Start(pairedDevices)
-	slog.Info("sync tunnel credentials applied",
-		"signalingUrl", signalingURL,
-		"desktopId", deviceID,
-		"hasAccountId", accountID != "",
-		"pairedDevices", len(pairedDevices),
-	)
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "credentials synced"})
-}
-
-func (s *Server) pairedDevicesForSignaling() ([]map[string]string, error) {
-	devices, err := s.store.ListPairedDevices()
-	if err != nil {
-		return nil, err
-	}
-
-	paired := make([]map[string]string, 0, len(devices))
-	for _, device := range devices {
-		if device.RevokedAt != nil || device.ClientID == "" || device.PairingTokenHash == "" {
-			continue
-		}
-		paired = append(paired, map[string]string{
-			"clientId":     device.ClientID,
-			"pairingToken": device.PairingTokenHash,
-		})
-	}
-	return paired, nil
+	s.writeOSSCommercialDisabled(w, r, "tunnel.credentials")
 }

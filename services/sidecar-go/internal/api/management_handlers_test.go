@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/nicksyncflow/sidecar/internal/api"
@@ -188,6 +189,38 @@ func TestManagementUnblockUnknownDeviceReturnsNotFound(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("status=%d, want 404", resp.StatusCode)
+	}
+}
+
+func TestManagementBlockDeviceDisconnectsBlockedClient(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	insertPairedDeviceWithStableID(t, st, "client-001", "Alice iPhone", "Alice iPhone", "stable-001", "2026-06-14T08:00:00Z")
+	insertPairedDeviceWithStableID(t, st, "client-002", "Bob Android", "Bob Android", "stable-002", "2026-06-14T08:00:00Z")
+
+	clientStates := &fakeDisconnectingClientStates{
+		states: fakeClientStates{
+			"client-001": "syncing",
+			"client-002": "connected",
+		},
+	}
+	_, handler := api.NewServer(st, cfg, hub, clientStates)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Post(srv.URL+"/management/devices/client-001/block", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST block: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("POST block status=%d, want 200", resp.StatusCode)
+	}
+
+	if strings.Join(clientStates.disconnected, ",") != "client-001" {
+		t.Fatalf("disconnected clients=%v, want [client-001]", clientStates.disconnected)
+	}
+	if clientStates.reason != "device_blocked" {
+		t.Fatalf("disconnect reason=%q, want device_blocked", clientStates.reason)
 	}
 }
 
