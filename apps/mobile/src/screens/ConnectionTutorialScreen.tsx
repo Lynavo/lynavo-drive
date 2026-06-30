@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '../components/Icon';
-import { marketConfig } from '../markets';
+import { appConfig } from '../config/app-config';
 
 type TutorialTabId = 'lan' | 'qr' | 'code' | 'ip';
 
@@ -32,7 +32,7 @@ interface TutorialCard {
 }
 
 const TAB_IDS: TutorialTabId[] = ['lan', 'qr', 'code', 'ip'];
-const desktopDownloadHost = marketConfig.downloadUrl
+const desktopDownloadHost = appConfig.endpoints.webBaseUrl
   .replace(/^https?:\/\//, '')
   .replace(/\/$/, '');
 
@@ -384,7 +384,7 @@ export function ConnectionTutorialScreen() {
               {t('connectionTutorial.troubleshoot.supportBody')}
             </Text>
             <Text style={styles.supportEmail}>
-              {marketConfig.supportEmail}
+              {appConfig.endpoints.supportEmail}
             </Text>
           </Pressable>
         </Pressable>

@@ -379,14 +379,6 @@ export async function retryLanReconnect(params: {
   await NativeSyncEngine.triggerSync?.();
 }
 
-export async function savePublicWakeTarget(config: {
-  host: string;
-  port: number;
-  enabled: boolean;
-}): Promise<void> {
-  await NativeSyncEngine.savePublicWakeTarget(config);
-}
-
 /** Interrupt auto upload: stops processing auto items, persists 'interrupted' state. */
 export async function interruptAutoUpload(): Promise<void> {
   await NativeSyncEngine.pauseAutoUpload();
@@ -471,12 +463,6 @@ export async function browseSharedFiles(
   return result as SharedDirectoryDTO;
 }
 
-function getCurrentAccessToken(): string {
-  const authStore =
-    require('../stores/auth-store') as typeof import('../stores/auth-store');
-  return authStore.getAccessToken() ?? '';
-}
-
 export async function browseDirectory(
   scope: DirectoryScope,
   path?: string,
@@ -484,7 +470,7 @@ export async function browseDirectory(
   const result = await NativeSyncEngine.browseSharedFiles(
     scope,
     path ?? '',
-    scope === 'personal' ? getCurrentAccessToken() : '',
+    '',
   );
   return result as DirectoryListingDTO;
 }
@@ -502,7 +488,7 @@ export async function downloadDirectoryFile(
   const result = await NativeSyncEngine.downloadSharedFile(
     scope,
     path,
-    scope === 'personal' ? getCurrentAccessToken() : '',
+    '',
   );
   return result as DownloadResult;
 }
@@ -550,7 +536,7 @@ export async function getDirectoryFileStreamUrl(
   const result = await NativeSyncEngine.getSharedFileStreamUrl(
     scope,
     path,
-    scope === 'personal' ? getCurrentAccessToken() : '',
+    '',
   );
   return result as string;
 }
@@ -560,7 +546,7 @@ export async function getPersonalFileThumbnailUrl(
 ): Promise<string> {
   const result = await NativeSyncEngine.getPersonalFileThumbnailUrl(
     path,
-    getCurrentAccessToken(),
+    '',
   );
   return result as string;
 }
@@ -573,7 +559,7 @@ export async function prepareDirectoryFilePreview(
   const result = await NativeSyncEngine.prepareSharedFilePreview(
     scope,
     path,
-    scope === 'personal' ? getCurrentAccessToken() : '',
+    '',
     filename?.trim() ?? '',
   );
   return result as string;
@@ -709,32 +695,31 @@ export async function presentLimitedPhotoPicker(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Account Identity Reset (Phase 1 / 2 / 3)
+// Sync Identity Reset (Phase 1 / 2 / 3)
 //
 // Single native entry point for clearing everything the sync layer has ever
-// persisted about the current account: binding, pairing tokens, clientId,
-// upload queue, sessions, daily ledger, auto-upload config. `clientDisplayName`
-// is preserved as a device preference. See the native
+// persisted about the current local identity: binding, pairing tokens,
+// clientId, upload queue, sessions, daily ledger, auto-upload config.
+// `clientDisplayName` is preserved as a device preference. See the native
 // SyncEngineManager.wipeSyncIdentity (iOS) / performWipeSyncIdentity
 // companion (Android) implementations for the authoritative cleared-vs-kept
 // list.
 // ---------------------------------------------------------------------------
 
 /** Run the full native wipe. Awaited — the caller MUST hold navigation /
- *  auth state until this resolves or rejects, otherwise the next login flow
- *  can race into residual state. */
+ *  local identity state until this resolves or rejects, otherwise a new
+ *  pairing flow can race into residual state. */
 export async function wipeSyncIdentity(): Promise<void> {
   await NativeSyncEngine.wipeSyncIdentity();
 }
 
-/** Read the auth user-id last bound to the sync identity on this device.
+/** Read the legacy owner id last bound to the sync identity on this device.
  *  `null` means "no owner recorded yet" (fresh install, post-wipe, or an
  *  older build that never wrote the field).
  *
  *  Returned as a string so backend ids above 2^53 round-trip losslessly —
  *  the native bridge would otherwise demote through `Double` on both
- *  iOS (`NSNumber`) and Android (`Long`). Callers compare against
- *  `String(profile.id)`. */
+ *  iOS (`NSNumber`) and Android (`Long`). */
 export async function getOwnerUserId(): Promise<string | null> {
   const result = await NativeSyncEngine.getOwnerUserId();
   if (typeof result !== 'string' || result.length === 0) {
@@ -759,9 +744,7 @@ export async function exportDiagnostics(): Promise<string> {
   return String(result);
 }
 
-/** Record the auth user-id now bound to the sync identity on this device.
- *  Written after a successful login + owner-check, so a later login by a
- *  different user can be detected via owner mismatch and force a wipe.
+/** Record a legacy owner id for the sync identity on this device.
  *
  *  Accepts either `number | string` for caller convenience; we stringify
  *  before the native call so the bridge layer never sees `Double` and

@@ -132,15 +132,6 @@
     "globalSharedFilesTitle": "我的電腦",
     "globalSharedFilesDesc": "瀏覽我的電腦中的檔案"
   },
-  "trialUpgrade": {
-    "entry": "免費試用剩餘 {{days}} 天，點擊升級 Pro 解鎖全部功能"
-  },
-  "expired": {
-    "title": "試用已結束",
-    "subtitle": "訂閱後可繼續使用素材上傳、自動上傳與共享檔案存取",
-    "subscribeCta": "立即訂閱",
-    "viewHelp": "查看幫助"
-  },
   "onboarding": {
     "skip": "跳過引導",
     "previous": "上一步",
@@ -160,7 +151,7 @@
     },
     "settings": {
       "title": "全域設定",
-      "body": "查看目前連接的設備與訂閱狀態，修改手機顯示名稱，或取得技術支援。"
+      "body": "查看目前連接的設備，修改手機顯示名稱，或取得技術支援。"
     },
     "help": {
       "title": "幫助中心",

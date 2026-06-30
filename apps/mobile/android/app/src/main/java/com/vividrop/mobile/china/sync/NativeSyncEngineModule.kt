@@ -34,7 +34,6 @@ import com.facebook.react.bridge.WritableArray
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.facebook.react.modules.core.PermissionAwareActivity
-import com.vividrop.mobile.china.BuildConfig
 import mobiletunnel.Mobiletunnel
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -160,9 +159,7 @@ class NativeSyncEngineModule(
 
   override fun getConstants(): Map<String, Any>? {
     val packageName = reactApplicationContext.packageName
-    val market = if (packageName.contains("global")) "global" else "cn"
     return mapOf(
-      "SYNCFLOW_MARKET" to market,
       "PACKAGE_NAME" to packageName
     )
   }
@@ -951,8 +948,7 @@ class NativeSyncEngineModule(
       return "wake=nil"
     }
     val usableTargets = AndroidSyncPrimitives.validWakeTargets(wake.targets).size
-    val hasPublic = wake.publicTarget?.enabled == true && wake.publicTarget.host.isNotBlank()
-    return "wakeSupported=${wake.supported} wakeTargets=${wake.targets.size} wakeUsableTargets=$usableTargets remoteWakeEnabled=$hasPublic"
+    return "wakeSupported=${wake.supported} wakeTargets=${wake.targets.size} wakeUsableTargets=$usableTargets remoteWakeEnabled=false"
   }
 
   @ReactMethod
@@ -1049,51 +1045,6 @@ class NativeSyncEngineModule(
     saveBinding(updated)
     emitBindingStateChanged(updated)
     promise.resolve(null)
-  }
-
-  @ReactMethod
-  fun savePublicWakeTarget(params: ReadableMap, promise: Promise) {
-    try {
-      val binding = loadBinding()
-      if (binding == null) {
-        promise.reject("SAVE_PUBLIC_WAKE_TARGET_ERROR", "No active binding available")
-        return
-      }
-      val host = if (params.hasKey("host") && !params.isNull("host")) params.getString("host").orEmpty() else ""
-      val port = if (params.hasKey("port") && !params.isNull("port")) params.getInt("port") else 9
-      val enabled = if (params.hasKey("enabled") && !params.isNull("enabled")) params.getBoolean("enabled") else false
-
-      AndroidSyncPrimitives.validatePublicWakeTarget(host, port, enabled)
-
-      val existingWake = binding.wake ?: AndroidWakeCapability(
-        supported = false,
-        targets = emptyList(),
-        publicTarget = null,
-        updatedAt = isoNow(),
-      )
-      val newPublicTarget = if (host.trim().isNotEmpty()) {
-        AndroidPublicWakeTarget(
-          kind = "router_wan_udp",
-          host = host.trim(),
-          port = port,
-          enabled = enabled,
-          updatedAt = isoNow(),
-        )
-      } else {
-        null
-      }
-      val updatedWake = existingWake.copy(
-        publicTarget = newPublicTarget,
-        updatedAt = isoNow(),
-      )
-      val updatedBinding = binding.copy(wake = updatedWake)
-      saveBinding(updatedBinding)
-      emitBindingStateChanged(updatedBinding)
-      emitIdleSyncState(updatedBinding)
-      promise.resolve(null)
-    } catch (error: Throwable) {
-      promise.reject("SAVE_PUBLIC_WAKE_TARGET_ERROR", error.message ?: error.javaClass.simpleName, error)
-    }
   }
 
   @ReactMethod
@@ -1533,43 +1484,8 @@ class NativeSyncEngineModule(
 
   @ReactMethod
   fun requestIgnoreBatteryOptimizations(promise: Promise) {
-    if (BuildConfig.FLAVOR == "global") {
-      recordDiagnosticsLog("Keepalive", "battery optimization request ignored for global flavor")
-      promise.resolve(false)
-      return
-    }
-    try {
-      if (isIgnoringBatteryOptimizationsValue()) {
-        promise.resolve(true)
-        return
-      }
-      val requestIntent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-        data = Uri.parse("package:${reactApplicationContext.packageName}")
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-      }
-      val fallbackIntent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-      }
-      val packageManager = reactApplicationContext.packageManager
-      val intent = if (requestIntent.resolveActivity(packageManager) != null) {
-        requestIntent
-      } else {
-        fallbackIntent
-      }
-      reactApplicationContext.startActivity(intent)
-      recordDiagnosticsLog("Keepalive", "battery optimization settings opened")
-      promise.resolve(false)
-    } catch (error: Throwable) {
-      recordDiagnosticsLog(
-        "Keepalive",
-        "battery optimization request failed: ${error.message ?: error.javaClass.simpleName}",
-      )
-      promise.reject(
-        "ANDROID_BATTERY_OPTIMIZATION_REQUEST_FAILED",
-        error.message ?: "Failed to open battery optimization settings",
-        error,
-      )
-    }
+    recordDiagnosticsLog("Keepalive", "battery optimization request ignored for global-only OSS Android")
+    promise.resolve(false)
   }
 
   @ReactMethod
@@ -2598,11 +2514,7 @@ class NativeSyncEngineModule(
   }
 
   private fun currentAndroidBackgroundKeepaliveStrategy(): String =
-    if (BuildConfig.FLAVOR == "global") {
-      "android_global_foreground_service_play_compliant"
-    } else {
-      "android_cn_foreground_service_battery_whitelist"
-    }
+    "android_global_foreground_service_play_compliant"
 
   private fun buildAndroidBackgroundKeepaliveStatusJson(): JSONObject {
     val isForegroundServiceActive = synchronized(syncRunLock) { syncInProgress }
@@ -3936,7 +3848,7 @@ class NativeSyncEngineModule(
         directPort = DEFAULT_SIDECAR_HTTP_PORT,
       )
       if (canReachSidecarHealth(binding.host, BINDING_PROBE_TIMEOUT_MS)) {
-        return sharedFileRoute(scope, kind, path, requestAccessToken, directDecision, directSnapshot)
+        return sharedFileRoute(scope, kind, path, requestAccessToken, binding.pairingToken, directDecision, directSnapshot)
       }
 
       if (directSnapshot.hasCredentials && !directSnapshot.isActive && !directSnapshot.isStarting) {
@@ -3944,13 +3856,7 @@ class NativeSyncEngineModule(
         startP2PTunnelIfNeeded(binding)
       }
 
-      val allowPublicWake = AndroidSyncPrimitives.shouldAllowSharedFilesPublicWake(
-        scope = scope,
-        path = path,
-        operation = kind,
-        trigger = "shared_files_root_browse",
-      )
-      val wokeHost = attemptSharedFilesLANWakeIfNeeded(binding, reason, allowPublicWake = allowPublicWake)
+      val wokeHost = attemptSharedFilesLANWakeIfNeeded(binding, reason)
       if (wokeHost != null) {
         val isTunnel = wokeHost.startsWith("127.0.0.1")
         val finalDecision = if (isTunnel) {
@@ -3969,6 +3875,7 @@ class NativeSyncEngineModule(
           kind,
           path,
           requestAccessToken,
+          binding.pairingToken,
           finalDecision,
           directSnapshot,
         )
@@ -3986,7 +3893,7 @@ class NativeSyncEngineModule(
         directPort = DEFAULT_SIDECAR_HTTP_PORT,
       )
       recordNativeLog("SharedFiles", "using active P2P tunnel directly, skipping wake decision reason=$reason")
-      return sharedFileRoute(scope, kind, path, requestAccessToken, activeDecision, wakeGateSnapshot)
+      return sharedFileRoute(scope, kind, path, requestAccessToken, binding.pairingToken, activeDecision, wakeGateSnapshot)
     }
     val initialSnapshot = p2pTunnelRouteSnapshot()
     val initialDecision = AndroidSyncPrimitives.decideSharedFilesRoute(
@@ -3999,12 +3906,12 @@ class NativeSyncEngineModule(
 
     when (initialDecision.mode) {
       AndroidSharedFilesRouteMode.TUNNEL -> {
-        return sharedFileRoute(scope, kind, path, requestAccessToken, initialDecision, initialSnapshot)
+        return sharedFileRoute(scope, kind, path, requestAccessToken, binding.pairingToken, initialDecision, initialSnapshot)
       }
 
       AndroidSharedFilesRouteMode.DIRECT_LAN -> {
         recordNativeLog("SharedFiles", "P2P tunnel unavailable for shared files reason=$reason; credentials missing")
-        return sharedFileRoute(scope, kind, path, requestAccessToken, initialDecision, initialSnapshot)
+        return sharedFileRoute(scope, kind, path, requestAccessToken, binding.pairingToken, initialDecision, initialSnapshot)
       }
 
       AndroidSharedFilesRouteMode.WAIT_FOR_TUNNEL -> {
@@ -4018,7 +3925,7 @@ class NativeSyncEngineModule(
             directPort = DEFAULT_SIDECAR_HTTP_PORT,
           )
           if (readyDecision.mode == AndroidSharedFilesRouteMode.TUNNEL) {
-            return sharedFileRoute(scope, kind, path, requestAccessToken, readyDecision, readySnapshot)
+            return sharedFileRoute(scope, kind, path, requestAccessToken, binding.pairingToken, readyDecision, readySnapshot)
           }
         }
       }
@@ -4038,7 +3945,7 @@ class NativeSyncEngineModule(
         "P2P tunnel wait timed out for shared files reason=$reason hasCredentials=${fallbackSnapshot.hasCredentials}",
       )
     }
-    return sharedFileRoute(scope, kind, path, requestAccessToken, fallbackDecision, fallbackSnapshot)
+    return sharedFileRoute(scope, kind, path, requestAccessToken, binding.pairingToken, fallbackDecision, fallbackSnapshot)
   }
 
   private fun logPeerProxySkipDiagnostics() {
@@ -4064,6 +3971,7 @@ class NativeSyncEngineModule(
     kind: String,
     path: String,
     requestAccessToken: String,
+    pairingToken: String,
     decision: AndroidSharedFilesRouteDecision,
     snapshot: P2PTunnelRouteSnapshot,
   ): SharedFileRoute {
@@ -4081,14 +3989,18 @@ class NativeSyncEngineModule(
       scope = normalizedScope,
       kind = kind,
       path = path,
+      escapedPath = endpoint,
       url = appendSharedDirectoryQueryParams(
         URL("http", decision.host, decision.port, endpoint),
         normalizedScope,
         authorizationToken,
+        pairingToken,
+        includePersonalSignature = false,
       ),
       urlHost = decision.host,
       port = decision.port,
       authorizationToken = authorizationToken,
+      personalAccessPairingToken = pairingToken.takeIf { normalizedScope == "personal" }?.trim()?.ifBlank { null },
       displayHost = displayHost,
       isTunnel = decision.isTunnel,
       reachabilityRoute = if (decision.isTunnel) currentSharedFilesTunnelReachabilityRoute() else "lan",
@@ -4102,10 +4014,13 @@ class NativeSyncEngineModule(
     if (Mobiletunnel.currentSelectedICERoute() == "turn_relay") "relay" else "tunnel"
 
   private fun sharedFileUrlForRoute(kind: String, path: String, route: SharedFileRoute): URL =
-    appendSharedDirectoryAccessToken(
-      URL("http", route.urlHost, route.port, sharedFileEndpoint(route.scope, kind, path)),
-      route,
-    )
+    sharedFileEndpoint(route.scope, kind, path).let { endpoint ->
+      appendSharedDirectoryAccessToken(
+        URL("http", route.urlHost, route.port, endpoint),
+        route,
+        endpoint,
+      )
+    }
 
   private fun receivedListRoute(route: SharedFileRoute, currentClientOnly: Boolean = true): SharedFileRoute {
     val queryItems = mutableListOf(
@@ -4121,6 +4036,7 @@ class NativeSyncEngineModule(
     return route.copy(
       kind = "list",
       path = "received",
+      escapedPath = "/resources/mobile/received",
       url = URL(
         "http",
         route.urlHost,
@@ -4190,15 +4106,40 @@ class NativeSyncEngineModule(
     if (scope.trim().equals("personal", ignoreCase = true)) "personal" else "team"
 
   private fun applySharedDirectoryAuthorization(connection: HttpURLConnection, route: SharedFileRoute) {
-    val token = route.authorizationToken ?: return
-    connection.setRequestProperty("Authorization", "Bearer $token")
+    route.authorizationToken?.let { token ->
+      connection.setRequestProperty("Authorization", "Bearer $token")
+    }
+    val signature = personalAccessSignature(
+      scope = route.scope,
+      pairingToken = route.personalAccessPairingToken,
+      method = "GET",
+      escapedPath = route.escapedPath,
+      clientId = getOrCreateClientId(),
+    ) ?: return
+    connection.setRequestProperty("X-SyncFlow-Auth", signature.signature)
+    connection.setRequestProperty("X-SyncFlow-Auth-Timestamp", signature.timestamp)
+    connection.setRequestProperty("X-SyncFlow-Auth-Nonce", signature.nonce)
   }
 
-  private fun appendSharedDirectoryAccessToken(url: URL, route: SharedFileRoute): URL {
-    return appendSharedDirectoryQueryParams(url, route.scope, route.authorizationToken)
+  private fun appendSharedDirectoryAccessToken(url: URL, route: SharedFileRoute, escapedPath: String): URL {
+    return appendSharedDirectoryQueryParams(
+      url = url,
+      scope = route.scope,
+      authorizationToken = route.authorizationToken,
+      personalAccessPairingToken = route.personalAccessPairingToken,
+      escapedPath = escapedPath,
+      includePersonalSignature = true,
+    )
   }
 
-  private fun appendSharedDirectoryQueryParams(url: URL, scope: String, authorizationToken: String?): URL {
+  private fun appendSharedDirectoryQueryParams(
+    url: URL,
+    scope: String,
+    authorizationToken: String?,
+    personalAccessPairingToken: String?,
+    escapedPath: String = url.path,
+    includePersonalSignature: Boolean = false,
+  ): URL {
     val queryItems = mutableListOf<Pair<String, String>>()
     authorizationToken?.trim()?.takeIf { it.isNotBlank() }?.let {
       queryItems.add("access_token" to it)
@@ -4208,6 +4149,20 @@ class NativeSyncEngineModule(
       if (clientId.isNotBlank()) {
         queryItems.add("clientId" to clientId)
         queryItems.add("clientName" to getClientDisplayNameValue().trim().ifBlank { clientId })
+        if (includePersonalSignature) {
+          val signature = personalAccessSignature(
+            scope = scope,
+            pairingToken = personalAccessPairingToken,
+            method = "GET",
+            escapedPath = escapedPath,
+            clientId = clientId,
+          )
+          if (signature != null) {
+            queryItems.add("X-SyncFlow-Auth" to signature.signature)
+            queryItems.add("X-SyncFlow-Auth-Timestamp" to signature.timestamp)
+            queryItems.add("X-SyncFlow-Auth-Nonce" to signature.nonce)
+          }
+        }
       }
     }
     if (queryItems.isEmpty()) {
@@ -4218,6 +4173,28 @@ class NativeSyncEngineModule(
       "$name=${URLEncoder.encode(value, "UTF-8")}"
     }
     return URL("${url}$separator$query")
+  }
+
+  private fun personalAccessSignature(
+    scope: String,
+    pairingToken: String?,
+    method: String,
+    escapedPath: String,
+    clientId: String,
+  ): AndroidPersonalAccessSignature? {
+    val normalizedToken = pairingToken?.trim().orEmpty()
+    val normalizedClientId = clientId.trim()
+    if (scope != "personal" || normalizedToken.isBlank() || normalizedClientId.isBlank()) {
+      return null
+    }
+    return AndroidSyncPrimitives.personalAccessSignature(
+      pairingToken = normalizedToken,
+      method = method,
+      escapedPath = escapedPath,
+      clientId = normalizedClientId,
+      timestamp = isoNow(),
+      nonce = UUID.randomUUID().toString().replace("-", ""),
+    )
   }
 
   private fun p2pTunnelRouteSnapshot(): P2PTunnelRouteSnapshot =
@@ -4344,7 +4321,6 @@ class NativeSyncEngineModule(
   private fun attemptSharedFilesLANWakeIfNeeded(
     binding: StoredBinding,
     reason: String,
-    allowPublicWake: Boolean = false,
   ): String? {
     val wake = binding.wake
     recordNativeLog(
@@ -4371,7 +4347,7 @@ class NativeSyncEngineModule(
     )
     val wakeAttemptStartedAt = isoNow()
     try {
-      val result = sendWakeOnLanPackets(targets, if (allowPublicWake) wake.publicTarget else null)
+      val result = sendWakeOnLanPackets(targets)
       val failures = result.failures
         .takeIf { it.isNotEmpty() }
         ?.let { " failedDestinations=${describeWakeFailures(it)}" }
@@ -4562,7 +4538,6 @@ class NativeSyncEngineModule(
 
   private fun sendWakeOnLanPackets(
     targets: List<AndroidWakeTarget>,
-    publicTarget: AndroidPublicWakeTarget? = null
   ): WakeOnLanSendResult {
     val repeatCount = 3
     var sentPackets = 0
@@ -4574,9 +4549,6 @@ class NativeSyncEngineModule(
       for (target in targets) {
         val packetBytes = AndroidSyncPrimitives.buildWakeOnLanMagicPacket(target.macAddress)
         val targetDestinations = AndroidSyncPrimitives.wakePacketDestinations(target).toMutableList()
-        if (publicTarget != null && publicTarget.enabled && publicTarget.host.isNotBlank()) {
-          targetDestinations.add(AndroidWakePacketDestination(publicTarget.host.trim(), publicTarget.port))
-        }
         val uniqueDestinations = targetDestinations.distinct()
         destinations.addAll(uniqueDestinations)
         repeat(repeatCount) { round ->
@@ -5886,7 +5858,7 @@ class NativeSyncEngineModule(
       recordDiagnosticsLog("SyncEngine", "retryLanReconnect LAN host unavailable; wake disabled")
       return
     }
-    if (attemptSharedFilesLANWakeIfNeeded(binding, "manual_lan_reconnect", allowPublicWake = false) != null) {
+    if (attemptSharedFilesLANWakeIfNeeded(binding, "manual_lan_reconnect") != null) {
       sendPresenceHeartbeatAsync(binding, reason = "manual_lan_reconnect_presence", recoverOnFailure = false)
       startForegroundSyncRound(reason = "manual_trigger", threadName = "NativeSyncEngineSync")
     } else {
@@ -7294,20 +7266,7 @@ class NativeSyncEngineModule(
             }
           },
         )
-        if (publicTarget == null) {
-          putNull("publicTarget")
-        } else {
-          putMap(
-            "publicTarget",
-            Arguments.createMap().apply {
-              putString("kind", publicTarget.kind)
-              putString("host", publicTarget.host)
-              putInt("port", publicTarget.port)
-              putBoolean("enabled", publicTarget.enabled)
-              putString("updatedAt", publicTarget.updatedAt)
-            }
-          )
-        }
+        putNull("publicTarget")
       }
     }
 
@@ -7457,10 +7416,12 @@ class NativeSyncEngineModule(
     val scope: String,
     val kind: String,
     val path: String,
+    val escapedPath: String,
     val url: URL,
     val urlHost: String,
     val port: Int,
     val authorizationToken: String?,
+    val personalAccessPairingToken: String?,
     val displayHost: String,
     val isTunnel: Boolean,
     val reachabilityRoute: String,

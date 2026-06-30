@@ -1,7 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
-import type { SubscriptionInfo, UserProfile } from '../../stores/auth-store';
 
 import { SettingsGlobalScreen } from '../SettingsGlobalScreen';
 import {
@@ -9,20 +8,12 @@ import {
   getBindingState,
   getClientDisplayName,
   setClientDisplayName,
-  wipeSyncIdentity,
 } from '../../services/SyncEngineModule';
-import {
-  logout as serverLogout,
-  deleteAccount,
-} from '../../services/auth-service';
-import { resetCurrentDesktopSidecarIfReachable } from '../../services/sidecar-reset-service';
-import { clearUserScopedStorage } from '../../utils/clearUserScopedStorage';
 import {
   resolveLanguagePreference,
   saveLanguagePreference,
 } from '../../i18n/language-preference';
 import i18n from '../../i18n';
-import { iapService } from '../../services/iap-service';
 
 jest.mock('react-native-localize', () => ({
   getLocales: jest.fn(() => [
@@ -37,25 +28,6 @@ jest.mock('react-native-localize', () => ({
 }));
 
 const mockNavigate = jest.fn();
-const mockClearAuth = jest.fn();
-const mockSetSignedOutTransition = jest.fn();
-const mockLoadSubscription = jest.fn();
-
-const mockAuth: {
-  user: UserProfile | null;
-  subscription: SubscriptionInfo | null;
-  refreshToken: string | null;
-  clearAuth: jest.Mock;
-  setSignedOutTransition: jest.Mock;
-  loadSubscription: jest.Mock;
-} = {
-  user: null,
-  subscription: null,
-  refreshToken: 'refresh-token',
-  clearAuth: mockClearAuth,
-  setSignedOutTransition: mockSetSignedOutTransition,
-  loadSubscription: mockLoadSubscription,
-};
 
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({
@@ -98,29 +70,11 @@ jest.mock('react-i18next', () => {
   };
 });
 
-jest.mock('../../stores/auth-store', () => ({
-  useAuth: () => mockAuth,
-}));
-
 jest.mock('../../services/SyncEngineModule', () => ({
   getBindingState: jest.fn(),
   getClientDisplayName: jest.fn(),
   setClientDisplayName: jest.fn(),
   getAppInfo: jest.fn(),
-  wipeSyncIdentity: jest.fn(),
-}));
-
-jest.mock('../../services/auth-service', () => ({
-  logout: jest.fn(),
-  deleteAccount: jest.fn(),
-}));
-
-jest.mock('../../services/sidecar-reset-service', () => ({
-  resetCurrentDesktopSidecarIfReachable: jest.fn(),
-}));
-
-jest.mock('../../utils/clearUserScopedStorage', () => ({
-  clearUserScopedStorage: jest.fn(),
 }));
 
 jest.mock('../../i18n/language-preference', () => ({
@@ -133,19 +87,6 @@ jest.mock('../../i18n', () => ({
   __esModule: true,
   default: {
     changeLanguage: jest.fn().mockResolvedValue(undefined),
-  },
-}));
-
-jest.mock('../../services/iap-service', () => ({
-  iapService: {
-    restore: jest.fn(),
-  },
-}));
-
-jest.mock('../../constants/features', () => ({
-  FEATURES: {
-    IAP_ENABLED: true,
-    IAP_RESTORE_ENABLED: true,
   },
 }));
 
@@ -172,19 +113,16 @@ jest.mock('lucide-react-native', () => {
     Check: createIcon('mock-check-icon'),
     ChevronLeft: createIcon('mock-chevron-left-icon'),
     ChevronRight: createIcon('mock-chevron-right-icon'),
-    Crown: createIcon('mock-crown-icon'),
     FolderOpen: createIcon('mock-folder-open-icon'),
     HelpCircle: createIcon('mock-help-circle-icon'),
     Home: createIcon('mock-home-icon'),
     Laptop: createIcon('mock-laptop-icon'),
     Languages: createIcon('mock-languages-icon'),
-    LogOut: createIcon('mock-log-out-icon'),
     MessageSquare: createIcon('mock-message-square-icon'),
     Monitor: createIcon('mock-monitor-icon'),
     Pencil: createIcon('mock-pencil-icon'),
     RefreshCw: createIcon('mock-refresh-cw-icon'),
     Smartphone: createIcon('mock-smartphone-icon'),
-    Trash2: createIcon('mock-trash-icon'),
     User: createIcon('mock-user-icon'),
   };
 });
@@ -204,21 +142,6 @@ const mockedSetClientDisplayName = setClientDisplayName as jest.MockedFunction<
   typeof setClientDisplayName
 >;
 const mockedGetAppInfo = getAppInfo as jest.MockedFunction<typeof getAppInfo>;
-const mockedWipeSyncIdentity = wipeSyncIdentity as jest.MockedFunction<
-  typeof wipeSyncIdentity
->;
-const mockedServerLogout = serverLogout as jest.MockedFunction<
-  typeof serverLogout
->;
-const mockedDeleteAccount = deleteAccount as jest.MockedFunction<
-  typeof deleteAccount
->;
-const mockedResetSidecar =
-  resetCurrentDesktopSidecarIfReachable as jest.MockedFunction<
-    typeof resetCurrentDesktopSidecarIfReachable
-  >;
-const mockedClearUserScopedStorage =
-  clearUserScopedStorage as jest.MockedFunction<typeof clearUserScopedStorage>;
 const mockedSaveLanguagePreference =
   saveLanguagePreference as jest.MockedFunction<typeof saveLanguagePreference>;
 const mockedResolveLanguagePreference =
@@ -226,10 +149,6 @@ const mockedResolveLanguagePreference =
     typeof resolveLanguagePreference
   >;
 const mockedChangeLanguage = i18n.changeLanguage as jest.Mock;
-const mockedIapRestore = iapService.restore as jest.MockedFunction<
-  typeof iapService.restore
->;
-
 async function renderSettingsGlobalScreen() {
   const screen = render(<SettingsGlobalScreen />);
   await act(async () => {
@@ -242,22 +161,6 @@ async function renderSettingsGlobalScreen() {
 describe('SettingsGlobalScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockAuth.user = {
-      id: 1,
-      primaryIdentity: { type: 'email', display: 'creator@example.com' },
-      identities: [{ type: 'email', display: 'creator@example.com' }],
-      status: 'subscribed',
-      plan: 'yearly',
-      expireAt: '2027-04-01T00:00:00.000Z',
-      trialEnd: null,
-    };
-    mockAuth.subscription = {
-      status: 'subscribed',
-      plan: 'yearly',
-      expireAt: '2027-04-01T00:00:00.000Z',
-      trialEnd: null,
-    };
-    mockAuth.refreshToken = 'refresh-token';
     mockedGetBindingState.mockResolvedValue({
       deviceId: 'desktop-1',
       deviceName: 'Studio Mac',
@@ -276,35 +179,23 @@ describe('SettingsGlobalScreen', () => {
       version: '3.4.5',
       build: '67',
     });
-    mockedWipeSyncIdentity.mockResolvedValue(undefined);
-    mockedServerLogout.mockResolvedValue(undefined);
-    mockedDeleteAccount.mockResolvedValue(undefined);
-    mockedResetSidecar.mockResolvedValue(undefined);
-    mockedClearUserScopedStorage.mockResolvedValue(undefined);
     mockedSaveLanguagePreference.mockResolvedValue(undefined);
     mockedResolveLanguagePreference.mockReturnValue('en');
     mockedChangeLanguage.mockResolvedValue(undefined);
-    mockedIapRestore.mockResolvedValue([
-      { productId: 'vividrop_yearly' } as never,
-    ]);
-    mockLoadSubscription.mockResolvedValue({
-      status: 'subscribed',
-      plan: 'yearly',
-      expireAt: '2027-04-01T00:00:00.000Z',
-      trialEnd: null,
-    });
   });
 
-  test('renders account, subscription, current desktop, device name, and version from real state', async () => {
+  test('renders local device, current desktop, and version without official account rows', async () => {
     const { getByText, queryByText } = await renderSettingsGlobalScreen();
 
-    await waitFor(() => expect(getByText('creator@example.com')).toBeTruthy());
-    expect(getByText('已订阅 · 年度方案')).toBeTruthy();
+    await waitFor(() => expect(getByText('Field iPhone')).toBeTruthy());
     expect(getByText('Edit Bay')).toBeTruthy();
     expect(getByText('当前设备 · 已连接')).toBeTruthy();
-    expect(getByText('Field iPhone')).toBeTruthy();
     expect(getByText('版本 3.4.5 (67)')).toBeTruthy();
 
+    expect(queryByText('creator@example.com')).toBeNull();
+    expect(queryByText('会员状态')).toBeNull();
+    expect(queryByText('退出登录')).toBeNull();
+    expect(queryByText('注销账号')).toBeNull();
     expect(queryByText('+1 206 **** 1234')).toBeNull();
     expect(queryByText('Pro Annual · 剩余 28 天')).toBeNull();
     expect(queryByText('MacBook Pro')).toBeNull();
@@ -345,46 +236,6 @@ describe('SettingsGlobalScreen', () => {
     expect(getByText('版本 --')).toBeTruthy();
   });
 
-  test('renders trial, expired, and unknown subscription states from auth snapshots', async () => {
-    mockAuth.subscription = {
-      status: 'trialing',
-      plan: '',
-      expireAt: null,
-      trialEnd: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-    };
-    const trial = await renderSettingsGlobalScreen();
-    expect(trial.getByText(/试用中 · 剩余 \d+ 天/)).toBeTruthy();
-
-    trial.unmount();
-    jest.clearAllMocks();
-    mockAuth.user = {
-      ...mockAuth.user!,
-      status: 'sub_expired',
-      plan: 'monthly',
-      expireAt: '2026-01-01T00:00:00.000Z',
-      trialEnd: null,
-    };
-    mockAuth.subscription = null;
-    mockedGetBindingState.mockResolvedValue(null);
-    mockedGetClientDisplayName.mockResolvedValue(null);
-    mockedGetAppInfo.mockResolvedValue(null);
-
-    const expired = await renderSettingsGlobalScreen();
-    expect(expired.getByText('订阅已过期')).toBeTruthy();
-
-    expired.unmount();
-    jest.clearAllMocks();
-    mockAuth.user = null;
-    mockAuth.subscription = null;
-    mockedGetBindingState.mockResolvedValue(null);
-    mockedGetClientDisplayName.mockResolvedValue(null);
-    mockedGetAppInfo.mockResolvedValue(null);
-
-    const unknown = await renderSettingsGlobalScreen();
-    expect(unknown.getByText('状态未知')).toBeTruthy();
-    expect(unknown.getByText('未登录')).toBeTruthy();
-  });
-
   test('keeps content bottom spacing aligned with the reference page padding', async () => {
     const { getByTestId } = await renderSettingsGlobalScreen();
 
@@ -395,11 +246,16 @@ describe('SettingsGlobalScreen', () => {
     expect(contentStyle.paddingBottom).toBe(24);
   });
 
-  test('navigates from reference action rows', async () => {
-    const { getByText } = await renderSettingsGlobalScreen();
+  test('keeps settings OSS-only without purchase, membership, logout, or delete-account actions', async () => {
+    const { getByText, queryByTestId, queryByText } =
+      await renderSettingsGlobalScreen();
 
-    fireEvent.press(getByText('会员状态'));
-    expect(mockNavigate).toHaveBeenCalledWith('Subscription');
+    expect(mockNavigate).not.toHaveBeenCalledWith('Subscription');
+    expect(queryByText('会员状态')).toBeNull();
+    expect(queryByTestId('global-settings-logout')).toBeNull();
+    expect(queryByTestId('global-settings-delete-account')).toBeNull();
+    expect(queryByTestId('global-settings-restore-purchase')).toBeNull();
+    expect(queryByText('恢复购买')).toBeNull();
 
     fireEvent.press(getByText('切换设备'));
     expect(mockNavigate).toHaveBeenCalledWith('DeviceDiscovery', {
@@ -448,32 +304,6 @@ describe('SettingsGlobalScreen', () => {
     expect(getByText('Field iPhone')).toBeTruthy();
   });
 
-  test('restores purchases through IAP service and refreshes subscription state', async () => {
-    const { getByText, getByTestId } = await renderSettingsGlobalScreen();
-
-    fireEvent.press(getByTestId('global-settings-restore-purchase'));
-    await act(async () => {
-      fireEvent.press(getByText('恢复购买'));
-    });
-
-    expect(mockedIapRestore).toHaveBeenCalledTimes(1);
-    expect(mockLoadSubscription).toHaveBeenCalledTimes(1);
-    expect(getByText('已恢复订阅并刷新会员状态。')).toBeTruthy();
-  });
-
-  test('shows restore purchase failures without pretending success', async () => {
-    mockedIapRestore.mockRejectedValueOnce(new Error('store unavailable'));
-    const { getByText, getByTestId } = await renderSettingsGlobalScreen();
-
-    fireEvent.press(getByTestId('global-settings-restore-purchase'));
-    await act(async () => {
-      fireEvent.press(getByText('恢复购买'));
-    });
-
-    expect(mockLoadSubscription).not.toHaveBeenCalled();
-    expect(getByText('恢复购买失败，请稍后重试。')).toBeTruthy();
-  });
-
   test('only offers supported global languages and persists selected preference', async () => {
     const { getByText, getByTestId, queryByText } =
       await renderSettingsGlobalScreen();
@@ -508,90 +338,4 @@ describe('SettingsGlobalScreen', () => {
     expect(getByText('English')).toBeTruthy();
   });
 
-  test('runs the full logout cleanup flow instead of only clearing auth', async () => {
-    const { getByText, getByTestId } = await renderSettingsGlobalScreen();
-
-    fireEvent.press(getByTestId('global-settings-logout'));
-    expect(getByText('确定要退出当前账号吗？')).toBeTruthy();
-
-    await act(async () => {
-      fireEvent.press(getByTestId('global-settings-confirm-logout'));
-    });
-
-    expect(mockedResetSidecar).toHaveBeenCalledTimes(1);
-    expect(mockedWipeSyncIdentity).toHaveBeenCalledTimes(1);
-    expect(mockedClearUserScopedStorage).toHaveBeenCalledTimes(1);
-    expect(mockedServerLogout).toHaveBeenCalledWith('refresh-token');
-    expect(mockSetSignedOutTransition).toHaveBeenCalledWith('logout');
-    expect(mockClearAuth).toHaveBeenCalledTimes(1);
-  });
-
-  test('keeps local logout complete when server token revoke has already expired', async () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
-    mockedServerLogout.mockRejectedValueOnce(
-      new Error('Token 无效或已过期'),
-    );
-    const { getByTestId } = await renderSettingsGlobalScreen();
-
-    fireEvent.press(getByTestId('global-settings-logout'));
-    await act(async () => {
-      fireEvent.press(getByTestId('global-settings-confirm-logout'));
-      await Promise.resolve();
-    });
-
-    expect(mockSetSignedOutTransition).toHaveBeenCalledWith('logout');
-    expect(mockClearAuth).toHaveBeenCalledTimes(1);
-    expect(warnSpy).not.toHaveBeenCalledWith(
-      '[SettingsGlobal] server logout failed:',
-      expect.any(Error),
-    );
-  });
-
-  test('does not clear auth when logout cannot wipe native sync identity', async () => {
-    mockedWipeSyncIdentity.mockRejectedValueOnce(new Error('wipe failed'));
-    const { getByText, getByTestId } = await renderSettingsGlobalScreen();
-
-    fireEvent.press(getByTestId('global-settings-logout'));
-    await act(async () => {
-      fireEvent.press(getByTestId('global-settings-confirm-logout'));
-    });
-
-    expect(mockClearAuth).not.toHaveBeenCalled();
-    expect(getByText('退出登录失败，请稍后重试。')).toBeTruthy();
-  });
-
-  test('deletes the account on the server before local cleanup and keeps modal open on server failure', async () => {
-    const { getByText, getByTestId, queryByText } =
-      await renderSettingsGlobalScreen();
-
-    fireEvent.press(getByTestId('global-settings-delete-account'));
-    await act(async () => {
-      fireEvent.press(getByTestId('global-settings-confirm-delete-account'));
-    });
-
-    expect(mockedDeleteAccount).toHaveBeenCalledTimes(1);
-    expect(mockedResetSidecar).toHaveBeenCalledTimes(1);
-    expect(mockedWipeSyncIdentity).toHaveBeenCalledTimes(1);
-    expect(mockedClearUserScopedStorage).toHaveBeenCalledTimes(1);
-    expect(mockSetSignedOutTransition).toHaveBeenCalledWith('account_deleted');
-    expect(mockClearAuth).toHaveBeenCalledTimes(1);
-    expect(queryByText('确定要注销当前账号吗？此操作不可撤销。')).toBeNull();
-
-    mockedDeleteAccount.mockRejectedValueOnce(new Error('server down'));
-    mockClearAuth.mockClear();
-    const failed = await renderSettingsGlobalScreen();
-
-    fireEvent.press(failed.getByTestId('global-settings-delete-account'));
-    await act(async () => {
-      fireEvent.press(
-        failed.getByTestId('global-settings-confirm-delete-account'),
-      );
-    });
-
-    expect(mockClearAuth).not.toHaveBeenCalled();
-    expect(failed.getByText('注销账号失败，请稍后重试。')).toBeTruthy();
-    expect(
-      failed.getByText('确定要注销当前账号吗？此操作不可撤销。'),
-    ).toBeTruthy();
-  });
 });

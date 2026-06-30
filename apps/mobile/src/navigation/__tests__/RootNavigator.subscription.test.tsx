@@ -1,9 +1,8 @@
 /**
- * RootNavigator — SUBSCRIPTION_ENFORCEMENT routing test
+ * RootNavigator — entitlement fail-open routing test
  *
- * Focuses on verifying that:
- *   - trial_expired / sub_expired  → routes to SubscriptionScreen
- *   - trialing / subscribed        → does NOT route to paywall
+ * Focuses on verifying that entitlement status no longer blocks foreground
+ * LAN sync routing. Paid background / remote gates are handled separately.
  *
  * All screens are replaced with minimal stubs so the test only exercises
  * routing logic. Native modules and third-party libs are mocked to allow
@@ -48,17 +47,6 @@ jest.mock('react-native-localize', () => ({
       isRTL: false,
     },
   ],
-}));
-
-// ---------------------------------------------------------------------------
-// Feature flags — SUBSCRIPTION_ENFORCEMENT on, IAP off
-// ---------------------------------------------------------------------------
-jest.mock('../../constants/features', () => ({
-  FEATURES: {
-    SUBSCRIPTION_ENFORCEMENT: true,
-    IAP_ENABLED: false,
-    IAP_RESTORE_ENABLED: false,
-  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -111,17 +99,6 @@ jest.mock('react-native-keychain', () => ({
   },
 }));
 
-jest.mock('../../services/iap-service', () => ({
-  iapService: {
-    initialize: jest.fn().mockResolvedValue(undefined),
-    teardown: jest.fn().mockResolvedValue(undefined),
-    onOrphanPurchaseVerified: jest.fn(() => jest.fn()),
-    checkEligibility: jest.fn().mockResolvedValue([]),
-    restore: jest.fn().mockResolvedValue([]),
-    getProductSummaries: jest.fn().mockResolvedValue([]),
-  },
-}));
-
 jest.mock('../../services/SyncEngineModule', () => ({
   cancelAllManualUploads: jest.fn(),
   interruptAutoUpload: jest.fn(),
@@ -155,18 +132,6 @@ jest.mock('@react-native-documents/viewer', () => ({
 // ---------------------------------------------------------------------------
 // Screen stubs — test only cares about which screen gets routed to
 // ---------------------------------------------------------------------------
-jest.mock('../../screens/SubscriptionScreen', () => ({
-  SubscriptionScreen: () => {
-    const R = require('react');
-    const { Text } = require('react-native');
-    return R.createElement(
-      Text,
-      { testID: 'subscription-screen' },
-      'Subscription',
-    );
-  },
-}));
-
 jest.mock('../../screens/DeviceDiscoveryScreen', () => ({
   DeviceDiscoveryScreen: () => {
     const R = require('react');
@@ -216,22 +181,6 @@ jest.mock('../../screens/SyncActivityGlobalScreen', () => ({
       { testID: 'global-sync-activity-screen' },
       `GlobalSyncActivity showBottomTabBar=${String(showBottomTabBar)}`,
     );
-  },
-}));
-
-jest.mock('../../screens/LoginScreen', () => ({
-  LoginScreen: () => {
-    const R = require('react');
-    const { Text } = require('react-native');
-    return R.createElement(Text, { testID: 'login-screen' }, 'Login');
-  },
-}));
-
-jest.mock('../../screens/SmsVerifyScreen', () => ({
-  SmsVerifyScreen: () => {
-    const R = require('react');
-    const { Text } = require('react-native');
-    return R.createElement(Text, { testID: 'sms-verify-screen' }, 'SmsVerify');
   },
 }));
 
@@ -295,6 +244,14 @@ jest.mock('../../screens/HistoryScreen', () => ({
   },
 }));
 
+jest.mock('../../screens/HistoryGlobalScreen', () => ({
+  HistoryGlobalScreen: () => {
+    const R = require('react');
+    const { Text } = require('react-native');
+    return R.createElement(Text, { testID: 'history-screen' }, 'History');
+  },
+}));
+
 jest.mock('../../screens/SettingsScreen', () => ({
   SettingsScreen: ({ showBottomTabBar }: { showBottomTabBar?: boolean }) => {
     const R = require('react');
@@ -323,6 +280,18 @@ jest.mock('../../screens/SettingsGlobalScreen', () => ({
   },
 }));
 
+jest.mock('../../screens/SubscriptionGlobalScreen', () => ({
+  SubscriptionGlobalScreen: () => {
+    const R = require('react');
+    const { Text } = require('react-native');
+    return R.createElement(
+      Text,
+      { testID: 'subscription-screen' },
+      'Subscription',
+    );
+  },
+}));
+
 jest.mock('../../screens/HelpScreen', () => ({
   HelpScreen: () => {
     const R = require('react');
@@ -337,12 +306,6 @@ jest.mock('../../screens/QRScannerScreen', () => ({
     const { Text } = require('react-native');
     return R.createElement(Text, { testID: 'qr-scanner-screen' }, 'QRScanner');
   },
-}));
-
-// AuthScreenShell used in SignedOutTransitionScreen / ProfileErrorScreen
-jest.mock('../../components/auth/AuthScreenShell', () => ({
-  AUTH_COLORS: { primary: '#4e8ef7' },
-  AuthScreenShell: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 // ---------------------------------------------------------------------------
@@ -382,8 +345,6 @@ function mockAuthForStatus(status: string, subscriptionStatus = status) {
     profileLoading: false,
     profileError: null,
     signedOutTransition: null,
-    loadSubscription: jest.fn().mockResolvedValue(undefined),
-    retryProfileLoad: jest.fn(),
     clearAuth: jest.fn(),
     setSignedOutTransition: jest.fn(),
   });
@@ -415,9 +376,6 @@ beforeEach(() => {
   process.env = { ...originalEnv };
   delete process.env.SYNCFLOW_VISUAL_QA;
   delete process.env.SYNCFLOW_VISUAL_QA_ROUTE;
-  (NativeModules as Record<string, unknown>).AppleAuthModule = {
-    SYNCFLOW_MARKET: 'cn',
-  };
 
   // NativeSyncEngine.getBindingState returns null → falls through to DeviceDiscovery
   (NativeModules as Record<string, unknown>).NativeSyncEngine = {
@@ -436,47 +394,68 @@ afterAll(() => {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('RootNavigator — SUBSCRIPTION_ENFORCEMENT', () => {
-  test('routes trial_expired user to SubscriptionScreen', async () => {
+describe('RootNavigator — entitlement fail-open routing', () => {
+  test('routes trial_expired user to foreground LAN discovery, not SubscriptionScreen', async () => {
     renderWith('trial_expired');
     await waitFor(() =>
-      expect(screen.getByTestId('subscription-screen')).toBeTruthy(),
-    );
-  });
-
-  test('routes sub_expired user to SubscriptionScreen', async () => {
-    renderWith('sub_expired');
-    await waitFor(() =>
-      expect(screen.getByTestId('subscription-screen')).toBeTruthy(),
-    );
-  });
-
-  test('routes trialing user to main app (not paywall)', async () => {
-    renderWith('trialing');
-    await waitFor(() => {
-      expect(screen.queryByTestId('subscription-screen')).toBeNull();
-    });
-  });
-
-  test('routes subscribed user to main app (not paywall)', async () => {
-    renderWith('subscribed');
-    await waitFor(() => {
-      expect(screen.queryByTestId('subscription-screen')).toBeNull();
-    });
-  });
-
-  test('prefers active subscription snapshot over stale expired user status', async () => {
-    renderWith('trial_expired', 'subscribed');
-    await waitFor(() =>
-      expect(screen.getByTestId('device-discovery-screen')).toBeTruthy(),
+      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
     );
     expect(screen.queryByTestId('subscription-screen')).toBeNull();
   });
 
-  test('resets to SubscriptionScreen when subscription expires after entering the app', async () => {
+  test('routes sub_expired user to foreground LAN discovery, not SubscriptionScreen', async () => {
+    renderWith('sub_expired');
+    await waitFor(() =>
+      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+    );
+    expect(screen.queryByTestId('subscription-screen')).toBeNull();
+  });
+
+  test('routes trialing user to main app (not paywall)', async () => {
+    renderWith('trialing');
+    await waitFor(() =>
+      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+    );
+    expect(screen.queryByTestId('subscription-screen')).toBeNull();
+  });
+
+  test('routes subscribed user to main app (not paywall)', async () => {
+    renderWith('subscribed');
+    await waitFor(() =>
+      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+    );
+    expect(screen.queryByTestId('subscription-screen')).toBeNull();
+  });
+
+  test('expired status with an existing binding still routes to SyncActivity', async () => {
+    (
+      NativeModules.NativeSyncEngine.getBindingState as jest.Mock
+    ).mockResolvedValue({
+      deviceId: 'desktop-1',
+      deviceName: 'Studio Mac',
+      host: '192.168.1.10',
+    });
+
+    renderWith('sub_expired');
+
+    await waitFor(() =>
+      expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy(),
+    );
+    expect(screen.queryByTestId('subscription-screen')).toBeNull();
+  });
+
+  test('active subscription snapshot over stale expired user status also routes to LAN discovery', async () => {
+    renderWith('trial_expired', 'subscribed');
+    await waitFor(() =>
+      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+    );
+    expect(screen.queryByTestId('subscription-screen')).toBeNull();
+  });
+
+  test('does not reset foreground LAN route to SubscriptionScreen when subscription expires after entering the app', async () => {
     const view = renderWith('subscribed');
     await waitFor(() =>
-      expect(screen.getByTestId('device-discovery-screen')).toBeTruthy(),
+      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
     );
 
     mockAuthForStatus('subscribed', 'sub_expired');
@@ -487,9 +466,9 @@ describe('RootNavigator — SUBSCRIPTION_ENFORCEMENT', () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByTestId('subscription-screen')).toBeTruthy(),
+      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
     );
-    expect(screen.queryByTestId('device-discovery-screen')).toBeNull();
+    expect(screen.queryByTestId('subscription-screen')).toBeNull();
   });
 
   test('uses visual QA whitelisted authed route as initial route', async () => {
@@ -505,9 +484,6 @@ describe('RootNavigator — SUBSCRIPTION_ENFORCEMENT', () => {
   });
 
   test('global connected session renders home, remote resources, and settings inside the main tab shell', async () => {
-    (NativeModules as Record<string, unknown>).AppleAuthModule = {
-      SYNCFLOW_MARKET: 'global',
-    };
     (NativeModules as Record<string, unknown>).NativeSyncEngine = {
       getBindingState: jest.fn().mockResolvedValue({ deviceId: 'desktop-1' }),
       addListener: jest.fn(),

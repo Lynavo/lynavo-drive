@@ -86,11 +86,9 @@ describe('RecentDownloadsSection', () => {
     const textValues = tree!.root
       .findAllByType(Text)
       .map(node => node.props.children);
-    expect(textValues).toContain('暂无最近下载');
-    expect(textValues).toContain('从电脑下载到本机的文件会出现在这里。');
-    expect(textValues).not.toContain(
-      '开启自动上传后，同步到电脑的素材会出现在这里。',
-    );
+    expect(textValues).toContain('syncActivity.recentDownload.emptyTitle');
+    expect(textValues).toContain('syncActivity.recentDownload.emptyMessage');
+    expect(textValues).not.toContain('syncActivity.empty.title');
     expect(textValues).not.toContain('照片');
     expect(textValues).not.toContain('arrow-down-circle-outline');
 
@@ -231,10 +229,8 @@ describe('RecentDownloadsSection', () => {
     const textValues = tree!.root
       .findAllByType(Text)
       .map(node => node.props.children);
-    expect(textValues).toContain('暂无同步记录');
-    expect(textValues).toContain(
-      '完成第一次自动同步后，记录会按电脑完成日期显示在这里。',
-    );
+    expect(textValues).toContain('syncActivity.syncRecords.emptyTitle');
+    expect(textValues).toContain('syncActivity.syncRecords.emptyMessage');
     expect(textValues).not.toContain('Mini4');
   });
 
@@ -249,9 +245,7 @@ describe('RecentDownloadsSection', () => {
     const textValues = tree!.root
       .findAllByType(Text)
       .map(node => node.props.children);
-    expect(textValues).toContain('暂无同步记录');
-    expect(textValues).toContain(
-      '完成第一次自动同步后，记录会按电脑完成日期显示在这里。',
-    );
+    expect(textValues).toContain('syncActivity.syncRecords.emptyTitle');
+    expect(textValues).toContain('syncActivity.syncRecords.emptyMessage');
   });
 });

@@ -5,9 +5,8 @@
   "sections": {
     "connectedDevice": "已连接设备",
     "supportHelp": "支持与帮助",
-    "giftCard": "礼品卡",
-    "account": "我的账户",
     "myDevice": "我的设备",
+    "device": "本机设备",
     "computers": "电脑设备",
     "general": "通用"
   },
@@ -21,17 +20,6 @@
     "offline": "离线",
     "notConnected": "未连接"
   },
-  "subscription": {
-    "subscribed": "订阅服务",
-    "trial": "试用服务",
-    "trialDays": "{{days}} 天",
-    "freeTrial": "免费试用",
-    "introTrial": "月订阅免费期",
-    "expired": "已到期",
-    "active": "有效",
-    "subscribeCta": "立即订阅",
-    "restoreDesc": "从应用商店检查历史购买记录"
-  },
   "myDevice": {
     "label": "我的设备名称",
     "hint": "此名称将在 PC 端显示",
@@ -43,17 +31,12 @@
     "openSettings": "打开系统设置"
   },
   "rows": {
-    "currentAccount": "当前账号",
     "latestSync": "最近同步",
     "appVersion": "应用版本",
     "language": "语言",
     "faq": "常见问题",
     "faqDesc": "操作说明与常见问题",
     "diagnosticsDesc": "上传日志和设备状态以方便排查问题"
-  },
-  "phone": {
-    "reveal": "显示完整手机号",
-    "hide": "隐藏手机号"
   },
   "language": {
     "system": "跟随系统",
@@ -87,48 +70,12 @@
       "toast": "已取消上传"
     }
   },
-  "giftCard": {
-    "action": "礼品卡兑换",
-    "desc": "输入礼品码以解锁 7 天试用",
-    "monthlyPlan": "月订阅",
-    "yearlyPlan": "年订阅",
-    "modal": {
-      "title": "礼品卡兑换",
-      "message": "输入礼品卡代码以启用或延长订阅。",
-      "placeholder": "输入礼品卡代码",
-      "cancel": "取消",
-      "submit": "兑换"
-    },
-    "empty": {
-      "title": "请输入礼品卡代码",
-      "body": "请确认代码后再兑换。"
-    },
-    "success": {
-      "title": "兑换成功",
-      "body": "已为你套用 {{plan}}。"
-    },
-    "failure": {
-      "title": "兑换失败",
-      "body": "礼品卡兑换失败，请稍后重试。",
-      "invalidCode": "礼品卡代码无效，请确认后再兑换。",
-      "expired": "此礼品卡已过期。",
-      "notAvailable": "此礼品卡已停用或已兑换完毕。",
-      "alreadyRedeemed": "此账号已兑换过此礼品卡。",
-      "planMismatch": "此礼品卡方案无法套用到当前账号。",
-      "invalidOperation": "礼品卡兑换资料不正确，请确认后再试。",
-      "activeSubscription": "当前已有订阅会员，无法使用礼品卡。",
-      "network": "网络连接异常，请检查后再试。"
-    }
-  },
   "actions": {
     "exportDiagnostics": "导出诊断包",
     "exportingDiagnostics": "正在导出诊断包…",
     "help": "帮助",
     "resetSyncStatus": "重置同步状态",
-    "logout": "登出",
     "switch": "切换",
-    "deleteAccount": "注销账号",
-    "deletingAccount": "注销中…",
     "forgetDesktop": "遗忘此电脑",
     "switchDevice": "切换设备",
     "switchDeviceDesc": "将断开当前设备并重新连接其他电脑"
@@ -159,11 +106,6 @@
       "body": "确定要遗忘并中断与电脑“{{name}}”的连接吗？这将会清除本地的连接记录与绑定状态。",
       "confirm": "确定遗忘"
     },
-    "logout": {
-      "title": "退出登录",
-      "body": "确定要退出登录吗？",
-      "confirm": "确定退出"
-    },
     "exportUnavailable": {
       "title": "无法导出",
       "body": "当前版本暂不支持导出诊断包"
@@ -175,48 +117,15 @@
     "languageSaveFailed": {
       "title": "无法切换语言",
       "body": "语言设置保存失败，请稍后重试。"
-    },
-    "deleteAccount": {
-      "title": "删除帐号",
-      "body": "此动作将永久删除你的帐号、所有登入方式与使用纪录。此动作无法复原。",
-      "continue": "继续",
-      "confirmAgainTitle": "确定删除帐号？",
-      "confirmAgainBody": "这是最后一次确认。删除后资料无法救回。",
-      "confirmAgainButton": "确定删除"
     }
-  },
-  "remoteWake": {
-    "title": "远程唤醒 (Remote Wake)",
-    "lanStatus": "局域网唤醒状态",
-    "lanStatusCached": "已缓存局域网唤醒目标",
-    "lanStatusNotCached": "未缓存局域网唤醒目标，请在局域网连接一次以缓存",
-    "autoReadyTitle": "已自动取得电脑唤醒信息",
-    "autoReadyBody": "外网唤醒仍需要路由器 Wake-on-WAN 或 UDP 转发。Vivi Drop 会自动套用当前公网出口与建议连接端口，如果路由器设置不同可在下方调整。",
-    "autoMissingTitle": "尚未取得电脑唤醒信息",
-    "autoMissingBody": "请让手机与电脑在同一个 Wi-Fi 下成功连接一次，Vivi Drop 会自动缓存 MAC、broadcast 与建议连接端口。",
-    "enableHint": "启用后，从外部网络打开“我的电脑”时会先尝试远程唤醒。如果路由器未设置，仍可能无法唤醒。",
-    "advancedTitle": "手动高级设置",
-    "wowEnable": "启用 Wake-on-WAN 远程唤醒",
-    "wowHostLabel": "公网主机名 / IP",
-    "wowHostPlaceholder": "例如 DDNS 域名或公网 IP",
-    "wowPortLabel": "连接端口",
-    "wowSave": "保存远程唤醒设置",
-    "wowSaving": "保存中...",
-    "wowSaveSuccess": "远程唤醒设置保存成功",
-    "invalidHost": "请输入有效的公网主机名或 IP 地址",
-    "invalidPort": "请输入有效的端口号 (1-65535)"
   },
   "global": {
     "my": "我的",
-    "mySubtitle": "账号、设备和应用偏好。",
-    "memberStatus": "会员状态",
-    "restorePurchase": "恢复购买",
-    "restorePurchaseRow": "恢复已购买订阅",
+    "mySubtitle": "设备和应用偏好。",
     "deviceName": "设备名称",
     "editDeviceName": "编辑设备名称",
     "appVersionShort": "版本",
     "update": "更新",
-    "logout": "退出登录",
     "back": "返回",
     "languageTitle": "语言",
     "systemLanguage": "跟随系统语言",
@@ -228,25 +137,7 @@
     "cancel": "取消",
     "errorDeviceNameEmpty": "请输入设备名称",
     "errorDeviceNameSave": "保存失败，请稍后重试",
-    "logoutTitle": "退出登录",
-    "logoutDesc": "确定要退出当前账号吗？",
-    "logoutConfirm": "退出登录",
-    "loggingOut": "退出中…",
-    "errorLogout": "退出登录失败，请稍后重试。",
-    "restorePurchaseTitle": "恢复已购买订阅",
-    "restorePurchaseDesc": "正在从应用商店检查当前账号的历史购买记录。",
-    "restoring": "恢复中…",
     "gotIt": "知道了",
-    "restoreSuccess": "已恢复订阅并刷新会员状态。",
-    "restoreNotFound": "未找到可恢复的订阅，已刷新会员状态。",
-    "restoreNotSupported": "当前平台暂不支持恢复购买，已刷新会员状态。",
-    "restoreCancelled": "已取消恢复购买。",
-    "restoreFailed": "恢复购买失败，请稍后重试。",
-    "deleteAccountTitle": "注销账号",
-    "deleteAccountDesc": "确定要注销当前账号吗？此操作不可撤销。",
-    "deleteAccount": "注销",
-    "deleting": "注销中…",
-    "errorDeleteAccount": "注销账号失败，请稍后重试。",
     "uploadDiagnosticsTitle": "上传诊断包",
     "uploadDiagnosticsDesc": "请简要描述您遇到的问题，方便我们快速定位。",
     "diagnosticsPlaceholder": "例如：传输到一半会自动中断",
@@ -256,20 +147,6 @@
     "uploadSuccessMsg": "诊断包已上传，感谢您的反馈！",
     "uploadFailureTitle": "上传失败",
     "uploadFailureMsg": "上传诊断包时发生错误，请检查网络连接后重试。",
-    "notLoggedIn": "未登录",
-    "yearlyPlan": "年度方案",
-    "monthlyPlan": "月度方案",
-    "trialRemaining": "试用中 · 剩余 {{days}} 天",
-    "trialing": "试用中",
-    "subscribedWithPlan": "已订阅 · {{plan}}",
-    "subscribed": "已订阅",
-    "subscribedGiftCard": "已订阅 · 礼品卡",
-    "subscribedGiftCardExpiry": "已订阅 · 礼品卡权益至 {{date}}",
-    "subscribedGiftCardEntitlement": "已订阅 · 礼品卡权益",
-    "subscriptionCancelledExpiry": "已取消续订 · 可用至 {{date}}",
-    "subscriptionCancelled": "已取消续订",
-    "trialExpired": "试用已结束",
-    "subscriptionExpired": "订阅已过期",
     "statusUnknown": "状态未知",
     "connected": "已连接",
     "connecting": "连接中",

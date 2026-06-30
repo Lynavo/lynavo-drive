@@ -1,5 +1,11 @@
 import React from 'react';
-import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import {
+  render,
+  fireEvent,
+  waitFor,
+  act,
+  cleanup,
+} from '@testing-library/react-native';
 import {
   Alert,
   NativeEventEmitter,
@@ -45,7 +51,8 @@ jest.mock('react-i18next', () => {
             'sharedFiles.networkError.title': '載入失敗',
             'sharedFiles.networkError.message': '請稍後重試',
             'sharedFiles.dialogs.downloadFailed': '下載失敗',
-            'sharedFiles.dialogs.downloadFailedMessage': '無法下載檔案，请稍後重試',
+            'sharedFiles.dialogs.downloadFailedMessage':
+              '無法下載檔案，请稍後重試',
             'sharedFiles.dialogs.savedLocationPhotos': '相簿',
             'sharedFiles.dialogs.previewFailed': '預覽失敗',
             'sharedFiles.dialogs.previewFailedMessage': '無法取得檔案預覽',
@@ -56,35 +63,87 @@ jest.mock('react-i18next', () => {
             'sharedFiles.dialogs.cancel': '取消',
             'sharedFiles.title': '遠端資源',
             'sharedFiles.phoneSyncSpace.title': '手機同步空間',
-            'sharedFiles.phoneSyncSpace.desc': '檢視已同步至电脑的檔案與上传来源',
+            'sharedFiles.phoneSyncSpace.desc':
+              '檢視已同步至电脑的檔案與上传来源',
+            'sharedFiles.phoneSyncSpace.badgeSync': '同步后显示',
+            'sharedFiles.phoneSyncSpace.badgeSource': '来源清晰',
+            'sharedFiles.phoneSyncSpace.select': '選擇',
             'sharedFiles.phoneSyncSpace.empty': '尚無同步檔案',
+            'sharedFiles.phoneSyncSpace.emptySubtitle':
+              '开启自动上传后，同步到电脑的素材会出现在这里。',
+            'sharedFiles.phoneSyncSpace.filesCount': `${
+              options?.count ?? 0
+            } 个文件`,
+            'sharedFiles.phoneSyncSpace.loadingTitle': '正在加载',
+            'sharedFiles.phoneSyncSpace.loadingSubtitle':
+              '同步空间列表会在这里刷新。',
+            'sharedFiles.phoneSyncSpace.mediaTypes.file': '文件',
+            'sharedFiles.phoneSyncSpace.mediaTypes.photo': '照片',
+            'sharedFiles.phoneSyncSpace.mediaTypes.video': '视频',
+            'sharedFiles.phoneSyncSpace.previewSyncedFile': '预览已同步文件',
+            'sharedFiles.phoneSyncSpace.downloadSyncedFile': '下载已同步文件',
             'sharedFiles.phoneSyncSpace.desktopDeleted': '電腦已刪除',
             'sharedFiles.phoneSyncSpace.desktopDeletedMessage':
               '此檔案已從電腦刪除',
             'sharedFiles.phoneSyncSpace.deletedDownloadMessage':
               '無法下載已刪除的檔案',
+            'sharedFiles.phoneSyncSpace.previewFailedTitle': '无法加载预览',
+            'sharedFiles.phoneSyncSpace.previewFailedSubtitle':
+              '请确认电脑在线且文件仍存在。',
             'sharedFiles.remoteAccess.title': '遠端訪問電腦',
-            'sharedFiles.remoteAccess.desc': '流覽電腦端共享的目錄結構並下載文件',
+            'sharedFiles.remoteAccess.desc':
+              '流覽電腦端共享的目錄結構並下載文件',
+            'sharedFiles.remoteAccess.ossDesc':
+              '通过同一局域网访问已配对电脑文件，不需要订阅。',
+            'sharedFiles.remoteAccess.badgeDesktop': '电脑',
+            'sharedFiles.remoteAccess.badgeView': '浏览',
+            'sharedFiles.remoteAccess.ossBadge': '局域网',
             'sharedFiles.remoteAccess.empty': '此資料夾為空',
+            'sharedFiles.remoteAccess.rootDirectoryLabel': '用户目录',
+            'sharedFiles.remoteAccess.fallbackDesktopLabel': '当前电脑',
+            'sharedFiles.remoteAccess.unboundRemoteSubtitle': '尚未连接电脑',
+            'sharedFiles.remoteAccess.noFilesTitle': '暂无文件',
+            'sharedFiles.remoteAccess.noFilesSubtitle':
+              '电脑端共享的文件会显示在这里。',
             'sharedFiles.remoteAccess.remoteAccessDisabledTitle':
               '尚未開啟遠端存取',
             'sharedFiles.remoteAccess.remoteAccessDisabledSubtitle':
               '請到電腦端開啟「遠端存取」後，再回到手機端重新整理。',
-            'sharedFiles.remoteAccess.desktopLoggedOutTitle': '電腦端未登入',
-            'sharedFiles.remoteAccess.desktopLoggedOutSubtitle':
-              '請先在電腦端登入同一個帳號，並確認已開啟「遠端存取」。',
-            'sharedFiles.remoteAccess.accountMismatchTitle': '帳號不一致',
-            'sharedFiles.remoteAccess.accountMismatchSubtitle':
-              '請確認手機與電腦端登入同一個帳號後，再重新檢查。',
             'sharedFiles.remoteAccess.recheckPermission': '重新檢查',
+            'sharedFiles.remoteAccess.loadingTitle': '远程资源加载中',
+            'sharedFiles.remoteAccess.loadingSubtitle':
+              '正在读取电脑端共享目录。',
+            'sharedFiles.remoteAccess.networkDisconnectedTitle': '网络断开',
+            'sharedFiles.remoteAccess.networkDisconnectedSubtitle':
+              '当前路径会保留，恢复网络或电脑端在线后可以继续访问。',
+            'sharedFiles.remoteAccess.retryConnection': '重试连接',
+            'sharedFiles.remoteAccess.listView': '列表视图',
+            'sharedFiles.remoteAccess.gridView': '网格视图',
+            'sharedFiles.remoteAccess.searchFilesPlaceholder': '搜索电脑文件',
+            'sharedFiles.remoteAccess.searchFolderPlaceholder':
+              '搜索当前文件夹',
+            'sharedFiles.remoteAccess.connectionStatePrefix':
+              '远端访问连接方式：',
+            'sharedFiles.remoteAccess.sortTitle': '排序方式',
             'sharedFiles.remoteAccess.select': '選擇',
             'sharedFiles.remoteAccess.done': '完成',
             'sharedFiles.remoteAccess.download': '下載',
             'sharedFiles.remoteAccess.share': '分享',
+            'sharedFiles.connectionStatus.lan': '局域网',
+            'sharedFiles.connectionStatus.unavailable': '不可达',
+            'sharedFiles.sortBy.name': '名称',
+            'sharedFiles.sortBy.time': '时间',
+            'sharedFiles.sortBy.size': '文件大小',
+            'common.back': '返回',
+            'common.today': '今天',
+            'common.yesterday': '昨天',
             'sharedFiles.remoteAccess.selectedCount': `已選擇 ${
               options?.count ?? 0
             } 個`,
           };
+          if (key === 'sharedFiles.phoneSyncSpace.summary') {
+            return `${options?.count ?? 0} 个 · ${options?.size ?? ''}`;
+          }
           if (
             key === 'sharedFiles.dialogs.downloadSavedToPhotos' &&
             options?.name
@@ -184,6 +243,37 @@ const mockGoBack = jest.fn();
 const mockCanGoBack = jest.fn(() => true);
 const mockReset = jest.fn();
 const mockDispatch = jest.fn();
+let mockAuthState: {
+  isLoggedIn: boolean;
+  user: null | {
+    id: number;
+    status: string;
+    plan: string;
+    expireAt: string | null;
+    trialEnd: string | null;
+  };
+  subscription: null | {
+    status: string;
+    plan: string;
+    expireAt: string | null;
+    trialEnd: string | null;
+  };
+} = {
+  isLoggedIn: true,
+  user: {
+    id: 1,
+    status: 'subscribed',
+    plan: 'yearly',
+    expireAt: '2030-01-01T00:00:00.000Z',
+    trialEnd: null,
+  },
+  subscription: {
+    status: 'subscribed',
+    plan: 'yearly',
+    expireAt: '2030-01-01T00:00:00.000Z',
+    trialEnd: null,
+  },
+};
 
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({
@@ -200,10 +290,27 @@ jest.mock('@react-navigation/native', () => ({
 }));
 
 jest.mock('../../stores/auth-store', () => ({
-  useAuth: () => ({
-    subscription: { status: 'subscribed' },
-  }),
+  useAuth: () => mockAuthState,
 }));
+
+function resetMockAuthState() {
+  mockAuthState = {
+    isLoggedIn: true,
+    user: {
+      id: 1,
+      status: 'subscribed',
+      plan: 'yearly',
+      expireAt: '2030-01-01T00:00:00.000Z',
+      trialEnd: null,
+    },
+    subscription: {
+      status: 'subscribed',
+      plan: 'yearly',
+      expireAt: '2030-01-01T00:00:00.000Z',
+      trialEnd: null,
+    },
+  };
+}
 
 jest.mock('../../dev/visualQa', () => ({
   isVisualQaEnabled: () => mockVisualQaEnabled,
@@ -340,6 +447,41 @@ const mockRecordDownloadedFile = recordDownloadedFile as jest.Mock;
 const mockRecordDiagnosticsLog = recordDiagnosticsLog as jest.Mock;
 const mockViewDocument = viewDocument as jest.Mock;
 
+beforeEach(() => {
+  [
+    mockListSharedResources,
+    mockListSharedFolderContents,
+    mockListGlobalRemoteAccessResources,
+    mockListGlobalRemoteAccessFolderContents,
+    mockListReceivedLibrary,
+    mockListCurrentClientReceivedLibrary,
+    mockListGlobalReceivedLibraryPage,
+    mockDownloadResource,
+    mockDownloadResourceForGlobal,
+    mockDownloadReceivedLibraryItem,
+    mockDownloadGlobalRemoteAccessResource,
+    mockGetResourcePreviewUrl,
+    mockGetReceivedLibraryPreviewUrl,
+    mockGetGlobalRemoteAccessPreviewUrl,
+    mockPrepareResourcePreview,
+    mockPrepareReceivedLibraryPreview,
+    mockPrepareGlobalRemoteAccessPreview,
+    mockPrepareGlobalRemoteAccessShareFile,
+    mockShareResources,
+    mockShareGlobalRemoteAccessResources,
+    mockRecordDownloadedFile,
+    mockRecordDiagnosticsLog,
+    mockViewDocument,
+    mockShareOpen,
+  ].forEach(mock => {
+    mock?.mockReset();
+  });
+});
+
+afterEach(() => {
+  cleanup();
+});
+
 function makeReceivedLibraryPage(
   items: Array<Record<string, unknown>>,
   overrides: Record<string, unknown> = {},
@@ -361,9 +503,8 @@ function mockCurrentClientReceivedLibraryPageFromLegacyList() {
       desktop: unknown,
       options?: { page?: number; pageSize?: number },
     ) => {
-      const items = (((await mockListCurrentClientReceivedLibrary(
-        desktop,
-      )) || []) as Array<Record<string, unknown> & { fileSize?: number }>);
+      const items = ((await mockListCurrentClientReceivedLibrary(desktop)) ||
+        []) as Array<Record<string, unknown> & { fileSize?: number }>;
       return makeReceivedLibraryPage(items, {
         page: options?.page ?? 1,
         pageSize: options?.pageSize ?? 20,
@@ -415,6 +556,7 @@ describe('SharedFilesScreen Helpers', () => {
 describe('SharedFilesScreen V2 (Landing Menu)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    resetMockAuthState();
     mockVisualQaEnabled = false;
   });
 
@@ -441,7 +583,7 @@ describe('SharedFilesScreen V2 (Landing Menu)', () => {
     expect(mockRecordDiagnosticsLog).toHaveBeenCalledWith(
       'PhoneSyncSpace',
       'entry pressed',
-      { market: 'cn', screen: 'SharedFilesScreen' },
+      { screen: 'SharedFilesScreen' },
     );
   });
 
@@ -455,11 +597,32 @@ describe('SharedFilesScreen V2 (Landing Menu)', () => {
     fireEvent.press(getByText('遠端訪問電腦'));
     expect(mockNavigate).toHaveBeenCalledWith('RemoteAccess');
   });
+
+  it('keeps guest users on local-LAN remote access instead of login or purchase flow', () => {
+    mockAuthState = {
+      isLoggedIn: false,
+      user: null,
+      subscription: null,
+    };
+
+    const { getByText } = render(
+      <TestErrorBoundary>
+        <SharedFilesScreen />
+      </TestErrorBoundary>,
+    );
+
+    fireEvent.press(getByText('遠端訪問電腦'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('RemoteAccess');
+    expect(mockNavigate).not.toHaveBeenCalledWith('Login');
+    expect(mockNavigate).not.toHaveBeenCalledWith('Subscription', undefined);
+  });
 });
 
 describe('SharedFilesGlobalScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    resetMockAuthState();
     mockVisualQaEnabled = false;
   });
 
@@ -482,8 +645,42 @@ describe('SharedFilesGlobalScreen', () => {
     expect(mockRecordDiagnosticsLog).toHaveBeenCalledWith(
       'PhoneSyncSpace',
       'entry pressed',
-      { market: 'global', screen: 'SharedFilesGlobalScreen' },
+      { screen: 'SharedFilesGlobalScreen' },
     );
+  });
+
+  it('keeps global remote access local-LAN without a paid entitlement gate', () => {
+    const { getByText, queryByText } = render(
+      <SharedFilesGlobalScreen showBottomTabBar={false} />,
+    );
+
+    expect(getByText('局域网')).toBeTruthy();
+    expect(
+      getByText('通过同一局域网访问已配对电脑文件，不需要订阅。'),
+    ).toBeTruthy();
+    fireEvent.press(getByText('遠端訪問電腦'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('RemoteAccess');
+    expect(mockNavigate).not.toHaveBeenCalledWith('Subscription');
+    expect(queryByText('网络断开')).toBeNull();
+  });
+
+  it('keeps guest users on local-LAN remote access instead of login or purchase flow', () => {
+    mockAuthState = {
+      isLoggedIn: false,
+      user: null,
+      subscription: null,
+    };
+
+    const { getByText } = render(
+      <SharedFilesGlobalScreen showBottomTabBar={false} />,
+    );
+
+    fireEvent.press(getByText('遠端訪問電腦'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('RemoteAccess');
+    expect(mockNavigate).not.toHaveBeenCalledWith('Login');
+    expect(mockNavigate).not.toHaveBeenCalledWith('Subscription');
   });
 });
 
@@ -538,6 +735,22 @@ describe('RemoteAccessGlobalScreen', () => {
     await waitFor(() => {
       expect(mockListGlobalRemoteAccessResources).toHaveBeenCalledWith();
     });
+  });
+
+  it('lists remote resources without a paid tunnel entitlement gate', async () => {
+    mockListGlobalRemoteAccessResources.mockResolvedValueOnce([]);
+
+    const { queryByText } = render(
+      <TestErrorBoundary>
+        <RemoteAccessGlobalScreen />
+      </TestErrorBoundary>,
+    );
+
+    await waitFor(() => {
+      expect(mockListGlobalRemoteAccessResources).toHaveBeenCalledWith();
+    });
+    expect(queryByText('需要订阅才能远程访问')).toBeNull();
+    expect(queryByText('网络断开')).toBeNull();
   });
 
   it('renders remote access list items without calling hooks from renderItem helpers', async () => {
@@ -674,7 +887,7 @@ describe('RemoteAccessGlobalScreen', () => {
     expect(nestedInHeaderActions).toBe(false);
   });
 
-  it('maps the native tunnel route to the P2P badge', async () => {
+  it('ignores the native tunnel route and keeps the OSS badge local-LAN only', async () => {
     mockBindingState.mockResolvedValueOnce({
       deviceId: 'desktop-device-id',
       host: '192.168.1.100',
@@ -689,21 +902,22 @@ describe('RemoteAccessGlobalScreen', () => {
     });
     mockListGlobalRemoteAccessResources.mockResolvedValueOnce([]);
 
-    const { getByText } = render(
+    const { getByText, queryByText } = render(
       <TestErrorBoundary>
         <RemoteAccessGlobalScreen />
       </TestErrorBoundary>,
     );
 
     await waitFor(() => {
-      expect(getByText('P2P')).toBeTruthy();
+      expect(getByText('局域网')).toBeTruthy();
     });
+    expect(queryByText('P2P')).toBeNull();
   });
 
-  it('updates the shared-files route badge from native reachability events', async () => {
+  it('ignores relay reachability events in the OSS local-LAN runtime', async () => {
     mockListGlobalRemoteAccessResources.mockResolvedValueOnce([]);
 
-    const { getByText } = render(
+    const { getByText, queryByText } = render(
       <TestErrorBoundary>
         <RemoteAccessGlobalScreen />
       </TestErrorBoundary>,
@@ -711,6 +925,7 @@ describe('RemoteAccessGlobalScreen', () => {
 
     await waitFor(() => {
       expect(mockListGlobalRemoteAccessResources).toHaveBeenCalledWith();
+      expect(getByText('局域网')).toBeTruthy();
     });
 
     await act(async () => {
@@ -724,8 +939,9 @@ describe('RemoteAccessGlobalScreen', () => {
     });
 
     await waitFor(() => {
-      expect(getByText('中继服务器')).toBeTruthy();
+      expect(getByText('局域网')).toBeTruthy();
     });
+    expect(queryByText('中继服务器')).toBeNull();
   });
 
   it('keeps a successful LAN browse badge when a later native event is still waking', async () => {
@@ -779,7 +995,7 @@ describe('RemoteAccessGlobalScreen', () => {
     expect(queryByText('唤醒中')).toBeNull();
   });
 
-  it('shows a pending P2P badge instead of stale LAN while a fallback tunnel is connecting', async () => {
+  it('keeps the LAN badge instead of showing fallback tunnel progress', async () => {
     mockBindingState.mockResolvedValue({
       deviceId: 'desktop-device-id',
       deviceName: 'Studio Mini',
@@ -826,12 +1042,13 @@ describe('RemoteAccessGlobalScreen', () => {
       });
     });
 
-    expect(getByText('P2P 连接中')).toBeTruthy();
-    expect(queryByText('局域网')).toBeNull();
+    expect(getByText('局域网')).toBeTruthy();
+    expect(queryByText('P2P 连接中')).toBeNull();
     expect(queryByText('唤醒中')).toBeNull();
   });
 
-  it('shows a pending relay badge when the fallback advances to relay', async () => {
+  it('does not render relay fallback progress as a community route badge', async () => {
+    jest.useFakeTimers();
     mockBindingState.mockResolvedValueOnce({
       deviceId: 'desktop-device-id',
       host: '192.168.1.100',
@@ -848,16 +1065,23 @@ describe('RemoteAccessGlobalScreen', () => {
       () => new Promise(() => {}),
     );
 
-    const { getByText, queryByText } = render(
+    const { getByText, queryByText, unmount } = render(
       <TestErrorBoundary>
         <RemoteAccessGlobalScreen />
       </TestErrorBoundary>,
     );
 
-    await waitFor(() => {
-      expect(getByText('中继服务器连接中')).toBeTruthy();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
     });
+    expect(mockListGlobalRemoteAccessResources).toHaveBeenCalledWith();
+    expect(getByText('远程资源加载中')).toBeTruthy();
+    expect(queryByText('中继服务器连接中')).toBeNull();
     expect(queryByText('唤醒中')).toBeNull();
+
+    unmount();
+    jest.clearAllTimers();
   });
 
   it('falls back to the disconnected state when global remote loading times out', async () => {
@@ -917,9 +1141,7 @@ describe('RemoteAccessGlobalScreen', () => {
       expect(getByText('尚未開啟遠端存取')).toBeTruthy();
     });
     expect(
-      getByText(
-        '請到電腦端開啟「遠端存取」後，再回到手機端重新整理。',
-      ),
+      getByText('請到電腦端開啟「遠端存取」後，再回到手機端重新整理。'),
     ).toBeTruthy();
     expect(getByText('重新檢查')).toBeTruthy();
     expect(queryByText('网络断开')).toBeNull();
@@ -929,7 +1151,7 @@ describe('RemoteAccessGlobalScreen', () => {
     );
   });
 
-  it('shows desktop logged-out guidance instead of network disconnected when the desktop account is unavailable', async () => {
+  it('shows generic LAN unavailable guidance when the desktop account identity is unavailable', async () => {
     jest.spyOn(console, 'warn').mockImplementation(() => {});
     mockListGlobalRemoteAccessResources.mockRejectedValueOnce(
       new Error('desktop account identity is unavailable'),
@@ -942,21 +1164,18 @@ describe('RemoteAccessGlobalScreen', () => {
     );
 
     await waitFor(() => {
-      expect(getByText('電腦端未登入')).toBeTruthy();
+      expect(getByText('网络断开')).toBeTruthy();
     });
-    expect(
-      getByText(
-        '請先在電腦端登入同一個帳號，並確認已開啟「遠端存取」。',
-      ),
-    ).toBeTruthy();
-    expect(getByText('重新檢查')).toBeTruthy();
+    expect(getByText('重试连接')).toBeTruthy();
+    expect(queryByText('電腦端未登入')).toBeNull();
+    expect(queryByText('帳號不一致')).toBeNull();
     expect(
       queryByText('sharedFiles.remoteAccess.networkDisconnectedTitle'),
     ).toBeNull();
     expect(queryByText('尚未開啟遠端存取')).toBeNull();
   });
 
-  it('shows account mismatch guidance instead of network disconnected when mobile and desktop accounts differ', async () => {
+  it('shows generic LAN unavailable guidance when mobile and desktop account identities differ', async () => {
     jest.spyOn(console, 'warn').mockImplementation(() => {});
     mockListGlobalRemoteAccessResources.mockRejectedValueOnce(
       new Error('account mismatch'),
@@ -969,12 +1188,11 @@ describe('RemoteAccessGlobalScreen', () => {
     );
 
     await waitFor(() => {
-      expect(getByText('帳號不一致')).toBeTruthy();
+      expect(getByText('网络断开')).toBeTruthy();
     });
-    expect(
-      getByText('請確認手機與電腦端登入同一個帳號後，再重新檢查。'),
-    ).toBeTruthy();
-    expect(getByText('重新檢查')).toBeTruthy();
+    expect(getByText('重试连接')).toBeTruthy();
+    expect(queryByText('電腦端未登入')).toBeNull();
+    expect(queryByText('帳號不一致')).toBeNull();
     expect(
       queryByText('sharedFiles.remoteAccess.networkDisconnectedTitle'),
     ).toBeNull();
@@ -1589,10 +1807,8 @@ describe('RemoteAccessGlobalScreen', () => {
       localPath: '/local/photo.jpg',
       thumbnailUrl:
         'http://192.168.1.100:39394/personal/thumbnail/Album/photo.jpg?v=1024-1780000',
-      previewUrl:
-        'http://192.168.1.100:39394/personal/stream/Album/photo.jpg',
-      streamUrl:
-        'http://192.168.1.100:39394/personal/stream/Album/photo.jpg',
+      previewUrl: 'http://192.168.1.100:39394/personal/stream/Album/photo.jpg',
+      streamUrl: 'http://192.168.1.100:39394/personal/stream/Album/photo.jpg',
       savedToPhotos: false,
     });
     expect(mockRecordDiagnosticsLog).toHaveBeenCalledWith(
@@ -1656,7 +1872,7 @@ describe('RemoteAccessGlobalScreen', () => {
     fireEvent.press(getByText('選擇'));
     fireEvent.press(getByText('alpha.jpg'));
     fireEvent.press(getByText('beta.mov'));
-    fireEvent.press(getByText('下载'));
+    fireEvent.press(getByText(/^(下载|下載)$/));
 
     await waitFor(() => {
       expect(mockDownloadGlobalRemoteAccessResource).toHaveBeenCalledTimes(2);
@@ -2370,7 +2586,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
     mockDownloadReceivedLibraryItem.mockResolvedValueOnce({
       savedToPhotos: false,
       localPath: 'content://downloads/my_downloads/42',
-      savedLocation: 'Downloads/Vivi Drop',
+      savedLocation: 'Downloads/Lynavo Drive',
     });
     mockRecordDownloadedFile.mockResolvedValueOnce(undefined);
 
@@ -2538,11 +2754,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
         },
       ]);
 
-      const {
-        getByTestId,
-        getByText,
-        UNSAFE_queryAllByProps,
-      } = render(
+      const { getByTestId, getByText, UNSAFE_queryAllByProps } = render(
         <TestErrorBoundary>
           <PhoneSyncSpaceGlobalScreen />
         </TestErrorBoundary>,

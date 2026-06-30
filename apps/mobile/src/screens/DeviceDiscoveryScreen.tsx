@@ -54,7 +54,7 @@ import {
   recentDesktopMatchesDiscoveredDevice,
 } from './deviceDiscoveryDevices';
 import { shouldKeepCachedDevicesVisible } from './deviceDiscoveryRefresh';
-import { marketConfig } from '../markets';
+import { appConfig } from '../config/app-config';
 import { useRecentDesktops } from '../stores/recent-desktops-store';
 import type { RecentDesktopDTO } from '@syncflow/contracts';
 
@@ -67,7 +67,7 @@ type DiscoveredDevice = Pick<
   'deviceId' | 'name' | 'ip' | 'type' | 'port'
 >;
 
-const desktopDownloadHost = marketConfig.downloadUrl
+const desktopDownloadHost = appConfig.endpoints.webBaseUrl
   .replace(/^https?:\/\//, '')
   .replace(/\/$/, '');
 

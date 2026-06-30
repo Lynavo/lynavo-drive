@@ -296,10 +296,18 @@ describe('SyncActivityGlobalScreen', () => {
       <SyncActivityGlobalScreen showBottomTabBar={false} />,
     );
 
-    expect(queryByText('上传中 · 本次传输进度')).toBeNull();
+    expect(
+      queryByText(
+        'syncActivity.home.syncing · syncActivity.home.currentTransferProgress',
+      ),
+    ).toBeNull();
 
     await waitFor(() => {
-      expect(getByText('上传中 · 本次传输进度')).toBeTruthy();
+      expect(
+        getByText(
+          'syncActivity.home.syncing · syncActivity.home.currentTransferProgress',
+        ),
+      ).toBeTruthy();
     });
 
     expect(getBindingState).toHaveBeenCalledTimes(1);
@@ -307,7 +315,7 @@ describe('SyncActivityGlobalScreen', () => {
     expect(getReadOnlyQueue).toHaveBeenCalledTimes(1);
     expect(getHistoryDays).toHaveBeenCalledTimes(1);
     expect(getByText('Studio Mac')).toBeTruthy();
-    expect(getByText('已连接')).toBeTruthy();
+    expect(getByText('common.connectionStates.connected')).toBeTruthy();
     const metaRowChildren = React.Children.toArray(
       getByTestId('sync-activity-auto-meta-row').props.children,
     ) as React.ReactElement<{ testID?: string }>[];
@@ -325,19 +333,21 @@ describe('SyncActivityGlobalScreen', () => {
         alignItems: 'center',
       }),
     );
-    expect(getByText('已上传2/5')).toBeTruthy();
+    expect(getByText('syncActivity.home.uploadedCount')).toBeTruthy();
     expect(getByText('42%')).toBeTruthy();
-    expect(getByText('传输速度')).toBeTruthy();
+    expect(getByText('syncActivity.stats.transferSpeed')).toBeTruthy();
     expect(getByText('12.5 MB/s')).toBeTruthy();
-    expect(getByText('传输进度')).toBeTruthy();
-    expect(getByText('文件大小')).toBeTruthy();
+    expect(getByText('syncActivity.stats.progress')).toBeTruthy();
+    expect(getByText('syncActivity.stats.fileSize')).toBeTruthy();
     expect(getByText('2.0 MB / 5.0 MB')).toBeTruthy();
-    expect(getByText('当前文件')).toBeTruthy();
+    expect(getByText('syncActivity.stats.currentFile')).toBeTruthy();
     expect(getByText('Clip-A.mov')).toBeTruthy();
-    expect(getByText('最近同步时间：2026-06-16 17:45')).toBeTruthy();
+    expect(
+      getByText('syncActivity.home.latestSyncTimeLabel：2026-06-16 17:45'),
+    ).toBeTruthy();
     expect(getByText('Studio Mac 1m 15s')).toBeTruthy();
     expect(getByText('6.0 MB')).toBeTruthy();
-    expect(queryByText('自动同步未开启')).toBeNull();
+    expect(queryByText('syncActivity.home.autoSyncDisabled')).toBeNull();
   });
 
   test('renders completed auto-upload as a settled state instead of an active transfer', async () => {
@@ -377,11 +387,11 @@ describe('SyncActivityGlobalScreen', () => {
     );
 
     await waitFor(() => {
-      expect(getByText('本次同步已完成')).toBeTruthy();
+      expect(getByText('syncActivity.completed.auto.title')).toBeTruthy();
     });
 
-    expect(getByText('已同步 7 个 · 13.0 MB')).toBeTruthy();
-    expect(getByText('等待新增素材自动同步')).toBeTruthy();
+    expect(getByText('syncActivity.home.completedSummary')).toBeTruthy();
+    expect(getByText('syncActivity.home.waitingForNewAssets')).toBeTruthy();
     expect(
       StyleSheet.flatten(
         getByTestId('sync-activity-upload-completed-card').props.style,
@@ -392,7 +402,11 @@ describe('SyncActivityGlobalScreen', () => {
         alignItems: 'stretch',
       }),
     );
-    expect(queryByText('上传中 · 本次传输进度')).toBeNull();
+    expect(
+      queryByText(
+        'syncActivity.home.syncing · syncActivity.home.currentTransferProgress',
+      ),
+    ).toBeNull();
     expect(queryByText('0 MB/s')).toBeNull();
     expect(queryByText('准备中')).toBeNull();
     expect(getByText('Studio Mac <1s')).toBeTruthy();
@@ -484,7 +498,7 @@ describe('SyncActivityGlobalScreen', () => {
       });
     });
     expect(screen.getByText('Studio Mac')).toBeTruthy();
-    expect(screen.getByText('离线')).toBeTruthy();
+    expect(screen.getByText('common.connectionStates.offline')).toBeTruthy();
 
     screen.unmount();
 

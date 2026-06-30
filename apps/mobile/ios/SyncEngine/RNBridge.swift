@@ -617,22 +617,6 @@ class NativeSyncEngineModule: RCTEventEmitter {
     }
 
     @objc
-    func savePublicWakeTarget(_ params: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        let host = params["host"] as? String
-        let port = params["port"] as? Int ?? (params["port"] as? NSNumber)?.intValue
-        let enabled = params["enabled"] as? Bool ?? false
-
-        Task {
-            do {
-                try await SyncEngineManager.shared.savePublicWakeTarget(host: host, port: port, enabled: enabled)
-                resolve(nil)
-            } catch {
-                reject("SAVE_PUBLIC_WAKE_TARGET_ERROR", error.localizedDescription, error)
-            }
-        }
-    }
-
-    @objc
     func triggerSync(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         SyncEngineManager.shared.startSync()
         resolve(nil)

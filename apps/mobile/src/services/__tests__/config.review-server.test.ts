@@ -1,20 +1,3 @@
-jest.mock('../../markets', () => ({
-  activeMarket: 'cn',
-  isGlobalMarket: () => false,
-  isChinaMarket: () => true,
-  marketConfig: {
-    market: 'cn',
-    apiBaseUrl: 'https://api.vividrop.cn',
-    reviewApiBaseUrl: 'https://review-api.vividrop.cn',
-    appReviewPhone: '18812345678',
-    appReviewEmail: 'review@vividrop.cn',
-  },
-}));
-
-jest.mock('../../release-profile', () => ({
-  releaseApiBaseUrl: null,
-}));
-
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: {
@@ -25,31 +8,20 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  APP_REVIEW_PHONE,
-  APP_REVIEW_EMAIL,
-  DEV_API_BASE_URL,
-  PROD_BASE_URL,
-  REVIEW_API_BASE_URL,
-  clearSessionBaseUrl,
-  getBaseUrl,
-  getSessionBaseUrl,
-  loadSessionBaseUrl,
-  resolveAuthBaseUrlForPhone,
-  resolveAuthBaseUrlForEmail,
-  setDebugBaseUrlOverride,
-  setSessionBaseUrl,
-} from '../config';
+import * as config from '../config';
 
 const testGlobal = globalThis as typeof globalThis & { __DEV__?: boolean };
 
-describe('review server routing config', () => {
+describe('OSS API config', () => {
   const originalDevFlag = testGlobal.__DEV__;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
-    void clearSessionBaseUrl();
-    void setDebugBaseUrlOverride(null);
+    Object.defineProperty(testGlobal, '__DEV__', {
+      value: true,
+      configurable: true,
+    });
+    await config.setDebugBaseUrlOverride(null);
   });
 
   afterEach(() => {
@@ -59,117 +31,57 @@ describe('review server routing config', () => {
     });
   });
 
-  test('routes the App Review phone to the review API server', () => {
-    expect(resolveAuthBaseUrlForPhone(APP_REVIEW_PHONE)).toBe(
-      REVIEW_API_BASE_URL,
-    );
-    expect(resolveAuthBaseUrlForPhone(`+86 ${APP_REVIEW_PHONE}`)).toBe(
-      REVIEW_API_BASE_URL,
-    );
+  test('uses review API as the debug built-in base URL', () => {
+    expect(config.PROD_BASE_URL).toBe('https://api.lynavo.com');
+    expect(config.REVIEW_API_BASE_URL).toBe('https://review-api.lynavo.com');
+    expect(config.DEV_API_BASE_URL).toBe('https://review-api.lynavo.com');
+    expect(config.getBaseUrl()).toBe('https://review-api.lynavo.com');
   });
 
-  test('routes the App Review email to the review API server', () => {
-    expect(resolveAuthBaseUrlForEmail(APP_REVIEW_EMAIL)).toBe(
-      REVIEW_API_BASE_URL,
-    );
-    expect(resolveAuthBaseUrlForEmail(APP_REVIEW_EMAIL.toUpperCase())).toBe(
-      REVIEW_API_BASE_URL,
-    );
-  });
-
-  test('routes normal phone numbers to the review API server by default', () => {
-    expect(resolveAuthBaseUrlForPhone('13312341234')).toBe(DEV_API_BASE_URL);
-  });
-
-  test('routes normal emails to the review API server by default', () => {
-    expect(resolveAuthBaseUrlForEmail('normal@vividrop.cn')).toBe(DEV_API_BASE_URL);
-  });
-
-  test('routes normal phone numbers to the review API server on Android dev builds by default', () => {
-    jest.isolateModules(() => {
-      Object.defineProperty(testGlobal, '__DEV__', {
-        value: true,
-        configurable: true,
-      });
-      jest.doMock('react-native', () => ({
-        Platform: { OS: 'android' },
-      }));
-
-      const config = require('../config') as typeof import('../config');
-
-      expect(config.resolveAuthBaseUrlForPhone('13312341234')).toBe(
-        config.DEV_API_BASE_URL,
-      );
+  test('uses production API as the release built-in base URL', () => {
+    Object.defineProperty(testGlobal, '__DEV__', {
+      value: false,
+      configurable: true,
     });
+
+    expect(config.getBaseUrl()).toBe(config.PROD_BASE_URL);
   });
 
-  test('uses the debug base URL override before review server routing in dev', async () => {
-    await setDebugBaseUrlOverride('http://192.168.1.42:8080');
+  test('uses and persists the debug base URL override in dev builds', async () => {
+    await config.setDebugBaseUrlOverride('http://192.168.1.42:8080');
 
-    expect(resolveAuthBaseUrlForPhone(APP_REVIEW_PHONE)).toBe(
-      'http://192.168.1.42:8080',
-    );
-    expect(resolveAuthBaseUrlForEmail(APP_REVIEW_EMAIL)).toBe(
-      'http://192.168.1.42:8080',
-    );
-  });
-
-  test('persists the authenticated session base URL for later API calls', async () => {
-    await setSessionBaseUrl(REVIEW_API_BASE_URL);
-
-    expect(getSessionBaseUrl()).toBe(REVIEW_API_BASE_URL);
-    expect(getBaseUrl()).toBe(REVIEW_API_BASE_URL);
+    expect(config.getDebugBaseUrlOverride()).toBe('http://192.168.1.42:8080');
+    expect(config.getBaseUrl()).toBe('http://192.168.1.42:8080');
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-      '@vividrop/auth/api_base_url',
-      REVIEW_API_BASE_URL,
+      '@vividrop/debug/api_base_url',
+      'http://192.168.1.42:8080',
     );
   });
 
-  test('loads and clears the authenticated session base URL', async () => {
+  test('loads persisted debug base URL override in dev builds', async () => {
     (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(
-      REVIEW_API_BASE_URL,
+      'http://192.168.1.42:8080',
     );
 
-    await loadSessionBaseUrl();
+    await config.loadDebugBaseUrlOverride();
 
-    expect(getSessionBaseUrl()).toBe(REVIEW_API_BASE_URL);
-
-    await clearSessionBaseUrl();
-
-    expect(getSessionBaseUrl()).toBeNull();
-    expect(AsyncStorage.removeItem).toHaveBeenCalledWith(
-      '@vividrop/auth/api_base_url',
-    );
+    expect(config.getBaseUrl()).toBe('http://192.168.1.42:8080');
   });
 
-  test('ignores stale production session URL when using the review API server', async () => {
-    (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(
-      'https://api.vividrop.cn',
-    );
-
-    await loadSessionBaseUrl();
-
-    expect(getSessionBaseUrl()).toBeNull();
-    expect(AsyncStorage.removeItem).toHaveBeenCalledWith(
-      '@vividrop/auth/api_base_url',
-    );
+  test('does not expose official auth routing or session-base helpers', () => {
+    expect(config).not.toHaveProperty('APP_REVIEW_EMAIL');
+    expect(config).not.toHaveProperty('resolveAuthBaseUrlForEmail');
+    expect(config).not.toHaveProperty('loadSessionBaseUrl');
+    expect(config).not.toHaveProperty('setSessionBaseUrl');
+    expect(config).not.toHaveProperty('clearSessionBaseUrl');
+    expect(config).not.toHaveProperty('getSessionBaseUrl');
   });
 
-  test('does not block the active session when session URL persistence fails', async () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    (AsyncStorage.setItem as jest.Mock).mockRejectedValueOnce(
-      new Error('storage unavailable'),
+  test('rejects invalid debug base URL overrides', async () => {
+    await expect(
+      config.setDebugBaseUrlOverride('192.168.1.42:8080'),
+    ).rejects.toThrow(
+      'debug base URL must start with http:// or https://',
     );
-
-    await expect(setSessionBaseUrl(REVIEW_API_BASE_URL)).resolves.toBe(
-      undefined,
-    );
-    expect(getSessionBaseUrl()).toBe(REVIEW_API_BASE_URL);
-    expect(getBaseUrl()).toBe(REVIEW_API_BASE_URL);
-    expect(warnSpy).toHaveBeenCalledWith(
-      '[config] failed to persist session API base URL',
-      expect.any(Error),
-    );
-    warnSpy.mockRestore();
   });
 });

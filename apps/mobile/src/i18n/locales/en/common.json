@@ -31,9 +31,5 @@
     "home": "Home",
     "files": "Files",
     "settings": "Me"
-  },
-  "logoutError": {
-    "title": "Logout Failed",
-    "message": "Failed to fully clear local data. Please try again. If this keeps happening, restart the app."
   }
 }

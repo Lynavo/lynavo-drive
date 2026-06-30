@@ -5,9 +5,8 @@
   "sections": {
     "connectedDevice": "已連接設備",
     "supportHelp": "支援與幫助",
-    "giftCard": "禮品卡",
-    "account": "我的帳號",
     "myDevice": "我的設備",
+    "device": "本機設備",
     "computers": "電腦設備",
     "general": "通用"
   },
@@ -21,17 +20,6 @@
     "offline": "離線",
     "notConnected": "未連接"
   },
-  "subscription": {
-    "subscribed": "訂閱服務",
-    "trial": "試用服務",
-    "trialDays": "{{days}} 天",
-    "freeTrial": "免費試用",
-    "introTrial": "月訂閱免費期",
-    "expired": "已到期",
-    "active": "有效",
-    "subscribeCta": "立即訂閱",
-    "restoreDesc": "從應用商店檢查歷史購買記錄"
-  },
   "myDevice": {
     "label": "我的設備名稱",
     "hint": "此名稱將在 PC 端顯示",
@@ -43,17 +31,12 @@
     "openSettings": "開啟系統設定"
   },
   "rows": {
-    "currentAccount": "當前帳號",
     "latestSync": "最近同步",
     "appVersion": "應用版本",
     "language": "語言",
     "faq": "常見問題",
     "faqDesc": "操作說明與常見問題",
     "diagnosticsDesc": "上傳日誌和設備狀態以方便排查問題"
-  },
-  "phone": {
-    "reveal": "顯示完整手機號",
-    "hide": "隱藏手機號"
   },
   "language": {
     "system": "跟隨系統",
@@ -87,48 +70,12 @@
       "toast": "已取消上傳"
     }
   },
-  "giftCard": {
-    "action": "禮品卡兌換",
-    "desc": "輸入禮品碼以解鎖 7 天試用",
-    "monthlyPlan": "月訂閱",
-    "yearlyPlan": "年訂閱",
-    "modal": {
-      "title": "禮品卡兌換",
-      "message": "輸入禮品卡代碼以啟用或延長訂閱。",
-      "placeholder": "輸入禮品卡代碼",
-      "cancel": "取消",
-      "submit": "兌換"
-    },
-    "empty": {
-      "title": "請輸入禮品卡代碼",
-      "body": "請確認代碼後再兌換。"
-    },
-    "success": {
-      "title": "兌換成功",
-      "body": "已為你套用 {{plan}}。"
-    },
-    "failure": {
-      "title": "兌換失敗",
-      "body": "禮品卡兌換失敗，請稍後再試。",
-      "invalidCode": "禮品卡代碼無效，請確認後再兌換。",
-      "expired": "此禮品卡已過期。",
-      "notAvailable": "此禮品卡已停用或已兌換完畢。",
-      "alreadyRedeemed": "此帳號已兌換過此禮品卡。",
-      "planMismatch": "此禮品卡方案無法套用到目前帳號。",
-      "invalidOperation": "禮品卡兌換資料不正確，請確認後再試。",
-      "activeSubscription": "目前已有訂閱會員，無法使用禮品卡。",
-      "network": "網路連線異常，請檢查後再試。"
-    }
-  },
   "actions": {
     "exportDiagnostics": "匯出診斷包",
     "exportingDiagnostics": "正在匯出診斷包…",
     "help": "幫助",
     "resetSyncStatus": "重置同步狀態",
-    "logout": "登出",
     "switch": "切換",
-    "deleteAccount": "注銷帳號",
-    "deletingAccount": "注銷中…",
     "forgetDesktop": "遺忘此電腦",
     "switchDevice": "切換設備",
     "switchDeviceDesc": "將斷開當前設備並重新連接其他電腦"
@@ -159,11 +106,6 @@
       "body": "確定要遺忘並中斷與電腦「{{name}}」的連接嗎？這將會清除本地的連接紀錄與綁定狀態。",
       "confirm": "確定遺忘"
     },
-    "logout": {
-      "title": "登出",
-      "body": "確定要登出嗎？",
-      "confirm": "確定退出"
-    },
     "exportUnavailable": {
       "title": "無法導出",
       "body": "目前版本暫不支援匯出診斷包"
@@ -175,48 +117,15 @@
     "languageSaveFailed": {
       "title": "無法切換語言",
       "body": "語言設定保存失敗，請稍後再試。"
-    },
-    "deleteAccount": {
-      "title": "刪除帳號",
-      "body": "此動作將永久刪除你的帳號、所有登入方式與使用紀錄。此動作無法復原。",
-      "continue": "繼續",
-      "confirmAgainTitle": "確定刪除帳號？",
-      "confirmAgainBody": "這是最後一次確認。刪除後資料無法救回。",
-      "confirmAgainButton": "確定刪除"
     }
-  },
-  "remoteWake": {
-    "title": "遠端喚醒 (Remote Wake)",
-    "lanStatus": "區域網路喚醒狀態",
-    "lanStatusCached": "已快取區域網路喚醒目標",
-    "lanStatusNotCached": "未快取區域網路喚醒目標，請在區域網路連接一次以快取",
-    "autoReadyTitle": "已自動取得電腦喚醒資訊",
-    "autoReadyBody": "外網喚醒仍需要路由器 Wake-on-WAN 或 UDP 轉發。Vivi Drop 會自動套用目前公網出口與建議連接埠，若路由器設定不同可在下方調整。",
-    "autoMissingTitle": "尚未取得電腦喚醒資訊",
-    "autoMissingBody": "請讓手機與電腦在同一個 Wi-Fi 下成功連線一次，Vivi Drop 會自動快取 MAC、broadcast 與建議連接埠。",
-    "enableHint": "啟用後，從外部網路打開「我的電腦」時會先嘗試遠端喚醒。若路由器未設定，仍可能無法喚醒。",
-    "advancedTitle": "手動進階設定",
-    "wowEnable": "啟用 Wake-on-WAN 遠端喚醒",
-    "wowHostLabel": "公網主機名 / IP",
-    "wowHostPlaceholder": "例如 DDNS 域名或公網 IP",
-    "wowPortLabel": "連接埠",
-    "wowSave": "儲存遠端喚醒設定",
-    "wowSaving": "儲存中...",
-    "wowSaveSuccess": "遠端喚醒設定儲存成功",
-    "invalidHost": "請輸入有效的公網主機名或 IP 地址",
-    "invalidPort": "請輸入有效的連接埠 (1-65535)"
   },
   "global": {
     "my": "我的",
-    "mySubtitle": "帳號、設備和應用偏好。",
-    "memberStatus": "會員狀態",
-    "restorePurchase": "恢復購買",
-    "restorePurchaseRow": "恢復已購買訂閱",
+    "mySubtitle": "設備和應用偏好。",
     "deviceName": "設備名稱",
     "editDeviceName": "編輯設備名稱",
     "appVersionShort": "版本",
     "update": "更新",
-    "logout": "退出登入",
     "back": "返回",
     "languageTitle": "語言",
     "systemLanguage": "跟隨系統語言",
@@ -228,25 +137,7 @@
     "cancel": "取消",
     "errorDeviceNameEmpty": "請輸入設備名稱",
     "errorDeviceNameSave": "儲存失敗，請稍後重試",
-    "logoutTitle": "退出登入",
-    "logoutDesc": "確定要退出目前帳號嗎？",
-    "logoutConfirm": "退出登入",
-    "loggingOut": "登出中…",
-    "errorLogout": "登出失敗，請稍後重試。",
-    "restorePurchaseTitle": "恢復已購買訂閱",
-    "restorePurchaseDesc": "正在從應用商店檢查目前帳號的历史購買記錄。",
-    "restoring": "恢復中…",
     "gotIt": "知道了",
-    "restoreSuccess": "已恢復訂閱並重新整理會員狀態。",
-    "restoreNotFound": "未找到可恢復的訂閱，已重新整理會員狀態。",
-    "restoreNotSupported": "目前平台暫不支援恢復購買，已重新整理會員狀態。",
-    "restoreCancelled": "已取消恢復購買。",
-    "restoreFailed": "恢復購買失敗，請稍後重試。",
-    "deleteAccountTitle": "註銷帳號",
-    "deleteAccountDesc": "確定要註銷目前帳號嗎？此操作不可撤銷。",
-    "deleteAccount": "註銷",
-    "deleting": "註銷中…",
-    "errorDeleteAccount": "註銷帳號失敗，請稍後重試。",
     "uploadDiagnosticsTitle": "上傳診斷包",
     "uploadDiagnosticsDesc": "請簡要描述您遇到的問題，方便我們快速定位。",
     "diagnosticsPlaceholder": "例如：傳輸到一半會自動中斷",
@@ -256,20 +147,6 @@
     "uploadSuccessMsg": "診斷包已上傳，感謝您的回饋！",
     "uploadFailureTitle": "上傳失敗",
     "uploadFailureMsg": "上傳診斷包時發生錯誤，請檢查網路連線後重試。",
-    "notLoggedIn": "未登入",
-    "yearlyPlan": "年度方案",
-    "monthlyPlan": "月度方案",
-    "trialRemaining": "試用中 · 剩餘 {{days}} 天",
-    "trialing": "試用中",
-    "subscribedWithPlan": "已訂閱 · {{plan}}",
-    "subscribed": "已訂閱",
-    "subscribedGiftCard": "已訂閱 · 禮品卡",
-    "subscribedGiftCardExpiry": "已訂閱 · 禮品卡權益至 {{date}}",
-    "subscribedGiftCardEntitlement": "已訂閱 · 禮品卡權益",
-    "subscriptionCancelledExpiry": "已取消續訂 · 可用至 {{date}}",
-    "subscriptionCancelled": "已取消續訂",
-    "trialExpired": "試用已結束",
-    "subscriptionExpired": "訂閱已過期",
     "statusUnknown": "狀態未知",
     "connected": "已連接",
     "connecting": "連接中",

@@ -3,5 +3,5 @@ packages:
   - 'packages/*'
 allowBuilds:
   electron: true
-patchedDependencies:
-  react-native-iap@12.16.4: patches/react-native-iap@12.16.4.patch
+  electron-winstaller: true
+  esbuild: true

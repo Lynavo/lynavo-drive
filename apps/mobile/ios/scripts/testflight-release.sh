@@ -6,58 +6,28 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 IOS_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd -- "${IOS_DIR}/../../.." && pwd)"
 MODE="${1:-archive-upload}"
-MARKET="${2:-}"
-
-# Auto-detect market if not explicitly provided as an argument
-if [[ -z "${MARKET}" ]]; then
-  if [[ "${SCHEME:-}" == "SyncFlowMobileGlobal" ]]; then
-    MARKET="global"
-  else
-    MARKET="cn"
-  fi
+if [[ $# -gt 1 ]]; then
+  echo "Ignoring deprecated iOS profile argument: $2" >&2
 fi
 
 WORKSPACE="${IOS_DIR}/SyncFlowMobile.xcworkspace"
-
-# Set default settings based on market
-if [[ "${MARKET}" == "global" ]]; then
-  SCHEME="${SCHEME:-SyncFlowMobileGlobal}"
-  CONFIGURATION="${CONFIGURATION:-ReleaseGlobal}"
-  APPLE_API_KEY_ID="${APPLE_API_KEY_ID:-AMY9XVV3LD}"
-  APPLE_API_ISSUER="${APPLE_API_ISSUER:-8de17ec0-4bff-4ab2-8c01-ace1f9307147}"
-else
-  SCHEME="${SCHEME:-SyncFlowMobile}"
-  CONFIGURATION="${CONFIGURATION:-Release}"
-  APPLE_API_KEY_ID="${APPLE_API_KEY_ID:-HY8CAHGPW9}"
-  APPLE_API_ISSUER="${APPLE_API_ISSUER:-54cad458-4184-4fc6-a1c7-cb4b0c6ded0e}"
-fi
-
-if [[ -z "${EXPORT_OPTIONS:-}" ]]; then
-  if [[ "${SCHEME}" == "SyncFlowMobileGlobal" ]]; then
-    EXPORT_OPTIONS="${IOS_DIR}/ExportOptions-TestFlightGlobal.plist"
-  else
-    EXPORT_OPTIONS="${IOS_DIR}/ExportOptions-TestFlight.plist"
-  fi
-fi
+SCHEME="${SCHEME:-SyncFlowMobile}"
+CONFIGURATION="${CONFIGURATION:-Release}"
+APPLE_API_KEY_ID="${APPLE_API_KEY_ID:-AMY9XVV3LD}"
+APPLE_API_ISSUER="${APPLE_API_ISSUER:-8de17ec0-4bff-4ab2-8c01-ace1f9307147}"
+EXPORT_OPTIONS="${EXPORT_OPTIONS:-${IOS_DIR}/ExportOptions-TestFlight.plist}"
 ARCHIVES_DIR="${IOS_DIR}/build/archives"
 EXPORT_DIR="/tmp/syncflow-export"
 IOS_EXPORT_SIGNING_CERTIFICATE="${IOS_EXPORT_SIGNING_CERTIFICATE:-Apple Distribution}"
 
 # Resolve App Store Connect API Key path
 if [[ -z "${APPLE_API_KEY:-}" ]]; then
-  if [[ -f "${REPO_ROOT}/AuthKey_${APPLE_API_KEY_ID}.p8" ]]; then
-    APPLE_API_KEY="${REPO_ROOT}/AuthKey_${APPLE_API_KEY_ID}.p8"
-  elif [[ -f "${REPO_ROOT}/AuthKey_China_${APPLE_API_KEY_ID}.p8" ]]; then
-    APPLE_API_KEY="${REPO_ROOT}/AuthKey_China_${APPLE_API_KEY_ID}.p8"
-  elif [[ -f "${REPO_ROOT}/AuthKey_Global_${APPLE_API_KEY_ID}.p8" ]]; then
-    APPLE_API_KEY="${REPO_ROOT}/AuthKey_Global_${APPLE_API_KEY_ID}.p8"
-  else
-    APPLE_API_KEY="${REPO_ROOT}/AuthKey_${APPLE_API_KEY_ID}.p8"
-  fi
+  APPLE_API_KEY="${REPO_ROOT}/AuthKey_${APPLE_API_KEY_ID}.p8"
 fi
 
 PROJECT_FILE="${IOS_DIR}/SyncFlowMobile.xcodeproj/project.pbxproj"
-MOBILE_CONFIG_FILE="${MOBILE_CONFIG_FILE:-${REPO_ROOT}/apps/mobile/src/services/config.ts}"
+MOBILE_CONFIG_FILE="${MOBILE_CONFIG_FILE:-${REPO_ROOT}/apps/mobile/src/config/app-config.ts}"
+CONTRACTS_ENDPOINTS_FILE="${CONTRACTS_ENDPOINTS_FILE:-${REPO_ROOT}/packages/contracts/src/service-endpoints.ts}"
 MARKETING_VERSION="$(sed -n 's/.*MARKETING_VERSION = \([^;]*\);/\1/p' "${PROJECT_FILE}" | head -n 1 | tr -d '[:space:]')"
 BUILD_NUMBER="$(sed -n 's/.*CURRENT_PROJECT_VERSION = \([^;]*\);/\1/p' "${PROJECT_FILE}" | head -n 1 | tr -d '[:space:]')"
 
@@ -68,7 +38,7 @@ ARCHIVE_PATH="${ARCHIVES_DIR}/SyncFlow-${MARKETING_VERSION}-b${BUILD_NUMBER}.xca
 usage() {
   cat <<EOF
 Usage:
-  ${IOS_DIR}/scripts/testflight-release.sh [mode] [cn|global]
+  ${IOS_DIR}/scripts/testflight-release.sh [mode]
 
 Modes:
   archive         Build a Release xcarchive (auto-increments build number)
@@ -77,15 +47,10 @@ Modes:
   check-review-phone
                   Verify mobile APP_REVIEW_PHONE/APP_REVIEW_EMAIL matches SERVER_ENV_FILE
 
-Markets:
-  cn              China market (default)
-  global          Global market
-
 Note: If archive or upload fails, the build number will be rolled back automatically.
 Set SERVER_ENV_FILE=/path/to/server/.env.prod before TestFlight packaging.
 
 Defaults:
-  MARKET=${MARKET}
   SCHEME=${SCHEME}
   CONFIGURATION=${CONFIGURATION}
   BUILD_NUMBER=${BUILD_NUMBER}
@@ -147,21 +112,26 @@ extract_mobile_review_phone() {
   local config_file="$1"
   local raw_val
   raw_val="$(sed -n "s/^[[:space:]]*export const APP_REVIEW_PHONE[[:space:]]*=[[:space:]]*['\"]\\([^'\"]*\\)['\"].*/\\1/p" "${config_file}" | head -n 1)"
-  
+
   if [[ -z "${raw_val}" ]]; then
-    # Fallback to parsing from markets config based on SCHEME
-    local market_dir
-    market_dir="$(dirname "${config_file}")/../markets"
-    local market_config
-    if [[ "${SCHEME}" == "SyncFlowMobileGlobal" ]]; then
-      market_config="${market_dir}/global/config.ts"
-    else
-      market_config="${market_dir}/cn/config.ts"
-    fi
-    if [[ -f "${market_config}" ]]; then
-      raw_val="$(sed -n "s/^[[:space:]]*appReviewPhone[[:space:]]*:[[:space:]]*['\"]\\([^'\"]*\\)['\"].*/\\1/p" "${market_config}" | head -n 1)"
+    raw_val="$(sed -n "s/^[[:space:]]*phone[[:space:]]*:[[:space:]]*['\"]\\([^'\"]*\\)['\"].*/\\1/p" "${config_file}" | head -n 1)"
+  fi
+  echo "${raw_val}"
+}
+
+extract_contract_review_email() {
+  local endpoints_file="$1"
+  local raw_val
+  raw_val="$(sed -n "s/^[[:space:]]*export const LYNAVO_REVIEW_EMAIL[[:space:]]*=[[:space:]]*['\"]\\([^'\"]*\\)['\"].*/\\1/p" "${endpoints_file}" | head -n 1)"
+
+  if [[ -z "${raw_val}" ]]; then
+    local root_domain
+    root_domain="$(sed -n "s/^[[:space:]]*export const LYNAVO_ROOT_DOMAIN[[:space:]]*=[[:space:]]*['\"]\\([^'\"]*\\)['\"].*/\\1/p" "${endpoints_file}" | head -n 1)"
+    if [[ -n "${root_domain}" ]]; then
+      raw_val="review@${root_domain}"
     fi
   fi
+
   echo "${raw_val}"
 }
 
@@ -190,18 +160,12 @@ extract_mobile_review_email() {
   local config_file="$1"
   local raw_val
   raw_val="$(sed -n "s/^[[:space:]]*export const APP_REVIEW_EMAIL[[:space:]]*=[[:space:]]*['\"]\\([^'\"]*\\)['\"].*/\\1/p" "${config_file}" | head -n 1)"
-  
+
   if [[ -z "${raw_val}" ]]; then
-    # Fallback to parsing from markets config based on SCHEME
-    local market_dir
-    market_dir="$(dirname "${config_file}")/../markets"
-    local market_config
-    if [[ "${SCHEME}" == "SyncFlowMobileGlobal" ]]; then
-      market_config="${market_dir}/global/config.ts"
-    fi
-    if [[ -f "${market_config}" ]]; then
-      raw_val="$(sed -n "s/^[[:space:]]*appReviewEmail[[:space:]]*:[[:space:]]*['\"]\\([^'\"]*\\)['\"].*/\\1/p" "${market_config}" | head -n 1)"
-    fi
+    raw_val="$(sed -n "s/^[[:space:]]*email[[:space:]]*:[[:space:]]*['\"]\\([^'\"]*\\)['\"].*/\\1/p" "${config_file}" | head -n 1)"
+  fi
+  if [[ -z "${raw_val}" && -f "${CONTRACTS_ENDPOINTS_FILE}" ]] && grep -Eq 'LYNAVO_ENDPOINTS\.reviewEmail|LYNAVO_REVIEW_EMAIL' "${config_file}"; then
+    raw_val="$(extract_contract_review_email "${CONTRACTS_ENDPOINTS_FILE}")"
   fi
   echo "${raw_val}"
 }

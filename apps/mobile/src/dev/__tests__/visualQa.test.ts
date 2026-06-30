@@ -170,9 +170,6 @@ describe('visual QA dev bootstrap', () => {
     process.env.SYNCFLOW_VISUAL_QA_ROUTE = 'Login';
     expect(resolveVisualQaInitialRoute()).toBeNull();
 
-    process.env.SYNCFLOW_VISUAL_QA_ROUTE = 'SmsVerify';
-    expect(resolveVisualQaInitialRoute()).toBeNull();
-
     process.env.SYNCFLOW_VISUAL_QA_ROUTE = 'NotARoute';
     expect(resolveVisualQaInitialRoute()).toBeNull();
   });

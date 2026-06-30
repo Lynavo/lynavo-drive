@@ -27,61 +27,15 @@ jest.mock('react-native-keychain', () => ({
   },
 }));
 
-jest.mock('../bootstrapAuthedSession', () =>
-  jest.requireActual('../bootstrapAuthedSession'),
-);
-
-jest.mock('../../constants/features', () => ({
-  FEATURES: {
-    SUBSCRIPTION_ENFORCEMENT: false,
-    IAP_ENABLED: false,
-    IAP_RESTORE_ENABLED: false,
-  },
-}));
-
-jest.mock('../../hooks/useIapLifecycle', () => ({
-  useIapLifecycle: jest.fn(),
-}));
-
 jest.mock('../../services/auth-service', () => ({
   registerAuthStoreActions: jest.fn(),
-  getUserProfile: jest.fn().mockResolvedValue({
-    id: 7,
-    primaryIdentity: { type: 'email', display: 'qa@example.com' },
-    identities: [{ type: 'email', display: 'qa@example.com' }],
-    status: 'subscribed',
-    plan: 'monthly',
-    expireAt: '2030-01-01T00:00:00.000Z',
-    trialEnd: null,
-  }),
-}));
-
-jest.mock('../../services/subscription-service', () => ({
-  getSubscriptionStatus: jest.fn().mockResolvedValue({
-    status: 'subscribed',
-    plan: 'monthly',
-    expireAt: '2030-01-01T00:00:00.000Z',
-    trialEnd: null,
-  }),
 }));
 
 jest.mock('../../services/SyncEngineModule', () => ({
-  getOwnerUserId: jest.fn().mockResolvedValue('7'),
-  setOwnerUserId: jest.fn().mockResolvedValue(undefined),
-  wipeSyncIdentity: jest.fn().mockResolvedValue(undefined),
   setTunnelCredentials: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('../../services/sidecar-reset-service', () => ({
-  resetCurrentDesktopSidecarIfReachable: jest.fn().mockResolvedValue(undefined),
-}));
-
-jest.mock('../../utils/clearUserScopedStorage', () => ({
-  clearUserScopedStorage: jest.fn().mockResolvedValue(undefined),
-}));
-
 import { AuthProvider, useAuth } from '../auth-store';
-import { getUserProfile } from '../../services/auth-service';
 
 function AuthProbe() {
   const auth = useAuth();
@@ -139,7 +93,7 @@ describe('AuthProvider visual QA bootstrap', () => {
       expect(state).toEqual({
         accessToken: 'mock-sandbox-access-token:designer@example.com',
         refreshToken: 'mock-sandbox-refresh-token',
-        userId: 7,
+        userId: null,
       });
     });
     expect(Keychain.setGenericPassword).toHaveBeenCalledWith(
@@ -150,7 +104,6 @@ describe('AuthProvider visual QA bootstrap', () => {
       }),
       expect.any(Object),
     );
-    expect(getUserProfile).toHaveBeenCalledTimes(1);
   });
 
   test('hydrates dev skip-auth tokens without enabling visual QA route mocks', async () => {
@@ -176,7 +129,7 @@ describe('AuthProvider visual QA bootstrap', () => {
       expect(state).toEqual({
         accessToken: 'mock-sandbox-access-token:functional@example.com',
         refreshToken: 'mock-sandbox-refresh-token',
-        userId: 7,
+        userId: null,
       });
     });
     expect(Keychain.setGenericPassword).toHaveBeenCalledWith(
@@ -189,8 +142,9 @@ describe('AuthProvider visual QA bootstrap', () => {
     );
   });
 
-  test('does not replace existing persisted tokens', async () => {
+  test('clears stale persisted official tokens before hydrating visual QA tokens', async () => {
     process.env.SYNCFLOW_VISUAL_QA = '1';
+    process.env.SYNCFLOW_VISUAL_QA_EMAIL = 'designer@example.com';
     (Keychain.getGenericPassword as jest.Mock).mockResolvedValue({
       username: 'tokens',
       password: JSON.stringify({
@@ -213,10 +167,15 @@ describe('AuthProvider visual QA bootstrap', () => {
         refreshToken: string | null;
       };
 
-      expect(state.accessToken).toBe('persisted-access');
-      expect(state.refreshToken).toBe('persisted-refresh');
+      expect(state.accessToken).toBe(
+        'mock-sandbox-access-token:designer@example.com',
+      );
+      expect(state.refreshToken).toBe('mock-sandbox-refresh-token');
     });
-    expect(Keychain.setGenericPassword).not.toHaveBeenCalledWith(
+    expect(Keychain.resetGenericPassword).toHaveBeenCalledWith({
+      service: 'cn.vividrop.auth',
+    });
+    expect(Keychain.setGenericPassword).toHaveBeenCalledWith(
       'tokens',
       expect.stringContaining('mock-sandbox-access-token'),
       expect.any(Object),

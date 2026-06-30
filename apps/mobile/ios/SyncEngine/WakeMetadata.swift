@@ -32,17 +32,7 @@ struct WakeCapability: Codable, Equatable {
             },
             "updatedAt": updatedAt,
         ]
-        if let publicTarget = publicTarget {
-            payload["publicTarget"] = [
-                "kind": publicTarget.kind,
-                "host": publicTarget.host,
-                "port": publicTarget.port,
-                "enabled": publicTarget.enabled,
-                "updatedAt": publicTarget.updatedAt,
-            ]
-        } else {
-            payload["publicTarget"] = NSNull()
-        }
+        payload["publicTarget"] = NSNull()
         return payload
     }
 
@@ -72,35 +62,29 @@ struct WakeCapability: Codable, Equatable {
             )
         }
 
-        var publicTarget: PublicWakeTarget? = nil
-        if let publicRaw = object["publicTarget"] as? [String: Any] {
-            let kind = (publicRaw["kind"] as? String) ?? "router_wan_udp"
-            let host = (publicRaw["host"] as? String) ?? ""
-            let port = (publicRaw["port"] as? Int) ?? (publicRaw["port"] as? NSNumber)?.intValue ?? 0
-            let enabled = (publicRaw["enabled"] as? Bool) ?? false
-            let pUpdatedAt = (publicRaw["updatedAt"] as? String) ?? ""
-            publicTarget = PublicWakeTarget(kind: kind, host: host, port: port, enabled: enabled, updatedAt: pUpdatedAt)
-        }
-
         return WakeCapability(
             supported: supported,
             targets: targets,
-            publicTarget: publicTarget,
+            publicTarget: nil,
             updatedAt: updatedAt?.isEmpty == false ? updatedAt! : ISO8601DateFormatter().string(from: Date())
         )
     }
 
     static func decodeJSONString(_ raw: String?) -> WakeCapability? {
         guard let raw,
-              let data = raw.data(using: .utf8)
+              let data = raw.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data)
         else {
             return nil
         }
-        return try? JSONDecoder().decode(WakeCapability.self, from: data)
+        return fromJSONValue(object)
     }
 
     func encodeJSONString() -> String? {
-        guard let data = try? JSONEncoder().encode(self) else {
+        let payload = toPayload()
+        guard JSONSerialization.isValidJSONObject(payload),
+              let data = try? JSONSerialization.data(withJSONObject: payload)
+        else {
             return nil
         }
         return String(data: data, encoding: .utf8)
@@ -108,12 +92,20 @@ struct WakeCapability: Codable, Equatable {
 
     static func merge(newWake: WakeCapability?, existingWake: WakeCapability?) -> WakeCapability? {
         guard let newWake else {
-            return existingWake
+            guard let existingWake else {
+                return nil
+            }
+            return WakeCapability(
+                supported: existingWake.supported,
+                targets: existingWake.targets,
+                publicTarget: nil,
+                updatedAt: existingWake.updatedAt
+            )
         }
         return WakeCapability(
             supported: newWake.supported,
             targets: newWake.targets,
-            publicTarget: existingWake?.publicTarget,
+            publicTarget: nil,
             updatedAt: newWake.updatedAt
         )
     }

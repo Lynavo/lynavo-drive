@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -17,18 +17,13 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Crown,
   HelpCircle,
   Laptop,
   Languages,
-  LogOut,
   MessageSquare,
   Monitor,
   Pencil,
-  RefreshCw,
   Smartphone,
-  Trash2,
-  User,
 } from 'lucide-react-native';
 import * as RNLocalize from 'react-native-localize';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -41,27 +36,15 @@ import { ModalBlurBackdrop } from '../components/shared/ModalBlurBackdrop';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { androidBoxShadow } from '../utils/androidShadow';
 import {
-  useAuth,
-  type SubscriptionInfo,
-  type UserProfile,
-} from '../stores/auth-store';
-import {
   exportDiagnostics,
   getAppInfo,
   getBindingState,
   getClientDisplayName,
   getClientId,
   setClientDisplayName,
-  wipeSyncIdentity,
   type AppInfo,
 } from '../services/SyncEngineModule';
 import { diagnosticUploadService } from '../services/diagnostic-upload-service';
-import {
-  deleteAccount,
-  logout as serverLogout,
-} from '../services/auth-service';
-import { resetCurrentDesktopSidecarIfReachable } from '../services/sidecar-reset-service';
-import { clearUserScopedStorage } from '../utils/clearUserScopedStorage';
 import {
   loadStoredLanguagePreference,
   resolveLanguagePreference,
@@ -70,17 +53,10 @@ import {
 } from '../i18n/language-preference';
 import i18n from '../i18n';
 import { useTranslation } from 'react-i18next';
-import { iapService } from '../services/iap-service';
-import { classifyIapError, IapErrorClass } from '../services/iap-errors';
-import { FEATURES } from '../constants/features';
-import {
-  resolveSubscriptionDisplayState,
-  type SubscriptionDisplayState,
-} from '../utils/subscriptionStatusDisplay';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'Settings'>;
 type TabKey = 'home' | 'files' | 'settings';
-type LucideNativeIcon = typeof User;
+type LucideNativeIcon = typeof Smartphone;
 
 interface SettingsGlobalScreenProps {
   showBottomTabBar?: boolean;
@@ -107,10 +83,6 @@ type LanguageMode = 'system' | 'manual';
 type LanguageId = Exclude<LanguagePreference, 'system'>;
 
 type ModalTone = 'blue' | 'purple' | 'red';
-type RestorePurchaseState = {
-  message: string;
-  tone: 'success' | 'neutral' | 'error';
-} | null;
 
 const NEUTRAL_VALUE = '--';
 
@@ -127,107 +99,6 @@ function firstNonEmptyString(...values: unknown[]): string | null {
     }
   }
   return null;
-}
-
-function describeLogError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  if (typeof error === 'string') {
-    return error;
-  }
-  return 'unknown';
-}
-
-function getAccountDisplayName(user: UserProfile | null, t: any): string {
-  return (
-    firstNonEmptyString(
-      user?.primaryIdentity?.display,
-      ...(user?.identities.map(identity => identity.display) ?? []),
-    ) ?? t('settings.global.notLoggedIn')
-  );
-}
-
-function getPlanLabel(plan: SubscriptionInfo['plan'] | UserProfile['plan'], t: any) {
-  switch (plan) {
-    case 'yearly':
-      return t('settings.global.yearlyPlan');
-    case 'monthly':
-      return t('settings.global.monthlyPlan');
-    default:
-      return null;
-  }
-}
-
-function getDateLabel(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
-    2,
-    '0',
-  )}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function getSubscriptionSubtitle(
-  display: SubscriptionDisplayState,
-  subscription: SubscriptionInfo | null,
-  user: UserProfile | null,
-  t: any,
-): string {
-  switch (display.kind) {
-    case 'account_trial':
-    case 'subscription_intro_trial':
-      return display.daysRemaining > 0
-        ? t('settings.global.trialRemaining', { days: display.daysRemaining })
-        : t('settings.global.trialing');
-    case 'subscribed': {
-      const plan = getPlanLabel(subscription?.plan ?? user?.plan ?? '', t);
-      return plan ? t('settings.global.subscribedWithPlan', { plan }) : t('settings.global.subscribed');
-    }
-    case 'gift_card_subscribed':
-      return t('settings.global.subscribedGiftCard');
-    case 'gift_card_entitlement_queued': {
-      const date = getDateLabel(display.entitlementExpireAt ?? null);
-      return date
-        ? t('settings.global.subscribedGiftCardExpiry', { date })
-        : t('settings.global.subscribedGiftCardEntitlement');
-    }
-    case 'subscribed_cancelled': {
-      const date = getDateLabel(subscription?.expireAt ?? user?.expireAt);
-      return date
-        ? t('settings.global.subscriptionCancelledExpiry', { date })
-        : t('settings.global.subscriptionCancelled');
-    }
-    case 'trial_expired':
-      return t('settings.global.trialExpired');
-    case 'sub_expired':
-      return t('settings.global.subscriptionExpired');
-    case 'unknown':
-    default:
-      return t('settings.global.statusUnknown');
-  }
-}
-
-function getSubscriptionBadge(
-  display: SubscriptionDisplayState,
-): SettingsRowProps['badge'] {
-  switch (display.kind) {
-    case 'account_trial':
-    case 'subscription_intro_trial':
-      return 'Trial';
-    case 'subscribed':
-    case 'gift_card_subscribed':
-    case 'gift_card_entitlement_queued':
-    case 'subscribed_cancelled':
-      return 'Pro';
-    case 'trial_expired':
-    case 'sub_expired':
-      return 'Expired';
-    case 'unknown':
-    default:
-      return undefined;
-  }
 }
 
 function getConnectionLabel(state: ConnectionState, t: any): string {
@@ -290,7 +161,6 @@ export function SettingsGlobalScreen({
 }: SettingsGlobalScreenProps) {
   const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp>();
-  const auth = useAuth();
   const [activeView, setActiveView] = useState<'settings' | 'language'>(
     'settings',
   );
@@ -308,20 +178,6 @@ export function SettingsGlobalScreen({
     useState<LanguagePreference>('system');
   const [languageError, setLanguageError] = useState<string | null>(null);
   const [showEditDevice, setShowEditDevice] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] =
-    useState(false);
-  const [showRestorePurchaseConfirm, setShowRestorePurchaseConfirm] =
-    useState(false);
-  const [logoutError, setLogoutError] = useState<string | null>(null);
-  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(
-    null,
-  );
-  const [restorePurchaseState, setRestorePurchaseState] =
-    useState<RestorePurchaseState>(null);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-  const [isRestoringPurchase, setIsRestoringPurchase] = useState(false);
   const [isUploadingDiagnostics, setIsUploadingDiagnostics] = useState(false);
   const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false);
   const [diagnosticsNote, setDiagnosticsNote] = useState('');
@@ -392,70 +248,8 @@ export function SettingsGlobalScreen({
     };
   }, []);
 
-  const subscriptionDisplay = useMemo(
-    () =>
-      resolveSubscriptionDisplayState({
-        subscription: auth.subscription,
-        user: auth.user,
-      }),
-    [auth.subscription, auth.user],
-  );
-
-  const accountDisplayName = getAccountDisplayName(auth.user, t);
-  const subscriptionSubtitle = getSubscriptionSubtitle(
-    subscriptionDisplay,
-    auth.subscription,
-    auth.user,
-    t,
-  );
-  const subscriptionBadge = getSubscriptionBadge(subscriptionDisplay);
   const currentDeviceName = deviceName ?? NEUTRAL_VALUE;
   const languageSubtitle = getLanguageLabel(languagePreference, t);
-
-  const handleConfirmLogout = async () => {
-    if (isLoggingOut) return;
-    setIsLoggingOut(true);
-    setLogoutError(null);
-
-    try {
-      await resetCurrentDesktopSidecarIfReachable();
-    } catch (error) {
-      console.warn('[SettingsGlobal] desktop sidecar reset failed:', error);
-    }
-
-    try {
-      await wipeSyncIdentity();
-    } catch (error) {
-      console.warn('[SettingsGlobal] wipeSyncIdentity failed:', error);
-      setLogoutError(t('settings.global.errorLogout'));
-      setIsLoggingOut(false);
-      return;
-    }
-
-    try {
-      await clearUserScopedStorage();
-    } catch (error) {
-      console.warn('[SettingsGlobal] clearUserScopedStorage failed:', error);
-    }
-
-    const refreshToken = auth.refreshToken;
-    if (refreshToken) {
-      void serverLogout(refreshToken).catch(error => {
-        console.info(
-          '[SettingsGlobal] server logout failed (already cleared locally):',
-          describeLogError(error),
-        );
-      });
-    }
-
-    auth.setSignedOutTransition('logout');
-    try {
-      auth.clearAuth();
-    } catch (error) {
-      console.warn('[SettingsGlobal] clearAuth failed:', error);
-    }
-    setShowLogoutConfirm(false);
-  };
 
   const handleOpenEditDevice = () => {
     setEditingName(deviceName ?? '');
@@ -536,94 +330,6 @@ export function SettingsGlobalScreen({
     }
   };
 
-  const handleRestorePurchase = async () => {
-    if (isRestoringPurchase) return;
-    setIsRestoringPurchase(true);
-    setRestorePurchaseState(null);
-
-    try {
-      if (FEATURES.IAP_ENABLED && FEATURES.IAP_RESTORE_ENABLED) {
-        const restored = await iapService.restore();
-        await auth.loadSubscription();
-        setRestorePurchaseState(
-          restored.length > 0
-            ? {
-                message: t('settings.global.restoreSuccess'),
-                tone: 'success',
-              }
-            : {
-                message: t('settings.global.restoreNotFound'),
-                tone: 'neutral',
-              },
-        );
-        return;
-      }
-
-      await auth.loadSubscription();
-      setRestorePurchaseState({
-        message: t('settings.global.restoreNotSupported'),
-        tone: 'neutral',
-      });
-    } catch (error) {
-      const classification = classifyIapError(error);
-      setRestorePurchaseState({
-        message:
-          classification.kind === IapErrorClass.Cancelled
-            ? t('settings.global.restoreCancelled')
-            : t('settings.global.restoreFailed'),
-        tone:
-          classification.kind === IapErrorClass.Cancelled ? 'neutral' : 'error',
-      });
-    } finally {
-      setIsRestoringPurchase(false);
-    }
-  };
-
-  const handleConfirmDeleteAccount = async () => {
-    if (isDeletingAccount) return;
-    setIsDeletingAccount(true);
-    setDeleteAccountError(null);
-
-    try {
-      await deleteAccount();
-    } catch (error) {
-      console.warn('[SettingsGlobal] deleteAccount failed:', error);
-      setDeleteAccountError(t('settings.global.errorDeleteAccount'));
-      setIsDeletingAccount(false);
-      return;
-    }
-
-    auth.setSignedOutTransition('account_deleted');
-
-    try {
-      await resetCurrentDesktopSidecarIfReachable();
-    } catch (error) {
-      console.warn('[SettingsGlobal] desktop sidecar reset failed:', error);
-    }
-
-    try {
-      await wipeSyncIdentity();
-    } catch (error) {
-      console.warn(
-        '[SettingsGlobal] wipeSyncIdentity failed after delete:',
-        error,
-      );
-    }
-
-    try {
-      await clearUserScopedStorage();
-    } catch (error) {
-      console.warn('[SettingsGlobal] clearUserScopedStorage failed:', error);
-    }
-
-    try {
-      auth.clearAuth();
-    } catch (error) {
-      console.warn('[SettingsGlobal] clearAuth failed after delete:', error);
-    }
-    setShowDeleteAccountConfirm(false);
-  };
-
   if (activeView === 'language') {
     return (
       <LanguageGlobalView
@@ -659,37 +365,7 @@ export function SettingsGlobalScreen({
             <Text style={styles.subtitle}>{t('settings.global.mySubtitle')}</Text>
           </View>
 
-          <SettingsSection title={t('settings.sections.account')}>
-            <SettingsRow
-              icon={User}
-              iconBackground="#E4F5FF"
-              iconColor="#1677D2"
-              title={accountDisplayName}
-            />
-            <SettingsRow
-              icon={Crown}
-              iconBackground="#EEEAFB"
-              iconColor="#746AA8"
-              title={t('settings.global.memberStatus')}
-              subtitle={subscriptionSubtitle}
-              badge={subscriptionBadge}
-              badgeTone="blue"
-              showChevron
-              onPress={() => navigation.navigate('Subscription')}
-            />
-            <SettingsRow
-              icon={RefreshCw}
-              iconBackground="#E4F5FF"
-              iconColor="#1677D2"
-              title={t('settings.global.restorePurchaseRow')}
-              subtitle={t('settings.subscription.restoreDesc')}
-              showChevron
-              testID="global-settings-restore-purchase"
-              onPress={() => {
-                setRestorePurchaseState(null);
-                setShowRestorePurchaseConfirm(true);
-              }}
-            />
+          <SettingsSection title={t('settings.sections.device')}>
             <SettingsRow
               icon={Smartphone}
               iconBackground="#E4F5FF"
@@ -777,35 +453,11 @@ export function SettingsGlobalScreen({
               title={t('settings.uploadDiagnostic.button')}
               subtitle={t('settings.rows.diagnosticsDesc')}
               showChevron
+              last
               onPress={() => {
                 setDiagnosticsNote('');
                 setShowDiagnosticsModal(true);
               }}
-            />
-            <SettingsRow
-              icon={LogOut}
-              iconBackground="#FFF0F0"
-              iconColor="#E24D4D"
-              title={t('settings.global.logout')}
-              danger
-              testID="global-settings-logout"
-              onPress={() => {
-                setLogoutError(null);
-                setShowLogoutConfirm(true);
-              }}
-            />
-            <SettingsRow
-              icon={Trash2}
-              iconBackground="#FFF0F0"
-              iconColor="#E24D4D"
-              title={t('settings.actions.deleteAccount')}
-              danger
-              testID="global-settings-delete-account"
-              onPress={() => {
-                setDeleteAccountError(null);
-                setShowDeleteAccountConfirm(true);
-              }}
-              last
             />
           </SettingsSection>
         </ScrollView>
@@ -856,144 +508,6 @@ export function SettingsGlobalScreen({
             >
               <Text style={styles.modalPrimaryButtonText}>
                 {isSavingDeviceName ? t('settings.global.saving') : t('settings.global.save')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </GlobalSettingsModalFrame>
-      ) : null}
-
-      {showLogoutConfirm ? (
-        <GlobalSettingsModalFrame
-          title={t('settings.global.logoutTitle')}
-          description={t('settings.global.logoutDesc')}
-          icon={LogOut}
-          tone="red"
-          onClose={() => {
-            if (!isLoggingOut) {
-              setShowLogoutConfirm(false);
-            }
-          }}
-        >
-          {logoutError ? (
-            <Text style={styles.modalErrorText}>{logoutError}</Text>
-          ) : null}
-          <View style={styles.modalSplitActions}>
-            <TouchableOpacity
-              style={styles.modalSecondaryButton}
-              accessibilityRole="button"
-              activeOpacity={0.72}
-              disabled={isLoggingOut}
-              onPress={() => setShowLogoutConfirm(false)}
-            >
-              <Text style={styles.modalSecondaryButtonText}>{t('settings.global.cancel')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              testID="global-settings-confirm-logout"
-              style={styles.modalDangerButton}
-              accessibilityRole="button"
-              activeOpacity={0.72}
-              disabled={isLoggingOut}
-              onPress={() => {
-                void handleConfirmLogout();
-              }}
-            >
-              <Text style={styles.modalDangerButtonText}>
-                {isLoggingOut ? t('settings.global.loggingOut') : t('settings.global.logoutConfirm')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </GlobalSettingsModalFrame>
-      ) : null}
-
-      {showRestorePurchaseConfirm ? (
-        <GlobalSettingsModalFrame
-          title={t('settings.global.restorePurchaseTitle')}
-          description={t('settings.global.restorePurchaseDesc')}
-          icon={RefreshCw}
-          tone="purple"
-          onClose={() => {
-            if (!isRestoringPurchase) {
-              setShowRestorePurchaseConfirm(false);
-            }
-          }}
-        >
-          {restorePurchaseState ? (
-            <Text
-              style={[
-                styles.modalResultText,
-                restorePurchaseState.tone === 'error'
-                  ? styles.modalResultError
-                  : restorePurchaseState.tone === 'success'
-                    ? styles.modalResultSuccess
-                    : styles.modalResultNeutral,
-              ]}
-            >
-              {restorePurchaseState.message}
-            </Text>
-          ) : null}
-          <TouchableOpacity
-            style={styles.modalFullPrimaryButton}
-            accessibilityRole="button"
-            activeOpacity={0.72}
-            disabled={isRestoringPurchase}
-            onPress={() => {
-              if (restorePurchaseState) {
-                setShowRestorePurchaseConfirm(false);
-                setRestorePurchaseState(null);
-                return;
-              }
-              void handleRestorePurchase();
-            }}
-          >
-            <Text style={styles.modalPrimaryButtonText}>
-              {isRestoringPurchase
-                ? t('settings.global.restoring')
-                : restorePurchaseState
-                  ? t('settings.global.gotIt')
-                  : t('settings.global.restorePurchase')}
-            </Text>
-          </TouchableOpacity>
-        </GlobalSettingsModalFrame>
-      ) : null}
-
-      {showDeleteAccountConfirm ? (
-        <GlobalSettingsModalFrame
-          title={t('settings.global.deleteAccountTitle')}
-          description={t('settings.global.deleteAccountDesc')}
-          icon={Trash2}
-          tone="red"
-          onClose={() => {
-            if (!isDeletingAccount) {
-              setShowDeleteAccountConfirm(false);
-            }
-          }}
-        >
-          {deleteAccountError ? (
-            <Text style={styles.modalErrorText}>{deleteAccountError}</Text>
-          ) : null}
-          <View style={styles.modalSplitActions}>
-            <TouchableOpacity
-              testID="global-settings-cancel-delete-account"
-              style={styles.modalSecondaryButton}
-              accessibilityRole="button"
-              activeOpacity={0.72}
-              disabled={isDeletingAccount}
-              onPress={() => setShowDeleteAccountConfirm(false)}
-            >
-              <Text style={styles.modalSecondaryButtonText}>{t('settings.global.cancel')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              testID="global-settings-confirm-delete-account"
-              style={styles.modalDangerButton}
-              accessibilityRole="button"
-              activeOpacity={0.72}
-              disabled={isDeletingAccount}
-              onPress={() => {
-                void handleConfirmDeleteAccount();
-              }}
-            >
-              <Text style={styles.modalDangerButtonText}>
-                {isDeletingAccount ? t('settings.global.deleting') : t('settings.global.deleteAccount')}
               </Text>
             </TouchableOpacity>
           </View>

@@ -103,7 +103,7 @@ type RouteStatusViewModel = {
   label: string;
   tone: RouteStatusTone;
 };
-type RemoteAccountIssue = 'desktopLoggedOut' | 'accountMismatch';
+type RemoteAccessDisabledReason = 'desktop';
 
 const SORT_OPTIONS: Array<{ id: SortKey; label: string }> = [
   { id: 'name', label: '名称' },
@@ -122,7 +122,7 @@ const REMOTE_ACCESS_REQUEST_TIMEOUT_MS = 30_000;
 const REMOTE_ACCESS_TIMEOUT_ERROR_MESSAGE = 'Remote access request timed out';
 const REMOTE_ACCESS_READY_RETRY_ATTEMPTS = 2;
 const REMOTE_ACCESS_READY_RETRY_DELAY_MS = 1_200;
-const DEFAULT_SHARE_TARGETS = ['微信', 'QQ', '企業微信', '更多'];
+const DEFAULT_SHARE_TARGETS = ['Save', 'Copy Link', 'Email', 'More'];
 const REMOTE_RESOURCE_ICON_GRADIENTS: Record<
   RemoteResourceIconType,
   RemoteResourceGradientStop[]
@@ -222,9 +222,9 @@ const MOCK_ROOT_ITEMS: RemoteResourceItem[] = [
     addedOffsetHours: 25,
   }),
   resource({
-    resourceId: 'vividrop-official',
+    resourceId: 'community-docs',
     kind: 'shared_folder',
-    displayName: 'vividrop-official',
+    displayName: 'community-docs',
     countLabel: '文件夹',
     addedOffsetHours: 30,
   }),
@@ -304,9 +304,9 @@ const MOCK_FOLDER_CONTENTS: Record<string, RemoteResourceItem[]> = {
       addedOffsetHours: 122,
     }),
   ],
-  'vividrop-official': [
+  'community-docs': [
     resource({
-      resourceId: 'official-guide',
+      resourceId: 'community-guide',
       kind: 'shared_file',
       displayName: 'brand-guide.pdf',
       fileSize: 6710886,
@@ -316,7 +316,7 @@ const MOCK_FOLDER_CONTENTS: Record<string, RemoteResourceItem[]> = {
       addedOffsetHours: 72,
     }),
     resource({
-      resourceId: 'official-release',
+      resourceId: 'community-release',
       kind: 'shared_file',
       displayName: 'release-note.docx',
       fileSize: 1258291,
@@ -435,15 +435,15 @@ function isRemoteAccessDisabledError(error: unknown) {
   );
 }
 
-function getRemoteAccountIssue(error: unknown): RemoteAccountIssue | null {
-  const normalizedMessage = getNormalizedErrorMessage(error);
-  if (normalizedMessage.includes('desktop account identity is unavailable')) {
-    return 'desktopLoggedOut';
-  }
-  if (normalizedMessage.includes('account mismatch')) {
-    return 'accountMismatch';
-  }
-  return null;
+function translateOrFallback(
+  t: (key: string) => string,
+  key: string,
+  fallback: string,
+) {
+  const value = t(key);
+  return typeof value === 'string' && value.trim().length > 0 && value !== key
+    ? value
+    : fallback;
 }
 
 function isRemoteAccessReadyRetryableError(error: unknown) {
@@ -474,7 +474,6 @@ async function withRemoteAccessReadyRetry<T>(
     } catch (error) {
       lastError = error;
       if (
-        getRemoteAccountIssue(error) ||
         isRemoteAccessDisabledError(error) ||
         isRemoteAccessTimeoutError(error) ||
         !isRemoteAccessReadyRetryableError(error) ||
@@ -608,15 +607,13 @@ function normalizeSharedFilesReachability(
   if (!deviceId || !state) return null;
 
   const route = nonEmptyString(record.route);
-  const normalizedRoute =
-    route === 'lan' || route === 'tunnel' || route === 'relay' ? route : null;
+  if (route && route !== 'lan') return null;
+  const normalizedRoute = route === 'lan' ? route : null;
 
   if (
     state !== 'unknown' &&
     state !== 'available' &&
     state !== 'unavailable' &&
-    state !== 'waking' &&
-    state !== 'wake_setup_required' &&
     state !== 'wake_unavailable'
   ) {
     return null;
@@ -693,14 +690,7 @@ function getDisplayedSharedFilesReachability(
   if (!lastSuccessful) return current;
   if (!current) return lastSuccessful;
 
-  if (
-    current.state === 'unknown' &&
-    (current.route === 'tunnel' || current.route === 'relay')
-  ) {
-    return current;
-  }
-
-  if (current.state === 'unknown' || current.state === 'waking') {
+  if (current.state === 'unknown') {
     return lastSuccessful;
   }
 
@@ -717,26 +707,7 @@ function getRouteStatusViewModel(
     if (reachability.route === 'lan') {
       return { label: t('sharedFiles.connectionStatus.lan') || '局域网', tone: 'online' };
     }
-    if (reachability.route === 'tunnel') {
-      return { label: t('sharedFiles.connectionStatus.p2p') || 'P2P', tone: 'online' };
-    }
-    if (reachability.route === 'relay') {
-      return { label: t('sharedFiles.connectionStatus.relay') || '中继服务器', tone: 'online' };
-    }
     return null;
-  }
-
-  if (reachability.state === 'unknown') {
-    if (reachability.route === 'tunnel') {
-      return { label: t('sharedFiles.connectionStatus.p2pConnecting') || 'P2P 连接中', tone: 'pending' };
-    }
-    if (reachability.route === 'relay') {
-      return { label: t('sharedFiles.connectionStatus.relayConnecting') || '中继服务器连接中', tone: 'pending' };
-    }
-  }
-
-  if (reachability.state === 'waking') {
-    return { label: t('sharedFiles.connectionStatus.waking') || '唤醒中', tone: 'pending' };
   }
 
   if (
@@ -744,10 +715,6 @@ function getRouteStatusViewModel(
     reachability.state === 'wake_unavailable'
   ) {
     return { label: t('sharedFiles.connectionStatus.unavailable') || '不可达', tone: 'offline' };
-  }
-
-  if (reachability.state === 'wake_setup_required') {
-    return { label: t('sharedFiles.connectionStatus.remoteWakeSetupRequired') || '需设置唤醒', tone: 'pending' };
   }
 
   return null;
@@ -877,9 +844,8 @@ export function RemoteAccessGlobalScreen() {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [networkDisconnected, setNetworkDisconnected] = useState(false);
-  const [remoteAccessDisabled, setRemoteAccessDisabled] = useState(false);
-  const [remoteAccountIssue, setRemoteAccountIssue] =
-    useState<RemoteAccountIssue | null>(null);
+  const [remoteAccessDisabledReason, setRemoteAccessDisabledReason] =
+    useState<RemoteAccessDisabledReason | null>(null);
   const [rootItems, setRootItems] = useState<RemoteResourceItem[]>([]);
   const [folderItemsByKey, setFolderItemsByKey] = useState<
     Record<string, RemoteResourceItem[]>
@@ -933,8 +899,7 @@ export function RemoteAccessGlobalScreen() {
 
   const loadData = useCallback(async () => {
     setNetworkDisconnected(false);
-    setRemoteAccessDisabled(false);
-    setRemoteAccountIssue(null);
+    setRemoteAccessDisabledReason(null);
     setFolderLoadError(false);
     setFolderLoading(false);
     setFolderItemsByKey({});
@@ -1012,11 +977,8 @@ export function RemoteAccessGlobalScreen() {
       } else {
         setPreviewMode(false);
         setRootItems([]);
-        const accountIssue = getRemoteAccountIssue(e);
-        if (accountIssue) {
-          setRemoteAccountIssue(accountIssue);
-        } else if (isRemoteAccessDisabledError(e)) {
-          setRemoteAccessDisabled(true);
+        if (isRemoteAccessDisabledError(e)) {
+          setRemoteAccessDisabledReason('desktop');
         } else {
           setNetworkDisconnected(true);
         }
@@ -1382,7 +1344,7 @@ export function RemoteAccessGlobalScreen() {
     t,
   });
   const routeStatus = getRouteStatusViewModel(
-    networkDisconnected || remoteAccessDisabled || remoteAccountIssue
+    networkDisconnected || remoteAccessDisabledReason
       ? null
       : getDisplayedSharedFilesReachability(
           sharedFilesReachability,
@@ -1585,13 +1547,11 @@ export function RemoteAccessGlobalScreen() {
               {t('sharedFiles.remoteAccess.loadingSubtitle') || '正在读取电脑端共享目录。'}
             </Text>
           </View>
-        ) : remoteAccountIssue ? (
-          <RemoteAccountIssueState
-            issue={remoteAccountIssue}
+        ) : remoteAccessDisabledReason ? (
+          <RemoteAccessDisabledState
+            reason={remoteAccessDisabledReason}
             onRetry={retryLoadData}
           />
-        ) : remoteAccessDisabled ? (
-          <RemoteAccessDisabledState onRetry={retryLoadData} />
         ) : networkDisconnected ? (
           <NetworkDisconnectedState onRetry={retryLoadData} />
         ) : folderLoading ? (
@@ -1716,20 +1676,33 @@ function NetworkDisconnectedState({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-function RemoteAccessDisabledState({ onRetry }: { onRetry: () => void }) {
+function RemoteAccessDisabledState({
+  reason,
+  onRetry,
+}: {
+  reason: RemoteAccessDisabledReason;
+  onRetry: () => void;
+}) {
   const { t } = useTranslation();
+  const translate = t as (key: string) => string;
   return (
     <View style={styles.centeredCard}>
       <View style={styles.disconnectedIcon}>
         <Icon name="lock-closed-outline" size={28} color="#DC2626" />
       </View>
       <Text style={styles.centeredTitle}>
-        {t('sharedFiles.remoteAccess.remoteAccessDisabledTitle') ||
-          '尚未開啟遠端存取'}
+        {translateOrFallback(
+          translate,
+          'sharedFiles.remoteAccess.remoteAccessDisabledTitle',
+          '尚未開啟遠端存取',
+        )}
       </Text>
       <Text style={styles.centeredSubtitle}>
-        {t('sharedFiles.remoteAccess.remoteAccessDisabledSubtitle') ||
-          '請到電腦端開啟「遠端存取」後，再回到手機端重新整理。'}
+        {translateOrFallback(
+          translate,
+          'sharedFiles.remoteAccess.remoteAccessDisabledSubtitle',
+          '請到電腦端開啟「遠端存取」後，再回到手機端重新整理。',
+        )}
       </Text>
       <TouchableOpacity
         style={styles.retryButton}
@@ -1738,63 +1711,11 @@ function RemoteAccessDisabledState({ onRetry }: { onRetry: () => void }) {
         onPress={onRetry}
       >
         <Text style={styles.retryButtonText}>
-          {t('sharedFiles.remoteAccess.recheckPermission') || '重新檢查'}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-function RemoteAccountIssueState({
-  issue,
-  onRetry,
-}: {
-  issue: RemoteAccountIssue;
-  onRetry: () => void;
-}) {
-  const { t } = useTranslation();
-  const titleKey =
-    issue === 'desktopLoggedOut'
-      ? 'sharedFiles.remoteAccess.desktopLoggedOutTitle'
-      : 'sharedFiles.remoteAccess.accountMismatchTitle';
-  const subtitleKey =
-    issue === 'desktopLoggedOut'
-      ? 'sharedFiles.remoteAccess.desktopLoggedOutSubtitle'
-      : 'sharedFiles.remoteAccess.accountMismatchSubtitle';
-  const fallbackTitle =
-    issue === 'desktopLoggedOut' ? '電腦端未登入' : '帳號不一致';
-  const fallbackSubtitle =
-    issue === 'desktopLoggedOut'
-      ? '請先在電腦端登入同一個帳號，並確認已開啟「遠端存取」。'
-      : '請確認手機與電腦端登入同一個帳號後，再重新檢查。';
-
-  return (
-    <View style={styles.centeredCard}>
-      <View style={styles.disconnectedIcon}>
-        <Icon
-          name={
-            issue === 'desktopLoggedOut'
-              ? 'person-circle-outline'
-              : 'people-outline'
-          }
-          size={28}
-          color="#DC2626"
-        />
-      </View>
-      <Text style={styles.centeredTitle}>
-        {t(titleKey) || fallbackTitle}
-      </Text>
-      <Text style={styles.centeredSubtitle}>
-        {t(subtitleKey) || fallbackSubtitle}
-      </Text>
-      <TouchableOpacity
-        style={styles.retryButton}
-        activeOpacity={0.75}
-        accessibilityRole="button"
-        onPress={onRetry}
-      >
-        <Text style={styles.retryButtonText}>
-          {t('sharedFiles.remoteAccess.recheckPermission') || '重新檢查'}
+          {translateOrFallback(
+            translate,
+            'sharedFiles.remoteAccess.recheckPermission',
+            '重新檢查',
+          )}
         </Text>
       </TouchableOpacity>
     </View>

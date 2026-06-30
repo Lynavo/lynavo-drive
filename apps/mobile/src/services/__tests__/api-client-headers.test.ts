@@ -1,3 +1,6 @@
+const mockGetAccessToken = jest.fn<string | null, []>();
+const mockGetRefreshToken = jest.fn<string | null, []>();
+
 jest.mock('react-native', () => ({
   NativeModules: {
     NativeSyncEngine: {
@@ -8,8 +11,13 @@ jest.mock('react-native', () => ({
 }));
 
 jest.mock('../../stores/auth-store', () => ({
-  getAccessToken: () => 'access-token',
-  getRefreshToken: () => null,
+  getAccessToken: () => mockGetAccessToken(),
+  getRefreshToken: () => mockGetRefreshToken(),
+}));
+
+jest.mock('../auth-service', () => ({
+  _setTokensFromApi: jest.fn(),
+  _clearAuthFromApi: jest.fn(),
 }));
 
 jest.mock('../auth-device-id', () => ({
@@ -21,11 +29,32 @@ jest.mock('../config', () => ({
   describeInsecureBaseUrl: () => null,
 }));
 
-import { clientInfoHeaders } from '../api';
+import { apiGet, clientInfoHeaders, ERROR_CODE } from '../api';
+
+type TestGlobal = typeof globalThis & {
+  fetch: jest.Mock;
+};
+
+const testGlobal = globalThis as TestGlobal;
+const originalFetch = testGlobal.fetch;
+
+function mockJsonResponse<T>(data: T): Response {
+  return {
+    status: 200,
+    json: jest.fn().mockResolvedValue(data),
+  } as unknown as Response;
+}
 
 describe('api client headers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetAccessToken.mockReturnValue('stale-official-access-token');
+    mockGetRefreshToken.mockReturnValue('stale-official-refresh-token');
+    testGlobal.fetch = jest.fn();
+  });
+
+  afterAll(() => {
+    testGlobal.fetch = originalFetch;
   });
 
   test('builds app version headers for API requests', async () => {
@@ -35,5 +64,64 @@ describe('api client headers', () => {
       'X-Client-Version': '1.0.0',
       'X-Client-Build': '9',
     });
+  });
+
+  test('does not attach Authorization even when stale official tokens remain in memory', async () => {
+    testGlobal.fetch.mockResolvedValueOnce(
+      mockJsonResponse({
+        code: 0,
+        message: 'ok',
+        data: { ok: true },
+      }),
+    );
+
+    await expect(apiGet('/status')).resolves.toEqual({ ok: true });
+
+    expect(testGlobal.fetch).toHaveBeenCalledTimes(1);
+    const init = testGlobal.fetch.mock.calls[0]?.[1] as RequestInit;
+    expect(init.headers).toEqual(
+      expect.objectContaining({
+        'Content-Type': 'application/json',
+        'X-Auth-Device-Id': 'device-1',
+        'X-Client-App': 'vividrop-mobile',
+        'X-Client-Platform': 'android',
+      }),
+    );
+    expect(init.headers).not.toEqual(
+      expect.objectContaining({
+        Authorization: expect.any(String),
+      }),
+    );
+  });
+
+  test('does not call auth refresh when an OSS API response reports TOKEN_INVALID', async () => {
+    testGlobal.fetch
+      .mockResolvedValueOnce(
+        mockJsonResponse({
+          code: ERROR_CODE.TOKEN_INVALID,
+          message: 'token invalid',
+          data: null,
+        }),
+      )
+      .mockResolvedValueOnce(
+        mockJsonResponse({
+          code: 0,
+          message: 'ok',
+          data: {
+            access_token: 'fresh-access-token',
+            refresh_token: 'fresh-refresh-token',
+          },
+        }),
+      );
+
+    await expect(apiGet('/profile')).rejects.toMatchObject({
+      code: ERROR_CODE.TOKEN_INVALID,
+      message: 'token invalid',
+    });
+
+    expect(testGlobal.fetch).toHaveBeenCalledTimes(1);
+    expect(testGlobal.fetch.mock.calls[0]?.[0]).toBe(
+      'https://api.test/api/v1/profile',
+    );
   });
 });

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text } from 'react-native';
-import { render, screen, waitFor } from '@testing-library/react-native';
+import { act, render, screen, waitFor } from '@testing-library/react-native';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
@@ -12,13 +12,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 jest.mock('react-native-keychain', () => ({
-  getGenericPassword: jest.fn().mockResolvedValue({
-    username: 'tokens',
-    password: JSON.stringify({
-      access: 'expired-access',
-      refresh: 'refresh-1',
-    }),
-  }),
+  getGenericPassword: jest.fn().mockResolvedValue(false),
   setGenericPassword: jest.fn().mockResolvedValue(true),
   resetGenericPassword: jest.fn().mockResolvedValue(true),
   ACCESSIBLE: {
@@ -26,40 +20,9 @@ jest.mock('react-native-keychain', () => ({
   },
 }));
 
-jest.mock('../bootstrapAuthedSession', () =>
-  jest.requireActual('../bootstrapAuthedSession'),
-);
-
-jest.mock('../../constants/features', () => ({
-  FEATURES: {
-    SUBSCRIPTION_ENFORCEMENT: false,
-    IAP_ENABLED: false,
-    IAP_RESTORE_ENABLED: false,
-  },
-}));
-
-jest.mock('../../hooks/useIapLifecycle', () => ({
-  useIapLifecycle: jest.fn(),
-}));
-
 let mockRegisteredSetTokens:
   | ((accessToken: string, refreshToken: string) => void)
   | null = null;
-const mockGetUserProfile = jest.fn(async () => {
-  await waitFor(() => {
-    expect(mockRegisteredSetTokens).not.toBeNull();
-  });
-  mockRegisteredSetTokens?.('fresh-access', 'refresh-2');
-  return {
-    id: 42,
-    primaryIdentity: { type: 'email', display: 'u@example.com' },
-    identities: [{ type: 'email', display: 'u@example.com' }],
-    status: 'subscribed',
-    plan: 'yearly',
-    expireAt: '2030-01-01T00:00:00.000Z',
-    trialEnd: null,
-  };
-});
 
 jest.mock('../../services/auth-service', () => ({
   registerAuthStoreActions: jest.fn(
@@ -70,35 +33,14 @@ jest.mock('../../services/auth-service', () => ({
       mockRegisteredSetTokens = setTokens;
     },
   ),
-  getUserProfile: mockGetUserProfile,
-}));
-
-jest.mock('../../services/subscription-service', () => ({
-  getSubscriptionStatus: jest.fn().mockResolvedValue({
-    status: 'subscribed',
-    plan: 'yearly',
-    expireAt: '2030-01-01T00:00:00.000Z',
-    trialEnd: null,
-  }),
 }));
 
 jest.mock('../../services/SyncEngineModule', () => ({
-  getOwnerUserId: jest.fn().mockResolvedValue('42'),
-  setOwnerUserId: jest.fn().mockResolvedValue(undefined),
-  wipeSyncIdentity: jest.fn().mockResolvedValue(undefined),
   setTunnelCredentials: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('../../services/sidecar-reset-service', () => ({
-  resetCurrentDesktopSidecarIfReachable: jest.fn().mockResolvedValue(undefined),
-}));
-
-jest.mock('../../utils/clearUserScopedStorage', () => ({
-  clearUserScopedStorage: jest.fn().mockResolvedValue(undefined),
-}));
-
 import { AuthProvider, useAuth } from '../auth-store';
-import { useIapLifecycle } from '../../hooks/useIapLifecycle';
+import * as Keychain from 'react-native-keychain';
 
 function AuthProbe() {
   const auth = useAuth();
@@ -113,19 +55,24 @@ function AuthProbe() {
   );
 }
 
-describe('AuthProvider bootstrap after token refresh', () => {
+describe('AuthProvider token refresh bridge', () => {
   beforeEach(() => {
     mockRegisteredSetTokens = null;
-    mockGetUserProfile.mockClear();
-    (useIapLifecycle as jest.Mock).mockClear();
   });
 
-  test('does not cancel profile bootstrap when API silently rotates tokens', async () => {
+  test('ignores official API token updates without running profile bootstrap', async () => {
     render(
       <AuthProvider>
         <AuthProbe />
       </AuthProvider>,
     );
+
+    await waitFor(() => {
+      expect(mockRegisteredSetTokens).not.toBeNull();
+    });
+    await act(async () => {
+      mockRegisteredSetTokens?.('fresh-access', 'refresh-2');
+    });
 
     await waitFor(() => {
       const state = JSON.parse(
@@ -137,19 +84,15 @@ describe('AuthProvider bootstrap after token refresh', () => {
       };
 
       expect(state).toEqual({
-        accessToken: 'fresh-access',
+        accessToken: null,
         profileLoading: false,
-        userId: 42,
+        userId: null,
       });
     });
-    expect(mockGetUserProfile).toHaveBeenCalledTimes(1);
-    expect(useIapLifecycle).toHaveBeenLastCalledWith(
-      expect.objectContaining({ isLoggedIn: true }),
+    expect(Keychain.setGenericPassword).not.toHaveBeenCalledWith(
+      'tokens',
+      expect.stringContaining('fresh-access'),
+      expect.any(Object),
     );
-    expect(
-      (useIapLifecycle as jest.Mock).mock.calls.some(
-        ([args]) => args?.isLoggedIn === false,
-      ),
-    ).toBe(true);
   });
 });

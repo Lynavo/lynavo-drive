@@ -5,9 +5,8 @@
   "sections": {
     "connectedDevice": "Connected Device",
     "supportHelp": "Support & Help",
-    "giftCard": "Gift Card",
-    "account": "My Account",
     "myDevice": "My Device",
+    "device": "Local Device",
     "computers": "Computer Devices",
     "general": "General"
   },
@@ -21,17 +20,6 @@
     "offline": "Offline",
     "notConnected": "Not connected"
   },
-  "subscription": {
-    "subscribed": "Subscription",
-    "trial": "Trial",
-    "trialDays": "{{days}} days",
-    "freeTrial": "Free trial",
-    "introTrial": "Monthly intro trial",
-    "expired": "Expired",
-    "active": "Active",
-    "subscribeCta": "Subscribe Now",
-    "restoreDesc": "Check purchase history from App Store"
-  },
   "myDevice": {
     "label": "My Device Name",
     "hint": "This name will be shown on your PC.",
@@ -43,17 +31,12 @@
     "openSettings": "Open System Settings"
   },
   "rows": {
-    "currentAccount": "Current Account",
     "latestSync": "Latest Sync",
     "appVersion": "App Version",
     "language": "Language",
     "faq": "FAQ",
     "faqDesc": "Usage instructions & FAQ",
     "diagnosticsDesc": "Send logs and device status for troubleshooting"
-  },
-  "phone": {
-    "reveal": "Show full phone number",
-    "hide": "Hide phone number"
   },
   "language": {
     "system": "System",
@@ -87,48 +70,12 @@
       "toast": "Upload cancelled"
     }
   },
-  "giftCard": {
-    "action": "Redeem gift card",
-    "desc": "Enter gift card code to unlock trial",
-    "monthlyPlan": "monthly subscription",
-    "yearlyPlan": "yearly subscription",
-    "modal": {
-      "title": "Redeem gift card",
-      "message": "Enter a gift card code to activate or extend your subscription.",
-      "placeholder": "Enter gift card code",
-      "cancel": "Cancel",
-      "submit": "Redeem"
-    },
-    "empty": {
-      "title": "Enter a gift card code",
-      "body": "Check the code before redeeming."
-    },
-    "success": {
-      "title": "Redeemed",
-      "body": "{{plan}} has been applied to your account."
-    },
-    "failure": {
-      "title": "Redeem failed",
-      "body": "Gift card redemption failed. Please try again later.",
-      "invalidCode": "This gift card code is invalid. Check it and try again.",
-      "expired": "This gift card has expired.",
-      "notAvailable": "This gift card is no longer available or has already been fully redeemed.",
-      "alreadyRedeemed": "This account has already redeemed this gift card.",
-      "planMismatch": "This gift card plan can't be applied to the current account.",
-      "invalidOperation": "The gift card redemption details are invalid. Check them and try again.",
-      "activeSubscription": "This account already has an active subscription and can't use a gift card.",
-      "network": "Network connection failed. Check your connection and try again."
-    }
-  },
   "actions": {
     "exportDiagnostics": "Export Diagnostics",
     "exportingDiagnostics": "Exporting diagnostics...",
     "help": "Help",
     "resetSyncStatus": "Reset Sync Status",
-    "logout": "Log Out",
     "switch": "Switch",
-    "deleteAccount": "Delete account",
-    "deletingAccount": "Deleting…",
     "forgetDesktop": "Forget Desktop",
     "switchDevice": "Switch Device",
     "switchDeviceDesc": "Disconnect current device and connect to another computer"
@@ -159,11 +106,6 @@
       "body": "Are you sure you want to forget and disconnect from the desktop \"{{name}}\"? This will clear local connection records and binding state.",
       "confirm": "Forget"
     },
-    "logout": {
-      "title": "Log Out",
-      "body": "Are you sure you want to log out?",
-      "confirm": "Confirm Log Out"
-    },
     "exportUnavailable": {
       "title": "Cannot Export",
       "body": "This build does not support exporting the diagnostics bundle."
@@ -175,48 +117,15 @@
     "languageSaveFailed": {
       "title": "Cannot Change Language",
       "body": "Failed to save the language setting. Please try again later."
-    },
-    "deleteAccount": {
-      "title": "Delete account",
-      "body": "This permanently deletes your account, every sign-in method, and all usage history. This cannot be undone.",
-      "continue": "Continue",
-      "confirmAgainTitle": "Delete your account?",
-      "confirmAgainBody": "This is your final confirmation. Deleted data cannot be recovered.",
-      "confirmAgainButton": "Delete account"
     }
-  },
-  "remoteWake": {
-    "title": "Remote Wake",
-    "lanStatus": "LAN Wake Status",
-    "lanStatusCached": "LAN wake targets cached",
-    "lanStatusNotCached": "No LAN wake targets cached. Connect once on same LAN to cache.",
-    "autoReadyTitle": "Desktop wake details collected automatically",
-    "autoReadyBody": "Remote wake still requires router Wake-on-WAN or UDP forwarding. Vivi Drop automatically applies the current public endpoint and suggested port; adjust them below if your router uses different forwarding.",
-    "autoMissingTitle": "Desktop wake details not collected yet",
-    "autoMissingBody": "Connect the phone and desktop once on the same Wi-Fi. Vivi Drop will cache the MAC address, broadcast address, and suggested port automatically.",
-    "enableHint": "When enabled, opening My Computer from an external network will try remote wake first. If the router is not configured, the desktop may still not wake.",
-    "advancedTitle": "Advanced manual settings",
-    "wowEnable": "Enable Wake-on-WAN",
-    "wowHostLabel": "Public Host / IP",
-    "wowHostPlaceholder": "e.g., DDNS domain or public IP",
-    "wowPortLabel": "Port",
-    "wowSave": "Save Remote Wake Setting",
-    "wowSaving": "Saving...",
-    "wowSaveSuccess": "Remote wake settings saved successfully",
-    "invalidHost": "Please enter a valid host or IP address",
-    "invalidPort": "Please enter a valid port number (1-65535)"
   },
   "global": {
     "my": "My",
-    "mySubtitle": "Accounts, devices, and preferences.",
-    "memberStatus": "Membership",
-    "restorePurchase": "Restore Purchases",
-    "restorePurchaseRow": "Restore Purchases",
+    "mySubtitle": "Devices and preferences.",
     "deviceName": "Device Name",
     "editDeviceName": "Edit device name",
     "appVersionShort": "Version",
     "update": "Update",
-    "logout": "Log Out",
     "back": "Back",
     "languageTitle": "Language",
     "systemLanguage": "Follow System Language",
@@ -228,25 +137,7 @@
     "cancel": "Cancel",
     "errorDeviceNameEmpty": "Please enter a device name",
     "errorDeviceNameSave": "Failed to save, please try again later",
-    "logoutTitle": "Log Out",
-    "logoutDesc": "Are you sure you want to log out of the current account?",
-    "logoutConfirm": "Log Out",
-    "loggingOut": "Logging out...",
-    "errorLogout": "Failed to log out, please try again later.",
-    "restorePurchaseTitle": "Restore Purchases",
-    "restorePurchaseDesc": "Checking your purchase history from the App Store.",
-    "restoring": "Restoring...",
     "gotIt": "Got It",
-    "restoreSuccess": "Subscription restored and membership status refreshed.",
-    "restoreNotFound": "No restorable subscription found; membership status refreshed.",
-    "restoreNotSupported": "Restoring purchases is not supported on this platform; membership status refreshed.",
-    "restoreCancelled": "Restore purchases cancelled.",
-    "restoreFailed": "Failed to restore purchases, please try again later.",
-    "deleteAccountTitle": "Delete Account",
-    "deleteAccountDesc": "Are you sure you want to delete your account? This action cannot be undone.",
-    "deleteAccount": "Delete",
-    "deleting": "Deleting...",
-    "errorDeleteAccount": "Failed to delete account, please try again later.",
     "uploadDiagnosticsTitle": "Upload Diagnostics",
     "uploadDiagnosticsDesc": "Please briefly describe the issue you encountered to help us troubleshoot.",
     "diagnosticsPlaceholder": "e.g., Transfer gets interrupted halfway",
@@ -256,20 +147,6 @@
     "uploadSuccessMsg": "Diagnostics bundle uploaded. Thank you for your feedback!",
     "uploadFailureTitle": "Upload Failed",
     "uploadFailureMsg": "An error occurred while uploading the diagnostics bundle. Please check your network and try again.",
-    "notLoggedIn": "Not logged in",
-    "yearlyPlan": "Yearly Plan",
-    "monthlyPlan": "Monthly Plan",
-    "trialRemaining": "Trialing · {{days}} days remaining",
-    "trialing": "Trialing",
-    "subscribedWithPlan": "Subscribed · {{plan}}",
-    "subscribed": "Subscribed",
-    "subscribedGiftCard": "Subscribed · Gift Card",
-    "subscribedGiftCardExpiry": "Subscribed · Gift card benefits until {{date}}",
-    "subscribedGiftCardEntitlement": "Subscribed · Gift Card benefits",
-    "subscriptionCancelledExpiry": "Subscription cancelled · Valid until {{date}}",
-    "subscriptionCancelled": "Subscription cancelled",
-    "trialExpired": "Trial expired",
-    "subscriptionExpired": "Subscription expired",
     "statusUnknown": "Unknown status",
     "connected": "Connected",
     "connecting": "Connecting",

@@ -7,7 +7,6 @@ import {
   listDownloadRecords,
   recordDownloadedFile,
 } from '../download-records-service';
-import { clearUserScopedStorage } from '../../utils/clearUserScopedStorage';
 import { recordDiagnosticsLog } from '../diagnostics-log-service';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -213,20 +212,6 @@ describe('download-records-service', () => {
     expect(mockedAsyncStorage.removeItem).toHaveBeenCalledWith(
       DOWNLOAD_RECORDS_STORAGE_KEY,
     );
-  });
-
-  it('clears download records during user-scoped cleanup', async () => {
-    mockedAsyncStorage.getAllKeys.mockResolvedValueOnce([
-      'unrelated-key',
-      DOWNLOAD_RECORDS_STORAGE_KEY,
-    ]);
-
-    await clearUserScopedStorage();
-
-    expect(mockedAsyncStorage.multiRemove).toHaveBeenCalledWith([
-      DOWNLOAD_RECORDS_STORAGE_KEY,
-    ]);
-    expect(mockedAsyncStorage.removeItem).not.toHaveBeenCalled();
   });
 
   it('strips signed URLs from personal-dir records before persistence', async () => {

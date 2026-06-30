@@ -298,7 +298,7 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     expect(screen.queryByText('开始使用 Vivi Drop')).toBeNull();
   });
 
-  it('hides the back button in the initial post-login connection flow', async () => {
+  it('hides the back button in the initial connection flow', async () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {

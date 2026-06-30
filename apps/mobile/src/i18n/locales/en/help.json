@@ -44,8 +44,8 @@
       "answer": "Aim the phone camera at the QR code shown on the PC. If scanning fails, connect by manually entering the 6-digit pairing code."
     },
     "item4": {
-      "title": "How long is the trial, and how do I renew?",
-      "answer": "New users get a 7-day free trial after registration. After it ends, a subscription is required to continue using Vivi Drop. Go to Settings → Membership to view subscription status or purchase."
+      "title": "Does the open-source edition require a subscription?",
+      "answer": "No. The OSS edition keeps local LAN pairing, foreground sync, and shared-folder browsing available without an official account."
     },
     "item5": {
       "title": "What if the shared folder is empty?",

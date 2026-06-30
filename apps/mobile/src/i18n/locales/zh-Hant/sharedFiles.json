@@ -33,6 +33,8 @@
   "remoteAccess": {
     "title": "遠端訪問電腦",
     "desc": "瀏覽電腦端共享的目錄結構並下載檔案",
+    "ossDesc": "透過本地局域網瀏覽已配對電腦的檔案，無需訂閱或遠端隧道。",
+    "ossBadge": "局域網",
     "badgeDesktop": "桌面目錄",
     "badgeView": "列表/網格",
     "select": "選擇",
@@ -59,12 +61,8 @@
     "networkDisconnectedTitle": "網路斷開",
     "networkDisconnectedSubtitle": "目前路徑將保留，恢復網路或電腦端在線後可繼續存取。",
     "retryConnection": "重試連線",
-    "remoteAccessDisabledTitle": "尚未開啟遠端存取",
-    "remoteAccessDisabledSubtitle": "請到電腦端開啟「遠端存取」後，再回到手機端重新整理。",
-    "desktopLoggedOutTitle": "電腦端未登入",
-    "desktopLoggedOutSubtitle": "請先在電腦端登入同一個帳號，並確認已開啟「遠端存取」。",
-    "accountMismatchTitle": "帳號不一致",
-    "accountMismatchSubtitle": "請確認手機與電腦端登入同一個帳號後，再重新檢查。",
+    "remoteAccessDisabledTitle": "局域網共享不可用",
+    "remoteAccessDisabledSubtitle": "請確認已配對電腦在線，並已在本地共享資料夾後重新檢查。",
     "recheckPermission": "重新檢查",
     "folderLoadErrorTitle": "目錄載入失敗",
     "folderLoadErrorSubtitle": "無法讀取此共享資料夾，請確認電腦端檔案依然存在。",
@@ -79,7 +77,7 @@
     "sortTitle": "排序方式",
     "shareTitle": "分享所選檔案",
     "shareSubtitle": "已選擇 {{count}} 個檔案",
-    "shareTargets": ["微信", "QQ", "企業微信", "更多"],
+    "shareTargets": ["儲存", "複製連結", "郵件", "更多"],
     "listView": "列表檢視",
     "gridView": "網格檢視"
   },
@@ -106,15 +104,9 @@
   },
   "connectionStatus": {
     "lan": "區域網路在線",
-    "p2p": "P2P 在線",
-    "relay": "中繼在線",
-    "waking": "正在喚醒電腦端",
     "unavailable": "電腦端不可達",
     "offline": "離線",
-    "p2pConnecting": "P2P 連線中",
-    "relayConnecting": "中繼伺服器連線中",
-    "unbound": "未綁定",
-    "remoteWakeSetupRequired": "需設定喚醒"
+    "unbound": "未綁定"
   },
   "emptyState": {
     "title": "目前沒有內容",
@@ -131,11 +123,7 @@
   },
   "personalUnauthorized": {
     "title": "個人共享目錄無法存取",
-    "message": "請確認手機與電腦端已登入相同帳號，並在電腦端完成個人共享目錄設定"
-  },
-  "remoteWakeSetupRequired": {
-    "title": "需要設定遠端喚醒",
-    "message": "目前不在電腦所在網路。若電腦已睡眠，請先到設定啟用遠端喚醒，或切回同一個 Wi-Fi。"
+    "message": "請先與這台電腦完成本地配對，並在電腦端配置個人共享目錄。"
   },
   "networkError": {
     "title": "載入失敗",

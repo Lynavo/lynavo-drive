@@ -1,7 +1,6 @@
 import {
   buildOverview,
   getSyncActivityAutoRoundDisplayMetrics,
-  getTrialUpgradeEntryDays,
   getSyncActivityDisplayProgressPercent,
   isPreparationPhase,
   resolveSyncErrorAlertMessage,
@@ -9,7 +8,6 @@ import {
   shouldKickAutoUploadSyncAfterGateRelease,
   shouldRenderSyncActivityProgress,
   shouldResetAutoUploadGateKickAttempt,
-  shouldShowSubscriptionExpiredOverlay,
   shouldTreatSyncActivityAsBetweenItems,
 } from '../SyncActivityScreen';
 import { getSyncActivityMainCardState } from '../../utils/syncActivityTransferState';
@@ -1305,30 +1303,6 @@ describe('getSyncActivityAutoRoundDisplayMetrics', () => {
   });
 });
 
-describe('shouldShowSubscriptionExpiredOverlay', () => {
-  it('shows only when subscription enforcement is active on the focused screen', () => {
-    expect(
-      shouldShowSubscriptionExpiredOverlay({
-        subscriptionEnforcement: true,
-        isFocused: true,
-        isLoggedIn: true,
-        featureAccessAllowed: false,
-      }),
-    ).toBe(true);
-  });
-
-  it('hides after navigating away from SyncActivity', () => {
-    expect(
-      shouldShowSubscriptionExpiredOverlay({
-        subscriptionEnforcement: true,
-        isFocused: false,
-        isLoggedIn: true,
-        featureAccessAllowed: false,
-      }),
-    ).toBe(false);
-  });
-});
-
 describe('shouldKickAutoUploadSyncAfterGateRelease', () => {
   it('does not start the native loop for active idle auto upload with no pending work', () => {
     expect(
@@ -1439,66 +1413,6 @@ describe('shouldResetAutoUploadGateKickAttempt', () => {
         bindingDeviceId: null,
       }),
     ).toBe(true);
-  });
-});
-
-describe('getTrialUpgradeEntryDays', () => {
-  it('returns remaining days for account trial users', () => {
-    const trialEnd = new Date(
-      Date.now() + 3 * 24 * 60 * 60 * 1000,
-    ).toISOString();
-
-    expect(
-      getTrialUpgradeEntryDays({
-        user: {
-          id: 1,
-          primaryIdentity: null,
-          identities: [],
-          status: 'trialing',
-          plan: '',
-          expireAt: null,
-          trialEnd,
-        },
-      }),
-    ).toBeGreaterThanOrEqual(2);
-  });
-
-  it('prefers subscription snapshot and hides the entry for subscribed users', () => {
-    expect(
-      getTrialUpgradeEntryDays({
-        subscription: {
-          status: 'subscribed',
-          plan: 'yearly',
-          expireAt: '2027-04-23T00:00:00.000Z',
-          trialEnd: null,
-        },
-        user: {
-          id: 1,
-          primaryIdentity: null,
-          identities: [],
-          status: 'trialing',
-          plan: '',
-          expireAt: null,
-          trialEnd: '2026-04-26T00:00:00.000Z',
-        },
-      }),
-    ).toBe(0);
-  });
-
-  it('hides the entry when the trial has expired', () => {
-    expect(
-      getTrialUpgradeEntryDays({
-        user: {
-          id: 1,
-          primaryIdentity: null,
-          identities: [],
-          status: 'trial_expired',
-          plan: '',
-          expireAt: null,
-          trialEnd: '2026-04-17T00:00:00.000Z',
-        },
-      }),
-    ).toBe(0);
   });
 });
 

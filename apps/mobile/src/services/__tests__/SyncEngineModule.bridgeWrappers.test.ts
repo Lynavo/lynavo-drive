@@ -1,5 +1,8 @@
 describe('SyncEngineModule shared bridge wrappers', () => {
-  const loadModule = (nativeSyncEngine: Record<string, unknown>) => {
+  const loadModule = (
+    nativeSyncEngine: Record<string, unknown>,
+    options: { accessToken?: string | null } = {},
+  ) => {
     jest.resetModules();
     jest.doMock('react-native', () => ({
       NativeModules: {
@@ -27,6 +30,9 @@ describe('SyncEngineModule shared bridge wrappers', () => {
         removeItem: jest.fn().mockResolvedValue(undefined),
       },
     }));
+    jest.doMock('../../stores/auth-store', () => ({
+      getAccessToken: jest.fn(() => options.accessToken ?? null),
+    }));
 
     return require('../SyncEngineModule') as typeof import('../SyncEngineModule');
   };
@@ -34,6 +40,7 @@ describe('SyncEngineModule shared bridge wrappers', () => {
   afterEach(() => {
     jest.dontMock('react-native');
     jest.dontMock('@react-native-async-storage/async-storage');
+    jest.dontMock('../../stores/auth-store');
     jest.resetModules();
     jest.clearAllMocks();
   });
@@ -300,6 +307,81 @@ describe('SyncEngineModule shared bridge wrappers', () => {
       ),
     ).resolves.toBe('/cache/notes.txt');
 
+    expect(nativeSyncEngine.prepareSharedFilePreview).toHaveBeenCalledWith(
+      'personal',
+      'Desktop/notes.txt',
+      '',
+      'notes.txt',
+    );
+  });
+
+  it('does not forward stale official access tokens for personal file operations', async () => {
+    const directoryListing = {
+      scope: 'personal',
+      path: '',
+      files: [],
+      totalCount: 0,
+    };
+    const downloadResult = {
+      savedToPhotos: false,
+      localPath: '/downloads/notes.txt',
+    };
+    const nativeSyncEngine = {
+      browseSharedFiles: jest.fn().mockResolvedValue(directoryListing),
+      downloadSharedFile: jest.fn().mockResolvedValue(downloadResult),
+      getSharedFileStreamUrl: jest
+        .fn()
+        .mockResolvedValue('http://127.0.0.1:39394/personal/stream/notes.txt'),
+      getPersonalFileThumbnailUrl: jest
+        .fn()
+        .mockResolvedValue(
+          'http://127.0.0.1:39394/personal/thumbnail/notes.txt',
+        ),
+      prepareSharedFilePreview: jest.fn().mockResolvedValue('/cache/notes.txt'),
+    };
+    const syncEngine = loadModule(nativeSyncEngine, {
+      accessToken: 'stale-official-token',
+    });
+
+    await expect(syncEngine.browseDirectory('personal')).resolves.toEqual(
+      directoryListing,
+    );
+    await expect(
+      syncEngine.downloadDirectoryFile('personal', 'Desktop/notes.txt'),
+    ).resolves.toEqual(downloadResult);
+    await expect(
+      syncEngine.getDirectoryFileStreamUrl('personal', 'Desktop/notes.txt'),
+    ).resolves.toBe('http://127.0.0.1:39394/personal/stream/notes.txt');
+    await expect(
+      syncEngine.getPersonalFileThumbnailUrl('Desktop/notes.txt'),
+    ).resolves.toBe('http://127.0.0.1:39394/personal/thumbnail/notes.txt');
+    await expect(
+      syncEngine.prepareDirectoryFilePreview(
+        'personal',
+        'Desktop/notes.txt',
+        'notes.txt',
+      ),
+    ).resolves.toBe('/cache/notes.txt');
+
+    expect(nativeSyncEngine.browseSharedFiles).toHaveBeenCalledWith(
+      'personal',
+      '',
+      '',
+    );
+    expect(nativeSyncEngine.downloadSharedFile).toHaveBeenCalledWith(
+      'personal',
+      'Desktop/notes.txt',
+      '',
+    );
+    expect(nativeSyncEngine.getSharedFileStreamUrl).toHaveBeenCalledWith(
+      'personal',
+      'Desktop/notes.txt',
+      '',
+    );
+    expect(nativeSyncEngine.getPersonalFileThumbnailUrl).toHaveBeenCalledWith(
+      'Desktop/notes.txt',
+      '',
+    );
     expect(nativeSyncEngine.prepareSharedFilePreview).toHaveBeenCalledWith(
       'personal',
       'Desktop/notes.txt',

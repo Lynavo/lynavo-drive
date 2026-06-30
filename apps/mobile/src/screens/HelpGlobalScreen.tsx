@@ -3,29 +3,18 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
-  Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '../components/Icon';
 import { GlobalGradientBackground } from '../components/GlobalGradientBackground';
-import { ModalBlurBackdrop } from '../components/shared/ModalBlurBackdrop';
-import { useAuth } from '../stores/auth-store';
-import { marketConfig } from '../markets';
-import {
-  getGiftCardConfig,
-  redeemGiftCard,
-} from '../services/gift-card-service';
-import { getGiftCardRedeemFailureTranslationKey } from '../services/gift-card-errors';
-import { markSubscriptionJustActivated } from '../hooks/useExpiryReminder';
+import { appConfig } from '../config/app-config';
 import {
   isDiagnosticsExportUnavailable,
   shareDiagnosticsArchive,
@@ -40,11 +29,6 @@ interface FaqItem {
 export function HelpGlobalScreen() {
   const navigation = useNavigation();
   const { t } = useTranslation();
-  const auth = useAuth();
-  const [isGiftCardEnabled, setIsGiftCardEnabled] = useState(false);
-  const [giftCardPromptVisible, setGiftCardPromptVisible] = useState(false);
-  const [giftCardCode, setGiftCardCode] = useState('');
-  const [isRedeemingGiftCard, setIsRedeemingGiftCard] = useState(false);
   const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false);
 
   const faqs: FaqItem[] = [
@@ -74,54 +58,9 @@ export function HelpGlobalScreen() {
     },
   ];
 
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-      void getGiftCardConfig()
-        .then(config => {
-          if (!cancelled) {
-            setIsGiftCardEnabled(config.enabled);
-          }
-        })
-        .catch(err => {
-          console.warn('[help] gift card config refresh failed', err);
-          if (!cancelled) {
-            setIsGiftCardEnabled(false);
-          }
-        });
-      return () => {
-        cancelled = true;
-      };
-    }, []),
-  );
-
-  const handleOpenGiftCardPrompt = useCallback(async () => {
-    try {
-      const config = await getGiftCardConfig();
-      if (!config.enabled) {
-        setIsGiftCardEnabled(false);
-        setGiftCardPromptVisible(false);
-        return;
-      }
-      setIsGiftCardEnabled(true);
-      setGiftCardCode('');
-      setGiftCardPromptVisible(true);
-    } catch (err) {
-      console.warn('[help] gift card config refresh failed', err);
-      setIsGiftCardEnabled(false);
-      setGiftCardPromptVisible(false);
-    }
-  }, []);
-
   const handleOpenSupportEmail = useCallback(() => {
-    void Linking.openURL(`mailto:${marketConfig.supportEmail}`);
+    void Linking.openURL(`mailto:${appConfig.endpoints.supportEmail}`);
   }, []);
-
-  const handleCloseGiftCardPrompt = useCallback(() => {
-    if (isRedeemingGiftCard) return;
-    setGiftCardPromptVisible(false);
-    setGiftCardCode('');
-  }, [isRedeemingGiftCard]);
 
   const handleExportDiagnostics = useCallback(async () => {
     if (isExportingDiagnostics) return;
@@ -145,42 +84,6 @@ export function HelpGlobalScreen() {
       setIsExportingDiagnostics(false);
     }
   }, [isExportingDiagnostics, t]);
-
-  const handleRedeemGiftCard = useCallback(async () => {
-    const normalizedCode = giftCardCode.trim().toUpperCase();
-    if (!normalizedCode) {
-      Alert.alert(
-        t('settings.giftCard.empty.title'),
-        t('settings.giftCard.empty.body'),
-      );
-      return;
-    }
-
-    setIsRedeemingGiftCard(true);
-    try {
-      const result = await redeemGiftCard(normalizedCode);
-      setGiftCardPromptVisible(false);
-      setGiftCardCode('');
-      markSubscriptionJustActivated();
-      await auth.loadSubscription();
-      Alert.alert(
-        t('settings.giftCard.success.title'),
-        t('settings.giftCard.success.body', {
-          plan:
-            result.plan === 'yearly'
-              ? t('settings.giftCard.yearlyPlan')
-              : result.plan === 'monthly'
-                ? t('settings.giftCard.monthlyPlan')
-                : result.plan,
-        }),
-      );
-    } catch (error) {
-      const failureKey = getGiftCardRedeemFailureTranslationKey(error);
-      Alert.alert(t('settings.giftCard.failure.title'), t(failureKey));
-    } finally {
-      setIsRedeemingGiftCard(false);
-    }
-  }, [auth, giftCardCode, t]);
 
   return (
     <GlobalGradientBackground>
@@ -236,7 +139,7 @@ export function HelpGlobalScreen() {
                     {t('help.contact.supportEmail')}
                   </Text>
                   <Text style={styles.actionDesc}>
-                    {marketConfig.supportEmail}
+                    {appConfig.endpoints.supportEmail}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -269,107 +172,9 @@ export function HelpGlobalScreen() {
                   <Icon name="chevron-forward" size={16} color="#C7D2DF" />
                 )}
               </TouchableOpacity>
-              {isGiftCardEnabled ? (
-                <>
-                  <View style={styles.actionSeparator} />
-                  <TouchableOpacity
-                    style={styles.actionRow}
-                    activeOpacity={0.7}
-                    onPress={handleOpenGiftCardPrompt}
-                  >
-                    <View style={[styles.actionIconBox, styles.giftIconBox]}>
-                      <Icon name="gift-outline" size={18} color="#FFCC00" />
-                    </View>
-                    <View style={styles.actionContent}>
-                      <Text style={styles.actionTitle}>
-                        {t('settings.giftCard.action')}
-                      </Text>
-                      <Text style={styles.actionDesc}>
-                        {t('settings.giftCard.modal.message')}
-                      </Text>
-                    </View>
-                    <Icon name="chevron-forward" size={16} color="#C7D2DF" />
-                  </TouchableOpacity>
-                </>
-              ) : null}
             </View>
           </View>
         </ScrollView>
-
-        <Modal
-          transparent
-          visible={giftCardPromptVisible}
-          animationType="fade"
-          onRequestClose={handleCloseGiftCardPrompt}
-        >
-          <Pressable
-            style={styles.modalOverlay}
-            testID="help-gift-card-modal-backdrop"
-            onPress={handleCloseGiftCardPrompt}
-          >
-            <ModalBlurBackdrop />
-            <Pressable
-              style={styles.modalCard}
-              testID="help-gift-card-modal-card"
-              onPress={() => undefined}
-            >
-              <View style={styles.modalIconBox}>
-                <Icon name="gift-outline" size={28} color="#F59E0B" />
-              </View>
-              <Text style={styles.modalTitle}>
-                {t('settings.giftCard.modal.title')}
-              </Text>
-              <Text style={styles.modalMessage}>
-                {t('settings.giftCard.modal.message')}
-              </Text>
-              <TextInput
-                style={styles.modalInput}
-                value={giftCardCode}
-                onChangeText={setGiftCardCode}
-                placeholder={t('settings.giftCard.modal.placeholder')}
-                placeholderTextColor="#AEB4BE"
-                autoCapitalize="characters"
-                autoCorrect={false}
-                editable={!isRedeemingGiftCard}
-                accessibilityLabel={t('settings.giftCard.modal.placeholder')}
-              />
-              <View style={styles.modalButtonRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.modalButton,
-                    styles.modalCancelButton,
-                    isRedeemingGiftCard ? styles.modalButtonDisabled : null,
-                  ]}
-                  activeOpacity={0.7}
-                  onPress={handleCloseGiftCardPrompt}
-                  disabled={isRedeemingGiftCard}
-                >
-                  <Text style={styles.modalCancelText}>
-                    {t('settings.giftCard.modal.cancel')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.modalButton,
-                    styles.modalSubmitButton,
-                    isRedeemingGiftCard ? styles.modalButtonDisabled : null,
-                  ]}
-                  activeOpacity={0.7}
-                  onPress={handleRedeemGiftCard}
-                  disabled={isRedeemingGiftCard}
-                >
-                  {isRedeemingGiftCard ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.modalSubmitText}>
-                      {t('settings.giftCard.modal.submit')}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </Pressable>
-          </Pressable>
-        </Modal>
       </SafeAreaView>
     </GlobalGradientBackground>
   );

@@ -3,6 +3,7 @@ package com.vividrop.mobile.china.sync
 import java.util.zip.ZipFile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -357,7 +358,7 @@ class AndroidSyncPrimitivesTest {
   }
 
   @Test
-  fun parseWakeCapabilityReadsPublicTarget() {
+  fun parseWakeCapabilityIgnoresPublicTargetFromServerMetadata() {
     val capability = AndroidSyncPrimitives.parseWakeCapability(
       mapOf(
         "supported" to true,
@@ -383,15 +384,11 @@ class AndroidSyncPrimitivesTest {
     requireNotNull(capability)
     assertTrue(capability.supported)
     assertTrue(capability.hasUsableTargets)
-    val pt = capability.publicTarget
-    requireNotNull(pt)
-    assertEquals("my-ddns.org", pt.host)
-    assertEquals(9, pt.port)
-    assertTrue(pt.enabled)
+    assertNull(capability.publicTarget)
   }
 
   @Test
-  fun mergeWakeCapabilityPreservesPublicTarget() {
+  fun mergeWakeCapabilityClearsPublicTarget() {
     val existingPT = AndroidPublicWakeTarget(
       kind = "router_wan_udp",
       host = "my-wan.net",
@@ -417,39 +414,7 @@ class AndroidSyncPrimitivesTest {
     requireNotNull(merged)
     assertEquals("2026-06-11T01:00:00Z", merged.updatedAt)
     assertEquals(1, merged.targets.size)
-    val pt = merged.publicTarget
-    requireNotNull(pt)
-    assertEquals("my-wan.net", pt.host)
-    assertEquals(9, pt.port)
-    assertTrue(pt.enabled)
-  }
-
-  @Test
-  fun validatePublicWakeTargetValidatesEnabledConfigurations() {
-    // Should not throw for valid enabled config
-    AndroidSyncPrimitives.validatePublicWakeTarget("my-ddns.org", 9, true)
-    AndroidSyncPrimitives.validatePublicWakeTarget("1.2.3.4", 1234, true)
-
-    // Should not throw for disabled invalid config
-    AndroidSyncPrimitives.validatePublicWakeTarget("", 0, false)
-
-    // Should throw for empty/blank host when enabled
-    assertThrows(IllegalArgumentException::class.java) {
-      AndroidSyncPrimitives.validatePublicWakeTarget("", 9, true)
-    }
-
-    assertThrows(IllegalArgumentException::class.java) {
-      AndroidSyncPrimitives.validatePublicWakeTarget("   ", 9, true)
-    }
-
-    // Should throw for invalid ports when enabled
-    assertThrows(IllegalArgumentException::class.java) {
-      AndroidSyncPrimitives.validatePublicWakeTarget("my-ddns.org", 0, true)
-    }
-
-    assertThrows(IllegalArgumentException::class.java) {
-      AndroidSyncPrimitives.validatePublicWakeTarget("my-ddns.org", 65536, true)
-    }
+    assertNull(merged.publicTarget)
   }
 
   @Test
@@ -550,8 +515,8 @@ class AndroidSyncPrimitivesTest {
   }
 
   @Test
-  fun publicWakeIsScopedToPersonalRootBrowseAndExcludesManualReconnect() {
-    assertTrue(
+  fun publicWakeIsDisabledForOssSharedFilesRoutes() {
+    assertFalse(
       AndroidSyncPrimitives.shouldAllowSharedFilesPublicWake(
         scope = "personal",
         path = "",
@@ -1608,6 +1573,64 @@ class AndroidSyncPrimitivesTest {
       "aab8c4cf6d1387ef25855f432b1faeff6b6290ed5f62eb49e79bc00be0f96f1d",
       hmac,
     )
+  }
+
+  @Test
+  fun canonicalPersonalAccessMatchesSidecarLineOrder() {
+    val canonical = AndroidSyncPrimitives.canonicalPersonalAccess(
+      method = "get",
+      escapedPath = "/personal/download/Photos%2FIMG_0001.JPG",
+      clientId = "phone-123",
+      timestamp = "2026-06-22T10:20:30.123Z",
+      nonce = "nonce-123",
+    )
+
+    assertEquals(
+      """
+      GET
+      /personal/download/Photos%2FIMG_0001.JPG
+      phone-123
+      2026-06-22T10:20:30.123Z
+      nonce-123
+      """.trimIndent(),
+      canonical,
+    )
+  }
+
+  @Test
+  fun computePersonalAccessHmacUsesSha256PairingTokenBytesAsKey() {
+    val signature = AndroidSyncPrimitives.computePersonalAccessHmac(
+      pairingToken = "pairing-token-secret",
+      method = "get",
+      escapedPath = "/personal/download/Photos%2FIMG_0001.JPG",
+      clientId = "phone-123",
+      timestamp = "2026-06-22T10:20:30.123Z",
+      nonce = "nonce-123",
+    )
+
+    assertEquals(
+      "6fc9632974ae6a98854607cda3c7dac1327247e86d733098cc2a1a065c83d050",
+      signature,
+    )
+  }
+
+  @Test
+  fun personalAccessSignatureCarriesSignatureTimestampAndNonce() {
+    val signed = AndroidSyncPrimitives.personalAccessSignature(
+      pairingToken = "pairing-token-secret",
+      method = "GET",
+      escapedPath = "/personal/list",
+      clientId = "phone-123",
+      timestamp = "2026-06-22T10:20:30.123Z",
+      nonce = "nonce-456",
+    )
+
+    assertEquals(
+      "94ef62337c99a78061a32ea4bd9b04ecb3d263f003a8174881afb1e2e4d00421",
+      signed.signature,
+    )
+    assertEquals("2026-06-22T10:20:30.123Z", signed.timestamp)
+    assertEquals("nonce-456", signed.nonce)
   }
 
   @Test

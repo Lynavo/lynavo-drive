@@ -23,14 +23,31 @@ export function SharedFilesGlobalScreen({
 }: SharedFilesGlobalScreenProps) {
   const navigation = useNavigation<NavigationProp>();
   const { t } = useTranslation();
+  const translate = t as (key: string) => string;
 
   const openPhoneSyncSpace = () => {
     recordDiagnosticsLog('PhoneSyncSpace', 'entry pressed', {
-      market: 'global',
       screen: 'SharedFilesGlobalScreen',
     });
     navigation.navigate('PhoneSyncSpace');
   };
+
+  const openRemoteAccess = () => {
+    recordDiagnosticsLog('RemoteAccess', 'local LAN entry pressed', {
+      screen: 'SharedFilesGlobalScreen',
+    });
+    navigation.navigate('RemoteAccess');
+  };
+  const remoteAccessDescription = translateOrFallback(
+    translate,
+    'sharedFiles.remoteAccess.ossDesc',
+    'Access paired computer files on the same local network.',
+  );
+  const remoteAccessBadge = translateOrFallback(
+    translate,
+    'sharedFiles.remoteAccess.ossBadge',
+    'LAN',
+  );
 
   return (
     <GlobalGradientBackground>
@@ -68,10 +85,14 @@ export function SharedFilesGlobalScreen({
               </Text>
               <View style={styles.badgeRow}>
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{t('sharedFiles.phoneSyncSpace.badgeSync')}</Text>
+                  <Text style={styles.badgeText}>
+                    {t('sharedFiles.phoneSyncSpace.badgeSync')}
+                  </Text>
                 </View>
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{t('sharedFiles.phoneSyncSpace.badgeSource')}</Text>
+                  <Text style={styles.badgeText}>
+                    {t('sharedFiles.phoneSyncSpace.badgeSource')}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -81,7 +102,7 @@ export function SharedFilesGlobalScreen({
           <TouchableOpacity
             style={styles.card}
             activeOpacity={0.8}
-            onPress={() => navigation.navigate('RemoteAccess')}
+            onPress={openRemoteAccess}
           >
             <View
               style={[
@@ -96,15 +117,16 @@ export function SharedFilesGlobalScreen({
                 {t('sharedFiles.remoteAccess.title') || '遠端訪問電腦'}
               </Text>
               <Text style={styles.cardDescription}>
-                {t('sharedFiles.remoteAccess.desc') ||
-                  '流覽電腦端共享的目錄結構並下載文件'}
+                {remoteAccessDescription}
               </Text>
               <View style={styles.badgeRow}>
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{t('sharedFiles.remoteAccess.badgeDesktop')}</Text>
+                  <Text style={styles.badgeText}>
+                    {t('sharedFiles.remoteAccess.badgeDesktop')}
+                  </Text>
                 </View>
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{t('sharedFiles.remoteAccess.badgeView')}</Text>
+                  <Text style={styles.badgeText}>{remoteAccessBadge}</Text>
                 </View>
               </View>
             </View>
@@ -115,6 +137,17 @@ export function SharedFilesGlobalScreen({
       {showBottomTabBar ? <GlobalBottomTabBar activeTab="files" /> : null}
     </GlobalGradientBackground>
   );
+}
+
+function translateOrFallback(
+  t: (key: string) => string,
+  key: string,
+  fallback: string,
+) {
+  const value = t(key);
+  return typeof value === 'string' && value.trim().length > 0 && value !== key
+    ? value
+    : fallback;
 }
 
 const styles = StyleSheet.create({

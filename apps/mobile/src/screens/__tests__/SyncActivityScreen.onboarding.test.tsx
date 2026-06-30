@@ -6,7 +6,6 @@ const mockNavigate = jest.fn();
 const mockDispatch = jest.fn();
 const mockHasSeenSyncActivityTour = jest.fn().mockResolvedValue(false);
 const mockMarkSyncActivityTourSeen = jest.fn().mockResolvedValue(undefined);
-let mockIsGlobalMarket = false;
 
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({
@@ -59,7 +58,7 @@ jest.mock('react-i18next', () => ({
         'syncActivity.onboarding.history.body': '查看所有已完成的傳輸記錄。',
         'syncActivity.onboarding.settings.title': '全域設定',
         'syncActivity.onboarding.settings.body':
-          '查看設備與訂閱狀態，修改手機顯示名稱。',
+          '查看連接設備，修改手機顯示名稱。',
         'syncActivity.onboarding.help.title': '幫助中心',
         'syncActivity.onboarding.help.body': '遇到問題時可查看快速上手指南。',
       })[key] ?? key,
@@ -85,10 +84,6 @@ jest.mock('../../components/Icon', () => ({
   },
 }));
 
-jest.mock('../../components/SubscriptionStatusIcon', () => ({
-  SubscriptionStatusIcon: () => null,
-}));
-
 jest.mock('../../services/SyncEngineModule', () => ({
   cancelAllManualUploads: jest.fn().mockResolvedValue(undefined),
   disableAutoUpload: jest.fn().mockResolvedValue(undefined),
@@ -109,17 +104,6 @@ jest.mock('../../stores/auth-store', () => ({
     },
   }),
   isFeatureAccessAllowed: () => true,
-}));
-
-jest.mock('../../constants/features', () => ({
-  FEATURES: {
-    SUBSCRIPTION_ENFORCEMENT: false,
-  },
-}));
-
-jest.mock('../../markets', () => ({
-  ...jest.requireActual('../../markets'),
-  isGlobalMarket: () => mockIsGlobalMarket,
 }));
 
 jest.mock('../../utils/onboardingStorage', () => ({
@@ -195,7 +179,6 @@ describe('SyncActivityScreen onboarding', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockIsGlobalMarket = false;
     mockHasSeenSyncActivityTour.mockResolvedValue(false);
     mockMarkSyncActivityTourSeen.mockResolvedValue(undefined);
     (NativeModules as Record<string, unknown>).NativeSyncEngine = {
@@ -267,8 +250,7 @@ describe('SyncActivityScreen onboarding', () => {
     expect(screen.queryByText('手動同步')).toBeNull();
   });
 
-  it('uses My Computer copy for the shared files quick entry in global builds', async () => {
-    mockIsGlobalMarket = true;
+  it('uses My Computer copy for the shared files quick entry', async () => {
     mockHasSeenSyncActivityTour.mockResolvedValueOnce(true);
 
     const screen = render(<SyncActivityScreen />);

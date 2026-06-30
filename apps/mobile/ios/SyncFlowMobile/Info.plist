@@ -70,8 +70,6 @@
 	<string>Vivi Drop 需要访问您的照片库以同步媒体文件到电脑</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
-	<key>SyncFlowMarket</key>
-	<string>$(SYNCFLOW_MARKET)</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Ionicons.ttf</string>

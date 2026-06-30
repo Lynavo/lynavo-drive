@@ -1,4 +1,5 @@
 import { resolveLocale } from '../locale-resolver';
+import { resources } from '../resources';
 
 type Locale = {
   languageCode: string;
@@ -17,7 +18,7 @@ const locale = (tag: string, languageCode: string, countryCode: string, scriptCo
 });
 
 describe('resolveLocale', () => {
-  it('returns zh-Hans for simplified Chinese (mainland)', () => {
+  it('returns zh-Hans for simplified Chinese with CN region', () => {
     expect(resolveLocale([locale('zh-Hans-CN', 'zh', 'CN', 'Hans')])).toBe('zh-Hans');
   });
 
@@ -70,5 +71,44 @@ describe('resolveLocale', () => {
 
   it('returns en for empty list', () => {
     expect(resolveLocale([])).toBe('en');
+  });
+});
+
+describe('OSS commercial-removal locale guards', () => {
+  const supportedLocales = ['en', 'zh-Hans', 'zh-Hant'] as const;
+
+  it('does not ship unused remote-wake settings copy', () => {
+    for (const localeName of supportedLocales) {
+      const settings = resources[localeName].translation.settings as Record<
+        string,
+        unknown
+      >;
+
+      expect(settings).not.toHaveProperty('remoteWake');
+    }
+  });
+
+  it('keeps shared-files remote access copy local-LAN only', () => {
+    for (const localeName of supportedLocales) {
+      const sharedFiles = resources[localeName].translation
+        .sharedFiles as Record<string, unknown>;
+      const remoteAccess = sharedFiles.remoteAccess as Record<string, unknown>;
+      const connectionStatus = sharedFiles.connectionStatus as Record<
+        string,
+        unknown
+      >;
+
+      expect(remoteAccess).not.toHaveProperty('desktopLoggedOutTitle');
+      expect(remoteAccess).not.toHaveProperty('desktopLoggedOutSubtitle');
+      expect(remoteAccess).not.toHaveProperty('accountMismatchTitle');
+      expect(remoteAccess).not.toHaveProperty('accountMismatchSubtitle');
+      expect(connectionStatus).not.toHaveProperty('p2p');
+      expect(connectionStatus).not.toHaveProperty('relay');
+      expect(connectionStatus).not.toHaveProperty('waking');
+      expect(connectionStatus).not.toHaveProperty('p2pConnecting');
+      expect(connectionStatus).not.toHaveProperty('relayConnecting');
+      expect(connectionStatus).not.toHaveProperty('remoteWakeSetupRequired');
+      expect(sharedFiles).not.toHaveProperty('remoteWakeSetupRequired');
+    }
   });
 });

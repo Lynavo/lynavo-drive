@@ -33,6 +33,8 @@
   "remoteAccess": {
     "title": "Remote Access",
     "desc": "Browse your computer's shared directory and download files",
+    "ossDesc": "Browse paired desktop files over your local LAN.",
+    "ossBadge": "LAN",
     "badgeDesktop": "Desktop dir",
     "badgeView": "List/Grid",
     "select": "Select",
@@ -59,12 +61,8 @@
     "networkDisconnectedTitle": "Network Disconnected",
     "networkDisconnectedSubtitle": "Current path will be kept. You can continue accessing after network is restored or desktop app is online.",
     "retryConnection": "Retry Connection",
-    "remoteAccessDisabledTitle": "Remote Access Is Off",
-    "remoteAccessDisabledSubtitle": "Turn on Remote Access on the desktop app, then check again on your phone.",
-    "desktopLoggedOutTitle": "Desktop Is Signed Out",
-    "desktopLoggedOutSubtitle": "Sign in to the same account on the desktop app and make sure Remote Access is on.",
-    "accountMismatchTitle": "Account Mismatch",
-    "accountMismatchSubtitle": "Use the same account on your phone and desktop app, then check again.",
+    "remoteAccessDisabledTitle": "LAN Sharing Unavailable",
+    "remoteAccessDisabledSubtitle": "Make sure the paired desktop is online and sharing a local folder, then check again.",
     "recheckPermission": "Check Again",
     "folderLoadErrorTitle": "Folder Load Failed",
     "folderLoadErrorSubtitle": "Unable to read this shared folder. Please make sure the files still exist on the computer.",
@@ -79,7 +77,7 @@
     "sortTitle": "Sort By",
     "shareTitle": "Share Selected Files",
     "shareSubtitle": "{{count}} files selected",
-    "shareTargets": ["WeChat", "QQ", "WeCom", "More"],
+    "shareTargets": ["Save", "Copy Link", "Email", "More"],
     "listView": "List View",
     "gridView": "Grid View"
   },
@@ -106,15 +104,9 @@
   },
   "connectionStatus": {
     "lan": "LAN online",
-    "p2p": "P2P online",
-    "relay": "Relay online",
-    "waking": "Waking desktop...",
     "unavailable": "Desktop unreachable",
     "offline": "Offline",
-    "p2pConnecting": "P2P connecting...",
-    "relayConnecting": "Relay connecting...",
-    "unbound": "Unbound",
-    "remoteWakeSetupRequired": "Remote Wake Required"
+    "unbound": "Unbound"
   },
   "emptyState": {
     "title": "No Content Yet",
@@ -131,11 +123,7 @@
   },
   "personalUnauthorized": {
     "title": "Personal Shared Folder Unavailable",
-    "message": "Make sure the phone and desktop app are signed in to the same account, then configure the personal shared folder on desktop."
-  },
-  "remoteWakeSetupRequired": {
-    "title": "Remote Wake Setup Required",
-    "message": "This phone is not on the desktop network. If the desktop is asleep, enable Remote Wake in Settings or switch back to the same Wi-Fi."
+    "message": "Pair this phone with the desktop and configure the personal shared folder on the desktop."
   },
   "networkError": {
     "title": "Failed to Load",

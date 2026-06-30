@@ -33,7 +33,6 @@
     "react-i18next": "^15.7.4",
     "react-native": "0.84.1",
     "react-native-gesture-handler": "^2.30.0",
-    "react-native-iap": "^12.16.4",
     "react-native-keychain": "^10.0.0",
     "react-native-localize": "^3.7.0",
     "react-native-safe-area-context": "^5.5.2",

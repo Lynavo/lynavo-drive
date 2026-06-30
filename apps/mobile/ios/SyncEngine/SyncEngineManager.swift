@@ -6296,7 +6296,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             return
         }
 
-        if let _ = await attemptSharedFilesLANWakeIfNeeded(binding: binding, reason: "manual_lan_reconnect", allowPublicWake: false),
+        if let _ = await attemptSharedFilesLANWakeIfNeeded(binding: binding, reason: "manual_lan_reconnect"),
            let current = uploadStore?.getBinding() {
             sendPresenceHeartbeat(
                 clientId: bindingService.getOrCreateClientId(),
@@ -8354,12 +8354,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     private func attemptSharedFilesLANWakeIfNeeded(
         binding: BindingRecord,
-        reason: String,
-        allowPublicWake: Bool = false
+        reason: String
     ) async -> String? {
         syncDiagnosticsLog(
             "SharedFiles",
-            "wake candidate reason=\(reason) hasMetadata=\(binding.wake != nil) hasUsableTargets=\(binding.wake?.hasUsableTargets == true) hasPublicTarget=\(binding.wake?.publicTarget != nil) publicTargetEnabled=\(binding.wake?.publicTarget?.enabled == true) \(wakeCapabilityLogSummary(binding.wake))"
+            "wake candidate reason=\(reason) hasMetadata=\(binding.wake != nil) hasUsableTargets=\(binding.wake?.hasUsableTargets == true) \(wakeCapabilityLogSummary(binding.wake))"
         )
         guard let wake = binding.wake,
               wake.hasUsableTargets
@@ -8382,8 +8381,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let wakeAttemptStartedAt = Date()
         do {
             let result = try wakeOnLanService.sendWakePackets(
-                targets: targets,
-                publicTarget: allowPublicWake ? wake.publicTarget : nil
+                targets: targets
             )
             let failures = result.failures.isEmpty ? "" : " failedDestinations=\(describeWakeFailures(result.failures))"
             syncDiagnosticsLog(
@@ -8561,14 +8559,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         applySharedFilesTunnelRoute(reason: reason)
     }
 
-    private func prepareSharedFilesRoute(reason: String, allowWake: Bool = false) async throws -> (host: String, isTunnel: Bool) {
-        return try await prepareSharedFilesRoute(reason: reason, allowWake: allowWake, allowPublicWake: false)
-    }
-
     private func prepareSharedFilesRoute(
         reason: String,
-        allowWake: Bool = false,
-        allowPublicWake: Bool = false
+        allowWake: Bool = false
     ) async throws -> (host: String, isTunnel: Bool) {
         guard let binding = uploadStore?.getBinding() else {
             sharedFilesService.sidecarHost = nil
@@ -8666,8 +8659,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         ),
            let wokeHost = await attemptSharedFilesLANWakeIfNeeded(
                binding: binding,
-               reason: reason,
-               allowPublicWake: allowPublicWake
+               reason: reason
            ) {
             let isTunnel = wokeHost.contains("127.0.0.1")
             sharedFilesService.sidecarHost = wokeHost
@@ -8908,16 +8900,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             "SharedFiles",
             "wake decision scope=\(scope.rawValue) path=\(path) operation=list allowWake=\(allowWake) \(wakeCapabilityLogSummary(uploadStore?.getBinding()?.wake))"
         )
-        let allowPublicWake = SharedFilesRoutePolicy.shouldAllowPublicWake(
-            scope: scope.rawValue,
-            path: path,
-            operation: "list",
-            trigger: "shared_files_root_browse"
-        )
         var route = try await prepareSharedFilesRoute(
             reason: "browse_shared_files",
-            allowWake: allowWake,
-            allowPublicWake: allowPublicWake
+            allowWake: allowWake
         )
         let accessClientID = scope == .personal ? getClientId() : ""
         let accessClientName = scope == .personal ? getClientDisplayName() : ""
@@ -9543,45 +9528,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
         binding.deviceAlias = alias
         try persistBinding(binding)
-    }
-
-    func savePublicWakeTarget(host: String?, port: Int?, enabled: Bool) async throws {
-        slog("[SyncEngine] savePublicWakeTarget host=\(host ?? "nil") port=\(port ?? 0) enabled=\(enabled)")
-        if enabled {
-            guard let host = host, !host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                throw SyncEngineError.pairingError("Host cannot be empty when remote wake is enabled")
-            }
-            guard let port = port, port >= 1 && port <= 65535 else {
-                throw SyncEngineError.pairingError("Port must be between 1 and 65535 when remote wake is enabled")
-            }
-        }
-        guard var binding = uploadStore?.getBinding() else {
-            throw SyncEngineError.pairingError("No active binding to configure public wake target")
-        }
-
-        let target: PublicWakeTarget?
-        if let host = host, !host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let port = port {
-            target = PublicWakeTarget(
-                kind: "router_wan_udp",
-                host: host.trimmingCharacters(in: .whitespacesAndNewlines),
-                port: port,
-                enabled: enabled,
-                updatedAt: ISO8601DateFormatter().string(from: Date())
-            )
-        } else {
-            target = nil
-        }
-
-        let currentWake = binding.wake ?? WakeCapability(supported: false, targets: [], publicTarget: nil, updatedAt: ISO8601DateFormatter().string(from: Date()))
-        binding.wake = WakeCapability(
-            supported: currentWake.supported,
-            targets: currentWake.targets,
-            publicTarget: target,
-            updatedAt: ISO8601DateFormatter().string(from: Date())
-        )
-
-        try persistBinding(binding)
-        NativeSyncEngineModule.shared?.emitBindingStateChanged(bindingStatePayload(binding: binding))
     }
 
     // MARK: - Account Identity Reset (Phase 1 / 2 / 3)

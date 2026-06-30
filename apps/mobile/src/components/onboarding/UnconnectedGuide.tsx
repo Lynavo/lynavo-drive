@@ -9,9 +9,9 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '../Icon';
-import { marketConfig } from '../../markets';
+import { appConfig } from '../../config/app-config';
 
-const DOWNLOAD_URL = marketConfig.downloadUrl;
+const DOWNLOAD_URL = appConfig.endpoints.webBaseUrl;
 
 
 interface UnconnectedGuideProps {

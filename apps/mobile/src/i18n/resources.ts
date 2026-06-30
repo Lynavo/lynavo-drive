@@ -1,6 +1,5 @@
 import common_en from './locales/en/common.json';
 import errors_en from './locales/en/errors.json';
-import auth_en from './locales/en/auth.json';
 import settings_en from './locales/en/settings.json';
 import syncActivity_en from './locales/en/syncActivity.json';
 import codeVerify_en from './locales/en/codeVerify.json';
@@ -15,7 +14,6 @@ import history_en from './locales/en/history.json';
 import albumWorkbench_en from './locales/en/albumWorkbench.json';
 import common_zh_Hans from './locales/zh-Hans/common.json';
 import errors_zh_Hans from './locales/zh-Hans/errors.json';
-import auth_zh_Hans from './locales/zh-Hans/auth.json';
 import settings_zh_Hans from './locales/zh-Hans/settings.json';
 import syncActivity_zh_Hans from './locales/zh-Hans/syncActivity.json';
 import codeVerify_zh_Hans from './locales/zh-Hans/codeVerify.json';
@@ -30,7 +28,6 @@ import history_zh_Hans from './locales/zh-Hans/history.json';
 import albumWorkbench_zh_Hans from './locales/zh-Hans/albumWorkbench.json';
 import common_zh_Hant from './locales/zh-Hant/common.json';
 import errors_zh_Hant from './locales/zh-Hant/errors.json';
-import auth_zh_Hant from './locales/zh-Hant/auth.json';
 import settings_zh_Hant from './locales/zh-Hant/settings.json';
 import syncActivity_zh_Hant from './locales/zh-Hant/syncActivity.json';
 import codeVerify_zh_Hant from './locales/zh-Hant/codeVerify.json';
@@ -47,7 +44,6 @@ import albumWorkbench_zh_Hant from './locales/zh-Hant/albumWorkbench.json';
 export const LOCALE_SECTIONS = [
   'common',
   'errors',
-  'auth',
   'settings',
   'syncActivity',
   'codeVerify',
@@ -65,7 +61,6 @@ export const LOCALE_SECTIONS = [
 export const translationSchema = {
   common: common_zh_Hant,
   errors: errors_zh_Hant,
-  auth: auth_zh_Hant,
   settings: settings_zh_Hant,
   syncActivity: syncActivity_zh_Hant,
   codeVerify: codeVerify_zh_Hant,
@@ -85,7 +80,6 @@ export const resources = {
     translation: {
       common: common_en,
       errors: errors_en,
-      auth: auth_en,
       settings: settings_en,
       syncActivity: syncActivity_en,
       codeVerify: codeVerify_en,
@@ -104,7 +98,6 @@ export const resources = {
     translation: {
       common: common_zh_Hans,
       errors: errors_zh_Hans,
-      auth: auth_zh_Hans,
       settings: settings_zh_Hans,
       syncActivity: syncActivity_zh_Hans,
       codeVerify: codeVerify_zh_Hans,
@@ -123,7 +116,6 @@ export const resources = {
     translation: {
       common: common_zh_Hant,
       errors: errors_zh_Hant,
-      auth: auth_zh_Hant,
       settings: settings_zh_Hant,
       syncActivity: syncActivity_zh_Hant,
       codeVerify: codeVerify_zh_Hant,

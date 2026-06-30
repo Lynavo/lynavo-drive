@@ -132,15 +132,6 @@
     "globalSharedFilesTitle": "My Computer",
     "globalSharedFilesDesc": "Browse files from My Computer"
   },
-  "trialUpgrade": {
-    "entry": "{{days}} days left in your free trial. Upgrade to Pro to unlock everything."
-  },
-  "expired": {
-    "title": "Trial Ended",
-    "subtitle": "Subscribe to continue using photo upload, auto upload, and shared file access.",
-    "subscribeCta": "Subscribe Now",
-    "viewHelp": "View Help"
-  },
   "onboarding": {
     "skip": "Skip guide",
     "previous": "Back",
@@ -160,7 +151,7 @@
     },
     "settings": {
       "title": "Global Settings",
-      "body": "Check the connected device and subscription status, edit the phone display name, or get technical support."
+      "body": "Check the connected device, edit the phone display name, or get technical support."
     },
     "help": {
       "title": "Help Center",

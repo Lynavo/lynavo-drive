@@ -57,41 +57,6 @@ expect(
     "destinations must include subnet broadcast, limited broadcast, and last known host IP for every port"
 )
 
-let publicTarget = PublicWakeTarget(
-    kind: "router_wan_udp",
-    host: "public.syncflow.net",
-    port: 9999,
-    enabled: true,
-    updatedAt: "2026-06-11T12:00:00Z"
-)
-
-let destinationsWithPublic = WakeOnLanService.destinations(for: validTargets[0], publicTarget: publicTarget)
-expect(
-    destinationsWithPublic == [
-        WakePacketDestination(host: "192.168.1.255", port: 9),
-        WakePacketDestination(host: "192.168.1.255", port: 7),
-        WakePacketDestination(host: "255.255.255.255", port: 9),
-        WakePacketDestination(host: "255.255.255.255", port: 7),
-        WakePacketDestination(host: "192.168.1.20", port: 9),
-        WakePacketDestination(host: "192.168.1.20", port: 7),
-        WakePacketDestination(host: "public.syncflow.net", port: 9999),
-    ],
-    "destinations with enabled publicTarget must append the public host and port"
-)
-
-let disabledPublicTarget = PublicWakeTarget(
-    kind: "router_wan_udp",
-    host: "public.syncflow.net",
-    port: 9999,
-    enabled: false,
-    updatedAt: "2026-06-11T12:00:00Z"
-)
-let destinationsWithDisabledPublic = WakeOnLanService.destinations(for: validTargets[0], publicTarget: disabledPublicTarget)
-expect(
-    destinationsWithDisabledPublic == destinations,
-    "destinations with disabled publicTarget must not include the public host and port"
-)
-
 var sends: [(host: String, port: Int, bytes: Int)] = []
 let service = WakeOnLanService(repeatCount: 1) { host, port, packet in
     sends.append((host: host, port: port, bytes: packet.count))
@@ -106,16 +71,6 @@ expect(sends[1].host == "192.168.1.255" && sends[1].port == 7, "second wake pack
 expect(sends[2].host == "255.255.255.255" && sends[2].port == 9, "third wake packet must use limited broadcast")
 expect(sends[4].host == "192.168.1.20" && sends[4].port == 9, "fifth wake packet must use last known host IP")
 expect(sends.allSatisfy { $0.bytes == 102 }, "all wake packets must contain a full magic packet")
-
-var publicSends: [(host: String, port: Int, bytes: Int)] = []
-let publicService = WakeOnLanService(repeatCount: 1) { host, port, packet in
-    publicSends.append((host: host, port: port, bytes: packet.count))
-}
-let publicSendResult = try! publicService.sendWakePackets(targets: validTargets, publicTarget: publicTarget)
-expect(publicSendResult.sentPackets == 7, "sendWakePackets with publicTarget must send 7 packets")
-expect(publicSendResult.destinations == destinationsWithPublic, "sendWakePackets destinations must match destinationsWithPublic")
-expect(publicSends.count == 7, "publicSends must have exactly 7 packets")
-expect(publicSends[6].host == "public.syncflow.net" && publicSends[6].port == 9999, "last sent packet must go to the public target")
 
 enum TestWakeSendError: Error, CustomStringConvertible {
     case blockedBroadcast
@@ -190,12 +145,35 @@ do {
     expect(false, "unexpected error type")
 }
 
-// Assert merge preserves public target
+// Assert legacy public targets are ignored on decode, serialization, and merge.
 let existingPT = PublicWakeTarget(kind: "router_wan_udp", host: "my-wan.net", port: 9, enabled: true, updatedAt: "2026-06-11T00:00:00Z")
 let existingWake = WakeCapability(supported: true, targets: [], publicTarget: existingPT, updatedAt: "2026-06-11T00:00:00Z")
+let payloadWithPublicTarget = existingWake.toPayload()
+expect(payloadWithPublicTarget["publicTarget"] is NSNull, "wake payload serialization must clear public target")
+let decodedWake = WakeCapability.fromJSONValue([
+    "supported": true,
+    "updatedAt": "2026-06-11T00:00:00Z",
+    "targets": [
+        [
+            "interfaceName": "en0",
+            "macAddress": "aa:bb:cc:dd:ee:ff",
+            "ipv4Address": "192.168.1.20",
+            "broadcastAddress": "192.168.1.255",
+            "ports": [9],
+        ],
+    ],
+    "publicTarget": [
+        "kind": "router_wan_udp",
+        "host": "my-wan.net",
+        "port": 9,
+        "enabled": true,
+        "updatedAt": "2026-06-11T00:00:00Z",
+    ],
+])
+expect(decodedWake?.publicTarget == nil, "wake metadata decode must ignore legacy public target")
 let newWake = WakeCapability(supported: true, targets: [targets[0]], publicTarget: nil, updatedAt: "2026-06-11T01:00:00Z")
 let mergedWake = WakeCapability.merge(newWake: newWake, existingWake: existingWake)
 expect(mergedWake != nil, "merged capability must not be nil")
 expect(mergedWake?.updatedAt == "2026-06-11T01:00:00Z", "merged capability must update timestamp")
 expect(mergedWake?.targets.count == 1, "merged capability must update targets")
-expect(mergedWake?.publicTarget == existingPT, "merged capability must preserve existing public target")
+expect(mergedWake?.publicTarget == nil, "merged capability must clear existing public target")

@@ -1,8 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { VIVIDROP_REVIEW_API_BASE_URL } from '@syncflow/contracts';
 
-import { marketConfig } from '../markets';
-import { releaseApiBaseUrl } from '../release-profile';
+import { appConfig } from '../config/app-config';
 
 // ---------------------------------------------------------------------------
 // Backend configuration
@@ -12,9 +10,9 @@ import { releaseApiBaseUrl } from '../release-profile';
 // DEVELOPER NOTE — REAL-DEVICE DEBUG REQUIRES OVERRIDE
 // ============================================================================
 //
-// The built-in default below points at production. App Review routing is handled
-// by `APP_REVIEW_PHONE`, so normal debug sessions exercise the same config
-// switches as production unless a developer override is set.
+// The built-in default below points at the review API for debug builds and the
+// production API for release builds. Official login/profile routing is not part
+// of the OSS runtime; use a debug override for local API diagnostics.
 //
 // To debug against your dev backend on a real device, do ONE of:
 //
@@ -31,23 +29,18 @@ import { releaseApiBaseUrl } from '../release-profile';
 //       so each developer's local override stays out of git automatically.
 // ============================================================================
 
-export const PROD_BASE_URL = releaseApiBaseUrl ?? marketConfig.apiBaseUrl;
-export const REVIEW_API_BASE_URL = marketConfig.reviewApiBaseUrl;
-export const APP_REVIEW_PHONE = marketConfig.appReviewPhone;
-export const APP_REVIEW_EMAIL = marketConfig.appReviewEmail;
+export const PROD_BASE_URL = appConfig.endpoints.apiBaseUrl;
+export const REVIEW_API_BASE_URL = appConfig.endpoints.reviewApiBaseUrl;
 
 // Default backend for normal debug sessions. Use setDebugBaseUrlOverride() for
 // temporary per-device overrides without changing this shared default.
-export const DEV_API_BASE_URL: string =
-  releaseApiBaseUrl ?? VIVIDROP_REVIEW_API_BASE_URL;
+export const DEV_API_BASE_URL: string = appConfig.endpoints.reviewApiBaseUrl;
 
 const DEBUG_OVERRIDE_STORAGE_KEY = '@vividrop/debug/api_base_url';
-const SESSION_BASE_URL_STORAGE_KEY = '@vividrop/auth/api_base_url';
 
 // In-memory cache of the AsyncStorage override; set by loadDebugBaseUrlOverride()
 // at app startup so the very first request can see it without a sync read.
 let _debugOverride: string | null = null;
-let _sessionBaseUrl: string | null = null;
 let _warnedRealDeviceLoopback = false;
 
 /**
@@ -91,75 +84,9 @@ export function getDebugBaseUrlOverride(): string | null {
   return _debugOverride;
 }
 
-export function resolveAuthBaseUrlForPhone(phone: string): string {
-  if (_debugOverride) return _debugOverride;
-  if (normalizePhoneDigits(phone) === APP_REVIEW_PHONE) {
-    return REVIEW_API_BASE_URL;
-  }
-  return getBuiltInBaseUrl();
-}
-
-export function resolveAuthBaseUrlForEmail(email: string): string {
-  if (_debugOverride) return _debugOverride;
-  if (email.trim().toLowerCase() === APP_REVIEW_EMAIL.toLowerCase()) {
-    return REVIEW_API_BASE_URL;
-  }
-  return getBuiltInBaseUrl();
-}
-
-export async function loadSessionBaseUrl(): Promise<void> {
-  try {
-    const v = await AsyncStorage.getItem(SESSION_BASE_URL_STORAGE_KEY);
-    if (v && /^https?:\/\//.test(v) && !shouldIgnoreSessionBaseUrl(v)) {
-      _sessionBaseUrl = v;
-      return;
-    }
-    _sessionBaseUrl = null;
-    if (v && shouldIgnoreSessionBaseUrl(v)) {
-      await AsyncStorage.removeItem(SESSION_BASE_URL_STORAGE_KEY);
-    }
-  } catch {
-    _sessionBaseUrl = null;
-  }
-}
-
-export async function setSessionBaseUrl(url: string): Promise<void> {
-  if (!/^https?:\/\//.test(url)) {
-    throw new Error('session base URL must start with http:// or https://');
-  }
-  _sessionBaseUrl = url;
-  try {
-    await AsyncStorage.setItem(SESSION_BASE_URL_STORAGE_KEY, url);
-  } catch (err) {
-    console.warn('[config] failed to persist session API base URL', err);
-  }
-}
-
-export async function clearSessionBaseUrl(): Promise<void> {
-  _sessionBaseUrl = null;
-  try {
-    await AsyncStorage.removeItem(SESSION_BASE_URL_STORAGE_KEY);
-  } catch (err) {
-    console.warn('[config] failed to clear session API base URL', err);
-  }
-}
-
-export function getSessionBaseUrl(): string | null {
-  return _sessionBaseUrl;
-}
-
 export function getBaseUrl(): string {
   if (_debugOverride) return _debugOverride;
-  if (_sessionBaseUrl && !shouldIgnoreSessionBaseUrl(_sessionBaseUrl)) {
-    return _sessionBaseUrl;
-  }
   return getBuiltInBaseUrl();
-}
-
-function shouldIgnoreSessionBaseUrl(url: string): boolean {
-  if (typeof __DEV__ === 'undefined' || !__DEV__) return false;
-  if (DEV_API_BASE_URL === PROD_BASE_URL) return false;
-  return url === PROD_BASE_URL;
 }
 
 function getBuiltInBaseUrl(): string {
@@ -174,13 +101,6 @@ function getBuiltInBaseUrl(): string {
     return DEV_API_BASE_URL;
   }
   return PROD_BASE_URL;
-}
-
-function normalizePhoneDigits(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
-  return digits.length === 13 && digits.startsWith('86')
-    ? digits.slice(2)
-    : digits;
 }
 
 // Returns null if the URL is acceptable, otherwise an error message describing

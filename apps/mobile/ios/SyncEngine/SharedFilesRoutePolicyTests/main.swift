@@ -452,13 +452,13 @@ expect(
 )
 
 expect(
-    SharedFilesRoutePolicy.shouldAllowPublicWake(
+    !SharedFilesRoutePolicy.shouldAllowPublicWake(
         scope: "personal",
         path: "",
         operation: "list",
         trigger: "shared_files_root_browse"
     ),
-    "personal root browse must be allowed to use configured Wake-on-WAN"
+    "OSS personal root browse must remain LAN-only and must not use configured Wake-on-WAN"
 )
 
 expect(

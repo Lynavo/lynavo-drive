@@ -27,10 +27,6 @@
       android:name="android.permission.READ_EXTERNAL_STORAGE"
       android:maxSdkVersion="32" />
 
-    <queries>
-      <package android:name="com.tencent.mm" />
-    </queries>
-
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
@@ -54,11 +50,6 @@
         android:exported="false"
         android:foregroundServiceType="dataSync" />
       <activity
-        android:name=".wxapi.WXPayEntryActivity"
-        android:exported="true"
-        android:launchMode="singleTop"
-        android:theme="@android:style/Theme.Translucent.NoTitleBar" />
-      <activity
         android:name=".MainActivity"
         android:label="@string/app_name"
         android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
@@ -74,6 +65,8 @@
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
+            <!-- OAuth redirect migration is not complete in Task 9; keep the
+                 legacy scheme so existing login redirects do not break. -->
             <data android:scheme="vividrop" android:host="auth" />
         </intent-filter>
       </activity>

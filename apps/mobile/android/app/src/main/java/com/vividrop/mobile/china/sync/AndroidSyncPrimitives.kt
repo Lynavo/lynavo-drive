@@ -125,6 +125,12 @@ data class AndroidSharedFilesRouteMetadata(
   val activeTunnelPort: Int?,
 )
 
+data class AndroidPersonalAccessSignature(
+  val signature: String,
+  val timestamp: String,
+  val nonce: String,
+)
+
 data class AndroidWakeTarget(
   val interfaceName: String,
   val macAddress: String,
@@ -173,20 +179,7 @@ data class AndroidWakeCapability(
           },
         ),
       )
-      if (publicTarget != null) {
-        put(
-          "publicTarget",
-          JSONObject().apply {
-            put("kind", publicTarget.kind)
-            put("host", publicTarget.host)
-            put("port", publicTarget.port)
-            put("enabled", publicTarget.enabled)
-            put("updatedAt", publicTarget.updatedAt)
-          }
-        )
-      } else {
-        put("publicTarget", JSONObject.NULL)
-      }
+      put("publicTarget", JSONObject.NULL)
     }
 }
 
@@ -196,16 +189,7 @@ data class AndroidBackgroundKeepaliveStopState(
 )
 
 object AndroidSyncPrimitives {
-  fun validatePublicWakeTarget(host: String, port: Int, enabled: Boolean) {
-    if (enabled) {
-      if (host.trim().isEmpty()) {
-        throw IllegalArgumentException("Host cannot be empty when remote wake is enabled")
-      }
-      if (port < 1 || port > 65535) {
-        throw IllegalArgumentException("Port must be between 1 and 65535 when remote wake is enabled")
-      }
-    }
-  }
+  private const val OSS_PUBLIC_WAKE_ENABLED = false
 
   fun peerProxySkipReasons(
     hasMultiDesktopBindingSource: Boolean,
@@ -235,8 +219,8 @@ object AndroidSyncPrimitives {
     newWake: AndroidWakeCapability?,
     existingWake: AndroidWakeCapability?,
   ): AndroidWakeCapability? {
-    if (newWake == null) return existingWake
-    return newWake.copy(publicTarget = existingWake?.publicTarget)
+    if (newWake == null) return existingWake?.copy(publicTarget = null)
+    return newWake.copy(publicTarget = null)
   }
 
   fun decideSharedFilesRoute(
@@ -330,19 +314,10 @@ object AndroidSyncPrimitives {
         )
       }
     }
-    val publicTarget = raw.optJSONObject("publicTarget")?.let { pt ->
-      AndroidPublicWakeTarget(
-        kind = pt.optString("kind", "router_wan_udp"),
-        host = pt.optString("host"),
-        port = pt.optInt("port", 9),
-        enabled = pt.optBoolean("enabled", false),
-        updatedAt = pt.optString("updatedAt").takeIf { it.isNotBlank() }.orEmpty(),
-      )
-    }
     return AndroidWakeCapability(
       supported = raw.optBoolean("supported", false),
       targets = targets,
-      publicTarget = publicTarget,
+      publicTarget = null,
       updatedAt = raw.optString("updatedAt").takeIf { it.isNotBlank() }.orEmpty(),
     )
   }
@@ -369,23 +344,10 @@ object AndroidSyncPrimitives {
         )
       }
       .orEmpty()
-    val publicTarget = (raw["publicTarget"] as? Map<*, *>)?.let { pt ->
-      AndroidPublicWakeTarget(
-        kind = pt["kind"] as? String ?: "router_wan_udp",
-        host = pt["host"] as? String ?: "",
-        port = when (val p = pt["port"]) {
-          is Number -> p.toInt()
-          is String -> p.toIntOrNull() ?: 9
-          else -> 9
-        },
-        enabled = pt["enabled"] as? Boolean ?: false,
-        updatedAt = pt["updatedAt"] as? String ?: "",
-      )
-    }
     return AndroidWakeCapability(
       supported = raw["supported"] as? Boolean ?: false,
       targets = targets,
-      publicTarget = publicTarget,
+      publicTarget = null,
       updatedAt = raw["updatedAt"] as? String ?: "",
     )
   }
@@ -413,7 +375,8 @@ object AndroidSyncPrimitives {
     trigger: String,
   ): Boolean =
     shouldAttemptSharedFilesWake(scope, path, operation) &&
-      trigger == "shared_files_root_browse"
+      trigger == "shared_files_root_browse" &&
+      OSS_PUBLIC_WAKE_ENABLED
 
   fun sharedFilesRouteMetadata(
     decision: AndroidSharedFilesRouteDecision,
@@ -972,13 +935,67 @@ object AndroidSyncPrimitives {
   fun computeAuthHmac(
     pairingToken: String,
     nonceHex: String,
-  ): String {
+  ): String = computePairingTokenHmacHex(pairingToken, hexToBytes(nonceHex))
+
+  fun canonicalPersonalAccess(
+    method: String,
+    escapedPath: String,
+    clientId: String,
+    timestamp: String,
+    nonce: String,
+  ): String = listOf(
+    method.uppercase(Locale.US),
+    escapedPath,
+    clientId,
+    timestamp,
+    nonce,
+  ).joinToString("\n")
+
+  fun computePersonalAccessHmac(
+    pairingToken: String,
+    method: String,
+    escapedPath: String,
+    clientId: String,
+    timestamp: String,
+    nonce: String,
+  ): String = computePairingTokenHmacHex(
+    pairingToken,
+    canonicalPersonalAccess(
+      method = method,
+      escapedPath = escapedPath,
+      clientId = clientId,
+      timestamp = timestamp,
+      nonce = nonce,
+    ).toByteArray(Charsets.UTF_8),
+  )
+
+  fun personalAccessSignature(
+    pairingToken: String,
+    method: String,
+    escapedPath: String,
+    clientId: String,
+    timestamp: String,
+    nonce: String,
+  ): AndroidPersonalAccessSignature =
+    AndroidPersonalAccessSignature(
+      signature = computePersonalAccessHmac(
+        pairingToken = pairingToken,
+        method = method,
+        escapedPath = escapedPath,
+        clientId = clientId,
+        timestamp = timestamp,
+        nonce = nonce,
+      ),
+      timestamp = timestamp,
+      nonce = nonce,
+    )
+
+  private fun computePairingTokenHmacHex(pairingToken: String, data: ByteArray): String {
     val tokenHash = MessageDigest.getInstance("SHA-256")
       .digest(pairingToken.toByteArray(Charsets.UTF_8))
-    val nonceBytes = hexToBytes(nonceHex)
     val mac = Mac.getInstance("HmacSHA256")
     mac.init(SecretKeySpec(tokenHash, "HmacSHA256"))
-    return mac.doFinal(nonceBytes).toHex()
+    return mac.doFinal(data).toHex()
   }
 
   fun sortedPendingItems(items: List<AndroidUploadItem>): List<AndroidUploadItem> =

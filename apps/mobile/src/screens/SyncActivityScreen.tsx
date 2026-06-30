@@ -9,7 +9,6 @@ import {
   NativeEventEmitter,
   Alert,
   AppState,
-  Modal,
   Platform,
   type AppStateStatus,
 } from 'react-native';
@@ -30,7 +29,6 @@ import type {
 } from '@syncflow/contracts';
 import { colors } from '../theme/colors';
 import { Icon } from '../components/Icon';
-import { SubscriptionStatusIcon } from '../components/SubscriptionStatusIcon';
 import { GradientBackground } from '../components/GradientBackground';
 import { BottomTabBar } from '../components/BottomTabBar';
 import { listHistory } from '../services/desktop-local-service';
@@ -69,13 +67,8 @@ import {
 import {
   useAuth,
   isFeatureAccessAllowed,
-  type SubscriptionInfo,
-  type UserProfile,
 } from '../stores/auth-store';
-import { resolveSubscriptionDisplayState } from '../utils/subscriptionStatusDisplay';
-import { FEATURES } from '../constants/features';
 import type { RootStackParamList } from '../navigation/RootNavigator';
-import { isGlobalMarket } from '../markets';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -382,22 +375,6 @@ export function shouldBypassOfflineDisplayDelay(snapshot: {
   );
 }
 
-export function shouldShowSubscriptionExpiredOverlay({
-  subscriptionEnforcement,
-  isFocused,
-  isLoggedIn,
-  featureAccessAllowed,
-}: {
-  subscriptionEnforcement: boolean;
-  isFocused: boolean;
-  isLoggedIn: boolean;
-  featureAccessAllowed: boolean;
-}): boolean {
-  return (
-    subscriptionEnforcement && isFocused && isLoggedIn && !featureAccessAllowed
-  );
-}
-
 export function shouldKickAutoUploadSyncAfterGateRelease(snapshot: {
   autoUploadState?: AutoUploadState | null;
   uploadState?: string | null;
@@ -443,20 +420,6 @@ export function shouldResetAutoUploadGateKickAttempt(snapshot: {
     !snapshot.featureAccessAllowed ||
     !snapshot.bindingDeviceId
   );
-}
-
-export function getTrialUpgradeEntryDays(input: {
-  subscription?: SubscriptionInfo | null;
-  user?: UserProfile | null;
-}): number {
-  const state = resolveSubscriptionDisplayState(input);
-  if (
-    state.kind !== 'account_trial' &&
-    state.kind !== 'subscription_intro_trial'
-  ) {
-    return 0;
-  }
-  return Math.max(0, state.daysRemaining);
 }
 
 export function getSyncActivityDisplayProgressPercent(
@@ -589,7 +552,6 @@ export function SyncActivityScreen() {
   const navigation = useNavigation<SyncActivityNav>();
   const isScreenFocused = useIsFocused();
   const { t } = useTranslation();
-  const isGlobalBuild = isGlobalMarket();
   const auth = useAuth();
   const [overview, setOverview] = useState<SyncOverview>(EMPTY_OVERVIEW);
   const [bindingState, setBindingState] = useState<BindingState | null>(null);
@@ -695,10 +657,6 @@ export function SyncActivityScreen() {
   const featureAccessAllowed = isFeatureAccessAllowed(
     auth.subscription?.status ?? auth.user?.status,
   );
-  const trialUpgradeEntryDays = getTrialUpgradeEntryDays({
-    subscription: auth.subscription,
-    user: auth.user,
-  });
 
   const measureSyncActivityTourTarget = useCallback(
     (
@@ -894,7 +852,7 @@ export function SyncActivityScreen() {
         await NativeSyncEngine.startDiscovery();
         // Do not unconditionally call triggerSync() here. Auto upload still
         // needs an explicit active config; a focused effect below resumes only
-        // that already-enabled state after subscription/paywall navigation.
+        // that already-enabled state after returning from local navigation.
       } catch (e) {
         console.warn('[SyncActivity] loadReal error:', e);
         setInitialLoading(false);
@@ -1315,13 +1273,6 @@ export function SyncActivityScreen() {
       iconBackground: '#EEF3FA',
     },
   ];
-  const showSubscriptionExpiredOverlay = shouldShowSubscriptionExpiredOverlay({
-    subscriptionEnforcement: FEATURES.SUBSCRIPTION_ENFORCEMENT,
-    isFocused: isScreenFocused,
-    isLoggedIn: auth.isLoggedIn,
-    featureAccessAllowed,
-  });
-
   useEffect(() => {
     if (autoRoundDisplayMetrics.shouldTrack) {
       const nextBaseline = autoRoundDisplayMetrics.baseline;
@@ -2093,18 +2044,10 @@ export function SyncActivityScreen() {
                   <Icon name="folder-outline" size={22} color="#22c55e" />
                 </View>
                 <Text style={styles.quickEntryTitle}>
-                  {t(
-                    isGlobalBuild
-                      ? 'syncActivity.quickEntry.globalSharedFilesTitle'
-                      : 'syncActivity.quickEntry.sharedFilesTitle',
-                  )}
+                  {t('syncActivity.quickEntry.globalSharedFilesTitle')}
                 </Text>
                 <Text style={styles.quickEntryDesc}>
-                  {t(
-                    isGlobalBuild
-                      ? 'syncActivity.quickEntry.globalSharedFilesDesc'
-                      : 'syncActivity.quickEntry.sharedFilesDesc',
-                  )}
+                  {t('syncActivity.quickEntry.globalSharedFilesDesc')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -2125,62 +2068,7 @@ export function SyncActivityScreen() {
             totalBytes={todayStats.totalBytes}
           />
 
-          {trialUpgradeEntryDays > 0 && (
-            <TouchableOpacity
-              style={styles.trialUpgradeEntry}
-              activeOpacity={0.75}
-              onPress={() => navigation.navigate('Subscription')}
-            >
-              <View style={styles.trialUpgradeIcon}>
-                <SubscriptionStatusIcon tone="trial" size={22} />
-              </View>
-              <Text style={styles.trialUpgradeText}>
-                {t('syncActivity.trialUpgrade.entry', {
-                  days: trialUpgradeEntryDays,
-                })}
-              </Text>
-              <Icon name="chevron-forward" size={18} color="#d97706" />
-            </TouchableOpacity>
-          )}
         </ScrollView>
-
-        {/* Trial / Subscription expired overlay — gated by FEATURES until real
-          IAP is wired (otherwise the overlay sends users to a dead-end
-          subscription screen with no working purchase flow). */}
-        {showSubscriptionExpiredOverlay && (
-          <Modal visible transparent animationType="fade" statusBarTranslucent>
-            <View style={styles.expiredOverlay}>
-              <View style={styles.expiredCard}>
-                <View style={styles.expiredIconCircle}>
-                  <SubscriptionStatusIcon tone="expired" size={34} />
-                </View>
-                <Text style={styles.expiredTitle}>
-                  {t('syncActivity.expired.title')}
-                </Text>
-                <Text style={styles.expiredSubtitle}>
-                  {t('syncActivity.expired.subtitle')}
-                </Text>
-                <TouchableOpacity
-                  style={styles.expiredPrimaryButton}
-                  activeOpacity={0.7}
-                  onPress={() => navigation.navigate('Subscription')}
-                >
-                  <Text style={styles.expiredPrimaryButtonText}>
-                    {t('syncActivity.expired.subscribeCta')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  activeOpacity={0.6}
-                  onPress={() => navigation.navigate('Help')}
-                >
-                  <Text style={styles.expiredSecondaryText}>
-                    {t('syncActivity.expired.viewHelp')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
-        )}
         <SyncActivityTour
           visible={showSyncActivityTour}
           onSkip={() => void handleDismissSyncActivityTour()}
@@ -2884,98 +2772,6 @@ const styles = StyleSheet.create({
   quickEntryDesc: {
     fontSize: 11,
     color: SOFT_TEXT,
-  },
-  trialUpgradeEntry: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginHorizontal: 20,
-    marginTop: 18,
-    borderRadius: 18,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    backgroundColor: 'rgba(255, 251, 235, 0.72)',
-    borderWidth: 1,
-    borderColor: 'rgba(217, 119, 6, 0.28)',
-  },
-  trialUpgradeIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(217, 119, 6, 0.1)',
-  },
-  trialUpgradeText: {
-    flex: 1,
-    minWidth: 0,
-    fontSize: 13,
-    lineHeight: 19,
-    fontWeight: '600',
-    color: '#92400e',
-  },
-
-  // Trial / Subscription expired overlay
-  expiredOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  expiredCard: {
-    width: '100%',
-    backgroundColor: colors.card,
-    borderRadius: 24,
-    paddingVertical: 36,
-    paddingHorizontal: 28,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 8,
-  },
-  expiredIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  expiredTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: DARK,
-    marginBottom: 10,
-  },
-  expiredSubtitle: {
-    fontSize: 14,
-    color: MUTED_TEXT,
-    textAlign: 'center',
-    lineHeight: 21,
-    marginBottom: 24,
-  },
-  expiredPrimaryButton: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: PRIMARY_NAVY,
-    marginBottom: 16,
-  },
-  expiredPrimaryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  expiredSecondaryText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: MUTED_TEXT,
   },
   queueSection: {
     paddingHorizontal: 20,

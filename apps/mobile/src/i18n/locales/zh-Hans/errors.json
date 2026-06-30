@@ -26,9 +26,6 @@
   "exportDiagnosticsUnavailable": "当前版本暂不支持导出诊断包",
   "serverErrorHttp": "服务器错误 (HTTP {{status}})",
   "responseParseError": "响应解析失败",
-  "profileLoadFailed": "加载用户信息失败",
-  "profileLoadTitle": "无法加载账号信息",
-  "accountDeleteFailed": "删除帐号失败，请稍后再试",
   "pairingVersionMismatchTitle": "版本不兼容",
   "pairingVersionMismatchMessage": "手机与电脑端的版本不兼容，请将电脑端（桌面端）App 更新至最新版本后再试。",
   "pairingBlocked": "配对已被锁定。请在电脑端“设置”中点击“解除封锁此设备”，或重新产生连接码后再试。"

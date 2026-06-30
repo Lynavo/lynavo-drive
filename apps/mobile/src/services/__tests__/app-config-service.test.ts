@@ -1,10 +1,9 @@
-import { getAppConfig, refreshNativeAppFeatureSettings } from '../app-config-service';
-import { apiGet } from '../api';
+import {
+  getAppConfig,
+  normalizePublicIPv4,
+  refreshNativeAppFeatureSettings,
+} from '../app-config-service';
 import { setBackgroundSilentAudioEnabled } from '../SyncEngineModule';
-
-jest.mock('../api', () => ({
-  apiGet: jest.fn(),
-}));
 
 jest.mock('../SyncEngineModule', () => ({
   setBackgroundSilentAudioEnabled: jest.fn(),
@@ -15,46 +14,31 @@ describe('app-config-service', () => {
     jest.clearAllMocks();
   });
 
-  it('parses background silent audio as disabled by default', async () => {
-    (apiGet as jest.Mock).mockResolvedValueOnce({
-      features: {
-        gift_card: { enabled: true },
-      },
-      network: {
-        caller_public_ip: '8.8.8.8',
-      },
-    });
-
+  it('returns OSS local defaults without commercial feature switches', async () => {
     await expect(getAppConfig()).resolves.toEqual({
-      giftCard: { enabled: true },
-      backgroundSilentAudio: { enabled: false },
-      network: { callerPublicIp: '8.8.8.8' },
-    });
-  });
-
-  it('ignores invalid caller public IP values', async () => {
-    (apiGet as jest.Mock).mockResolvedValueOnce({
-      network: {
-        caller_public_ip: '192.168.1.10',
-      },
-    });
-
-    await expect(getAppConfig()).resolves.toEqual({
-      giftCard: { enabled: false },
       backgroundSilentAudio: { enabled: false },
       network: { callerPublicIp: null },
     });
   });
 
-  it('applies the background silent audio flag to the native sync engine', async () => {
-    (apiGet as jest.Mock).mockResolvedValueOnce({
-      features: {
-        background_silent_audio: { enabled: true },
-      },
-    });
+  it('does not ship the unused remote tunnel credentials service module', () => {
+    const modulePath = [
+      '..',
+      ['tunnel', 'credentials', 'service'].join('-'),
+    ].join('/');
 
+    expect(() => jest.requireActual(modulePath)).toThrow(/Cannot find module/);
+  });
+
+  it('normalizes only routable public IPv4 addresses for legacy callers', () => {
+    expect(normalizePublicIPv4('8.8.8.8')).toBe('8.8.8.8');
+    expect(normalizePublicIPv4('192.168.1.10')).toBeNull();
+    expect(normalizePublicIPv4('bad')).toBeNull();
+  });
+
+  it('always disables native background silent audio in the OSS runtime', async () => {
     await refreshNativeAppFeatureSettings();
 
-    expect(setBackgroundSilentAudioEnabled).toHaveBeenCalledWith(true);
+    expect(setBackgroundSilentAudioEnabled).toHaveBeenCalledWith(false);
   });
 });

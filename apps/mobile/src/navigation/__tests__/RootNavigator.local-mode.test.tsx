@@ -1,10 +1,10 @@
 /**
- * RootNavigator — global pairing invalidation routing
+ * RootNavigator — guest local LAN mode
  *
- * Verifies the global build invariant:
- *   - native pairing invalidation resets any authenticated route to pairing
- *   - ordinary offline binding state remains an in-app update, not a pairing reset
- *   - cold-start persisted invalidation opens pairing with an explicit reason
+ * Guest users with no persisted auth token should land in the foreground LAN
+ * sync surfaces, not the login screen. The initial route is still driven by
+ * the native binding snapshot: bound devices go to SyncActivity, fresh local
+ * installs go to DeviceDiscovery.
  */
 import React from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react-native';
@@ -14,9 +14,6 @@ type NativeListener = (payload: unknown) => void;
 
 let nativeListeners: Record<string, NativeListener> = {};
 
-// ---------------------------------------------------------------------------
-// react-native-gesture-handler — must be mocked before @react-navigation/stack
-// ---------------------------------------------------------------------------
 jest.mock('react-native-gesture-handler', () => ({
   GestureHandlerRootView: ({ children }: { children: React.ReactNode }) =>
     children,
@@ -53,7 +50,7 @@ jest.mock('react-native-safe-area-context', () => {
     useSafeAreaInsets: () => insets,
     SafeAreaInsetsContext,
     initialWindowMetrics: {
-      insets: { top: 0, bottom: 0, left: 0, right: 0 },
+      insets,
       frame: { x: 0, y: 0, width: 390, height: 844 },
     },
   };
@@ -62,8 +59,8 @@ jest.mock('react-native-safe-area-context', () => {
 jest.mock('../../components/Icon', () => ({
   Icon: ({ name }: { name: string }) => {
     const R = require('react');
-    const { Text: T } = require('react-native');
-    return R.createElement(T, null, name);
+    const { Text } = require('react-native');
+    return R.createElement(Text, null, name);
   },
 }));
 
@@ -85,52 +82,53 @@ jest.mock('react-native-keychain', () => ({
   },
 }));
 
-jest.mock('../../services/SyncEngineModule', () => {
-  const actual = jest.requireActual('../../services/SyncEngineModule');
-  return {
-    ...actual,
-    wipeSyncIdentity: jest.fn(),
-    cancelAllManualUploads: jest.fn(),
-    interruptAutoUpload: jest.fn(),
-    enableAutoUpload: jest.fn(),
-    browseAlbum: jest.fn().mockResolvedValue([]),
-    getAlbumStats: jest.fn().mockResolvedValue({
-      totalCount: 0,
-      transferredCount: 0,
-      queuedCount: 0,
-      pendingCount: 0,
-    }),
-    submitManualUpload: jest.fn(),
-    getAutoUploadConfig: jest.fn().mockResolvedValue({
-      enabled: false,
-      state: 'disabled',
-      timeRangeMode: 'all',
-      customTimeFrom: null,
-    }),
-    saveAutoUploadConfig: jest.fn(),
-    getPhotoAuthorizationStatus: jest.fn().mockResolvedValue('authorized'),
-    presentLimitedPhotoPicker: jest.fn(),
-    getAlbumCollections: jest.fn().mockResolvedValue([]),
-  };
-});
+jest.mock('../../services/SyncEngineModule', () => ({
+  PAIRING_INVALIDATED_EVENT: 'onPairingInvalidated',
+  PAIRING_INVALIDATED_ROUTE_REASON: 'pairing_invalidated',
+  isPairingInvalidatedEvent: (payload: unknown) => {
+    if (payload === null || payload === undefined) return true;
+    if (typeof payload !== 'object' || Array.isArray(payload)) return false;
+    const prototype = Object.getPrototypeOf(payload);
+    if (prototype !== Object.prototype && prototype !== null) return false;
+    const reason = (payload as { reason?: unknown }).reason;
+    return reason === undefined || typeof reason === 'string';
+  },
+  wipeSyncIdentity: jest.fn(),
+  cancelAllManualUploads: jest.fn(),
+  interruptAutoUpload: jest.fn(),
+  enableAutoUpload: jest.fn(),
+  browseAlbum: jest.fn().mockResolvedValue([]),
+  getAlbumStats: jest.fn().mockResolvedValue({
+    totalCount: 0,
+    transferredCount: 0,
+    queuedCount: 0,
+    pendingCount: 0,
+  }),
+  submitManualUpload: jest.fn(),
+  getAutoUploadConfig: jest.fn().mockResolvedValue({
+    enabled: false,
+    state: 'disabled',
+    timeRangeMode: 'all',
+    customTimeFrom: null,
+  }),
+  saveAutoUploadConfig: jest.fn(),
+  getPhotoAuthorizationStatus: jest.fn().mockResolvedValue('authorized'),
+  presentLimitedPhotoPicker: jest.fn(),
+  getAlbumCollections: jest.fn().mockResolvedValue([]),
+}));
 
-// ---------------------------------------------------------------------------
-// Screen stubs — route params are surfaced as text for assertions.
-// ---------------------------------------------------------------------------
 jest.mock('../../screens/DeviceDiscoveryGlobalScreen', () => ({
   DeviceDiscoveryGlobalScreen: ({
     route,
   }: {
-    route?: { params?: { mode?: string; reason?: string } };
+    route?: { params?: { reason?: string } };
   }) => {
     const R = require('react');
     const { Text } = require('react-native');
     return R.createElement(
       Text,
       { testID: 'global-device-discovery-screen' },
-      `GlobalDeviceDiscovery reason=${String(
-        route?.params?.reason,
-      )} mode=${String(route?.params?.mode)}`,
+      `GlobalDeviceDiscovery reason=${String(route?.params?.reason)}`,
     );
   },
 }));
@@ -174,6 +172,9 @@ jest.mock('../../screens/SubscriptionGlobalScreen', () => ({
 jest.mock('../../screens/AutoUploadSettingsGlobalScreen', () => ({
   AutoUploadSettingsGlobalScreen: () => null,
 }));
+jest.mock('../../components/GlobalBottomTabBar', () => ({
+  GlobalBottomTabBar: () => null,
+}));
 
 jest.mock('../../screens/DeviceDiscoveryScreen', () => ({
   DeviceDiscoveryScreen: () => null,
@@ -211,10 +212,6 @@ jest.mock('../../screens/AutoUploadSettingsScreen', () => ({
   AutoUploadSettingsScreen: () => null,
 }));
 
-jest.mock('../../components/GlobalBottomTabBar', () => ({
-  GlobalBottomTabBar: () => null,
-}));
-
 jest.mock('../../stores/auth-store', () => {
   const actual = jest.requireActual('../../stores/auth-store');
   return {
@@ -223,11 +220,9 @@ jest.mock('../../stores/auth-store', () => {
   };
 });
 
-// ---------------------------------------------------------------------------
-// Imports after mocks
-// ---------------------------------------------------------------------------
-import { CommonActions, NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer } from '@react-navigation/native';
 import { useAuth } from '../../stores/auth-store';
+import { wipeSyncIdentity } from '../../services/SyncEngineModule';
 import { RootNavigator } from '../RootNavigator';
 import i18n from '../../i18n';
 
@@ -239,7 +234,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   nativeListeners = {};
   (NativeModules as Record<string, unknown>).NativeSyncEngine = {
-    getBindingState: jest.fn().mockResolvedValue({ deviceId: 'desktop-1' }),
+    getBindingState: jest.fn().mockResolvedValue(null),
     getBindingInvalidationState: jest.fn().mockResolvedValue(null),
     addListener: jest.fn(),
     removeListeners: jest.fn(),
@@ -251,15 +246,12 @@ beforeEach(() => {
       return { remove: jest.fn() } as never;
     });
   (useAuth as jest.Mock).mockReturnValue({
-    isLoggedIn: true,
+    isLoggedIn: false,
     isLoading: false,
-    user: { id: 1, status: 'subscribed' },
-    subscription: {
-      status: 'subscribed',
-      plan: '',
-      expireAt: null,
-      trialEnd: null,
-    },
+    accessToken: null,
+    refreshToken: null,
+    user: null,
+    subscription: null,
     profileLoading: false,
     profileError: null,
     signedOutTransition: null,
@@ -269,7 +261,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  jest.useRealTimers();
   jest.restoreAllMocks();
 });
 
@@ -281,160 +272,108 @@ function renderRootNavigator() {
   );
 }
 
-describe('RootNavigator — pairing invalidation', () => {
-  test('pairing invalidation event guard accepts only null, undefined, or plain object payloads', () => {
-    class CustomPayload {
-      reason = 'desktop_reset_code';
-    }
-    const { isPairingInvalidatedEvent } = jest.requireActual(
-      '../../services/SyncEngineModule',
-    ) as typeof import('../../services/SyncEngineModule');
-
-    expect(isPairingInvalidatedEvent(null)).toBe(true);
-    expect(isPairingInvalidatedEvent(undefined)).toBe(true);
-    expect(isPairingInvalidatedEvent({ reason: 'desktop_reset_code' })).toBe(
-      true,
-    );
-    expect(isPairingInvalidatedEvent(Object.create(null))).toBe(true);
-
-    expect(isPairingInvalidatedEvent({ reason: 123 })).toBe(false);
-    expect(isPairingInvalidatedEvent(['desktop_reset_code'])).toBe(false);
-    expect(isPairingInvalidatedEvent(new Date())).toBe(false);
-    expect(isPairingInvalidatedEvent(new Map())).toBe(false);
-    expect(isPairingInvalidatedEvent(new CustomPayload())).toBe(false);
-  });
-
-  test('global authenticated navigation resets when native emits onPairingInvalidated', async () => {
+describe('RootNavigator — guest local LAN mode', () => {
+  test('guest without native binding routes to DeviceDiscovery, not Login', async () => {
     renderRootNavigator();
-
-    await waitFor(() =>
-      expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy(),
-    );
-
-    await act(async () => {
-      nativeListeners.onPairingInvalidated?.({ reason: 'desktop_reset_code' });
-    });
 
     await waitFor(() =>
       expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
     );
-    expect(screen.getByText(/reason=pairing_invalidated/)).toBeTruthy();
-    expect(screen.queryByTestId('global-sync-activity-screen')).toBeNull();
+    expect(screen.queryByTestId('global-login-screen')).toBeNull();
+    expect(NativeModules.NativeSyncEngine.getBindingState).toHaveBeenCalled();
+    expect(wipeSyncIdentity).not.toHaveBeenCalled();
   });
 
-  test('watcher suppresses immediate duplicate invalidation events but handles a later event', async () => {
-    renderRootNavigator();
-
-    await waitFor(() =>
-      expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy(),
-    );
-
-    jest.useFakeTimers();
-    const resetSpy = jest.spyOn(CommonActions, 'reset');
-
-    act(() => {
-      nativeListeners.onPairingInvalidated?.({
-        reason: 'desktop_reset_code',
-      });
-      nativeListeners.onPairingInvalidated?.({
-        reason: 'desktop_reset_code',
-      });
-    });
-
-    expect(resetSpy).toHaveBeenCalledTimes(1);
-
-    act(() => {
-      jest.advanceTimersByTime(600);
-    });
-    act(() => {
-      nativeListeners.onPairingInvalidated?.({
-        reason: 'desktop_reset_code',
-      });
-    });
-
-    expect(resetSpy).toHaveBeenCalledTimes(2);
-  });
-
-  test('watcher accepts another invalidation after the in-flight debounce window', async () => {
-    jest.useFakeTimers();
-    renderRootNavigator();
-
-    await waitFor(() =>
-      expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy(),
-    );
-
-    const resetSpy = jest.spyOn(CommonActions, 'reset');
-
-    act(() => {
-      nativeListeners.onPairingInvalidated?.({
-        reason: 'desktop_reset_code',
-      });
-    });
-
-    expect(resetSpy).toHaveBeenCalledTimes(1);
-
-    act(() => {
-      jest.advanceTimersByTime(500);
-    });
-
-    act(() => {
-      nativeListeners.onPairingInvalidated?.({
-        reason: 'desktop_reset_code',
-      });
-    });
-
-    expect(resetSpy).toHaveBeenCalledTimes(2);
-  });
-
-  test('ordinary offline binding updates do not reset navigation', async () => {
-    renderRootNavigator();
-
-    await waitFor(() =>
-      expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy(),
-    );
-
-    await act(async () => {
-      nativeListeners.onBindingStateChanged?.({
-        deviceId: 'desktop-1',
-        status: 'offline',
-      });
-    });
-
-    expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy();
-    expect(screen.queryByTestId('global-device-discovery-screen')).toBeNull();
-  });
-
-  test('cold-start native persisted invalidation routes to DeviceDiscovery with reason pairing_invalidated', async () => {
+  test('guest with native binding routes to SyncActivity, not Login', async () => {
     (
-      NativeModules.NativeSyncEngine.getBindingInvalidationState as jest.Mock
-    ).mockResolvedValue({ reason: 'desktop_reset_code' });
+      NativeModules.NativeSyncEngine.getBindingState as jest.Mock
+    ).mockResolvedValue({
+      deviceId: 'desktop-1',
+      deviceName: 'Studio Mac',
+      host: '192.168.1.10',
+    });
+
+    renderRootNavigator();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy(),
+    );
+    expect(screen.queryByTestId('global-login-screen')).toBeNull();
+    expect(wipeSyncIdentity).not.toHaveBeenCalled();
+  });
+
+  test('guest local stack keeps pairing invalidation watcher active', async () => {
+    (
+      NativeModules.NativeSyncEngine.getBindingState as jest.Mock
+    ).mockResolvedValue({
+      deviceId: 'desktop-1',
+      deviceName: 'Studio Mac',
+      host: '192.168.1.10',
+    });
+
+    renderRootNavigator();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy(),
+    );
+    expect(nativeListeners.onPairingInvalidated).toBeDefined();
+
+    await act(async () => {
+      nativeListeners.onPairingInvalidated?.({
+        reason: 'desktop_reset_code',
+      });
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+    );
+    expect(screen.getByText(/reason=pairing_invalidated/)).toBeTruthy();
+  });
+
+  test('persisted official tokens without a profile still fail open to local LAN', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoggedIn: true,
+      isLoading: false,
+      accessToken: 'stale-access-token',
+      refreshToken: 'stale-refresh-token',
+      user: null,
+      subscription: null,
+      profileLoading: false,
+      profileError: null,
+      signedOutTransition: null,
+      clearAuth: jest.fn(),
+      setSignedOutTransition: jest.fn(),
+    });
 
     renderRootNavigator();
 
     await waitFor(() =>
       expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
     );
-    expect(screen.getByText(/reason=pairing_invalidated/)).toBeTruthy();
-    expect(screen.queryByTestId('global-sync-activity-screen')).toBeNull();
+    expect(wipeSyncIdentity).not.toHaveBeenCalled();
   });
 
-  test.each([
-    { reason: 123 },
-    new Date('2026-06-24T00:00:00.000Z'),
-    ['desktop_reset_code'],
-  ])(
-    'cold-start invalid persisted invalidation state falls back to bound default route: %p',
-    async invalidation => {
-      (
-        NativeModules.NativeSyncEngine.getBindingInvalidationState as jest.Mock
-      ).mockResolvedValue(invalidation);
+  test('profile load errors from stale commercial sessions do not block LAN screens', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoggedIn: true,
+      isLoading: false,
+      accessToken: 'stale-access-token',
+      refreshToken: 'stale-refresh-token',
+      user: null,
+      subscription: null,
+      profileLoading: false,
+      profileError: { message: 'profile server unavailable' },
+      signedOutTransition: null,
+      clearAuth: jest.fn(),
+      setSignedOutTransition: jest.fn(),
+    });
 
-      renderRootNavigator();
+    renderRootNavigator();
 
-      await waitFor(() =>
-        expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy(),
-      );
-      expect(screen.queryByTestId('global-device-discovery-screen')).toBeNull();
-    },
-  );
+    await waitFor(() =>
+      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+    );
+    expect(screen.queryByText('profile server unavailable')).toBeNull();
+    expect(wipeSyncIdentity).not.toHaveBeenCalled();
+  });
 });

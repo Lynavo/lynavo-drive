@@ -24,7 +24,7 @@ jest.mock('../config', () => ({
   getBaseUrl: () => 'https://api.test',
 }));
 
-import { apiGet, apiPostNoAuth } from '../api';
+import { apiPostNoAuth, ERROR_CODE } from '../api';
 
 type TestGlobal = typeof globalThis & {
   __DEV__?: boolean;
@@ -52,23 +52,13 @@ describe('api dev sandbox mock tokens', () => {
     testGlobal.fetch = originalFetch;
   });
 
-  test('returns local TURN credentials without hitting the network', async () => {
-    await expect(apiGet('/tunnel/turn-credentials')).resolves.toEqual({
-      username: 'visual-qa',
-      credential: 'visual-qa',
-      urls: ['turn:127.0.0.1:3478?transport=udp'],
-    });
-    expect(testGlobal.fetch).not.toHaveBeenCalled();
-  });
-
-  test('returns local refresh response without clearing auth', async () => {
+  test('rejects auth refresh without hitting network in the OSS runtime', async () => {
     await expect(
       apiPostNoAuth('/auth/refresh', {
         refresh_token: 'mock-sandbox-refresh-token',
       }),
-    ).resolves.toEqual({
-      access_token: 'mock-sandbox-access-token:qa@example.com',
-      refresh_token: 'mock-sandbox-refresh-token',
+    ).rejects.toMatchObject({
+      code: ERROR_CODE.TOKEN_INVALID,
     });
     expect(mockSetTokensFromApi).not.toHaveBeenCalled();
     expect(mockClearAuthFromApi).not.toHaveBeenCalled();

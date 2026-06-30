@@ -18,17 +18,25 @@ export function SharedFilesScreen() {
 
   const openPhoneSyncSpace = () => {
     recordDiagnosticsLog('PhoneSyncSpace', 'entry pressed', {
-      market: 'cn',
       screen: 'SharedFilesScreen',
     });
     navigation.navigate('PhoneSyncSpace');
+  };
+
+  const openRemoteAccess = () => {
+    recordDiagnosticsLog('RemoteAccess', 'local LAN entry pressed', {
+      screen: 'SharedFilesScreen',
+    });
+    navigation.navigate('RemoteAccess');
   };
 
   return (
     <GradientBackground>
       <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>{t('sharedFiles.title') || '遠端資源'}</Text>
+          <Text style={styles.headerTitle}>
+            {t('sharedFiles.title') || '遠端資源'}
+          </Text>
         </View>
 
         <View style={styles.cardContainer}>
@@ -37,7 +45,12 @@ export function SharedFilesScreen() {
             activeOpacity={0.8}
             onPress={openPhoneSyncSpace}
           >
-            <View style={[styles.iconWrapper, { backgroundColor: 'rgba(59, 130, 246, 0.08)' }]}>
+            <View
+              style={[
+                styles.iconWrapper,
+                { backgroundColor: 'rgba(59, 130, 246, 0.08)' },
+              ]}
+            >
               <Icon name="phone-portrait-outline" size={36} color="#3b82f6" />
             </View>
             <View style={styles.cardInfo}>
@@ -45,7 +58,8 @@ export function SharedFilesScreen() {
                 {t('sharedFiles.phoneSyncSpace.title') || '手機同步空間'}
               </Text>
               <Text style={styles.cardDescription}>
-                {t('sharedFiles.phoneSyncSpace.desc') || '檢視已同步至電腦的檔案與上傳來源'}
+                {t('sharedFiles.phoneSyncSpace.desc') ||
+                  '檢視已同步至電腦的檔案與上傳來源'}
               </Text>
             </View>
             <Icon name="chevron-forward" size={24} color="#94a3b8" />
@@ -54,9 +68,14 @@ export function SharedFilesScreen() {
           <TouchableOpacity
             style={styles.card}
             activeOpacity={0.8}
-            onPress={() => navigation.navigate('RemoteAccess')}
+            onPress={openRemoteAccess}
           >
-            <View style={[styles.iconWrapper, { backgroundColor: 'rgba(139, 92, 246, 0.08)' }]}>
+            <View
+              style={[
+                styles.iconWrapper,
+                { backgroundColor: 'rgba(139, 92, 246, 0.08)' },
+              ]}
+            >
               <Icon name="desktop-outline" size={36} color="#8b5cf6" />
             </View>
             <View style={styles.cardInfo}>
@@ -64,7 +83,8 @@ export function SharedFilesScreen() {
                 {t('sharedFiles.remoteAccess.title') || '遠端訪問電腦'}
               </Text>
               <Text style={styles.cardDescription}>
-                {t('sharedFiles.remoteAccess.desc') || '流覽電腦端共享的目錄結構並下載文件'}
+                {t('sharedFiles.remoteAccess.desc') ||
+                  '流覽電腦端共享的目錄結構並下載文件'}
               </Text>
             </View>
             <Icon name="chevron-forward" size={24} color="#94a3b8" />

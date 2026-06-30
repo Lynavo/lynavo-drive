@@ -78,10 +78,6 @@ jest.mock('../../components/Icon', () => ({
   },
 }));
 
-jest.mock('../../components/SubscriptionStatusIcon', () => ({
-  SubscriptionStatusIcon: () => null,
-}));
-
 jest.mock('../../services/SyncEngineModule', () => ({
   cancelAllManualUploads: jest.fn().mockResolvedValue(undefined),
   disableAutoUpload: jest.fn().mockResolvedValue(undefined),
@@ -106,12 +102,6 @@ jest.mock('../../stores/auth-store', () => ({
     },
   }),
   isFeatureAccessAllowed: () => true,
-}));
-
-jest.mock('../../constants/features', () => ({
-  FEATURES: {
-    SUBSCRIPTION_ENFORCEMENT: false,
-  },
 }));
 
 import { SyncActivityScreen } from '../SyncActivityScreen';

@@ -11,6 +11,7 @@ enum SharedFilesRoutePolicy {
     static let sharedFileTunnelHeartbeatGracePeriod: TimeInterval = 3
     static let sharedFileTunnelRouteWaitTimeout: TimeInterval = 4
     static let sharedFileDownloadMaxAttempts = 4
+    private static let ossPublicWakeEnabled = false
     private static let sharedFilePathSegmentAllowedCharacters: CharacterSet = {
         var allowed = CharacterSet.alphanumerics
         allowed.insert(charactersIn: "-._~")
@@ -338,7 +339,8 @@ enum SharedFilesRoutePolicy {
         trigger: String
     ) -> Bool {
         shouldAttemptWake(scope: scope, path: path, operation: operation) &&
-            trigger == "shared_files_root_browse"
+            trigger == "shared_files_root_browse" &&
+            ossPublicWakeEnabled
     }
 
     static func peerProxySkipReasons(

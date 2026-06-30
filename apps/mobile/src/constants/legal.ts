@@ -1,4 +1,4 @@
-import { marketConfig } from '../markets';
+import { appConfig } from '../config/app-config';
 
-export const USER_AGREEMENT_URL = marketConfig.termsUrl;
-export const PRIVACY_POLICY_URL = marketConfig.privacyUrl;
+export const USER_AGREEMENT_URL = appConfig.legal.termsUrl;
+export const PRIVACY_POLICY_URL = appConfig.legal.privacyUrl;

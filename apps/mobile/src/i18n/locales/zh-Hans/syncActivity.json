@@ -132,15 +132,6 @@
     "globalSharedFilesTitle": "我的电脑",
     "globalSharedFilesDesc": "浏览我的电脑中的文件"
   },
-  "trialUpgrade": {
-    "entry": "免费试用剩余 {{days}} 天，点击升级 Pro 解锁全部功能"
-  },
-  "expired": {
-    "title": "试用已结束",
-    "subtitle": "订阅后可继续使用素材上传、自动上传与共享文件访问",
-    "subscribeCta": "立即订阅",
-    "viewHelp": "查看帮助"
-  },
   "onboarding": {
     "skip": "跳过引导",
     "previous": "上一步",
@@ -160,7 +151,7 @@
     },
     "settings": {
       "title": "全局设置",
-      "body": "查看当前连接的设备与订阅状态，修改手机显示名称，或获取技术支持。"
+      "body": "查看当前连接的设备，修改手机显示名称，或获取技术支持。"
     },
     "help": {
       "title": "帮助中心",
