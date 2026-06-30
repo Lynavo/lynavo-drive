@@ -76,7 +76,7 @@ if [[ "${SYNCFLOW_ANDROID_PRINT_DEVICE_ONLY:-}" == "1" ]]; then
   exit 0
 fi
 
-echo "Installing SyncFlowMobile Android debug build on $device_model ($selected_device)..."
+echo "Installing LynavoDrive Android debug build on $device_model ($selected_device)..."
 (
   cd "$ANDROID_DIR"
   ANDROID_SERIAL="$selected_device" ./gradlew "$INSTALL_TASK"
@@ -102,5 +102,5 @@ if ! metro_ready; then
   done
 fi
 
-echo "Launching SyncFlowMobile Android on $device_model ($selected_device)..."
+echo "Launching LynavoDrive Android on $device_model ($selected_device)..."
 adb -s "$selected_device" shell am start -n "$APP_ID/$MAIN_ACTIVITY"

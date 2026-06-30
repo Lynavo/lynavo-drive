@@ -46,9 +46,12 @@ assert.equal(iosNoMetroConfig.request, 'launch');
 assert.equal(iosNoMetroConfig.preLaunchTask, 'mobile: start metro');
 assert.match(
   iosNoMetroConfig.command,
-  /corepack pnpm --filter @lynavo-drive\/mobile exec react-native run-ios .*--scheme "SyncFlowMobile" .*--mode "Debug" .*--no-packager/,
+  /corepack pnpm --filter @lynavo-drive\/mobile exec react-native run-ios .*--scheme "LynavoDrive" .*--mode "Debug" .*--no-packager/,
 );
-assert.doesNotMatch(iosNoMetroConfig.command, /SyncFlowMobileGlobal|DebugGlobal|SYNCFLOW_MARKET/);
+assert.doesNotMatch(
+  iosNoMetroConfig.command,
+  /SyncFlowMobileGlobal|LynavoDriveGlobal|DebugGlobal|SYNCFLOW_MARKET/,
+);
 
 const iosDeviceConfig = launch.configurations.find(
   (configuration) => configuration.name === 'Mobile: iOS (macOS)',

@@ -131,7 +131,7 @@ function getAppInfo() {
 function resolveBuildNumber() {
 	const fallback = "";
 	const packagedPackageJson = (0, node_path.join)(electron.app.getAppPath(), "package.json");
-	const repoProject = (0, node_path.join)(process.cwd(), "apps", "mobile", "ios", "SyncFlowMobile.xcodeproj", "project.pbxproj");
+	const repoProject = (0, node_path.join)(process.cwd(), "apps", "mobile", "ios", "LynavoDrive.xcodeproj", "project.pbxproj");
 	try {
 		const packaged = require(packagedPackageJson);
 		if (packaged.syncflowBuildNumber) return packaged.syncflowBuildNumber;

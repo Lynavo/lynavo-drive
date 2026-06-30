@@ -27,7 +27,7 @@ process.stdout.write(require.resolve(`hermes-compiler/hermesc/\${osBin}`, {
 }
 
 def resolveIosBuildSetting(String settingName) {
-    def projectFile = file("../../ios/SyncFlowMobile.xcodeproj/project.pbxproj")
+    def projectFile = file("../../ios/LynavoDrive.xcodeproj/project.pbxproj")
     def matcher = projectFile.text =~ /${settingName} = ([^;]+);/
 
     if (!matcher.find()) {

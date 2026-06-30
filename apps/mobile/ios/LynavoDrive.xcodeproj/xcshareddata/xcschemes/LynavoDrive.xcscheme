@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-               BuildableName = "SyncFlowMobile.app"
-               BlueprintName = "SyncFlowMobile"
-               ReferencedContainer = "container:SyncFlowMobile.xcodeproj">
+               BuildableName = "LynavoDrive.app"
+               BlueprintName = "LynavoDrive"
+               ReferencedContainer = "container:LynavoDrive.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -28,17 +28,6 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES">
       <Testables>
-         <TestableReference
-            skipped = "NO"
-            useTestSelectionWhitelist = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "00E356ED1AD99517003FC87E"
-               BuildableName = "SyncFlowMobileTests.xctest"
-               BlueprintName = "SyncFlowMobileTests"
-               ReferencedContainer = "container:SyncFlowMobile.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
@@ -56,9 +45,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "SyncFlowMobile.app"
-            BlueprintName = "SyncFlowMobile"
-            ReferencedContainer = "container:SyncFlowMobile.xcodeproj">
+            BuildableName = "LynavoDrive.app"
+            BlueprintName = "LynavoDrive"
+            ReferencedContainer = "container:LynavoDrive.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -73,9 +62,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "SyncFlowMobile.app"
-            BlueprintName = "SyncFlowMobile"
-            ReferencedContainer = "container:SyncFlowMobile.xcodeproj">
+            BuildableName = "LynavoDrive.app"
+            BlueprintName = "LynavoDrive"
+            ReferencedContainer = "container:LynavoDrive.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

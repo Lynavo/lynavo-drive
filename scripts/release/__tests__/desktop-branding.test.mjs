@@ -23,7 +23,7 @@ function readAndroidBuildGradle() {
 
 function readMobileIosVersions() {
   const project = readFileSync(
-    resolve(repoRoot, 'apps/mobile/ios/SyncFlowMobile.xcodeproj/project.pbxproj'),
+    resolve(repoRoot, 'apps/mobile/ios/LynavoDrive.xcodeproj/project.pbxproj'),
     'utf8',
   );
   const marketingVersions = new Set(
@@ -85,7 +85,7 @@ test('android package version and build number resolve from the mobile iOS relea
 
   assert.match(
     buildGradle,
-    /file\("\.\.\/\.\.\/ios\/SyncFlowMobile\.xcodeproj\/project\.pbxproj"\)/,
+    /file\("\.\.\/\.\.\/ios\/LynavoDrive\.xcodeproj\/project\.pbxproj"\)/,
   );
   assert.match(buildGradle, /versionCode\s+resolveIosBuildNumber\(\)\.toInteger\(\)/);
   assert.match(buildGradle, /versionName\s+resolveIosMarketingVersion\(\)/);

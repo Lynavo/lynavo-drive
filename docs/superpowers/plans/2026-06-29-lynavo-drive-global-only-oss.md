@@ -334,16 +334,16 @@ pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 
 **Files:**
 
-- Modify: `apps/mobile/ios/SyncFlowMobile.xcodeproj/project.pbxproj`
-- Modify/Delete: `apps/mobile/ios/SyncFlowMobile.xcodeproj/xcshareddata/xcschemes/*`
-- Modify: `apps/mobile/ios/SyncFlowMobile/Info.plist`
-- Modify: `apps/mobile/ios/SyncFlowMobile/AppleAuthModule.swift`
-- Modify: `apps/mobile/ios/SyncFlowMobile/SyncFlowMobile.entitlements`
-- Delete or merge: `apps/mobile/ios/SyncFlowMobile/SyncFlowMobileGlobal.entitlements`
+- Modify: `apps/mobile/ios/LynavoDrive.xcodeproj/project.pbxproj`
+- Modify/Delete: `apps/mobile/ios/LynavoDrive.xcodeproj/xcshareddata/xcschemes/*`
+- Modify: `apps/mobile/ios/LynavoDrive/Info.plist`
+- Modify: `apps/mobile/ios/LynavoDrive/AppleAuthModule.swift`
+- Modify: `apps/mobile/ios/LynavoDrive/LynavoDrive.entitlements`
+- Delete or merge: `apps/mobile/ios/LynavoDrive/LynavoDriveGlobal.entitlements`
 - Modify: `apps/mobile/ios/Podfile`
 - Modify: `apps/mobile/ios/scripts/testflight-release.sh`
 
-- [x] Choose one surviving scheme for this task: `SyncFlowMobile` as a compatibility name, or `LynavoDrive` if all scripts/tests are updated together.
+- [x] Choose one surviving scheme for this task: `LynavoDrive`.
 - [x] Remove `DebugGlobal` / `ReleaseGlobal` and `SYNCFLOW_MARKET`.
 - [x] Remove `SyncFlowMarket` from `Info.plist` and `AppleAuthModule` constants.
 - [x] Preserve Apple Sign-In entitlement in the surviving entitlement file.
@@ -354,7 +354,7 @@ pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 
 ```bash
 cd apps/mobile/ios && pod install
-cd apps/mobile/ios && xcodebuild -workspace SyncFlowMobile.xcworkspace -scheme SyncFlowMobile -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+cd apps/mobile/ios && xcodebuild -workspace LynavoDrive.xcworkspace -scheme LynavoDrive -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
@@ -553,7 +553,7 @@ pnpm test
 - Modify: `packages/contracts/src/protocol.ts`
 
 - [x] Rename Android package/namespace and FileProvider authority. No legacy keychain/shared prefs compatibility is required for the OSS baseline.
-- [ ] Rename iOS target/project directories only if Xcode scheme/build commands are updated and verified.
+- [x] Rename iOS target/project directories only if Xcode scheme/build commands are updated and verified.
 - [x] Rename sidecar binary to `lynavo-drive-sidecar`.
 - [x] Drop legacy data-dir compatibility; fresh OSS state uses `Lynavo Drive` only.
 - [x] Decide mDNS compatibility: Lynavo Drive is incompatible with old `_syncflow._tcp` clients and uses `_lynavodrive._tcp` only.
@@ -564,7 +564,7 @@ pnpm test
 ```bash
 cd services/sidecar-go && go test ./...
 cd apps/mobile/android && ./gradlew test assembleDebug
-cd apps/mobile/ios && xcodebuild -workspace SyncFlowMobile.xcworkspace -scheme SyncFlowMobile -configuration Debug -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
+cd apps/mobile/ios && xcodebuild -workspace LynavoDrive.xcworkspace -scheme LynavoDrive -configuration Debug -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
 pnpm build
 pnpm typecheck
 ```
@@ -587,7 +587,7 @@ Native release builds are required before shipping but may be deferred if the cu
 
 ```bash
 cd apps/mobile/android && ./gradlew test assembleDebug assembleRelease
-cd apps/mobile/ios && xcodebuild -workspace SyncFlowMobile.xcworkspace -scheme SyncFlowMobile -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+cd apps/mobile/ios && xcodebuild -workspace LynavoDrive.xcworkspace -scheme LynavoDrive -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
 Native verification update, 2026-06-30:

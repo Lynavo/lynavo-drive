@@ -11,7 +11,7 @@ const DEV_TARGETS = new Set([
   'mobile-ios-device',
   'mobile-android',
 ]);
-const NATIVE_IOS_SCHEME = 'SyncFlowMobile';
+const NATIVE_IOS_SCHEME = 'LynavoDrive';
 const NATIVE_IOS_MODE = 'Debug';
 
 export function buildDevRunPlan({ profileName, target, extraArgs = [] }) {

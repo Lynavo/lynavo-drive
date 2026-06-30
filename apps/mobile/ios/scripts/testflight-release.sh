@@ -10,8 +10,8 @@ if [[ $# -gt 1 ]]; then
   echo "Ignoring deprecated iOS profile argument: $2" >&2
 fi
 
-WORKSPACE="${IOS_DIR}/SyncFlowMobile.xcworkspace"
-SCHEME="${SCHEME:-SyncFlowMobile}"
+WORKSPACE="${IOS_DIR}/LynavoDrive.xcworkspace"
+SCHEME="${SCHEME:-LynavoDrive}"
 CONFIGURATION="${CONFIGURATION:-Release}"
 APPLE_API_KEY_ID="${APPLE_API_KEY_ID:-AMY9XVV3LD}"
 APPLE_API_ISSUER="${APPLE_API_ISSUER:-8de17ec0-4bff-4ab2-8c01-ace1f9307147}"
@@ -25,7 +25,7 @@ if [[ -z "${APPLE_API_KEY:-}" ]]; then
   APPLE_API_KEY="${REPO_ROOT}/AuthKey_${APPLE_API_KEY_ID}.p8"
 fi
 
-PROJECT_FILE="${IOS_DIR}/SyncFlowMobile.xcodeproj/project.pbxproj"
+PROJECT_FILE="${IOS_DIR}/LynavoDrive.xcodeproj/project.pbxproj"
 MOBILE_CONFIG_FILE="${MOBILE_CONFIG_FILE:-${REPO_ROOT}/apps/mobile/src/config/app-config.ts}"
 CONTRACTS_ENDPOINTS_FILE="${CONTRACTS_ENDPOINTS_FILE:-${REPO_ROOT}/packages/contracts/src/service-endpoints.ts}"
 MARKETING_VERSION="$(sed -n 's/.*MARKETING_VERSION = \([^;]*\);/\1/p' "${PROJECT_FILE}" | head -n 1 | tr -d '[:space:]')"

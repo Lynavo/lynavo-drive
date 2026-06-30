@@ -20,7 +20,7 @@
     "dev:mobile:android:prod": "node scripts/dev/run-release-profile.mjs --profile prod --target mobile-android",
     "profile:mobile:prod": "node scripts/dev/run-release-profile.mjs --profile prod --target mobile-metro --set-mobile-profile-only",
     "profile:mobile:reset": "node scripts/dev/run-release-profile.mjs --reset-mobile-profile",
-    "build:mobile": "cd apps/mobile/ios && xcodebuild -workspace SyncFlowMobile.xcworkspace -scheme SyncFlowMobile -destination 'generic/platform=iOS' -configuration Debug CODE_SIGNING_ALLOWED=NO build",
+    "build:mobile": "cd apps/mobile/ios && xcodebuild -workspace LynavoDrive.xcworkspace -scheme LynavoDrive -destination 'generic/platform=iOS' -configuration Debug CODE_SIGNING_ALLOWED=NO build",
     "build:mobile:android": "pnpm --filter @lynavo-drive/mobile build:android",
     "dev:sidecar": "cd services/sidecar-go && make run",
     "build:sidecar": "cd services/sidecar-go && make build",

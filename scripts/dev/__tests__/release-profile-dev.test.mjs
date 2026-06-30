@@ -48,7 +48,7 @@ test('builds review iOS dev command with the single native scheme and mobile pro
     'react-native',
     'run-ios',
     '--scheme',
-    'SyncFlowMobile',
+    'LynavoDrive',
     '--mode',
     'Debug',
     '--simulator',

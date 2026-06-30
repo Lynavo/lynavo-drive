@@ -4,8 +4,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../../.." && pwd)"
-IOS_WORKSPACE="${REPO_ROOT}/apps/mobile/ios/SyncFlowMobile.xcworkspace"
-IOS_SCHEME="SyncFlowMobile"
+IOS_WORKSPACE="${REPO_ROOT}/apps/mobile/ios/LynavoDrive.xcworkspace"
+IOS_SCHEME="LynavoDrive"
 
 # Default Lynavo MAS Apple API Key (same as Developer ID for simplicity)
 DEFAULT_API_KEY="${REPO_ROOT}/AuthKey_AMY9XVV3LD.p8"

@@ -332,7 +332,7 @@ pnpm release --profile review --targets android,mac,win,linux
 ```
 
 Android release target 會透過 Gradle 從
-`apps/mobile/ios/SyncFlowMobile.xcodeproj/project.pbxproj` 讀取
+`apps/mobile/ios/LynavoDrive.xcodeproj/project.pbxproj` 讀取
 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION`，不要在
 `apps/mobile/android/app/build.gradle` 另外手動維護 Android
 `versionName` / `versionCode`。

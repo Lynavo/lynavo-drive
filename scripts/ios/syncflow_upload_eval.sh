@@ -567,7 +567,7 @@ obj = json.load(open(sys.argv[1], encoding="utf-8"))
 for proc in obj.get("result", {}).get("runningProcesses", []):
     executable = proc.get("executable", "")
     pid = proc.get("processIdentifier")
-    if "SyncFlowMobile.app/SyncFlowMobile" in executable and pid is not None:
+    if "LynavoDrive.app/LynavoDrive" in executable and pid is not None:
         print(pid)
         raise SystemExit(0)
 raise SystemExit(1)

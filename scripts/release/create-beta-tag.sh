@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
-WORKSPACE="$ROOT_DIR/apps/mobile/ios/SyncFlowMobile.xcworkspace"
-SCHEME="SyncFlowMobile"
+WORKSPACE="$ROOT_DIR/apps/mobile/ios/LynavoDrive.xcworkspace"
+SCHEME="LynavoDrive"
 
 if [[ ! -d "$ROOT_DIR/.git" && ! -f "$ROOT_DIR/.git" ]]; then
   echo "Not in git repository root: $ROOT_DIR" >&2

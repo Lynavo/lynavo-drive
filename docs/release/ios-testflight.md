@@ -40,7 +40,7 @@ Native identity / bundle id migration is deferred to the later native migration 
 
 位置：
 
-- [project.pbxproj](/Volumes/workspace/work/sync-flow/apps/mobile/ios/SyncFlowMobile.xcodeproj/project.pbxproj)
+- [project.pbxproj](/Volumes/workspace/work/sync-flow/apps/mobile/ios/LynavoDrive.xcodeproj/project.pbxproj)
 
 当前建议：
 

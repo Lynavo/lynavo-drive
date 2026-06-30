@@ -67,7 +67,7 @@ print("{}\t{}".format(selected.get("identifier"), selected.get("name")))
 device_id="${selection%%	*}"
 device_name="${selection#*	}"
 
-echo "Launching SyncFlowMobile on ${device_name} (${device_id})..."
+echo "Launching LynavoDrive on ${device_name} (${device_id})..."
 
 if [[ "${SYNCFLOW_IOS_PRINT_DEVICE_ONLY:-}" == "1" ]]; then
   exit 0
@@ -82,7 +82,7 @@ unset VSCODE_DEBUGGING
 
 exec corepack pnpm --filter @lynavo-drive/mobile exec react-native run-ios \
   --device "${device_id}" \
-  --scheme "SyncFlowMobile" \
+  --scheme "LynavoDrive" \
   --mode "Debug" \
   --no-packager \
   "$@"

@@ -5,8 +5,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../../.." && pwd)"
 TARGET="${1:-dmg}"
-IOS_WORKSPACE="${REPO_ROOT}/apps/mobile/ios/SyncFlowMobile.xcworkspace"
-IOS_SCHEME="SyncFlowMobile"
+IOS_WORKSPACE="${REPO_ROOT}/apps/mobile/ios/LynavoDrive.xcworkspace"
+IOS_SCHEME="LynavoDrive"
 DESKTOP_PACKAGE_JSON="${REPO_ROOT}/apps/desktop/package.json"
 ELECTRON_BUILDER_CONFIG="electron-builder.yml"
 

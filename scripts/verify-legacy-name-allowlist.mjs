@@ -187,11 +187,11 @@ const ALLOWED_EXACT_PATHS = new Map([
     allowTerms(['syncflow'], 'Go module import path remains before module rename.'),
   ],
   [
-    'apps/mobile/ios/SyncFlowMobile/AuthKeychainCleaner.swift',
+    'apps/mobile/ios/LynavoDrive/AuthKeychainCleaner.swift',
     allowAny('Keychain migration strings preserve access to existing credentials.'),
   ],
   [
-    'apps/mobile/ios/SyncFlowMobile/AppleAuthModule.swift',
+    'apps/mobile/ios/LynavoDrive/AppleAuthModule.swift',
     allowAny('Keychain migration strings and build settings preserve existing installs.'),
   ],
   [

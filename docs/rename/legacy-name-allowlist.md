@@ -43,8 +43,8 @@ It scans hidden files and directories, while explicitly skipping generated build
 | `services/sidecar-go/internal/config/config.go`                  | Device IP override env name remains before env rename.                                                                        |
 | `services/sidecar-go/cmd/syncflow-sidecar/main.go`               | Go module path and sidecar config entrypoint names remain before cmd/module rename.                                           |
 | `services/sidecar-go/cmd/syncflow-sidecar/main_test.go`          | Go module import path remains before module rename.                                                                           |
-| `apps/mobile/ios/SyncFlowMobile/AuthKeychainCleaner.swift`       | Keychain migration strings preserve access to existing credentials.                                                           |
-| `apps/mobile/ios/SyncFlowMobile/AppleAuthModule.swift`           | Keychain migration strings and build settings preserve existing installs.                                                     |
+| `apps/mobile/ios/LynavoDrive/AuthKeychainCleaner.swift`          | Keychain migration strings preserve access to existing credentials.                                                           |
+| `apps/mobile/ios/LynavoDrive/AppleAuthModule.swift`              | Keychain migration strings and build settings preserve existing installs.                                                     |
 | `apps/mobile/src/utils/clearUserScopedStorage.ts`                | Shared-preference and storage migration strings preserve existing installs.                                                   |
 | `apps/mobile/src/utils/__tests__/clearUserScopedStorage.test.ts` | Shared-preference migration test coverage.                                                                                    |
 | `apps/mobile/src/screens/*GlobalScreen.tsx`                      | Temporary post-market-removal filenames retained to avoid broad mobile UI import churn; follow-up rename can drop the suffix. |

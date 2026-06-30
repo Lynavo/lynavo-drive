@@ -48,8 +48,8 @@ cd /Volumes/workspace/work/sync-flow
 pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 
 cd /Volumes/workspace/work/sync-flow/apps/mobile/ios
-xcodebuild -workspace SyncFlowMobile.xcworkspace -scheme SyncFlowMobile -configuration Debug -destination 'generic/platform=iOS' build
-xcodebuild -workspace SyncFlowMobile.xcworkspace -scheme SyncFlowMobile -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
+xcodebuild -workspace LynavoDrive.xcworkspace -scheme LynavoDrive -configuration Debug -destination 'generic/platform=iOS' build
+xcodebuild -workspace LynavoDrive.xcworkspace -scheme LynavoDrive -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
 
 cd /Volumes/workspace/work/sync-flow/apps/mobile/android
 ./gradlew assembleDebug

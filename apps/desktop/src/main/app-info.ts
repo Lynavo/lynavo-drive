@@ -22,7 +22,7 @@ export function resolveBuildNumber(): string {
     'apps',
     'mobile',
     'ios',
-    'SyncFlowMobile.xcodeproj',
+    'LynavoDrive.xcodeproj',
     'project.pbxproj',
   );
 

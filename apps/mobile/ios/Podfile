@@ -5,7 +5,7 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
-project 'SyncFlowMobile'
+project 'LynavoDrive'
 
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
@@ -22,7 +22,7 @@ ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
 # glog 0.3.5 source build is broken (NO_THREADS / pread / mutex.h issues).
 ENV['RCT_USE_RN_DEP'] = '1'
 
-target 'SyncFlowMobile' do
+target 'LynavoDrive' do
   config = use_native_modules!
   hermes_cli_path = '${PODS_ROOT}/hermes-engine/destroot/bin/hermesc'
 
