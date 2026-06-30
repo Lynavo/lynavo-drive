@@ -6,7 +6,7 @@ import {
   type DesktopSharedResourceDTO,
   type DesktopSyncRecordDTO,
   type ReceivedLibraryItemDTO,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 import { IPC, registerIpcHandlers } from '../ipc-handlers';
 import { checkForUpdates, uploadDiagnostics } from '../diagnostics';
 import { sidecarClient } from '../sidecar-client';

@@ -32,7 +32,7 @@ import {
   X,
 } from 'lucide-react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { SIDECAR_HTTP_PORT, type BindingStateDTO } from '@syncflow/contracts';
+import { SIDECAR_HTTP_PORT, type BindingStateDTO } from '@lynavo-drive/contracts';
 
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/globalColors';

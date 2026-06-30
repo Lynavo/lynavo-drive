@@ -15,8 +15,8 @@ import type {
   SharedDirectoryDTO,
   ShareStatusDTO,
   SortDirection,
-} from '@syncflow/contracts';
-import type { SidecarEvent } from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
+import type { SidecarEvent } from '@lynavo-drive/contracts';
 import type { BonjourInstallResult } from '../shared/bonjour';
 import type { SidecarRuntimeState } from '../shared/sidecar-runtime';
 

@@ -4,7 +4,7 @@
 
 **Goal:** Add desktop-local connection device management so successful mobile pairings become authorized devices, wrong connection-code attempts are counted per `clientId + desktopDeviceId`, and a phone is permanently blocked on that desktop after 5 wrong attempts until the desktop user clears it.
 
-**Architecture:** `@syncflow/contracts` defines the shared DTOs and stable error codes. The Go sidecar owns SQLite persistence, LMUP pairing decisions, block enforcement, and HTTP management APIs; Electron main/preload bridges those APIs to the renderer; the renderer adds a settings section for authorized devices, blocked clients, and recent attempts. Mobile native layers propagate structured pairing error codes and metadata to React Native, where `CodeVerifyScreen` displays the correct localized message.
+**Architecture:** `@lynavo-drive/contracts` defines the shared DTOs and stable error codes. The Go sidecar owns SQLite persistence, LMUP pairing decisions, block enforcement, and HTTP management APIs; Electron main/preload bridges those APIs to the renderer; the renderer adds a settings section for authorized devices, blocked clients, and recent attempts. Mobile native layers propagate structured pairing error codes and metadata to React Native, where `CodeVerifyScreen` displays the correct localized message.
 
 **Tech Stack:** TypeScript, Electron IPC/preload bridge, React 18.3, Zustand, Vitest, Go `net/http`, Go SQLite via `mattn/go-sqlite3`, React Native, Swift, Kotlin
 
@@ -172,7 +172,7 @@ it('exports connection device management DTOs and pairing error codes', () => {
 Run:
 
 ```bash
-pnpm --filter @syncflow/contracts test -- exports
+pnpm --filter @lynavo-drive/contracts test -- exports
 ```
 
 Expected: FAIL because `ConnectionDeviceDTO`, `BlockedPairingClientDTO`, `PairingAttemptDTO`, `ConnectionDevicesSettingsDTO`, `PairingErrorMetadataDTO`, `PAIRING_CODE_INVALID`, and `PAIRING_CLIENT_BLOCKED` are not exported yet.
@@ -277,8 +277,8 @@ export interface ConnectionDevicesSettingsDTO {
 Run:
 
 ```bash
-pnpm --filter @syncflow/contracts test -- exports
-pnpm --filter @syncflow/contracts build
+pnpm --filter @lynavo-drive/contracts test -- exports
+pnpm --filter @lynavo-drive/contracts build
 ```
 
 Expected: PASS. The build should emit updated type declarations.
@@ -2053,7 +2053,7 @@ it('maps connection device management calls to IPC channels', async () => {
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- sidecar-client ipc-handlers preload
+pnpm --filter @lynavo-drive/desktop test -- sidecar-client ipc-handlers preload
 ```
 
 Expected: FAIL because methods and IPC channels do not exist.
@@ -2068,7 +2068,7 @@ import type {
   DeviceFileLedgerPageDTO,
   DeviceFileSortField,
   SortDirection,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 ```
 
 Add methods in `sidecarClient`:
@@ -2139,7 +2139,7 @@ In `apps/desktop/src/preload/api.d.ts`, import `ConnectionDevicesSettingsDTO` an
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- sidecar-client ipc-handlers preload
+pnpm --filter @lynavo-drive/desktop test -- sidecar-client ipc-handlers preload
 ```
 
 Expected: PASS.
@@ -2165,7 +2165,7 @@ Create `apps/desktop/src/renderer/stores/__tests__/connection-devices-store.test
 
 ```typescript
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ConnectionDevicesSettingsDTO } from '@syncflow/contracts';
+import type { ConnectionDevicesSettingsDTO } from '@lynavo-drive/contracts';
 import { useConnectionDevicesStore } from '../connection-devices-store';
 
 const fixture: ConnectionDevicesSettingsDTO = {
@@ -2246,7 +2246,7 @@ describe('connection devices store', () => {
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- connection-devices-store
+pnpm --filter @lynavo-drive/desktop test -- connection-devices-store
 ```
 
 Expected: FAIL because the store does not exist.
@@ -2257,7 +2257,7 @@ Create `apps/desktop/src/renderer/stores/connection-devices-store.ts`:
 
 ```typescript
 import { create } from 'zustand';
-import type { ConnectionDevicesSettingsDTO } from '@syncflow/contracts';
+import type { ConnectionDevicesSettingsDTO } from '@lynavo-drive/contracts';
 
 const emptyConnectionDevices: ConnectionDevicesSettingsDTO = {
   authorizedDevices: [],
@@ -2332,7 +2332,7 @@ export const useConnectionDevicesStore = create<ConnectionDevicesState>((set, ge
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- connection-devices-store
+pnpm --filter @lynavo-drive/desktop test -- connection-devices-store
 ```
 
 Expected: PASS.
@@ -2456,7 +2456,7 @@ it('shows the connection devices settings section', () => {
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- ConnectionDevicesSection SettingsPage
+pnpm --filter @lynavo-drive/desktop test -- ConnectionDevicesSection SettingsPage
 ```
 
 Expected: FAIL because the section and translation keys do not exist.
@@ -2698,7 +2698,7 @@ Insert after the connection-code section:
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- ConnectionDevicesSection SettingsPage
+pnpm --filter @lynavo-drive/desktop test -- ConnectionDevicesSection SettingsPage
 ```
 
 Expected: PASS.
@@ -2787,7 +2787,7 @@ async function enterCode(code: string) {
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- CodeVerifyScreen
+pnpm --filter @lynavo-drive/mobile test -- CodeVerifyScreen
 ```
 
 Expected: FAIL because stable pairing error mapping is missing.
@@ -2947,8 +2947,8 @@ In `apps/mobile/ios/SyncEngine/RNBridge.swift`, update `pairDevice` catch handli
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- CodeVerifyScreen
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test -- CodeVerifyScreen
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 Expected: PASS.
@@ -3005,7 +3005,7 @@ if capabilities["connectionDeviceManagement"] != true {
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- ipc-handlers
+pnpm --filter @lynavo-drive/desktop test -- ipc-handlers
 cd services/sidecar-go && go test ./internal/api -run TestHealthEndpoint -count=1
 ```
 
@@ -3046,7 +3046,7 @@ Do not include `revokesPairingsOnCodeRotation`.
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- ipc-handlers
+pnpm --filter @lynavo-drive/desktop test -- ipc-handlers
 cd services/sidecar-go && go test ./internal/api -run TestHealthEndpoint -count=1
 ```
 
@@ -3081,7 +3081,7 @@ Expected: PASS.
 Run:
 
 ```bash
-pnpm --filter @syncflow/contracts build
+pnpm --filter @lynavo-drive/contracts build
 ```
 
 Expected: PASS.
@@ -3091,8 +3091,8 @@ Expected: PASS.
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test
-pnpm --filter @syncflow/desktop typecheck
+pnpm --filter @lynavo-drive/desktop test
+pnpm --filter @lynavo-drive/desktop typecheck
 ```
 
 Expected: PASS.
@@ -3102,7 +3102,7 @@ Expected: PASS.
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 Expected: PASS.
@@ -3124,8 +3124,8 @@ Expected: PASS. If the full suite exposes unrelated pre-existing failures, recor
 Use two separate desktop data directories or two temp DBs:
 
 ```bash
-SYNCFLOW_DATA_DIR=/tmp/syncflow-desktop-1 pnpm --filter @syncflow/desktop dev
-SYNCFLOW_DATA_DIR=/tmp/syncflow-desktop-2 pnpm --filter @syncflow/desktop dev
+SYNCFLOW_DATA_DIR=/tmp/syncflow-desktop-1 pnpm --filter @lynavo-drive/desktop dev
+SYNCFLOW_DATA_DIR=/tmp/syncflow-desktop-2 pnpm --filter @lynavo-drive/desktop dev
 ```
 
 Verify:

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ConnectionDevicesSettingsDTO } from '@syncflow/contracts';
+import type { ConnectionDevicesSettingsDTO } from '@lynavo-drive/contracts';
 
 const emptyConnectionDevices: ConnectionDevicesSettingsDTO = {
   authorizedDevices: [],

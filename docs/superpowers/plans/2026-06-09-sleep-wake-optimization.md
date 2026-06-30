@@ -27,7 +27,7 @@
 
 ### P2: Same-LAN Wake-on-LAN
 
-- Add wake DTOs and reachability states in `@syncflow/contracts`.
+- Add wake DTOs and reachability states in `@lynavo-drive/contracts`.
 - Sidecar collects LAN wake targets while awake and exposes full metadata only to paired clients.
 - Mobile persists wake metadata with the bound desktop.
 - When opening "My Computer" and LAN health fails, mobile sends same-LAN WOL packets, emits `waking`, polls health, then falls back to existing routes.
@@ -69,7 +69,7 @@ it('starts display sleep blocker only when enabled and transfer is active', () =
 
 - [ ] **Step 2: Verify red**
 
-Run: `pnpm --filter @syncflow/desktop test -- src/main/__tests__/power-save-manager.test.ts`
+Run: `pnpm --filter @lynavo-drive/desktop test -- src/main/__tests__/power-save-manager.test.ts`
 
 Expected: FAIL because production code still starts `prevent-app-suspension`.
 
@@ -93,7 +93,7 @@ Use Taiwan Traditional Chinese for `zh-Hant`.
 
 - [ ] **Step 5: Verify green**
 
-Run: `pnpm --filter @syncflow/desktop test -- src/main/__tests__/power-save-manager.test.ts`
+Run: `pnpm --filter @lynavo-drive/desktop test -- src/main/__tests__/power-save-manager.test.ts`
 
 Expected: PASS.
 
@@ -114,7 +114,7 @@ Use copy that says sleeping desktops pause transfer, progress is saved, and reco
 
 - [ ] **Step 2: Verify i18n JSON**
 
-Run: `pnpm --filter @syncflow/mobile test -- src/i18n/__tests__/bootstrap.test.tsx`
+Run: `pnpm --filter @lynavo-drive/mobile test -- src/i18n/__tests__/bootstrap.test.tsx`
 
 Expected: PASS.
 

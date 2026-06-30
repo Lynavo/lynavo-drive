@@ -1,4 +1,4 @@
-import type { SettingsDTO } from '@syncflow/contracts';
+import type { SettingsDTO } from '@lynavo-drive/contracts';
 import type { ElectronAPI } from '../../preload/api';
 import { BONJOUR_WINDOWS_SUPPORT_URL } from '../../shared/bonjour';
 import { INITIAL_SIDECAR_RUNTIME_STATE } from '../../shared/sidecar-runtime';

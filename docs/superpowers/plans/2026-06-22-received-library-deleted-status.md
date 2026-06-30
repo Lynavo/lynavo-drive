@@ -57,6 +57,6 @@
 
 - [x] Run `go test ./internal/store ./internal/api` from `services/sidecar-go`.
 - [x] Run the targeted mobile Jest test.
-- [x] Run `pnpm build` because `@syncflow/contracts` changed.
-- [x] Run `pnpm --filter @syncflow/mobile exec tsc --noEmit`.
+- [x] Run `pnpm build` because `@lynavo-drive/contracts` changed.
+- [x] Run `pnpm --filter @lynavo-drive/mobile exec tsc --noEmit`.
 - [x] Review `git diff` for unintended protocol, queue, sync state, persistence, or unrelated UI changes.

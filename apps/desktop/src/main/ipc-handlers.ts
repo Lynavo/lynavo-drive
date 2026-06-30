@@ -3,7 +3,7 @@ import log from 'electron-log';
 import { readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { AddSharedResourcePayload } from '@syncflow/contracts';
+import type { AddSharedResourcePayload } from '@lynavo-drive/contracts';
 import { sidecarClient } from './sidecar-client';
 import {
   openFolder,
@@ -106,8 +106,8 @@ export function registerIpcHandlers(
       options?: {
         page?: number;
         pageSize?: number;
-        sortField?: import('@syncflow/contracts').DeviceFileSortField;
-        sortDirection?: import('@syncflow/contracts').SortDirection;
+        sortField?: import('@lynavo-drive/contracts').DeviceFileSortField;
+        sortDirection?: import('@lynavo-drive/contracts').SortDirection;
       },
     ) => sidecarClient.getDeviceFiles(deviceId, date, options),
   );

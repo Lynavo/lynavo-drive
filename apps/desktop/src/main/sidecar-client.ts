@@ -1,7 +1,7 @@
 import http from 'node:http';
 import https from 'node:https';
 import log from 'electron-log';
-import { APP_COMPATIBILITY_VERSION, SIDECAR_HTTP_PORT } from '@syncflow/contracts';
+import { APP_COMPATIBILITY_VERSION, SIDECAR_HTTP_PORT } from '@lynavo-drive/contracts';
 import type {
   AddSharedResourcePayload,
   ConnectionDevicesSettingsDTO,
@@ -15,7 +15,7 @@ import type {
   ReceivedLibraryItemDTO,
   ReceivedLibraryPageDTO,
   SortDirection,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 import { desktopClientHeaders } from './app-info';
 
 const BASE = `http://127.0.0.1:${SIDECAR_HTTP_PORT}`;
@@ -219,9 +219,9 @@ export const sidecarClient = {
   updatePowerState: (snapshot: PowerEventSnapshot) =>
     request<{ ok: boolean }>('POST', '/power/state', snapshot),
   getDashboardSummary: () =>
-    request<import('@syncflow/contracts').DashboardSummaryDTO>('GET', '/dashboard/summary'),
+    request<import('@lynavo-drive/contracts').DashboardSummaryDTO>('GET', '/dashboard/summary'),
   getDashboardDevices: () =>
-    request<import('@syncflow/contracts').DashboardDeviceDTO[]>('GET', '/dashboard/devices'),
+    request<import('@lynavo-drive/contracts').DashboardDeviceDTO[]>('GET', '/dashboard/devices'),
   getDeviceFiles: (
     id: string,
     date: string,
@@ -242,9 +242,9 @@ export const sidecarClient = {
     return request<DeviceFileLedgerPageDTO>('GET', `/devices/${id}/files?${params.toString()}`);
   },
   getDeviceDates: (id: string) => request<{ dates: string[] }>('GET', `/devices/${id}/dates`),
-  getSettings: () => request<import('@syncflow/contracts').SettingsDTO>('GET', '/settings'),
-  updateSettings: (s: Partial<import('@syncflow/contracts').SettingsDTO>) =>
-    request<import('@syncflow/contracts').SettingsDTO>('PUT', '/settings', s),
+  getSettings: () => request<import('@lynavo-drive/contracts').SettingsDTO>('GET', '/settings'),
+  updateSettings: (s: Partial<import('@lynavo-drive/contracts').SettingsDTO>) =>
+    request<import('@lynavo-drive/contracts').SettingsDTO>('PUT', '/settings', s),
   resetState: () => request<{ ok: boolean }>('POST', '/settings/reset-state', {}),
   setConnectionCode: (code: string) =>
     request<{ code: string }>('POST', '/connection-code', { code }),
@@ -264,14 +264,14 @@ export const sidecarClient = {
     ),
   regenerateConnectionCode: () => request<{ code: string }>('POST', '/connection-code/regenerate'),
   getShareStatus: () =>
-    request<import('@syncflow/contracts').ShareStatusDTO>('GET', '/share/status'),
+    request<import('@lynavo-drive/contracts').ShareStatusDTO>('GET', '/share/status'),
   validateShare: () =>
-    request<import('@syncflow/contracts').ShareStatusDTO>('POST', '/share/validate'),
+    request<import('@lynavo-drive/contracts').ShareStatusDTO>('POST', '/share/validate'),
   getTransferActive: () => request<{ active: boolean }>('GET', '/transfer/active'),
   getSharedList: (path?: string) => {
     const encodedPath = path ? encodeSharedFilePath(path) : '';
     const endpoint = encodedPath ? `/shared/list/${encodedPath}` : '/shared/list';
-    return request<import('@syncflow/contracts').SharedDirectoryDTO>('GET', endpoint);
+    return request<import('@lynavo-drive/contracts').SharedDirectoryDTO>('GET', endpoint);
   },
   getManagedDevices: () =>
     request<DesktopLocalListResponse<DesktopManagedDeviceDTO>>('GET', '/management/devices'),

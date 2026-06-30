@@ -26,7 +26,7 @@ import type {
   AutoUploadState,
   DesktopSyncRecordDTO,
   DeviceType,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 import { colors } from '../theme/colors';
 import { Icon } from '../components/Icon';
 import { GradientBackground } from '../components/GradientBackground';

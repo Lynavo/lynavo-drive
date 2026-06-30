@@ -35,7 +35,7 @@ import { recordDownloadedFile } from '../services/download-records-service';
 import type {
   DesktopSharedResourceDTO,
   DirectoryFileDTO,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 import {
   canPreviewDocumentFile,
   documentMimeType,

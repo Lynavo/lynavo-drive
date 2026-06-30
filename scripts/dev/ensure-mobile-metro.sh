@@ -37,7 +37,7 @@ unset VSCODE_INSPECTOR_OPTIONS
 unset VSCODE_JS_DEBUG_BOOTLOADER
 unset VSCODE_DEBUGGING
 
-corepack pnpm --filter @syncflow/mobile start &
+corepack pnpm --filter @lynavo-drive/mobile start &
 metro_pid="$!"
 
 cleanup() {

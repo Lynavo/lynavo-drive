@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useDeviceDetailStore } from '../device-detail-store';
 import { mockFiles, mockAvailableDates } from '../../mocks/files';
-import type { DeviceFileLedgerDTO } from '@syncflow/contracts';
+import type { DeviceFileLedgerDTO } from '@lynavo-drive/contracts';
 
 describe('device-detail-store', () => {
   beforeEach(() => {

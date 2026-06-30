@@ -228,7 +228,7 @@ it('exports wake metadata DTOs for bound desktop wake attempts', () => {
 
 - [ ] **Step 2: Run the contracts test and verify it fails**
 
-Run: `pnpm --filter @syncflow/contracts test -- exports.test.ts`
+Run: `pnpm --filter @lynavo-drive/contracts test -- exports.test.ts`
 
 Expected: TypeScript reports that `WakeCapabilityDTO`, `WakeTargetDTO`, `BindingStateDTO.wake`, or `SharedFilesReachabilityDTO.state = "waking"` is not defined.
 
@@ -281,13 +281,13 @@ export interface BindingStateDTO {
 
 - [ ] **Step 4: Run contracts tests**
 
-Run: `pnpm --filter @syncflow/contracts test -- exports.test.ts`
+Run: `pnpm --filter @lynavo-drive/contracts test -- exports.test.ts`
 
 Expected: PASS.
 
 - [ ] **Step 5: Build contracts**
 
-Run: `pnpm --filter @syncflow/contracts build`
+Run: `pnpm --filter @lynavo-drive/contracts build`
 
 Expected: package builds without TypeScript errors.
 
@@ -828,7 +828,7 @@ if let wake = wakeCapability(from: response["wake"]),
 
 - [ ] **Step 6: Compile iOS native code**
 
-Run: `pnpm --filter @syncflow/mobile exec tsc --noEmit`
+Run: `pnpm --filter @lynavo-drive/mobile exec tsc --noEmit`
 
 Expected: PASS for JS/TS bridge types. Then run the existing iOS build command used in this repo, such as `pnpm release --profile cn-review --targets ios --dry-run` for command validation or the local Xcode simulator build when available.
 
@@ -1417,7 +1417,7 @@ it('shows waking status when native reports a wake attempt', async () => {
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- SharedFilesDownloadGate.test.tsx
+pnpm --filter @lynavo-drive/mobile test -- SharedFilesDownloadGate.test.tsx
 ```
 
 Expected: FAIL because `waking` is not mapped.
@@ -1482,8 +1482,8 @@ Update `en`:
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- SharedFilesDownloadGate.test.tsx
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test -- SharedFilesDownloadGate.test.tsx
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 Expected: both commands pass.
@@ -1535,7 +1535,7 @@ it('uses the explicit LAN retry path when reconnect is tapped', async () => {
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- SyncActivityScreen.test.tsx
+pnpm --filter @lynavo-drive/mobile test -- SyncActivityScreen.test.tsx
 ```
 
 Expected: FAIL because the reconnect button still calls `startDiscovery` and `triggerSync` directly.
@@ -1681,8 +1681,8 @@ Add this comment near the offline/reconnecting banner action wiring:
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- SyncActivityScreen.test.tsx
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test -- SyncActivityScreen.test.tsx
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 Expected: both commands pass.
@@ -1791,9 +1791,9 @@ Add tests that assert:
 Run the focused tests changed by this task, then run type checks for touched packages:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- HelpPage.test.tsx
-pnpm --filter @syncflow/desktop exec tsc --noEmit
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/desktop test -- HelpPage.test.tsx
+pnpm --filter @lynavo-drive/desktop exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 ## Task 11: Go Sidecar Peer Proxy Wake Endpoint
@@ -2087,7 +2087,7 @@ Mobile logs must distinguish:
 - [ ] **Step 3: Run mobile TypeScript verification**
   Run:
   ```bash
-  pnpm --filter @syncflow/mobile exec tsc --noEmit
+  pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
   ```
   Expected: PASS.
 
@@ -2132,7 +2132,7 @@ Mobile logs must distinguish:
 - No renderer code directly accesses sidecar, filesystem, or SQLite.
 - No upload queue item can be deleted, reordered, skipped, or manually selected by this change.
 - No sync state machine transition changes outside shared-files route wake attempts or explicit LAN reconnect wake attempts.
-- DTO additions are imported from `@syncflow/contracts` where TypeScript code consumes them.
+- DTO additions are imported from `@lynavo-drive/contracts` where TypeScript code consumes them.
 - Sidecar event names remain dot-notation.
 - mDNS TXT records do not contain MAC addresses or wake targets.
 

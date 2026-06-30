@@ -28,7 +28,7 @@ import { shouldTreatReconnectAsWaitingForNetworkRecovery } from '../utils/reconn
 import { getReconnectInterruptionReason } from '../utils/reconnectInterruptionReason';
 import { formatQueueCountDisplay } from '../utils/queueCountDisplay';
 import { SyncPerformanceHint } from './components/SyncPerformanceHint';
-import type { DeviceType } from '@syncflow/contracts';
+import type { DeviceType } from '@lynavo-drive/contracts';
 
 // ---------------------------------------------------------------------------
 // Types

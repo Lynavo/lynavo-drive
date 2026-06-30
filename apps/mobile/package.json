@@ -1,5 +1,5 @@
 {
-  "name": "@syncflow/mobile",
+  "name": "@lynavo-drive/mobile",
   "version": "1.0.1",
   "private": true,
   "scripts": {
@@ -10,7 +10,7 @@
     "start:reset": "react-native start --reset-cache",
     "test": "jest",
     "import:i18n": "python3 ./scripts/import_i18n_workbook.py",
-    "build": "cd ios && xcodebuild -workspace SyncFlowMobile.xcworkspace -scheme SyncFlowMobile -destination 'generic/platform=iOS' -configuration Debug build",
+    "build": "cd ios && xcodebuild -workspace SyncFlowMobile.xcworkspace -scheme SyncFlowMobile -destination 'generic/platform=iOS' -configuration Debug CODE_SIGNING_ALLOWED=NO build",
     "build:android": "cd android && ./gradlew assembleDebug",
     "archive:testflight": "bash ./ios/scripts/testflight-release.sh archive",
     "upload:testflight": "bash ./ios/scripts/testflight-release.sh upload",
@@ -26,7 +26,7 @@
     "@react-navigation/bottom-tabs": "^7.15.9",
     "@react-navigation/native": "^7.1.34",
     "@react-navigation/stack": "^7.8.6",
-    "@syncflow/contracts": "workspace:*",
+    "@lynavo-drive/contracts": "workspace:*",
     "i18next": "^23.16.8",
     "lucide-react-native": "0.577.0",
     "react": "19.2.3",

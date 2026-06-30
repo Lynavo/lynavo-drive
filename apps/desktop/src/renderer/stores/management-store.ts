@@ -3,7 +3,7 @@ import type {
   DesktopAccessRecordDTO,
   DesktopManagedDeviceDTO,
   DesktopSyncRecordDTO,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 
 export interface RecordFilters {
   clientId?: string;

@@ -129,7 +129,7 @@ func getAssetPreviewSource(assetLocalId: String) -> [String: Any]
 
 ---
 
-## 4. 契約層（`@syncflow/contracts`）
+## 4. 契約層（`@lynavo-drive/contracts`）
 
 ### 4.1 新增 DTO
 
@@ -150,7 +150,7 @@ export interface AssetPreviewSourceDTO {
 
 ### 4.3 建置
 
-改完 contracts 後必須 `pnpm build`（turbo 會重建 `@syncflow/contracts`），desktop 雖不用改但確保依賴一致。
+改完 contracts 後必須 `pnpm build`（turbo 會重建 `@lynavo-drive/contracts`），desktop 雖不用改但確保依賴一致。
 
 ---
 
@@ -203,9 +203,9 @@ export interface AssetPreviewSourceDTO {
 實作完成前必須全部綠燈：
 
 - `pnpm build`（contracts 重建）
-- `pnpm --filter @syncflow/mobile exec tsc --noEmit`
-- `pnpm --filter @syncflow/mobile test`
-- iOS 本機 build 通過（`pnpm --filter @syncflow/mobile build` 或直接 Xcode build）
+- `pnpm --filter @lynavo-drive/mobile exec tsc --noEmit`
+- `pnpm --filter @lynavo-drive/mobile test`
+- iOS 本機 build 通過（`pnpm --filter @lynavo-drive/mobile build` 或直接 Xcode build）
 - 手機實機冒煙：相冊列表點 item 開預覽、左右滑、點圓圈選中、全選、上傳；影片預覽播放/暫停切頁；已上傳 item 預覽可開但無圓圈
 
 ---

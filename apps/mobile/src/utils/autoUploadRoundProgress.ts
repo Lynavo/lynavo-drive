@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeModules } from 'react-native';
-import type { AutoUploadState, UploadTaskSource } from '@syncflow/contracts';
+import type { AutoUploadState, UploadTaskSource } from '@lynavo-drive/contracts';
 
 export interface AutoUploadRoundOverview {
   uploadState: string;

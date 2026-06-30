@@ -64,14 +64,14 @@ function buildTargetCommand(target) {
   if (target === 'desktop') {
     return {
       command: 'pnpm',
-      args: ['--filter', '@syncflow/desktop', 'dev'],
+      args: ['--filter', '@lynavo-drive/desktop', 'dev'],
     };
   }
 
   if (target === 'mobile-metro') {
     return {
       command: 'pnpm',
-      args: ['--filter', '@syncflow/mobile', 'start'],
+      args: ['--filter', '@lynavo-drive/mobile', 'start'],
     };
   }
 
@@ -81,7 +81,7 @@ function buildTargetCommand(target) {
       args: [
         'pnpm',
         '--filter',
-        '@syncflow/mobile',
+        '@lynavo-drive/mobile',
         'exec',
         'react-native',
         'run-ios',

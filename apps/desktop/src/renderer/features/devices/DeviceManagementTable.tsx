@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Smartphone, ShieldAlert, Unlock, Wifi } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { DashboardDeviceDTO, DesktopManagedDeviceDTO } from '@syncflow/contracts';
+import type { DashboardDeviceDTO, DesktopManagedDeviceDTO } from '@lynavo-drive/contracts';
 import { useDashboardStore } from '@renderer/stores/dashboard-store';
 import { Button } from '@renderer/components/ui/button';
 import { Progress } from '@renderer/components/ui/progress';

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { toast } from 'sonner';
-import type { DashboardDeviceDTO, DashboardSummaryDTO } from '@syncflow/contracts';
-import type { DeviceDashboardStatus } from '@syncflow/contracts';
+import type { DashboardDeviceDTO, DashboardSummaryDTO } from '@lynavo-drive/contracts';
+import type { DeviceDashboardStatus } from '@lynavo-drive/contracts';
 import i18n from '@renderer/i18n';
 import { useSidecarRuntimeStore } from './sidecar-runtime-store';
 

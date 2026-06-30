@@ -1,7 +1,7 @@
 import WebSocket from 'ws';
 import { BrowserWindow } from 'electron';
 import log from 'electron-log';
-import { SIDECAR_HTTP_PORT, type SidecarEvent } from '@syncflow/contracts';
+import { SIDECAR_HTTP_PORT, type SidecarEvent } from '@lynavo-drive/contracts';
 
 export class WsBridge {
   private ws: WebSocket | null = null;

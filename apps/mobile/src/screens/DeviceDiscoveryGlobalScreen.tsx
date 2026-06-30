@@ -29,7 +29,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type {
   DiscoveredDeviceDTO,
   RecentDesktopDTO,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 import {
   SafeAreaView,
   useSafeAreaInsets,

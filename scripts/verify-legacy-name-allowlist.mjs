@@ -103,28 +103,6 @@ const ALLOWED_EXACT_PATHS = new Map([
     allowAny('Regression test fixture for unallowlisted legacy-name detection.'),
   ],
   [
-    'packages/contracts/package.json',
-    allowTerms(['@syncflow'], '@syncflow package name before package rename.'),
-  ],
-  [
-    'packages/design-tokens/package.json',
-    allowTerms(['@syncflow'], '@syncflow package name before package rename.'),
-  ],
-  [
-    'apps/desktop/package.json',
-    allowTerms(['@syncflow'], '@syncflow package name before package rename.'),
-  ],
-  [
-    'apps/mobile/package.json',
-    allowTerms(['@syncflow'], '@syncflow package name before package rename.'),
-  ],
-  ['package.json', allowTerms(['@syncflow'], '@syncflow package scripts before package rename.')],
-  ['pnpm-lock.yaml', allowTerms(['@syncflow'], '@syncflow package names before package rename.')],
-  [
-    'pnpm-workspace.yaml',
-    allowTerms(['@syncflow'], '@syncflow workspace names before package rename.'),
-  ],
-  [
     'services/sidecar-go/go.mod',
     allowTerms(['syncflow'], 'Go module path before sidecar module rename.'),
   ],

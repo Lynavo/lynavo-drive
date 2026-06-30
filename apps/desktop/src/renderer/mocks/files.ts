@@ -1,4 +1,4 @@
-import type { DeviceFileLedgerDTO } from '@syncflow/contracts';
+import type { DeviceFileLedgerDTO } from '@lynavo-drive/contracts';
 
 export const mockFiles: DeviceFileLedgerDTO[] = [
   {

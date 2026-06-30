@@ -40,10 +40,10 @@
 
 ```bash
 go test ./...
-pnpm --filter @syncflow/desktop test
-pnpm --filter @syncflow/desktop typecheck
-pnpm --filter @syncflow/mobile test -- SharedFilesDownloadGate.test.tsx --runInBand
-pnpm --filter @syncflow/mobile exec tsc --noEmit
-pnpm --filter @syncflow/contracts build
+pnpm --filter @lynavo-drive/desktop test
+pnpm --filter @lynavo-drive/desktop typecheck
+pnpm --filter @lynavo-drive/mobile test -- SharedFilesDownloadGate.test.tsx --runInBand
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/contracts build
 git diff --check
 ```

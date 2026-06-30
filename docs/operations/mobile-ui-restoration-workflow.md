@@ -16,7 +16,7 @@
 执行优先级：
 
 1. 当前仓库实现：业务流程、状态来源、native bridge、权限、同步状态机。
-2. `@syncflow/contracts`：DTO、事件、端口、协议常量。
+2. `@lynavo-drive/contracts`：DTO、事件、端口、协议常量。
 3. `/Volumes/workspace/work/vividrop-ui-mobile`：UI/UX 视觉参考。
 4. `docs/testing/beta-test-matrix.md`：回归验证范围。
 
@@ -265,8 +265,8 @@ Can mock: list items, pagination, filter options for UI preview
 最小验证：
 
 ```bash
-pnpm --filter @syncflow/mobile exec tsc --noEmit
-pnpm --filter @syncflow/mobile test -- <相关测试名>
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test -- <相关测试名>
 git diff --check
 ```
 

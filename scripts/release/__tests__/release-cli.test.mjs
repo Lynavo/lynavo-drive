@@ -56,8 +56,8 @@ test('prints the review release plan without running build commands in dry-run m
     result.stdout,
     /bash -lc cd apps\/mobile\/android && \.\/gradlew assembleRelease bundleRelease -PreactNativeArchitectures=arm64-v8a,x86_64/,
   );
-  assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:win/);
-  assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:linux/);
+  assert.match(result.stdout, /pnpm --filter @lynavo-drive\/desktop package:win/);
+  assert.match(result.stdout, /pnpm --filter @lynavo-drive\/desktop package:linux/);
 });
 
 test('prints the prod release plan without market or legacy API env in dry-run mode', () => {
@@ -77,8 +77,8 @@ test('prints the prod release plan without market or legacy API env in dry-run m
   assert.doesNotMatch(result.stdout, /VIVIDROP_API_BASE_URL=/);
   assert.match(result.stdout, /ELECTRON_BUILDER_CONFIG=electron-builder\.yml/);
   assert.match(result.stdout, /pnpm package:desktop:signed/);
-  assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:win/);
-  assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:linux/);
+  assert.match(result.stdout, /pnpm --filter @lynavo-drive\/desktop package:win/);
+  assert.match(result.stdout, /pnpm --filter @lynavo-drive\/desktop package:linux/);
 });
 
 test('release execution scrubs stale commercial and legacy parent env before spawning children', () => {

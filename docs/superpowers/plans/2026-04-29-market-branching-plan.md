@@ -4,7 +4,7 @@
 
 **Goal:** Support China and global market builds from one shared SyncFlow codebase without long-lived `dev-cn` / `dev-global` forks.
 
-**Architecture:** Keep `dev` as the shared integration branch and move market differences into explicit `MARKET=cn` / `MARKET=global` profile and build flavor layers. Shared sync behavior remains in `@syncflow/contracts`, Go sidecar, desktop bridge, React Native shared screens, and native SyncEngine; market-specific behavior stays in config, assets, auth routes, native app identity, and packaging.
+**Architecture:** Keep `dev` as the shared integration branch and move market differences into explicit `MARKET=cn` / `MARKET=global` profile and build flavor layers. Shared sync behavior remains in `@lynavo-drive/contracts`, Go sidecar, desktop bridge, React Native shared screens, and native SyncEngine; market-specific behavior stays in config, assets, auth routes, native app identity, and packaging.
 
 **Tech Stack:** Git branch workflow, React Native 0.84, TypeScript strict mode, React Navigation, iOS Xcode targets or schemes, Android Gradle product flavors, Electron Builder, pnpm/turborepo.
 
@@ -60,7 +60,7 @@ Global market:
 
 ```text
 Do not create long-lived dev-cn / dev-global branches.
-Do not fork @syncflow/contracts for market differences.
+Do not fork @lynavo-drive/contracts for market differences.
 Do not fork Go sidecar behavior for market differences.
 Do not change queue semantics, sync state machine, LMUP protocol, or sidecar ports.
 Do not use UI-only hiding for native SDKs that should be excluded from a market build.
@@ -219,7 +219,7 @@ Run:
 
 ```bash
 cd /Volumes/T7/Dev/Web/SyncFlow
-pnpm --filter @syncflow/mobile test -- market-config.test.ts
+pnpm --filter @lynavo-drive/mobile test -- market-config.test.ts
 ```
 
 Expected:
@@ -344,7 +344,7 @@ Run:
 
 ```bash
 cd /Volumes/T7/Dev/Web/SyncFlow
-pnpm --filter @syncflow/mobile test -- market-config.test.ts
+pnpm --filter @lynavo-drive/mobile test -- market-config.test.ts
 ```
 
 Expected:
@@ -425,7 +425,7 @@ Run:
 
 ```bash
 cd /Volumes/T7/Dev/Web/SyncFlow
-pnpm --filter @syncflow/mobile test -- config.review-server.test.ts auth-service.review-server.test.ts
+pnpm --filter @lynavo-drive/mobile test -- config.review-server.test.ts auth-service.review-server.test.ts
 ```
 
 Expected:
@@ -489,7 +489,7 @@ Run:
 
 ```bash
 cd /Volumes/T7/Dev/Web/SyncFlow
-pnpm --filter @syncflow/mobile test -- LoginGlobalScreen.test.tsx
+pnpm --filter @lynavo-drive/mobile test -- LoginGlobalScreen.test.tsx
 ```
 
 Expected:
@@ -617,7 +617,7 @@ Run:
 
 ```bash
 cd /Volumes/T7/Dev/Web/SyncFlow
-pnpm --filter @syncflow/mobile test -- LoginGlobalScreen.test.tsx RootNavigator.subscription.test.tsx
+pnpm --filter @lynavo-drive/mobile test -- LoginGlobalScreen.test.tsx RootNavigator.subscription.test.tsx
 ```
 
 Expected:
@@ -878,7 +878,7 @@ Run:
 
 ```bash
 cd /Volumes/T7/Dev/Web/SyncFlow
-pnpm --filter @syncflow/desktop typecheck
+pnpm --filter @lynavo-drive/desktop typecheck
 ```
 
 Expected:
@@ -923,7 +923,7 @@ Run:
 
 ```bash
 cd /Volumes/T7/Dev/Web/SyncFlow
-pnpm --filter @syncflow/mobile add @react-native-google-signin/google-signin
+pnpm --filter @lynavo-drive/mobile add @react-native-google-signin/google-signin
 ```
 
 Expected:
@@ -972,7 +972,7 @@ Run:
 
 ```bash
 cd /Volumes/T7/Dev/Web/SyncFlow
-SYNCFLOW_MARKET=global pnpm --filter @syncflow/mobile test -- LoginGlobalScreen.test.tsx RootNavigator.subscription.test.tsx
+SYNCFLOW_MARKET=global pnpm --filter @lynavo-drive/mobile test -- LoginGlobalScreen.test.tsx RootNavigator.subscription.test.tsx
 ```
 
 Expected:
@@ -1039,15 +1039,15 @@ Hotfix branches are used only after a build has shipped or entered external revi
 China:
 
 ```bash
-SYNCFLOW_MARKET=cn pnpm --filter @syncflow/mobile exec tsc --noEmit
-pnpm --filter @syncflow/desktop package:cn
+SYNCFLOW_MARKET=cn pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/desktop package:cn
 ```
 
 Global:
 
 ```bash
-SYNCFLOW_MARKET=global pnpm --filter @syncflow/mobile exec tsc --noEmit
-pnpm --filter @syncflow/desktop package:global
+SYNCFLOW_MARKET=global pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/desktop package:global
 ```
 ````
 
@@ -1077,8 +1077,8 @@ Run:
 
 ```bash
 cd /Volumes/T7/Dev/Web/SyncFlow
-pnpm --filter @syncflow/contracts build
-pnpm --filter @syncflow/design-tokens build
+pnpm --filter @lynavo-drive/contracts build
+pnpm --filter @lynavo-drive/design-tokens build
 ```
 
 Expected:
@@ -1093,8 +1093,8 @@ Run:
 
 ```bash
 cd /Volumes/T7/Dev/Web/SyncFlow
-pnpm --filter @syncflow/mobile exec tsc --noEmit
-pnpm --filter @syncflow/mobile test
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test
 ```
 
 Expected:
@@ -1110,8 +1110,8 @@ Run:
 
 ```bash
 cd /Volumes/T7/Dev/Web/SyncFlow
-pnpm --filter @syncflow/desktop typecheck
-pnpm --filter @syncflow/desktop test
+pnpm --filter @lynavo-drive/desktop typecheck
+pnpm --filter @lynavo-drive/desktop test
 ```
 
 Expected:
@@ -1162,8 +1162,8 @@ Run:
 
 ```bash
 cd /Volumes/T7/Dev/Web/SyncFlow
-pnpm --filter @syncflow/desktop build:cn
-pnpm --filter @syncflow/desktop build:global
+pnpm --filter @lynavo-drive/desktop build:cn
+pnpm --filter @lynavo-drive/desktop build:global
 ```
 
 Expected:

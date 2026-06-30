@@ -10,7 +10,7 @@ import type {
   ReceivedLibraryItemDTO,
   SharedFilesReachabilityDTO,
   SyncSummaryDTO,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 
 export interface Spec extends TurboModule {
   // 权限

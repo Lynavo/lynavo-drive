@@ -39,7 +39,7 @@ import {
   type DirectoryFileDTO,
   type DesktopSharedResourceDTO,
   type SharedFilesReachabilityDTO,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/globalColors';

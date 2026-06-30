@@ -7,7 +7,7 @@ import type {
   ReceivedLibraryPageDTO,
   DesktopSyncRecordDTO,
   SharedDirectoryDTO,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 import {
   browseDirectory,
   downloadDirectoryFile,

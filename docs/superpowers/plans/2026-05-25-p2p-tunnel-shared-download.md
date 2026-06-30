@@ -51,7 +51,7 @@
   ```
 
 - [ ] **Step 3: Run build to update contract bundle**
-  Run: `pnpm --filter @syncflow/contracts build`
+  Run: `pnpm --filter @lynavo-drive/contracts build`
   Expected: Command succeeds, generating updated build outputs under `packages/contracts/dist`.
 
 - [ ] **Step 4: Commit contracts changes**

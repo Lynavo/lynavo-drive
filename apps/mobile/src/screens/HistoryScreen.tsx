@@ -20,7 +20,7 @@ import { Icon } from '../components/Icon';
 import { GradientBackground } from '../components/GradientBackground';
 import { BottomTabBar } from '../components/BottomTabBar';
 import { listHistory, downloadResource } from '../services/desktop-local-service';
-import type { DesktopSyncRecordDTO } from '@syncflow/contracts';
+import type { DesktopSyncRecordDTO } from '@lynavo-drive/contracts';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'History'>;
 

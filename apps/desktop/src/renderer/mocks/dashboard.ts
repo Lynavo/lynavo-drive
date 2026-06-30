@@ -1,4 +1,4 @@
-import type { DashboardSummaryDTO } from '@syncflow/contracts';
+import type { DashboardSummaryDTO } from '@lynavo-drive/contracts';
 
 export const mockDashboardSummary: DashboardSummaryDTO = {
   todayUploadCount: 42,

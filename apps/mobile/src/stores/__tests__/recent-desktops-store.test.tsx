@@ -8,7 +8,7 @@ import {
   loadRecentDesktopsFromStorage,
   saveRecentDesktopsToStorage,
 } from '../recent-desktops-store';
-import type { RecentDesktopDTO } from '@syncflow/contracts';
+import type { RecentDesktopDTO } from '@lynavo-drive/contracts';
 
 function TestComponent() {
   const { recentDesktops, addDesktop, forgetDesktop, updateAuthStatus } = useRecentDesktops();

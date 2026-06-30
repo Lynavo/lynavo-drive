@@ -36,5 +36,5 @@ Focused tests will cover:
 The regression command is:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- desktop-local-service.test.ts
+pnpm --filter @lynavo-drive/mobile test -- desktop-local-service.test.ts
 ```

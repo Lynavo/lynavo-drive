@@ -25,7 +25,7 @@ import {
   ErrorCode,
   type ErrorCode as SyncFlowErrorCode,
   type PairingErrorMetadataDTO,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/colors';
 import { useTranslation } from 'react-i18next';

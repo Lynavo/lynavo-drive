@@ -1532,8 +1532,8 @@ renderer 應容忍：
 ### 8.4 驗證命令
 
 ```bash
-pnpm --filter @syncflow/desktop test renderer/stores/__tests__/dashboard-store.test.ts
-pnpm --filter @syncflow/desktop test renderer/features/dashboard
+pnpm --filter @lynavo-drive/desktop test renderer/stores/__tests__/dashboard-store.test.ts
+pnpm --filter @lynavo-drive/desktop test renderer/features/dashboard
 ```
 
 ---
@@ -1675,7 +1675,7 @@ startSync() → connectAndUpload() → streamFileData() via LMUP/2 TCP
 2. **Go 編譯**: `go build ./cmd/syncflow-sidecar/`
 3. **curl 手動測試**: 直接 POST 檔案到 `/upload/{clientId}` 驗證端到端
 4. **iOS 編譯**: Xcode build 通過（無 SilentAudioService 引用錯誤）
-5. **iOS TypeScript 類型檢查**: `pnpm --filter @syncflow/mobile exec tsc --noEmit`
+5. **iOS TypeScript 類型檢查**: `pnpm --filter @lynavo-drive/mobile exec tsc --noEmit`
 6. **前景同步回歸**: TCP 傳輸行為不變
 7. **背景轉換測試**: app 進入背景後只建立 1 個 background URLSession task，且 desktop 顯示 `transferring`
 8. **manual 插隊測試**: auto item 背景完成後，若此時 queue head 變成 manual item，下一個背景 task 必須取 manual item
@@ -1700,7 +1700,7 @@ startSync() → connectAndUpload() → streamFileData() via LMUP/2 TCP
 27. **Startup sweep 測試**: app 強殺後在 `uploading` 狀態的 row，cold-start 後必須被歸零成 `queued`、`acked_offset = 0`、`transport = NULL`
 28. **BGProcessing binding hydrate 測試**: 模擬冷啟動下 `SyncEngineManager.shared.currentBinding` 為 nil，BackgroundExecutionService 必須能從 `UploadStore.getLastKnownBinding()` + Keychain 組出 binding；若 binding 資料不全，回 `.missingBinding` 而非 crash
 29. **SilentAudioService 引用清空測試**: 執行 `rg -n "SilentAudioService\\.shared" apps/mobile/ios/SyncEngine apps/mobile/ios/SyncFlowMobile`，結果必須為空
-30. **Desktop renderer 回歸**（Phase 8）: `pnpm --filter @syncflow/desktop test` 全綠；背景 HTTP 來源的 `currentFile` 能正常顯示於 DeviceCard；progress 長時間不變時 UI 不閃爍
+30. **Desktop renderer 回歸**（Phase 8）: `pnpm --filter @lynavo-drive/desktop test` 全綠；背景 HTTP 來源的 `currentFile` 能正常顯示於 DeviceCard；progress 長時間不變時 UI 不閃爍
 31. **HMAC path 格式測試**: 以非 ASCII-safe clientId（例如含 `/`、空白、中文）產生 HMAC proof，sidecar 必須拒絕或 mobile 端在 clientId 產生處就應拒絕；避免 percent-encoding 歧義導致 HMAC 不符
 32. **Startup 順序回歸**: 透過 log 驗證 app cold-start 時執行順序為 `UploadStore.init → sweep → configureBackgroundUploadService → reconnectBackgroundSession → 任何 enqueue`；不得有任何 enqueue 落在 reconnect 之前
 33. **DELETE /upload 跨協定 reset 測試**: HTTP 半檔後 foreground TCP 接手同一 fileKey，mobile 必須先 DELETE 再 TCP；DELETE HMAC canonical 為 6 行 `method\npath\nclientId\nfileKey\ntimestamp\nnonce`（`method="DELETE"`，**不含** `bodySha256Hex` / `filenameB64` / `mediaType` / `fileSize` / `createdAt` / `modifiedAt`，與 POST 的 canonical 獨立）；成功後 sidecar `.part` + `uploads.committed_bytes` 歸零、mobile `requires_remote_reset` 清 0

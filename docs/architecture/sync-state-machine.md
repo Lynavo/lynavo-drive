@@ -28,7 +28,7 @@
 
 ## 3. Binding / Connection State
 
-契約定義在 `@syncflow/contracts`：
+契約定義在 `@lynavo-drive/contracts`：
 
 - `discovering`
 - `bound`
@@ -58,7 +58,7 @@
 
 ## 4. Upload State
 
-`@syncflow/contracts` 裡定義的是粗粒度狀態：
+`@lynavo-drive/contracts` 裡定義的是粗粒度狀態：
 
 - `idle`
 - `scanning`
@@ -83,7 +83,7 @@
 
 ## 5. SyncEngine Internal State
 
-內部狀態枚舉位於 `@syncflow/contracts` 的 `SyncEngineState`：
+內部狀態枚舉位於 `@lynavo-drive/contracts` 的 `SyncEngineState`：
 
 - `idle`
 - `discovering`

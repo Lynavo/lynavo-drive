@@ -5,7 +5,7 @@ import { delimiter, join } from 'node:path';
 import { promisify } from 'node:util';
 import { app } from 'electron';
 import log from 'electron-log';
-import { APP_COMPATIBILITY_VERSION, SIDECAR_HTTP_PORT } from '@syncflow/contracts';
+import { APP_COMPATIBILITY_VERSION, SIDECAR_HTTP_PORT } from '@lynavo-drive/contracts';
 import { sidecarClient, supportsConnectionDeviceManagement } from './sidecar-client';
 import type { SidecarHealth } from './sidecar-client';
 import type {

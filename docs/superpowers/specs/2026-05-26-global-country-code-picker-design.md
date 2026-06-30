@@ -61,9 +61,9 @@ export const COUNTRY_CODES: CountryCodeInfo[] = [
 * 在列表中显示格式如 `flag` + `nameZh (nameEn)` 或动态显示为 `t('locale') === 'zh' ? nameZh : nameEn`。
 
 ## 3. 验证计划
-1. **类型检查与编译验证**：在移动端目录下运行 `pnpm --filter @syncflow/mobile exec tsc --noEmit`，确保无 TypeScript 错误。
+1. **类型检查与编译验证**：在移动端目录下运行 `pnpm --filter @lynavo-drive/mobile exec tsc --noEmit`，确保无 TypeScript 错误。
 2. **测试用例验证**：
-   * 运行原本的登录屏幕测试用例：`pnpm --filter @syncflow/mobile test LoginScreen.test.tsx` 和 `LoginGlobalScreen.test.tsx`。
+   * 运行原本的登录屏幕测试用例：`pnpm --filter @lynavo-drive/mobile test LoginScreen.test.tsx` 和 `LoginGlobalScreen.test.tsx`。
    * 更新受国家码数据结构和验证规则变动影响的 Mock 逻辑。
 3. **界面与交互验证**：
    * 确保国家码列表支持中英文搜索（例如输入 "新"、"Singa"、"65" 均可匹配新加坡）。

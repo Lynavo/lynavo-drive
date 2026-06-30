@@ -1,4 +1,4 @@
-import type { DesktopManagedDeviceDTO } from '@syncflow/contracts';
+import type { DesktopManagedDeviceDTO } from '@lynavo-drive/contracts';
 import { useTranslation } from 'react-i18next';
 import { GlassCard } from '@renderer/components/shared/GlassCard';
 import { formatBytes, formatDateTime } from '@renderer/lib/format';

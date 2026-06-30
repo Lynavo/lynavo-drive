@@ -124,7 +124,7 @@ Current coordination risk:
 
 - page screens except mechanical import repair approved by coordinator
 - `apps/mobile/src/screens/LoginScreen.tsx`
-- `@syncflow/contracts`, sidecar APIs, sync engine state, native sync behavior
+- `@lynavo-drive/contracts`, sidecar APIs, sync engine state, native sync behavior
 
 **Acceptance:**
 
@@ -167,7 +167,7 @@ Current coordination risk:
 
 - sidecar service implementations
 - native sync modules
-- `@syncflow/contracts`
+- `@lynavo-drive/contracts`
 - history/help/settings/login files
 
 **Reference:**
@@ -310,18 +310,18 @@ Minimum integration checks:
 
 ```bash
 git diff --check
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 Targeted tests by package:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- --runTestsByPath apps/mobile/src/screens/__tests__/LoginGlobalScreen.test.tsx
-pnpm --filter @syncflow/mobile test -- --runTestsByPath apps/mobile/src/screens/__tests__/SharedFilesDownloadGate.test.tsx
-pnpm --filter @syncflow/mobile test -- --runTestsByPath apps/mobile/src/screens/__tests__/HelpScreen.test.tsx
-pnpm --filter @syncflow/mobile test -- --runTestsByPath apps/mobile/src/screens/__tests__/SubscriptionScreen.test.tsx
-pnpm --filter @syncflow/mobile test -- --runTestsByPath apps/mobile/src/screens/__tests__/AlbumWorkbenchScreen.test.tsx apps/mobile/src/components/__tests__/AssetPreviewModal.test.tsx
-pnpm --filter @syncflow/mobile test -- --runTestsByPath apps/mobile/src/screens/__tests__/SyncActivityScreen.header.test.tsx apps/mobile/src/screens/__tests__/syncActivityOverview.test.ts apps/mobile/src/screens/__tests__/DeviceDiscoveryScreen.switchMode.test.tsx apps/mobile/src/screens/__tests__/QRScannerScreen.test.tsx apps/mobile/src/screens/__tests__/CodeVerifyScreen.test.tsx
+pnpm --filter @lynavo-drive/mobile test -- --runTestsByPath apps/mobile/src/screens/__tests__/LoginGlobalScreen.test.tsx
+pnpm --filter @lynavo-drive/mobile test -- --runTestsByPath apps/mobile/src/screens/__tests__/SharedFilesDownloadGate.test.tsx
+pnpm --filter @lynavo-drive/mobile test -- --runTestsByPath apps/mobile/src/screens/__tests__/HelpScreen.test.tsx
+pnpm --filter @lynavo-drive/mobile test -- --runTestsByPath apps/mobile/src/screens/__tests__/SubscriptionScreen.test.tsx
+pnpm --filter @lynavo-drive/mobile test -- --runTestsByPath apps/mobile/src/screens/__tests__/AlbumWorkbenchScreen.test.tsx apps/mobile/src/components/__tests__/AssetPreviewModal.test.tsx
+pnpm --filter @lynavo-drive/mobile test -- --runTestsByPath apps/mobile/src/screens/__tests__/SyncActivityScreen.header.test.tsx apps/mobile/src/screens/__tests__/syncActivityOverview.test.ts apps/mobile/src/screens/__tests__/DeviceDiscoveryScreen.switchMode.test.tsx apps/mobile/src/screens/__tests__/QRScannerScreen.test.tsx apps/mobile/src/screens/__tests__/CodeVerifyScreen.test.tsx
 ```
 
 Native/global build checks:
@@ -470,7 +470,7 @@ Start with Package 0 because it owns the shared primitives that every page consu
 
 | Package | Status | Evidence | Remaining coordinator action |
 | --- | --- | --- | --- |
-| Package 0: Foundation / Native Modal / Shared Chrome | Integrated for next-page workers | Spec review passed with baseline-aware scope review; code quality re-review passed; `git diff --check`, `pnpm --filter @syncflow/mobile exec jest --runTestsByPath src/components/__tests__/BottomTabBar.test.tsx src/components/__tests__/Icon.test.tsx`, `pnpm --filter @syncflow/mobile exec tsc --noEmit`, and Android `:app:compileGlobalDebugKotlin` passed. Android native `china/ui/*` files are no longer ignored. | iOS cold-start visual check still required before final goal completion. |
+| Package 0: Foundation / Native Modal / Shared Chrome | Integrated for next-page workers | Spec review passed with baseline-aware scope review; code quality re-review passed; `git diff --check`, `pnpm --filter @lynavo-drive/mobile exec jest --runTestsByPath src/components/__tests__/BottomTabBar.test.tsx src/components/__tests__/Icon.test.tsx`, `pnpm --filter @lynavo-drive/mobile exec tsc --noEmit`, and Android `:app:compileGlobalDebugKotlin` passed. Android native `china/ui/*` files are no longer ignored. | iOS cold-start visual check still required before final goal completion. |
 | Package 0B: Android Global Market Bridge | Integrated after visual smoke caught Android CN fallback | Android global APK initially showed CN phone login because JS market resolution had no Android native market constant and fell back to `cn`. Added Android `NativeMarketConfig` backed by `BuildConfig.FLAVOR`, registered it in `MainApplication`, and updated JS market resolver to prefer `NativeMarketConfig` before the iOS `AppleAuthModule` fallback. `market-config.test.ts`, mobile `tsc --noEmit`, Android `:app:assembleGlobalDebug`, and Android emulator global login screenshot passed. | Keep Android global login in release smoke checklist; the native package name still contains `china` for historical namespace compatibility. |
 | Package 0C: Dev-only Visual QA Bootstrap | Integrated for screenshot workers | Added `SYNCFLOW_VISUAL_QA=1` mock-token bootstrap, authenticated route whitelist, and optional remote-resource preview flag. It is gated by `__DEV__`, leaves existing tokens untouched, and still uses normal profile bootstrap. Real iOS smoke initially proved Metro env is insufficient; follow-up moved QA config to native launch env / Android intent extras and added dev sandbox TURN/refresh mocks so startup requests do not clear mock auth. Targeted tests, mobile `tsc --noEmit`, iOS `DebugGlobal` build/run, Android `:app:compileGlobalDebugKotlin`, `git diff --check`, and iOS `History` launch-env screenshot passed. | Use this only for visual QA screenshot runs; never use it to simulate real sync binding, queue, or protocol behavior. |
 | Package 1: Global Auth | Reviewed and accepted | Package review passed; `LoginGlobalScreen.test.tsx` passed; integrated mobile `tsc --noEmit` passed; first-batch Jest suite passed. iOS `SyncFlowMobileGlobal` with `DebugGlobal` and Android `globalDebug` cold-start screenshots both showed global Google/Apple login with no phone fallback. | Provider/agreement modal screenshots still need to be captured in the full-page visual pass. |
@@ -486,7 +486,7 @@ Start with Package 0 because it owns the shared primitives that every page consu
 
 2026-06-16 continuation pass:
 
-- `pnpm --filter @syncflow/mobile exec tsc --noEmit`: pass.
+- `pnpm --filter @lynavo-drive/mobile exec tsc --noEmit`: pass.
 - `git diff --check`: pass.
 - QA/bootstrap regression suite passed: `api-dev-sandbox.test.ts`, `visualQa.test.ts`, `auth-store-visual-qa.test.tsx`, and `RootNavigator.subscription.test.tsx`; 4 suites / 18 tests.
 - Integrated mobile UI targeted suite passed: 27 suites / 281 tests, covering market config, shared chrome/icons, global login, files/history/help/settings/sync/device pairing/album/auto-upload/subscription, and visual QA bootstrap tests.

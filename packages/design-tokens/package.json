@@ -1,5 +1,5 @@
 {
-  "name": "@syncflow/design-tokens",
+  "name": "@lynavo-drive/design-tokens",
   "version": "0.1.1",
   "private": true,
   "main": "./dist/index.js",

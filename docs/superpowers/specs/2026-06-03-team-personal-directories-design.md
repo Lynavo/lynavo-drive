@@ -64,7 +64,7 @@ For existing installs:
 
 ## Contracts
 
-Add fields and types in `@syncflow/contracts`:
+Add fields and types in `@lynavo-drive/contracts`:
 
 - `SettingsDTO.personalPath: string`
 - Directory scope type: `DirectoryScope = 'team' | 'personal'`

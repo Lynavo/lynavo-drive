@@ -1,4 +1,4 @@
-import type { DeviceType } from '@syncflow/contracts';
+import type { DeviceType } from '@lynavo-drive/contracts';
 
 interface ReconnectInterruptionReasonEvidence {
   deviceType?: DeviceType;

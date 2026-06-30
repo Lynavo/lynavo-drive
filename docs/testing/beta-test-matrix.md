@@ -45,7 +45,7 @@ go test ./...
 
 ```bash
 cd /Volumes/workspace/work/sync-flow
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 
 cd /Volumes/workspace/work/sync-flow/apps/mobile/ios
 xcodebuild -workspace SyncFlowMobile.xcworkspace -scheme SyncFlowMobile -configuration Debug -destination 'generic/platform=iOS' build

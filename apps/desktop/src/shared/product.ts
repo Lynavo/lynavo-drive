@@ -1,5 +1,5 @@
-import { LYNAVO_API_BASE_URL } from '@syncflow/contracts';
-import type { Distribution, ReleaseChannel } from '@syncflow/contracts';
+import { LYNAVO_API_BASE_URL } from '@lynavo-drive/contracts';
+import type { Distribution, ReleaseChannel } from '@lynavo-drive/contracts';
 
 export const PRODUCT_NAME = 'Lynavo Drive';
 export const APP_STORAGE_IDENTITY_NAME = 'Vivi Drop';

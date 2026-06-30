@@ -4,9 +4,9 @@
 
 **Goal:** Replace global mobile UI mock data with existing real Vivi Drop business logic while preserving the global-only UI split and leaving CN screens untouched.
 
-**Architecture:** Global screens remain the presentation boundary. They should consume existing shared services, `SyncEngineModule` wrappers, auth store state, and `@syncflow/contracts` DTOs rather than duplicating CN UI or redefining protocol types. Shared services can be touched only when a real business gap exists and must be verified against CN call sites.
+**Architecture:** Global screens remain the presentation boundary. They should consume existing shared services, `SyncEngineModule` wrappers, auth store state, and `@lynavo-drive/contracts` DTOs rather than duplicating CN UI or redefining protocol types. Shared services can be touched only when a real business gap exists and must be verified against CN call sites.
 
-**Tech Stack:** React Native, TypeScript strict mode, React Navigation, AsyncStorage, NativeSyncEngine bridge, `@syncflow/contracts`, Jest/React Native Testing Library.
+**Tech Stack:** React Native, TypeScript strict mode, React Navigation, AsyncStorage, NativeSyncEngine bridge, `@lynavo-drive/contracts`, Jest/React Native Testing Library.
 
 ---
 
@@ -14,7 +14,7 @@
 
 - Main agent coordinates, reviews, integrates, and verifies. Implementation should be delegated to workers where scopes are independent.
 - Workers must not edit CN screens: `DeviceDiscoveryScreen.tsx`, `SyncActivityScreen.tsx`, `SettingsScreen.tsx`, `RemoteAccessScreen.tsx`, `PhoneSyncSpaceScreen.tsx`, `HistoryScreen.tsx`, `AutoUploadSettingsScreen.tsx`, `SharedFilesScreen.tsx`.
-- Workers must not edit `@syncflow/contracts`, native SyncEngine, sidecar protocol, queue semantics, or sync state machine unless a later task explicitly scopes that work.
+- Workers must not edit `@lynavo-drive/contracts`, native SyncEngine, sidecar protocol, queue semantics, or sync state machine unless a later task explicitly scopes that work.
 - No worker should revert existing edits made by the user or by another worker.
 - Every worker must report changed files, tests run, and any risks or unimplemented edge cases.
 - Completed subagents may be closed after returning. Running subagents should not be closed early; if a stop is unavoidable, ask them to wrap up first.
@@ -57,9 +57,9 @@
 **Verification:**
 
 ```bash
-pnpm --filter @syncflow/mobile test -- DeviceDiscoveryGlobalScreen
-pnpm --filter @syncflow/mobile test -- recent-desktops-store
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test -- DeviceDiscoveryGlobalScreen
+pnpm --filter @lynavo-drive/mobile test -- recent-desktops-store
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 ## Task 2: Global Settings Real State And Account Actions
@@ -84,8 +84,8 @@ pnpm --filter @syncflow/mobile exec tsc --noEmit
 **Verification:**
 
 ```bash
-pnpm --filter @syncflow/mobile test -- SettingsGlobalScreen
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test -- SettingsGlobalScreen
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 ## Task 3: Global Auto Upload Real Config
@@ -106,8 +106,8 @@ pnpm --filter @syncflow/mobile exec tsc --noEmit
 **Verification:**
 
 ```bash
-pnpm --filter @syncflow/mobile test -- AutoUploadSettingsGlobalScreen
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test -- AutoUploadSettingsGlobalScreen
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 ## Task 4: Global Sync Activity Real State
@@ -130,8 +130,8 @@ pnpm --filter @syncflow/mobile exec tsc --noEmit
 **Verification:**
 
 ```bash
-pnpm --filter @syncflow/mobile test -- SyncActivityGlobalScreen GlobalSyncActivityHomeSections
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test -- SyncActivityGlobalScreen GlobalSyncActivityHomeSections
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 ## Task 5: Global History And Download Records No Production Mock
@@ -154,8 +154,8 @@ pnpm --filter @syncflow/mobile exec tsc --noEmit
 **Verification:**
 
 ```bash
-pnpm --filter @syncflow/mobile test -- HistoryGlobalScreen DownloadRecordsGlobalScreen
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test -- HistoryGlobalScreen DownloadRecordsGlobalScreen
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 ## Task 6: Global Remote Resources And Phone Sync Space
@@ -177,8 +177,8 @@ pnpm --filter @syncflow/mobile exec tsc --noEmit
 **Verification:**
 
 ```bash
-pnpm --filter @syncflow/mobile exec tsc --noEmit
-pnpm --filter @syncflow/mobile test -- SharedFilesDownloadGate
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test -- SharedFilesDownloadGate
 ```
 
 ## Task 7: Shared JS Bridge Wrappers
@@ -191,14 +191,14 @@ pnpm --filter @syncflow/mobile test -- SharedFilesDownloadGate
 
 - [ ] Add typed wrappers for existing native methods only: `getBindingState`, `getSyncOverview`, `getReadOnlyQueue`, `getHistoryDays`, `getClientDisplayName`, `setClientDisplayName`, `getAppInfo`.
 - [ ] Add platform-safe guards only where the native method is optional.
-- [ ] Do not redefine DTOs; import from `@syncflow/contracts`.
+- [ ] Do not redefine DTOs; import from `@lynavo-drive/contracts`.
 - [ ] Do not modify native code, contracts, or CN pages in this task.
 
 **Verification:**
 
 ```bash
-pnpm --filter @syncflow/mobile test -- SyncEngineModule
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test -- SyncEngineModule
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 ## Task 8: Download Persistence Gap
@@ -217,15 +217,15 @@ pnpm --filter @syncflow/mobile exec tsc --noEmit
 **Verification:**
 
 ```bash
-pnpm --filter @syncflow/mobile test -- download-records-service
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test -- download-records-service
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 ## Final Verification
 
 ```bash
-pnpm --filter @syncflow/mobile test
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 pnpm verify:android-syncengine-bridge
 ```
 

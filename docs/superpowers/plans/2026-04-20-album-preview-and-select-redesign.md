@@ -6,7 +6,7 @@
 
 **Architecture:** Split each list item into two touch zones (body = preview, circle = select). Remove `multiSelectMode` / long-press. New `AssetPreviewModal` uses horizontal `FlatList` pager. iOS bridge gains `getAssetPreviewSource` that lazy-loads full-resolution images and returns native video URLs; tmp cache is age/size-evicted at startup.
 
-**Tech Stack:** React Native 0.84 + TypeScript strict, `react-native-video@^6` (new), native iOS (Swift + Photos framework), `@syncflow/contracts` (shared DTOs), Jest + `@testing-library/react-native`.
+**Tech Stack:** React Native 0.84 + TypeScript strict, `react-native-video@^6` (new), native iOS (Swift + Photos framework), `@lynavo-drive/contracts` (shared DTOs), Jest + `@testing-library/react-native`.
 
 **Spec:** `docs/superpowers/specs/2026-04-20-album-preview-and-select-redesign-design.md`
 
@@ -54,12 +54,12 @@ export interface AssetPreviewSourceDTO {
 
 - [ ] **Step 2: Verify export**
 
-Ensure the file already uses `export interface` — no barrel change needed; `@syncflow/contracts` re-exports everything from `types.ts`.
+Ensure the file already uses `export interface` — no barrel change needed; `@lynavo-drive/contracts` re-exports everything from `types.ts`.
 
 - [ ] **Step 3: Build contracts**
 
 Run: `pnpm build`
-Expected: turbo builds `@syncflow/contracts` and `@syncflow/design-tokens` without errors.
+Expected: turbo builds `@lynavo-drive/contracts` and `@lynavo-drive/design-tokens` without errors.
 
 - [ ] **Step 4: Commit**
 
@@ -377,7 +377,7 @@ import type {
   AutoUploadConfigDTO,
   SharedDirectoryDTO,
   AutoUploadTimeRangeMode,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 ```
 
 - [ ] **Step 2: Add wrapper function**
@@ -395,7 +395,7 @@ export async function getAssetPreviewSource(
 
 - [ ] **Step 3: Typecheck**
 
-Run: `pnpm --filter @syncflow/mobile exec tsc --noEmit`
+Run: `pnpm --filter @lynavo-drive/mobile exec tsc --noEmit`
 Expected: No errors.
 
 - [ ] **Step 4: Commit**
@@ -418,7 +418,7 @@ git commit -m "feat(mobile): Add getAssetPreviewSource JS wrapper"
 Run from repo root:
 
 ```bash
-pnpm --filter @syncflow/mobile add react-native-video@^6.0.0
+pnpm --filter @lynavo-drive/mobile add react-native-video@^6.0.0
 ```
 
 - [ ] **Step 2: Pod install**
@@ -460,7 +460,7 @@ Create `apps/mobile/src/components/__tests__/AssetPreviewModal.test.tsx`:
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import { Text, TouchableOpacity } from 'react-native';
-import type { AlbumAssetDTO } from '@syncflow/contracts';
+import type { AlbumAssetDTO } from '@lynavo-drive/contracts';
 
 jest.mock('../../services/SyncEngineModule', () => ({
   getAssetPreviewSource: jest.fn().mockResolvedValue({
@@ -547,7 +547,7 @@ describe('AssetPreviewModal', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @syncflow/mobile test -- AssetPreviewModal.test.tsx`
+Run: `pnpm --filter @lynavo-drive/mobile test -- AssetPreviewModal.test.tsx`
 Expected: FAIL with "Cannot find module '../AssetPreviewModal'".
 
 - [ ] **Step 3: Create minimal component**
@@ -565,7 +565,7 @@ import {
   FlatList,
   Dimensions,
 } from 'react-native';
-import type { AlbumAssetDTO } from '@syncflow/contracts';
+import type { AlbumAssetDTO } from '@lynavo-drive/contracts';
 import { Icon } from './Icon';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -649,7 +649,7 @@ const styles = StyleSheet.create({
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `pnpm --filter @syncflow/mobile test -- AssetPreviewModal.test.tsx`
+Run: `pnpm --filter @lynavo-drive/mobile test -- AssetPreviewModal.test.tsx`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -729,7 +729,7 @@ it('shows error text when preview source returns cloud_unavailable', async () =>
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `pnpm --filter @syncflow/mobile test -- AssetPreviewModal.test.tsx`
+Run: `pnpm --filter @lynavo-drive/mobile test -- AssetPreviewModal.test.tsx`
 Expected: FAIL — the new tests cannot find Image / error text.
 
 - [ ] **Step 3: Implement preview page component**
@@ -740,7 +740,7 @@ Edit `AssetPreviewModal.tsx`. Add new component above the main export:
 import { Image, ActivityIndicator } from 'react-native';
 import { useEffect } from 'react';
 import { getAssetPreviewSource } from '../services/SyncEngineModule';
-import type { AssetPreviewSourceDTO } from '@syncflow/contracts';
+import type { AssetPreviewSourceDTO } from '@lynavo-drive/contracts';
 import { useTranslation } from 'react-i18next';
 
 interface PreviewPageProps {
@@ -848,7 +848,7 @@ jest.mock('react-i18next', () => ({
 
 - [ ] **Step 5: Run tests**
 
-Run: `pnpm --filter @syncflow/mobile test -- AssetPreviewModal.test.tsx`
+Run: `pnpm --filter @lynavo-drive/mobile test -- AssetPreviewModal.test.tsx`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
@@ -906,7 +906,7 @@ it('renders Video with paused=true when not active', async () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @syncflow/mobile test -- AssetPreviewModal.test.tsx`
+Run: `pnpm --filter @lynavo-drive/mobile test -- AssetPreviewModal.test.tsx`
 Expected: FAIL — video source is null for video branch.
 
 - [ ] **Step 3: Implement video branch**
@@ -939,7 +939,7 @@ if (source?.mediaType === 'video') {
 
 - [ ] **Step 4: Run tests**
 
-Run: `pnpm --filter @syncflow/mobile test -- AssetPreviewModal.test.tsx`
+Run: `pnpm --filter @lynavo-drive/mobile test -- AssetPreviewModal.test.tsx`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -1106,7 +1106,7 @@ const renderListItem = useCallback(
 
 - [ ] **Step 5: Typecheck**
 
-Run: `pnpm --filter @syncflow/mobile exec tsc --noEmit`
+Run: `pnpm --filter @lynavo-drive/mobile exec tsc --noEmit`
 Expected: No errors.
 
 - [ ] **Step 6: Commit**
@@ -1153,7 +1153,7 @@ const handleToggleSelect = useCallback((assetLocalId: string) => {
 
 - [ ] **Step 4: Typecheck**
 
-Run: `pnpm --filter @syncflow/mobile exec tsc --noEmit`
+Run: `pnpm --filter @lynavo-drive/mobile exec tsc --noEmit`
 Expected: No errors.
 
 - [ ] **Step 5: Commit**
@@ -1239,7 +1239,7 @@ selectAllBtnText: {
 
 - [ ] **Step 4: Typecheck**
 
-Run: `pnpm --filter @syncflow/mobile exec tsc --noEmit`
+Run: `pnpm --filter @lynavo-drive/mobile exec tsc --noEmit`
 Expected: No errors.
 
 - [ ] **Step 5: Commit**
@@ -1279,7 +1279,7 @@ At the end of the JSX tree, just before the closing fragment/view of the root, a
 
 - [ ] **Step 3: Typecheck**
 
-Run: `pnpm --filter @syncflow/mobile exec tsc --noEmit`
+Run: `pnpm --filter @lynavo-drive/mobile exec tsc --noEmit`
 Expected: No errors.
 
 - [ ] **Step 4: Commit**
@@ -1367,7 +1367,7 @@ it('toggles selection when the top-right circle is tapped', async () => {
 
 - [ ] **Step 5: Run mobile tests**
 
-Run: `pnpm --filter @syncflow/mobile test`
+Run: `pnpm --filter @lynavo-drive/mobile test`
 Expected: PASS (all old + new tests).
 
 - [ ] **Step 6: Commit**
@@ -1432,7 +1432,7 @@ Add top-level keys to `zh-Hant/albumWorkbench.json`:
 
 - [ ] **Step 4: Run tests**
 
-Run: `pnpm --filter @syncflow/mobile test`
+Run: `pnpm --filter @lynavo-drive/mobile test`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -1451,14 +1451,14 @@ git commit -m "i18n(mobile): Add preview + select-all strings in en / zh-Hans / 
 - [ ] **Step 1: Full typecheck**
 
 ```bash
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 Expected: No errors.
 
 - [ ] **Step 2: Full test run**
 
 ```bash
-pnpm --filter @syncflow/mobile test
+pnpm --filter @lynavo-drive/mobile test
 ```
 Expected: All passing.
 

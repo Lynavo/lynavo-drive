@@ -326,8 +326,8 @@ translation（i18next 預設 namespace，僅此一個）
 
 ## 9. 回歸驗證
 
-- [ ] `pnpm --filter @syncflow/mobile exec tsc --noEmit` 通過（型別注入無誤）
-- [ ] `pnpm --filter @syncflow/mobile test` 通過
+- [ ] `pnpm --filter @lynavo-drive/mobile exec tsc --noEmit` 通過（型別注入無誤）
+- [ ] `pnpm --filter @lynavo-drive/mobile test` 通過
 - [ ] iOS/Android 冷啟動在 `zh-Hans-CN` locale 顯示簡體
 - [ ] iOS/Android 切至 `en-US` locale 後重啟顯示英文
 - [ ] `zh-Hant-TW` locale 重啟顯示英文（fallback 驗證）

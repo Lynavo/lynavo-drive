@@ -1,7 +1,7 @@
 import { Smartphone, Monitor, FolderOpen, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import type { DashboardDeviceDTO } from '@syncflow/contracts';
+import type { DashboardDeviceDTO } from '@lynavo-drive/contracts';
 import { Button } from '@renderer/components/ui/button';
 
 const colors = {

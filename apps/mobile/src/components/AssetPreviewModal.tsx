@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import type { AlbumAssetDTO, AssetPreviewSourceDTO } from '@syncflow/contracts';
+import type { AlbumAssetDTO, AssetPreviewSourceDTO } from '@lynavo-drive/contracts';
 import { Icon } from './Icon';
 import { getAssetPreviewSource } from '../services/SyncEngineModule';
 

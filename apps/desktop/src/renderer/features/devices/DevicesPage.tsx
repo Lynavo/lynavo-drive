@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Smartphone, ShieldAlert, Wifi } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { DesktopManagedDeviceDTO } from '@syncflow/contracts';
+import type { DesktopManagedDeviceDTO } from '@lynavo-drive/contracts';
 import { useManagementStore } from '@renderer/stores/management-store';
 import { useDashboardStore } from '@renderer/stores/dashboard-store';
 import { DeviceManagementTable } from './DeviceManagementTable';

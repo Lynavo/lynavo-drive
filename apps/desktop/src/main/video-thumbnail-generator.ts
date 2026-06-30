@@ -12,7 +12,7 @@ import {
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { app, nativeImage } from 'electron';
 import log from 'electron-log';
-import { SIDECAR_EVENT_TYPES, type SidecarEvent } from '@syncflow/contracts';
+import { SIDECAR_EVENT_TYPES, type SidecarEvent } from '@lynavo-drive/contracts';
 
 type VideoThumbnailRequestPayload = Extract<
   SidecarEvent,

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { FileIcon, Folder, AlertCircle, Trash2, Download } from 'lucide-react';
-import type { DesktopSharedResourceDTO } from '@syncflow/contracts';
+import type { DesktopSharedResourceDTO } from '@lynavo-drive/contracts';
 import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
 import {

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SidecarEvent } from '@syncflow/contracts';
+import type { SidecarEvent } from '@lynavo-drive/contracts';
 import { useAppStore } from '@renderer/stores/app-store';
 import { useDirectoryStore } from '@renderer/stores/directory-store';
 import { useSettingsStore } from '@renderer/stores/settings-store';

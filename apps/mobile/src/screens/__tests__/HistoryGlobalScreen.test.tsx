@@ -66,7 +66,7 @@ jest.mock('../../services/SyncEngineModule', () => ({
 import { listHistory } from '../../services/desktop-local-service';
 import { getBindingState } from '../../services/SyncEngineModule';
 import { HistoryGlobalScreen } from '../HistoryGlobalScreen';
-import type { DesktopSyncRecordDTO } from '@syncflow/contracts';
+import type { DesktopSyncRecordDTO } from '@lynavo-drive/contracts';
 
 const mockedListHistory = listHistory as jest.MockedFunction<typeof listHistory>;
 const mockedGetBindingState = getBindingState as jest.MockedFunction<

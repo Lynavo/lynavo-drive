@@ -1,4 +1,4 @@
-import type { SettingsDTO } from '@syncflow/contracts';
+import type { SettingsDTO } from '@lynavo-drive/contracts';
 
 export const mockSettings: SettingsDTO = {
   deviceName: 'Alice 的 MacBook Pro',

@@ -1,5 +1,5 @@
 /**
- * Mobile-safe hex equivalents of @syncflow/design-tokens OKLCH palette.
+ * Mobile-safe hex equivalents of @lynavo-drive/design-tokens OKLCH palette.
  * React Native does not support OKLCH, so we convert to hex.
  */
 export const colors = {

@@ -1,6 +1,6 @@
 # Vivi Drop 系统概覽
 
-本文件用於幫助新同事快速理解目前系統邊界、職責分工和主鏈路。不作為產品規格文件；行為以目前程式碼和 `@syncflow/contracts` 為準。
+本文件用於幫助新同事快速理解目前系統邊界、職責分工和主鏈路。不作為產品規格文件；行為以目前程式碼和 `@lynavo-drive/contracts` 為準。
 
 ## 1. 目標
 
@@ -150,7 +150,7 @@ Vivi Drop 目前的目標非常聚焦：
 目前開發與排障按以下優先級判斷：
 
 1. 目前已提交程式碼
-2. `@syncflow/contracts`
+2. `@lynavo-drive/contracts`
 3. `docs/testing/beta-test-matrix.md`
 
 不應再依賴已刪除的歷史 spec 檔案。

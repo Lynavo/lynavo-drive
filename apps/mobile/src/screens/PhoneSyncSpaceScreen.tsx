@@ -43,7 +43,7 @@ import {
   SIDECAR_HTTP_PORT,
   type BindingStateDTO,
   type ReceivedLibraryItemDTO,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'PhoneSyncSpace'>;
 type PhoneSyncPreviewState = {

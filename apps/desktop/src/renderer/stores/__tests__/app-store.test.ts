@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAppStore } from '../app-store';
-import type { DashboardDeviceDTO } from '@syncflow/contracts';
+import type { DashboardDeviceDTO } from '@lynavo-drive/contracts';
 
 const mockDevice: DashboardDeviceDTO = {
   deviceId: 'd1',

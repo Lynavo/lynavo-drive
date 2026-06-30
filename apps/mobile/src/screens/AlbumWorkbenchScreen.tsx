@@ -45,7 +45,7 @@ import DateTimePicker, {
 } from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import type { AlbumAssetDTO, AutoUploadConfigDTO } from '@syncflow/contracts';
+import type { AlbumAssetDTO, AutoUploadConfigDTO } from '@lynavo-drive/contracts';
 import { AssetPreviewModal } from '../components/AssetPreviewModal';
 import { Icon } from '../components/Icon';
 import {

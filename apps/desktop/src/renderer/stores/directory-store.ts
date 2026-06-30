@@ -4,7 +4,7 @@ import type {
   DashboardDeviceDTO,
   SharedFileDTO,
   SortDirection,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 import i18n from '@renderer/i18n';
 import { useSidecarRuntimeStore } from './sidecar-runtime-store';
 

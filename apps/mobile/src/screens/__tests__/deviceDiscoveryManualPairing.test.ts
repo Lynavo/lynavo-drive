@@ -1,4 +1,4 @@
-import { PROTOCOL_PORT } from '@syncflow/contracts';
+import { PROTOCOL_PORT } from '@lynavo-drive/contracts';
 
 import {
   buildManualPairDevice,

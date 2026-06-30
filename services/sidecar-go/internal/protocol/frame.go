@@ -22,7 +22,7 @@ var bodyPool = sync.Pool{
 	},
 }
 
-// Message type constants matching @syncflow/contracts
+// Message type constants matching @lynavo-drive/contracts
 const (
 	TypeHelloReq           uint16 = 0x0001
 	TypeHelloRes           uint16 = 0x0002

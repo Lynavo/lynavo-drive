@@ -3,7 +3,7 @@ import type { DocumentPickerResponse } from '@react-native-documents/picker';
 import {
   ErrorCode,
   type ErrorCode as SyncFlowErrorCode,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 import type {
   AlbumAssetDTO,
   AssetPreviewSourceDTO,
@@ -18,7 +18,7 @@ import type {
   SharedDirectoryDTO,
   SyncSummaryDTO,
   AutoUploadTimeRangeMode,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 import {
   clearAutoUploadSessionBestEffort,
   startAutoUploadSessionBestEffort,

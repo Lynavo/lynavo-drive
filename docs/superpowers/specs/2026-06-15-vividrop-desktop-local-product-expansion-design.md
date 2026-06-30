@@ -30,7 +30,7 @@ The source of truth for management, records, authorization, blocking, shared fil
 - Preserve queue semantics: no delete, reorder, skip, or manual queue mutation UI.
 - Preserve automatic incremental sync. Do not turn the production mobile album flow into manual file picking.
 - Preserve single-file serial upload per phone.
-- Keep all shared DTOs and protocol constants in `@syncflow/contracts`.
+- Keep all shared DTOs and protocol constants in `@lynavo-drive/contracts`.
 - Desktop renderer must not directly access sidecar, filesystem, or SQLite; it must go through preload/main bridges.
 
 ## Reference Handling
@@ -419,7 +419,7 @@ Do not delete underlying compatibility logic by default. Keep existing stores, b
 
 - Build contracts before desktop/mobile consumers.
 - Add or update type tests where this repo already has contract tests.
-- Ensure desktop/mobile import shared DTOs from `@syncflow/contracts`.
+- Ensure desktop/mobile import shared DTOs from `@lynavo-drive/contracts`.
 
 ### Sidecar
 

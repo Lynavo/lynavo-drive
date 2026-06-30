@@ -1,4 +1,4 @@
-import { PROTOCOL_PORT, type DiscoveredDeviceDTO } from '@syncflow/contracts';
+import { PROTOCOL_PORT, type DiscoveredDeviceDTO } from '@lynavo-drive/contracts';
 
 export type ManualPairDevice = Pick<DiscoveredDeviceDTO, 'deviceId' | 'name' | 'ip' | 'type' | 'port'>;
 

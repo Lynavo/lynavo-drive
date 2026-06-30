@@ -34,7 +34,7 @@ import {
 } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
-import type { DiscoveredDeviceDTO } from '@syncflow/contracts';
+import type { DiscoveredDeviceDTO } from '@lynavo-drive/contracts';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/colors';
 import { Icon } from '../components/Icon';
@@ -56,7 +56,7 @@ import {
 import { shouldKeepCachedDevicesVisible } from './deviceDiscoveryRefresh';
 import { appConfig } from '../config/app-config';
 import { useRecentDesktops } from '../stores/recent-desktops-store';
-import type { RecentDesktopDTO } from '@syncflow/contracts';
+import type { RecentDesktopDTO } from '@lynavo-drive/contracts';
 
 // ---------------------------------------------------------------------------
 // Types

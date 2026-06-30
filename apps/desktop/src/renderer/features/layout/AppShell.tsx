@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState, type CSSProperties, type FormEvent
 import { useTranslation } from 'react-i18next';
 import { Download, HelpCircle, Loader2, QrCode, RefreshCw, Smartphone } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { LYNAVO_WEB_BASE_URL } from '@syncflow/contracts';
+import { LYNAVO_WEB_BASE_URL } from '@lynavo-drive/contracts';
 import { Skeleton } from '@renderer/components/ui/skeleton';
 import { persistLocale } from '@renderer/i18n';
 import {

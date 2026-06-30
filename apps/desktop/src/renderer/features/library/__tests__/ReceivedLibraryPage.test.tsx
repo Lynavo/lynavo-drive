@@ -6,7 +6,7 @@ import { useDashboardStore } from '@renderer/stores/dashboard-store';
 import { useManagementStore } from '@renderer/stores/management-store';
 import { useSettingsStore } from '@renderer/stores/settings-store';
 import { toast } from 'sonner';
-import type { DashboardDeviceDTO, ReceivedLibraryItemDTO } from '@syncflow/contracts';
+import type { DashboardDeviceDTO, ReceivedLibraryItemDTO } from '@lynavo-drive/contracts';
 
 vi.mock('sonner', () => ({
   toast: {

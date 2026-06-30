@@ -65,7 +65,7 @@ Important behavior: the WebSocket event is only a signal. It does not return a r
 
 ## Data Contracts
 
-### `@syncflow/contracts`
+### `@lynavo-drive/contracts`
 
 Modify `packages/contracts/src/events.ts`.
 
@@ -311,7 +311,7 @@ Behavior:
 - Electron must validate `sourcePath` and `cachePath` independently before reading or writing.
 - Electron must write only inside the sidecar thumbnail cache root.
 - The renderer must not access sidecar, filesystem, or SQLite directly.
-- DTO types must come from `@syncflow/contracts`.
+- DTO types must come from `@lynavo-drive/contracts`.
 - Do not introduce unauthenticated filesystem write routes.
 
 ## Testing Plan
@@ -357,9 +357,9 @@ Run targeted checks first:
 
 ```bash
 (cd services/sidecar-go && go test ./internal/api ./internal/events)
-pnpm --filter @syncflow/desktop test -- video-thumbnail-generator ws-bridge
-pnpm --filter @syncflow/mobile test -- desktop-local-service RemoteAccessGlobalScreen GlobalSyncActivityHomeSections
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/desktop test -- video-thumbnail-generator ws-bridge
+pnpm --filter @lynavo-drive/mobile test -- desktop-local-service RemoteAccessGlobalScreen GlobalSyncActivityHomeSections
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 Then run broader checks when the branch is ready:
@@ -372,7 +372,7 @@ pnpm test
 
 ## Implementation Order
 
-1. Update `@syncflow/contracts` event typing.
+1. Update `@lynavo-drive/contracts` event typing.
 2. Add sidecar DTO propagation for `streamUrl` and video `thumbnailUrl`.
 3. Add sidecar video thumbnail cache miss flow with in-flight coalescing and event broadcast.
 4. Add Electron main video thumbnail generator and wire it into the existing `WsBridge` callback.

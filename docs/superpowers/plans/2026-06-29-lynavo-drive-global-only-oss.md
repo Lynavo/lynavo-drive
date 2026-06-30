@@ -6,7 +6,7 @@
 
 **Architecture:** Remove `cn/global` market branching before removing commercial behavior. The OSS baseline should expose one product configuration, one release channel model, and fail-open foreground LAN sync. Background continuation, remote tunnel, subscription purchase, gift-card redemption, TURN/signaling, and official-account flows should first be made fail-closed, then deleted or hidden from the open-source runtime in the commercial removal phase. Protocol/storage compatibility names such as `_syncflow._tcp`, existing keychain services, and old data directories are allowed only through an explicit legacy allowlist and migration task.
 
-**Tech Stack:** pnpm monorepo, TypeScript strict mode, React Native, Electron, React 18, Go sidecar, Vitest/Jest, Gradle, Xcode, `@syncflow/contracts` until the package rename task lands.
+**Tech Stack:** pnpm monorepo, TypeScript strict mode, React Native, Electron, React 18, Go sidecar, Vitest/Jest, Gradle, Xcode, `@lynavo-drive/contracts` after the package rename task.
 
 ---
 
@@ -25,7 +25,7 @@
 
 - Release profiles become `review` and `prod`; `cn-prod`, `global-prod`, `cn-review`, and `global-review` are removed.
 - Public OSS app IDs target `com.lynavo.drive.mobile` and `com.lynavo.drive.desktop`, but store migration implications must remain documented until a release owner confirms App Store / Play continuity.
-- mDNS service `_syncflow._tcp`, sidecar health service `syncflow-sidecar`, Go module path, and package scope `@syncflow/*` are legacy compatibility items until their own migration tasks land.
+- mDNS service `_syncflow._tcp`, sidecar health service `syncflow-sidecar`, and Go module path are legacy compatibility items until their own migration tasks land. The workspace package scope is migrated in Task 16.
 - Official commercial native modules are not added to the public repo in this plan. OSS implements entitlement contracts and fail-closed stubs/guards only.
 - Android/iOS package and target renames are split from flavor/scheme removal to keep builds debuggable.
 - Product direction confirmed after the code review fix pass: continue toward a thorough open-source edition. Do not preserve subscription/IAP/gift-card/TURN/official remote access as a public Pro overlay unless a later product decision reverses this.
@@ -57,7 +57,7 @@
 
 - [x] Write a failing test or dry-run command that proves unallowlisted `Vivi Drop`, `vividrop`, `SyncFlow`, `syncflow`, `SYNCFLOW`, `VIVIDROP`, and `@syncflow` hits are detected outside the product plan and allowlist.
 - [x] Implement `scripts/verify-legacy-name-allowlist.mjs` using `rg --json` or a structured child-process wrapper, not ad hoc unchecked string parsing.
-- [x] Allow current compatibility items by exact path and rationale: protocol service type, sidecar health service, Go module path, `@syncflow/*` package names before package rename, keychain/shared-pref migration strings, old data-dir migration paths, and historical docs under `docs/superpowers/*`.
+- [x] Allow current compatibility items by exact path and rationale: protocol service type, sidecar health service, Go module path, keychain/shared-pref migration strings, old data-dir migration paths, and historical docs under `docs/superpowers/*`.
 - [x] Add `verify:legacy-names` to root `package.json`.
 - [x] Keep the script advisory at first if current hits are intentionally broad; later rename tasks tighten it to CI-blocking.
 
@@ -138,7 +138,7 @@ node scripts/dev/run-release-profile.mjs --profile review --target mobile-metro 
 - [x] Add `Distribution = 'community' | 'official'`.
 - [x] Add `DriveFeatureKey`, `EntitlementSource`, and `DriveEntitlements`.
 - [x] Add `resolveDriveEntitlements(input)` with foreground LAN fail-open and background/remote fail-closed behavior.
-- [x] Keep `@syncflow/contracts` package name unchanged in this task; package rename is Task 16.
+- [x] Keep the pre-rename contracts package name unchanged in this task; package rename is Task 16.
 - [x] Keep existing `VIVIDROP_*` constants until consumers move to Lynavo constants, but add Lynavo constants for new code.
 
 **Required policy behavior:**
@@ -156,8 +156,8 @@ resolveDriveEntitlements({
 **Verification:**
 
 ```bash
-pnpm --filter @syncflow/contracts test
-pnpm --filter @syncflow/contracts typecheck
+pnpm --filter @lynavo-drive/contracts test
+pnpm --filter @lynavo-drive/contracts typecheck
 ```
 
 ## Task 4: Mobile Single App Config
@@ -184,8 +184,8 @@ pnpm --filter @syncflow/contracts typecheck
 **Verification:**
 
 ```bash
-pnpm --filter @syncflow/mobile test -- src/config/__tests__/app-config.test.ts src/services/__tests__/config.release-profile.test.ts src/constants/__tests__/iap.test.ts src/utils/__tests__/subscriptionPaymentRouting.test.ts
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test -- src/config/__tests__/app-config.test.ts src/services/__tests__/config.release-profile.test.ts src/constants/__tests__/iap.test.ts src/utils/__tests__/subscriptionPaymentRouting.test.ts
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 ## Task 5: Mobile Guest Local Mode
@@ -212,8 +212,8 @@ pnpm --filter @syncflow/mobile exec tsc --noEmit
 **Verification:**
 
 ```bash
-pnpm --filter @syncflow/mobile test -- src/navigation/__tests__/RootNavigator.local-mode.test.tsx src/navigation/__tests__/RootNavigator.subscription.test.tsx src/stores/__tests__/auth-store-local-mode.test.tsx
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test -- src/navigation/__tests__/RootNavigator.local-mode.test.tsx src/navigation/__tests__/RootNavigator.subscription.test.tsx src/stores/__tests__/auth-store-local-mode.test.tsx
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 ## Task 6: Mobile Paid Feature Entitlement Resolver
@@ -243,8 +243,8 @@ pnpm --filter @syncflow/mobile exec tsc --noEmit
 **Verification:**
 
 ```bash
-pnpm --filter @syncflow/mobile test -- src/entitlements/__tests__/drive-entitlements.test.ts src/services/__tests__/tunnel-credentials-service.test.ts src/services/__tests__/app-config-service.test.ts
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test -- src/entitlements/__tests__/drive-entitlements.test.ts src/services/__tests__/tunnel-credentials-service.test.ts src/services/__tests__/app-config-service.test.ts
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 ## Task 7: Desktop Product Helper And Market Removal
@@ -270,8 +270,8 @@ pnpm --filter @syncflow/mobile exec tsc --noEmit
 **Verification:**
 
 ```bash
-pnpm --filter @syncflow/desktop exec vitest run src/shared src/main/__tests__/sidecar-client.test.ts src/main/__tests__/oauth-config.test.ts
-pnpm --filter @syncflow/desktop typecheck
+pnpm --filter @lynavo-drive/desktop exec vitest run src/shared src/main/__tests__/sidecar-client.test.ts src/main/__tests__/oauth-config.test.ts
+pnpm --filter @lynavo-drive/desktop typecheck
 ```
 
 ## Task 8: Desktop Guest Local Shell
@@ -295,8 +295,8 @@ pnpm --filter @syncflow/desktop typecheck
 **Verification:**
 
 ```bash
-pnpm --filter @syncflow/desktop exec vitest run src/renderer/features/layout/__tests__/AppShell.test.tsx src/renderer/components/shared/__tests__/AuthPage.test.tsx src/renderer/components/shared/__tests__/LoginDialog.test.tsx
-pnpm --filter @syncflow/desktop typecheck
+pnpm --filter @lynavo-drive/desktop exec vitest run src/renderer/features/layout/__tests__/AppShell.test.tsx src/renderer/components/shared/__tests__/AuthPage.test.tsx src/renderer/components/shared/__tests__/LoginDialog.test.tsx
+pnpm --filter @lynavo-drive/desktop typecheck
 ```
 
 ## Task 9: Android Flavor Removal
@@ -325,7 +325,7 @@ pnpm --filter @syncflow/desktop typecheck
 
 ```bash
 cd apps/mobile/android && ./gradlew test assembleDebug
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 ## Task 10: iOS Scheme And Market Config Collapse
@@ -355,7 +355,7 @@ pnpm --filter @syncflow/mobile exec tsc --noEmit
 ```bash
 cd apps/mobile/ios && pod install
 cd apps/mobile/ios && xcodebuild -workspace SyncFlowMobile.xcworkspace -scheme SyncFlowMobile -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 ## Task 11: Mobile Market Directory And CN Flow Removal
@@ -379,8 +379,8 @@ pnpm --filter @syncflow/mobile exec tsc --noEmit
 
 ```bash
 rg -n "activeMarket|marketConfig|isGlobalMarket|isChinaMarket|SYNCFLOW_MARKET|cnMarket|globalMarket" apps/mobile/src
-pnpm --filter @syncflow/mobile test
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 ## Task 12: Desktop Packaging And Visible Branding
@@ -408,7 +408,7 @@ pnpm --filter @syncflow/mobile exec tsc --noEmit
 
 ```bash
 node --test apps/desktop/scripts/__tests__/package-linux.test.mjs apps/desktop/scripts/__tests__/run-electron-vite-config.test.mjs apps/desktop/scripts/__tests__/build-sidecar-linux.test.mjs
-pnpm --filter @syncflow/desktop typecheck
+pnpm --filter @lynavo-drive/desktop typecheck
 ```
 
 ## Task 13: Sidecar Remote Entitlement Guard
@@ -433,7 +433,7 @@ pnpm --filter @syncflow/desktop typecheck
 
 ```bash
 cd services/sidecar-go && go test ./internal/api
-pnpm --filter @syncflow/desktop exec vitest run src/main/__tests__/sidecar-client.test.ts
+pnpm --filter @lynavo-drive/desktop exec vitest run src/main/__tests__/sidecar-client.test.ts
 ```
 
 ## Task 14: Docs And Release Rule Rewrite
@@ -497,9 +497,9 @@ pnpm format:check README.md AGENTS.md docs/release docs/open-source docs/commerc
 
 ```bash
 rg -n "SubscriptionGlobalScreen|iap|purchase|restore|gift.?card|turn-credentials|canUseRemoteTunnel|canUseBackgroundContinuation|LYNAVO_GIFTCARD|subscription/status" apps packages scripts services docs --glob '!**/node_modules/**'
-pnpm --filter @syncflow/mobile exec tsc --noEmit
-pnpm --filter @syncflow/desktop test
-pnpm --filter @syncflow/desktop typecheck
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/desktop test
+pnpm --filter @lynavo-drive/desktop typecheck
 cd services/sidecar-go && go test ./...
 ```
 
@@ -518,22 +518,22 @@ Task 15 verification update, 2026-06-30:
 
 - Modify: `packages/contracts/package.json`
 - Modify: `packages/design-tokens/package.json`
-- Modify: all imports of `@syncflow/contracts` and `@syncflow/design-tokens`
+- Modify: all imports of the contracts and design-token workspace packages
 - Modify: root and app `package.json`
 - Modify: `pnpm-lock.yaml`
 - Modify: Vite/tsconfig/test setup that references old package names
 
-- [ ] Rename packages to `@lynavo-drive/contracts` and `@lynavo-drive/design-tokens`.
-- [ ] Run `pnpm install` to update the lockfile.
-- [ ] Update all source imports and tests.
-- [ ] Keep protocol constants stable unless the mDNS migration task is executed.
-- [ ] Do not mix with behavioral changes.
+- [x] Rename packages to `@lynavo-drive/contracts` and `@lynavo-drive/design-tokens`.
+- [x] Run `pnpm install` to update the lockfile.
+- [x] Update all source imports and tests.
+- [x] Keep protocol constants stable unless the mDNS migration task is executed.
+- [x] Do not mix with behavioral changes.
 
 **Verification:**
 
 ```bash
 pnpm install
-rg -n "@syncflow/contracts|@syncflow/design-tokens" apps packages scripts services README.md docs
+rg -n "@syncflow/(contracts|design-tokens|desktop|mobile)" apps packages scripts services README.md AGENTS.md CLAUDE.md package.json pnpm-lock.yaml .vscode docs --glob '!docs/product/lynavo-drive-global-only-oss-commercial-plan.md'
 pnpm build
 pnpm typecheck
 pnpm test
@@ -576,10 +576,10 @@ Run the narrow checks for each task as it lands. Before claiming the branch is c
 ```bash
 node scripts/verify-legacy-name-allowlist.mjs
 pnpm test:release
-pnpm --filter @syncflow/contracts test
-pnpm --filter @syncflow/mobile exec tsc --noEmit
-pnpm --filter @syncflow/desktop test
-pnpm --filter @syncflow/desktop typecheck
+pnpm --filter @lynavo-drive/contracts test
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/desktop test
+pnpm --filter @lynavo-drive/desktop typecheck
 cd services/sidecar-go && go test ./...
 ```
 

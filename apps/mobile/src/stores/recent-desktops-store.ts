@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { RecentDesktopDTO } from '@syncflow/contracts';
+import type { RecentDesktopDTO } from '@lynavo-drive/contracts';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const STORAGE_KEY = '@vividrop/recent_desktops';

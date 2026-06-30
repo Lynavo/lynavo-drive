@@ -1,7 +1,7 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@renderer/lib/utils';
-import type { DeviceDashboardStatus } from '@syncflow/contracts';
+import type { DeviceDashboardStatus } from '@lynavo-drive/contracts';
 
 const dotVariants = cva('h-2 w-2 rounded-full', {
   variants: {

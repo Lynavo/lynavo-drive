@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import type { DesktopAccessRecordDTO } from '@syncflow/contracts';
+import type { DesktopAccessRecordDTO } from '@lynavo-drive/contracts';
 import { RecordsPage } from '../RecordsPage';
 import { useManagementStore } from '@renderer/stores/management-store';
 

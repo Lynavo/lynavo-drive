@@ -76,7 +76,7 @@ function assertTypeExports(
   return true;
 }
 
-describe('@syncflow/contracts exports', () => {
+describe('@lynavo-drive/contracts exports', () => {
   it('exports PROTOCOL_VERSION', () => {
     expect(contracts.PROTOCOL_VERSION).toBe('LMUP/2');
   });

@@ -224,7 +224,7 @@ This is incredibly elegant, uses `prefilledCode` parameter, wait for 600ms, and 
 
 - [ ] **Step 2: Run test to verify it passes**
 
-Run: `pnpm --filter @syncflow/mobile test CodeVerifyScreen.test.tsx`
+Run: `pnpm --filter @lynavo-drive/mobile test CodeVerifyScreen.test.tsx`
 Expected: PASS
 
 - [ ] **Step 3: Commit**

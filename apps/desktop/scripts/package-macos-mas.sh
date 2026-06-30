@@ -31,11 +31,11 @@ echo "Build number: ${SYNCFLOW_BUILD_NUMBER}"
 echo "Building sidecar..."
 
 cd "${REPO_ROOT}"
-pnpm --filter @syncflow/desktop build:sidecar
+pnpm --filter @lynavo-drive/desktop build:sidecar
 
 echo "Packaging for Mac App Store (MAS)..."
 # No explicit identities passed - letting electron-builder auto-detect
-pnpm --filter @syncflow/desktop exec electron-builder --mac mas \
+pnpm --filter @lynavo-drive/desktop exec electron-builder --mac mas \
   "-c.buildVersion=${SYNCFLOW_BUILD_NUMBER}" \
   "-c.mas.bundleVersion=${SYNCFLOW_BUILD_NUMBER}" \
   "-c.extraMetadata.syncflowBuildNumber=${SYNCFLOW_BUILD_NUMBER}" \

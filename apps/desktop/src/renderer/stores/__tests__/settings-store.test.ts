@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useSettingsStore } from '../settings-store';
 import { mockSettings } from '../../mocks/settings';
-import type { SettingsDTO } from '@syncflow/contracts';
+import type { SettingsDTO } from '@lynavo-drive/contracts';
 import { useSidecarRuntimeStore } from '../sidecar-runtime-store';
 
 describe('settings-store', () => {

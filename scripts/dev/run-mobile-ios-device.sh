@@ -80,7 +80,7 @@ unset VSCODE_INSPECTOR_OPTIONS
 unset VSCODE_JS_DEBUG_BOOTLOADER
 unset VSCODE_DEBUGGING
 
-exec corepack pnpm --filter @syncflow/mobile exec react-native run-ios \
+exec corepack pnpm --filter @lynavo-drive/mobile exec react-native run-ios \
   --device "${device_id}" \
   --scheme "SyncFlowMobile" \
   --mode "Debug" \

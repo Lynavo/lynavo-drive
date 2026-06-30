@@ -71,7 +71,7 @@ it('detects Linux hosts explicitly', () => {
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop exec vitest run src/shared/__tests__/platform-capabilities.test.ts
+pnpm --filter @lynavo-drive/desktop exec vitest run src/shared/__tests__/platform-capabilities.test.ts
 ```
 
 Expected: fail with an export error for `isLinuxPlatform`.
@@ -169,10 +169,10 @@ Update `apps/desktop/src/renderer/hooks/use-electron-api.ts` mock platform:
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop exec vitest run \
+pnpm --filter @lynavo-drive/desktop exec vitest run \
   src/shared/__tests__/platform-capabilities.test.ts \
   src/preload/__tests__/index.test.ts
-pnpm --filter @syncflow/desktop typecheck
+pnpm --filter @lynavo-drive/desktop typecheck
 ```
 
 Expected: tests and typecheck pass.
@@ -242,7 +242,7 @@ Add the Linux regression:
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop exec vitest run src/renderer/features/settings/__tests__/ShareAddressSection.test.tsx
+pnpm --filter @lynavo-drive/desktop exec vitest run src/renderer/features/settings/__tests__/ShareAddressSection.test.tsx
 ```
 
 Expected: fail because Linux currently receives Windows detail text.
@@ -375,7 +375,7 @@ describe('SystemGuideSection', () => {
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop exec vitest run src/renderer/features/settings/__tests__/SystemGuideSection.test.tsx
+pnpm --filter @lynavo-drive/desktop exec vitest run src/renderer/features/settings/__tests__/SystemGuideSection.test.tsx
 ```
 
 Expected: fail because Linux-specific guide text does not exist.
@@ -447,10 +447,10 @@ Render the Mac card only when `isMac`, the Windows card only when `isWindows`, a
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop exec vitest run \
+pnpm --filter @lynavo-drive/desktop exec vitest run \
   src/renderer/features/settings/__tests__/ShareAddressSection.test.tsx \
   src/renderer/features/settings/__tests__/SystemGuideSection.test.tsx
-pnpm --filter @syncflow/desktop typecheck
+pnpm --filter @lynavo-drive/desktop typecheck
 ```
 
 Expected: tests and typecheck pass.
@@ -833,7 +833,7 @@ Modify `apps/desktop/package.json` scripts:
 Modify root `package.json` scripts:
 
 ```json
-"package:desktop:linux": "pnpm --filter @syncflow/desktop package:linux"
+"package:desktop:linux": "pnpm --filter @lynavo-drive/desktop package:linux"
 ```
 
 - [ ] **Step 5: Run package helper tests and JSON validation**
@@ -978,7 +978,7 @@ Update `builds commands and env from the selected profile` target list to includ
 Add the expected Linux step:
 
 ```js
-      ['linux', 'pnpm', ['--filter', '@syncflow/desktop', 'package:linux:global']],
+      ['linux', 'pnpm', ['--filter', '@lynavo-drive/desktop', 'package:linux:global']],
 ```
 
 - [ ] **Step 2: Add dry-run CLI Linux assertions**
@@ -1044,7 +1044,7 @@ Add Linux step before the Windows fallback return:
     return {
       target,
       command: 'pnpm',
-      args: ['--filter', '@syncflow/desktop', profile.desktopLinuxScript],
+      args: ['--filter', '@lynavo-drive/desktop', profile.desktopLinuxScript],
     };
   }
 ```
@@ -1162,8 +1162,8 @@ git commit -m "docs: add linux desktop release checks"
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test
-pnpm --filter @syncflow/desktop typecheck
+pnpm --filter @lynavo-drive/desktop test
+pnpm --filter @lynavo-drive/desktop typecheck
 ```
 
 Expected: all tests pass and typecheck succeeds.

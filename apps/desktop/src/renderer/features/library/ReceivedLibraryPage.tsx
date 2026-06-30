@@ -17,7 +17,7 @@ import { useManagementStore } from '@renderer/stores/management-store';
 import { formatBytes, formatSmartDate } from '@renderer/lib/format';
 import { FileIcon } from '@renderer/components/shared/FileIcon';
 import { Skeleton } from '@renderer/components/ui/skeleton';
-import type { ReceivedLibraryItemDTO } from '@syncflow/contracts';
+import type { ReceivedLibraryItemDTO } from '@lynavo-drive/contracts';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 

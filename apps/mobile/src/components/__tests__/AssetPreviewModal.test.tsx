@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import { Text, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
-import type { AlbumAssetDTO } from '@syncflow/contracts';
+import type { AlbumAssetDTO } from '@lynavo-drive/contracts';
 import { getAssetPreviewSource } from '../../services/SyncEngineModule';
 
 jest.mock('../../services/SyncEngineModule', () => ({

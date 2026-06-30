@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { APP_COMPATIBILITY_VERSION } from '@syncflow/contracts';
+import { APP_COMPATIBILITY_VERSION } from '@lynavo-drive/contracts';
 import { SidecarManager } from '../sidecar-manager';
 import { sidecarClient, syncCredentialsToSidecar } from '../sidecar-client';
 

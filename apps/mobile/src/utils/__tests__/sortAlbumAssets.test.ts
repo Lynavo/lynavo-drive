@@ -1,4 +1,4 @@
-import type { AlbumAssetDTO } from '@syncflow/contracts';
+import type { AlbumAssetDTO } from '@lynavo-drive/contracts';
 import { sortAlbumAssetsForDisplay } from '../sortAlbumAssets';
 
 function makeAsset(

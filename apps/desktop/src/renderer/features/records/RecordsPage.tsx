@@ -8,7 +8,7 @@ import {
   previewManagedDevices,
   shouldUsePreviewData,
 } from '@renderer/features/preview/demo-data';
-import type { DesktopAccessRecordDTO } from '@syncflow/contracts';
+import type { DesktopAccessRecordDTO } from '@lynavo-drive/contracts';
 
 const RECORDS_PER_PAGE = 5;
 

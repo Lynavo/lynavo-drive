@@ -29,7 +29,7 @@ export default defineConfig({
     },
     define: envDefine,
     optimizeDeps: {
-      include: ['@syncflow/contracts', '@syncflow/design-tokens'],
+      include: ['@lynavo-drive/contracts', '@lynavo-drive/design-tokens'],
     },
     plugins: [react()],
   },

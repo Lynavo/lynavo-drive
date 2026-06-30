@@ -18,7 +18,7 @@ import type {
   HistoryLedgerCardDTO,
   ReadOnlyQueueItemDTO,
   SyncSummaryDTO,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 
 import { GlobalBottomTabBar } from '../components/GlobalBottomTabBar';
 import { GlobalGradientBackground } from '../components/GlobalGradientBackground';

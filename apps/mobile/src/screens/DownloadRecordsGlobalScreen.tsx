@@ -19,7 +19,7 @@ import Video from 'react-native-video';
 import {
   SIDECAR_HTTP_PORT,
   type ReceivedLibraryItemDTO,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 
 import { GlobalGradientBackground } from '../components/GlobalGradientBackground';
 import { Icon } from '../components/Icon';

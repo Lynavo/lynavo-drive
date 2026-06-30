@@ -120,13 +120,13 @@ function buildTargetStep(profile, target) {
     return {
       target,
       command: 'pnpm',
-      args: ['--filter', '@syncflow/desktop', 'package:linux'],
+      args: ['--filter', '@lynavo-drive/desktop', 'package:linux'],
     };
   }
   return {
     target,
     command: 'pnpm',
-    args: ['--filter', '@syncflow/desktop', 'package:win'],
+    args: ['--filter', '@lynavo-drive/desktop', 'package:win'],
   };
 }
 

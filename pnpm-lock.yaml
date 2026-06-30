@@ -35,10 +35,10 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@syncflow/contracts':
+      '@lynavo-drive/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@syncflow/design-tokens':
+      '@lynavo-drive/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
       class-variance-authority:
@@ -171,7 +171,7 @@ importers:
       '@react-navigation/stack':
         specifier: ^7.8.6
         version: 7.8.6(3c57eda626e2c0c485c5eb2b7da59778)
-      '@syncflow/contracts':
+      '@lynavo-drive/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
       i18next:

@@ -12,7 +12,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import type {
   DashboardDeviceDTO,
   DeviceDashboardStatus,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 import { DeviceNameSection } from '../DeviceNameSection';
 import { useSettingsStore } from '@renderer/stores/settings-store';
 import { useDashboardStore } from '@renderer/stores/dashboard-store';

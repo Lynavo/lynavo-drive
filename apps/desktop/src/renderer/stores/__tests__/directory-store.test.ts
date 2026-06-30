@@ -5,7 +5,7 @@ import type {
   DashboardDeviceDTO,
   DeviceFileLedgerPageDTO,
   SharedDirectoryDTO,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 
 describe('directory-store', () => {
   beforeEach(() => {

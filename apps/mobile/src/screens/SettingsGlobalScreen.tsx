@@ -28,7 +28,7 @@ import {
 import * as RNLocalize from 'react-native-localize';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import type { BindingStateDTO, ConnectionState } from '@syncflow/contracts';
+import type { BindingStateDTO, ConnectionState } from '@lynavo-drive/contracts';
 
 import { GlobalGradientBackground } from '../components/GlobalGradientBackground';
 import { GlobalBottomTabBar } from '../components/GlobalBottomTabBar';

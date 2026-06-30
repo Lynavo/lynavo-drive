@@ -24,7 +24,7 @@ let electron = require("electron");
 let path = require("path");
 let node_http = require("node:http");
 node_http = __toESM(node_http);
-let _syncflow_contracts = require("@syncflow/contracts");
+let _lynavo_drive_contracts = require("@lynavo-drive/contracts");
 let electron_log = require("electron-log");
 electron_log = __toESM(electron_log);
 let node_child_process = require("node:child_process");
@@ -36,7 +36,7 @@ let node_events = require("node:events");
 let ws = require("ws");
 ws = __toESM(ws);
 //#region src/main/sidecar-client.ts
-var BASE = `http://127.0.0.1:${_syncflow_contracts.SIDECAR_HTTP_PORT}`;
+var BASE = `http://127.0.0.1:${_lynavo_drive_contracts.SIDECAR_HTTP_PORT}`;
 async function request(method, path, body) {
 	return new Promise((resolve, reject) => {
 		const url = new URL(path, BASE);
@@ -499,7 +499,7 @@ var WsBridge = class {
 	}
 	connect() {
 		if (this.ws && (this.ws.readyState === ws.default.OPEN || this.ws.readyState === ws.default.CONNECTING)) return;
-		const url = `ws://127.0.0.1:${_syncflow_contracts.SIDECAR_HTTP_PORT}/events/stream`;
+		const url = `ws://127.0.0.1:${_lynavo_drive_contracts.SIDECAR_HTTP_PORT}/events/stream`;
 		electron_log.default.info(`[WsBridge] connecting to ${url}`);
 		this.ws = new ws.default(url);
 		this.ws.on("open", () => {

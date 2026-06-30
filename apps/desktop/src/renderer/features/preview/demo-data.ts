@@ -3,7 +3,7 @@ import type {
   DesktopAccessRecordDTO,
   DesktopManagedDeviceDTO,
   ReceivedLibraryItemDTO,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 
 export function shouldUsePreviewData(hasRealData: boolean): boolean {
   return import.meta.env.DEV && !hasRealData;

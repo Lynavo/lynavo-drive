@@ -1,5 +1,5 @@
 {
-  "name": "@syncflow/contracts",
+  "name": "@lynavo-drive/contracts",
   "version": "0.1.1",
   "private": true,
   "main": "./dist/index.js",

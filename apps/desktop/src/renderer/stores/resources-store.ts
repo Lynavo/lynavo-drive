@@ -4,7 +4,7 @@ import type {
   ReceivedLibraryDeviceStatDTO,
   ReceivedLibraryItemDTO,
   AddSharedResourcePayload,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 
 const RECEIVED_LIBRARY_PAGE_SIZE = 30;
 

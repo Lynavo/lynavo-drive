@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 import type { TFunction } from 'i18next';
-import type { DesktopSyncRecordDTO } from '@syncflow/contracts';
+import type { DesktopSyncRecordDTO } from '@lynavo-drive/contracts';
 import { colors } from '../../theme/colors';
 import { Icon } from '../../components/Icon';
 import { formatBytes } from '../../utils/format';

@@ -4,7 +4,7 @@ import type {
   DeviceFileLedgerDTO,
   DeviceFileSortField,
   SortDirection,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 import i18n from '@renderer/i18n';
 
 export type SortField = DeviceFileSortField;

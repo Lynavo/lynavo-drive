@@ -15,7 +15,7 @@ import {
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SIDECAR_EVENT_TYPES } from '@syncflow/contracts';
+import { SIDECAR_EVENT_TYPES } from '@lynavo-drive/contracts';
 
 const electronMockState = vi.hoisted(() => {
   const thumbnail = {

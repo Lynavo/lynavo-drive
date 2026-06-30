@@ -47,7 +47,7 @@ This approach matches the existing architecture:
 
 1. Desktop renderer does not access sidecar, SQLite, or filesystem directly.
 2. Sidecar owns LMUP pairing, HMAC auth, SQLite persistence, and HTTP API.
-3. Shared DTOs live in `@syncflow/contracts`.
+3. Shared DTOs live in `@lynavo-drive/contracts`.
 4. Device identity remains mobile `clientId`.
 
 ## Data Model
@@ -393,7 +393,7 @@ The renderer must use preload bridge and main IPC. It must not call sidecar dire
 
 ### Contracts
 
-Add DTOs in `@syncflow/contracts`:
+Add DTOs in `@lynavo-drive/contracts`:
 
 1. `ConnectionDeviceDTO`
 2. `BlockedPairingClientDTO`
@@ -451,7 +451,7 @@ Successful pairing still stores the returned `pairingToken` and uses the existin
 9. Revoking authorization does not delete upload history.
 10. Revoking authorization does not alter daily statistics.
 11. Renderer does not access sidecar, SQLite, or filesystem directly.
-12. All shared DTOs and error code names come from `@syncflow/contracts`.
+12. All shared DTOs and error code names come from `@lynavo-drive/contracts`.
 
 ## Risks and Mitigations
 
@@ -479,7 +479,7 @@ Mitigation: Change regenerate-code behavior so it does not revoke existing devic
 1. Add migrations after `004_stable_device_id.sql`.
 2. Update sidecar store tests before changing handler behavior.
 3. Update `handleHello` before `handlePair`, because blocked clients should be rejected as early as possible.
-4. Keep all DTO additions in `@syncflow/contracts`.
+4. Keep all DTO additions in `@lynavo-drive/contracts`.
 5. Run `pnpm build` after changing contracts.
 6. Run Go sidecar tests for pairing, store, and API behavior.
 7. Run desktop renderer tests for settings UI and store behavior.

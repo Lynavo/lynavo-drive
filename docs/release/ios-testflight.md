@@ -21,7 +21,7 @@ Native identity / bundle id migration is deferred to the later native migration 
 发布前至少确认：
 
 1. `/Volumes/workspace/work/sync-flow/services/sidecar-go` 下 `go test ./...` 全绿
-2. `/Volumes/workspace/work/sync-flow` 下 `pnpm --filter @syncflow/mobile exec tsc --noEmit` 通过
+2. `/Volumes/workspace/work/sync-flow` 下 `pnpm --filter @lynavo-drive/mobile exec tsc --noEmit` 通过
 3. iOS Debug 构建通过
 4. iOS Release smoke 构建通过
 5. 真机至少验证一次：

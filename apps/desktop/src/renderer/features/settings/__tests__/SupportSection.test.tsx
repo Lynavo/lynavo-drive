@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createElement, createRef, type ComponentType, type RefAttributes } from 'react';
-import type { DashboardDeviceDTO } from '@syncflow/contracts';
+import type { DashboardDeviceDTO } from '@lynavo-drive/contracts';
 import { Dialog, DialogOverlay, DialogPortal } from '@renderer/components/ui/dialog';
 import { useDashboardStore } from '@renderer/stores/dashboard-store';
 import { SupportSection } from '../SupportSection';

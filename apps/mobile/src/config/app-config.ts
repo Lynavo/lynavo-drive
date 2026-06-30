@@ -3,7 +3,7 @@ import {
   LYNAVO_REVIEW_API_BASE_URL,
   LYNAVO_SUPPORT_EMAIL,
   LYNAVO_WEB_BASE_URL,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 
 interface AppConfigEndpoints {
   readonly webBaseUrl: string;

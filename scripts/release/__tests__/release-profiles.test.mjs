@@ -95,8 +95,8 @@ test('builds commands and env from the selected profile', () => {
         ],
       ],
       ['mac', 'pnpm', ['package:desktop:signed']],
-      ['win', 'pnpm', ['--filter', '@syncflow/desktop', 'package:win']],
-      ['linux', 'pnpm', ['--filter', '@syncflow/desktop', 'package:linux']],
+      ['win', 'pnpm', ['--filter', '@lynavo-drive/desktop', 'package:win']],
+      ['linux', 'pnpm', ['--filter', '@lynavo-drive/desktop', 'package:linux']],
     ],
   );
 });

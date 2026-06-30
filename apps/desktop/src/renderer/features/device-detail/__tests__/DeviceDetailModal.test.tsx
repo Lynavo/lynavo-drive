@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { DeviceDetailModal } from '../DeviceDetailModal';
 import { useAppStore } from '@renderer/stores/app-store';
 import { useDeviceDetailStore } from '@renderer/stores/device-detail-store';
-import type { DashboardDeviceDTO } from '@syncflow/contracts';
+import type { DashboardDeviceDTO } from '@lynavo-drive/contracts';
 
 const mockDevice: DashboardDeviceDTO = {
   deviceId: 'test-001',

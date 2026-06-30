@@ -5,7 +5,7 @@
       "label": "desktop: build contracts",
       "type": "process",
       "command": "corepack",
-      "args": ["pnpm", "--filter", "@syncflow/contracts", "build"],
+      "args": ["pnpm", "--filter", "@lynavo-drive/contracts", "build"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -15,7 +15,7 @@
       "label": "desktop: build design tokens",
       "type": "process",
       "command": "corepack",
-      "args": ["pnpm", "--filter", "@syncflow/design-tokens", "build"],
+      "args": ["pnpm", "--filter", "@lynavo-drive/design-tokens", "build"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -31,7 +31,7 @@
       "label": "desktop: dev",
       "type": "process",
       "command": "corepack",
-      "args": ["pnpm", "--filter", "@syncflow/desktop", "dev"],
+      "args": ["pnpm", "--filter", "@lynavo-drive/desktop", "dev"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -58,7 +58,7 @@
       "label": "desktop: package win",
       "type": "process",
       "command": "corepack",
-      "args": ["pnpm", "--filter", "@syncflow/desktop", "package:win"],
+      "args": ["pnpm", "--filter", "@lynavo-drive/desktop", "package:win"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -108,7 +108,7 @@
       "args": [
         "pnpm",
         "--filter",
-        "@syncflow/mobile",
+        "@lynavo-drive/mobile",
         "exec",
         "react-native",
         "run-android",

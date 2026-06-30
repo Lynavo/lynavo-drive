@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import os from 'node:os';
 import type { ElectronAPI } from './api';
-import type { SidecarEvent } from '@syncflow/contracts';
+import type { SidecarEvent } from '@lynavo-drive/contracts';
 import type { SidecarRuntimeState } from '../shared/sidecar-runtime';
 import { isLinuxPlatform, usesTitleBarOverlayControls } from '../shared/platform-capabilities';
 
@@ -66,8 +66,8 @@ const electronAPI: ElectronAPI = {
       options?: {
         page?: number;
         pageSize?: number;
-        sortField?: import('@syncflow/contracts').DeviceFileSortField;
-        sortDirection?: import('@syncflow/contracts').SortDirection;
+        sortField?: import('@lynavo-drive/contracts').DeviceFileSortField;
+        sortDirection?: import('@lynavo-drive/contracts').SortDirection;
       },
     ) => ipcRenderer.invoke(IPC.SIDECAR_DEVICE_FILES, deviceId, date, options),
     getDeviceDates: (deviceId: string) => ipcRenderer.invoke(IPC.SIDECAR_DEVICE_DATES, deviceId),

@@ -111,7 +111,7 @@ describe('onboardingStorage', () => {
 
 - [ ] **Step 2: Run storage tests and verify RED**
 
-Run: `pnpm --filter @syncflow/mobile test -- onboardingStorage.test.ts`
+Run: `pnpm --filter @lynavo-drive/mobile test -- onboardingStorage.test.ts`
 
 Expected: fail because `../onboardingStorage` does not exist.
 
@@ -161,7 +161,7 @@ export function markSyncActivityTourSeen(): Promise<void> {
 
 - [ ] **Step 4: Run storage tests and verify GREEN**
 
-Run: `pnpm --filter @syncflow/mobile test -- onboardingStorage.test.ts`
+Run: `pnpm --filter @lynavo-drive/mobile test -- onboardingStorage.test.ts`
 
 Expected: pass.
 
@@ -176,7 +176,7 @@ Add a test that seeds `@vividrop/onboarding/unconnected/v1/seen` and `@vividrop/
 
 - [ ] **Step 2: Run cleanup test and verify behavior**
 
-Run: `pnpm --filter @syncflow/mobile test -- clearUserScopedStorage.test.ts`
+Run: `pnpm --filter @lynavo-drive/mobile test -- clearUserScopedStorage.test.ts`
 
 Expected: pass if cleanup already preserves unknown app-level keys; fail only if cleanup is too broad.
 
@@ -195,7 +195,7 @@ Create or extend a focused test that mocks initial mode, `hasSeenUnconnectedGuid
 
 - [ ] **Step 2: Run test and verify RED**
 
-Run: `pnpm --filter @syncflow/mobile test -- DeviceDiscoveryScreen.onboarding.test.tsx`
+Run: `pnpm --filter @lynavo-drive/mobile test -- DeviceDiscoveryScreen.onboarding.test.tsx`
 
 Expected: fail because `UnconnectedGuide` and mount logic do not exist.
 
@@ -209,7 +209,7 @@ On initial mode only, read `hasSeenUnconnectedGuide()` on mount. If false, show 
 
 - [ ] **Step 5: Run DeviceDiscovery onboarding tests**
 
-Run: `pnpm --filter @syncflow/mobile test -- DeviceDiscoveryScreen.onboarding.test.tsx`
+Run: `pnpm --filter @lynavo-drive/mobile test -- DeviceDiscoveryScreen.onboarding.test.tsx`
 
 Expected: pass.
 
@@ -228,7 +228,7 @@ Extend `SyncActivityScreen.header.test.tsx` or add `SyncActivityScreen.onboardin
 
 - [ ] **Step 2: Run test and verify RED**
 
-Run: `pnpm --filter @syncflow/mobile test -- SyncActivityScreen.onboarding.test.tsx`
+Run: `pnpm --filter @lynavo-drive/mobile test -- SyncActivityScreen.onboarding.test.tsx`
 
 Expected: fail because the tour component and mount logic do not exist.
 
@@ -242,7 +242,7 @@ After initial native data load finishes and `bindingState.deviceId` exists, read
 
 - [ ] **Step 5: Run SyncActivity onboarding tests**
 
-Run: `pnpm --filter @syncflow/mobile test -- SyncActivityScreen.onboarding.test.tsx`
+Run: `pnpm --filter @lynavo-drive/mobile test -- SyncActivityScreen.onboarding.test.tsx`
 
 Expected: pass.
 
@@ -256,14 +256,14 @@ Expected: pass.
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- onboardingStorage.test.ts clearUserScopedStorage.test.ts DeviceDiscoveryScreen.onboarding.test.tsx SyncActivityScreen.onboarding.test.tsx SyncActivityScreen.header.test.tsx
+pnpm --filter @lynavo-drive/mobile test -- onboardingStorage.test.ts clearUserScopedStorage.test.ts DeviceDiscoveryScreen.onboarding.test.tsx SyncActivityScreen.onboarding.test.tsx SyncActivityScreen.header.test.tsx
 ```
 
 Expected: pass.
 
 - [ ] **Step 2: Run mobile typecheck**
 
-Run: `pnpm --filter @syncflow/mobile exec tsc --noEmit`
+Run: `pnpm --filter @lynavo-drive/mobile exec tsc --noEmit`
 
 Expected: pass.
 

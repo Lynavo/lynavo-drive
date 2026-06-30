@@ -90,9 +90,11 @@ test('includes hidden files while keeping generated artifacts ignored', () => {
 test('applies exact-path allowlists only to their allowed terms', () => {
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'legacy-name-allowlist-'));
   try {
+    const sidecarDir = join(fixtureRoot, 'services', 'sidecar-go');
+    mkdirSync(sidecarDir, { recursive: true });
     writeFileSync(
-      join(fixtureRoot, 'package.json'),
-      '{"name":"@syncflow/root","title":"SyncFlow"}\n',
+      join(sidecarDir, 'go.mod'),
+      'module github.com/gpt-open/syncflow\n// SyncFlow\n',
     );
 
     const result = runVerifier(['--root', fixtureRoot]);
@@ -100,8 +102,8 @@ test('applies exact-path allowlists only to their allowed terms', () => {
     assert.equal(result.status, 1, result.stderr);
     assert.match(result.stdout, /Allowed legacy name hits: 1/);
     assert.match(result.stdout, /Unallowlisted legacy name hits: 1/);
-    assert.match(result.stdout, /package\.json:1 SyncFlow/);
-    assert.doesNotMatch(result.stdout, /package\.json:1 @syncflow/);
+    assert.match(result.stdout, /services\/sidecar-go\/go\.mod:2 SyncFlow/);
+    assert.doesNotMatch(result.stdout, /services\/sidecar-go\/go\.mod:1 syncflow/);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }

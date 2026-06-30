@@ -33,9 +33,9 @@ Lynavo Drive 目前是 global-only OSS baseline。發佈文件不再維護 CN / 
 
 ```bash
 git status --short
-pnpm --filter @syncflow/mobile exec tsc --noEmit
-pnpm --filter @syncflow/desktop test
-pnpm --filter @syncflow/desktop typecheck
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/desktop test
+pnpm --filter @lynavo-drive/desktop typecheck
 pnpm build:mobile:android
 cd services/sidecar-go && go test ./...
 ```

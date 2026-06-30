@@ -165,8 +165,8 @@ echo "Electron builder config: ${ELECTRON_BUILDER_CONFIG}"
 
 cd "${REPO_ROOT}"
 
-pnpm --filter @syncflow/desktop build
-pnpm --filter @syncflow/desktop build:sidecar:mac
+pnpm --filter @lynavo-drive/desktop build
+pnpm --filter @lynavo-drive/desktop build:sidecar:mac
 
 BUILD_ARGS=(
   "--config"
@@ -181,10 +181,10 @@ build_macos_arch() {
   local arch_build_args=("${BUILD_ARGS[@]}")
 
   if [[ "${target}" == "dir" ]]; then
-    pnpm --filter @syncflow/desktop exec electron-builder --mac "${target}" "--${arch}" -c.mac.notarize=false "${arch_build_args[@]}"
+    pnpm --filter @lynavo-drive/desktop exec electron-builder --mac "${target}" "--${arch}" -c.mac.notarize=false "${arch_build_args[@]}"
   else
     arch_build_args+=("-c.dmg.title=${DMG_CREATE_VOLUME_NAME}")
-    pnpm --filter @syncflow/desktop exec electron-builder --mac "${target}" "--${arch}" "${arch_build_args[@]}"
+    pnpm --filter @lynavo-drive/desktop exec electron-builder --mac "${target}" "--${arch}" "${arch_build_args[@]}"
   fi
 }
 

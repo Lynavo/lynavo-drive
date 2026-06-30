@@ -338,7 +338,7 @@ describe('RootNavigator pairing invalidation routing', () => {
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- RootNavigator.pairingInvalidation.test.tsx
+pnpm --filter @lynavo-drive/mobile test -- RootNavigator.pairingInvalidation.test.tsx
 ```
 
 Expected: FAIL because `onPairingInvalidated`, `getBindingInvalidationState`, and `reason` initial params are not wired.
@@ -489,7 +489,7 @@ Render the watcher before the navigator:
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- RootNavigator.pairingInvalidation.test.tsx
+pnpm --filter @lynavo-drive/mobile test -- RootNavigator.pairingInvalidation.test.tsx
 ```
 
 Expected: PASS.
@@ -540,7 +540,7 @@ it('shows a pairing invalidated message while keeping pairing choices available'
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- DeviceDiscoveryGlobalScreen.onboarding.test.tsx -t "pairing invalidated"
+pnpm --filter @lynavo-drive/mobile test -- DeviceDiscoveryGlobalScreen.onboarding.test.tsx -t "pairing invalidated"
 ```
 
 Expected: FAIL because the route reason and copy are not implemented.
@@ -605,7 +605,7 @@ Do not fold this into `connectionStateContent`; that object hides device rows an
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- DeviceDiscoveryGlobalScreen.onboarding.test.tsx -t "pairing invalidated"
+pnpm --filter @lynavo-drive/mobile test -- DeviceDiscoveryGlobalScreen.onboarding.test.tsx -t "pairing invalidated"
 ```
 
 Expected: PASS.
@@ -934,7 +934,7 @@ git commit -m "feat(android): emit pairing invalidation on token rejection"
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- RootNavigator.pairingInvalidation.test.tsx DeviceDiscoveryGlobalScreen.onboarding.test.tsx
+pnpm --filter @lynavo-drive/mobile test -- RootNavigator.pairingInvalidation.test.tsx DeviceDiscoveryGlobalScreen.onboarding.test.tsx
 ```
 
 Expected: PASS.
@@ -958,7 +958,7 @@ Expected: all commands exit 0.
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 Expected: exit 0.

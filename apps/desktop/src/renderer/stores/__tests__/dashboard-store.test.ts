@@ -4,7 +4,7 @@ import {
   resetPendingOfflineStatusDebounceForTests,
   useDashboardStore,
 } from '../dashboard-store';
-import type { DashboardDeviceDTO, DashboardSummaryDTO } from '@syncflow/contracts';
+import type { DashboardDeviceDTO, DashboardSummaryDTO } from '@lynavo-drive/contracts';
 import { useSidecarRuntimeStore } from '../sidecar-runtime-store';
 
 describe('dashboard-store', () => {

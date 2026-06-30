@@ -32,13 +32,6 @@ It scans hidden files and directories, while explicitly skipping generated build
 | `docs/rename/legacy-name-allowlist.md`                           | This allowlist document necessarily names legacy forms.                     |
 | `scripts/verify-legacy-name-allowlist.mjs`                       | The verifier owns the legacy-name pattern and compatibility allowlist.      |
 | `scripts/release/__tests__/legacy-name-allowlist.test.mjs`       | Regression test fixture for unallowlisted legacy-name detection.            |
-| `package.json`                                                   | `@syncflow/*` package scripts before package rename.                        |
-| `pnpm-lock.yaml`                                                 | `@syncflow/*` package names before package rename.                          |
-| `pnpm-workspace.yaml`                                            | `@syncflow/*` workspace names before package rename.                        |
-| `packages/contracts/package.json`                                | `@syncflow/contracts` package name before package rename.                   |
-| `packages/design-tokens/package.json`                            | `@syncflow/design-tokens` package name before package rename.               |
-| `apps/desktop/package.json`                                      | `@syncflow/desktop` package name and `syncflow-sidecar` build output before package/binary rename. |
-| `apps/mobile/package.json`                                       | `@syncflow/mobile` package name before package rename.                      |
 | `apps/desktop/electron-builder.yml`                              | Packaged sidecar resource remains `syncflow-sidecar` until sidecar binary migration. |
 | `apps/desktop/resources/installer.nsh`                           | Installer targets `syncflow-sidecar.exe` and deletes legacy firewall rules during upgrade. |
 | `apps/desktop/scripts/build-sidecar-linux.cjs`                   | Sidecar build output remains `syncflow-sidecar` until sidecar binary migration. |

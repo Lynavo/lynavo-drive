@@ -1,5 +1,5 @@
 {
-  "name": "@syncflow/desktop",
+  "name": "@lynavo-drive/desktop",
   "productName": "Lynavo Drive",
   "description": "Lynavo Drive desktop app for local mobile media sync.",
   "version": "1.0.1",
@@ -24,7 +24,7 @@
     "package:mas": "bash ./scripts/package-macos-mas.sh",
     "upload:testflight": "bash ./scripts/upload-macos-testflight.sh",
     "package:all": "node ./scripts/run-workspace-pnpm.cjs build && pnpm build:sidecar && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
-    "package:win": "node ./scripts/run-workspace-pnpm.cjs build && node ./scripts/run-workspace-pnpm.cjs --filter @syncflow/desktop build:sidecar:win && node ./scripts/verify-windows-resources.cjs && node ./scripts/run-electron-builder.cjs --win nsis zip --x64",
+    "package:win": "node ./scripts/run-workspace-pnpm.cjs build && node ./scripts/run-workspace-pnpm.cjs --filter @lynavo-drive/desktop build:sidecar:win && node ./scripts/verify-windows-resources.cjs && node ./scripts/run-electron-builder.cjs --win nsis zip --x64",
     "package:linux": "node ./scripts/package-linux.cjs",
     "preview": "node ./scripts/run-electron-vite.cjs preview",
     "test": "vitest run",
@@ -32,11 +32,11 @@
     "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json",
     "lint": "eslint src/",
     "clean": "rm -rf dist out .turbo",
-    "predev": "node ./scripts/run-workspace-pnpm.cjs --filter @syncflow/contracts build && node ./scripts/run-workspace-pnpm.cjs --filter @syncflow/design-tokens build"
+    "predev": "node ./scripts/run-workspace-pnpm.cjs --filter @lynavo-drive/contracts build && node ./scripts/run-workspace-pnpm.cjs --filter @lynavo-drive/design-tokens build"
   },
   "dependencies": {
-    "@syncflow/contracts": "workspace:*",
-    "@syncflow/design-tokens": "workspace:*",
+    "@lynavo-drive/contracts": "workspace:*",
+    "@lynavo-drive/design-tokens": "workspace:*",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "electron-log": "^5.4.3",

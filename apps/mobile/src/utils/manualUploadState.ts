@@ -1,4 +1,4 @@
-import type { UploadTaskSource } from '@syncflow/contracts';
+import type { UploadTaskSource } from '@lynavo-drive/contracts';
 
 export interface ManualUploadSnapshot {
   manualPending?: number | null;

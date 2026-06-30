@@ -13,9 +13,9 @@
    - 或 `/Volumes/T7/Dev/Web/sync-flow-pack/AuthKey_Lynavo_AMY9XVV3LD.p8`
 4. sidecar 与 desktop 当前代码都已通过基本验证：
    - `/Volumes/workspace/work/sync-flow/services/sidecar-go` 下 `go test ./...`
-   - `/Volumes/workspace/work/sync-flow` 下 `pnpm --filter @syncflow/desktop test`
-   - `/Volumes/workspace/work/sync-flow` 下 `pnpm --filter @syncflow/desktop typecheck`
-   - `/Volumes/workspace/work/sync-flow` 下 `pnpm --filter @syncflow/desktop build`
+   - `/Volumes/workspace/work/sync-flow` 下 `pnpm --filter @lynavo-drive/desktop test`
+   - `/Volumes/workspace/work/sync-flow` 下 `pnpm --filter @lynavo-drive/desktop typecheck`
+   - `/Volumes/workspace/work/sync-flow` 下 `pnpm --filter @lynavo-drive/desktop build`
 
 说明：
 
@@ -69,7 +69,7 @@ pnpm package:desktop:signed
 
 ```bash
 cd /Volumes/T7/Dev/Web/sync-flow-pack
-pnpm --filter @syncflow/desktop package:signed:dir
+pnpm --filter @lynavo-drive/desktop package:signed:dir
 ```
 
 等价脚本入口：
@@ -92,7 +92,7 @@ export APPLE_API_KEY='/absolute/path/to/AuthKey_xxxxxx.p8'
 export APPLE_API_KEY_ID='AMY9XVV3LD'
 export APPLE_API_ISSUER='<global issuer id>'
 
-pnpm --filter @syncflow/desktop package:signed
+pnpm --filter @lynavo-drive/desktop package:signed
 ```
 
 注意：

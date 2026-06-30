@@ -27,19 +27,19 @@
       "type": "node-terminal",
       "request": "launch",
       "preLaunchTask": "mobile: start metro",
-      "command": "cd \"${workspaceFolder}\" && corepack pnpm --filter @syncflow/mobile exec react-native run-ios --scheme \"SyncFlowMobile\" --mode \"Debug\" --no-packager"
+      "command": "cd \"${workspaceFolder}\" && corepack pnpm --filter @lynavo-drive/mobile exec react-native run-ios --scheme \"SyncFlowMobile\" --mode \"Debug\" --no-packager"
     },
     {
       "name": "Mobile: Metro (macOS)",
       "type": "node-terminal",
       "request": "launch",
-      "command": "cd \"${workspaceFolder}\" && corepack pnpm --filter @syncflow/mobile start"
+      "command": "cd \"${workspaceFolder}\" && corepack pnpm --filter @lynavo-drive/mobile start"
     },
     {
       "name": "Desktop: Dev",
       "type": "node-terminal",
       "request": "launch",
-      "command": "cd \"${workspaceFolder}\" && corepack pnpm --filter @syncflow/desktop dev"
+      "command": "cd \"${workspaceFolder}\" && corepack pnpm --filter @lynavo-drive/desktop dev"
     }
   ],
   "compounds": [

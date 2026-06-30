@@ -6,7 +6,7 @@
 
 **Architecture:** Keep sidecar unchanged and add a mobile service adapter over the existing native personal-directory bridge. The global remote access screen will receive the same `DesktopSharedResourceDTO` shape it already renders, but operations for `personal-dir:` items will route through `scope='personal'`.
 
-**Tech Stack:** React Native, TypeScript, Jest, existing `SyncEngineModule` native bridge, `@syncflow/contracts` DTOs.
+**Tech Stack:** React Native, TypeScript, Jest, existing `SyncEngineModule` native bridge, `@lynavo-drive/contracts` DTOs.
 
 ---
 
@@ -65,7 +65,7 @@ it('lists global remote access from the desktop personal directory root', async 
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- desktop-local-service.test.ts
+pnpm --filter @lynavo-drive/mobile test -- desktop-local-service.test.ts
 ```
 
 Expected: FAIL because the new helper exports do not exist.
@@ -109,7 +109,7 @@ Replace global screen usage of `listSharedResources`, `listSharedFolderContents`
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- desktop-local-service.test.ts
+pnpm --filter @lynavo-drive/mobile test -- desktop-local-service.test.ts
 ```
 
 Expected: PASS.
@@ -124,13 +124,13 @@ Expected: PASS.
 - [ ] **Step 1: Run focused mobile tests**
 
 ```bash
-pnpm --filter @syncflow/mobile test -- desktop-local-service.test.ts SharedFilesDownloadGate.test.tsx
+pnpm --filter @lynavo-drive/mobile test -- desktop-local-service.test.ts SharedFilesDownloadGate.test.tsx
 ```
 
 - [ ] **Step 2: Run TypeScript check**
 
 ```bash
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 - [ ] **Step 3: Self-review impact scope**

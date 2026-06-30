@@ -28,7 +28,7 @@ import {
 import DateTimePicker, {
   DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
-import type { AutoUploadTimeRangeMode } from '@syncflow/contracts';
+import type { AutoUploadTimeRangeMode } from '@lynavo-drive/contracts';
 
 import { GlobalGradientBackground } from '../components/GlobalGradientBackground';
 import { androidBoxShadow } from '../utils/androidShadow';

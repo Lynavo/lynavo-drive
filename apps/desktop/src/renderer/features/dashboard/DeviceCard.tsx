@@ -1,6 +1,6 @@
 import { FileVideo, HardDrive, Smartphone } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { DashboardDeviceDTO } from '@syncflow/contracts';
+import type { DashboardDeviceDTO } from '@lynavo-drive/contracts';
 import { GlassCard } from '@renderer/components/shared/GlassCard';
 import { StatusBadge } from '@renderer/components/shared/StatusBadge';
 import { Progress } from '@renderer/components/ui/progress';

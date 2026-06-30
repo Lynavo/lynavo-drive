@@ -4,7 +4,7 @@
 
 **Goal:** Rebuild Vivi Drop desktop and mobile into the approved desktop-local management product, absorbing both reference projects while keeping management, records, authorization, blocking, shared files, and access history local to each desktop.
 
-**Architecture:** `@syncflow/contracts` defines all new DTOs and API shapes. Go sidecar owns SQLite persistence, pairing/blocking, shared/public registries, received library, sync records, and access records. Desktop reaches these through main/preload IPC and renders the new management console; mobile reaches only the currently connected desktop and stores recent-desktop convenience state locally.
+**Architecture:** `@lynavo-drive/contracts` defines all new DTOs and API shapes. Go sidecar owns SQLite persistence, pairing/blocking, shared/public registries, received library, sync records, and access records. Desktop reaches these through main/preload IPC and renders the new management console; mobile reaches only the currently connected desktop and stores recent-desktop convenience state locally.
 
 **Tech Stack:** TypeScript contracts, Electron main/preload/React renderer, Zustand stores, Vitest, React Native navigation/screens/i18n, Go sidecar with embedded SQLite migrations and `go test`.
 
@@ -182,7 +182,7 @@ function assertTypeExports(
 Run:
 
 ```bash
-pnpm --filter @syncflow/contracts test -- exports
+pnpm --filter @lynavo-drive/contracts test -- exports
 ```
 
 Expected: TypeScript/Vitest fails because the new exports do not exist.
@@ -337,8 +337,8 @@ Confirm `packages/contracts/src/index.ts` exports `types.ts` and `events.ts`. Ad
 Run:
 
 ```bash
-pnpm --filter @syncflow/contracts test -- exports
-pnpm --filter @syncflow/contracts build
+pnpm --filter @lynavo-drive/contracts test -- exports
+pnpm --filter @lynavo-drive/contracts build
 ```
 
 Expected: both pass.
@@ -866,8 +866,8 @@ Expose matching preload methods.
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- sidecar-client ipc-handlers preload
-pnpm --filter @syncflow/desktop typecheck
+pnpm --filter @lynavo-drive/desktop test -- sidecar-client ipc-handlers preload
+pnpm --filter @lynavo-drive/desktop typecheck
 ```
 
 Expected: pass.
@@ -933,7 +933,7 @@ Remove user-reachable entries from `SettingsPage` that are not in the approved n
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- Sidebar SettingsPage app-store
+pnpm --filter @lynavo-drive/desktop test -- Sidebar SettingsPage app-store
 ```
 
 Expected: pass.
@@ -1016,8 +1016,8 @@ Render `DevicesPage` and `RecordsPage`.
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- management-store DevicesPage RecordsPage
-pnpm --filter @syncflow/desktop typecheck
+pnpm --filter @lynavo-drive/desktop test -- management-store DevicesPage RecordsPage
+pnpm --filter @lynavo-drive/desktop typecheck
 ```
 
 Expected: pass.
@@ -1107,8 +1107,8 @@ Render shared and library pages.
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- resources-store SharedResourcesPage ReceivedLibraryPage
-pnpm --filter @syncflow/desktop typecheck
+pnpm --filter @lynavo-drive/desktop test -- resources-store SharedResourcesPage ReceivedLibraryPage
+pnpm --filter @lynavo-drive/desktop typecheck
 ```
 
 Expected: pass.
@@ -1172,8 +1172,8 @@ Use Taiwan-standard Traditional Chinese for new zh-Hant copy. Keep existing i18n
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- Dashboard SettingsPage HelpPage
-pnpm --filter @syncflow/desktop typecheck
+pnpm --filter @lynavo-drive/desktop test -- Dashboard SettingsPage HelpPage
+pnpm --filter @lynavo-drive/desktop typecheck
 ```
 
 Expected: pass.
@@ -1283,8 +1283,8 @@ Show:
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- recent-desktops CodeVerifyScreen DeviceDiscoveryScreen
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test -- recent-desktops CodeVerifyScreen DeviceDiscoveryScreen
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 Expected: pass.
@@ -1402,8 +1402,8 @@ Use Taiwan-standard Traditional Chinese for zh-Hant copy and keep existing marke
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- desktop-local-service SharedFilesScreen HistoryScreen SyncActivityScreen AlbumWorkbenchScreen SettingsScreen HelpScreen
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test -- desktop-local-service SharedFilesScreen HistoryScreen SyncActivityScreen AlbumWorkbenchScreen SettingsScreen HelpScreen
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 Expected: pass.
@@ -1474,8 +1474,8 @@ If the update changes enough workflows, add a short regression doc with:
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- Sidebar SettingsPage Dashboard DevicesPage RecordsPage SharedResourcesPage ReceivedLibraryPage
-pnpm --filter @syncflow/mobile test -- DeviceDiscoveryScreen CodeVerifyScreen SyncActivityScreen SharedFilesScreen HistoryScreen AlbumWorkbenchScreen SettingsScreen
+pnpm --filter @lynavo-drive/desktop test -- Sidebar SettingsPage Dashboard DevicesPage RecordsPage SharedResourcesPage ReceivedLibraryPage
+pnpm --filter @lynavo-drive/mobile test -- DeviceDiscoveryScreen CodeVerifyScreen SyncActivityScreen SharedFilesScreen HistoryScreen AlbumWorkbenchScreen SettingsScreen
 ```
 
 Expected: pass.
@@ -1513,7 +1513,7 @@ Expected:
 Run:
 
 ```bash
-pnpm --filter @syncflow/contracts build
+pnpm --filter @lynavo-drive/contracts build
 ```
 
 Expected: pass.
@@ -1533,8 +1533,8 @@ Expected: pass.
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop typecheck
-pnpm --filter @syncflow/desktop test
+pnpm --filter @lynavo-drive/desktop typecheck
+pnpm --filter @lynavo-drive/desktop test
 ```
 
 Expected: pass.
@@ -1544,8 +1544,8 @@ Expected: pass.
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile exec tsc --noEmit
-pnpm --filter @syncflow/mobile test
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test
 ```
 
 Expected: pass.

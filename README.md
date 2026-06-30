@@ -7,7 +7,7 @@
 - 桌面端、Go sidecar、移动端和 iOS / Android 原生同步能力都已落地
 - iOS 与 Android 移动端都属于当前支持范围
 - 当前工作重点是 beta 收口、异常恢复、后台上传、远程能力边界和发布验证
-- 仓库中目前没有单独维护的产品 spec 文件；开发基线以当前代码、`@syncflow/contracts` 和测试矩阵为准
+- 仓库中目前没有单独维护的产品 spec 文件；开发基线以当前代码、`@lynavo-drive/contracts` 和测试矩阵为准
 - guest/local 用户可使用前景 LAN 自动同步；后台持续和远程访问属于官方商业能力，缺少有效 entitlement 时必须 fail closed
 
 ## 前置依赖
@@ -26,8 +26,8 @@
 pnpm install
 
 # 2. 建置共享包
-pnpm --filter @syncflow/contracts build
-pnpm --filter @syncflow/design-tokens build
+pnpm --filter @lynavo-drive/contracts build
+pnpm --filter @lynavo-drive/design-tokens build
 
 # 3. 啟動 Desktop 開發模式
 pnpm dev:desktop
@@ -136,7 +136,7 @@ lynavo-drive/
 | iOS Native     | Swift `SyncEngine` + BGTask + PhotoKit + Network.framework |
 | Android Native | Kotlin bridge + NativeSyncEngine / MediaStore / NsdManager |
 | Sidecar        | Go 1.25.6 + SQLite + WebSocket                             |
-| Shared         | `@syncflow/contracts` + `@syncflow/design-tokens`          |
+| Shared         | `@lynavo-drive/contracts` + `@lynavo-drive/design-tokens`          |
 | Test           | vitest 4.1 + jest + `go test`                              |
 
 ## 架構概覽
@@ -160,7 +160,7 @@ Desktop (Electron + Go sidecar, macOS / Windows)
 
 ## 開發基線
 
-- 共享型別、常量、事件名、連接埠定義統一來自 `@syncflow/contracts`
+- 共享型別、常量、事件名、連接埠定義統一來自 `@lynavo-drive/contracts`
 - renderer 不直接存取 sidecar、檔案系統、SQLite；全部透過 preload bridge / main 進程轉發
 - 佇列保持唯讀，不允許在 UI 裡刪除、重排或跳過
 - 同一台手機同一時間只允許序列上傳一個檔案

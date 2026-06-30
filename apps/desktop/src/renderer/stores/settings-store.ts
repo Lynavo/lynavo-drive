@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SettingsDTO, ShareStatusDTO } from '@syncflow/contracts';
+import type { SettingsDTO, ShareStatusDTO } from '@lynavo-drive/contracts';
 import i18n from '@renderer/i18n';
 import { useSidecarRuntimeStore } from './sidecar-runtime-store';
 

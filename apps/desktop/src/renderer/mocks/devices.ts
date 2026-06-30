@@ -1,4 +1,4 @@
-import type { DashboardDeviceDTO } from '@syncflow/contracts';
+import type { DashboardDeviceDTO } from '@lynavo-drive/contracts';
 
 export const mockDevices: DashboardDeviceDTO[] = [
   {

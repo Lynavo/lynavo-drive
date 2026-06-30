@@ -3,7 +3,7 @@ import type {
   DesktopAccessRecordDTO,
   DesktopManagedDeviceDTO,
   DesktopSyncRecordDTO,
-} from '@syncflow/contracts';
+} from '@lynavo-drive/contracts';
 import { useManagementStore } from '../management-store';
 
 const authorizedDevice: DesktopManagedDeviceDTO = {

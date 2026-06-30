@@ -204,8 +204,8 @@ UTM networking should use bridged mode for real-device pairing tests.
 
 Run before Linux packaging:
 
-- `pnpm --filter @syncflow/desktop test`
-- `pnpm --filter @syncflow/desktop typecheck`
+- `pnpm --filter @lynavo-drive/desktop test`
+- `pnpm --filter @lynavo-drive/desktop typecheck`
 - `cd services/sidecar-go && go test ./...`
 - release profile tests for Linux target parsing and command generation
 - package script tests for sidecar Linux arch mapping where practical

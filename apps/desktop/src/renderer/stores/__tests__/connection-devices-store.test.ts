@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ConnectionDevicesSettingsDTO } from '@syncflow/contracts';
+import type { ConnectionDevicesSettingsDTO } from '@lynavo-drive/contracts';
 import { useConnectionDevicesStore } from '../connection-devices-store';
 
 const fixture: ConnectionDevicesSettingsDTO = {

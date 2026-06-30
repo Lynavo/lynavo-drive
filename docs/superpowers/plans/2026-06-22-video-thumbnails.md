@@ -99,7 +99,7 @@ Add this test inside the existing `describe('desktop-local product exports', ...
 Run:
 
 ```bash
-pnpm --filter @syncflow/contracts test -- exports
+pnpm --filter @lynavo-drive/contracts test -- exports
 ```
 
 Expected: FAIL because `VIDEO_THUMBNAIL_REQUEST` is not defined on `SIDECAR_EVENT_TYPES`.
@@ -142,8 +142,8 @@ Add the union member to `SidecarEvent`:
 Run:
 
 ```bash
-pnpm --filter @syncflow/contracts test -- exports
-pnpm --filter @syncflow/contracts typecheck
+pnpm --filter @lynavo-drive/contracts test -- exports
+pnpm --filter @lynavo-drive/contracts typecheck
 ```
 
 Expected: PASS.
@@ -153,7 +153,7 @@ Expected: PASS.
 Run:
 
 ```bash
-pnpm --filter @syncflow/contracts build
+pnpm --filter @lynavo-drive/contracts build
 ```
 
 Expected: PASS and `packages/contracts/dist` updates.
@@ -765,7 +765,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SIDECAR_EVENT_TYPES } from '@syncflow/contracts';
+import { SIDECAR_EVENT_TYPES } from '@lynavo-drive/contracts';
 
 const electronMockState = vi.hoisted(() => {
   const thumbnail = {
@@ -900,7 +900,7 @@ describe('video-thumbnail-generator', () => {
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- video-thumbnail-generator
+pnpm --filter @lynavo-drive/desktop test -- video-thumbnail-generator
 ```
 
 Expected: FAIL because `video-thumbnail-generator.ts` does not exist.
@@ -914,7 +914,7 @@ import { existsSync, mkdirSync, renameSync, rmSync, statSync, writeFileSync } fr
 import { dirname, extname, isAbsolute, join, resolve, sep } from 'node:path';
 import { app, nativeImage } from 'electron';
 import log from 'electron-log';
-import { SIDECAR_EVENT_TYPES, type SidecarEvent } from '@syncflow/contracts';
+import { SIDECAR_EVENT_TYPES, type SidecarEvent } from '@lynavo-drive/contracts';
 
 type VideoThumbnailRequestPayload = Extract<
   SidecarEvent,
@@ -1052,8 +1052,8 @@ Replace the current callback:
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- video-thumbnail-generator ws-bridge
-pnpm --filter @syncflow/desktop typecheck
+pnpm --filter @lynavo-drive/desktop test -- video-thumbnail-generator ws-bridge
+pnpm --filter @lynavo-drive/desktop typecheck
 ```
 
 Expected: PASS.
@@ -1105,7 +1105,7 @@ streamUrl: 'http://127.0.0.1:39394/personal/stream/clip.mov',
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- desktop-local-service
+pnpm --filter @lynavo-drive/mobile test -- desktop-local-service
 ```
 
 Expected: FAIL because `personalDirectoryFileToSharedResource` currently preserves only image `thumbnailUrl` and drops video stream URLs.
@@ -1140,7 +1140,7 @@ function personalDirectoryFileToSharedResource(
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- desktop-local-service
+pnpm --filter @lynavo-drive/mobile test -- desktop-local-service
 ```
 
 Expected: PASS.
@@ -1225,7 +1225,7 @@ it('falls back to the video file type icon when a global remote video thumbnail 
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- SharedFilesDownloadGate
+pnpm --filter @lynavo-drive/mobile test -- SharedFilesDownloadGate
 ```
 
 Expected: FAIL because `RemoteResourceVisual` only uses thumbnails for images.
@@ -1249,7 +1249,7 @@ Keep the existing `<Image testID="remote-resource-thumbnail-image" ... />` block
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- SharedFilesDownloadGate
+pnpm --filter @lynavo-drive/mobile test -- SharedFilesDownloadGate
 ```
 
 Expected: PASS.
@@ -1389,7 +1389,7 @@ it('does not render local video paths as recent download thumbnails', () => {
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- DownloadRecordsGlobalScreen GlobalSyncActivityHomeSections
+pnpm --filter @lynavo-drive/mobile test -- DownloadRecordsGlobalScreen GlobalSyncActivityHomeSections
 ```
 
 Expected: FAIL because list thumbnail code still uses `<Video>` for video preview URIs.
@@ -1474,7 +1474,7 @@ Remove the `<Video testID="recent-download-thumbnail-video" ... />` rendering br
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- DownloadRecordsGlobalScreen GlobalSyncActivityHomeSections
+pnpm --filter @lynavo-drive/mobile test -- DownloadRecordsGlobalScreen GlobalSyncActivityHomeSections
 ```
 
 Expected: PASS.
@@ -1506,8 +1506,8 @@ Expected: PASS.
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- video-thumbnail-generator ws-bridge
-pnpm --filter @syncflow/desktop typecheck
+pnpm --filter @lynavo-drive/desktop test -- video-thumbnail-generator ws-bridge
+pnpm --filter @lynavo-drive/desktop typecheck
 ```
 
 Expected: PASS.
@@ -1517,8 +1517,8 @@ Expected: PASS.
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- desktop-local-service SharedFilesDownloadGate DownloadRecordsGlobalScreen GlobalSyncActivityHomeSections
-pnpm --filter @syncflow/mobile exec tsc --noEmit
+pnpm --filter @lynavo-drive/mobile test -- desktop-local-service SharedFilesDownloadGate DownloadRecordsGlobalScreen GlobalSyncActivityHomeSections
+pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 ```
 
 Expected: PASS.
@@ -1549,7 +1549,7 @@ Expected: PASS. If full tests are too slow, record the exact targeted commands f
 Run desktop dev locally:
 
 ```bash
-pnpm --filter @syncflow/desktop dev
+pnpm --filter @lynavo-drive/desktop dev
 ```
 
 From a paired mobile app or simulator:
@@ -1573,7 +1573,7 @@ git diff -- packages/contracts/src/events.ts services/sidecar-go/internal/api ap
 
 Confirm:
 
-- DTO types are still imported from `@syncflow/contracts`.
+- DTO types are still imported from `@lynavo-drive/contracts`.
 - Renderer does not access filesystem, sidecar, or SQLite directly.
 - Queue semantics, sync status transitions, upload concurrency, access-record semantics, and persistence schemas are unchanged except existing thumbnail/stream metadata propagation.
 - `video.thumbnail.request` uses dot-notation.

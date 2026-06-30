@@ -95,7 +95,7 @@ if ! metro_ready; then
     if (( SECONDS >= metro_deadline )); then
       echo "Metro is not running on port $METRO_PORT."
       echo "Start Metro with the VS Code 'Mobile: Metro (macOS)' launch target or run:"
-      echo "  corepack pnpm --filter @syncflow/mobile start"
+      echo "  corepack pnpm --filter @lynavo-drive/mobile start"
       exit 1
     fi
 

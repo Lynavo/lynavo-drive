@@ -1,5 +1,5 @@
 import { cn } from '@renderer/lib/utils';
-import { glass, elevation } from '@syncflow/design-tokens';
+import { glass, elevation } from '@lynavo-drive/design-tokens';
 import type { ReactNode } from 'react';
 
 interface GlassCardProps {

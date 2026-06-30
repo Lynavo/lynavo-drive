@@ -90,7 +90,7 @@ expect(settings.allowCrossDeviceReceivedAccess).toBe(true);
 Run:
 
 ```bash
-pnpm --filter @syncflow/contracts test -- exports
+pnpm --filter @lynavo-drive/contracts test -- exports
 ```
 
 Expected before implementation:
@@ -125,7 +125,7 @@ export interface SettingsDTO {
 Run:
 
 ```bash
-pnpm --filter @syncflow/contracts test -- exports
+pnpm --filter @lynavo-drive/contracts test -- exports
 ```
 
 Expected:
@@ -139,13 +139,13 @@ PASS
 Run:
 
 ```bash
-pnpm --filter @syncflow/contracts build
+pnpm --filter @lynavo-drive/contracts build
 ```
 
 Expected:
 
 ```text
-@syncflow/contracts build succeeds
+@lynavo-drive/contracts build succeeds
 ```
 
 - [ ] **Step 6: Commit contracts changes**
@@ -1268,7 +1268,7 @@ it('toggles cross-device received library access', async () => {
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- SettingsPage
+pnpm --filter @lynavo-drive/desktop test -- SettingsPage
 ```
 
 Expected before implementation:
@@ -1320,7 +1320,7 @@ Use the existing `Switch` and `Label` imports. If this file uses a local row com
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- SettingsPage
+pnpm --filter @lynavo-drive/desktop test -- SettingsPage
 ```
 
 Expected:
@@ -1380,7 +1380,7 @@ expect(result.items[0]).toEqual(
 Run:
 
 ```bash
-pnpm --filter @syncflow/mobile test -- desktop-local-service
+pnpm --filter @lynavo-drive/mobile test -- desktop-local-service
 ```
 
 Expected:
@@ -1410,15 +1410,15 @@ git commit -m "test: keep mobile received library server scoped"
 Run:
 
 ```bash
-pnpm --filter @syncflow/contracts test
-pnpm --filter @syncflow/contracts build
+pnpm --filter @lynavo-drive/contracts test
+pnpm --filter @lynavo-drive/contracts build
 ```
 
 Expected:
 
 ```text
-@syncflow/contracts test succeeds
-@syncflow/contracts build succeeds
+@lynavo-drive/contracts test succeeds
+@lynavo-drive/contracts build succeeds
 ```
 
 - [ ] **Step 2: Run sidecar verification**
@@ -1443,15 +1443,15 @@ ok  	github.com/nicksyncflow/sidecar/internal/api
 Run:
 
 ```bash
-pnpm --filter @syncflow/desktop test -- SettingsPage
-pnpm --filter @syncflow/mobile test -- desktop-local-service
+pnpm --filter @lynavo-drive/desktop test -- SettingsPage
+pnpm --filter @lynavo-drive/mobile test -- desktop-local-service
 ```
 
 Expected:
 
 ```text
-@syncflow/desktop SettingsPage tests pass
-@syncflow/mobile desktop-local-service tests pass
+@lynavo-drive/desktop SettingsPage tests pass
+@lynavo-drive/mobile desktop-local-service tests pass
 ```
 
 - [ ] **Step 4: Run monorepo typecheck**

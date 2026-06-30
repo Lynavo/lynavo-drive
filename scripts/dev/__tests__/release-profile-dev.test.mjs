@@ -16,7 +16,7 @@ test('builds prod desktop dev env from the release channel profile', () => {
   });
 
   assert.equal(plan.command, 'pnpm');
-  assert.deepEqual(plan.args, ['--filter', '@syncflow/desktop', 'dev']);
+  assert.deepEqual(plan.args, ['--filter', '@lynavo-drive/desktop', 'dev']);
   assert.equal(plan.profile.channel, 'prod');
   assert.equal(Object.hasOwn(plan.profile, 'market'), false);
   assert.equal(plan.env.LYNAVO_RELEASE_CHANNEL, 'prod');
@@ -43,7 +43,7 @@ test('builds review iOS dev command with the single native scheme and mobile pro
   assert.deepEqual(plan.args, [
     'pnpm',
     '--filter',
-    '@syncflow/mobile',
+    '@lynavo-drive/mobile',
     'exec',
     'react-native',
     'run-ios',
