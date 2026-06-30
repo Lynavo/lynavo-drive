@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import test from 'node:test';
 
 function runReleaseDryRun(profile, targets = 'ios,android,win,linux') {
@@ -27,52 +30,110 @@ test('prints linux in release target help', () => {
   assert.match(result.stdout, /--targets ios,android,mac,win,linux/);
 });
 
-test('prints the cn-review release plan without running build commands in dry-run mode', () => {
-  const result = runReleaseDryRun('cn-review');
+test('prints the review release plan without running build commands in dry-run mode', () => {
+  const result = runReleaseDryRun('review');
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Profile:\s+cn-review/);
-  assert.match(result.stdout, /Market:\s+cn/);
-  assert.match(result.stdout, /Base URL:\s+https:\/\/review-api\.vividrop\.cn/);
+  assert.match(result.stdout, /Profile:\s+review/);
+  assert.match(result.stdout, /Channel:\s+review/);
+  assert.doesNotMatch(result.stdout, /Market:/);
+  assert.doesNotMatch(result.stdout, /market/i);
+  assert.match(result.stdout, /Base URL:\s+https:\/\/review-api\.lynavo\.com/);
   assert.match(result.stdout, /DRY RUN/);
-  assert.match(result.stdout, /SYNCFLOW_MARKET=cn/);
-  assert.match(result.stdout, /SYNCFLOW_API_BASE_URL=https:\/\/review-api\.vividrop\.cn/);
-  assert.match(result.stdout, /VIVIDROP_API_BASE_URL=https:\/\/review-api\.vividrop\.cn/);
-  assert.match(result.stdout, /ELECTRON_BUILDER_CONFIG=electron-builder\.cn\.yml/);
+  assert.match(result.stdout, /LYNAVO_RELEASE_CHANNEL=review/);
+  assert.match(result.stdout, /LYNAVO_API_BASE_URL=https:\/\/review-api\.lynavo\.com/);
+  assert.doesNotMatch(result.stdout, /LYNAVO_CLIENT_CONFIG_BASE_URL=/);
+  assert.doesNotMatch(result.stdout, /LYNAVO_GIFTCARD_REDEEM_BASE_URL=/);
+  assert.doesNotMatch(result.stdout, /SYNCFLOW_MARKET=/);
+  assert.doesNotMatch(result.stdout, /SYNCFLOW_API_BASE_URL=/);
+  assert.doesNotMatch(result.stdout, /VIVIDROP_API_BASE_URL=/);
+  assert.match(result.stdout, /ELECTRON_BUILDER_CONFIG=electron-builder\.yml/);
   assert.match(
     result.stdout,
-    /bash apps\/mobile\/ios\/scripts\/testflight-release\.sh archive-upload cn/,
+    /bash apps\/mobile\/ios\/scripts\/testflight-release\.sh archive-upload/,
   );
   assert.match(
     result.stdout,
-    /bash -lc cd apps\/mobile\/android && \.\/gradlew assembleCnRelease bundleCnRelease -PreactNativeArchitectures=arm64-v8a,x86_64/,
+    /bash -lc cd apps\/mobile\/android && \.\/gradlew assembleRelease bundleRelease -PreactNativeArchitectures=arm64-v8a,x86_64/,
   );
-  assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:win:cn/);
-  assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:linux:cn/);
+  assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:win/);
+  assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:linux/);
 });
 
-test('prints the global-review release plan without running build commands in dry-run mode', () => {
-  const result = runReleaseDryRun('global-review');
+test('prints the prod release plan without market or legacy API env in dry-run mode', () => {
+  const result = runReleaseDryRun('prod', 'mac,win,linux');
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Profile:\s+global-review/);
-  assert.match(result.stdout, /Market:\s+global/);
-  assert.match(result.stdout, /Base URL:\s+https:\/\/review-api\.vividrop\.cn/);
+  assert.match(result.stdout, /Profile:\s+prod/);
+  assert.match(result.stdout, /Channel:\s+prod/);
+  assert.doesNotMatch(result.stdout, /Market:/);
+  assert.doesNotMatch(result.stdout, /market/i);
+  assert.match(result.stdout, /Base URL:\s+https:\/\/api\.lynavo\.com/);
   assert.match(result.stdout, /DRY RUN/);
-  assert.match(result.stdout, /SYNCFLOW_MARKET=global/);
-  assert.match(result.stdout, /SYNCFLOW_API_BASE_URL=https:\/\/review-api\.vividrop\.cn/);
-  assert.match(result.stdout, /VIVIDROP_API_BASE_URL=https:\/\/review-api\.vividrop\.cn/);
-  assert.match(result.stdout, /ELECTRON_BUILDER_CONFIG=electron-builder\.global\.yml/);
-  assert.match(
-    result.stdout,
-    /bash apps\/mobile\/ios\/scripts\/testflight-release\.sh archive-upload global/,
+  assert.match(result.stdout, /LYNAVO_RELEASE_CHANNEL=prod/);
+  assert.match(result.stdout, /LYNAVO_API_BASE_URL=https:\/\/api\.lynavo\.com/);
+  assert.doesNotMatch(result.stdout, /SYNCFLOW_MARKET=/);
+  assert.doesNotMatch(result.stdout, /SYNCFLOW_API_BASE_URL=/);
+  assert.doesNotMatch(result.stdout, /VIVIDROP_API_BASE_URL=/);
+  assert.match(result.stdout, /ELECTRON_BUILDER_CONFIG=electron-builder\.yml/);
+  assert.match(result.stdout, /pnpm package:desktop:signed/);
+  assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:win/);
+  assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:linux/);
+});
+
+test('release execution scrubs stale commercial and legacy parent env before spawning children', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'syncflow-release-env-'));
+  const capturePath = join(tempDir, 'child-env.json');
+  const fakePnpmPath = join(tempDir, 'pnpm');
+  writeFileSync(
+    fakePnpmPath,
+    [
+      '#!/usr/bin/env node',
+      "require('node:fs').writeFileSync(process.env.CAPTURE_ENV_PATH, JSON.stringify(process.env, null, 2));",
+    ].join('\n'),
   );
-  assert.match(
-    result.stdout,
-    /bash -lc cd apps\/mobile\/android && \.\/gradlew assembleGlobalRelease bundleGlobalRelease -PreactNativeArchitectures=arm64-v8a,x86_64/,
-  );
-  assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:win:global/);
-  assert.match(result.stdout, /pnpm --filter @syncflow\/desktop package:linux:global/);
+  chmodSync(fakePnpmPath, 0o755);
+
+  try {
+    const result = spawnSync(
+      process.execPath,
+      ['scripts/release/release.mjs', '--profile', 'review', '--targets', 'mac'],
+      {
+        cwd: new URL('../../..', import.meta.url),
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${tempDir}:${process.env.PATH ?? ''}`,
+          CAPTURE_ENV_PATH: capturePath,
+          SYNCFLOW_MARKET: 'cn',
+          SYNCFLOW_API_BASE_URL: 'https://legacy-syncflow.example',
+          VIVIDROP_API_BASE_URL: 'https://legacy-vividrop.example',
+          LYNAVO_CLIENT_CONFIG_BASE_URL: 'https://commercial-config.example',
+          LYNAVO_GIFTCARD_REDEEM_BASE_URL: 'https://gift.example',
+          SYNCFLOW_GOOGLE_CLIENT_CONFIG_FILE: '/secure/google-client.json',
+          GOOGLE_CLIENT_ID: 'google-client-id',
+          APPLE_OAUTH_CLIENT_ID: 'com.example.signin',
+        },
+      },
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const childEnv = JSON.parse(readFileSync(capturePath, 'utf8'));
+
+    assert.equal(childEnv.LYNAVO_RELEASE_CHANNEL, 'review');
+    assert.equal(childEnv.LYNAVO_API_BASE_URL, 'https://review-api.lynavo.com');
+    assert.equal(childEnv.ELECTRON_BUILDER_CONFIG, 'electron-builder.yml');
+    assert.equal(Object.hasOwn(childEnv, 'SYNCFLOW_MARKET'), false);
+    assert.equal(Object.hasOwn(childEnv, 'SYNCFLOW_API_BASE_URL'), false);
+    assert.equal(Object.hasOwn(childEnv, 'VIVIDROP_API_BASE_URL'), false);
+    assert.equal(Object.hasOwn(childEnv, 'LYNAVO_CLIENT_CONFIG_BASE_URL'), false);
+    assert.equal(Object.hasOwn(childEnv, 'LYNAVO_GIFTCARD_REDEEM_BASE_URL'), false);
+    assert.equal(Object.hasOwn(childEnv, 'SYNCFLOW_GOOGLE_CLIENT_CONFIG_FILE'), false);
+    assert.equal(Object.hasOwn(childEnv, 'GOOGLE_CLIENT_ID'), false);
+    assert.equal(Object.hasOwn(childEnv, 'APPLE_OAUTH_CLIENT_ID'), false);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
 });
 
 test('rejects missing profile', () => {

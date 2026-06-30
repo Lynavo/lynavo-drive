@@ -2,11 +2,14 @@
 
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildReleasePlan, listReleaseProfileNames, parseTargets } from './release-profiles.mjs';
 
+const require = createRequire(import.meta.url);
+const { buildOssChildEnv } = require('../dev/oss-env-scrubber.cjs');
 const repoRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const mobileReleaseProfilePath = resolve(repoRoot, 'apps/mobile/src/release-profile.ts');
 
@@ -84,7 +87,7 @@ Profiles:
 
 function printPlan(plan, dryRun) {
   console.log(`Profile:  ${plan.profile.name}`);
-  console.log(`Market:   ${plan.profile.market}`);
+  console.log(`Channel:  ${plan.profile.channel}`);
   console.log(`Review:   ${plan.profile.review ? 'yes' : 'no'}`);
   console.log(`Base URL: ${plan.profile.apiBaseUrl}`);
   console.log(`Targets:  ${plan.steps.map((step) => step.target).join(', ')}`);
@@ -121,10 +124,7 @@ function runStep(step, profileEnv) {
 
   const result = spawnSync(step.command, step.args, {
     cwd: repoRoot,
-    env: {
-      ...process.env,
-      ...profileEnv,
-    },
+    env: buildOssChildEnv(process.env, profileEnv),
     stdio: 'inherit',
   });
 

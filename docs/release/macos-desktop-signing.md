@@ -1,6 +1,6 @@
 # macOS Desktop 签名与公证
 
-本文件描述 Vivi Drop 桌面端在本地完成 Developer ID 签名和 Apple notarization 的标准路径。
+本文件描述 Lynavo Drive 桌面端在本地完成 Developer ID 签名和 Apple notarization 的标准路径。
 
 ## 1. 前置条件
 
@@ -9,7 +9,8 @@
 1. 已安装 `Developer ID Application` 证书到当前 Mac 的 keychain
 2. 已下载 App Store Connect Team API Key（`.p8`）
 3. 仓库根目录存在本地 API key 文件：
-   - `/Volumes/T7/Dev/Web/sync-flow-pack/AuthKey_HY8CAHGPW9.p8`
+   - `/Volumes/T7/Dev/Web/sync-flow-pack/AuthKey_AMY9XVV3LD.p8`
+   - 或 `/Volumes/T7/Dev/Web/sync-flow-pack/AuthKey_Lynavo_AMY9XVV3LD.p8`
 4. sidecar 与 desktop 当前代码都已通过基本验证：
    - `/Volumes/workspace/work/sync-flow/services/sidecar-go` 下 `go test ./...`
    - `/Volumes/workspace/work/sync-flow` 下 `pnpm --filter @syncflow/desktop test`
@@ -23,29 +24,27 @@
 
 ## 2. 当前默认签名材料
 
-macOS Desktop 签名材料必须跟随 release profile 的 market 选择，不允许用其他 Team 的 Developer ID 代签。
+macOS Desktop 签名材料必须跟随 Lynavo Drive release profile，不允许用其他 Team 的 Developer ID 代签。
 
-| Profile market | Developer ID Team ID | App Store Connect key |
-| --- | --- | --- |
-| `cn` | `GKN7JQNCMC` | `AuthKey_HY8CAHGPW9.p8` |
-| `global` | `S44ANBLMF9` | `AuthKey_Global_AMY9XVV3LD.p8` |
+| Release profile   | Developer ID Team ID | App Store Connect key                                     |
+| ----------------- | -------------------- | --------------------------------------------------------- |
+| `review` / `prod` | `S44ANBLMF9`         | `AuthKey_AMY9XVV3LD.p8` or `AuthKey_Lynavo_AMY9XVV3LD.p8` |
 
-脚本会根据 `SYNCFLOW_MARKET` 自动选择预期 Team ID，并从当前 keychain 中寻找对应的 `Developer ID Application` identity。找不到对应 Team ID 时会直接停止打包，并列出当前可用的 `Developer ID Application` identity。
+脚本会选择预期 Team ID，并从当前 keychain 中寻找对应的 `Developer ID Application` identity。找不到对应 Team ID 时会直接停止打包，并列出当前可用的 `Developer ID Application` identity。
 
 注意：DMG 内的 `.app` 必须使用 `Developer ID Application: ... (Team ID)` 签名。`Developer ID Installer: ... (Team ID)` 只适用于 `.pkg` installer，不能替代 `.app` 的 Developer ID Application 签名。
 
-`CSC_NAME` 覆盖仍然允许，但必须匹配当前 market 的 Team ID。举例：
+`CSC_NAME` 覆盖仍然允许，但必须匹配 Lynavo Drive 的 Team ID。举例：
 
-1. `global-review` / `global-prod` 必须匹配 `S44ANBLMF9`
-2. `cn-review` / `cn-prod` 必须匹配 `GKN7JQNCMC`
-3. `CSC_NAME` 不要带 `Developer ID Application:` 前缀
+1. `review` / `prod` 必须匹配 `S44ANBLMF9`
+2. `CSC_NAME` 不要带 `Developer ID Application:` 前缀
 
 ## 3. 一键打包
 
 正式打包优先从仓库根目录使用 release profile：
 
 ```bash
-pnpm release --profile global-review --targets mac
+pnpm release --profile review --targets mac
 ```
 
 单独验证 macOS 打包脚本时，可以先由 release profile 注入环境变量后再执行桌面打包入口：
@@ -62,7 +61,7 @@ pnpm package:desktop:signed
 4. 输出最终 DMG 到：
    - `/Volumes/workspace/work/sync-flow/apps/desktop/release`
    - `/Volumes/T7/Dev/Web/sync-flow-pack/apps/desktop/release`
-   - 其中包含 `ViviDrop-<version>-arm64.dmg` 和 `ViviDrop-<version>-x64.dmg`
+   - 其中包含 `LynavoDrive-<version>-arm64.dmg` 和 `LynavoDrive-<version>-x64.dmg`
 
 ## 4. 本地快速验签
 
@@ -81,14 +80,13 @@ bash /Volumes/T7/Dev/Web/sync-flow-pack/apps/desktop/scripts/package-macos-signe
 
 这会产出已签名但未 notarize 的 `.app` 目录：
 
-- `/Volumes/T7/Dev/Web/sync-flow-pack/apps/desktop/release/mac*/Vivi Drop.app`
+- `/Volumes/T7/Dev/Web/sync-flow-pack/apps/desktop/release/mac*/Lynavo Drive.app`
 
 ## 5. 可覆盖的环境变量
 
 如果本机签名材料变化，可以覆盖下面这些变量：
 
 ```bash
-export SYNCFLOW_MARKET='global'
 export CSC_NAME='Example Developer ID Name (S44ANBLMF9)'
 export APPLE_API_KEY='/absolute/path/to/AuthKey_xxxxxx.p8'
 export APPLE_API_KEY_ID='AMY9XVV3LD'
@@ -110,7 +108,7 @@ pnpm --filter @syncflow/desktop package:signed
 ### 6.1 主 app 签名
 
 ```bash
-for app in /Volumes/T7/Dev/Web/sync-flow-pack/apps/desktop/release/mac*/Vivi\ Drop.app; do
+for app in /Volumes/T7/Dev/Web/sync-flow-pack/apps/desktop/release/mac*/Lynavo\ Drive.app; do
   codesign -dv --verbose=4 "$app"
 done
 ```
@@ -118,15 +116,13 @@ done
 预期看到：
 
 1. `Authority=Developer ID Application: ...`
-2. `TeamIdentifier` 与 release profile market 一致：
-   - `global`：`S44ANBLMF9`
-   - `cn`：`GKN7JQNCMC`
+2. `TeamIdentifier` 与 Lynavo Drive release profile 一致：`S44ANBLMF9`
 3. `Runtime Version` 存在
 
 ### 6.2 sidecar 签名
 
 ```bash
-for app in /Volumes/T7/Dev/Web/sync-flow-pack/apps/desktop/release/mac*/Vivi\ Drop.app; do
+for app in /Volumes/T7/Dev/Web/sync-flow-pack/apps/desktop/release/mac*/Lynavo\ Drive.app; do
   codesign -dv --verbose=4 "$app/Contents/Resources/syncflow-sidecar"
 done
 ```
@@ -136,7 +132,7 @@ done
 ### 6.3 Gatekeeper 评估
 
 ```bash
-for app in /Volumes/T7/Dev/Web/sync-flow-pack/apps/desktop/release/mac*/Vivi\ Drop.app; do
+for app in /Volumes/T7/Dev/Web/sync-flow-pack/apps/desktop/release/mac*/Lynavo\ Drive.app; do
   spctl --assess --type execute -vv "$app"
 done
 ```

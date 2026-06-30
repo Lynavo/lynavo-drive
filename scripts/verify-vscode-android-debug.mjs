@@ -46,8 +46,9 @@ assert.equal(iosNoMetroConfig.request, 'launch');
 assert.equal(iosNoMetroConfig.preLaunchTask, 'mobile: start metro');
 assert.match(
   iosNoMetroConfig.command,
-  /corepack pnpm --filter @syncflow\/mobile exec react-native run-ios --no-packager/,
+  /corepack pnpm --filter @syncflow\/mobile exec react-native run-ios .*--scheme "SyncFlowMobile" .*--mode "Debug" .*--no-packager/,
 );
+assert.doesNotMatch(iosNoMetroConfig.command, /SyncFlowMobileGlobal|DebugGlobal|SYNCFLOW_MARKET/);
 
 const iosDeviceConfig = launch.configurations.find(
   (configuration) => configuration.name === 'Mobile: iOS (macOS)',
@@ -98,10 +99,15 @@ assert.equal(
 );
 assert.equal(mobilePackage.scripts?.start, 'react-native start');
 
-assert.match(
+assert.equal(
+  Object.hasOwn(mobilePackage.dependencies ?? {}, 'react-native-iap'),
+  false,
+  'OSS mobile package must not depend on react-native-iap',
+);
+assert.doesNotMatch(
   androidBuildGradle,
-  /missingDimensionStrategy\s+["']store["']\s*,\s*["']play["']/,
-  'Android debug builds should resolve react-native-iap to the Play store flavor',
+  /missingDimensionStrategy\s+["']store["']/,
+  'Android debug builds should not configure a react-native-iap store flavor',
 );
 
 assert.match(

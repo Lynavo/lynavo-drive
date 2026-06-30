@@ -28,7 +28,7 @@ if [[ "$1" == "-s" ]]; then
       if [[ "$2" == "getprop" ]]; then
         echo "PEGM10"
       else
-        echo "$device shell $*" >>"$SYNCFLOW_ANDROID_TEST_ADB_LOG"
+        echo "$device $*" >>"$SYNCFLOW_ANDROID_TEST_ADB_LOG"
       fi
       ;;
     reverse)
@@ -68,17 +68,26 @@ chmod +x "$tmp_dir/bin/adb" "$tmp_dir/bin/curl" "$tmp_dir/repo/apps/mobile/andro
 
 export PATH="$tmp_dir/bin:$PATH"
 export SYNCFLOW_ANDROID_DEVICE="15977ea9"
-export SYNCFLOW_ANDROID_APP_ID="com.vividrop.mobile.global"
 export SYNCFLOW_ANDROID_TEST_ADB_LOG="$tmp_dir/adb.log"
 export SYNCFLOW_ANDROID_TEST_GRADLE_LOG="$tmp_dir/gradle.log"
 
 bash "$tmp_dir/repo/scripts/dev/run-mobile-android-device.sh" >/dev/null
 
 actual_gradle_args="$(cat "$SYNCFLOW_ANDROID_TEST_GRADLE_LOG")"
-expected_gradle_args=":app:installGlobalDebug"
+expected_gradle_args=":app:installDebug"
 
 if [[ "$actual_gradle_args" != "$expected_gradle_args" ]]; then
   echo "Expected Gradle args: $expected_gradle_args" >&2
   echo "Actual Gradle args:   $actual_gradle_args" >&2
+  exit 1
+fi
+
+actual_adb_log="$(cat "$SYNCFLOW_ANDROID_TEST_ADB_LOG")"
+expected_launch="15977ea9 shell am start -n com.vividrop.mobile.china/com.vividrop.mobile.china.MainActivity"
+
+if ! grep -Fq "$expected_launch" <<<"$actual_adb_log"; then
+  echo "Expected adb launch: $expected_launch" >&2
+  echo "Actual adb log:" >&2
+  cat "$SYNCFLOW_ANDROID_TEST_ADB_LOG" >&2
   exit 1
 fi

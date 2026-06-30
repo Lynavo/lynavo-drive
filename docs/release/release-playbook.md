@@ -1,4 +1,4 @@
-# Vivi Drop Beta 發佈手冊
+# Lynavo Drive Beta 發佈手冊
 
 本文件是目前 beta 發佈的總入口。iOS TestFlight、Android Debug 構建驗證、desktop 安裝包（macOS / Windows / Linux）和 beta tag 都按這裡的順序執行。
 
@@ -8,7 +8,9 @@
 - `docs/release/macos-desktop-signing.md`
 - `docs/release/market-release-flow.md`
 
-desktop 桌面包可用根目錄指令碼分平台打包；正式打包仍必須優先走 `pnpm release --profile <profile> --targets ...`，不要手動拼接 release 環境變數。
+desktop 桌面包正式 / Review 打包必須優先走 `pnpm release --profile review|prod --targets ...`，不要手動拼接 release 環境變數。`package:*` 根目錄指令碼只作為 release profile 內部步驟或本地開發驗證入口，不作為正式發佈入口。
+
+Lynavo Drive 目前是 global-only OSS baseline。發佈文件不再維護 CN / Global 雙市場流程；local foreground LAN 同步對 guest/community build fail-open，remote/background 商業能力缺少有效 entitlement 時 fail-closed。
 
 ## 1. 目前版本規則
 
@@ -65,13 +67,14 @@ cd services/sidecar-go && go test ./...
 
 ## 4. 發 iOS TestFlight
 
-從倉庫根目錄執行：
+從倉庫根目錄按目標 profile 執行其一：
 
 ```bash
-SERVER_ENV_FILE=/path/to/vivi-drop-server/.env.prod pnpm package:mobile:testflight
+SERVER_ENV_FILE=/path/to/vivi-drop-server/.env.prod pnpm release --profile review --targets ios
+SERVER_ENV_FILE=/path/to/vivi-drop-server/.env.prod pnpm release --profile prod --targets ios
 ```
 
-如果你想拆步：
+如果只是排查 TestFlight archive / upload 腳本，可用底層 package 指令拆步；正式 / Review 發佈仍以 `pnpm release --profile review|prod --targets ios` 為準：
 
 ```bash
 SERVER_ENV_FILE=/path/to/vivi-drop-server/.env.prod pnpm package:mobile:testflight:archive
@@ -84,7 +87,7 @@ config 內的 `APP_REVIEW_PHONE`。不一致會直接失敗，避免 App Review 
 
 產物位置：
 
-- `apps/mobile/ios/build/archives/ViviDrop-<version>-b<build>.xcarchive`
+- `apps/mobile/ios/build/archives/SyncFlow-<version>-b<build>.xcarchive`
 
 上傳成功後：
 
@@ -94,24 +97,23 @@ config 內的 `APP_REVIEW_PHONE`。不一致會直接失敗，避免 App Review 
 
 ## 5. 出 desktop 安裝包
 
-正式發佈打包優先使用 release profile，例如 `pnpm release --profile global-prod --targets mac,win,linux`。下列根目錄指令碼可用於對應平台的本地打包或單平台驗證。
+正式發佈打包優先使用 release profile，例如 `pnpm release --profile prod --targets mac,win,linux`。下列根目錄指令碼可用於對應平台的本地打包或單平台驗證。
 
 ### 5.1 macOS signed DMG
 
 正式發佈必須從倉庫根目錄使用 release profile。例：
 
 ```bash
-pnpm release --profile global-review --targets mac
+pnpm release --profile review --targets mac
 ```
 
-macOS Developer ID Team ID 必須跟 release profile market 一致：
+macOS Developer ID Team ID 必須跟 Lynavo Drive 發佈身份一致：
 
-| Profile market | Required Team ID |
-| --- | --- |
-| `global` | `S44ANBLMF9` |
-| `cn` | `GKN7JQNCMC` |
+| Release profile   | Required Team ID |
+| ----------------- | ---------------- |
+| `review` / `prod` | `S44ANBLMF9`     |
 
-`package-macos-signed.sh` 會根據 `SYNCFLOW_MARKET` 檢查 Team ID；找不到匹配的 `Developer ID Application` identity 時不能用其他 Team 代簽。
+`package-macos-signed.sh` 會檢查預期 Team ID；找不到匹配的 `Developer ID Application` identity 時不能用其他 Team 代簽。歷史雙市場 Team ID 不再是推薦發佈路徑。
 
 如果只做本地驗籤：
 
@@ -121,56 +123,61 @@ pnpm package:desktop:signed:dir
 
 產物位置：
 
-- `apps/desktop/release/ViviDrop-0.1.0-arm64.dmg`
-- `apps/desktop/release/ViviDrop-0.1.0-x64.dmg`
-- `apps/desktop/release/mac*/Vivi Drop.app`
+- `apps/desktop/release/LynavoDrive-0.1.0-arm64.dmg`
+- `apps/desktop/release/LynavoDrive-0.1.0-x64.dmg`
+- `apps/desktop/release/mac*/Lynavo Drive.app`
 
 發佈前至少確認：
 
 ```bash
-for app in apps/desktop/release/mac*/Vivi\ Drop.app; do
+for app in apps/desktop/release/mac*/Lynavo\ Drive.app; do
   codesign -dv --verbose=4 "$app" 2>&1 | grep TeamIdentifier
 done
-for app in apps/desktop/release/mac*/Vivi\ Drop.app; do
+for app in apps/desktop/release/mac*/Lynavo\ Drive.app; do
   spctl --assess --type execute -vv "$app"
 done
-hdiutil verify apps/desktop/release/ViviDrop-0.1.0-arm64.dmg
-hdiutil verify apps/desktop/release/ViviDrop-0.1.0-x64.dmg
+hdiutil verify apps/desktop/release/LynavoDrive-0.1.0-arm64.dmg
+hdiutil verify apps/desktop/release/LynavoDrive-0.1.0-x64.dmg
 ```
 
 ### 5.2 Windows NSIS / ZIP
 
-從倉庫根目錄執行：
+正式 / Review 發佈從倉庫根目錄使用 release profile：
 
 ```bash
-pnpm package:desktop:win
+pnpm release --profile review --targets win
+pnpm release --profile prod --targets win
 ```
+
+如果只做 Windows 本地封裝或單平台開發驗證，可直接執行 `pnpm package:desktop:win`；它不替代 release profile。
 
 產物位置：
 
-- `apps/desktop/release/ViviDrop-0.1.0-x64.exe`
-- `apps/desktop/release/ViviDrop-0.1.0-x64.zip`
+- `apps/desktop/release/LynavoDrive-0.1.0-x64.exe`
+- `apps/desktop/release/LynavoDrive-0.1.0-x64.zip`
 
 發佈前至少確認：
 
 1. fresh install 後 app 能正常啟動
-2. `resources\vivi-drop-sidecar.exe` 已隨包落地並能被 desktop 拉起
-3. 安裝器已寫入 `SyncFlow Sidecar TCP`、`SyncFlow Sidecar HTTP` 和 `SyncFlow mDNS UDP` 防火牆規則，分別放行 `39393/TCP`、`39394/TCP` 和 `5353/UDP`
+2. `resources\syncflow-sidecar.exe` 已隨包落地並能被 desktop 拉起
+3. 安裝器已寫入相容既有安裝的 `Vivi Drop Sidecar TCP`、`Vivi Drop Sidecar HTTP` 和 `Vivi Drop mDNS UDP` 防火牆規則，分別放行 `39393/TCP`、`39394/TCP` 和 `5353/UDP`；規則命名改為 Lynavo Drive 留到後續 native/binary/mDNS migration 任務
 4. 設定頁能看到 Bonjour 執行時資訊，缺少 Bonjour 時 fallback 狀態可解釋
 
 ### 5.3 Linux `.deb`
 
 Ubuntu 22.04+ Linux 桌面包提供 `.deb`，覆蓋 `amd64` / `x64` 和 `arm64`；Ubuntu `amd64` 對應產物檔名中的 `x64`。
 
-Linux `.deb` 按目標 Ubuntu host / VM / arch 分開打包。從倉庫根目錄執行時，預設打包目前 Linux host arch：
+Linux `.deb` 按目標 Ubuntu host / VM / arch 分開打包。正式 / Review 發佈從倉庫根目錄使用 release profile：
+
+```bash
+pnpm release --profile review --targets linux
+pnpm release --profile prod --targets linux
+```
+
+如果只做 Linux 本地封裝或指定 arch 的開發驗證，可使用底層 package 指令；它們不替代 release profile。需要顯式指定 arch 時，可在 `apps/desktop` 下用 pnpm 的 `--` 轉發參數：
 
 ```bash
 pnpm package:desktop:linux
-```
-
-如果需要顯式指定 arch，可在 `apps/desktop` 下用 pnpm 的 `--` 轉發參數：
-
-```bash
 cd apps/desktop
 pnpm package:linux -- --arch x64
 pnpm package:linux -- --arch arm64
@@ -178,8 +185,8 @@ pnpm package:linux -- --arch arm64
 
 產物位置如下；`linux-x64.deb` 與 `linux-arm64.deb` 分別來自 x64 和 arm64 的獨立打包執行，不是單次命令同時產出：
 
-- `apps/desktop/release/ViviDrop-<version>-linux-x64.deb`
-- `apps/desktop/release/ViviDrop-<version>-linux-arm64.deb`
+- `apps/desktop/release/LynavoDrive-<version>-linux-x64.deb`
+- `apps/desktop/release/LynavoDrive-<version>-linux-arm64.deb`
 
 發佈前至少確認：
 
@@ -212,7 +219,7 @@ pnpm tag:beta
 
 ```bash
 cd /Volumes/T7/Dev/Web/vivi-drop-server
-git tag -a beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION> -m "Vivi Drop beta <MARKETING_VERSION> (<CURRENT_PROJECT_VERSION>)"
+git tag -a beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION> -m "Lynavo Drive beta <MARKETING_VERSION> (<CURRENT_PROJECT_VERSION>)"
 ```
 
 如果要推遠端 tag，SyncFlow 可直接執行：
@@ -239,7 +246,7 @@ git push origin beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION>
 5. 出 macOS signed DMG
 6. 如本輪包含 Windows，出 Windows NSIS / ZIP
 7. 如本輪包含 Linux，出 Ubuntu 22.04+ `.deb`
-8. 給 SyncFlow 和 vivi-drop-server 打同一個 beta tag
+8. 給 SyncFlow 和 vivi-drop-server 打同一個 Lynavo Drive beta tag
 9. 確認工作區乾淨
 10. 推程式碼和 tag
 11. 等 TestFlight processing 完成後再擴大測試範圍
@@ -251,20 +258,22 @@ git push origin beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION>
 1. fresh install
 2. 配對
 3. 同步一輪真實素材
-4. 切背景繼續上傳
-5. 中途斷網恢復
-6. 歷史和設定頁狀態正常
-7. App Store Connect 裝置支援範圍確認只發布 iPhone，不發布 iPad / tablet
+4. Community/OSS 背景靜默續傳 fail-closed：只確認不啟用或承諾 paid background continuation
+5. 回到前景後繼續 foreground LAN 同步 / 恢復驗證
+6. 中途斷網恢復
+7. 歷史和設定頁狀態正常
+8. App Store Connect 裝置支援範圍確認只發布 iPhone，不發布 iPad / tablet
 
 ### 8.2 Android
 
 1. Debug build 安裝
 2. 配對
 3. 同步一輪真實素材
-4. 切背景繼續上傳
-5. 中途斷網恢復
-6. 歷史和設定頁狀態正常
-7. Google Play Device catalog 確認只發布 mobile phones，不發布 tablet form factor
+4. Community/OSS 背景靜默續傳 fail-closed：只確認不啟用或承諾 paid background continuation
+5. 回到前景後繼續 foreground LAN 同步 / 恢復驗證
+6. 中途斷網恢復
+7. 歷史和設定頁狀態正常
+8. Google Play Device catalog 確認只發布 mobile phones，不發布 tablet form factor
 
 ### 8.3 macOS
 
@@ -277,16 +286,16 @@ git push origin beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION>
 
 ### 8.4 Windows
 
-1. 從 `ViviDrop-Setup.exe` fresh install
+1. 從 `LynavoDrive-*-x64.exe` fresh install
 2. app 正常啟動
 3. sidecar 正常監聽和廣播
-4. `SyncFlow Sidecar TCP / SyncFlow Sidecar HTTP / SyncFlow mDNS UDP` 防火牆規則已寫入
+4. `Vivi Drop Sidecar TCP / Vivi Drop Sidecar HTTP / Vivi Drop mDNS UDP` 防火牆規則已寫入；Task 15 保留既有 firewall/mDNS identity，命名遷移留到後續 native/binary/mDNS migration 任務
 5. 設定頁 Bonjour 執行時 / fallback 文案正常
 6. 診斷包匯出正常
 
 ### 8.5 Linux
 
-1. 從 `ViviDrop-*-linux-*.deb` fresh install
+1. 從 `LynavoDrive-*-linux-*.deb` fresh install
 2. app 正常啟動
 3. sidecar 正常監聽 `39393/TCP` 與 `39394/TCP`
 4. mDNS / zeroconf 廣播可被真機 mobile 發現，網路允許 `5353/UDP`
@@ -312,16 +321,14 @@ git push origin beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION>
 正式打包、Review 打包、TestFlight 上傳、Android APK 與 desktop DMG/EXE/DEB 打包都必須先選 release profile：
 
 ```bash
-pnpm release --profile cn-prod --targets ios,mac,win,linux
-pnpm release --profile global-prod --targets ios,mac,win,linux
-pnpm release --profile cn-review --targets ios,mac,win,linux
-pnpm release --profile global-review --targets ios,mac,win,linux
+pnpm release --profile prod --targets ios,mac,win,linux
+pnpm release --profile review --targets ios,mac,win,linux
 ```
 
 Android APK & AAB 可加入 `android` target：
 
 ```bash
-pnpm release --profile global-review --targets android,mac,win,linux
+pnpm release --profile review --targets android,mac,win,linux
 ```
 
 Android release target 會透過 Gradle 從
@@ -330,15 +337,15 @@ Android release target 會透過 Gradle 從
 `apps/mobile/android/app/build.gradle` 另外手動維護 Android
 `versionName` / `versionCode`。
 
-可用 `--dry-run` 檢查實際會執行的 market、base URL 與命令，不會打包或上傳：
+可用 `--dry-run` 檢查實際會執行的 release channel、base URL 與命令，不會打包或上傳：
 
 ```bash
-pnpm release --profile global-review --targets ios,mac,win,linux --dry-run
+pnpm release --profile review --targets ios,mac,win,linux --dry-run
 ```
 
-AI 或人工發佈時不得手動拼接 `SYNCFLOW_API_BASE_URL`、`VIVIDROP_API_BASE_URL`、`SYNCFLOW_MARKET` 來代替 profile。`*-prod` profile 不允許使用 Review Server；`*-review` profile 的 backend URL 必須是 `https://review-api.vividrop.cn`。
+AI 或人工發佈時不得手動拼接歷史 market 或 API base URL 環境變數來代替 profile。`prod` profile 不允許使用 Review Server；`review` profile 的 backend URL 必須是 review API。
 
-倉庫根目錄已有：
+倉庫根目錄已有以下底層指令碼，供 release profile 調度或本地開發驗證使用；正式 / Review 發佈不要直接把它們當成入口：
 
 ```bash
 SERVER_ENV_FILE=/path/to/vivi-drop-server/.env.prod pnpm package:mobile:testflight
@@ -349,4 +356,4 @@ pnpm package:desktop:linux
 pnpm tag:beta
 ```
 
-上述根目錄指令碼是目前 beta 階段可用入口；正式 / Review 發佈仍以 release profile 統一調度，不再建議臨時發明另一套手工步驟。
+上述根目錄指令碼是目前 beta 階段可用工具；正式 / Review 發佈仍以 release profile 統一調度，不再建議臨時發明另一套手工步驟。package scope、mDNS service、舊 data-dir 和 native package / bundle rename 是後續遷移任務，不在本發佈手冊步驟中執行。

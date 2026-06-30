@@ -1,12 +1,14 @@
 # iOS TestFlight 发布路径
 
-本文件只描述 Vivi Drop iOS 包从本地代码到 TestFlight 的发布步骤，不作为产品规格文档。
+本文件只描述 Lynavo Drive iOS 包从本地代码到 TestFlight 的发布步骤，不作为产品规格文档。
 
 ## 1. 当前版本约定
 
 - Marketing Version：`0.1.0`
 - Build Number：`CURRENT_PROJECT_VERSION`
-- Bundle ID：`com.vividrop.mobile.china`
+- Bundle ID：沿用当前工程已发布的 native bundle id。Task 15 不执行 native identity / bundle id migration；该迁移延后到后续 native migration 任务处理。
+
+Native identity / bundle id migration is deferred to the later native migration task.
 
 说明：
 
@@ -38,7 +40,7 @@
 
 位置：
 
-- [project.pbxproj](/Volumes/workspace/work/sync-flow/apps/mobile/ios/Vivi DropMobile.xcodeproj/project.pbxproj)
+- [project.pbxproj](/Volumes/workspace/work/sync-flow/apps/mobile/ios/SyncFlowMobile.xcodeproj/project.pbxproj)
 
 当前建议：
 
@@ -52,12 +54,19 @@
 
 ## 4. 脚本入口
 
-现在仓库已经提供固定脚本，不再要求手动走 Xcode Organizer。
+正式 / Review TestFlight 打包上传优先走根目录 release profile，不再要求手动走 Xcode Organizer，也不要手动拼接 API base URL。
 
-从仓库根目录执行：
+从仓库根目录按目标 profile 执行其一：
 
 ```bash
 cd /Volumes/workspace/work/sync-flow
+SERVER_ENV_FILE=/path/to/vivi-drop-server/.env.prod pnpm release --profile review --targets ios
+SERVER_ENV_FILE=/path/to/vivi-drop-server/.env.prod pnpm release --profile prod --targets ios
+```
+
+如需本地拆步验证，可直接调用底层 TestFlight 脚本：
+
+```bash
 SERVER_ENV_FILE=/path/to/vivi-drop-server/.env.prod pnpm package:mobile:testflight:archive
 SERVER_ENV_FILE=/path/to/vivi-drop-server/.env.prod pnpm package:mobile:testflight:upload
 SERVER_ENV_FILE=/path/to/vivi-drop-server/.env.prod pnpm package:mobile:testflight
@@ -87,7 +96,7 @@ SERVER_ENV_FILE=/path/to/vivi-drop-server/.env.prod \
 
 ## 5. 本地归档
 
-在仓库根目录执行：
+如果只做本地归档验证，在仓库根目录执行：
 
 ```bash
 cd /Volumes/workspace/work/sync-flow
@@ -98,17 +107,18 @@ SERVER_ENV_FILE=/path/to/vivi-drop-server/.env.prod pnpm package:mobile:testflig
 
 1. 命令成功退出
 2. 产物存在：
-   - `/Volumes/workspace/work/sync-flow/apps/mobile/ios/build/archives/Vivi Drop-<version>-b<build>.xcarchive`
+   - `/Volumes/workspace/work/sync-flow/apps/mobile/ios/build/archives/SyncFlow-<version>-b<build>.xcarchive`
 
 ## 6. 上传 TestFlight
 
 当前默认路径已经切到 CLI，不再要求手工点 Organizer。
 
-步骤：
+按目标 profile 执行其一：
 
 ```bash
 cd /Volumes/workspace/work/sync-flow
-SERVER_ENV_FILE=/path/to/vivi-drop-server/.env.prod pnpm package:mobile:testflight
+SERVER_ENV_FILE=/path/to/vivi-drop-server/.env.prod pnpm release --profile review --targets ios
+SERVER_ENV_FILE=/path/to/vivi-drop-server/.env.prod pnpm release --profile prod --targets ios
 ```
 
 如果只想上传已经存在的 archive：
@@ -127,14 +137,14 @@ SERVER_ENV_FILE=/path/to/vivi-drop-server/.env.prod pnpm package:mobile:testflig
 
 1. 当前 Mac 的 Xcode 账号已登录
 2. 对应团队在本机可用
-3. `com.vividrop.mobile.china` 已在 App Store Connect 建立 app 记录
+3. App Store Connect 中已有当前 native bundle id 对应的 app 记录；不要在 Task 15 发布路径中改 bundle id 或创建新的 bundle id 迁移路径
 
 ## 7. App Store Connect 操作
 
 上传完成后：
 
 1. 打开 [App Store Connect](https://appstoreconnect.apple.com/)
-2. 进入 `My Apps -> Vivi Drop -> TestFlight`
+2. 进入 `My Apps -> Lynavo Drive -> TestFlight`
 3. 等待 build 处理完成
 4. 填写本次 beta 说明
 5. 添加 Internal Testers 或 External Testers
@@ -150,6 +160,8 @@ SERVER_ENV_FILE=/path/to/vivi-drop-server/.env.prod pnpm package:mobile:testflig
 3. 已知限制：
    - 当前 TestFlight 包仅覆盖 iOS 发布渠道
    - 当前 beta 重点验证局域网同步与异常恢复
+   - guest local LAN 前景同步不需要登录或订阅
+   - remote/background 商业能力缺少有效 entitlement 时保持关闭
 
 ## 8. 建议的发布顺序
 

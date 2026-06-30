@@ -1,128 +1,80 @@
-# SyncFlow 多市場發佈與熱修復流程
+# Lynavo Drive Release Channel Flow
 
-本文件說明 SyncFlow 中國市場（CN）與全球市場（Global）的分支管理、Tag 對齊與熱修復（Hotfix）流程。
+本文件取代歷史多市場發佈流程。Lynavo Drive 目前是 global-only OSS baseline，只保留 `review` 和 `prod` 兩個 release channel；不再推薦或維護 CN / Global 雙市場 profile、分支或回歸表。
 
----
+## 1. Release Channel
 
-## 1. 分支策略與結構
+正式發佈與 Review 打包都必須使用根目錄 release profile：
 
-為了在一套程式碼庫中同時支援兩個市場的獨立發佈節奏，我們使用以下分支結構：
-
-```mermaid
-graph TD
-    dev[dev - 主開發分支] -->|合併/切出| release_cn[release/cn - 中國市場發佈分支]
-    dev -->|合併/切出| release_global[release/global - 全球市場發佈分支]
-
-    release_cn -->|建置 CN| app_cn[Vivi Drop CN App / Desktop]
-    release_global -->|建置 Global| app_global[Vivi Drop Global App / Desktop]
+```bash
+pnpm release --profile review --targets ios,android,mac,win,linux
+pnpm release --profile prod --targets ios,android,mac,win,linux
 ```
 
-- **`dev`**：核心開發分支。所有新功能（Features）與一般 Bug 修復（Bugfixes）皆在此分支進行開發與整合。
-- **`release/cn`**：中國市場的專屬發佈分支。僅包含已驗證並準備發佈至中國 App Store / Android 應用市場 / 國內官網的程式碼。
-- **`release/global`**：全球市場的專屬發佈分支。僅包含準備發佈至全球 App Store / Google Play / 全球官網的程式碼（整合 Google/Apple 原生登入）。
+如果只確認會執行什麼：
 
----
+```bash
+pnpm release --profile review --targets ios,android,mac,win,linux --dry-run
+```
 
-## 2. 獨立市場建置指南
+規則：
 
-在各自的發佈分支上，使用對應市場的環境變數與 scheme 進行建置。
+1. `review` 必須使用 review API，供 App Review、TestFlight 或內部審核包驗證。
+2. `prod` 不得使用 review API。
+3. release profile 負責注入 `LYNAVO_RELEASE_CHANNEL` 和 Lynavo API base URL。
+4. 不允許用歷史 market env 或手動 base URL 拼接替代 profile。
+5. `package:desktop:*`、Gradle、Xcode 或 Electron builder 單平台命令只用於本地驗證；正式發佈仍以 `pnpm release` 為入口。
 
-正式發佈與 Review 打包都必須使用根目錄 release profile，不要手動拼接
-`SYNCFLOW_MARKET` 或 API base URL：
+## 2. Branching And Hotfix
 
-| Market | Production profile | Review profile  | API base URL                                                                     |
-| ------ | ------------------ | --------------- | -------------------------------------------------------------------------------- |
-| CN     | `cn-prod`          | `cn-review`     | prod: `https://api.vividrop.cn`, review: `https://review-api.vividrop.cn`        |
-| Global | `global-prod`      | `global-review` | prod: `https://global-api.vividrop.cn`, review: `https://review-api.vividrop.cn` |
+不再按市場維護 `release/cn` 和 `release/global` 分支。建議流程：
 
-Review profile 只切換後端到 `https://review-api.vividrop.cn`，不改變市場身份：
-`cn-review` 仍使用 CN app/desktop packaging，`global-review` 仍使用 Global
-app/desktop packaging。
+1. 所有修復先進入主開發分支或對應 feature branch。
+2. 發佈候選從同一份 global-only 程式碼產出。
+3. 緊急修復仍遵循 dev-first 原則：先在主線修復並驗證，再 cherry-pick 到需要補發的 release branch。
+4. 補發時遞增 build number，使用同一套 `review` / `prod` profile 打包。
 
-### 2.1 中國市場（CN）
+## 3. OSS / Commercial Boundary
 
-- **環境變數**：`SYNCFLOW_MARKET=cn` (預設)
-- **iOS 專案**：
-  - Scheme: `SyncFlowMobile`
-  - Configuration: `Debug` / `Release`
-- **Android 專案**：
-  - Build Variant: `cnDebug` / `cnRelease`
-- **Desktop 專案**：
-  - 封裝指令：`pnpm package:cn` (使用 `electron-builder.cn.yml`)
+Community build 必須保留前景 LAN 同步能力：
 
-### 2.2 全球市場（Global）
+1. guest/local 使用者可在前景 LAN 內發現 desktop、配對、掃描素材並從 pending queue 自動上傳。
+2. 佇列是只讀的自動增量同步結果，不提供手動選檔、刪除、跳過或重排作為替代路徑。
+3. foreground LAN fail-open：登入、訂閱、官方商業模組缺失都不應阻斷本地前景 LAN 同步。
 
-- **環境變數**：`SYNCFLOW_MARKET=global`
-- **iOS 專案**：
-  - Scheme: `SyncFlowMobileGlobal`
-  - Configuration: `DebugGlobal` / `ReleaseGlobal`
-- **Android 專案**：
-  - Build Variant: `globalDebug` / `globalRelease`
-- **Desktop 專案**：
-  - 封裝指令：`pnpm package:global` (使用 `electron-builder.global.yml`)
+官方商業能力必須 fail closed：
 
----
+1. remote access、tunnel credentials、relay、cloud-assisted route 必須有有效 entitlement。
+2. background continuation / silent background upload 必須同時具備官方 native capability 和有效 entitlement。
+3. entitlement 缺失、過期、無法確認或官方 capability 不存在時，遠程和背景能力保持關閉。
 
-## 3. Tag 對齊與雙倉庫規則
+## 4. Beta Tag
 
-發佈打包完成後，必須為對應版本打上 Git Tag。
+TestFlight 打包上傳後仍保留跨倉庫 tag 規則。tag 名稱與 Lynavo Drive TestFlight build 對齊：
 
-### 3.1 Tag 格式命名
+```text
+beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION>
+```
 
-- **中國市場**：`beta/cn/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION>`
-  _例如：`beta/cn/v0.1.0-b6`_
-- **全球市場**：`beta/global/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION>`
-  _例如：`beta/global/v0.1.0-b6`_
+例如：
 
-### 3.2 雙倉庫對齊規則（跨倉庫約束）
+```text
+beta/v1.0.0-b37
+```
 
-若打包並上傳了 iOS TestFlight，完成後**必須**在以下兩個倉庫打上完全相同的 Tag 並推送到遠端：
+需要打 tag 的倉庫仍為：
 
 1. `/Volumes/T7/Dev/Web/SyncFlow`
 2. `/Volumes/T7/Dev/Web/vivi-drop-server`
 
-_請確保兩邊使用同一個 Tag 名稱，切勿只對其中一個倉庫打 Tag。_
+兩邊必須使用同一個 tag 名稱；若推送遠端 tag，也必須兩邊都推送。
 
----
+## 5. Deferred Migration Boundaries
 
-## 4. 熱修復（Hotfix）流程
+以下項目是後續遷移邊界，不在 release channel rewrite 中執行：
 
-當線上版本（CN 或 Global）出現緊急 Bug 需要修復時，請嚴格遵守以下「**Dev 先行，Cherry-pick 後導**」的原則，以避免程式碼分叉（Code Drift）。
-
-```mermaid
-sequenceDiagram
-    participant Developer as 開發者
-    participant DevBranch as dev 分支
-    participant CNBranch as release/cn 分支
-    participant GlobalBranch as release/global 分支
-
-    Developer->>DevBranch: 1. 提交 Hotfix 並進行本機驗證
-    Note over DevBranch: 驗證通過 (Green)
-    Developer->>CNBranch: 2. git cherry-pick <commit-sha>
-    Note over CNBranch: 重新打包驗收
-    Developer->>GlobalBranch: 3. git cherry-pick <commit-sha>
-    Note over GlobalBranch: 重新打包驗收
-```
-
-### 熱修復步驟：
-
-1. **在 `dev` 分支修復**：
-   開發者首先在 `dev` 分支（或自 `dev` 切出的臨時修復分支）上解決 Bug，完成測試與驗證。
-2. **獲取 Commit SHA**：
-   記錄該修復在 `dev` 分支合併後的 Commit SHA。
-3. **揀選至發佈分支**：
-   - 切換至 `release/cn` 分支，執行：
-     ```bash
-     git checkout release/cn
-     git cherry-pick <COMMIT_SHA>
-     ```
-   - 切換至 `release/global` 分支，執行：
-     ```bash
-     git checkout release/global
-     git cherry-pick <COMMIT_SHA>
-     ```
-4. **重新建置與發佈**：
-   在各自的 release 分支上重新執行預檢與打包流程，並打上遞增 build number 的 Tag（例如從 `b6` 升至 `b7`）。
-
-> [!WARNING]
-> 嚴禁直接在 `release/cn` 或 `release/global` 分支上直接修改並提交程式碼。所有變更必須源自 `dev`，否則會導致 `dev` 丟失修復，在下一次合併時引發程式碼回退（Regression）。
+1. package scope rename。
+2. mDNS service type 和 sidecar health service rename。
+3. 舊 data-dir、keychain、shared-preference migration。
+4. iOS bundle id、Android application id、native package namespace rename。
+5. store listing 和既有 App Store / Play continuity 決策。

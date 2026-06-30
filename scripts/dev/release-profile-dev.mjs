@@ -1,4 +1,8 @@
+import { createRequire } from 'node:module';
 import { buildReleasePlan } from '../release/release-profiles.mjs';
+
+const require = createRequire(import.meta.url);
+const { buildOssChildEnv } = require('./oss-env-scrubber.cjs');
 
 const DEV_TARGETS = new Set([
   'desktop',
@@ -7,6 +11,8 @@ const DEV_TARGETS = new Set([
   'mobile-ios-device',
   'mobile-android',
 ]);
+const NATIVE_IOS_SCHEME = 'SyncFlowMobile';
+const NATIVE_IOS_MODE = 'Debug';
 
 export function buildDevRunPlan({ profileName, target, extraArgs = [] }) {
   if (!DEV_TARGETS.has(target)) {
@@ -21,17 +27,18 @@ export function buildDevRunPlan({ profileName, target, extraArgs = [] }) {
     profileName,
     targets: [releaseTarget],
   });
+  const targetCommand = buildTargetCommand(target);
   const env = {
     ...releasePlan.env,
-    ...buildTargetEnv(releasePlan.profile, target),
+    ...buildTargetEnv(target),
   };
 
   return {
     profile: releasePlan.profile,
     target,
     env,
-    command: buildTargetCommand(releasePlan.profile, target).command,
-    args: [...buildTargetCommand(releasePlan.profile, target).args, ...extraArgs],
+    command: targetCommand.command,
+    args: [...targetCommand.args, ...extraArgs],
     writeMobileReleaseProfile: target.startsWith('mobile-'),
     mobileReleaseProfileSource: releasePlan.mobileReleaseProfileSource,
   };
@@ -40,7 +47,7 @@ export function buildDevRunPlan({ profileName, target, extraArgs = [] }) {
 export function buildSourceDefaultMobileReleaseProfileSource() {
   return `export const mobileReleaseProfile = {
   name: 'source-default',
-  market: 'source',
+  channel: 'dev',
   review: false,
   apiBaseUrl: '',
 } as const;
@@ -49,7 +56,11 @@ export const releaseApiBaseUrl = mobileReleaseProfile.apiBaseUrl.trim() || null;
 `;
 }
 
-function buildTargetCommand(profile, target) {
+export function buildDevChildEnv(parentEnv, profileEnv) {
+  return buildOssChildEnv(parentEnv, profileEnv);
+}
+
+function buildTargetCommand(target) {
   if (target === 'desktop') {
     return {
       command: 'pnpm',
@@ -65,7 +76,6 @@ function buildTargetCommand(profile, target) {
   }
 
   if (target === 'mobile-ios') {
-    const isGlobal = profile.market === 'global';
     return {
       command: 'corepack',
       args: [
@@ -76,9 +86,9 @@ function buildTargetCommand(profile, target) {
         'react-native',
         'run-ios',
         '--scheme',
-        isGlobal ? 'SyncFlowMobileGlobal' : 'SyncFlowMobile',
+        NATIVE_IOS_SCHEME,
         '--mode',
-        isGlobal ? 'DebugGlobal' : 'Debug',
+        NATIVE_IOS_MODE,
       ],
     };
   }
@@ -96,20 +106,6 @@ function buildTargetCommand(profile, target) {
   };
 }
 
-function buildTargetEnv(profile, target) {
-  if (target !== 'mobile-android') {
-    return {};
-  }
-
-  if (profile.market === 'global') {
-    return {
-      SYNCFLOW_ANDROID_APP_ID: 'com.vividrop.mobile.global',
-      SYNCFLOW_ANDROID_INSTALL_TASK: ':app:installGlobalDebug',
-    };
-  }
-
-  return {
-    SYNCFLOW_ANDROID_APP_ID: 'com.vividrop.mobile.china',
-    SYNCFLOW_ANDROID_INSTALL_TASK: ':app:installCnDebug',
-  };
+function buildTargetEnv(target) {
+  return {};
 }

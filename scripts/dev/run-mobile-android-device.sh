@@ -8,10 +8,11 @@ METRO_READY_TIMEOUT_SECONDS="${SYNCFLOW_ANDROID_METRO_READY_TIMEOUT_SECONDS:-20}
 APP_ID="${SYNCFLOW_ANDROID_APP_ID:-com.vividrop.mobile.china}"
 MAIN_ACTIVITY="${SYNCFLOW_ANDROID_MAIN_ACTIVITY:-.MainActivity}"
 if [[ "$MAIN_ACTIVITY" == .* ]]; then
-  # The Android namespace is com.vividrop.mobile.china, so relative activities are under that package
+  # The Android namespace stays under com.vividrop.mobile.china until Task 15
+  # performs the package path migration.
   MAIN_ACTIVITY="com.vividrop.mobile.china$MAIN_ACTIVITY"
 fi
-INSTALL_TASK="${SYNCFLOW_ANDROID_INSTALL_TASK:-}"
+INSTALL_TASK="${SYNCFLOW_ANDROID_INSTALL_TASK:-:app:installDebug}"
 
 unset NODE_OPTIONS
 unset VSCODE_INSPECTOR_OPTIONS
@@ -37,22 +38,6 @@ metro_ready() {
 
 require_command adb
 require_command curl
-
-if [[ -z "$INSTALL_TASK" ]]; then
-  case "$APP_ID" in
-    com.vividrop.mobile.china)
-      INSTALL_TASK=":app:installCnDebug"
-      ;;
-    com.vividrop.mobile.global)
-      INSTALL_TASK=":app:installGlobalDebug"
-      ;;
-    *)
-      echo "Unknown Android app id: $APP_ID" >&2
-      echo "Set SYNCFLOW_ANDROID_INSTALL_TASK to the matching Gradle install task." >&2
-      exit 1
-      ;;
-  esac
-fi
 
 selected_device="${SYNCFLOW_ANDROID_DEVICE:-${ANDROID_SERIAL:-}}"
 if [[ -n "$selected_device" ]]; then

@@ -2,60 +2,32 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Mobile: Android CN Debug (F5)",
+      "name": "Mobile: Android Debug (F5)",
       "type": "node-terminal",
       "request": "launch",
       "preLaunchTask": "mobile: start metro",
-      "command": "cd \"${workspaceFolder}\" && SYNCFLOW_ANDROID_APP_ID=com.vividrop.mobile.china SYNCFLOW_ANDROID_METRO_READY_TIMEOUT_SECONDS=180 bash scripts/dev/run-mobile-android-device.sh"
+      "command": "cd \"${workspaceFolder}\" && SYNCFLOW_ANDROID_METRO_READY_TIMEOUT_SECONDS=180 bash scripts/dev/run-mobile-android-device.sh"
     },
     {
-      "name": "Mobile: Android CN Emulator (F5)",
+      "name": "Mobile: Android Emulator (F5)",
       "type": "node-terminal",
       "request": "launch",
       "preLaunchTask": "mobile: start metro",
-      "command": "cd \"${workspaceFolder}\" && SYNCFLOW_ANDROID_DEVICE=emulator-5554 SYNCFLOW_ANDROID_APP_ID=com.vividrop.mobile.china SYNCFLOW_ANDROID_METRO_READY_TIMEOUT_SECONDS=180 bash scripts/dev/run-mobile-android-device.sh"
+      "command": "cd \"${workspaceFolder}\" && SYNCFLOW_ANDROID_DEVICE=emulator-5554 SYNCFLOW_ANDROID_METRO_READY_TIMEOUT_SECONDS=180 bash scripts/dev/run-mobile-android-device.sh"
     },
     {
-      "name": "Mobile: Android Global Debug (F5)",
+      "name": "Mobile: iOS (macOS)",
       "type": "node-terminal",
       "request": "launch",
       "preLaunchTask": "mobile: start metro",
-      "command": "cd \"${workspaceFolder}\" && SYNCFLOW_ANDROID_APP_ID=com.vividrop.mobile.global SYNCFLOW_ANDROID_METRO_READY_TIMEOUT_SECONDS=180 bash scripts/dev/run-mobile-android-device.sh"
+      "command": "cd \"${workspaceFolder}\" && bash scripts/dev/run-mobile-ios-device.sh"
     },
     {
-      "name": "Mobile: Android Global Emulator (F5)",
-      "type": "node-terminal",
-      "request": "launch",
-      "preLaunchTask": "mobile: start metro",
-      "command": "cd \"${workspaceFolder}\" && SYNCFLOW_ANDROID_DEVICE=emulator-5554 SYNCFLOW_ANDROID_APP_ID=com.vividrop.mobile.global SYNCFLOW_ANDROID_METRO_READY_TIMEOUT_SECONDS=180 bash scripts/dev/run-mobile-android-device.sh"
-    },
-    {
-      "name": "Mobile: iOS CN (macOS)",
-      "type": "node-terminal",
-      "request": "launch",
-      "preLaunchTask": "mobile: start metro",
-      "command": "cd \"${workspaceFolder}\" && SYNCFLOW_MARKET=cn bash scripts/dev/run-mobile-ios-device.sh"
-    },
-    {
-      "name": "Mobile: iOS Global (macOS)",
-      "type": "node-terminal",
-      "request": "launch",
-      "preLaunchTask": "mobile: start metro",
-      "command": "cd \"${workspaceFolder}\" && SYNCFLOW_MARKET=global bash scripts/dev/run-mobile-ios-device.sh"
-    },
-    {
-      "name": "Mobile: iOS CN Simulator (no Metro)",
+      "name": "Mobile: iOS Simulator (no Metro)",
       "type": "node-terminal",
       "request": "launch",
       "preLaunchTask": "mobile: start metro",
       "command": "cd \"${workspaceFolder}\" && corepack pnpm --filter @syncflow/mobile exec react-native run-ios --scheme \"SyncFlowMobile\" --mode \"Debug\" --no-packager"
-    },
-    {
-      "name": "Mobile: iOS Global Simulator (no Metro)",
-      "type": "node-terminal",
-      "request": "launch",
-      "preLaunchTask": "mobile: start metro",
-      "command": "cd \"${workspaceFolder}\" && corepack pnpm --filter @syncflow/mobile exec react-native run-ios --scheme \"SyncFlowMobileGlobal\" --mode \"DebugGlobal\" --no-packager"
     },
     {
       "name": "Mobile: Metro (macOS)",
@@ -74,8 +46,8 @@
     {
       "name": "Mobile: Android + iOS",
       "configurations": [
-        "Mobile: Android CN Debug (F5)",
-        "Mobile: iOS CN Simulator (no Metro)"
+        "Mobile: Android Debug (F5)",
+        "Mobile: iOS Simulator (no Metro)"
       ],
       "stopAll": false
     }

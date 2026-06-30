@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  buildDevChildEnv,
   buildDevRunPlan,
   buildSourceDefaultMobileReleaseProfileSource,
 } from './release-profile-dev.mjs';
@@ -33,7 +34,7 @@ function main() {
 
     printPlan(plan, options);
 
-    if (plan.writeMobileReleaseProfile) {
+    if (plan.writeMobileReleaseProfile && !options.dryRun) {
       writeMobileReleaseProfile(plan.mobileReleaseProfileSource);
     }
 
@@ -41,10 +42,7 @@ function main() {
 
     const result = spawnSync(plan.command, plan.args, {
       cwd: repoRoot,
-      env: {
-        ...process.env,
-        ...plan.env,
-      },
+      env: buildDevChildEnv(process.env, plan.env),
       stdio: 'inherit',
     });
 
@@ -119,7 +117,7 @@ Targets:
 
 function printPlan(plan, options) {
   console.log(`Profile:  ${plan.profile.name}`);
-  console.log(`Market:   ${plan.profile.market}`);
+  console.log(`Channel:  ${plan.profile.channel}`);
   console.log(`Review:   ${plan.profile.review ? 'yes' : 'no'}`);
   console.log(`Base URL: ${plan.profile.apiBaseUrl}`);
   console.log(`Target:   ${plan.target}`);
