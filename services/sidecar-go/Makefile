@@ -1,6 +1,6 @@
 .PHONY: build run test clean dev
 
-BINARY := syncflow-sidecar
+BINARY := lynavo-drive-sidecar
 CMD := ./cmd/syncflow-sidecar/
 
 # Build the sidecar binary

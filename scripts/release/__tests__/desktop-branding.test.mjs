@@ -98,8 +98,14 @@ test('desktop uses a single builder config with bundle build version from mobile
   const config = readDesktopConfig('electron-builder.yml');
 
   assert.match(config, new RegExp(`^buildVersion: "${mobileVersion.buildNumber}"$`, 'm'));
-  assert.equal(existsSync(resolve(repoRoot, 'apps/desktop', removedBuilderConfigName('cn'))), false);
-  assert.equal(existsSync(resolve(repoRoot, 'apps/desktop', removedBuilderConfigName('global'))), false);
+  assert.equal(
+    existsSync(resolve(repoRoot, 'apps/desktop', removedBuilderConfigName('cn'))),
+    false,
+  );
+  assert.equal(
+    existsSync(resolve(repoRoot, 'apps/desktop', removedBuilderConfigName('global'))),
+    false,
+  );
 });
 
 test('desktop builder config uses Lynavo Drive for visible package branding without identity migration', () => {
@@ -114,7 +120,10 @@ test('desktop builder config uses Lynavo Drive for visible package branding with
   assert.match(macConfig, /^  artifactName: LynavoDrive-\$\{version\}-\$\{arch\}\.\$\{ext\}$/m);
   assert.match(winConfig, /^  artifactName: LynavoDrive-\$\{version\}-\$\{arch\}\.\$\{ext\}$/m);
   assert.match(winConfig, /^  executableName: Vivi Drop$/m);
-  assert.match(linuxConfig, /^  artifactName: LynavoDrive-\$\{version\}-linux-\$\{arch\}\.\$\{ext\}$/m);
+  assert.match(
+    linuxConfig,
+    /^  artifactName: LynavoDrive-\$\{version\}-linux-\$\{arch\}\.\$\{ext\}$/m,
+  );
   assert.match(linuxConfig, /^  executableName: vivi-drop$/m);
   assert.match(nsisConfig, /^  shortcutName: Lynavo Drive$/m);
   assert.doesNotMatch(config, new RegExp(`^productName: ${legacySyncFlowName}$`, 'm'));
@@ -132,7 +141,7 @@ test('macOS permission descriptions use Lynavo Drive as the visible app name', (
   assert.doesNotMatch(config, new RegExp(`NS\\w+UsageDescription: ${legacyViviName} `));
 });
 
-test('windows installer keeps existing Vivi Drop firewall identities for Task 15', () => {
+test('windows installer keeps existing Vivi Drop firewall identities while scoping to renamed sidecar binary', () => {
   const installer = readDesktopConfig('resources/installer.nsh');
 
   assert.match(installer, new RegExp(`!define SF_RULE_TCP\\s+"${legacyViviName} Sidecar TCP"`));
@@ -147,6 +156,8 @@ test('windows installer keeps existing Vivi Drop firewall identities for Task 15
   assert.doesNotMatch(installer, new RegExp(`add rule name="${legacySyncFlowName}`));
   assert.doesNotMatch(installer, new RegExp(`description="${legacySyncFlowName}`));
   assert.doesNotMatch(installer, new RegExp(`DetailPrint ".*${legacySyncFlowName}`));
+  assert.match(installer, /resources\\lynavo-drive-sidecar\.exe/);
+  assert.doesNotMatch(installer, /resources\\syncflow-sidecar\.exe/);
 });
 
 test('windows installer does not delete existing Vivi Drop firewall rules during upgrade', () => {
@@ -177,7 +188,10 @@ test('Windows release and beta docs match preserved firewall rule identities', (
     `${legacyViviName} Sidecar HTTP`,
     `${legacyViviName} mDNS UDP`,
   ];
-  const releasePlaybook = readFileSync(resolve(repoRoot, 'docs/release/release-playbook.md'), 'utf8');
+  const releasePlaybook = readFileSync(
+    resolve(repoRoot, 'docs/release/release-playbook.md'),
+    'utf8',
+  );
   const betaMatrix = readFileSync(resolve(repoRoot, 'docs/testing/beta-test-matrix.md'), 'utf8');
 
   for (const doc of [releasePlaybook, betaMatrix]) {
@@ -188,6 +202,22 @@ test('Windows release and beta docs match preserved firewall rule identities', (
     assert.doesNotMatch(doc, /Lynavo Drive mDNS UDP/);
     assert.match(doc, /native\/binary\/mDNS migration/i);
   }
+});
+
+test('release docs verify the renamed packaged sidecar binary paths', () => {
+  const releasePlaybook = readFileSync(
+    resolve(repoRoot, 'docs/release/release-playbook.md'),
+    'utf8',
+  );
+  const macSigning = readFileSync(
+    resolve(repoRoot, 'docs/release/macos-desktop-signing.md'),
+    'utf8',
+  );
+
+  assert.match(releasePlaybook, /resources\\lynavo-drive-sidecar\.exe/);
+  assert.doesNotMatch(releasePlaybook, /resources\\syncflow-sidecar\.exe/);
+  assert.match(macSigning, /Contents\/Resources\/lynavo-drive-sidecar/);
+  assert.doesNotMatch(macSigning, /Contents\/Resources\/syncflow-sidecar/);
 });
 
 test('iOS TestFlight docs defer native bundle id migration', () => {
@@ -211,17 +241,17 @@ test('desktop builder config defines Linux deb packaging', () => {
   assert.match(linuxConfig, /^    - target: deb$/m);
   assert.match(linuxConfig, /^        - x64$/m);
   assert.match(linuxConfig, /^        - arm64$/m);
-  assert.match(linuxConfig, /^    - from: resources\/syncflow-sidecar$/m);
-  assert.match(linuxConfig, /^      to: syncflow-sidecar$/m);
+  assert.match(linuxConfig, /^    - from: resources\/lynavo-drive-sidecar$/m);
+  assert.match(linuxConfig, /^      to: lynavo-drive-sidecar$/m);
 });
 
-test('desktop packaging intentionally keeps the sidecar binary compatibility name', () => {
+test('desktop packaging uses the Lynavo Drive sidecar binary name', () => {
   const config = readDesktopConfig('electron-builder.yml');
   const packageJson = readDesktopConfig('package.json');
 
-  assert.match(config, /Contents\/Resources\/syncflow-sidecar/);
-  assert.match(config, /resources\/syncflow-sidecar/);
-  assert.match(config, /syncflow-sidecar\.exe/);
-  assert.match(packageJson, /syncflow-sidecar/);
-  assert.doesNotMatch(config, /lynavo-drive-sidecar/);
+  assert.match(config, /Contents\/Resources\/lynavo-drive-sidecar/);
+  assert.match(config, /resources\/lynavo-drive-sidecar/);
+  assert.match(config, /lynavo-drive-sidecar\.exe/);
+  assert.match(packageJson, /lynavo-drive-sidecar/);
+  assert.doesNotMatch(config, /syncflow-sidecar\.exe/);
 });

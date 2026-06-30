@@ -58,5 +58,5 @@ test('builds a CGO Linux sidecar environment while preserving the base env', () 
 
 test('exports deterministic sidecar paths for release packaging', () => {
   assert.match(sidecarRoot, /services[/\\]sidecar-go$/);
-  assert.match(outputPath, /apps[/\\]desktop[/\\]resources[/\\]syncflow-sidecar$/);
+  assert.match(outputPath, /apps[/\\]desktop[/\\]resources[/\\]lynavo-drive-sidecar$/);
 });

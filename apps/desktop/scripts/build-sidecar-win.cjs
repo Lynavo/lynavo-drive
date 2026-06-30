@@ -2,7 +2,7 @@ const { spawn, spawnSync } = require('node:child_process');
 const path = require('node:path');
 
 const sidecarRoot = path.resolve(__dirname, '..', '..', '..', 'services', 'sidecar-go');
-const outputPath = path.resolve(__dirname, '..', 'resources', 'syncflow-sidecar.exe');
+const outputPath = path.resolve(__dirname, '..', 'resources', 'lynavo-drive-sidecar.exe');
 const syncScriptPath = path.resolve(__dirname, 'sync-bonjour-runtime.cjs');
 const env = {
   ...process.env,
@@ -56,4 +56,3 @@ child.on('error', (error) => {
   console.error(error);
   process.exit(1);
 });
-

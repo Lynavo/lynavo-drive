@@ -19,6 +19,12 @@ import type {
 import { desktopClientHeaders } from './app-info';
 
 const BASE = `http://127.0.0.1:${SIDECAR_HTTP_PORT}`;
+export const SIDECAR_HEALTH_SERVICE_NAMES = ['syncflow-sidecar', 'lynavo-drive-sidecar'] as const;
+
+export function isCompatibleSidecarService(service: string | null | undefined): boolean {
+  return SIDECAR_HEALTH_SERVICE_NAMES.some((candidate) => candidate === service);
+}
+
 export type PowerEventSnapshot = {
   event: 'suspend' | 'resume' | 'lock-screen' | 'unlock-screen';
   state: 'awake' | 'sleeping' | 'locked' | 'unlocked';
@@ -110,7 +116,7 @@ export function supportsConnectionDeviceManagement(
 ): boolean {
   return (
     health?.ok === true &&
-    health.service === 'syncflow-sidecar' &&
+    isCompatibleSidecarService(health.service) &&
     health.appCompatibilityVersion === APP_COMPATIBILITY_VERSION &&
     health.capabilities?.connectionDeviceManagement === true
   );

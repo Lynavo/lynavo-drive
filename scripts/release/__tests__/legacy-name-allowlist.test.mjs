@@ -92,10 +92,7 @@ test('applies exact-path allowlists only to their allowed terms', () => {
   try {
     const sidecarDir = join(fixtureRoot, 'services', 'sidecar-go');
     mkdirSync(sidecarDir, { recursive: true });
-    writeFileSync(
-      join(sidecarDir, 'go.mod'),
-      'module github.com/gpt-open/syncflow\n// SyncFlow\n',
-    );
+    writeFileSync(join(sidecarDir, 'go.mod'), 'module github.com/gpt-open/syncflow\n// SyncFlow\n');
 
     const result = runVerifier(['--root', fixtureRoot]);
 
@@ -104,6 +101,31 @@ test('applies exact-path allowlists only to their allowed terms', () => {
     assert.match(result.stdout, /Unallowlisted legacy name hits: 1/);
     assert.match(result.stdout, /services\/sidecar-go\/go\.mod:2 SyncFlow/);
     assert.doesNotMatch(result.stdout, /services\/sidecar-go\/go\.mod:1 syncflow/);
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test('narrows desktop build script allowlists to the Go command path', () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'legacy-name-allowlist-'));
+  try {
+    const scriptDir = join(fixtureRoot, 'apps', 'desktop', 'scripts');
+    mkdirSync(scriptDir, { recursive: true });
+    writeFileSync(
+      join(scriptDir, 'build-sidecar-mac.cjs'),
+      [
+        "const outputPath = path.join(resourcesDir, 'resources/syncflow-sidecar');",
+        "run('go', ['build', '-o', output, './cmd/syncflow-sidecar/']);",
+      ].join('\n'),
+    );
+
+    const result = runVerifier(['--root', fixtureRoot]);
+
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stdout, /Allowed legacy name hits: 1/);
+    assert.match(result.stdout, /Unallowlisted legacy name hits: 1/);
+    assert.match(result.stdout, /apps\/desktop\/scripts\/build-sidecar-mac\.cjs:1 syncflow/);
+    assert.doesNotMatch(result.stdout, /apps\/desktop\/scripts\/build-sidecar-mac\.cjs:2 syncflow/);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }

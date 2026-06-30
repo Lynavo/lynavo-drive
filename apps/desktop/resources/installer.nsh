@@ -46,8 +46,8 @@
   ; source is safe.  Restricting to localsubnet would break cross-segment
   ; transfers (e.g. iPhone on 172.16.22.x connecting to Windows on 172.16.8.x).
   ; Scope to the sidecar executable when present for additional defence-in-depth.
-  IfFileExists "$INSTDIR\resources\syncflow-sidecar.exe" 0 +3
-    nsExec::ExecToStack 'netsh advfirewall firewall add rule name="${SF_RULE_TCP}" dir=in action=allow protocol=TCP localport=39393 program="$INSTDIR\resources\syncflow-sidecar.exe" description="Vivi Drop sidecar file transfer (TCP 39393)"'
+  IfFileExists "$INSTDIR\resources\lynavo-drive-sidecar.exe" 0 +3
+    nsExec::ExecToStack 'netsh advfirewall firewall add rule name="${SF_RULE_TCP}" dir=in action=allow protocol=TCP localport=39393 program="$INSTDIR\resources\lynavo-drive-sidecar.exe" description="Vivi Drop sidecar file transfer (TCP 39393)"'
     Goto tcp_rule_done
   nsExec::ExecToStack 'netsh advfirewall firewall add rule name="${SF_RULE_TCP}" dir=in action=allow protocol=TCP localport=39393 description="Vivi Drop sidecar file transfer (TCP 39393)"'
   tcp_rule_done:
@@ -58,8 +58,8 @@
   ; Android subnet fallback probes /health on the sidecar HTTP API before
   ; opening the LMUP TCP session, so Windows must allow this inbound port too.
   ; Scope to the sidecar executable when present for additional defence-in-depth.
-  IfFileExists "$INSTDIR\resources\syncflow-sidecar.exe" 0 +3
-    nsExec::ExecToStack 'netsh advfirewall firewall add rule name="${SF_RULE_HTTP}" dir=in action=allow protocol=TCP localport=39394 program="$INSTDIR\resources\syncflow-sidecar.exe" description="Vivi Drop sidecar HTTP health and API (TCP 39394)"'
+  IfFileExists "$INSTDIR\resources\lynavo-drive-sidecar.exe" 0 +3
+    nsExec::ExecToStack 'netsh advfirewall firewall add rule name="${SF_RULE_HTTP}" dir=in action=allow protocol=TCP localport=39394 program="$INSTDIR\resources\lynavo-drive-sidecar.exe" description="Vivi Drop sidecar HTTP health and API (TCP 39394)"'
     Goto http_rule_done
   nsExec::ExecToStack 'netsh advfirewall firewall add rule name="${SF_RULE_HTTP}" dir=in action=allow protocol=TCP localport=39394 description="Vivi Drop sidecar HTTP health and API (TCP 39394)"'
   http_rule_done:

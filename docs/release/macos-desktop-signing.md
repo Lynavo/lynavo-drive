@@ -56,7 +56,7 @@ pnpm package:desktop:signed
 这条路径会执行：
 
 1. 重新编译 sidecar 到 desktop 资源目录
-2. 使用 `Developer ID Application` 对主 app 和内嵌 `syncflow-sidecar` 签名
+2. 使用 `Developer ID Application` 对主 app 和内嵌 `lynavo-drive-sidecar` 签名
 3. 调用 Apple `notarytool` 提交公证并等待结果
 4. 输出最终 DMG 到：
    - `/Volumes/workspace/work/sync-flow/apps/desktop/release`
@@ -123,7 +123,7 @@ done
 
 ```bash
 for app in /Volumes/T7/Dev/Web/sync-flow-pack/apps/desktop/release/mac*/Lynavo\ Drive.app; do
-  codesign -dv --verbose=4 "$app/Contents/Resources/syncflow-sidecar"
+  codesign -dv --verbose=4 "$app/Contents/Resources/lynavo-drive-sidecar"
 done
 ```
 

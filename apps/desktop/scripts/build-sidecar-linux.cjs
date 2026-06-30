@@ -3,7 +3,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 
 const sidecarRoot = path.resolve(__dirname, '..', '..', '..', 'services', 'sidecar-go');
-const outputPath = path.resolve(__dirname, '..', 'resources', 'syncflow-sidecar');
+const outputPath = path.resolve(__dirname, '..', 'resources', 'lynavo-drive-sidecar');
 
 function mapElectronArchToGoArch(arch) {
   if (arch === 'x64') return 'amd64';

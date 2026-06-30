@@ -5,7 +5,7 @@ const { spawnSync } = require('node:child_process');
 const sidecarRoot = path.resolve(__dirname, '..', '..', '..', 'services', 'sidecar-go');
 const resourcesDir = path.resolve(__dirname, '..', 'resources');
 const buildDir = path.join(resourcesDir, '.sidecar-build');
-const outputPath = path.join(resourcesDir, 'syncflow-sidecar');
+const outputPath = path.join(resourcesDir, 'lynavo-drive-sidecar');
 const target = process.argv[2] ?? 'universal';
 const supportedTargets = new Set(['arm64', 'x64', 'universal']);
 
@@ -56,7 +56,7 @@ function capture(command, args) {
 function buildArch(arch, sdkPath) {
   const goArch = arch === 'x64' ? 'amd64' : 'arm64';
   const clangArch = arch === 'x64' ? 'x86_64' : 'arm64';
-  const output = path.join(buildDir, `syncflow-sidecar-${arch}`);
+  const output = path.join(buildDir, `lynavo-drive-sidecar-${arch}`);
   const archFlags = `-arch ${clangArch} -isysroot ${sdkPath} -mmacosx-version-min=11.0`;
 
   console.log(`Building macOS sidecar for ${arch}...`);

@@ -6,7 +6,7 @@ const resourcesDir = path.join(projectRoot, 'resources');
 
 const required = [
   {
-    file: 'syncflow-sidecar.exe',
+    file: 'lynavo-drive-sidecar.exe',
     hint: 'Run `pnpm build:sidecar:win` — requires Go + a Windows C compiler (e.g. x86_64-w64-mingw32-gcc on macOS/Linux).',
   },
   {

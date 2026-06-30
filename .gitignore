@@ -19,6 +19,7 @@ tools/node/
 
 # Go sidecar
 services/sidecar-go/syncflow-sidecar
+services/sidecar-go/lynavo-drive-sidecar
 services/sidecar-go/syncflow.db
 services/sidecar-go/syncflow.db-wal
 services/sidecar-go/syncflow.db-shm

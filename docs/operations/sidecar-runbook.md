@@ -37,8 +37,8 @@ desktop main 负责 sidecar 生命周期管理。
 
 桌面端打包产物内都包含一份 sidecar 二进制：
 
-- macOS：`Vivi Drop.app/Contents/Resources/syncflow-sidecar`
-- Windows：`<InstallDir>\\resources\\syncflow-sidecar.exe`
+- macOS：`Lynavo Drive.app/Contents/Resources/lynavo-drive-sidecar`
+- Windows：`<InstallDir>\\resources\\lynavo-drive-sidecar.exe`
 
 ## 2. 标准端口
 
@@ -47,11 +47,11 @@ desktop main 负责 sidecar 生命周期管理。
 
 如果这两个端口没有监听，绝大多数同步问题都没有必要继续往上看。
 
-Windows 安装包应写入以下入站防火墙规则：
+Windows 安装包当前应写入以下入站防火墙规则，并在升级时清理旧 `SyncFlow ...` 规则：
 
-- `SyncFlow Sidecar TCP`：`39393/TCP`，LMUP 文件传输与 `HELLO`
-- `SyncFlow Sidecar HTTP`：`39394/TCP`，sidecar HTTP API、`/health`、mobile discovery fallback
-- `SyncFlow mDNS UDP`：`5353/UDP`，Bonjour/mDNS 发现
+- `Vivi Drop Sidecar TCP`：`39393/TCP`，LMUP 文件传输与 `HELLO`
+- `Vivi Drop Sidecar HTTP`：`39394/TCP`，sidecar HTTP API、`/health`、mobile discovery fallback
+- `Vivi Drop mDNS UDP`：`5353/UDP`，Bonjour/mDNS 发现
 
 ## 3. 最小健康检查
 
@@ -76,20 +76,21 @@ Get-NetTCPConnection -State Listen -LocalPort 39393,39394 |
 macOS：
 
 ```bash
-pgrep -af syncflow-sidecar
+pgrep -af 'lynavo-drive-sidecar|syncflow-sidecar'
 ```
 
 Windows（PowerShell）：
 
 ```powershell
-Get-CimInstance Win32_Process -Filter "Name='syncflow-sidecar.exe'" |
+Get-CimInstance Win32_Process |
+  Where-Object { $_.Name -in @("lynavo-drive-sidecar.exe", "syncflow-sidecar.exe") } |
   Select-Object ProcessId,ParentProcessId,ExecutablePath,CommandLine
 ```
 
 判断点：
 
 1. 如果路径在 `go-build` cache 下，通常是本地源码临时运行残留
-2. 如果路径在 `Vivi Drop.app/Contents/Resources/` 或安装目录 `resources\\` 下，通常是 desktop 包内 sidecar
+2. 如果路径在 `Lynavo Drive.app/Contents/Resources/` 或安装目录 `resources\\` 下，通常是 desktop 包内 sidecar
 
 ### 3.3 Bonjour 广播
 
@@ -129,13 +130,13 @@ dns-sd.exe -B _syncflow._tcp local.
 macOS：
 
 ```bash
-pkill -f syncflow-sidecar
+pkill -f 'lynavo-drive-sidecar|syncflow-sidecar'
 ```
 
 Windows（PowerShell）：
 
 ```powershell
-Get-Process syncflow-sidecar -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process lynavo-drive-sidecar,syncflow-sidecar -ErrorAction SilentlyContinue | Stop-Process -Force
 ```
 
 ## 4.2 假在线 Bonjour 广播
@@ -192,9 +193,9 @@ Get-CimInstance Win32_Process -Filter "Name='dns-sd.exe'" |
 
 ```powershell
 Get-Service -Name "Bonjour Service"
-netsh advfirewall firewall show rule name="SyncFlow Sidecar TCP"
-netsh advfirewall firewall show rule name="SyncFlow Sidecar HTTP"
-netsh advfirewall firewall show rule name="SyncFlow mDNS UDP"
+netsh advfirewall firewall show rule name="Vivi Drop Sidecar TCP"
+netsh advfirewall firewall show rule name="Vivi Drop Sidecar HTTP"
+netsh advfirewall firewall show rule name="Vivi Drop mDNS UDP"
 ```
 
 处理原则：
@@ -223,7 +224,7 @@ netsh advfirewall firewall show rule name="SyncFlow mDNS UDP"
 macOS：
 
 ```bash
-pkill -f syncflow-sidecar || true
+pkill -f 'lynavo-drive-sidecar|syncflow-sidecar' || true
 pkill -f 'dns-sd.*_syncflow._tcp' || true
 ```
 
@@ -239,7 +240,7 @@ lsof -nP -iTCP:39394 -sTCP:LISTEN
 Windows（PowerShell）：
 
 ```powershell
-Get-Process syncflow-sidecar -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process lynavo-drive-sidecar,syncflow-sidecar -ErrorAction SilentlyContinue | Stop-Process -Force
 Get-CimInstance Win32_Process -Filter "Name='dns-sd.exe'" |
   Where-Object { $_.CommandLine -like '*_syncflow._tcp*' } |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force }

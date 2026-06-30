@@ -6,7 +6,11 @@ import { promisify } from 'node:util';
 import { app } from 'electron';
 import log from 'electron-log';
 import { APP_COMPATIBILITY_VERSION, SIDECAR_HTTP_PORT } from '@lynavo-drive/contracts';
-import { sidecarClient, supportsConnectionDeviceManagement } from './sidecar-client';
+import {
+  isCompatibleSidecarService,
+  sidecarClient,
+  supportsConnectionDeviceManagement,
+} from './sidecar-client';
 import type { SidecarHealth } from './sidecar-client';
 import type {
   BonjourRuntimeSource,
@@ -19,7 +23,7 @@ import { INITIAL_SIDECAR_RUNTIME_STATE } from '../shared/sidecar-runtime';
 
 const isDev = !app.isPackaged;
 const sidecarBinaryName =
-  process.platform === 'win32' ? 'syncflow-sidecar.exe' : 'syncflow-sidecar';
+  process.platform === 'win32' ? 'lynavo-drive-sidecar.exe' : 'lynavo-drive-sidecar';
 const HEALTHCHECK_INTERVAL_MS = 500;
 const SIDECAR_STOP_TIMEOUT_MS = 5000;
 const DEV_HEALTHCHECK_RETRIES = 120;
@@ -351,7 +355,7 @@ export class SidecarManager extends EventEmitter {
     const res = await this.getHealthSnapshot();
     return (
       res?.ok === true &&
-      res.service === 'syncflow-sidecar' &&
+      isCompatibleSidecarService(res.service) &&
       res.appCompatibilityVersion === APP_COMPATIBILITY_VERSION
     );
   }
@@ -370,7 +374,7 @@ export class SidecarManager extends EventEmitter {
 
   private async isSidecarReachable(): Promise<boolean> {
     const res = await this.getHealthSnapshot();
-    return res?.ok === true && res.service === 'syncflow-sidecar';
+    return res?.ok === true && isCompatibleSidecarService(res.service);
   }
 
   private async waitForHealth(retries: number, intervalMs: number): Promise<void> {

@@ -19,10 +19,10 @@ mac:
     NSDocumentsFolderUsageDescription: Lynavo Drive 需要存取文件資料夾，用於同步、儲存與開啟素材。
     NSDownloadsFolderUsageDescription: Lynavo Drive 需要存取下載資料夾，用於同步、儲存與開啟素材。
   binaries:
-    - Contents/Resources/syncflow-sidecar
+    - Contents/Resources/lynavo-drive-sidecar
   extraResources:
-    - from: resources/syncflow-sidecar
-      to: syncflow-sidecar
+    - from: resources/lynavo-drive-sidecar
+      to: lynavo-drive-sidecar
 dmg:
   backgroundColor: '#f5f7fb'
   iconSize: 128
@@ -60,7 +60,7 @@ win:
   extraResources:
     - from: resources
       filter:
-        - syncflow-sidecar.exe
+        - lynavo-drive-sidecar.exe
         - dns-sd.exe
         - dnssd.dll
 linux:
@@ -74,8 +74,8 @@ linux:
   executableName: vivi-drop
   icon: resources/icon-1024.png
   extraResources:
-    - from: resources/syncflow-sidecar
-      to: syncflow-sidecar
+    - from: resources/lynavo-drive-sidecar
+      to: lynavo-drive-sidecar
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true

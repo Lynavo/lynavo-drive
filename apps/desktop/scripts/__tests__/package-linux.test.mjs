@@ -176,7 +176,7 @@ test('desktop packaging keeps a single Lynavo Drive builder config', () => {
   assert.match(builderConfig, /^  executableName: Vivi Drop$/m);
   assert.match(builderConfig, /^  executableName: vivi-drop$/m);
   assert.match(builderConfig, /^  shortcutName: Lynavo Drive$/m);
-  assert.match(builderConfig, /syncflow-sidecar/);
+  assert.match(builderConfig, /lynavo-drive-sidecar/);
   assert.doesNotMatch(builderConfig, new RegExp(legacyViviSlug));
   assert.doesNotMatch(builderConfig, new RegExp(`productName: ${legacyViviName}`));
 });
@@ -236,5 +236,6 @@ test('Windows installer keeps existing Vivi Drop firewall rule identities', () =
   assert.match(installer, /delete rule name="\$\{SF_LEGACY_SYNCFLOW_RULE_TCP\}"/);
   assert.doesNotMatch(installer, /add rule name="\$\{SF_LEGACY_/);
   assert.match(installer, /description="Vivi Drop sidecar file transfer \(TCP 39393\)"/);
-  assert.match(installer, /syncflow-sidecar\.exe/);
+  assert.match(installer, /lynavo-drive-sidecar\.exe/);
+  assert.match(installer, /delete rule name="\$\{SF_LEGACY_SYNCFLOW_RULE_HTTP\}"/);
 });

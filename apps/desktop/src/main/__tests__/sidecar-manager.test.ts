@@ -51,10 +51,13 @@ vi.mock('../sidecar-client', async () => {
   };
 });
 
-function compatibleHealth(capabilities?: { connectionDeviceManagement?: boolean }) {
+function compatibleHealth(
+  capabilities?: { connectionDeviceManagement?: boolean },
+  service = 'syncflow-sidecar',
+) {
   return {
     ok: true,
-    service: 'syncflow-sidecar',
+    service,
     appCompatibilityVersion: APP_COMPATIBILITY_VERSION,
     ...(capabilities ? { capabilities } : {}),
   };
@@ -219,6 +222,29 @@ describe('SidecarManager', () => {
     await manager.start({ reuseExisting: true });
 
     expect(spawnMock).toHaveBeenCalledTimes(1);
+    expect(manager.getState().status).toBe('healthy');
+  });
+
+  it('accepts renamed sidecar health service identity', async () => {
+    vi.mocked(sidecarClient.getHealth).mockResolvedValue(
+      compatibleHealth({ connectionDeviceManagement: true }, 'lynavo-drive-sidecar'),
+    );
+
+    const manager = new SidecarManager();
+
+    await expect(manager.healthCheck()).resolves.toBe(true);
+  });
+
+  it('reuses an existing renamed sidecar when required health capabilities are present', async () => {
+    vi.mocked(sidecarClient.getHealth).mockResolvedValue(
+      compatibleHealth({ connectionDeviceManagement: true }, 'lynavo-drive-sidecar'),
+    );
+
+    const manager = new SidecarManager();
+
+    await manager.start({ reuseExisting: true });
+
+    expect(spawnMock).not.toHaveBeenCalled();
     expect(manager.getState().status).toBe('healthy');
   });
 });

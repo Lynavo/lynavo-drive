@@ -159,7 +159,7 @@ pnpm release --profile prod --targets win
 發佈前至少確認：
 
 1. fresh install 後 app 能正常啟動
-2. `resources\syncflow-sidecar.exe` 已隨包落地並能被 desktop 拉起
+2. `resources\lynavo-drive-sidecar.exe` 已隨包落地並能被 desktop 拉起
 3. 安裝器已寫入相容既有安裝的 `Vivi Drop Sidecar TCP`、`Vivi Drop Sidecar HTTP` 和 `Vivi Drop mDNS UDP` 防火牆規則，分別放行 `39393/TCP`、`39394/TCP` 和 `5353/UDP`；規則命名改為 Lynavo Drive 留到後續 native/binary/mDNS migration 任務
 4. 設定頁能看到 Bonjour 執行時資訊，缺少 Bonjour 時 fallback 狀態可解釋
 

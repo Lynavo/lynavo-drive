@@ -38,6 +38,23 @@ function allowTerms(terms, reason) {
   return { terms: new Set(terms), reason };
 }
 
+function allowMatches(matchers, reason) {
+  return {
+    matchers: matchers.map((matcher) => ({
+      terms: new Set(matcher.terms),
+      linePattern: matcher.linePattern,
+    })),
+    reason,
+  };
+}
+
+const GO_CMD_PATH_PATTERN =
+  /(?:^|[^A-Za-z0-9_./-])\.\/cmd\/syncflow-sidecar\/(?:[^A-Za-z0-9_./-]|$)/;
+
+function allowGoCmdPath(reason) {
+  return allowMatches([{ terms: ['syncflow'], linePattern: GO_CMD_PATH_PATTERN }], reason);
+}
+
 const HISTORICAL_SUPERPOWERS_DOC_REASON =
   'Temporary historical-doc exception for pre-rename implementation plans and specs; keep exact so new rename work is still reported.';
 
@@ -103,6 +120,37 @@ const ALLOWED_EXACT_PATHS = new Map([
     allowAny('Regression test fixture for unallowlisted legacy-name detection.'),
   ],
   [
+    'apps/desktop/package.json',
+    allowGoCmdPath(
+      'Desktop build script keeps Go cmd path ./cmd/syncflow-sidecar/ until cmd directory rename.',
+    ),
+  ],
+  [
+    'apps/desktop/scripts/build-sidecar-linux.cjs',
+    allowGoCmdPath(
+      'Sidecar build script keeps Go cmd path ./cmd/syncflow-sidecar/ until cmd directory rename.',
+    ),
+  ],
+  [
+    'apps/desktop/scripts/build-sidecar-mac.cjs',
+    allowGoCmdPath(
+      'Sidecar build script keeps Go cmd path ./cmd/syncflow-sidecar/ until cmd directory rename.',
+    ),
+  ],
+  [
+    'apps/desktop/scripts/build-sidecar-win.cjs',
+    allowGoCmdPath(
+      'Sidecar build script keeps Go cmd path ./cmd/syncflow-sidecar/ until cmd directory rename.',
+    ),
+  ],
+  [
+    'scripts/release/__tests__/desktop-branding.test.mjs',
+    allowMatches(
+      [{ terms: ['syncflow'], linePattern: /assert\.doesNotMatch\(.*syncflow-sidecar/ }],
+      'Regression tests assert old packaged sidecar exe paths do not return.',
+    ),
+  ],
+  [
     'services/sidecar-go/go.mod',
     allowTerms(['syncflow'], 'Go module path before sidecar module rename.'),
   ],
@@ -112,18 +160,20 @@ const ALLOWED_EXACT_PATHS = new Map([
   ],
   [
     'services/sidecar-go/Makefile',
-    allowTerms(['syncflow'], 'Sidecar binary and Go module path before sidecar rename.'),
+    allowMatches(
+      [
+        { terms: ['syncflow'], linePattern: GO_CMD_PATH_PATTERN },
+        {
+          terms: ['syncflow'],
+          linePattern: /(?:^|[^A-Za-z0-9_.-])syncflow\.db(?:-(?:wal|shm))?(?:[^A-Za-z0-9_.-]|$)/,
+        },
+      ],
+      'Go command path and local legacy dev database cleanup remain before cmd/data-dir rename.',
+    ),
   ],
   [
     'packages/contracts/src/protocol.ts',
     allowTerms(['syncflow'], 'Protocol service type remains _syncflow._tcp for LAN compatibility.'),
-  ],
-  [
-    'packages/contracts/src/service-endpoints.ts',
-    allowTerms(
-      ['syncflow'],
-      'Protocol service type and sidecar health service compatibility constants.',
-    ),
   ],
   [
     'services/sidecar-go/internal/mdns/broadcast.go',
@@ -170,7 +220,7 @@ const ALLOWED_EXACT_PATHS = new Map([
   ],
   [
     'services/sidecar-go/cmd/syncflow-sidecar/main.go',
-    allowAny('Sidecar binary, Go module path, and old data-dir migration compatibility.'),
+    allowAny('Go cmd path and old data-dir migration compatibility.'),
   ],
   [
     'services/sidecar-go/cmd/syncflow-sidecar/main_test.go',
@@ -232,7 +282,20 @@ function relativePath(scanRoot, path) {
 
 function allowReason(match) {
   const exactRule = ALLOWED_EXACT_PATHS.get(match.path);
-  if (exactRule && (!exactRule.terms || exactRule.terms.has(match.term))) {
+  if (!exactRule) {
+    return null;
+  }
+  if (!exactRule.terms && !exactRule.matchers) {
+    return exactRule.reason;
+  }
+  if (exactRule.terms?.has(match.term)) {
+    return exactRule.reason;
+  }
+  if (
+    exactRule?.matchers?.some(
+      (matcher) => matcher.terms.has(match.term) && matcher.linePattern.test(match.lineText),
+    )
+  ) {
     return exactRule.reason;
   }
   return null;
