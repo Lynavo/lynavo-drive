@@ -3,8 +3,6 @@ import type {
   UploadTaskSource,
 } from '@lynavo-drive/contracts';
 
-import { hasPendingManualWork } from './manualUploadState';
-
 export interface SyncActivityTransferSnapshot {
   uploadState?: string | null;
   autoUploadState?: AutoUploadState | null;
@@ -12,7 +10,6 @@ export interface SyncActivityTransferSnapshot {
   currentFileTotalBytes?: number | null;
   currentTaskSource?: UploadTaskSource | null;
   lastCompletedTaskSource?: UploadTaskSource | null;
-  manualUploadCancelled?: boolean | null;
   manualPending?: number | null;
   autoPending?: number | null;
   completedCount?: number | null;
@@ -66,11 +63,7 @@ function clampPercent(value: number): number {
 export function hasOutstandingSyncRoundWork(
   snapshot: SyncActivityTransferSnapshot | null | undefined,
 ): boolean {
-  if (
-    isAutoUploadStopped(snapshot) &&
-    !hasPendingManualWork(snapshot) &&
-    snapshot?.currentTaskSource !== 'manual'
-  ) {
+  if (isAutoUploadStopped(snapshot)) {
     return false;
   }
 
@@ -90,18 +83,14 @@ function hasFinishedSyncRound(
 function hasNoPendingQueueWork(
   snapshot: SyncActivityTransferSnapshot | null | undefined,
 ): boolean {
-  return (
-    (snapshot?.manualPending ?? 0) === 0 && (snapshot?.autoPending ?? 0) === 0
-  );
+  return (snapshot?.autoPending ?? 0) === 0;
 }
 
 function hasExplicitCompletedTaskSource(
   snapshot: SyncActivityTransferSnapshot | null | undefined,
 ): boolean {
   return (
-    snapshot?.lastCompletedTaskSource === 'manual' ||
     snapshot?.lastCompletedTaskSource === 'auto' ||
-    snapshot?.currentTaskSource === 'manual' ||
     snapshot?.currentTaskSource === 'auto'
   );
 }
@@ -125,11 +114,7 @@ export function isSyncActivityActivelyTransferring(
     return false;
   }
 
-  if (
-    isAutoUploadStopped(snapshot) &&
-    !hasPendingManualWork(snapshot) &&
-    snapshot?.currentTaskSource !== 'manual'
-  ) {
+  if (isAutoUploadStopped(snapshot)) {
     return false;
   }
 
@@ -139,7 +124,6 @@ export function isSyncActivityActivelyTransferring(
 
   return (
     ACTIVE_TRANSFER_STATES.has(snapshot?.uploadState ?? '') ||
-    hasPendingManualWork(snapshot) ||
     (snapshot?.autoUploadState === 'active' &&
       (snapshot?.autoPending ?? 0) > 0) ||
     hasOutstandingSyncRoundWork(snapshot)
@@ -152,21 +136,14 @@ export type SyncActivityMainCardState =
   | 'not_started'
   | 'auto_interrupted'
   | 'offline'
-  | 'auto_completed'
-  | 'manual_completed';
+  | 'auto_completed';
 
 function getCompletedTaskSource(
   snapshot: SyncActivityTransferSnapshot | null | undefined,
   allowStateFallback = false,
 ): UploadTaskSource | undefined {
-  if (snapshot?.lastCompletedTaskSource === 'manual') {
-    return 'manual';
-  }
   if (snapshot?.lastCompletedTaskSource === 'auto') {
     return 'auto';
-  }
-  if (snapshot?.currentTaskSource === 'manual') {
-    return 'manual';
   }
   if (snapshot?.currentTaskSource === 'auto') {
     return 'auto';
@@ -176,16 +153,6 @@ function getCompletedTaskSource(
   }
   if (snapshot?.autoUploadState === 'active') {
     return 'auto';
-  }
-  if (snapshot?.autoUploadState === 'disabled') {
-    return 'manual';
-  }
-  if (
-    snapshot?.autoUploadState === 'interrupted' &&
-    hasFinishedSyncRound(snapshot) &&
-    hasNoPendingQueueWork(snapshot)
-  ) {
-    return 'manual';
   }
   return undefined;
 }
@@ -198,7 +165,6 @@ export function getSyncActivityMainCardState(
     return 'offline';
   }
 
-  const hasManualWork = hasPendingManualWork(snapshot);
   const isActivelyTransferring = isSyncActivityActivelyTransferring(snapshot);
   const isAutoUploadActive = snapshot?.autoUploadState === 'active';
   const hasNonEmptyFinishedRound = hasFinishedSyncRound(snapshot);
@@ -219,26 +185,9 @@ export function getSyncActivityMainCardState(
     snapshot?.uploadState === 'paused_auto_upload' &&
     snapshot?.autoUploadState === 'interrupted' &&
     hasNoPendingQueueWork(snapshot) &&
-    completedTaskSource !== 'manual' &&
     !snapshot?.lastErrorCode;
 
-  if (hasManualWork) {
-    return 'running';
-  }
-
-  if (snapshot?.manualUploadCancelled && isOffline && !isActivelyTransferring) {
-    return 'offline';
-  }
-
-  if (snapshot?.manualUploadCancelled) {
-    return isAutoUploadActive ? 'standby' : 'not_started';
-  }
-
-  if (isFinishedRound && completedTaskSource === 'manual') {
-    return 'manual_completed';
-  }
-
-  if (isOffline && !isActivelyTransferring && !hasManualWork) {
+  if (isOffline && !isActivelyTransferring) {
     return 'offline';
   }
 
@@ -251,9 +200,7 @@ export function getSyncActivityMainCardState(
   }
 
   if (isFinishedRound && completedTaskSource) {
-    return completedTaskSource === 'manual'
-      ? 'manual_completed'
-      : 'auto_completed';
+    return 'auto_completed';
   }
 
   if (snapshot?.autoUploadState === 'interrupted') {

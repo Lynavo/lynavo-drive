@@ -33,12 +33,6 @@ RCT_EXTERN_METHOD(getAlbumStats:(RCTPromiseResolveBlock)resolve reject:(RCTPromi
 RCT_EXTERN_METHOD(getAlbumCollections:(NSString *)mediaFilter resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(getAssetPreviewSource:(NSString *)assetLocalId resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 
-// Lynavo Drive: Manual Upload
-RCT_EXTERN_METHOD(submitManualUpload:(NSDictionary *)params resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
-RCT_EXTERN_METHOD(submitDocumentUploads:(NSDictionary *)params resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
-RCT_EXTERN_METHOD(cancelManualBatch:(NSString *)batchId resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
-RCT_EXTERN_METHOD(cancelAllManualUploads:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
-
 // Lynavo Drive: Auto Upload Control
 // DEPRECATED: pauseAutoUpload/resumeAutoUpload to be removed, use enableAutoUpload/interruptAutoUpload instead
 RCT_EXTERN_METHOD(pauseAutoUpload:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)

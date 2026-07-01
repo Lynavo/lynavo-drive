@@ -48,7 +48,7 @@
   "selectedCount_other": "{{count}} items selected",
   "selectionHint": {
     "none": "No items selected",
-    "autoActiveLock": "Auto upload is on — manual upload unavailable"
+    "autoActiveLock": "Auto upload is on"
   },
   "deviceDisconnected": "Device offline",
   "mediaTypes": {
@@ -143,7 +143,7 @@
     },
     "switchUploadMode": {
       "title": "Switch Upload Mode",
-      "body": "An upload is in progress. Enabling auto upload will interrupt the manual upload. Continue?",
+      "body": "An upload is in progress. Enabling auto upload will restart the sync queue. Continue?",
       "confirm": "Confirm Switch"
     },
     "enableAutoFailed": {

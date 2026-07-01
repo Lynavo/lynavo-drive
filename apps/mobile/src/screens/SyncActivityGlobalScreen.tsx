@@ -667,8 +667,7 @@ function normalizeSyncOverview(
     autoUploadState: isAutoUploadState(autoUploadStateValue)
       ? autoUploadStateValue
       : prev.autoUploadState,
-    manualPending:
-      readNumberField(payload, 'manualPending') ?? prev.manualPending,
+    manualPending: 0,
     autoPending: readNumberField(payload, 'autoPending') ?? prev.autoPending,
   };
 }
@@ -726,8 +725,7 @@ function isCompletedUploadState(
     progress.totalCount > 0 && progress.completedCount >= progress.totalCount;
   const finishedBytes =
     progress.totalBytes <= 0 || progress.completedBytes >= progress.totalBytes;
-  const hasPendingQueueWork =
-    (overview.manualPending ?? 0) > 0 || (overview.autoPending ?? 0) > 0;
+  const hasPendingQueueWork = (overview.autoPending ?? 0) > 0;
 
   if (!finishedCount || !finishedBytes || hasPendingQueueWork) {
     return false;

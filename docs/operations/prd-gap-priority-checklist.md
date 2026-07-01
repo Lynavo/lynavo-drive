@@ -114,17 +114,17 @@
 建议动作：
 
 1. 再做一轮状态矩阵核对：
-   - 当前任务 manual + auto active
-   - 当前任务 manual + auto paused
    - 当前任务 auto + auto active
+   - 当前任务 auto + auto paused
    - 无当前任务 + auto paused
+   - 无当前任务 + auto active
 2. 确认按钮文案、可见性、优先级与设计预期一致
 3. 确认切 tab / 回前台后不会出现按钮消失或错位
 
 验收标准：
 
 - 首页按钮在各状态下稳定可解释
-- 不再出现“恢复自动上传”或“取消本次手动上传”异常隐藏
+- 不再出现旧手动文件上传按钮或取消入口
 
 ### 5. 重复素材提示细化
 
@@ -192,4 +192,3 @@
 - `apps/mobile/ios/SyncEngine/RNBridge.swift`
 - `apps/mobile/ios/SyncEngine/SyncEngineManager.swift`
 - `apps/mobile/ios/SyncEngine/AutoUploadConfigStore.swift`
-- `apps/mobile/ios/SyncEngine/ManualUploadService.swift`

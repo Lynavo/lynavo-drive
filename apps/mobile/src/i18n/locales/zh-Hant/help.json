@@ -20,7 +20,7 @@
     },
     "step2": {
       "title": "開啟同步",
-      "description": "手動傳送素材，或開啟背景自動上傳"
+      "description": "開啟自動上傳後，新增照片和影片會同步至電腦"
     }
   },
   "download": {

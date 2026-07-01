@@ -156,9 +156,6 @@ importers:
       '@react-native-community/datetimepicker':
         specifier: ^9.1.0
         version: 9.1.0(react-native@0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
-      '@react-native-documents/picker':
-        specifier: 12.0.1
-        version: 12.0.1(react-native@0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
       '@react-native-documents/viewer':
         specifier: 4.0.0
         version: 4.0.0(react-native@0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
@@ -2366,12 +2363,6 @@ packages:
         optional: true
       react-native-windows:
         optional: true
-
-  '@react-native-documents/picker@12.0.1':
-    resolution: {integrity: sha512-vpJKb4t/5bnxe9+gQl+plJfKrrIsmYwANGhNH2B9E1dS1+6FDBzg4Dwmcq4ueaGfkRKEPJ606mJttVEH1ZKZaA==}
-    peerDependencies:
-      react: '*'
-      react-native: '>=0.79.0'
 
   '@react-native-documents/viewer@4.0.0':
     resolution: {integrity: sha512-yBi/+6QOJDxZI3zWvfFT259xsIbTcnH0Utl85b0eQPcXG7CWDYvcM3A+Tg0NWrFj4VfX4f06+kv8khN/alfwMA==}
@@ -9249,11 +9240,6 @@ snapshots:
   '@react-native-community/datetimepicker@9.1.0(react-native@0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)':
     dependencies:
       invariant: 2.2.4
-      react: 19.2.3
-      react-native: 0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3)
-
-  '@react-native-documents/picker@12.0.1(react-native@0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)':
-    dependencies:
       react: 19.2.3
       react-native: 0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3)
 

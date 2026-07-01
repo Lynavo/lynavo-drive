@@ -20,7 +20,7 @@
     },
     "step2": {
       "title": "开启同步",
-      "description": "手动发送素材，或开启后台自动上传"
+      "description": "开启自动上传后，新增照片和视频会同步至电脑"
     }
   },
   "download": {

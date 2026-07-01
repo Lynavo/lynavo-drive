@@ -246,10 +246,8 @@ struct ScannedAsset {
     let creationDate: Date?
     let originalFilename: String
     let estimatedSize: Int64
-    var source: String = "auto"  // "auto" | "manual"
+    var source: String = "auto"
     var batchId: String? = nil
-    var sourceKind: String = "photo"  // "photo" | "document"
-    var sourceFilePath: String? = nil
     var mimeType: String? = nil
     var assetLocalId: String? = nil
 }

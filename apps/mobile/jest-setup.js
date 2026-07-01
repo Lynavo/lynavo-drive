@@ -5,14 +5,6 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
 
-jest.mock('@react-native-documents/picker', () => ({
-  errorCodes: {
-    OPERATION_CANCELED: 'OPERATION_CANCELED',
-  },
-  isErrorWithCode: jest.fn(error => Boolean(error?.code)),
-  pick: jest.fn().mockResolvedValue([]),
-}));
-
 jest.mock('@react-native-documents/viewer', () => ({
   viewDocument: jest.fn(),
 }));

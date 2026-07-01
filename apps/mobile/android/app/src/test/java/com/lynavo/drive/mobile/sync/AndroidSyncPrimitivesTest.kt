@@ -530,10 +530,10 @@ class AndroidSyncPrimitivesTest {
         autoUploadState = "active",
       ),
     )
-    assertTrue(
+    assertFalse(
       AndroidSyncPrimitives.shouldContinueAutoUploadRound(
-        roundReason = "manual_upload",
-        itemSource = "manual",
+        roundReason = "legacy_upload",
+        itemSource = "legacy",
         autoUploadState = "disabled",
       ),
     )
@@ -1073,78 +1073,6 @@ class AndroidSyncPrimitivesTest {
   }
 
   @Test
-  fun restoredConnectionResumesPendingManualUploadOnlyWhenIdle() {
-    assertTrue(
-      AndroidSyncPrimitives.shouldResumeManualUploadAfterReachabilityRestored(
-        previousConnectionState = "offline",
-        nextConnectionState = "connected",
-        manualPending = 1,
-        syncInProgress = false,
-      ),
-    )
-    assertTrue(
-      AndroidSyncPrimitives.shouldResumeManualUploadAfterReachabilityRestored(
-        previousConnectionState = "connecting",
-        nextConnectionState = "connected",
-        manualPending = 1,
-        syncInProgress = false,
-      ),
-    )
-    assertFalse(
-      AndroidSyncPrimitives.shouldResumeManualUploadAfterReachabilityRestored(
-        previousConnectionState = "connected",
-        nextConnectionState = "connected",
-        manualPending = 1,
-        syncInProgress = false,
-      ),
-    )
-    assertFalse(
-      AndroidSyncPrimitives.shouldResumeManualUploadAfterReachabilityRestored(
-        previousConnectionState = "offline",
-        nextConnectionState = "connected",
-        manualPending = 0,
-        syncInProgress = false,
-      ),
-    )
-    assertFalse(
-      AndroidSyncPrimitives.shouldResumeManualUploadAfterReachabilityRestored(
-        previousConnectionState = "offline",
-        nextConnectionState = "connected",
-        manualPending = 1,
-        syncInProgress = true,
-      ),
-    )
-  }
-
-  @Test
-  fun discoveryReachabilityReconnectResumesPendingManualUploadOnlyWhenIdle() {
-    assertTrue(
-      AndroidSyncPrimitives.shouldResumeManualUploadAfterDiscoveryReachabilityRestored(
-        previousConnectionState = "offline",
-        nextConnectionState = "connected",
-        manualPending = 1,
-        syncInProgress = false,
-      ),
-    )
-    assertFalse(
-      AndroidSyncPrimitives.shouldResumeManualUploadAfterDiscoveryReachabilityRestored(
-        previousConnectionState = "connected",
-        nextConnectionState = "connected",
-        manualPending = 1,
-        syncInProgress = false,
-      ),
-    )
-    assertFalse(
-      AndroidSyncPrimitives.shouldResumeManualUploadAfterDiscoveryReachabilityRestored(
-        previousConnectionState = "offline",
-        nextConnectionState = "connected",
-        manualPending = 1,
-        syncInProgress = true,
-      ),
-    )
-  }
-
-  @Test
   fun boundDiscoveryResolutionRefreshesPresenceWhenBindingIsOffline() {
     assertTrue(
       AndroidSyncPrimitives.shouldRefreshBoundPresenceFromDiscovery(
@@ -1439,7 +1367,7 @@ class AndroidSyncPrimitivesTest {
   }
 
   @Test
-  fun sortedPendingItemsPrioritizeManualThenOldestUpdatedAt() {
+  fun sortedPendingItemsUseOldestUpdatedAtThenFileKey() {
     val items = listOf(
       AndroidUploadItem(
         assetLocalId = "auto-new",
@@ -1458,18 +1386,18 @@ class AndroidSyncPrimitivesTest {
         updatedAt = "2026-01-03T00:00:00Z",
       ),
       AndroidUploadItem(
-        assetLocalId = "manual",
-        fileKey = "manual-key",
-        filename = "manual.jpg",
+        assetLocalId = "auto-middle",
+        fileKey = "auto-middle-key",
+        filename = "auto-middle.jpg",
         mediaType = "image",
         mimeType = "image/jpeg",
         fileSize = 10,
         createdAt = "2026-01-02T00:00:00Z",
         modifiedAt = "2026-01-02T00:00:00Z",
-        uri = "content://manual",
+        uri = "content://auto-middle",
         status = "queued",
-        source = "manual",
-        batchId = "batch-1",
+        source = "auto",
+        batchId = null,
         ackedOffset = 0,
         updatedAt = "2026-01-02T00:00:00Z",
       ),
@@ -1492,7 +1420,7 @@ class AndroidSyncPrimitivesTest {
     )
 
     assertEquals(
-      listOf("manual-key", "auto-old-key", "auto-new-key"),
+      listOf("auto-old-key", "auto-middle-key", "auto-new-key"),
       AndroidSyncPrimitives.sortedPendingItems(items).map { it.fileKey },
     )
   }
@@ -1504,7 +1432,6 @@ class AndroidSyncPrimitivesTest {
       testUploadItem(fileKey = "auto-queued", source = "auto", status = "queued"),
       testUploadItem(fileKey = "auto-preparing", source = "auto", status = "preparing"),
       testUploadItem(fileKey = "auto-uploading", source = "auto", status = "uploading"),
-      testUploadItem(fileKey = "manual-queued", source = "manual", status = "queued"),
       testUploadItem(fileKey = "auto-completed", source = "auto", status = "completed"),
     )
 
@@ -1515,7 +1442,6 @@ class AndroidSyncPrimitivesTest {
     assertEquals(updatedAt, cancelled["auto-queued"]?.updatedAt)
     assertEquals("cancelled", cancelled["auto-preparing"]?.status)
     assertEquals("uploading", cancelled["auto-uploading"]?.status)
-    assertEquals("queued", cancelled["manual-queued"]?.status)
     assertEquals("completed", cancelled["auto-completed"]?.status)
   }
 
@@ -1740,7 +1666,7 @@ class AndroidSyncPrimitivesTest {
       uri = "content://$fileKey",
       status = status,
       source = source,
-      batchId = if (source == "manual") "batch-1" else null,
+      batchId = null,
       ackedOffset = 0,
       updatedAt = "2026-01-01T00:00:00Z",
     )

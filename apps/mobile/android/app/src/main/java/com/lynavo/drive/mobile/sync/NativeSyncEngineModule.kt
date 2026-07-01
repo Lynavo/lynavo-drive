@@ -19,7 +19,6 @@ import android.os.Environment
 import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.MediaStore
-import android.provider.OpenableColumns
 import android.provider.Settings
 import android.util.Log
 import androidx.core.content.FileProvider
@@ -91,13 +90,6 @@ private class SharedFileHttpStatusException(
   val statusCode: Int,
   message: String,
 ) : Exception(message)
-
-private data class PickedDocumentMetadata(
-  val name: String,
-  val size: Long,
-  val mimeType: String,
-  val uri: Uri,
-)
 
 class NativeSyncEngineModule(
   reactContext: ReactApplicationContext,
@@ -1051,243 +1043,6 @@ class NativeSyncEngineModule(
   }
 
   @ReactMethod
-  fun submitManualUpload(params: ReadableMap, promise: Promise) {
-    runAsync(promise) {
-      val rawIds = params.getArray("assetLocalIds")
-      val assetIds = mutableListOf<String>()
-      if (rawIds != null) {
-        for (index in 0 until rawIds.size()) {
-          rawIds.getString(index)?.takeIf { it.isNotBlank() }?.let(assetIds::add)
-        }
-      }
-      val existingItems = uploadStore.getAllItems()
-      val activeIds = existingItems
-        .filter { it.status in ACTIVE_UPLOAD_STATUSES }
-        .mapTo(mutableSetOf()) { it.assetLocalId }
-      val batchId = UUID.randomUUID().toString().lowercase(Locale.US)
-      val candidates = mediaStoreRepository.findAssetsByIds(
-        assetLocalIds = assetIds,
-        clientId = getOrCreateClientId(),
-        source = "manual",
-        batchId = batchId,
-      )
-      val queued = candidates.filter { it.assetLocalId !in activeIds }
-      recordNativeLog(
-        "ManualUpload",
-        "submit requested selected=${assetIds.size} candidates=${candidates.size} queued=${queued.size} skipped=${assetIds.size - queued.size} batchId=$batchId",
-      )
-      uploadStore.upsertItems(queued)
-      emitQueueUpdated(uploadStore.queueToWritableArray(uploadStore.getPendingItems(limit = 100)))
-      emitIdleSyncState(loadBinding())
-      val result = Arguments.createMap().apply {
-        putInt("queuedCount", queued.size)
-        putInt("skippedCount", assetIds.size - queued.size)
-        putString("batchId", batchId)
-      }
-      promise.resolve(result)
-      if (queued.isNotEmpty()) {
-        startForegroundSyncRound(
-          reason = "manual_upload",
-          threadName = "NativeSyncEngineManualUpload",
-        )
-      }
-    }
-  }
-
-  @ReactMethod
-  fun submitDocumentUploads(params: ReadableMap, promise: Promise) {
-    val files = params.getArray("files")
-    if (files == null || files.size() == 0) {
-      promise.resolve(emptyDocumentUploadResult())
-      return
-    }
-
-    val uris = mutableListOf<Uri>()
-    for (index in 0 until files.size()) {
-      val file = files.getMap(index) ?: continue
-      val rawUri = file.getString("uri")?.trim().orEmpty()
-      if (rawUri.isBlank()) {
-        continue
-      }
-      uris += Uri.parse(rawUri)
-    }
-
-    if (uris.isEmpty()) {
-      promise.resolve(emptyDocumentUploadResult())
-      return
-    }
-
-    runAsync(promise) {
-      val result = queueDocumentUploads(uris)
-      promise.resolve(result)
-      if (result.getInt("queuedCount") > 0) {
-        startForegroundSyncRound(
-          reason = "manual_upload",
-          threadName = "NativeSyncEngineDocumentUpload",
-        )
-      }
-    }
-  }
-
-  private fun queueDocumentUploads(uris: List<Uri>): WritableMap {
-    val existingItems = uploadStore.getAllItems()
-    val activeIds = existingItems
-      .filter { it.status in ACTIVE_UPLOAD_STATUSES }
-      .mapTo(mutableSetOf()) { it.assetLocalId }
-    val batchId = UUID.randomUUID().toString().lowercase(Locale.US)
-    val clientId = getOrCreateClientId()
-    val now = isoNow()
-    val queued = mutableListOf<AndroidUploadItem>()
-    val files = Arguments.createArray()
-    var skipped = 0
-
-    for (uri in uris) {
-      takePersistableDocumentPermission(uri)
-      val metadata = readPickedDocumentMetadata(uri)
-      if (metadata == null || metadata.size <= 0) {
-        skipped += 1
-        continue
-      }
-      val assetLocalId = "document:${metadata.uri}"
-      if (assetLocalId in activeIds) {
-        skipped += 1
-        continue
-      }
-
-      val mediaType = AndroidSyncPrimitives.classifyMediaType(metadata.mimeType, metadata.name)
-      val item = AndroidUploadItem(
-        assetLocalId = assetLocalId,
-        fileKey = AndroidSyncPrimitives.computeFileKey(clientId, assetLocalId, mediaType),
-        filename = metadata.name,
-        mediaType = mediaType,
-        mimeType = metadata.mimeType,
-        fileSize = metadata.size,
-        createdAt = now,
-        modifiedAt = now,
-        uri = metadata.uri.toString(),
-        status = "queued",
-        source = "manual",
-        batchId = batchId,
-        ackedOffset = 0,
-        updatedAt = now,
-      )
-      queued += item
-      files.pushMap(Arguments.createMap().apply {
-        putString("name", metadata.name)
-        putDouble("size", metadata.size.toDouble())
-        putString("mimeType", metadata.mimeType)
-        putString("uri", metadata.uri.toString())
-      })
-      activeIds += assetLocalId
-    }
-
-    if (queued.isNotEmpty()) {
-      uploadStore.upsertItems(queued)
-      emitQueueUpdated(uploadStore.queueToWritableArray(uploadStore.getPendingItems(limit = 100)))
-      emitIdleSyncState(loadBinding())
-    }
-
-    recordNativeLog(
-      "ManualUpload",
-      "document picker queued=${queued.size} skipped=$skipped selected=${uris.size} batchId=$batchId",
-    )
-    return Arguments.createMap().apply {
-      putInt("queuedCount", queued.size)
-      putInt("skippedCount", skipped)
-      putString("batchId", batchId)
-      putArray("files", files)
-    }
-  }
-
-  private fun readPickedDocumentMetadata(uri: Uri): PickedDocumentMetadata? {
-    val resolver = reactApplicationContext.contentResolver
-    var displayName: String? = null
-    var size = 0L
-    resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-      if (cursor.moveToFirst()) {
-        val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-        if (nameIndex >= 0) {
-          displayName = cursor.getString(nameIndex)
-        }
-        val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-        if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) {
-          size = cursor.getLong(sizeIndex)
-        }
-      }
-    }
-    if (size <= 0) {
-      size = resolver.openAssetFileDescriptor(uri, "r")?.use { descriptor ->
-        descriptor.length.takeIf { it > 0 } ?: 0
-      } ?: 0
-    }
-    val filename = sanitizeDocumentFilename(
-      displayName?.takeIf { it.isNotBlank() }
-        ?: uri.lastPathSegment
-        ?: "Document",
-    )
-    val mimeType = resolver.getType(uri)
-      ?: AndroidSyncPrimitives.mimeTypeForFilename(filename)
-    return PickedDocumentMetadata(
-      name = filename,
-      size = size,
-      mimeType = mimeType,
-      uri = uri,
-    )
-  }
-
-  private fun takePersistableDocumentPermission(uri: Uri) {
-    try {
-      reactApplicationContext.contentResolver.takePersistableUriPermission(
-        uri,
-        Intent.FLAG_GRANT_READ_URI_PERMISSION,
-      )
-    } catch (error: SecurityException) {
-      recordNativeLog("ManualUpload", "persistable URI permission unavailable uri=$uri", Log.WARN)
-    } catch (error: IllegalArgumentException) {
-      recordNativeLog("ManualUpload", "URI permission is not persistable uri=$uri", Log.WARN)
-    }
-  }
-
-  private fun sanitizeDocumentFilename(raw: String): String {
-    val base = raw.trim().ifBlank { "Document" }
-    val cleaned = buildString(base.length) {
-      for (char in base) {
-        when (char) {
-          '/', '\\', ':', '\u0000', '\r', '\n' -> append('_')
-          else -> append(char)
-        }
-      }
-    }
-    return cleaned.ifBlank { "Document" }
-  }
-
-  private fun emptyDocumentUploadResult(): WritableMap =
-    Arguments.createMap().apply {
-      putInt("queuedCount", 0)
-      putInt("skippedCount", 0)
-      putString("batchId", "")
-      putArray("files", Arguments.createArray())
-    }
-
-  @ReactMethod
-  fun cancelManualBatch(batchId: String, promise: Promise) {
-    recordNativeLog("ManualUpload", "cancel batch requested batchId=$batchId")
-    uploadStore.cancelManualBatch(batchId, isoNow())
-    emitQueueUpdated(uploadStore.queueToWritableArray(uploadStore.getPendingItems(limit = 100)))
-    emitIdleSyncState(loadBinding())
-    promise.resolve(null)
-  }
-
-  @ReactMethod
-  fun cancelAllManualUploads(promise: Promise) {
-    recordNativeLog("ManualUpload", "cancel all requested")
-    uploadStore.cancelAllManual(isoNow())
-    emitQueueUpdated(uploadStore.queueToWritableArray(uploadStore.getPendingItems(limit = 100)))
-    emitIdleSyncState(loadBinding())
-    promise.resolve(null)
-  }
-
-  @ReactMethod
   fun pauseAutoUpload(promise: Promise) {
     recordNativeLog("AutoUpload", "pause requested")
     persistAutoUploadInterruptedState()
@@ -2132,27 +1887,19 @@ class NativeSyncEngineModule(
         emitError("ANDROID_SYNC_NO_BINDING", "尚未绑定桌面端，无法同步。")
         return
       }
-      val pendingBeforePermission = uploadStore.getPendingItems(limit = 10_000)
-      val documentOnlyManualRound = reason == "manual_upload" &&
-        pendingBeforePermission.isNotEmpty() &&
-        pendingBeforePermission.all { it.source == "manual" && it.assetLocalId.startsWith("document:") }
-      if (!documentOnlyManualRound) {
-        val permissionState = currentPhotoPermissionState()
-        if (permissionState == "denied") {
-          recordDiagnosticsLog("Sync", "round paused reason=$reason photoPermission=denied")
-          emitSyncState(binding, "paused_no_permission")
-          emitError("ANDROID_PHOTO_PERMISSION_DENIED", "Android 相簿权限尚未开启，无法扫描同步素材。")
-          return
-        }
-      } else {
-        recordDiagnosticsLog("Sync", "round reason=$reason using document-only queue; skipping photo permission preflight")
+      val permissionState = currentPhotoPermissionState()
+      if (permissionState == "denied") {
+        recordDiagnosticsLog("Sync", "round paused reason=$reason photoPermission=denied")
+        emitSyncState(binding, "paused_no_permission")
+        emitError("ANDROID_PHOTO_PERMISSION_DENIED", "Android 相簿权限尚未开启，无法扫描同步素材。")
+        return
       }
       val config = loadAutoUploadConfig()
       recordDiagnosticsLog(
         "Sync",
         "round requested reason=$reason autoEnabled=${config.enabled} autoState=${config.state}",
       )
-      if (reason != "manual_upload" && !config.enabled) {
+      if (!config.enabled) {
         recordDiagnosticsLog("Sync", "round ignored reason=$reason auto upload disabled")
         emitIdleSyncState(binding)
         return
@@ -2176,12 +1923,8 @@ class NativeSyncEngineModule(
       val existingAssetIds = existing
         .filter { it.status in ACTIVE_UPLOAD_STATUSES }
         .mapTo(mutableSetOf()) { it.assetLocalId }
-      val discovered = if (documentOnlyManualRound) {
-        emptyList()
-      } else {
-        mediaStoreRepository.scanAssets(clientId)
-          .filter { it.assetLocalId !in existingAssetIds }
-      }
+      val discovered = mediaStoreRepository.scanAssets(clientId)
+        .filter { it.assetLocalId !in existingAssetIds }
       if (discovered.isNotEmpty() && config.enabled) {
         uploadStore.upsertItems(discovered.map { it.copy(source = "auto", status = "queued", updatedAt = isoNow()) })
       }
@@ -2838,9 +2581,9 @@ class NativeSyncEngineModule(
         currentFileTotalBytes = item.fileSize,
         currentSpeedMbps = currentSpeedMbps,
         activeTuningProfile = "standard",
-        currentTaskSource = item.source,
+        currentTaskSource = item.source.takeIf { it == "auto" },
         autoUploadState = autoConfig.state,
-        manualPending = AndroidSyncPrimitives.pendingCount(pendingItems, "manual"),
+        manualPending = 0,
         autoPending = AndroidSyncPrimitives.pendingCount(pendingItems, "auto"),
       ),
     ).toWritableMap()
@@ -4405,7 +4148,6 @@ class NativeSyncEngineModule(
     lastErrorMessage: String? = null,
   ): WritableMap {
     val pendingBytes = pendingItems.sumOf { it.fileSize }
-    val manualPending = AndroidSyncPrimitives.pendingCount(pendingItems, "manual")
     val autoPending = AndroidSyncPrimitives.pendingCount(pendingItems, "auto")
     val autoConfig = loadAutoUploadConfig()
     return AndroidSyncPrimitives.buildSyncOverviewFields(
@@ -4418,7 +4160,7 @@ class NativeSyncEngineModule(
         lastErrorCode = lastErrorCode,
         lastErrorMessage = lastErrorMessage,
         autoUploadState = autoConfig.state,
-        manualPending = manualPending,
+        manualPending = 0,
         autoPending = autoPending,
       ),
     ).toWritableMap()
@@ -4438,7 +4180,7 @@ class NativeSyncEngineModule(
         totalCount = pendingItems.size,
         totalBytes = pendingBytes,
         autoUploadState = autoConfig.state,
-        manualPending = AndroidSyncPrimitives.pendingCount(pendingItems, "manual"),
+        manualPending = 0,
         autoPending = AndroidSyncPrimitives.pendingCount(pendingItems, "auto"),
       ),
     ).toJson()
@@ -4462,9 +4204,9 @@ class NativeSyncEngineModule(
           totalCount = pending.size,
           totalBytes = totalBytes,
           activeTuningProfile = "standard",
-          currentTaskSource = pending.firstOrNull()?.source,
+          currentTaskSource = pending.firstOrNull()?.source?.takeIf { it == "auto" },
           autoUploadState = autoConfig.state,
-          manualPending = AndroidSyncPrimitives.pendingCount(pending, "manual"),
+          manualPending = 0,
           autoPending = AndroidSyncPrimitives.pendingCount(pending, "auto"),
         ),
       ).toWritableMap(),
@@ -4496,7 +4238,7 @@ class NativeSyncEngineModule(
           totalBytes = totalBytes,
           lastCompletedTaskSource = lastCompletedTaskSource,
           autoUploadState = autoConfig.state,
-          manualPending = AndroidSyncPrimitives.pendingCount(pendingItems, "manual"),
+          manualPending = 0,
           autoPending = AndroidSyncPrimitives.pendingCount(pendingItems, "auto"),
         ),
       ).toWritableMap(),
@@ -4529,11 +4271,6 @@ class NativeSyncEngineModule(
       cancelPresenceRecoveryProbe(reason = reason ?: "state_connected")
       startPresenceHeartbeatTimer(updated)
       startPairingControlSessionIfNeeded(updated, reason = reason ?: "state_connected")
-      wakeManualUploadAfterReconnectIfNeeded(
-        previousConnectionState = binding.connectionState,
-        updatedBinding = updated,
-        reason = reason ?: "state_connected",
-      )
     } else if (connectionState == "offline") {
       val retryPresenceWhileOffline =
         AndroidSyncPrimitives.shouldRetryPresenceHeartbeatWhileOffline(reason)
@@ -4605,61 +4342,6 @@ class NativeSyncEngineModule(
       emitIdleSyncState(null)
     }
     true
-  }
-
-  private fun wakeManualUploadAfterReconnectIfNeeded(
-    previousConnectionState: String,
-    updatedBinding: StoredBinding,
-    reason: String,
-  ) {
-    val pendingItems = uploadStore.getPendingItems(limit = 10_000)
-    val manualPending = AndroidSyncPrimitives.pendingCount(pendingItems, "manual")
-    if (!AndroidSyncPrimitives.shouldResumeManualUploadAfterReachabilityRestored(
-        previousConnectionState = previousConnectionState,
-        nextConnectionState = updatedBinding.connectionState,
-        manualPending = manualPending,
-        syncInProgress = syncInProgress,
-      )
-    ) {
-      return
-    }
-
-    recordDiagnosticsLog(
-      "ManualUpload",
-      "resuming pending manual queue after reconnect pending=$manualPending reason=$reason",
-    )
-    resumePendingManualQueueAfterReconnect()
-  }
-
-  private fun wakeManualUploadAfterDiscoveryReconnectIfNeeded(
-    previousConnectionState: String,
-    updatedBinding: StoredBinding,
-    reason: String,
-  ) {
-    val pendingItems = uploadStore.getPendingItems(limit = 10_000)
-    val manualPending = AndroidSyncPrimitives.pendingCount(pendingItems, "manual")
-    if (!AndroidSyncPrimitives.shouldResumeManualUploadAfterDiscoveryReachabilityRestored(
-        previousConnectionState = previousConnectionState,
-        nextConnectionState = updatedBinding.connectionState,
-        manualPending = manualPending,
-        syncInProgress = syncInProgress,
-      )
-    ) {
-      return
-    }
-
-    recordDiagnosticsLog(
-      "ManualUpload",
-      "resuming pending manual queue after discovery reconnect pending=$manualPending reason=$reason",
-    )
-    resumePendingManualQueueAfterReconnect()
-  }
-
-  private fun resumePendingManualQueueAfterReconnect() {
-    startForegroundSyncRound(
-      reason = "manual_upload",
-      threadName = "NativeSyncEngineManualReconnect",
-    )
   }
 
   private fun sendPresenceHeartbeatAsync(

@@ -94,7 +94,6 @@ jest.mock('../../services/SyncEngineModule', () => ({
     return reason === undefined || typeof reason === 'string';
   },
   wipeSyncIdentity: jest.fn(),
-  cancelAllManualUploads: jest.fn(),
   interruptAutoUpload: jest.fn(),
   enableAutoUpload: jest.fn(),
   browseAlbum: jest.fn().mockResolvedValue([]),
@@ -104,7 +103,6 @@ jest.mock('../../services/SyncEngineModule', () => ({
     queuedCount: 0,
     pendingCount: 0,
   }),
-  submitManualUpload: jest.fn(),
   getAutoUploadConfig: jest.fn().mockResolvedValue({
     enabled: false,
     state: 'disabled',

@@ -98,7 +98,7 @@ const TOUR_BACKGROUND_HEIGHT = 1710;
 const ZERO_COORDINATE_ORIGIN: TourCoordinateOrigin = { left: 0, top: 0 };
 
 const TOUR_BACKGROUND_IMAGES_GLOBAL: Record<TourTarget, ImageSourcePropType> = {
-  album: require('../../assets/onboarding/global/sync-activity-manual.png'),
+  album: require('../../assets/onboarding/global/sync-activity-album.png'),
   panel: require('../../assets/onboarding/global/sync-activity-panel.png'),
   history: require('../../assets/onboarding/global/sync-activity-history.png'),
   settings: require('../../assets/onboarding/global/sync-activity-settings.png'),
@@ -298,8 +298,8 @@ export function SyncActivityTour({
     () => [
       {
         icon: 'image-outline',
-        title: t('syncActivity.onboarding.manual.title'),
-        body: t('syncActivity.onboarding.manual.body'),
+        title: t('syncActivity.onboarding.album.title'),
+        body: t('syncActivity.onboarding.album.body'),
         target: 'album',
       },
       {

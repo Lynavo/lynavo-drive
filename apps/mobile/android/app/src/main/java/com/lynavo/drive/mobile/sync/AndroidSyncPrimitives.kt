@@ -392,10 +392,7 @@ object AndroidSyncPrimitives {
     itemSource: String,
     autoUploadState: String,
   ): Boolean {
-    if (roundReason == "manual_upload" || itemSource != "auto") {
-      return true
-    }
-    return autoUploadState == "active"
+    return itemSource == "auto" && autoUploadState == "active"
   }
 
   fun cancelPendingAutoItems(items: List<AndroidUploadItem>, updatedAt: String): List<AndroidUploadItem> =
@@ -757,30 +754,6 @@ object AndroidSyncPrimitives {
     return lastResumeAtMs > wakeAttemptStartedAtMs
   }
 
-  fun shouldResumeManualUploadAfterReachabilityRestored(
-    previousConnectionState: String,
-    nextConnectionState: String,
-    manualPending: Int,
-    syncInProgress: Boolean,
-  ): Boolean =
-    manualPending > 0 &&
-      !syncInProgress &&
-      previousConnectionState.trim() != "connected" &&
-      nextConnectionState.trim() == "connected"
-
-  fun shouldResumeManualUploadAfterDiscoveryReachabilityRestored(
-    previousConnectionState: String,
-    nextConnectionState: String,
-    manualPending: Int,
-    syncInProgress: Boolean,
-  ): Boolean =
-    shouldResumeManualUploadAfterReachabilityRestored(
-      previousConnectionState = previousConnectionState,
-      nextConnectionState = nextConnectionState,
-      manualPending = manualPending,
-      syncInProgress = syncInProgress,
-    )
-
   fun shouldRefreshBoundPresenceFromDiscovery(
     bindingDeviceId: String,
     candidateDeviceId: String,
@@ -906,11 +879,7 @@ object AndroidSyncPrimitives {
   fun sortedPendingItems(items: List<AndroidUploadItem>): List<AndroidUploadItem> =
     items
       .filter { it.status in PENDING_STATUSES }
-      .sortedWith(
-        compareByDescending<AndroidUploadItem> { it.source == "manual" }
-          .thenBy { it.updatedAt }
-          .thenBy { it.fileKey },
-      )
+      .sortedWith(compareBy<AndroidUploadItem> { it.updatedAt }.thenBy { it.fileKey })
 
   fun classifyMediaType(mimeType: String, filename: String): String {
     val normalizedMime = mimeType.lowercase()

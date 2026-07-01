@@ -42,7 +42,7 @@
 - 保留 App 前台运行时的自动扫描、pending queue、单文件串行上传、增量上传。
 - 保留 Desktop / sidecar 的本地发现、配对、本地接收、本地历史。
 - 不保留 cn 登录、短信、支付宝、微信、cn API、cn release profile、cn UI、cn assets。
-- 不新增手动挑选文件上传路径来替代自动上传。
+- 不保留、不得新增手动挑选文件上传路径来替代自动上传。
 - 后台 / 锁屏继续上传和远程穿透是商业能力，必须和开源基础能力拆开。
 
 ### 1.3 商业版定位
@@ -765,7 +765,7 @@ export function resolveDriveEntitlements(input: {
   - 商业后台 / 远程能力不在 OSS runtime 里推导
 - 移除“未订阅阻止上传 / 自动上传”的逻辑。
 - 保留真实技术 gate：相册权限、局域网权限、设备发现、配对、安全码、网络可达性。
-- 不新增手动选择文件作为免费替代路径。
+- 不保留、不得新增手动选择文件作为免费替代路径。
 - 自动上传主开关含义固定为：前台局域网自动扫描 + pending queue + 串行上传。
 
 验收：
@@ -1247,7 +1247,7 @@ pnpm release --profile prod --targets ios,android,mac,win --dry-run
 原计划中的这些结论保留：
 
 - 前台局域网自动扫描、排队、增量上传是免费能力。
-- 不新增手动选择文件路径替代自动上传。
+- 不保留、不得新增手动选择文件路径替代自动上传。
 - 后台 / 锁屏继续是付费能力。
 - 远程穿透是付费能力。
 - broad subscription gate 要拆成 feature-level entitlement。

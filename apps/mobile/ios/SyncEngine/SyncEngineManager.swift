@@ -231,7 +231,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private var historyStore: HistoryLedgerStore?
     private var albumBrowserService: AlbumBrowserService?
     private var autoUploadConfigStore: AutoUploadConfigStore?
-    private var manualUploadService: ManualUploadService?
     let sharedFilesService = SharedFilesService()
     private let wakeOnLanService = WakeOnLanService()
     /// Live snapshot of the current binding. Takes priority over SQLite so a
@@ -248,7 +247,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private var appIsInBackground = false
     private var isAutoUploadInterrupted = false
     private var shouldAbortActiveAutoUpload = false
-    private var shouldAbortActiveManualUpload = false
     private var protocolSession: ProtocolSession?
     private var activeUploadSession: ProtocolSession?
     private var discoveredDevices: [String: DiscoveredDevice] = [:]  // keyed by deviceId
@@ -366,7 +364,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private var runtimeLastSpeedCheckTime: CFAbsoluteTime = 0
     private var runtimeLastBytesTransferred: Int64 = 0
     private var runtimeUploadState = "idle"
-    private var runtimeManualUploadCancelled = false
     private var runtimeLastCompletedTaskSource: String?
     private var runtimeRoundSource: String?
     private var lastBackgroundPhotoLibraryChangeAt: CFAbsoluteTime = 0
@@ -622,16 +619,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         includePersistedIdleStats: Bool = true
     ) -> [String: Any] {
         runtimeUploadState = uploadState
-        let preservesManualCancellation =
-            uploadState == "idle" || uploadState == "paused_auto_upload"
-        if !preservesManualCancellation {
-            runtimeManualUploadCancelled = false
-        }
-        let manualUploadCancelled =
-            runtimeManualUploadCancelled && preservesManualCancellation
         let currentBinding = uploadStore?.getBinding()
         let pendingCounts = uploadStore?.getPendingCountsBySource() ?? (auto: 0, manual: 0)
-        let currentTaskSource: Any = uploadStore?.getCurrentUploadingSource() ?? NSNull()
+        let currentSource = uploadStore?.getCurrentUploadingSource()
+        let currentTaskSource: Any = currentSource == "auto" ? "auto" : NSNull()
         let persistedQueueStats = uploadStore?.getQueueStats() ?? (totalCount: 0, totalBytes: 0, completedCount: 0, completedBytes: 0)
         let hasRuntimeRoundProgress =
             runtimeQueueTotalCount > 0 ||
@@ -641,9 +632,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             runtimeCurrentFileTotalBytes > 0
         let shouldFallbackToPersistedQueueStats =
             includePersistedIdleStats &&
-            !manualUploadCancelled &&
             !hasRuntimeRoundProgress &&
-            pendingCounts.manual == 0 &&
             pendingCounts.auto == 0 &&
             currentBinding != nil &&
             uploadState == "idle" &&
@@ -708,12 +697,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             "currentTaskSource": currentTaskSource,
             "lastCompletedTaskSource": runtimeLastCompletedTaskSource ?? NSNull(),
             "autoUploadState": autoUploadState,
-            "manualPending": pendingCounts.manual,
+            "manualPending": 0,
             "autoPending": pendingCounts.auto,
         ]
-        if manualUploadCancelled {
-            payload["manualUploadCancelled"] = true
-        }
         return payload
     }
 
@@ -724,7 +710,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     private func logSyncOverviewEmission(_ context: String, payload: [String: Any]) {
         let message = String(
-            format: "emit %@ state=%@ auto=%@ source=%@ lastSource=%@ completed=%@/%@ bytes=%@/%@ pending(manual=%@ auto=%@) currentFile=%@ currentBytes=%@/%@ progress=%@",
+            format: "emit %@ state=%@ auto=%@ source=%@ lastSource=%@ completed=%@/%@ bytes=%@/%@ pending(auto=%@) currentFile=%@ currentBytes=%@/%@ progress=%@",
             context,
             overviewLogValue(payload["uploadState"]),
             overviewLogValue(payload["autoUploadState"]),
@@ -734,7 +720,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             overviewLogValue(payload["totalCount"]),
             overviewLogValue(payload["completedBytes"]),
             overviewLogValue(payload["totalBytes"]),
-            overviewLogValue(payload["manualPending"]),
             overviewLogValue(payload["autoPending"]),
             overviewLogValue(payload["currentFile"]),
             overviewLogValue(payload["currentFileConfirmedBytes"]),
@@ -817,9 +802,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         )
         guard !pendingItems.isEmpty else { return [] }
 
-        let localIdentifiers = pendingItems
-            .filter { $0.sourceKind != "document" }
-            .map(\.assetLocalId)
+        let localIdentifiers = pendingItems.map(\.assetLocalId)
         let fetchedAssets = PHAsset.fetchAssets(withLocalIdentifiers: localIdentifiers, options: nil)
         var assetsByLocalId: [String: PHAsset] = [:]
         fetchedAssets.enumerateObjects { asset, _, _ in
@@ -828,37 +811,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
         var results: [ScannedAsset] = []
         var missingAssets = 0
-        let fileManager = FileManager.default
 
         for item in pendingItems {
-            if item.sourceKind == "document" {
-                guard let sourceFilePath = item.sourceFilePath,
-                      fileManager.fileExists(atPath: sourceFilePath) else {
-                    missingAssets += 1
-                    continue
-                }
-                let sourceURL = URL(fileURLWithPath: sourceFilePath)
-                let attrs = try? fileManager.attributesOfItem(atPath: sourceFilePath)
-                let size = item.fileSize
-                    ?? (attrs?[.size] as? NSNumber)?.int64Value
-                    ?? 0
-                results.append(ScannedAsset(
-                    asset: nil,
-                    fileKey: item.fileKey ?? item.assetLocalId,
-                    mediaType: item.mediaType.isEmpty ? "document" : item.mediaType,
-                    creationDate: nil,
-                    originalFilename: item.originalFilename ?? sourceURL.lastPathComponent,
-                    estimatedSize: size,
-                    source: item.source,
-                    batchId: item.batchId,
-                    sourceKind: "document",
-                    sourceFilePath: sourceFilePath,
-                    mimeType: item.mimeType,
-                    assetLocalId: item.assetLocalId
-                ))
-                continue
-            }
-
             guard let asset = assetsByLocalId[item.assetLocalId] else {
                 missingAssets += 1
                 continue
@@ -927,20 +881,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         )
     }
 
-    private func isManualUploadCancelled(fileKey: String, source: String) -> Bool {
-        guard source == "manual" else { return false }
-        if shouldAbortActiveManualUpload {
-            return true
-        }
-        return uploadStore?.getUploadItemByFileKey(fileKey)?.status == "cancelled"
-    }
-
-    private func throwIfManualUploadCancelled(fileKey: String, source: String) throws {
-        if isManualUploadCancelled(fileKey: fileKey, source: source) {
-            throw SyncEngineError.manualUploadCancelled
-        }
-    }
-
     private func queueItemIdentity(_ item: UploadItemRecord) -> String {
         item.fileKey ?? item.assetLocalId
     }
@@ -960,14 +900,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         cloudAssetFlags[key] = isCloudAsset
         cloudAssetDetectionInFlight.remove(key)
         return previous != isCloudAsset
-    }
-
-    private func manualUploadQueueAssets(from pendingAssets: [ScannedAsset]) -> [ScannedAsset] {
-        guard let first = pendingAssets.first, first.source == "manual" else { return [] }
-        guard let batchId = first.batchId, !batchId.isEmpty else {
-            return Array(pendingAssets.prefix { $0.source == "manual" })
-        }
-        return Array(pendingAssets.prefix { $0.source == "manual" && $0.batchId == batchId })
     }
 
     private func estimatedTotalBytes(for assets: [ScannedAsset]) -> Int64 {
@@ -1013,7 +945,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         case .critical, .serious: return
         default:                  thermalBatchLimit = 2
         }
-        let candidates = Array(items.filter { $0.sourceKind != "document" }.prefix(thermalBatchLimit))
+        let candidates = Array(items.prefix(thermalBatchLimit))
         for item in candidates {
             let key = queueItemIdentity(item)
 
@@ -1084,10 +1016,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     }
 
     private func exportAssetForUpload(_ asset: ScannedAsset) async throws -> ExportedFile {
-        if asset.sourceKind == "document" {
-            return try exportDocumentForUpload(asset)
-        }
-
         guard let photoAsset = asset.asset else {
             throw SyncEngineError.permissionError("Missing PHAsset for upload item")
         }
@@ -1132,40 +1060,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 attempt += 1
             }
         }
-    }
-
-    private func exportDocumentForUpload(_ asset: ScannedAsset) throws -> ExportedFile {
-        markAssetPreparing(asset: asset)
-        guard let sourceFilePath = asset.sourceFilePath else {
-            throw SyncEngineError.permissionError("Missing document source path")
-        }
-        let sourceURL = URL(fileURLWithPath: sourceFilePath)
-        let fileManager = FileManager.default
-        guard fileManager.fileExists(atPath: sourceURL.path) else {
-            throw SyncEngineError.permissionError("Document source file not found")
-        }
-
-        let tempDir = fileManager.temporaryDirectory.appendingPathComponent("lynavo_drive_export")
-        try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        let filename = asset.originalFilename.isEmpty ? sourceURL.lastPathComponent : asset.originalFilename
-        let tempURL = tempDir.appendingPathComponent(UUID().uuidString + "_" + filename)
-        if fileManager.fileExists(atPath: tempURL.path) {
-            try fileManager.removeItem(at: tempURL)
-        }
-        try fileManager.copyItem(at: sourceURL, to: tempURL)
-        let attrs = try fileManager.attributesOfItem(atPath: tempURL.path)
-        let size = (attrs[.size] as? NSNumber)?.int64Value ?? asset.estimatedSize
-        let modifiedAt = (attrs[.modificationDate] as? Date)?.iso8601String ?? ""
-
-        return ExportedFile(
-            tempURL: tempURL,
-            originalFilename: filename,
-            fileSize: size,
-            mimeType: asset.mimeType ?? "application/octet-stream",
-            mediaType: asset.mediaType.isEmpty ? "document" : asset.mediaType,
-            createdAt: "",
-            modifiedAt: modifiedAt
-        )
     }
 
     private func connectSession(
@@ -1264,7 +1158,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             historyStore = HistoryLedgerStore(store: uploadStore!)
             albumBrowserService = AlbumBrowserService(uploadStore: uploadStore)
             autoUploadConfigStore = AutoUploadConfigStore(store: uploadStore!)
-            manualUploadService = ManualUploadService(uploadStore: uploadStore, bindingService: bindingService)
             // Wire the binding-version accessor (H2): BindingService reads /
             // bumps the `binding_version` meta row through UploadStore, so
             // both `currentBindingVersion()` and `bumpBindingVersion()` need
@@ -2222,12 +2115,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private func resumeSyncAfterConnectionRecovery(reason: String) {
         let configState = autoUploadConfigStore?.getConfig().state ?? "disabled"
         let pendingCounts = uploadStore?.getPendingCountsBySource() ?? (auto: 0, manual: 0)
-        let shouldResume = configState == "active" || pendingCounts.manual > 0
+        let shouldResume = configState == "active"
 
         guard shouldResume else {
             syncDiagnosticsLog(
                 "SyncEngine",
-                "connection recovery did not resume sync (\(reason)) auto=\(configState) pending(manual=\(pendingCounts.manual) auto=\(pendingCounts.auto))"
+                "connection recovery did not resume sync (\(reason)) auto=\(configState) pending(auto=\(pendingCounts.auto))"
             )
             return
         }
@@ -2242,7 +2135,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
         syncDiagnosticsLog(
             "SyncEngine",
-            "connection recovery resuming sync (\(reason)) auto=\(configState) pending(manual=\(pendingCounts.manual) auto=\(pendingCounts.auto)) isSyncing=\(isSyncing) session=\(sessionService.state.rawValue)"
+            "connection recovery resuming sync (\(reason)) auto=\(configState) pending(auto=\(pendingCounts.auto)) isSyncing=\(isSyncing) session=\(sessionService.state.rawValue)"
         )
         startSync()
     }
@@ -2683,7 +2576,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private func stopSyncLifecycle(finalState: SessionService.SyncEngineState) {
         isSyncing = false
         shouldAbortActiveAutoUpload = false
-        shouldAbortActiveManualUpload = false
         shouldAbortActiveUploadForBindingChange = false
         didAttemptRemoteHistoryReconciliation = false
         // M8: terminal lifecycle — force-release so any dangling refcount
@@ -2919,7 +2811,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             switch syncError {
             case .networkError:
                 return true
-            case .databaseError, .pairingError, .structuredPairingError, .permissionError, .lowDiskPaused, .storageUnavailable, .reconnectExhausted, .bindingChanged, .autoUploadInterrupted, .manualUploadCancelled, .backgroundRuntimePaused:
+            case .databaseError, .pairingError, .structuredPairingError, .permissionError, .lowDiskPaused, .storageUnavailable, .reconnectExhausted, .bindingChanged, .autoUploadInterrupted, .backgroundRuntimePaused:
                 return false
             }
         }
@@ -3111,8 +3003,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     func startSync() {
         guard !isSyncing else {
             // Already running — wake the watch loop so it picks up newly
-            // queued items (e.g. manual upload submitted while pipeline is
-            // idle-waiting for photoLibraryChanged).
+            // queued auto items while the pipeline is idle-waiting for
+            // photoLibraryChanged.
             slog("[SyncEngine] startSync: already syncing — waking watch loop")
             syncDiagnosticsLog("SyncEngine", "startSync: already syncing — waking watch loop")
             photoLibraryChanged = true
@@ -3120,14 +3012,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             return
         }
 
-        // Check if there's anything to sync: auto upload must be active,
-        // OR there must be pending manual items. If neither, skip starting
-        // the full sync lifecycle (no background task, no audio session).
+        // Check if there's anything to sync: OSS upload work only runs when
+        // auto upload is active.
         let configState = autoUploadConfigStore?.getConfig().state ?? "disabled"
-        let manualPending = uploadStore?.getPendingCountsBySource().manual ?? 0
-        if configState != "active" && manualPending == 0 {
-            slog("[SyncEngine] startSync skipped — auto upload %@, no manual pending", configState)
-            syncDiagnosticsLog("SyncEngine", "startSync skipped — auto upload \(configState), no manual pending")
+        if configState != "active" {
+            slog("[SyncEngine] startSync skipped — auto upload %@", configState)
+            syncDiagnosticsLog("SyncEngine", "startSync skipped — auto upload \(configState)")
             // Emit current state so pages render correctly
             let payload = runtimeSyncOverviewPayload(uploadState: configState == "interrupted" ? "paused_auto_upload" : "idle")
             logSyncOverviewEmission("start_sync_skipped", payload: payload)
@@ -3169,8 +3059,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         runtimeCurrentFileTotalBytes = 0
         runtimeCurrentSpeedMbps = 0
         runtimeUploadState = "idle"
-        shouldAbortActiveManualUpload = false
-        runtimeManualUploadCancelled = false
         runtimeLastCompletedTaskSource = nil
         runtimeRoundSource = nil
 
@@ -3255,26 +3143,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     )
                     stopSyncLifecycle(finalState: .interruptedAutoUpload)
                 }
-            case .manualUploadCancelled:
-                slog("[SyncEngine] manual upload cancelled by user")
-                syncDiagnosticsLog("SyncEngine", "manual upload cancelled by user")
-                maintainConnectedBindingState(reason: "manual_upload_cancelled")
-                let clientId = bindingService.getOrCreateClientId()
-                sendPresenceHeartbeat(
-                    clientId: clientId,
-                    successReason: "manual_upload_cancelled_presence_restored",
-                    failureReason: "manual_upload_cancelled_presence_failed",
-                    updateStateOnFailure: false
-                )
-                clearRuntimeSyncRoundProgress(uploadState: "idle")
-                runtimeManualUploadCancelled = true
-                let payload = runtimeSyncOverviewPayload(
-                    uploadState: "idle",
-                    includePersistedIdleStats: false
-                )
-                logSyncOverviewEmission("pipeline_manual_cancelled", payload: payload)
-                NativeSyncEngineModule.shared?.emitSyncStateChanged(payload)
-                stopSyncLifecycle(finalState: .idle)
             case .backgroundRuntimePaused:
                 slog("[SyncEngine] foreground LAN sync paused because app entered background")
                 syncDiagnosticsLog("SyncEngine", "foreground LAN sync paused because app entered background")
@@ -3400,24 +3268,18 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             return
         }
 
-        // 1. Request photo permission only when this round needs PhotoKit.
-        // Document-only manual queues come from the system file picker and can
-        // upload without photo library access.
-        let pendingBeforePermission = uploadStore?.getPendingUploadItemsSorted(limit: nil) ?? []
-        let hasPhotoPending = pendingBeforePermission.contains { $0.sourceKind != "document" }
-        let needsPhotoAccess = hasPhotoPending || isAutoUploadActiveForDiscovery()
-        if needsPhotoAccess {
-            let permStatus = await photoScanner.requestPermission()
-            guard permStatus == .authorized || permStatus == .limited else {
-                slog("[SyncEngine] photo permission denied")
-                syncDiagnosticsLog("SyncEngine", "photo permission denied")
-                stopSyncLifecycle(finalState: .pausedNoPermission)
-                return
-            }
-
-            // 2. Start observing photo library for new assets
-            photoScanner.startObserving()
+        // 1. Request photo permission; OSS upload work comes only from the
+        // mobile photo-library scan and pending queue.
+        let permStatus = await photoScanner.requestPermission()
+        guard permStatus == .authorized || permStatus == .limited else {
+            slog("[SyncEngine] photo permission denied")
+            syncDiagnosticsLog("SyncEngine", "photo permission denied")
+            stopSyncLifecycle(finalState: .pausedNoPermission)
+            return
         }
+
+        // 2. Start observing photo library for new assets
+        photoScanner.startObserving()
 
         let clientId = bindingService.getOrCreateClientId()
 
@@ -3429,7 +3291,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
             // Re-read binding/token every round. A long-lived pipeline can be
             // woken after the user switches desktops; using the startup binding
-            // here would upload the next manual batch to the previous device.
+            // here would upload the next auto batch to the previous device.
             guard let binding = uploadStore?.getBinding() else {
                 throw SyncEngineError.pairingError("No binding found — pair first")
             }
@@ -3688,25 +3550,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             }
 
             // Connect, upload, disconnect — with retry on error
-            let manualRoundAssets = manualUploadQueueAssets(from: pendingAssets)
-            let manualRoundStats = manualRoundAssets.isEmpty
-                ? nil
-                : manualRoundAssets.first?.batchId.flatMap { uploadStore?.getManualQueueStats(batchId: $0) }
-            let uploadRoundAssets = manualRoundAssets.isEmpty
-                ? pendingAssets
-                : manualRoundAssets
-            let roundTotalCount = manualRoundAssets.isEmpty
-                ? stats.totalCount
-                : (manualRoundStats?.totalCount ?? uploadRoundAssets.count)
-            let roundTotalBytes = manualRoundAssets.isEmpty
-                ? stats.totalBytes
-                : (manualRoundStats?.totalBytes ?? estimatedTotalBytes(for: uploadRoundAssets))
-            let roundCompletedCount = manualRoundAssets.isEmpty
-                ? stats.completedCount
-                : (manualRoundStats?.completedCount ?? 0)
-            let roundCompletedBytes = manualRoundAssets.isEmpty
-                ? stats.completedBytes
-                : (manualRoundStats?.completedBytes ?? Int64(0))
+            let uploadRoundAssets = pendingAssets
+            let roundTotalCount = stats.totalCount
+            let roundTotalBytes = stats.totalBytes
+            let roundCompletedCount = stats.completedCount
+            let roundCompletedBytes = stats.completedBytes
             var retryAttempt = 0
             let maxReconnectAttempts = maxUploadReconnectAttempts()
             let maxRetryDelay: UInt64 = 30_000_000_000
@@ -3883,7 +3731,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         var uploadRoundPausedForLowDisk = false
         var uploadRoundStorageUnavailable = false
         var uploadRoundInterruptedByUser = false
-        var uploadRoundCancelledByUser = false
         var uploadRoundStoppedForBindingChange = false
         var uploadRoundInvalidatedPairing = false
 
@@ -3904,8 +3751,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 // binding state connected. The caller restores desktop presence
                 // immediately via a heartbeat.
                 maintainConnectedBindingState(reason: "upload_round_interrupted")
-            } else if uploadRoundCancelledByUser {
-                maintainConnectedBindingState(reason: "upload_round_manual_cancelled")
             } else if uploadRoundStoppedForBindingChange {
                 syncDiagnosticsLog("SyncEngine", "upload round stopped after binding changed")
             } else if uploadRoundInvalidatedPairing {
@@ -4079,20 +3924,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
             try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
 
-            if isManualUploadCancelled(fileKey: asset.fileKey, source: asset.source) {
-                uploadRoundCancelledByUser = true
-                slog("[SyncPipeline] stopping manual upload after cancellation before file %@", asset.fileKey)
-                syncDiagnosticsLog("SyncPipeline", "stopping manual upload after cancellation before file \(asset.fileKey)")
-                await cancelPrefetchAndCleanup()
-                throw SyncEngineError.manualUploadCancelled
-            }
-            // Between files: skip auto items when interrupted, skip cancelled batch items
+            // Between files: skip auto items when interrupted.
             if index > 0 {
                 if isAutoUploadInterrupted && asset.source == "auto" {
                     slog("[SyncPipeline] skipping auto item %@ — auto upload interrupted", asset.fileKey)
                     continue
                 }
-                // Check if this item was cancelled in DB (e.g. manual queue cancel)
+                // Check if this item was cancelled in DB.
                 if let item = uploadStore?.getUploadItemByFileKey(asset.fileKey),
                    item.status == "cancelled" {
                     slog("[SyncPipeline] skipping cancelled item %@", asset.fileKey)
@@ -4203,7 +4041,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 )
 
                 // After each file: check if a higher-priority item was inserted
-                // (e.g. manual item while auto batch is running). If DB queue head
+                // If DB queue head
                 // differs from our next batch item, break so outer loop re-fetches.
                 let nextIndex = index + 1
                 if nextIndex < assets.count {
@@ -4242,19 +4080,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                         exportService.cleanup(tempURL: leakedExport.tempURL)
                         nextExport = nil
                     }
-                    throw syncError
-                }
-                if let syncError = error as? SyncEngineError,
-                   case .manualUploadCancelled = syncError
-                {
-                    uploadRoundCancelledByUser = true
-                    slog("[SyncEngine] manual upload cancelled during file %@", asset.fileKey)
-                    syncDiagnosticsLog("SyncEngine", "manual upload cancelled during file \(asset.fileKey)")
-                    try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "cancelled")
-                    clearRuntimeCurrentFile()
-                    runtimeCurrentSpeedMbps = 0
-                    emitQueueToJS()
-                    await cancelPrefetchAndCleanup()
                     throw syncError
                 }
                 if let syncError = error as? SyncEngineError,
@@ -4370,7 +4195,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let tuning = resolvedUploadTuning(targetDeviceType: targetDeviceType)
         let fileTransferStart = CFAbsoluteTimeGetCurrent()
         try throwIfBindingChanged(expectedDeviceId: expectedDeviceId)
-        try throwIfManualUploadCancelled(fileKey: asset.fileKey, source: asset.source)
         try uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "uploading")
         // Update filename + size now that we know them from export
         if var item = uploadStore?.getUploadItemByFileKey(asset.fileKey) {
@@ -4391,7 +4215,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
         do {
             try throwIfBindingChanged(expectedDeviceId: expectedDeviceId)
-            try throwIfManualUploadCancelled(fileKey: asset.fileKey, source: asset.source)
 
             if asset.source == "auto" && shouldAbortActiveAutoUpload {
                 shouldAbortActiveAutoUpload = false
@@ -4420,7 +4243,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 throw SyncEngineError.networkError("Expected FILE_INIT_RES, got \(initType)")
             }
             try throwIfBindingChanged(expectedDeviceId: expectedDeviceId)
-            try throwIfManualUploadCancelled(fileKey: asset.fileKey, source: asset.source)
 
             let action = initRes["action"] as? String ?? "REJECT"
 
@@ -4440,7 +4262,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 runtimeCurrentSpeedMbps = 0
                 emitQueueToJS()
                 let payload = runtimeSyncOverviewPayload(uploadState: "uploading", progressPercent: 100)
-                if asset.source == "manual" || index + 1 >= total {
+                if index + 1 >= total {
                     logSyncOverviewEmission(
                         "file_skipped_completed source=\(asset.source) index=\(index + 1)/\(total)",
                         payload: payload
@@ -4509,7 +4331,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 throw SyncEngineError.networkError("Unknown FILE_INIT action: \(action)")
             }
 
-            try throwIfManualUploadCancelled(fileKey: asset.fileKey, source: asset.source)
             try throwIfBindingChanged(expectedDeviceId: expectedDeviceId)
 
             // FILE_END_REQ → FILE_END_RES
@@ -4559,7 +4380,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 updateRuntimeSpeed()
                 emitQueueToJS()
                 let payload = runtimeSyncOverviewPayload(uploadState: "uploading", progressPercent: 100)
-                if asset.source == "manual" || index + 1 >= total {
+                if index + 1 >= total {
                     logSyncOverviewEmission(
                         "file_completed source=\(asset.source) index=\(index + 1)/\(total)",
                         payload: payload
@@ -4622,14 +4443,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 runtimeCurrentSpeedMbps = 0
                 emitQueueToJS()
                 throw syncError
-            }
-            if asset.source == "manual" && isManualUploadCancelled(fileKey: asset.fileKey, source: asset.source) {
-                shouldAbortActiveManualUpload = false
-                try? uploadStore?.updateUploadStatus(fileKey: asset.fileKey, status: "cancelled")
-                clearRuntimeCurrentFile()
-                runtimeCurrentSpeedMbps = 0
-                emitQueueToJS()
-                throw SyncEngineError.manualUploadCancelled
             }
             if asset.source == "auto" && shouldAbortActiveAutoUpload {
                 shouldAbortActiveAutoUpload = false
@@ -4814,11 +4627,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
         func throwIfActiveUploadWasInterrupted() throws {
             try throwIfBindingChanged(expectedDeviceId: expectedDeviceId)
-            if source == "manual" && isManualUploadCancelled(fileKey: fileKey, source: source) {
-                streamOutcome = "STREAM_INTERRUPTED"
-                streamFailure = "manual upload cancelled by user"
-                throw SyncEngineError.manualUploadCancelled
-            }
             if source == "auto" && shouldAbortActiveAutoUpload {
                 streamOutcome = "STREAM_INTERRUPTED"
                 streamFailure = "auto upload interrupted by user"
@@ -6530,15 +6338,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
     }
 
-    /// Interrupt auto upload: skips auto items in queue, only processes manual items.
+    /// Interrupt auto upload: stops auto work until the user explicitly re-enables it.
     /// Once interrupted, user must explicitly re-enable.
     func interruptAutoUpload() {
         guard !isAutoUploadInterrupted else { return }
         persistAutoUploadInterruptedState(reason: "user_interrupt")
         clearRuntimeReconnectError()
 
-        // Clear pending auto items so they don't block manual uploads
-        // (dedup check) and re-enabling auto upload starts a fresh scan.
+        // Clear pending auto items so re-enabling auto upload starts a fresh scan.
         do {
             try uploadStore?.cancelPendingAutoItems()
         } catch {
@@ -6555,8 +6362,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 error: SyncEngineError.autoUploadInterrupted,
                 reason: "interrupt_auto_upload_requested"
             )
-        } else if currentTaskSource != "manual" &&
-                    runtimeLastCompletedTaskSource == "auto" &&
+        } else if runtimeLastCompletedTaskSource == "auto" &&
                     runtimeQueueTotalCount > 0 &&
                     runtimeQueueCompletedCount >= runtimeQueueTotalCount {
             clearRuntimeSyncRoundProgress(uploadState: "paused_auto_upload")
@@ -6651,8 +6457,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             photoLibraryChanged = true
             resumeWatchLoopIfNeeded()
         } else {
-            // Pipeline not running (e.g. manual upload already finished) —
-            // start it so auto upload actually begins scanning and uploading.
+            // Pipeline not running; start it so auto upload actually begins
+            // scanning and uploading.
             startSync()
         }
         let payload = runtimeSyncOverviewPayload(uploadState: isSyncing ? "scanning" : "idle")
@@ -6665,42 +6471,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     // DEPRECATED: to be removed, use enableAutoUpload/interruptAutoUpload instead
     func resumeAutoUpload() {
         enableAutoUpload()
-    }
-
-    /// Cancel remaining items in a manual queue.
-    func cancelManualBatch(batchId: String) throws {
-        try uploadStore?.cancelManualBatch(batchId: batchId)
-        slog("[SyncEngine] cancelled manual queue %@", batchId)
-        syncDiagnosticsLog("SyncEngine", "cancelled manual queue \(batchId)")
-        emitQueueToJS()
-    }
-
-    func cancelAllManualUploads() throws {
-        let currentTaskSource = uploadStore?.getCurrentUploadingSource()
-        let shouldAbortActiveManual = isSyncing && currentTaskSource == "manual"
-        try uploadStore?.cancelAllManualUploads()
-        if shouldAbortActiveManual {
-            shouldAbortActiveManualUpload = true
-            interruptActiveUploadResponse(
-                error: SyncEngineError.manualUploadCancelled,
-                reason: "cancel_manual_upload_requested"
-            )
-        }
-        clearRuntimeSyncRoundProgress(uploadState: "idle")
-        runtimeManualUploadCancelled = true
-        clearRuntimeReconnectError()
-        photoLibraryChanged = true
-        resumeWatchLoopIfNeeded()
-        maintainConnectedBindingState(reason: "cancel_manual_upload_requested")
-        slog("[SyncEngine] cancelled entire manual upload queue")
-        syncDiagnosticsLog("SyncEngine", "cancelled entire manual upload queue")
-        emitQueueToJS()
-        let payload = runtimeSyncOverviewPayload(
-            uploadState: "idle",
-            includePersistedIdleStats: false
-        )
-        logSyncOverviewEmission("cancel_manual_upload", payload: payload)
-        NativeSyncEngineModule.shared?.emitSyncStateChanged(payload)
     }
 
     // MARK: - Album Browser
@@ -6899,82 +6669,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
     }
 
-    // MARK: - Manual Upload
-
-    func submitManualUpload(assetLocalIds: [String]) -> [String: Any] {
-        guard let service = manualUploadService else {
-            return ["queuedCount": 0, "skippedCount": 0, "batchId": ""]
-        }
-
-        // Fetch PHAssets for the given local identifiers
-        let fetchResult = PHAsset.fetchAssets(
-            withLocalIdentifiers: assetLocalIds,
-            options: nil
-        )
-        var assets: [PHAsset] = []
-        fetchResult.enumerateObjects { asset, _, _ in
-            assets.append(asset)
-        }
-
-        let result = service.submitManualUpload(assets: assets)
-        if result.queuedCount > 0 {
-            runtimeManualUploadCancelled = false
-        }
-
-        // Emit queue update to JS
-        emitQueueToJS()
-
-        // Manual uploads must start immediately even when auto upload is disabled.
-        // If the loop is already alive, just wake it; otherwise bootstrap it.
-        if result.queuedCount > 0 {
-            if isSyncing {
-                photoLibraryChanged = true
-                resumeWatchLoopIfNeeded()
-            } else {
-                startSync()
-            }
-        } else if isSyncing {
-            resumeWatchLoopIfNeeded()
-        }
-
-        return [
-            "queuedCount": result.queuedCount,
-            "skippedCount": result.skippedCount,
-            "batchId": result.batchId,
-        ]
-    }
-
-    func submitDocumentUploads(fileURLs: [URL]) -> [String: Any] {
-        guard let service = manualUploadService else {
-            return ["queuedCount": 0, "skippedCount": fileURLs.count, "batchId": "", "files": []]
-        }
-
-        let result = service.submitDocumentUploads(fileURLs: fileURLs)
-        if result.queuedCount > 0 {
-            runtimeManualUploadCancelled = false
-        }
-
-        emitQueueToJS()
-        NativeSyncEngineModule.shared?.emitSyncStateChanged(runtimeSyncOverviewPayload(uploadState: "idle"))
-
-        if result.queuedCount > 0 {
-            if isSyncing {
-                photoLibraryChanged = true
-                resumeWatchLoopIfNeeded()
-            } else {
-                startSync()
-            }
-        } else if isSyncing {
-            resumeWatchLoopIfNeeded()
-        }
-
-        return [
-            "queuedCount": result.queuedCount,
-            "skippedCount": result.skippedCount,
-            "batchId": result.batchId,
-            "files": result.files,
-        ]
-    }
 
     // MARK: - Auto Upload Config
 
@@ -8142,9 +7836,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         isSyncing = false
         isAutoUploadInterrupted = false
         shouldAbortActiveAutoUpload = false
-        shouldAbortActiveManualUpload = false
         shouldAbortActiveUploadForBindingChange = false
-        runtimeManualUploadCancelled = false
         runtimeLastCompletedTaskSource = nil
         clearRuntimeSyncRoundProgress(uploadState: "idle")
         runtimeUploadState = "idle"

@@ -36,11 +36,9 @@ struct UploadItemRecord {
     var ackedOffset: Int64
     var lastErrorCode: String?
     let updatedAt: String
-    var source: String  // 'auto' | 'manual'
+    var source: String
     var batchId: String?
-    var priority: Int  // 0 = auto (default), 1 = manual (higher priority)
-    var sourceKind: String = "photo"
-    var sourceFilePath: String? = nil
+    var priority: Int
     var mimeType: String? = nil
 }
 
@@ -475,49 +473,6 @@ class UploadStore {
         }
     }
 
-    func getManualQueueStats(batchId: String) -> (totalCount: Int, totalBytes: Int64, completedCount: Int, completedBytes: Int64)? {
-        guard !batchId.isEmpty else { return nil }
-        return queue.sync {
-            let statsSql = """
-            SELECT
-                COUNT(*) AS total_count,
-                SUM(file_size) AS total_bytes,
-                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_count,
-                SUM(CASE WHEN status = 'completed' THEN file_size ELSE 0 END) AS completed_bytes
-            FROM upload_items
-            WHERE source = 'manual'
-              AND batch_id = ?1
-              AND status IN ('queued', 'discovered', 'preparing', 'ready', 'cloud_downloading', 'uploading', 'completed')
-            """
-            let rows = queryInternal(statsSql, bind: [.text(batchId)])
-            guard let first = rows.first else {
-                return nil
-            }
-            return (
-                totalCount: Int(first["total_count"] as? Int64 ?? 0),
-                totalBytes: first["total_bytes"] as? Int64 ?? 0,
-                completedCount: Int(first["completed_count"] as? Int64 ?? 0),
-                completedBytes: first["completed_bytes"] as? Int64 ?? 0
-            )
-        }
-    }
-
-    func getActiveManualQueueBatchId() -> String? {
-        return queue.sync {
-            let sql = """
-            SELECT batch_id FROM upload_items
-            WHERE source = 'manual'
-              AND batch_id IS NOT NULL
-              AND batch_id != ''
-              AND status IN ('queued', 'discovered', 'preparing', 'ready', 'cloud_downloading', 'uploading')
-            ORDER BY priority DESC, id ASC
-            LIMIT 1
-            """
-            let rows = queryInternal(sql, bind: [])
-            return rows.first?["batch_id"] as? String
-        }
-    }
-
     func getCompletedFileKeys() -> [String] {
         return queue.sync {
             let sql = "SELECT file_key FROM upload_items WHERE status = 'completed' AND file_key IS NOT NULL"
@@ -630,8 +585,8 @@ class UploadStore {
                     .text(item.source),
                     .textOrNull(item.batchId),
                     .int(Int64(item.priority)),
-                    .text(item.sourceKind),
-                    .textOrNull(item.sourceFilePath),
+                    .text("photo"),
+                    .null,
                     .textOrNull(item.mimeType)
                 ])
             }
@@ -644,8 +599,7 @@ class UploadStore {
 
     // MARK: - Priority-Sorted Pending Items
 
-    /// Returns pending items sorted by priority DESC (manual first), then id ASC.
-    /// This ensures manually selected items are uploaded before auto-scanned items.
+    /// Returns pending items sorted by priority DESC, then id ASC.
     func getPendingUploadItemsSorted(limit: Int? = nil, excludeSource: String? = nil) -> [UploadItemRecord] {
         return queue.sync {
             var sql = """
@@ -666,27 +620,16 @@ class UploadStore {
         }
     }
 
-    /// Count pending items split by source (auto vs manual).
+    /// Count pending auto-upload items.
     func getPendingCountsBySource() -> (auto: Int, manual: Int) {
         return queue.sync {
             let sql = """
-            SELECT source, COUNT(*) as cnt FROM upload_items
+            SELECT COUNT(*) as cnt FROM upload_items
             WHERE status IN ('queued', 'discovered', 'preparing', 'ready', 'cloud_downloading')
-            GROUP BY source
             """
-            let rows = queryInternal(sql, bind: [])
-            var autoCount = 0
-            var manualCount = 0
-            for row in rows {
-                let source = row["source"] as? String ?? "auto"
-                let count = (row["cnt"] as? Int64).map(Int.init) ?? 0
-                if source == "manual" {
-                    manualCount = count
-                } else {
-                    autoCount = count
-                }
-            }
-            return (auto: autoCount, manual: manualCount)
+            let row = queryInternal(sql, bind: []).first
+            let autoCount = (row?["cnt"] as? Int64).map(Int.init) ?? 0
+            return (auto: autoCount, manual: 0)
         }
     }
 
@@ -712,8 +655,7 @@ class UploadStore {
     }
 
     /// Cancel all pending auto-upload items. Called when user closes auto upload
-    /// so the queue is clean for manual uploads and re-enabling auto upload
-    /// starts a fresh scan.
+    /// so re-enabling auto upload starts a fresh scan.
     func cancelPendingAutoItems() throws {
         try queue.sync {
             let now = ISO8601DateFormatter().string(from: Date())
@@ -722,41 +664,6 @@ class UploadStore {
             WHERE source = 'auto' AND status IN ('queued', 'discovered', 'preparing', 'ready', 'cloud_downloading')
             """
             try executeWithBindings(sql, bindings: [.text(now)])
-        }
-    }
-
-    /// Cancel all pending and in-progress items in a manual queue.
-    /// Three checkpoints in the upload loop enforce this:
-    ///   1. Between files (index > 0): skips cancelled items before export
-    ///   2. After export, before TCP upload: skips and cleans up temp file
-    ///   3. Already in TCP: current file finishes (no mid-stream abort), then stops
-    func cancelManualBatch(batchId: String) throws {
-        try queue.sync {
-            let now = ISO8601DateFormatter().string(from: Date())
-            let sql = """
-            UPDATE upload_items SET status = 'cancelled', updated_at = ?1
-            WHERE batch_id = ?2 AND status IN ('queued', 'discovered', 'preparing', 'ready', 'uploading', 'cloud_downloading')
-            """
-            try executeWithBindings(sql, bindings: [
-                .text(now),
-                .text(batchId)
-            ])
-        }
-    }
-
-    /// Cancel all pending and in-progress manual items, regardless of which
-    /// batch they came from. Manual upload is modeled in the PRD as one
-    /// continuously appended queue, not isolated per-submit batches.
-    func cancelAllManualUploads() throws {
-        try queue.sync {
-            let now = ISO8601DateFormatter().string(from: Date())
-            let sql = """
-            UPDATE upload_items SET status = 'cancelled', updated_at = ?1
-            WHERE source = 'manual' AND status IN ('queued', 'discovered', 'preparing', 'ready', 'uploading', 'cloud_downloading')
-            """
-            try executeWithBindings(sql, bindings: [
-                .text(now),
-            ])
         }
     }
 
@@ -1084,8 +991,6 @@ class UploadStore {
             source: row["source"] as? String ?? "auto",
             batchId: row["batch_id"] as? String,
             priority: Int(row["priority"] as? Int64 ?? 0),
-            sourceKind: row["source_kind"] as? String ?? "photo",
-            sourceFilePath: row["source_file_path"] as? String,
             mimeType: row["mime_type"] as? String
         )
     }

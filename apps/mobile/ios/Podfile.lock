@@ -1319,27 +1319,6 @@ PODS:
     - React-RCTFBReactNativeSpec
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-  - react-native-document-picker (12.0.1):
-    - hermes-engine
-    - RCTRequired
-    - RCTTypeSafety
-    - React-Core
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-ImageManager
-    - React-jsi
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - ReactNativeDependencies
-    - Yoga
   - react-native-document-viewer (4.0.0):
     - hermes-engine
     - RCTRequired
@@ -2131,7 +2110,6 @@ DEPENDENCIES:
   - React-logger (from `../node_modules/react-native/ReactCommon/logger`)
   - React-Mapbuffer (from `../node_modules/react-native/ReactCommon`)
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
-  - "react-native-document-picker (from `../node_modules/@react-native-documents/picker`)"
   - "react-native-document-viewer (from `../node_modules/@react-native-documents/viewer`)"
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
   - react-native-video (from `../node_modules/react-native-video`)
@@ -2262,8 +2240,6 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   React-microtasksnativemodule:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/microtasks"
-  react-native-document-picker:
-    :path: "../node_modules/@react-native-documents/picker"
   react-native-document-viewer:
     :path: "../node_modules/@react-native-documents/viewer"
   react-native-safe-area-context:
@@ -2399,7 +2375,6 @@ SPEC CHECKSUMS:
   React-logger: db24f470fd04e25062bba89d0f845f0bb06743f0
   React-Mapbuffer: 8016ed7590fbedc903dc2d8351f0e9ccc851dd5e
   React-microtasksnativemodule: e019e567dad322e87b49044496b1ef86ac64c41b
-  react-native-document-picker: 598c549d1cbcc8c1f73abfbb5369d2faa10da242
   react-native-document-viewer: 6ea4098b8fae2224d36282b42777d5e26f64961d
   react-native-safe-area-context: 866dbfc3292621c18abe9857bda29485bf20607a
   react-native-video: 80a6980fbbc7d1b988ff7395bf94f2a10e871df2

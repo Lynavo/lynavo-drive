@@ -112,7 +112,7 @@ describe('buildOverview', () => {
     expect(next.currentFileTotalBytes).toBe(1000);
   });
 
-  it('captures the last completed task source for the completion card', () => {
+  it('ignores stale manual task source when a completion payload clears source', () => {
     const prev = {
       progressPercent: 92,
       currentSpeedMbps: 8.2,
@@ -145,7 +145,7 @@ describe('buildOverview', () => {
 
     expect(next.uploadState).toBe('completed');
     expect(next.currentTaskSource).toBeUndefined();
-    expect(next.lastCompletedTaskSource).toBe('manual');
+    expect(next.lastCompletedTaskSource).toBeUndefined();
   });
 
   it('uses native last completed source when an auto round completes after stale manual state', () => {
@@ -373,7 +373,7 @@ describe('buildOverview', () => {
     expect(getSyncActivityMainCardState(next, false)).toBe('standby');
   });
 
-  it('derives the last completed task source when native jumps straight from uploading to idle', () => {
+  it('does not derive manual completion when native jumps straight from uploading to idle', () => {
     const prev = {
       progressPercent: 100,
       currentSpeedMbps: 0,
@@ -408,10 +408,10 @@ describe('buildOverview', () => {
 
     expect(next.uploadState).toBe('idle');
     expect(next.currentTaskSource).toBeUndefined();
-    expect(next.lastCompletedTaskSource).toBe('manual');
+    expect(next.lastCompletedTaskSource).toBeUndefined();
   });
 
-  it('derives the last completed task source when native settles into paused_auto_upload after a manual round', () => {
+  it('does not derive manual completion when native settles into paused_auto_upload', () => {
     const prev = {
       progressPercent: 100,
       currentSpeedMbps: 0,
@@ -447,10 +447,10 @@ describe('buildOverview', () => {
 
     expect(next.uploadState).toBe('paused_auto_upload');
     expect(next.currentTaskSource).toBeUndefined();
-    expect(next.lastCompletedTaskSource).toBe('manual');
+    expect(next.lastCompletedTaskSource).toBeUndefined();
   });
 
-  it('derives the last completed task source when native scans immediately after a manual round finishes', () => {
+  it('does not derive manual completion when native scans immediately after stale manual source', () => {
     const prev = {
       progressPercent: 100,
       currentSpeedMbps: 0,
@@ -486,10 +486,10 @@ describe('buildOverview', () => {
 
     expect(next.uploadState).toBe('scanning');
     expect(next.currentTaskSource).toBeUndefined();
-    expect(next.lastCompletedTaskSource).toBe('manual');
+    expect(next.lastCompletedTaskSource).toBeUndefined();
   });
 
-  it('keeps manual completion context through a transient idle disabled payload', () => {
+  it('does not keep stale manual completion context through an idle disabled payload', () => {
     const prev = {
       progressPercent: 100,
       currentSpeedMbps: 0,
@@ -524,15 +524,15 @@ describe('buildOverview', () => {
       prev,
     );
 
-    expect(next.completedCount).toBe(1);
-    expect(next.totalCount).toBe(1);
-    expect(next.completedBytes).toBe(8192);
-    expect(next.totalBytes).toBe(8192);
-    expect(next.lastCompletedTaskSource).toBe('manual');
-    expect(getSyncActivityMainCardState(next, false)).toBe('manual_completed');
+    expect(next.completedCount).toBe(0);
+    expect(next.totalCount).toBe(0);
+    expect(next.completedBytes).toBe(0);
+    expect(next.totalBytes).toBe(0);
+    expect(next.lastCompletedTaskSource).toBeUndefined();
+    expect(getSyncActivityMainCardState(next, false)).toBe('not_started');
   });
 
-  it('does not turn a cancelled manual upload into manual completion', () => {
+  it('ignores stale manual cancel payload when auto upload is disabled', () => {
     const prev = {
       progressPercent: 31,
       currentSpeedMbps: 8.5,
@@ -563,7 +563,6 @@ describe('buildOverview', () => {
         manualPending: 0,
         autoPending: 0,
         autoUploadState: 'disabled',
-        manualUploadCancelled: true,
       },
       prev,
     );
@@ -577,7 +576,7 @@ describe('buildOverview', () => {
     expect(getSyncActivityMainCardState(next, false)).toBe('not_started');
   });
 
-  it('clears stale completed counts from a cancelled manual upload payload', () => {
+  it('ignores stale manual cancel payload and follows auto interrupted state', () => {
     const prev = {
       progressPercent: 45,
       currentSpeedMbps: 6.5,
@@ -609,21 +608,20 @@ describe('buildOverview', () => {
         manualPending: 0,
         autoPending: 0,
         autoUploadState: 'interrupted',
-        manualUploadCancelled: true,
       },
       prev,
     );
 
-    expect(next.progressPercent).toBe(0);
-    expect(next.completedCount).toBe(0);
-    expect(next.totalCount).toBe(0);
-    expect(next.completedBytes).toBe(0);
-    expect(next.totalBytes).toBe(0);
+    expect(next.progressPercent).toBe(100);
+    expect(next.completedCount).toBe(7);
+    expect(next.totalCount).toBe(7);
+    expect(next.completedBytes).toBe(4_912_657);
+    expect(next.totalBytes).toBe(4_912_657);
     expect(next.lastCompletedTaskSource).toBeUndefined();
-    expect(getSyncActivityMainCardState(next, false)).toBe('not_started');
+    expect(getSyncActivityMainCardState(next, false)).toBe('auto_interrupted');
   });
 
-  it('keeps cancellation across a stale idle overview refresh', () => {
+  it('does not persist stale manual cancellation across idle overview refreshes', () => {
     const cancelled = buildOverview(
       {
         uploadState: 'idle',
@@ -635,7 +633,6 @@ describe('buildOverview', () => {
         manualPending: 0,
         autoPending: 0,
         autoUploadState: 'interrupted',
-        manualUploadCancelled: true,
       },
       {
         progressPercent: 45,
@@ -673,14 +670,15 @@ describe('buildOverview', () => {
       cancelled,
     );
 
-    expect(refreshed.progressPercent).toBe(0);
-    expect(refreshed.completedCount).toBe(0);
-    expect(refreshed.totalCount).toBe(0);
-    expect(refreshed.manualUploadCancelled).toBe(true);
-    expect(getSyncActivityMainCardState(refreshed, false)).toBe('not_started');
+    expect(refreshed.progressPercent).toBe(100);
+    expect(refreshed.completedCount).toBe(7);
+    expect(refreshed.totalCount).toBe(7);
+    expect(getSyncActivityMainCardState(refreshed, false)).toBe(
+      'auto_interrupted',
+    );
   });
 
-  it('does not show the auto interrupted card for a cancelled manual upload snapshot', () => {
+  it('closes auto upload from stale manual source without showing manual state', () => {
     const prev = {
       progressPercent: 31,
       currentSpeedMbps: 8.5,
@@ -711,7 +709,6 @@ describe('buildOverview', () => {
         manualPending: 0,
         autoPending: 0,
         autoUploadState: 'interrupted',
-        manualUploadCancelled: true,
       },
       prev,
     );
@@ -723,7 +720,7 @@ describe('buildOverview', () => {
     expect(getSyncActivityMainCardState(next, false)).toBe('not_started');
   });
 
-  it('keeps manual completion after the final upload pulse clears current source', () => {
+  it('does not infer manual completion after the final upload pulse clears source', () => {
     const prev = {
       progressPercent: 100,
       currentSpeedMbps: 0,
@@ -758,12 +755,12 @@ describe('buildOverview', () => {
       prev,
     );
 
-    expect(next.completedCount).toBe(10);
-    expect(next.totalCount).toBe(10);
-    expect(next.completedBytes).toBe(63406077);
-    expect(next.totalBytes).toBe(63406077);
-    expect(next.lastCompletedTaskSource).toBe('manual');
-    expect(getSyncActivityMainCardState(next, false)).toBe('manual_completed');
+    expect(next.completedCount).toBe(0);
+    expect(next.totalCount).toBe(0);
+    expect(next.completedBytes).toBe(0);
+    expect(next.totalBytes).toBe(0);
+    expect(next.lastCompletedTaskSource).toBeUndefined();
+    expect(getSyncActivityMainCardState(next, false)).toBe('auto_interrupted');
   });
 
   it('does not convert a manual auto-upload interruption into auto completion', () => {
@@ -804,7 +801,7 @@ describe('buildOverview', () => {
     expect(next.completedCount).toBe(0);
     expect(next.totalCount).toBe(0);
     expect(next.currentTaskSource).toBe('auto');
-    expect(getSyncActivityMainCardState(next, false)).toBe('auto_interrupted');
+    expect(getSyncActivityMainCardState(next, false)).toBe('not_started');
   });
 
   it('keeps the interrupted card after the interrupted auto pipeline clears source', () => {
@@ -845,7 +842,7 @@ describe('buildOverview', () => {
     expect(next.completedCount).toBe(0);
     expect(next.totalCount).toBe(0);
     expect(next.currentTaskSource).toBeUndefined();
-    expect(getSyncActivityMainCardState(next, false)).toBe('auto_interrupted');
+    expect(getSyncActivityMainCardState(next, false)).toBe('not_started');
   });
 
   it('clears a previous reconnect error when native sends a null error code', () => {
@@ -1018,7 +1015,7 @@ describe('getSyncActivityDisplayProgressPercent', () => {
           currentFileTotalBytes: 1_000,
           currentTaskSource: 'auto',
           lastCompletedTaskSource: null,
-          autoUploadState: 'active',
+          autoUploadState: 'disabled',
           manualPending: 0,
           autoPending: 2,
         },
@@ -1042,7 +1039,6 @@ describe('getSyncActivityAutoRoundDisplayMetrics', () => {
           autoUploadState: 'active',
           autoPending: 6042,
         },
-        isManualUploading: false,
         rawMainCardState: 'running',
         baseline: null,
       }),
@@ -1071,7 +1067,6 @@ describe('getSyncActivityAutoRoundDisplayMetrics', () => {
           autoUploadState: 'active',
           autoPending: 6039,
         },
-        isManualUploading: false,
         rawMainCardState: 'running',
         baseline: {
           completedCount: 4,
@@ -1103,7 +1098,6 @@ describe('getSyncActivityAutoRoundDisplayMetrics', () => {
           autoUploadState: 'active',
           autoPending: 6039,
         },
-        isManualUploading: false,
         rawMainCardState: 'running',
         baseline: null,
       }),
@@ -1131,7 +1125,6 @@ describe('getSyncActivityAutoRoundDisplayMetrics', () => {
           roundBaselineCompletedCount: 800,
           roundBaselineCompletedBytes: 10_000,
         },
-        isManualUploading: false,
         rawMainCardState: 'running',
         baseline: {
           completedCount: 0,
@@ -1163,7 +1156,6 @@ describe('getSyncActivityAutoRoundDisplayMetrics', () => {
           roundBaselineCompletedCount: 1600,
           roundBaselineCompletedBytes: 30_700_000_000,
         },
-        isManualUploading: false,
         rawMainCardState: 'running',
         baseline: {
           completedCount: 0,
@@ -1200,7 +1192,6 @@ describe('getSyncActivityAutoRoundDisplayMetrics', () => {
           autoUploadState: 'active',
           autoPending: 0,
         },
-        isManualUploading: false,
         rawMainCardState: 'auto_completed',
         baseline,
       }),
@@ -1224,7 +1215,6 @@ describe('getSyncActivityAutoRoundDisplayMetrics', () => {
           autoUploadState: 'active',
           autoPending: 0,
         },
-        isManualUploading: false,
         rawMainCardState: 'standby',
         baseline,
       }),
@@ -1252,7 +1242,6 @@ describe('getSyncActivityAutoRoundDisplayMetrics', () => {
           roundBaselineCompletedCount: 1600,
           roundBaselineCompletedBytes: 30_697_316_309,
         },
-        isManualUploading: false,
         rawMainCardState: 'auto_completed',
         baseline: null,
       }),
@@ -1265,7 +1254,7 @@ describe('getSyncActivityAutoRoundDisplayMetrics', () => {
     });
   });
 
-  it('does not apply auto-round baseline logic to manual uploads', () => {
+  it('does not apply auto-round baseline logic to stale non-auto sources', () => {
     expect(
       getSyncActivityAutoRoundDisplayMetrics({
         overview: {
@@ -1273,12 +1262,11 @@ describe('getSyncActivityAutoRoundDisplayMetrics', () => {
           completedCount: 3,
           totalCount: 5,
           completedBytes: 2048,
-          currentTaskSource: 'manual',
+          currentTaskSource: null,
           lastCompletedTaskSource: null,
-          autoUploadState: 'active',
+          autoUploadState: 'disabled',
           autoPending: 2,
         },
-        isManualUploading: true,
         rawMainCardState: 'running',
         baseline: {
           completedCount: 1,

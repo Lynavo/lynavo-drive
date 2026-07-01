@@ -48,7 +48,7 @@
   "selectedCount_other": "已選 {{count}} 個素材",
   "selectionHint": {
     "none": "未選擇素材",
-    "autoActiveLock": "自動上傳中，手動上傳不可用"
+    "autoActiveLock": "自動上傳中"
   },
   "deviceDisconnected": "設備已斷開",
   "mediaTypes": {
@@ -143,7 +143,7 @@
     },
     "switchUploadMode": {
       "title": "切換上傳模式",
-      "body": "當前正在上傳，繼續自動上傳將中斷手動上傳，是否繼續？",
+      "body": "當前正在上傳，繼續自動上傳將重啟同步隊列，是否繼續？",
       "confirm": "確認切換"
     },
     "enableAutoFailed": {

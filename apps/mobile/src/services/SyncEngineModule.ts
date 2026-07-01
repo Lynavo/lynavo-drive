@@ -1,5 +1,4 @@
 import { NativeModules, Platform } from 'react-native';
-import type { DocumentPickerResponse } from '@react-native-documents/picker';
 import {
   ErrorCode,
   type ErrorCode as NativeSyncErrorCode,
@@ -75,27 +74,6 @@ export interface AlbumStats {
 }
 
 // ---------------------------------------------------------------------------
-// Manual upload result — returned by submitManualUpload bridge method
-// ---------------------------------------------------------------------------
-
-export interface ManualUploadResult {
-  queuedCount: number;
-  skippedCount: number;
-  batchId: string;
-}
-
-export interface DocumentUploadFile {
-  name: string;
-  size: number;
-  mimeType?: string | null;
-  uri?: string;
-}
-
-export interface DocumentUploadResult extends ManualUploadResult {
-  files: DocumentUploadFile[];
-}
-
-// ---------------------------------------------------------------------------
 // Typed wrappers for Lynavo Drive native bridge methods
 // ---------------------------------------------------------------------------
 
@@ -113,10 +91,6 @@ export interface AppInfo {
 export interface EnableAutoUploadOptions {
   skipPermissionPreflight?: boolean;
 }
-
-type DocumentPickerCancelledError = Error & {
-  code: 'DOCUMENT_PICKER_CANCELLED';
-};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -170,29 +144,6 @@ function normalizeHistoryLedgerCard(
     totalBytes: readNumberField(item, 'totalBytes') ?? 0,
     activeTransmissionSeconds,
   };
-}
-
-function normalizePickedDocument(
-  document: DocumentPickerResponse,
-): DocumentUploadFile {
-  return {
-    name: document.name?.trim() || 'Document',
-    size: document.size ?? 0,
-    mimeType: document.type ?? null,
-    uri: document.uri,
-  };
-}
-
-function createDocumentPickerCancelledError(): DocumentPickerCancelledError {
-  const error = new Error(
-    'Document picker was cancelled',
-  ) as DocumentPickerCancelledError;
-  error.code = 'DOCUMENT_PICKER_CANCELLED';
-  return error;
-}
-
-function loadDocumentPicker(): typeof import('@react-native-documents/picker') {
-  return require('@react-native-documents/picker') as typeof import('@react-native-documents/picker');
 }
 
 export async function getBindingState(): Promise<BindingStateDTO | null> {
@@ -298,57 +249,6 @@ export async function getAssetPreviewSource(
 ): Promise<AssetPreviewSourceDTO> {
   const result = await NativeSyncEngine.getAssetPreviewSource(assetLocalId);
   return result as AssetPreviewSourceDTO;
-}
-
-export async function submitManualUpload(
-  assetLocalIds: string[],
-): Promise<ManualUploadResult> {
-  const result = await NativeSyncEngine.submitManualUpload({ assetLocalIds });
-  return result as ManualUploadResult;
-}
-
-export async function pickDocumentUploads(): Promise<DocumentUploadResult> {
-  const {
-    errorCodes: documentPickerErrorCodes,
-    isErrorWithCode: isDocumentPickerErrorWithCode,
-    pick: pickDocuments,
-  } = loadDocumentPicker();
-  try {
-    const documents = await pickDocuments({
-      allowMultiSelection: true,
-      mode: 'open',
-      requestLongTermAccess: true,
-    });
-    return {
-      queuedCount: 0,
-      skippedCount: 0,
-      batchId: '',
-      files: documents.map(normalizePickedDocument),
-    };
-  } catch (error) {
-    if (
-      isDocumentPickerErrorWithCode(error) &&
-      error.code === documentPickerErrorCodes.OPERATION_CANCELED
-    ) {
-      throw createDocumentPickerCancelledError();
-    }
-    throw error;
-  }
-}
-
-export async function submitDocumentUploads(
-  files: DocumentUploadFile[],
-): Promise<DocumentUploadResult> {
-  const result = await NativeSyncEngine.submitDocumentUploads({ files });
-  return result as DocumentUploadResult;
-}
-
-export async function cancelManualBatch(batchId: string): Promise<void> {
-  await NativeSyncEngine.cancelManualBatch(batchId);
-}
-
-export async function cancelAllManualUploads(): Promise<void> {
-  await NativeSyncEngine.cancelAllManualUploads();
 }
 
 export async function retryLanReconnect(params: {

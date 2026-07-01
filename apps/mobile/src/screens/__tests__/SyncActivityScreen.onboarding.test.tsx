@@ -41,7 +41,7 @@ jest.mock('react-i18next', () => ({
         'syncActivity.notStarted.enableAuto': '開啟自動上傳',
         'syncActivity.quickEntry.title': '快捷入口',
         'syncActivity.quickEntry.albumTitle': '相簿',
-        'syncActivity.quickEntry.albumDesc': '瀏覽並手動上傳素材',
+        'syncActivity.quickEntry.albumDesc': '瀏覽相簿素材',
         'syncActivity.quickEntry.sharedFilesTitle': '共享目錄',
         'syncActivity.quickEntry.sharedFilesDesc': '瀏覽共享目錄與個人共享目錄',
         'syncActivity.quickEntry.globalSharedFilesTitle': '我的電腦',
@@ -50,8 +50,9 @@ jest.mock('react-i18next', () => ({
         'syncActivity.onboarding.previous': '上一步',
         'syncActivity.onboarding.next': `下一步 ${values?.step ?? ''}/${values?.total ?? ''}`,
         'syncActivity.onboarding.startJourney': '開啟旅程',
-        'syncActivity.onboarding.manual.title': '手動同步',
-        'syncActivity.onboarding.manual.body': '點擊這裡發送素材至電腦。',
+        'syncActivity.onboarding.album.title': '相簿素材',
+        'syncActivity.onboarding.album.body':
+          '從這裡瀏覽照片和影片。新增素材會進入自動同步隊列。',
         'syncActivity.onboarding.panel.title': '無感備份',
         'syncActivity.onboarding.panel.body': '這裡即時展示自動上傳進度。',
         'syncActivity.onboarding.history.title': '傳輸歷史',
@@ -85,7 +86,6 @@ jest.mock('../../components/Icon', () => ({
 }));
 
 jest.mock('../../services/SyncEngineModule', () => ({
-  cancelAllManualUploads: jest.fn().mockResolvedValue(undefined),
   disableAutoUpload: jest.fn().mockResolvedValue(undefined),
   enableAutoUpload: jest.fn().mockResolvedValue(undefined),
   retryLanReconnect: jest.fn().mockResolvedValue(undefined),
@@ -119,7 +119,7 @@ jest.mock('../../components/onboarding/SyncActivityTour', () => {
       return ReactInner.createElement(
         View,
         null,
-        ReactInner.createElement(Text, null, '手動同步'),
+        ReactInner.createElement(Text, null, '相簿素材'),
         ReactInner.createElement(
           TouchableOpacity,
           {
@@ -207,7 +207,7 @@ describe('SyncActivityScreen onboarding', () => {
     const screen = render(<SyncActivityScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('手動同步')).toBeTruthy();
+      expect(screen.getByText('相簿素材')).toBeTruthy();
     });
 
     fireEvent.press(screen.getByText('下一步 1/5'));
@@ -221,7 +221,7 @@ describe('SyncActivityScreen onboarding', () => {
     });
 
     await waitFor(() => {
-      expect(screen.queryByText('手動同步')).toBeNull();
+      expect(screen.queryByText('相簿素材')).toBeNull();
     });
   });
 
@@ -233,7 +233,7 @@ describe('SyncActivityScreen onboarding', () => {
     await waitFor(() => {
       expect(mockHasSeenSyncActivityTour).toHaveBeenCalledTimes(1);
     });
-    expect(screen.queryByText('手動同步')).toBeNull();
+    expect(screen.queryByText('相簿素材')).toBeNull();
   });
 
   it('uses My Computer copy for the shared files quick entry', async () => {

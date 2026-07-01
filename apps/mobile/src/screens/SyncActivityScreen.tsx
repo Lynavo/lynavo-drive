@@ -57,7 +57,6 @@ import {
   buildSyncConnectionEvidence,
   getConnectionBadgeState,
 } from '../utils/effectiveConnectionState';
-import { hasPendingManualWork } from '../utils/manualUploadState';
 import { rememberAutoUploadRoundProgress } from '../utils/autoUploadRoundProgress';
 import {
   getSyncActivityMainCardState,
@@ -93,7 +92,6 @@ interface SyncOverview {
   currentFileTotalBytes: number;
   currentTaskSource?: UploadTaskSource | null;
   lastCompletedTaskSource?: UploadTaskSource | null;
-  manualUploadCancelled?: boolean | null;
   autoUploadState?: AutoUploadState;
   manualPending?: number;
   autoPending?: number;
@@ -438,7 +436,6 @@ export function getSyncActivityAutoRoundDisplayMetrics(input: {
     | 'roundBaselineCompletedCount'
     | 'roundBaselineCompletedBytes'
   >;
-  isManualUploading: boolean;
   rawMainCardState: SyncActivityMainCardState;
   baseline?: AutoRoundDisplayBaseline | null;
 }): {
@@ -448,10 +445,9 @@ export function getSyncActivityAutoRoundDisplayMetrics(input: {
   totalCount: number;
   completedBytes: number;
 } {
-  const { overview, isManualUploading, rawMainCardState, baseline } = input;
+  const { overview, rawMainCardState, baseline } = input;
   const shouldTrack =
     overview.autoUploadState === 'active' &&
-    !isManualUploading &&
     (baseline !== null ||
       rawMainCardState === 'standby' ||
       rawMainCardState === 'auto_completed' ||
@@ -624,8 +620,8 @@ export function SyncActivityScreen() {
   const [connectionGraceActive, setConnectionGraceActive] = useState(true);
   const offlineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Optimistic UI: show "preparing auto-upload" immediately after the toggle,
-  // since the native pipeline can sit in a ~30 s heartbeat wait after the
-  // manual batch drains before it re-enters the scan loop.
+  // since the native pipeline can sit in a short heartbeat wait before it
+  // re-enters the scan loop.
   const [autoUploadPreparing, setAutoUploadPreparing] = useState(false);
   const autoUploadPreparingMinUntilRef = useRef<number | null>(null);
   const autoUploadPreparingSafetyTimerRef = useRef<ReturnType<
@@ -1141,21 +1137,14 @@ export function SyncActivityScreen() {
   }, [connectionGraceActive, isOffline, shouldBypassOfflineDelay]);
 
   const isAutoUploadActive = overview.autoUploadState === 'active';
-  const currentTaskSource = overview.currentTaskSource;
-  const hasManualUploadWork = hasPendingManualWork({
-    manualPending: overview.manualPending,
-    currentTaskSource,
-  });
 
   // ---------------------------------------------------------------------------
   // Card state determination
   // ---------------------------------------------------------------------------
 
-  // State 1: Upload Running — auto or manual upload active
+  // State 1: Upload Running — auto upload active
   // State 2: Auto Upload Not Started — device online, no upload active
   // State 3: Device Offline
-
-  const isManualUploading = hasManualUploadWork;
 
   const rawMainCardState = getSyncActivityMainCardState(
     overview,
@@ -1209,7 +1198,6 @@ export function SyncActivityScreen() {
   );
   const autoRoundDisplayMetrics = getSyncActivityAutoRoundDisplayMetrics({
     overview,
-    isManualUploading,
     rawMainCardState,
     baseline: autoRoundDisplayBaseline,
   });
@@ -1294,12 +1282,8 @@ export function SyncActivityScreen() {
 
   // Clear the optimistic "preparing auto-upload" state only once there is
   // concrete evidence that auto-upload has taken over. We intentionally do
-  // NOT clear the moment native enters 'scanning' — between scan-end and
-  // the first auto item actually uploading there is a transient gap where
-  // rawMainCardState regresses to 'manual_completed' (because
-  // lastCompletedTaskSource stays 'manual' until a new round starts).
-  // Keeping optimistic ON across that gap prevents the visible flash back
-  // to the manual-completed card.
+  // NOT clear the moment native enters 'scanning' — between scan-end and the
+  // first auto item actually uploading there can be a transient idle gap.
   //
   // Edge case: if the scan finishes with zero new items (nothing new to
   // upload), we'd otherwise wait out the 35 s safety timeout. We avoid
@@ -1576,87 +1560,6 @@ export function SyncActivityScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-            ) : mainCardState === 'manual_completed' ? (
-              <View style={styles.cardBody}>
-                <View style={styles.badgeRow}>
-                  <View style={styles.manualBadge}>
-                    <Text style={styles.manualBadgeText}>
-                      {t('syncActivity.badges.manual')}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.runningTitleRow}>
-                  <Text style={styles.runningTitle}>
-                    {t('syncActivity.completed.manual.title')}
-                  </Text>
-                  <Text
-                    style={[styles.runningPercent, styles.completionPercent]}
-                  >
-                    100%
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.progressBarTrack,
-                    styles.progressBarTrackComplete,
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.progressBarFill,
-                      styles.progressBarFillComplete,
-                    ]}
-                  />
-                </View>
-                <Text style={styles.completionSubtitle}>
-                  {t('syncActivity.completed.manual.subtitle', {
-                    completed: displayCompletedCount,
-                    total: completedProgressTotal,
-                  })}
-                </Text>
-                <View style={styles.completionStatsRow}>
-                  <CompletionStatCard
-                    label={t('syncActivity.stats.speed')}
-                    value={t('syncActivity.completed.speedIdle')}
-                  />
-                  <CompletionStatCard
-                    label={t('syncActivity.stats.progress')}
-                    value={t('syncActivity.completed.manual.progressValue', {
-                      completed: displayCompletedCount,
-                      total: completedProgressTotal,
-                    })}
-                  />
-                  <CompletionStatCard
-                    label={t('syncActivity.stats.transferred')}
-                    value={formatBytes(displayCompletedBytes)}
-                  />
-                </View>
-                <Text style={styles.completionHintText}>
-                  {t('syncActivity.completed.manual.hint')}
-                </Text>
-                <View style={styles.twoButtonRowCompact}>
-                  <TouchableOpacity
-                    style={[styles.rowButton, styles.rowButtonOutlined]}
-                    activeOpacity={0.75}
-                    onPress={() => navigation.navigate('AlbumWorkbench')}
-                  >
-                    <Text style={styles.rowButtonOutlinedText}>
-                      {t('syncActivity.completed.manual.goToAlbum')}
-                    </Text>
-                  </TouchableOpacity>
-                  {!autoUploadEnabledForDisplay && (
-                    <TouchableOpacity
-                      style={[styles.rowButton, styles.rowButtonPrimary]}
-                      activeOpacity={0.75}
-                      onPress={handleEnableAutoUpload}
-                    >
-                      <Text style={styles.rowButtonPrimaryText}>
-                        {t('syncActivity.completed.manual.enableAuto')}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
             ) : mainCardState === 'auto_completed' ? (
               <View style={styles.cardBody}>
                 <View style={styles.badgeRow}>
@@ -1745,28 +1648,14 @@ export function SyncActivityScreen() {
             ) : (
               <View style={styles.cardBody}>
                 <View style={styles.badgeRow}>
-                  <View
-                    style={
-                      isManualUploading ? styles.manualBadge : styles.autoBadge
-                    }
-                  >
-                    <Text
-                      style={
-                        isManualUploading
-                          ? styles.manualBadgeText
-                          : styles.autoBadgeText
-                      }
-                    >
-                      {isManualUploading
-                        ? t('syncActivity.badges.manual')
-                        : t('syncActivity.badges.auto')}
+                  <View style={styles.autoBadge}>
+                    <Text style={styles.autoBadgeText}>
+                      {t('syncActivity.badges.auto')}
                     </Text>
                   </View>
-                  {!isManualUploading && (
-                    <Text style={styles.badgeLabel}>
-                      {t('syncActivity.badges.autoEnabled')}
-                    </Text>
-                  )}
+                  <Text style={styles.badgeLabel}>
+                    {t('syncActivity.badges.autoEnabled')}
+                  </Text>
                 </View>
                 <View style={styles.runningTitleRow}>
                   <Text style={styles.runningTitle}>
@@ -1774,9 +1663,7 @@ export function SyncActivityScreen() {
                       ? getPreparationTitle(overview.uploadState, t)
                       : mainCardState === 'standby'
                         ? t('syncActivity.standby.title')
-                        : isManualUploading
-                          ? t('syncActivity.running.manualTitle')
-                          : t('syncActivity.running.autoTitle')}
+                        : t('syncActivity.running.autoTitle')}
                   </Text>
                   <Text style={styles.runningPercent}>
                     {displayProgressPercent}%
@@ -1840,22 +1727,19 @@ export function SyncActivityScreen() {
                   {t('syncActivity.running.queueInfo', {
                     queued: Math.max(
                       queue.length,
-                      overview.manualPending ?? 0,
                       overview.autoPending ?? 0,
                     ),
                   })}
                 </Text>
-                {!isManualUploading && (
-                  <TouchableOpacity
-                    style={styles.outlinedButton}
-                    activeOpacity={0.75}
-                    onPress={handleCloseAutoUpload}
-                  >
-                    <Text style={styles.outlinedButtonText}>
-                      {t('syncActivity.actions.closeAutoUpload')}
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  style={styles.outlinedButton}
+                  activeOpacity={0.75}
+                  onPress={handleCloseAutoUpload}
+                >
+                  <Text style={styles.outlinedButtonText}>
+                    {t('syncActivity.actions.closeAutoUpload')}
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -2083,9 +1967,8 @@ export function buildOverview(
     'lastCompletedTaskSource',
   );
   const payloadLastCompletedTaskSource =
-    payload.lastCompletedTaskSource === 'auto' ||
-    payload.lastCompletedTaskSource === 'manual'
-      ? payload.lastCompletedTaskSource
+    payload.lastCompletedTaskSource === 'auto'
+      ? 'auto'
       : undefined;
   const hasLastErrorCode = Object.prototype.hasOwnProperty.call(
     payload,
@@ -2109,114 +1992,67 @@ export function buildOverview(
     uploadState === 'idle' ||
     uploadState === 'paused_auto_upload';
   const nextCurrentTaskSource = hasCurrentTaskSource
-    ? ((payload.currentTaskSource as UploadTaskSource | undefined) ?? undefined)
-    : prev.currentTaskSource;
+    ? payload.currentTaskSource === 'auto'
+      ? 'auto'
+      : undefined
+    : prev.currentTaskSource === 'auto'
+      ? 'auto'
+      : undefined;
   const nextCompletedCount =
     (payload.completedCount as number | undefined) ?? prev.completedCount;
   const nextTotalCount =
     (payload.totalCount as number | undefined) ??
     (payload.queueTotalCount as number | undefined) ??
     prev.totalCount;
-  const nextManualPending =
-    (payload.manualPending as number | undefined) ?? prev.manualPending;
+  const nextManualPending = 0;
   const nextAutoPending =
     (payload.autoPending as number | undefined) ?? prev.autoPending;
   const nextAutoUploadState =
     (payload.autoUploadState as AutoUploadState | undefined) ??
     prev.autoUploadState;
-  const isSettledUploadState =
-    uploadState === 'idle' || uploadState === 'paused_auto_upload';
-  const isManualUploadCancelled =
-    payload.manualUploadCancelled === true ||
-    (prev.manualUploadCancelled === true &&
-      isSettledUploadState &&
-      nextManualPending === 0);
-  const isManualFinalFileSettlingToIdle =
-    !isManualUploadCancelled &&
-    isSettledUploadState &&
-    (nextAutoUploadState === 'disabled' ||
-      nextAutoUploadState === 'interrupted') &&
-    (prev.currentTaskSource === 'manual' ||
-      (prev.autoUploadState !== 'active' &&
-        prev.totalCount > 0 &&
-        prev.completedCount >= prev.totalCount) ||
-      (prev.autoUploadState !== 'active' &&
-        prev.currentFileTotalBytes > 0 &&
-        prev.currentFileConfirmedBytes >= prev.currentFileTotalBytes)) &&
-    nextManualPending === 0 &&
-    nextAutoPending === 0 &&
-    nextCompletedCount === 0 &&
-    nextTotalCount === 0;
-  const effectiveCompletedCount = isManualFinalFileSettlingToIdle
-    ? prev.totalCount
-    : isManualUploadCancelled
-      ? 0
-      : nextCompletedCount;
-  const effectiveTotalCount = isManualFinalFileSettlingToIdle
-    ? prev.totalCount
-    : isManualUploadCancelled
-      ? 0
-      : nextTotalCount;
-  const effectiveCompletedBytes = isManualFinalFileSettlingToIdle
-    ? prev.completedCount >= prev.totalCount
-      ? Math.max(prev.totalBytes, prev.completedBytes)
-      : Math.max(
-          prev.totalBytes,
-          prev.completedBytes + prev.currentFileConfirmedBytes,
-        )
-    : isManualUploadCancelled
-      ? 0
-      : ((payload.completedBytes as number | undefined) ?? prev.completedBytes);
-  const effectiveTotalBytes = isManualFinalFileSettlingToIdle
-    ? Math.max(prev.totalBytes, effectiveCompletedBytes)
-    : isManualUploadCancelled
-      ? 0
-      : ((payload.totalBytes as number | undefined) ??
-        (payload.queueTotalBytes as number | undefined) ??
-        prev.totalBytes);
+  const effectiveCompletedCount = nextCompletedCount;
+  const effectiveTotalCount = nextTotalCount;
+  const effectiveCompletedBytes =
+    (payload.completedBytes as number | undefined) ?? prev.completedBytes;
+  const effectiveTotalBytes =
+    (payload.totalBytes as number | undefined) ??
+    (payload.queueTotalBytes as number | undefined) ??
+    prev.totalBytes;
   const roundSettledStates = new Set(['idle', 'paused_auto_upload']);
   const roundCompletionBridgeStates = new Set([
     ...roundSettledStates,
     'scanning',
   ]);
   const roundFinishedWithoutCompletedPulse =
-    isManualFinalFileSettlingToIdle ||
-    (roundCompletionBridgeStates.has(uploadState) &&
-      !roundCompletionBridgeStates.has(prev.uploadState) &&
-      effectiveTotalCount > 0 &&
-      effectiveCompletedCount >= effectiveTotalCount &&
-      nextManualPending === 0 &&
-      nextAutoPending === 0);
+    roundCompletionBridgeStates.has(uploadState) &&
+    !roundCompletionBridgeStates.has(prev.uploadState) &&
+    effectiveTotalCount > 0 &&
+    effectiveCompletedCount >= effectiveTotalCount &&
+    nextAutoPending === 0;
   const inferredCompletedTaskSource =
     nextCurrentTaskSource ??
     payloadLastCompletedTaskSource ??
-    prev.currentTaskSource ??
+    (prev.currentTaskSource === 'auto' ? 'auto' : undefined) ??
     (nextAutoUploadState === 'active'
       ? ('auto' as UploadTaskSource)
       : undefined) ??
-    prev.lastCompletedTaskSource ??
-    ((prev.autoUploadState === 'active'
-      ? 'auto'
-      : 'manual') as UploadTaskSource);
-  const derivedLastCompletedTaskSource = isManualUploadCancelled
-    ? undefined
-    : hasLastCompletedTaskSource
-      ? payloadLastCompletedTaskSource
-      : uploadState === 'completed'
+    (prev.lastCompletedTaskSource === 'auto' ? 'auto' : undefined);
+  const derivedLastCompletedTaskSource = hasLastCompletedTaskSource
+    ? payloadLastCompletedTaskSource
+    : uploadState === 'completed'
+      ? inferredCompletedTaskSource
+      : roundFinishedWithoutCompletedPulse
         ? inferredCompletedTaskSource
-        : roundFinishedWithoutCompletedPulse
-          ? inferredCompletedTaskSource
-          : prev.lastCompletedTaskSource;
+        : prev.lastCompletedTaskSource === 'auto'
+          ? 'auto'
+          : undefined;
 
   return {
-    progressPercent: isManualUploadCancelled
-      ? 0
-      : ((payload.progressPercent as number | undefined) ??
-        (currentFileTotalBytes > 0
-          ? Math.round(
-              (currentFileConfirmedBytes / currentFileTotalBytes) * 100,
-            )
-          : prev.progressPercent)),
+    progressPercent:
+      (payload.progressPercent as number | undefined) ??
+      (currentFileTotalBytes > 0
+        ? Math.round((currentFileConfirmedBytes / currentFileTotalBytes) * 100)
+        : prev.progressPercent),
     currentSpeedMbps:
       uploadState === 'reconnecting'
         ? 0
@@ -2261,7 +2097,6 @@ export function buildOverview(
     // "clear". Only fall back to prev when the key is absent from payload.
     currentTaskSource: nextCurrentTaskSource,
     lastCompletedTaskSource: derivedLastCompletedTaskSource,
-    manualUploadCancelled: isManualUploadCancelled ? true : undefined,
     autoUploadState: nextAutoUploadState,
     manualPending: nextManualPending,
     autoPending: nextAutoPending,
@@ -2414,17 +2249,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#16a34a',
-  },
-  manualBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 8,
-    backgroundColor: 'rgba(59,159,216,0.12)',
-  },
-  manualBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: BLUE,
   },
   badgeLabel: {
     fontSize: 12,

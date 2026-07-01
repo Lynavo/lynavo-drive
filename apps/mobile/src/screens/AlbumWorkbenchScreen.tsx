@@ -21,9 +21,7 @@ import {
   NativeEventEmitter,
   Modal,
   Platform,
-  PanResponder,
   type AppStateStatus,
-  type GestureResponderEvent,
   type ImageSourcePropType,
   type ListRenderItemInfo,
 } from 'react-native';
@@ -55,8 +53,6 @@ import {
   browseAlbum,
   getAlbumStats,
   getAlbumCollections,
-  submitManualUpload,
-  cancelAllManualUploads,
   requestPhotoPermission,
   getAutoUploadConfig,
   saveAutoUploadConfig,
@@ -69,7 +65,6 @@ import {
 } from '../services/SyncEngineModule';
 import { formatBytes } from '../utils/format';
 import { sortAlbumAssetsForDisplay } from '../utils/sortAlbumAssets';
-import { hasPendingManualWork } from '../utils/manualUploadState';
 import { deriveDeviceConnected } from '../utils/deriveDeviceConnected';
 import {
   buildAutoUploadRoundOverview,
@@ -92,10 +87,6 @@ const GRID_ITEM_SIZE =
   (SCREEN_WIDTH - CONTENT_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) /
   GRID_COLUMNS;
 const PAGE_SIZE = 60;
-const GRID_DRAG_SELECT_MOVE_DELAY_MS = 180;
-const GRID_DRAG_SELECT_LONG_PRESS_MS = 300;
-const GRID_DRAG_SELECT_MOVE_TOLERANCE = 8;
-const GRID_SELECTION_CONTROL_HIT_SIZE = 44;
 
 const BLUE = '#3b9fd8';
 const DARK = '#1a3a5c';
@@ -133,17 +124,6 @@ function rememberAndBuildAutoUploadRoundOverview(
 type MediaFilter = 'all' | 'photos' | 'videos';
 type TransferFilter = 'all' | 'untransferred' | 'transferred';
 type ViewMode = 'grid' | 'list';
-type GridItemRef = React.ComponentRef<typeof View>;
-type GridDragSelectionMode = 'select' | 'deselect';
-
-interface MeasuredGridItem {
-  assetLocalId: string;
-  isTransferred: boolean;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
 
 type UnifiedFilter =
   | 'all'
@@ -230,48 +210,6 @@ export function AlbumWorkbenchScreen() {
   const assetListRequestRef = useRef(0);
   const autoUploadTransferredBaselineRef = useRef<number | null>(null);
 
-  // Selection
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const selectedIdsRef = useRef(selectedIds);
-  selectedIdsRef.current = selectedIds;
-  const [isGridDragScrollLocked, setGridDragScrollLocked] = useState(false);
-  const gridItemRefs = useRef(new Map<string, GridItemRef>());
-  const dragSelectionRef = useRef<{
-    active: boolean;
-    startAssetLocalId: string | null;
-    startPageX: number;
-    startPageY: number;
-    startedOnSelectionControl: boolean;
-    selectionMode: GridDragSelectionMode;
-    hasMoved: boolean;
-    canActivateByMove: boolean;
-    lastPageX: number;
-    lastPageY: number;
-    lastSelectedId: string | null;
-    measuredItems: MeasuredGridItem[];
-    moveActivationTimer: ReturnType<typeof setTimeout> | null;
-    longPressTimer: ReturnType<typeof setTimeout> | null;
-  }>({
-    active: false,
-    startAssetLocalId: null,
-    startPageX: 0,
-    startPageY: 0,
-    startedOnSelectionControl: false,
-    selectionMode: 'select',
-    hasMoved: false,
-    canActivateByMove: false,
-    lastPageX: 0,
-    lastPageY: 0,
-    lastSelectedId: null,
-    measuredItems: [],
-    moveActivationTimer: null,
-    longPressTimer: null,
-  });
-  const suppressNextGridPressRef = useRef(false);
-  const suppressNextGridPressTimerRef = useRef<ReturnType<
-    typeof setTimeout
-  > | null>(null);
-
   // Preview modal
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
@@ -299,9 +237,6 @@ export function AlbumWorkbenchScreen() {
   const [collections, setCollections] = useState<AlbumCollectionInfo[]>([]);
   const [collectionSheetVisible, setCollectionSheetVisible] = useState(false);
   const [collectionsLoading, setCollectionsLoading] = useState(false);
-
-  // Upload
-  const [uploading, setUploading] = useState(false);
 
   // Device connection state — used to disable upload button when offline
   const [deviceConnected, setDeviceConnected] = useState(false);
@@ -376,20 +311,6 @@ export function AlbumWorkbenchScreen() {
     animations.forEach(a => a.start());
     return () => animations.forEach(a => a.stop());
   }, [autoUploadConfig?.state, radarAnims]);
-
-  useEffect(() => {
-    return () => {
-      if (dragSelectionRef.current.moveActivationTimer) {
-        clearTimeout(dragSelectionRef.current.moveActivationTimer);
-      }
-      if (dragSelectionRef.current.longPressTimer) {
-        clearTimeout(dragSelectionRef.current.longPressTimer);
-      }
-      if (suppressNextGridPressTimerRef.current) {
-        clearTimeout(suppressNextGridPressTimerRef.current);
-      }
-    };
-  }, []);
 
   // ---------------------------------------------------------------------------
   // Data loading
@@ -710,79 +631,6 @@ export function AlbumWorkbenchScreen() {
     loadSyncOverview,
   ]);
 
-  // ---------------------------------------------------------------------------
-  // Selection handlers
-  // ---------------------------------------------------------------------------
-
-  const assetById = useMemo(
-    () => new Map(assets.map(asset => [asset.assetLocalId, asset])),
-    [assets],
-  );
-
-  const addSelectedId = useCallback(
-    (assetLocalId: string) => {
-      const asset = assetById.get(assetLocalId);
-      if (!asset || asset.isTransferred || isAutoUploadActive) return;
-
-      setSelectedIds(prev => {
-        if (prev.has(assetLocalId)) return prev;
-        const next = new Set(prev);
-        next.add(assetLocalId);
-        return next;
-      });
-    },
-    [assetById, isAutoUploadActive],
-  );
-
-  const removeSelectedId = useCallback((assetLocalId: string) => {
-    setSelectedIds(prev => {
-      if (!prev.has(assetLocalId)) return prev;
-      const next = new Set(prev);
-      next.delete(assetLocalId);
-      return next;
-    });
-  }, []);
-
-  useEffect(() => {
-    if (selectedIds.size === 0) return;
-
-    const transferredIds = assets
-      .filter(
-        asset => asset.isTransferred && selectedIds.has(asset.assetLocalId),
-      )
-      .map(asset => asset.assetLocalId);
-    if (transferredIds.length === 0) return;
-
-    setSelectedIds(prev => {
-      let changed = false;
-      const next = new Set(prev);
-      transferredIds.forEach(id => {
-        if (next.delete(id)) {
-          changed = true;
-        }
-      });
-      return changed ? next : prev;
-    });
-  }, [assets, selectedIds]);
-
-  const handleToggleSelect = useCallback(
-    (assetLocalId: string) => {
-      const asset = assetById.get(assetLocalId);
-      if (!asset || asset.isTransferred || isAutoUploadActive) return;
-
-      setSelectedIds(prev => {
-        const next = new Set(prev);
-        if (next.has(assetLocalId)) {
-          next.delete(assetLocalId);
-        } else {
-          next.add(assetLocalId);
-        }
-        return next;
-      });
-    },
-    [assetById, isAutoUploadActive],
-  );
-
   const handleOpenPreview = useCallback(
     (assetLocalId: string) => {
       const idx = assets.findIndex(a => a.assetLocalId === assetLocalId);
@@ -795,326 +643,10 @@ export function AlbumWorkbenchScreen() {
 
   const handleGridItemPress = useCallback(
     (assetLocalId: string) => {
-      if (suppressNextGridPressRef.current) {
-        suppressNextGridPressRef.current = false;
-        return;
-      }
       handleOpenPreview(assetLocalId);
     },
     [handleOpenPreview],
   );
-
-  const measureVisibleGridItems = useCallback(
-    (onMeasured: (items: MeasuredGridItem[]) => void) => {
-      const entries = Array.from(gridItemRefs.current.entries());
-      if (entries.length === 0) {
-        onMeasured([]);
-        return;
-      }
-
-      const measuredItems: MeasuredGridItem[] = [];
-      let pending = entries.length;
-      const finishOne = () => {
-        pending -= 1;
-        if (pending === 0) {
-          onMeasured(measuredItems);
-        }
-      };
-
-      entries.forEach(([assetLocalId, node]) => {
-        const asset = assetById.get(assetLocalId);
-        if (!asset || !node) {
-          finishOne();
-          return;
-        }
-
-        node.measureInWindow((x, y, width, height) => {
-          if (width > 0 && height > 0) {
-            measuredItems.push({
-              assetLocalId,
-              isTransferred: asset.isTransferred,
-              x,
-              y,
-              width,
-              height,
-            });
-          }
-          finishOne();
-        });
-      });
-    },
-    [assetById],
-  );
-
-  const isGridSelectionControlPoint = useCallback(
-    (event: GestureResponderEvent) => {
-      const { locationX, locationY } = event.nativeEvent;
-      return (
-        locationX >= GRID_ITEM_SIZE - GRID_SELECTION_CONTROL_HIT_SIZE &&
-        locationY <= GRID_SELECTION_CONTROL_HIT_SIZE
-      );
-    },
-    [],
-  );
-
-  const applyGridDragSelectionChange = useCallback(
-    (assetLocalId: string, selectionMode: GridDragSelectionMode) => {
-      if (selectionMode === 'deselect') {
-        removeSelectedId(assetLocalId);
-        return;
-      }
-      addSelectedId(assetLocalId);
-    },
-    [addSelectedId, removeSelectedId],
-  );
-
-  const updateGridDragSelectionAtPoint = useCallback(
-    (
-      pageX: number,
-      pageY: number,
-      measuredItems = dragSelectionRef.current.measuredItems,
-      selectionMode = dragSelectionRef.current.selectionMode,
-    ) => {
-      const hit = measuredItems.find(
-        item =>
-          pageX >= item.x &&
-          pageX <= item.x + item.width &&
-          pageY >= item.y &&
-          pageY <= item.y + item.height,
-      );
-      if (!hit || hit.isTransferred) return;
-      if (dragSelectionRef.current.lastSelectedId === hit.assetLocalId) return;
-
-      dragSelectionRef.current.lastSelectedId = hit.assetLocalId;
-      applyGridDragSelectionChange(hit.assetLocalId, selectionMode);
-    },
-    [applyGridDragSelectionChange],
-  );
-
-  const activateGridDragSelection = useCallback(
-    (pageX: number, pageY: number, fallbackAssetLocalId: string | null) => {
-      const state = dragSelectionRef.current;
-      const selectionMode = state.selectionMode;
-      if (state.active) {
-        updateGridDragSelectionAtPoint(
-          pageX,
-          pageY,
-          state.measuredItems,
-          selectionMode,
-        );
-        return;
-      }
-      setGridDragScrollLocked(true);
-
-      if (state.longPressTimer) {
-        clearTimeout(state.longPressTimer);
-        state.longPressTimer = null;
-      }
-
-      state.active = true;
-      state.lastSelectedId = null;
-      if (fallbackAssetLocalId) {
-        applyGridDragSelectionChange(fallbackAssetLocalId, selectionMode);
-        state.lastSelectedId = fallbackAssetLocalId;
-      }
-      measureVisibleGridItems(measuredItems => {
-        const currentState = dragSelectionRef.current;
-        if (
-          !currentState.active ||
-          currentState.selectionMode !== selectionMode
-        ) {
-          return;
-        }
-        currentState.measuredItems = measuredItems;
-        updateGridDragSelectionAtPoint(
-          pageX,
-          pageY,
-          measuredItems,
-          selectionMode,
-        );
-      });
-    },
-    [
-      applyGridDragSelectionChange,
-      measureVisibleGridItems,
-      updateGridDragSelectionAtPoint,
-    ],
-  );
-
-  const resetGridDragSelection = useCallback(() => {
-    const state = dragSelectionRef.current;
-    const wasActive = state.active;
-    if (state.moveActivationTimer) {
-      clearTimeout(state.moveActivationTimer);
-    }
-    if (state.longPressTimer) {
-      clearTimeout(state.longPressTimer);
-    }
-
-    dragSelectionRef.current = {
-      active: false,
-      startAssetLocalId: null,
-      startPageX: 0,
-      startPageY: 0,
-      startedOnSelectionControl: false,
-      selectionMode: 'select',
-      hasMoved: false,
-      canActivateByMove: false,
-      lastPageX: 0,
-      lastPageY: 0,
-      lastSelectedId: null,
-      measuredItems: [],
-      moveActivationTimer: null,
-      longPressTimer: null,
-    };
-    setGridDragScrollLocked(false);
-
-    if (wasActive) {
-      suppressNextGridPressRef.current = true;
-      if (suppressNextGridPressTimerRef.current) {
-        clearTimeout(suppressNextGridPressTimerRef.current);
-      }
-      suppressNextGridPressTimerRef.current = setTimeout(() => {
-        suppressNextGridPressRef.current = false;
-        suppressNextGridPressTimerRef.current = null;
-      }, 250);
-    }
-
-    return wasActive;
-  }, []);
-
-  const finishGridDragSelection = useCallback(
-    (assetLocalId: string) => {
-      const state = dragSelectionRef.current;
-      const shouldOpenPreview = !state.active && !state.hasMoved;
-      const shouldToggleSelection =
-        !state.active && !state.hasMoved && state.startedOnSelectionControl;
-      const wasActive = resetGridDragSelection();
-      if (!wasActive && shouldToggleSelection) {
-        handleToggleSelect(assetLocalId);
-        return;
-      }
-      if (!wasActive && shouldOpenPreview) {
-        handleOpenPreview(assetLocalId);
-      }
-    },
-    [handleOpenPreview, handleToggleSelect, resetGridDragSelection],
-  );
-
-  const beginGridDragSelection = useCallback(
-    (assetLocalId: string, event: GestureResponderEvent) => {
-      const asset = assetById.get(assetLocalId);
-      if (!asset || asset.isTransferred || isAutoUploadActive) return;
-
-      const { pageX, pageY } = event.nativeEvent;
-      const startedOnSelectionControl = isGridSelectionControlPoint(event);
-      const selectionMode: GridDragSelectionMode = selectedIdsRef.current.has(
-        assetLocalId,
-      )
-        ? 'deselect'
-        : 'select';
-      if (dragSelectionRef.current.moveActivationTimer) {
-        clearTimeout(dragSelectionRef.current.moveActivationTimer);
-      }
-      if (dragSelectionRef.current.longPressTimer) {
-        clearTimeout(dragSelectionRef.current.longPressTimer);
-      }
-      setGridDragScrollLocked(true);
-
-      dragSelectionRef.current = {
-        active: false,
-        startAssetLocalId: assetLocalId,
-        startPageX: pageX,
-        startPageY: pageY,
-        startedOnSelectionControl,
-        selectionMode,
-        hasMoved: false,
-        canActivateByMove: false,
-        lastPageX: pageX,
-        lastPageY: pageY,
-        lastSelectedId: null,
-        measuredItems: [],
-        moveActivationTimer: setTimeout(() => {
-          const currentState = dragSelectionRef.current;
-          if (currentState.startAssetLocalId !== assetLocalId) return;
-          currentState.canActivateByMove = true;
-          currentState.moveActivationTimer = null;
-          if (
-            currentState.startedOnSelectionControl &&
-            currentState.hasMoved &&
-            !currentState.active
-          ) {
-            activateGridDragSelection(
-              currentState.lastPageX,
-              currentState.lastPageY,
-              currentState.startAssetLocalId,
-            );
-          }
-        }, GRID_DRAG_SELECT_MOVE_DELAY_MS),
-        longPressTimer: setTimeout(() => {
-          activateGridDragSelection(pageX, pageY, assetLocalId);
-        }, GRID_DRAG_SELECT_LONG_PRESS_MS),
-      };
-    },
-    [
-      activateGridDragSelection,
-      assetById,
-      isAutoUploadActive,
-      isGridSelectionControlPoint,
-    ],
-  );
-
-  const handleGridDragMove = useCallback(
-    (event: GestureResponderEvent) => {
-      const state = dragSelectionRef.current;
-      const { pageX, pageY } = event.nativeEvent;
-      state.lastPageX = pageX;
-      state.lastPageY = pageY;
-      const dx = Math.abs(pageX - state.startPageX);
-      const dy = Math.abs(pageY - state.startPageY);
-      if (
-        dx > GRID_DRAG_SELECT_MOVE_TOLERANCE ||
-        dy > GRID_DRAG_SELECT_MOVE_TOLERANCE
-      ) {
-        state.hasMoved = true;
-      }
-      if (
-        !state.active &&
-        state.hasMoved &&
-        state.startedOnSelectionControl &&
-        state.canActivateByMove
-      ) {
-        activateGridDragSelection(pageX, pageY, state.startAssetLocalId);
-        return;
-      }
-
-      if (!state.active) return;
-      updateGridDragSelectionAtPoint(pageX, pageY);
-    },
-    [activateGridDragSelection, updateGridDragSelectionAtPoint],
-  );
-
-  const shouldCaptureGridSelectionGesture = useCallback(
-    (asset: AlbumAssetDTO, event: GestureResponderEvent) => {
-      return false;
-    },
-    [],
-  );
-
-  const selectableIds = useMemo(
-    () => assets.filter(a => !a.isTransferred).map(a => a.assetLocalId),
-    [assets],
-  );
-  const allSelectableSelected =
-    selectableIds.length > 0 && selectableIds.every(id => selectedIds.has(id));
-
-  const handleToggleSelectAll = useCallback(() => {
-    if (allSelectableSelected) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(selectableIds));
-    }
-  }, [allSelectableSelected, selectableIds]);
 
   // Unified filter: derives both mediaFilter and transferFilter from a single tab
   const [unifiedFilter, setUnifiedFilter] = useState<UnifiedFilter>('all');
@@ -1144,98 +676,6 @@ export function AlbumWorkbenchScreen() {
         break;
     }
   }, []);
-
-  // ---------------------------------------------------------------------------
-  // Upload handler
-  // ---------------------------------------------------------------------------
-
-  const handleUpload = useCallback(async () => {
-    if (selectedIds.size === 0) return;
-
-    if (autoUploadConfig?.state === 'active') {
-      Alert.alert(
-        t('albumWorkbench.dialogs.cannotUpload.title'),
-        t('albumWorkbench.dialogs.cannotUpload.autoActive'),
-      );
-      return;
-    }
-
-    // Check device connection before submitting
-    try {
-      const binding = await NativeModules.NativeSyncEngine?.getBindingState();
-      if (
-        !binding?.deviceId ||
-        (binding.connectionState !== 'connected' &&
-          binding.connectionState !== 'bound')
-      ) {
-        Alert.alert(
-          t('albumWorkbench.dialogs.cannotUpload.title'),
-          t('albumWorkbench.dialogs.cannotUpload.notConnected'),
-        );
-        return;
-      }
-    } catch {
-      Alert.alert(
-        t('albumWorkbench.dialogs.cannotUpload.title'),
-        t('albumWorkbench.dialogs.cannotUpload.notConnected'),
-      );
-      return;
-    }
-
-    try {
-      setUploading(true);
-      const result = await submitManualUpload(Array.from(selectedIds));
-      if (result.skippedCount === 0) {
-        // All succeeded
-        Alert.alert(
-          t('albumWorkbench.dialogs.submitted.title'),
-          t('albumWorkbench.dialogs.submitted.queuedOnly', {
-            count: result.queuedCount,
-          }),
-        );
-      } else if (result.queuedCount > 0) {
-        // Partial duplicates
-        Alert.alert(
-          t('albumWorkbench.dialogs.submitted.title'),
-          t('albumWorkbench.dialogs.submitted.queuedWithSkipped', {
-            queued: result.queuedCount,
-            skipped: result.skippedCount,
-          }),
-        );
-      } else {
-        // All duplicates
-        Alert.alert(
-          t('albumWorkbench.dialogs.allDuplicate.title'),
-          t('albumWorkbench.dialogs.allDuplicate.body', {
-            count: result.skippedCount,
-          }),
-        );
-      }
-      setSelectedIds(new Set());
-      // Reload assets to update transferred/queued states
-      void loadAssets(mediaFilter, transferFilter, true, collectionId);
-      void loadStats();
-      // Kick off the sync pipeline so queued items actually upload
-      NativeModules.NativeSyncEngine?.triggerSync?.();
-    } catch (e) {
-      Alert.alert(
-        t('albumWorkbench.dialogs.submitFailed.title'),
-        t('albumWorkbench.dialogs.submitFailed.body'),
-      );
-      console.warn('[AlbumWorkbench] submitManualUpload error:', e);
-    } finally {
-      setUploading(false);
-    }
-  }, [
-    autoUploadConfig?.state,
-    selectedIds,
-    loadAssets,
-    mediaFilter,
-    transferFilter,
-    collectionId,
-    loadStats,
-    t,
-  ]);
 
   // ---------------------------------------------------------------------------
   // Auto-upload config handlers
@@ -1308,44 +748,6 @@ export function AlbumWorkbenchScreen() {
             );
             return;
           }
-        }
-
-        // Check if manual upload is in progress — per PRD, must confirm first
-        try {
-          const syncData =
-            await NativeModules.NativeSyncEngine?.getSyncOverview();
-          if (hasPendingManualWork(syncData)) {
-            Alert.alert(
-              t('albumWorkbench.dialogs.switchUploadMode.title'),
-              t('albumWorkbench.dialogs.switchUploadMode.body'),
-              [
-                { text: t('common.cancel'), style: 'cancel' },
-                {
-                  text: t('albumWorkbench.dialogs.switchUploadMode.confirm'),
-                  onPress: async () => {
-                    try {
-                      await cancelAllManualUploads();
-                      await primeAutoUploadRoundBaseline();
-                      await enableAutoUpload();
-                      await loadConfig();
-                    } catch (e) {
-                      console.warn(
-                        '[AlbumWorkbench] enableAutoUpload error:',
-                        e,
-                      );
-                      Alert.alert(
-                        t('albumWorkbench.dialogs.enableAutoFailed.title'),
-                        t('albumWorkbench.dialogs.enableAutoFailed.body'),
-                      );
-                    }
-                  },
-                },
-              ],
-            );
-            return;
-          }
-        } catch {
-          // If we can't check, proceed — sync overview unavailable
         }
 
         await primeAutoUploadRoundBaseline();
@@ -1453,7 +855,6 @@ export function AlbumWorkbenchScreen() {
       setCollectionId(colId);
       setCollectionTitle(title);
       setCollectionSheetVisible(false);
-      setSelectedIds(new Set());
     },
     [],
   );
@@ -1484,43 +885,10 @@ export function AlbumWorkbenchScreen() {
 
   const renderGridItem = useCallback(
     ({ item }: ListRenderItemInfo<AlbumAssetDTO>) => {
-      const isSelected = selectedIds.has(item.assetLocalId);
-      const panResponder = PanResponder.create({
-        onStartShouldSetPanResponderCapture: event =>
-          shouldCaptureGridSelectionGesture(item, event),
-        onStartShouldSetPanResponder: event =>
-          shouldCaptureGridSelectionGesture(item, event),
-        onMoveShouldSetPanResponderCapture: event =>
-          shouldCaptureGridSelectionGesture(item, event),
-        onMoveShouldSetPanResponder: event =>
-          shouldCaptureGridSelectionGesture(item, event),
-        onPanResponderGrant: event => {
-          beginGridDragSelection(item.assetLocalId, event);
-        },
-        onPanResponderMove: handleGridDragMove,
-        onPanResponderRelease: () => finishGridDragSelection(item.assetLocalId),
-        onPanResponderTerminate: resetGridDragSelection,
-        onPanResponderTerminationRequest: () =>
-          !dragSelectionRef.current.active &&
-          !dragSelectionRef.current.startedOnSelectionControl &&
-          !isGridDragScrollLocked &&
-          selectedIds.size === 0,
-        onShouldBlockNativeResponder: () => false,
-      });
-
       return (
         <View
-          ref={node => {
-            if (node) {
-              gridItemRefs.current.set(item.assetLocalId, node);
-            } else {
-              gridItemRefs.current.delete(item.assetLocalId);
-            }
-          }}
-          collapsable={false}
           testID={`album-grid-item-${item.assetLocalId}`}
           style={styles.gridItem}
-          {...panResponder.panHandlers}
         >
           <TouchableOpacity
             style={styles.gridItemPressable}
@@ -1553,25 +921,14 @@ export function AlbumWorkbenchScreen() {
         </View>
       );
     },
-    [
-      beginGridDragSelection,
-      finishGridDragSelection,
-      handleGridDragMove,
-      handleGridItemPress,
-      isGridDragScrollLocked,
-      resetGridDragSelection,
-      selectedIds,
-      shouldCaptureGridSelectionGesture,
-      t,
-    ],
+    [handleGridItemPress, t],
   );
 
   const renderListItem = useCallback(
     ({ item }: ListRenderItemInfo<AlbumAssetDTO>) => {
-      const isSelected = selectedIds.has(item.assetLocalId);
       return (
         <TouchableOpacity
-          style={[styles.listRow, isSelected && styles.listRowSelected]}
+          style={styles.listRow}
           activeOpacity={0.7}
           onPress={() => handleOpenPreview(item.assetLocalId)}
         >
@@ -1611,7 +968,7 @@ export function AlbumWorkbenchScreen() {
         </TouchableOpacity>
       );
     },
-    [selectedIds, handleToggleSelect, handleOpenPreview, t],
+    [handleOpenPreview, t],
   );
 
   const keyExtractor = useCallback(
@@ -2088,10 +1445,8 @@ export function AlbumWorkbenchScreen() {
           data={isAutoUploadActive ? [] : assets}
           renderItem={renderGridItem}
           keyExtractor={keyExtractor}
-          extraData={selectedIds}
           numColumns={GRID_COLUMNS}
           contentContainerStyle={styles.gridContent}
-          scrollEnabled={!isGridDragScrollLocked}
           columnWrapperStyle={
             !isAutoUploadActive && assets.length > 0
               ? styles.gridRow
@@ -2118,7 +1473,6 @@ export function AlbumWorkbenchScreen() {
           data={isAutoUploadActive ? [] : assets}
           renderItem={renderListItem}
           keyExtractor={keyExtractor}
-          extraData={selectedIds}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           onEndReached={isAutoUploadActive ? undefined : handleEndReached}

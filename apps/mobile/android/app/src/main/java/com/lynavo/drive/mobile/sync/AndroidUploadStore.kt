@@ -118,32 +118,6 @@ class AndroidUploadStore(context: Context) {
   }
 
   @Synchronized
-  fun cancelManualBatch(batchId: String, updatedAt: String) {
-    writeItems(
-      readItems().map { item ->
-        if (item.batchId == batchId && item.source == "manual" && item.status in PENDING_STATUSES) {
-          item.copy(status = "cancelled", updatedAt = updatedAt)
-        } else {
-          item
-        }
-      },
-    )
-  }
-
-  @Synchronized
-  fun cancelAllManual(updatedAt: String) {
-    writeItems(
-      readItems().map { item ->
-        if (item.source == "manual" && item.status in PENDING_STATUSES) {
-          item.copy(status = "cancelled", updatedAt = updatedAt)
-        } else {
-          item
-        }
-      },
-    )
-  }
-
-  @Synchronized
   fun cancelPendingAutoItems(updatedAt: String) {
     writeItems(AndroidSyncPrimitives.cancelPendingAutoItems(readItems(), updatedAt))
   }
@@ -215,11 +189,7 @@ class AndroidUploadStore(context: Context) {
 
   private fun writeItems(items: List<AndroidUploadItem>) {
     val retained = items
-      .sortedWith(
-        compareByDescending<AndroidUploadItem> { it.source == "manual" }
-          .thenBy { it.updatedAt }
-          .thenBy { it.fileKey },
-      )
+      .sortedWith(compareBy<AndroidUploadItem> { it.updatedAt }.thenBy { it.fileKey })
       .take(MAX_STORED_QUEUE_ITEMS)
     val array = JSONArray()
     for (item in retained) {

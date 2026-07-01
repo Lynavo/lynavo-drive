@@ -15,7 +15,6 @@ const requiredReactMethods = [
   'getClientId',
   'getKnownDeviceIds',
   'getAssetPreviewSource',
-  'cancelAllManualUploads',
   'uploadDiagnosticsArchive',
 ];
 

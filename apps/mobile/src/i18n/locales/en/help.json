@@ -20,7 +20,7 @@
     },
     "step2": {
       "title": "Start Syncing",
-      "description": "Send media manually, or enable background auto upload."
+      "description": "Enable automatic upload so new photos and videos sync to your computer."
     }
   },
   "download": {

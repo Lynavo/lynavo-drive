@@ -100,7 +100,6 @@ jest.mock('react-native-keychain', () => ({
 }));
 
 jest.mock('../../services/SyncEngineModule', () => ({
-  cancelAllManualUploads: jest.fn(),
   interruptAutoUpload: jest.fn(),
   enableAutoUpload: jest.fn(),
   browseAlbum: jest.fn().mockResolvedValue([]),
@@ -110,7 +109,6 @@ jest.mock('../../services/SyncEngineModule', () => ({
     queuedCount: 0,
     pendingCount: 0,
   }),
-  submitManualUpload: jest.fn(),
   getAutoUploadConfig: jest.fn().mockResolvedValue({
     enabled: false,
     state: 'disabled',

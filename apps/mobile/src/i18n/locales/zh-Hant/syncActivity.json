@@ -55,13 +55,10 @@
     "autoPreparingSubtitle": "即將開始掃描新照片"
   },
   "badges": {
-    "manual": "手動",
     "auto": "自動",
-    "manualUploading": "手動上傳中",
     "autoEnabled": "自動上傳已開啟"
   },
   "running": {
-    "manualTitle": "手動上傳中",
     "autoTitle": "正在自動上傳",
     "autoRunningTitle": "自動上傳執行中",
     "autoRunningSubtitle": "新素材將自動傳輸到 PC 端",
@@ -73,7 +70,7 @@
   },
   "notStarted": {
     "title": "自動上傳未開啟",
-    "subtitle": "開啟自動上傳，拍完就同步；或者也可以選手動傳輸",
+    "subtitle": "開啟自動上傳，拍完後新照片和影片會自動同步",
     "goToAlbum": "去相簿",
     "enableAuto": "開啟自動上傳"
   },
@@ -108,25 +105,16 @@
       "fileCountValue": "{{count}} 個",
       "latestSync": "最近同步：{{label}}",
       "goToAlbum": "去相簿"
-    },
-    "manual": {
-      "title": "手動上傳已完成",
-      "subtitle": "已完成 {{completed}} / {{total}}",
-      "progressValue": "{{completed}} / {{total}}",
-      "hint": "本次上傳已完成\n自動上傳未開啟，可繼續手動上傳或開啟自動上傳",
-      "goToAlbum": "去相簿繼續上傳",
-      "enableAuto": "開啟自動上傳"
     }
   },
   "actions": {
     "cancelling": "正在取消...",
-    "cancelManualBatch": "取消本次手動上傳",
     "closeAutoUpload": "關閉自動上傳"
   },
   "quickEntry": {
     "title": "快捷入口",
     "albumTitle": "相簿",
-    "albumDesc": "瀏覽並手動上傳素材",
+    "albumDesc": "瀏覽相簿素材",
     "sharedFilesTitle": "共享目錄",
     "sharedFilesDesc": "瀏覽共享目錄與個人共享目錄",
     "globalSharedFilesTitle": "我的電腦",
@@ -137,9 +125,9 @@
     "previous": "上一步",
     "next": "下一步 {{step}}/{{total}}",
     "startJourney": "開啟旅程",
-    "manual": {
-      "title": "手動同步",
-      "body": "點擊這裡發送素材至電腦。進入相簿後勾選照片或影片，按需提交到傳輸隊列。"
+    "album": {
+      "title": "相簿素材",
+      "body": "從這裡瀏覽照片和影片。新增素材會進入自動同步隊列。"
     },
     "panel": {
       "title": "無感備份",
@@ -163,16 +151,6 @@
       "title": "同步異常",
       "lowDiskPaused": "接收磁碟剩餘空間小於 500MB，已暫停新的接收任務",
       "storageUnavailable": "電腦端接收目錄不可用，請在電腦端重新選擇或恢復資料夾"
-    },
-    "cancelManual": {
-      "title": "取消手動上傳",
-      "body": "確定取消當前的手動上傳隊列嗎？",
-      "rethink": "再想想",
-      "confirm": "確認取消"
-    },
-    "cancelManualFailed": {
-      "title": "取消失敗",
-      "body": "無法取消當前手動上傳，請稍後重試"
     },
     "closeAuto": {
       "title": "關閉自動上傳",
@@ -199,7 +177,7 @@
     },
     "switchUploadMode": {
       "title": "切換上傳模式",
-      "body": "當前正在上傳，繼續自動上傳將中斷手動上傳，是否繼續？",
+      "body": "當前正在上傳，繼續自動上傳將重啟同步隊列，是否繼續？",
       "confirm": "確認切換"
     },
     "enableAutoFailed": {

@@ -55,13 +55,10 @@
     "autoPreparingSubtitle": "Preparing to scan for new photos"
   },
   "badges": {
-    "manual": "Manual",
     "auto": "Auto",
-    "manualUploading": "Manual upload in progress",
     "autoEnabled": "Auto upload enabled"
   },
   "running": {
-    "manualTitle": "Manual Upload in Progress",
     "autoTitle": "Auto Uploading",
     "autoRunningTitle": "Auto Upload Running",
     "autoRunningSubtitle": "New photos will transfer to your PC automatically.",
@@ -73,7 +70,7 @@
   },
   "notStarted": {
     "title": "Auto Upload Is Off",
-    "subtitle": "Turn on auto upload to sync after you shoot, or use manual upload.",
+    "subtitle": "Turn on auto upload to sync new photos and videos after you shoot.",
     "goToAlbum": "Go to Album",
     "enableAuto": "Enable Auto Upload"
   },
@@ -108,25 +105,16 @@
       "fileCountValue": "{{count}}",
       "latestSync": "Latest sync: {{label}}",
       "goToAlbum": "Go to Album"
-    },
-    "manual": {
-      "title": "Manual Upload Complete",
-      "subtitle": "Completed {{completed}} / {{total}}",
-      "progressValue": "{{completed}} / {{total}}",
-      "hint": "This upload is complete.\nAuto upload is off, so you can keep uploading manually or turn it on.",
-      "goToAlbum": "Go to Album to Upload More",
-      "enableAuto": "Enable Auto Upload"
     }
   },
   "actions": {
     "cancelling": "Cancelling...",
-    "cancelManualBatch": "Cancel Manual Upload",
     "closeAutoUpload": "Turn Off Auto Upload"
   },
   "quickEntry": {
     "title": "Quick Actions",
     "albumTitle": "Album",
-    "albumDesc": "Browse and upload photos manually",
+    "albumDesc": "Browse your photo library",
     "sharedFilesTitle": "Shared Folder",
     "sharedFilesDesc": "Browse shared folder and personal shared folder",
     "globalSharedFilesTitle": "My Computer",
@@ -137,9 +125,9 @@
     "previous": "Back",
     "next": "Next {{step}}/{{total}}",
     "startJourney": "Start Journey",
-    "manual": {
-      "title": "Manual Sync",
-      "body": "Send media to your computer from here. Open the album, choose photos or videos, and submit them to the transfer queue."
+    "album": {
+      "title": "Album Library",
+      "body": "Browse photos and videos from here. New media is picked up by the automatic sync queue."
     },
     "panel": {
       "title": "Hands-free Backup",
@@ -163,16 +151,6 @@
       "title": "Sync Error",
       "lowDiskPaused": "Receiving disk space is below 500 MB. New receive tasks have been paused.",
       "storageUnavailable": "The receive folder on your computer is unavailable. Restore it or choose another folder on the desktop app."
-    },
-    "cancelManual": {
-      "title": "Cancel Manual Upload",
-      "body": "Cancel the current manual upload queue?",
-      "rethink": "Keep Uploading",
-      "confirm": "Confirm Cancel"
-    },
-    "cancelManualFailed": {
-      "title": "Cancel Failed",
-      "body": "Could not cancel the manual upload. Please try again later."
     },
     "closeAuto": {
       "title": "Turn Off Auto Upload",
@@ -199,7 +177,7 @@
     },
     "switchUploadMode": {
       "title": "Switch Upload Mode",
-      "body": "An upload is in progress. Enabling auto upload will interrupt the manual upload. Continue?",
+      "body": "An upload is in progress. Enabling auto upload will restart the sync queue. Continue?",
       "confirm": "Confirm Switch"
     },
     "enableAutoFailed": {

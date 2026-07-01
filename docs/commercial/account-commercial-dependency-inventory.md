@@ -27,10 +27,10 @@ browsing.
    resolver types. Commercial background, tunnel and paid-source metadata were
    removed from the OSS contract surface.
 3. Mobile native background continuation runtime, native shared-files tunnel
-   route skeletons, and mobile `RemoteAccess*` naming for LAN personal-directory
-   browsing have been removed from the OSS baseline. The largest remaining
-   mobile residue is now mainly manual file-selection upload surfaces and
-   negative assertion tests that guard removed commercial APIs.
+   route skeletons, mobile `RemoteAccess*` naming for LAN personal-directory
+   browsing, and manual file-selection upload surfaces have been removed from
+   the OSS baseline. Remaining mobile residue is mainly negative assertion tests
+   that guard removed commercial/manual APIs.
 4. Mobile LAN personal-directory browsing is now named `LocalComputer*` /
    `GlobalLocalComputer*` in JS/UI. Native shared-files policy may still
    recognize historical wire-level disabled messages for version compatibility;
@@ -83,7 +83,7 @@ browsing.
 | iOS P2P tunnel                | RN bridge credential entrypoints, former tunnel xcframework, old gomobile tunnel build script, `LocalTCPProxy`, tunnel route state/retry logic, and tunnel policy tests were removed.                                      | Moved out of OSS | Keep absent; iOS shared-files routing is LAN/WoL/direct-host only in OSS.                                  |
 | Android P2P tunnel            | RN bridge credential entrypoints, bundled MobileTunnel AAR/JAR, old gomobile tunnel build script, tunnel route state/retry logic, peer-proxy diagnostics, and tunnel policy tests were removed.                            | Moved out of OSS | Keep absent; Android shared-files routing is LAN/WoL/direct-host only in OSS.                              |
 | Public wake                   | Public Wake-on-WAN target DTOs and policy helpers were removed from iOS and Android; same-LAN WoL target metadata remains.                                                                                                 | Moved out of OSS | Keep same-LAN WoL only; do not reintroduce public/router/account-backed wake in OSS.                       |
-| Manual file selection         | `SyncEngineModule.ts:314`, `AutoUploadSettingsGlobalScreen.tsx:347`, `NativeSyncEngineModule.kt:1210`.                                                                                                                     | Harden           | Separate non-commercial invariant risk: OSS must not offer manual file selection as an upload replacement. |
+| Manual file selection         | JS service exports, document-picker dependency, iOS bridge/service, Android bridge methods, and manual selection UI were removed.                                                                                            | Removed from OSS | Keep absent; OSS upload sets must only come from mobile scan pending queue.                                |
 
 ## Sidecar And Contracts Inventory
 
@@ -112,7 +112,5 @@ browsing.
 
 ## Recommended Follow-up Order
 
-1. Manual upload cleanup: remove document picker/manual-selection upload paths
-   so the true upload set only comes from the mobile pending queue.
-2. Sidecar HTTP hardening: add HMAC/local-only protection to mobile resource and
+1. Sidecar HTTP hardening: add HMAC/local-only protection to mobile resource and
    presence routes, while keeping `/personal/*` as paired-device local browsing.

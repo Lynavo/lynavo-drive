@@ -68,8 +68,7 @@ export function buildAutoUploadRoundOverview(
   );
 
   const currentTaskSource =
-    payload.currentTaskSource === 'auto' ||
-    payload.currentTaskSource === 'manual'
+    payload.currentTaskSource === 'auto'
       ? payload.currentTaskSource
       : hasCurrentTaskSource
         ? null
@@ -114,7 +113,6 @@ function getCompletedThisRound(
   ) {
     return null;
   }
-  if (overview.currentTaskSource === 'manual') return null;
   if (!AUTO_UPLOAD_ROUND_STATES.has(overview.uploadState)) return null;
   if (overview.totalCount <= 0 && overview.completedCount <= 0) return null;
 

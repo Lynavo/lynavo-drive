@@ -49,7 +49,7 @@ jest.mock('react-i18next', () => ({
       if (key === 'syncActivity.quickEntry.title') return '快捷入口';
       if (key === 'syncActivity.quickEntry.albumTitle') return '相簿';
       if (key === 'syncActivity.quickEntry.albumDesc')
-        return '瀏覽並手動上傳素材';
+        return '瀏覽相簿素材';
       if (key === 'syncActivity.quickEntry.sharedFilesTitle') return '共享目錄';
       if (key === 'syncActivity.quickEntry.sharedFilesDesc')
         return '瀏覽共享目錄與個人共享目錄';
@@ -79,7 +79,6 @@ jest.mock('../../components/Icon', () => ({
 }));
 
 jest.mock('../../services/SyncEngineModule', () => ({
-  cancelAllManualUploads: jest.fn().mockResolvedValue(undefined),
   disableAutoUpload: jest.fn().mockResolvedValue(undefined),
   enableAutoUpload: jest.fn().mockResolvedValue(undefined),
   retryLanReconnect: jest.fn().mockResolvedValue(undefined),

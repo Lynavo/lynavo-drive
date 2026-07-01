@@ -16,7 +16,6 @@
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		9AAE6A8410E525480D8CD473 /* AlbumBrowserService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35E00EC8EDE5044F9DE0BFDA /* AlbumBrowserService.swift */; };
 		A02C8AC4F1D2121BB74AD3E9 /* AutoUploadConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D380A808E5707AB54A6BAD29 /* AutoUploadConfigStore.swift */; };
-		BEA438F6884C0C6D0918C25E /* ManualUploadService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42E22EE10B6D2552C83E31BB /* ManualUploadService.swift */; };
 		D4E1C9F42F92000100000001 /* BackgroundHandoffPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9F32F92000100000001 /* BackgroundHandoffPolicy.swift */; };
 		D4E1C9F62F7A000100000001 /* LynavoVersion.generated.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9F52F7A000100000001 /* LynavoVersion.generated.swift */; };
 		D4E1C9F82F8B000100000001 /* SharedFilesRoutePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9F72F8B000100000001 /* SharedFilesRoutePolicy.swift */; };
@@ -59,7 +58,6 @@
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = LynavoDrive/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		35E00EC8EDE5044F9DE0BFDA /* AlbumBrowserService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumBrowserService.swift; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-LynavoDrive.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-LynavoDrive.debug.xcconfig"; path = "Target Support Files/Pods-LynavoDrive/Pods-LynavoDrive.debug.xcconfig"; sourceTree = "<group>"; };
-		42E22EE10B6D2552C83E31BB /* ManualUploadService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualUploadService.swift; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-LynavoDrive.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-LynavoDrive.release.xcconfig"; path = "Target Support Files/Pods-LynavoDrive/Pods-LynavoDrive.release.xcconfig"; sourceTree = "<group>"; };
 		5A2D2F6A3480DB6500C3A12F /* AuthKeychainCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AuthKeychainCleaner.swift; path = LynavoDrive/AuthKeychainCleaner.swift; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-LynavoDrive.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-LynavoDrive.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -208,7 +206,6 @@
 				D4E1C9FB2F95000100000001 /* WakeOnLanService.swift */,
 				35E00EC8EDE5044F9DE0BFDA /* AlbumBrowserService.swift */,
 				D380A808E5707AB54A6BAD29 /* AutoUploadConfigStore.swift */,
-				42E22EE10B6D2552C83E31BB /* ManualUploadService.swift */,
 				D4E1CA302FA2000100000001 /* SharedFilesAccessPolicy.swift */,
 				D4E1C9F72F8B000100000001 /* SharedFilesRoutePolicy.swift */,
 				D2C0A4C610F1EE6DEAF9DAB0 /* SharedFilesService.swift */,
@@ -394,7 +391,6 @@
 				D4E1C9F62F7A000100000001 /* LynavoVersion.generated.swift in Sources */,
 				9AAE6A8410E525480D8CD473 /* AlbumBrowserService.swift in Sources */,
 				A02C8AC4F1D2121BB74AD3E9 /* AutoUploadConfigStore.swift in Sources */,
-				BEA438F6884C0C6D0918C25E /* ManualUploadService.swift in Sources */,
 				D4E1CA312FA2000100000001 /* SharedFilesAccessPolicy.swift in Sources */,
 				D4E1C9F82F8B000100000001 /* SharedFilesRoutePolicy.swift in Sources */,
 				D4E1C9FA2F94000100000001 /* PresenceReconnectPolicy.swift in Sources */,

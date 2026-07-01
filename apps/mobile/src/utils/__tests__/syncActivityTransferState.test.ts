@@ -73,7 +73,7 @@ describe('syncActivityTransferState', () => {
     expect(getSyncActivityMainCardState(snapshot, false)).toBe('standby');
   });
 
-  it('keeps running state when manual work exists even if auto upload is also active', () => {
+  it('ignores stale manual queue fields when auto upload has no work', () => {
     const snapshot = {
       uploadState: 'idle',
       autoUploadState: 'active' as const,
@@ -86,7 +86,8 @@ describe('syncActivityTransferState', () => {
       currentFileTotalBytes: 0,
     };
 
-    expect(getSyncActivityMainCardState(snapshot, false)).toBe('running');
+    expect(isSyncActivityActivelyTransferring(snapshot)).toBe(false);
+    expect(getSyncActivityMainCardState(snapshot, false)).toBe('standby');
   });
 
   it('shows an interrupted card after auto upload is interrupted', () => {
@@ -287,7 +288,7 @@ describe('syncActivityTransferState', () => {
     );
   });
 
-  it('shows manual completed state after a manual round finishes', () => {
+  it('does not show a completion card for stale manual source snapshots', () => {
     const snapshot = {
       uploadState: 'completed',
       autoUploadState: 'disabled' as const,
@@ -302,9 +303,7 @@ describe('syncActivityTransferState', () => {
     };
 
     expect(isSyncActivityActivelyTransferring(snapshot)).toBe(false);
-    expect(getSyncActivityMainCardState(snapshot, false)).toBe(
-      'manual_completed',
-    );
+    expect(getSyncActivityMainCardState(snapshot, false)).toBe('not_started');
   });
 
   it('treats an empty completed auto pulse as standby instead of completion', () => {
@@ -325,7 +324,7 @@ describe('syncActivityTransferState', () => {
     expect(getSyncActivityMainCardState(snapshot, false)).toBe('standby');
   });
 
-  it('keeps manual completed state after native settles back to idle', () => {
+  it('ignores stale manual completion after native settles back to idle', () => {
     const snapshot = {
       uploadState: 'idle',
       autoUploadState: 'disabled' as const,
@@ -340,9 +339,7 @@ describe('syncActivityTransferState', () => {
     };
 
     expect(isSyncActivityActivelyTransferring(snapshot)).toBe(false);
-    expect(getSyncActivityMainCardState(snapshot, false)).toBe(
-      'manual_completed',
-    );
+    expect(getSyncActivityMainCardState(snapshot, false)).toBe('not_started');
   });
 
   it('does not show manual completed state on a fresh idle snapshot from persisted queue stats', () => {
@@ -379,7 +376,7 @@ describe('syncActivityTransferState', () => {
     expect(getSyncActivityMainCardState(snapshot, false)).toBe('standby');
   });
 
-  it('keeps manual completed state after a finished manual round settles into paused_auto_upload', () => {
+  it('does not preserve stale manual completion after auto upload is closed', () => {
     const snapshot = {
       uploadState: 'paused_auto_upload',
       autoUploadState: 'interrupted' as const,
@@ -394,12 +391,10 @@ describe('syncActivityTransferState', () => {
     };
 
     expect(isSyncActivityActivelyTransferring(snapshot)).toBe(false);
-    expect(getSyncActivityMainCardState(snapshot, false)).toBe(
-      'manual_completed',
-    );
+    expect(getSyncActivityMainCardState(snapshot, false)).toBe('not_started');
   });
 
-  it('does not show manual completion when a cancelled payload carries stale finished counts', () => {
+  it('ignores stale manual cancellation fields and follows auto interrupted state', () => {
     const snapshot = {
       uploadState: 'idle',
       autoUploadState: 'interrupted' as const,
@@ -414,10 +409,12 @@ describe('syncActivityTransferState', () => {
       currentFileTotalBytes: 0,
     };
 
-    expect(getSyncActivityMainCardState(snapshot, false)).toBe('not_started');
+    expect(getSyncActivityMainCardState(snapshot, false)).toBe(
+      'auto_interrupted',
+    );
   });
 
-  it('keeps offline state ahead of a cancelled manual upload snapshot', () => {
+  it('keeps offline state ahead of a stale manual source snapshot', () => {
     const snapshot = {
       uploadState: 'idle',
       autoUploadState: 'disabled' as const,
@@ -435,7 +432,7 @@ describe('syncActivityTransferState', () => {
     expect(getSyncActivityMainCardState(snapshot, true)).toBe('offline');
   });
 
-  it('shows manual completed state when the final upload pulse has cleared current source', () => {
+  it('does not infer manual completion from a final upload pulse without auto context', () => {
     const snapshot = {
       uploadState: 'uploading',
       autoUploadState: 'interrupted' as const,
@@ -451,7 +448,7 @@ describe('syncActivityTransferState', () => {
 
     expect(isSyncActivityActivelyTransferring(snapshot)).toBe(false);
     expect(getSyncActivityMainCardState(snapshot, false)).toBe(
-      'manual_completed',
+      'auto_interrupted',
     );
   });
 
@@ -475,7 +472,7 @@ describe('syncActivityTransferState', () => {
     );
   });
 
-  it('keeps manual completed state when native emits a scanning pulse after the last file', () => {
+  it('ignores stale manual completion when native emits a scanning pulse', () => {
     const snapshot = {
       uploadState: 'scanning',
       autoUploadState: 'disabled' as const,
@@ -489,12 +486,10 @@ describe('syncActivityTransferState', () => {
       currentFileTotalBytes: 0,
     };
 
-    expect(getSyncActivityMainCardState(snapshot, false)).toBe(
-      'manual_completed',
-    );
+    expect(getSyncActivityMainCardState(snapshot, false)).toBe('not_started');
   });
 
-  it('prioritizes newly queued manual work over stale manual completion stats', () => {
+  it('does not prioritize stale manual queue fields over auto interruption', () => {
     const snapshot = {
       uploadState: 'scanning',
       autoUploadState: 'interrupted' as const,
@@ -508,17 +503,12 @@ describe('syncActivityTransferState', () => {
       currentFileTotalBytes: 0,
     };
 
-    expect(getSyncActivityMainCardState(snapshot, false)).toBe('running');
+    expect(getSyncActivityMainCardState(snapshot, false)).toBe(
+      'auto_interrupted',
+    );
   });
 
-  // Regression: during Wi-Fi flip mid-manual-batch the native layer emits
-  // uploadState='reconnecting'. Before this was added to the preparation-
-  // phase list the running card fell through to the "auto upload running"
-  // fallback, producing a Frankenstein UI mixing manual badge + auto title
-  // + "取消本次手動上傳" button. Both the selector (mainCardState) and
-  // the screen's PREPARATION_STATES must agree that reconnecting is a
-  // preparation phase so the active-but-idle else-branch is never reached.
-  it('keeps running state during reconnecting when a manual batch is pending', () => {
+  it('does not keep running state for stale manual work during reconnecting', () => {
     const snapshot = {
       uploadState: 'reconnecting',
       autoUploadState: 'interrupted' as const,
@@ -532,13 +522,13 @@ describe('syncActivityTransferState', () => {
       currentFileTotalBytes: 0,
     };
 
-    // Offline debounce may or may not have fired; selector behaviour must
-    // be the same either way because hasManualWork short-circuits first.
-    expect(getSyncActivityMainCardState(snapshot, false)).toBe('running');
-    expect(getSyncActivityMainCardState(snapshot, true)).toBe('running');
+    expect(getSyncActivityMainCardState(snapshot, false)).toBe(
+      'auto_interrupted',
+    );
+    expect(getSyncActivityMainCardState(snapshot, true)).toBe('offline');
   });
 
-  it('keeps running state during reconnecting mid-batch (after a file has completed)', () => {
+  it('does not keep running state during stale manual reconnecting snapshots', () => {
     const snapshot = {
       uploadState: 'reconnecting',
       autoUploadState: 'interrupted' as const,
@@ -552,7 +542,9 @@ describe('syncActivityTransferState', () => {
       currentFileTotalBytes: 0,
     };
 
-    expect(getSyncActivityMainCardState(snapshot, false)).toBe('running');
-    expect(getSyncActivityMainCardState(snapshot, true)).toBe('running');
+    expect(getSyncActivityMainCardState(snapshot, false)).toBe(
+      'auto_interrupted',
+    );
+    expect(getSyncActivityMainCardState(snapshot, true)).toBe('offline');
   });
 });
