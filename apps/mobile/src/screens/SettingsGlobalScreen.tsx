@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -439,15 +438,6 @@ export function SettingsGlobalScreen({
               iconColor="#746AA8"
               title={t('settings.global.appVersionShort')}
               subtitle={getVersionLabel(appInfo, t)}
-              rightAccessory={
-                Platform.OS !== 'ios' ? (
-                  <View style={styles.updateBadge}>
-                    <Text style={styles.updateBadgeText}>
-                      {t('settings.global.update')}
-                    </Text>
-                  </View>
-                ) : null
-              }
             />
             <SettingsRow
               icon={ArrowUpToLine}
@@ -910,18 +900,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  updateBadge: {
-    borderRadius: 999,
-    backgroundColor: '#1677D2',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  updateBadgeText: {
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
   },
   childHeader: {
     marginHorizontal: 12,

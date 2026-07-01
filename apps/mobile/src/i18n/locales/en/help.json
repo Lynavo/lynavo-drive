@@ -1,30 +1,6 @@
 {
-  "title": "Help Center",
   "sections": {
-    "gettingStarted": "Quick Start",
-    "faq": "FAQ",
     "contact": "Contact Support"
-  },
-  "product": {
-    "title": "Lynavo Drive",
-    "description": "A LAN media sync tool that sends photos and videos from your phone to your computer at high speed."
-  },
-  "steps": {
-    "step0": {
-      "title": "Download the PC App",
-      "description": "Visit lynavo.com on your computer to download and install."
-    },
-    "step1": {
-      "title": "Connect Your Device",
-      "description": "Scan with your phone or enter the 6-digit pairing code."
-    },
-    "step2": {
-      "title": "Start Syncing",
-      "description": "Enable automatic upload so new photos and videos sync to your computer."
-    }
-  },
-  "download": {
-    "label": "PC app download: www.lynavo.com"
   },
   "faq": {
     "item0": {
@@ -37,7 +13,7 @@
     },
     "item2": {
       "title": "What should I do if an upload fails?",
-      "answer": "Check network stability and confirm the PC app is still running. Retry failed tasks from the transfer page, or export a diagnostics bundle and contact support."
+      "answer": "Keep your phone and computer on the same Wi-Fi network and confirm the desktop app is still running. Lynavo Drive keeps completed files and retries unfinished queued items automatically. If it still fails, export a local diagnostics bundle and share it by email or the system share sheet."
     },
     "item3": {
       "title": "What if QR pairing does not work?",

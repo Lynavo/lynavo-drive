@@ -1,6 +1,7 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { HelpGlobalScreen } from '../HelpGlobalScreen';
+import { shareDiagnosticsArchive } from '../../utils/shareDiagnosticsArchive';
 
 const mockGoBack = jest.fn();
 
@@ -60,11 +61,25 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('../../utils/shareDiagnosticsArchive', () => ({
-  shareDiagnosticsArchive: jest.fn().mockResolvedValue(undefined),
+  shareDiagnosticsArchive: jest
+    .fn()
+    .mockResolvedValue('/tmp/help-diagnostics.zip'),
   isDiagnosticsExportUnavailable: jest.fn(() => false),
 }));
 
+const mockedShareDiagnosticsArchive =
+  shareDiagnosticsArchive as jest.MockedFunction<
+    typeof shareDiagnosticsArchive
+  >;
+
 describe('HelpGlobalScreen OSS copy', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedShareDiagnosticsArchive.mockResolvedValue(
+      '/tmp/help-diagnostics.zip',
+    );
+  });
+
   it('describes local LAN operation instead of trial or purchase flows', () => {
     const { getByText, queryByText } = render(<HelpGlobalScreen />);
 
@@ -78,5 +93,17 @@ describe('HelpGlobalScreen OSS copy', () => {
     ).toBeTruthy();
     expect(queryByText(/trial/i)).toBeNull();
     expect(queryByText(/purchase/i)).toBeNull();
+  });
+
+  it('shares a local diagnostics archive from the support section', async () => {
+    const { getByText } = render(<HelpGlobalScreen />);
+
+    expect(getByText('share-outline')).toBeTruthy();
+
+    fireEvent.press(getByText('Export Diagnostics'));
+
+    await waitFor(() => {
+      expect(mockedShareDiagnosticsArchive).toHaveBeenCalledTimes(1);
+    });
   });
 });

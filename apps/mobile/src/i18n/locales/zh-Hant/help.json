@@ -1,30 +1,6 @@
 {
-  "title": "幫助中心",
   "sections": {
-    "gettingStarted": "快速上手",
-    "faq": "常見問題",
     "contact": "聯絡支援"
-  },
-  "product": {
-    "title": "Lynavo Drive",
-    "description": "區域網路素材無線同步工具，手機照片和影片高速傳至電腦"
-  },
-  "steps": {
-    "step0": {
-      "title": "下載 PC 端",
-      "description": "電腦瀏覽器訪問 lynavo.com 下載安裝"
-    },
-    "step1": {
-      "title": "連接設備",
-      "description": "手機掃碼或輸入 6 位連接碼"
-    },
-    "step2": {
-      "title": "開啟同步",
-      "description": "開啟自動上傳後，新增照片和影片會同步至電腦"
-    }
-  },
-  "download": {
-    "label": "PC 端下載：www.lynavo.com"
   },
   "faq": {
     "item0": {
@@ -37,7 +13,7 @@
     },
     "item2": {
       "title": "上傳失敗怎麼處理？",
-      "answer": "檢查網路穩定性，確認 PC 端仍在執行。可在傳輸頁點擊失敗任務重試，或匯出診斷包聯絡客服協助排查。"
+      "answer": "請保持手機和電腦在同一 Wi-Fi 網路，並確認電腦端仍在執行。Lynavo Drive 會保留已完成檔案並自動重試未完成佇列；如果仍失敗，可匯出本機診斷包，透過郵件或系統分享傳送給維護者/支援方。"
     },
     "item3": {
       "title": "無法掃碼連接怎麼辦？",

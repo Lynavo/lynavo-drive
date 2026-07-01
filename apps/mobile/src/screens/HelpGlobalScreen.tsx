@@ -154,7 +154,7 @@ export function HelpGlobalScreen() {
                 disabled={isExportingDiagnostics}
               >
                 <View style={[styles.actionIconBox, styles.diagnosticsIconBox]}>
-                  <Icon name="cloud-upload-outline" size={18} color="#746AA8" />
+                  <Icon name="share-outline" size={18} color="#746AA8" />
                 </View>
                 <View style={styles.actionContent}>
                   <Text style={styles.actionTitle}>

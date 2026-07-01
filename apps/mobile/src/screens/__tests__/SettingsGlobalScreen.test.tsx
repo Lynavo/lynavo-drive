@@ -14,6 +14,7 @@ import {
   saveLanguagePreference,
 } from '../../i18n/language-preference';
 import i18n from '../../i18n';
+import { shareDiagnosticsArchive } from '../../utils/shareDiagnosticsArchive';
 
 jest.mock('react-native-localize', () => ({
   getLocales: jest.fn(() => [
@@ -93,6 +94,13 @@ jest.mock('../../i18n', () => ({
   },
 }));
 
+jest.mock('../../utils/shareDiagnosticsArchive', () => ({
+  shareDiagnosticsArchive: jest
+    .fn()
+    .mockResolvedValue('/tmp/settings-diagnostics.zip'),
+  isDiagnosticsExportUnavailable: jest.fn(() => false),
+}));
+
 jest.mock('../../components/Icon', () => ({
   Icon: ({ name }: { name: string }) => {
     const ReactInner = require('react');
@@ -152,6 +160,10 @@ const mockedResolveLanguagePreference =
     typeof resolveLanguagePreference
   >;
 const mockedChangeLanguage = i18n.changeLanguage as jest.Mock;
+const mockedShareDiagnosticsArchive =
+  shareDiagnosticsArchive as jest.MockedFunction<
+    typeof shareDiagnosticsArchive
+  >;
 async function renderSettingsGlobalScreen() {
   const screen = render(<SettingsGlobalScreen />);
   await act(async () => {
@@ -185,6 +197,9 @@ describe('SettingsGlobalScreen', () => {
     mockedSaveLanguagePreference.mockResolvedValue(undefined);
     mockedResolveLanguagePreference.mockReturnValue('en');
     mockedChangeLanguage.mockResolvedValue(undefined);
+    mockedShareDiagnosticsArchive.mockResolvedValue(
+      '/tmp/settings-diagnostics.zip',
+    );
   });
 
   test('renders local device, current desktop, and version without official account rows', async () => {
@@ -219,7 +234,6 @@ describe('SettingsGlobalScreen', () => {
       'language-outline',
       'help-circle-outline',
       'message-square-outline',
-      'cloud-upload-outline',
       'log-out-outline',
       'trash-outline',
       'chevron-forward',
@@ -267,6 +281,16 @@ describe('SettingsGlobalScreen', () => {
 
     fireEvent.press(getByText('常见问题'));
     expect(mockNavigate).toHaveBeenCalledWith('Help');
+  });
+
+  test('exports diagnostics through the local share helper', async () => {
+    const { getByText } = await renderSettingsGlobalScreen();
+
+    await act(async () => {
+      fireEvent.press(getByText('导出诊断包'));
+    });
+
+    expect(mockedShareDiagnosticsArchive).toHaveBeenCalledTimes(1);
   });
 
   test('hydrates and persists the device display name through the native bridge', async () => {

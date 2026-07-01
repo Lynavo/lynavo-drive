@@ -64,7 +64,6 @@ const ionicons: Record<string, number> = {
   'toggle-outline': 61167,
   'checkbox-outline': 60182,
   'square-outline': 61079,
-  'cloud-upload-outline': 60262,
   'sync-circle-outline': 61113,
   'apps-outline': 60017,
   'images-outline': 60563,

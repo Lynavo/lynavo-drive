@@ -3,9 +3,6 @@
   "title": "設定",
   "versionLabel": "v{{version}} ({{build}})",
   "sections": {
-    "connectedDevice": "已連接設備",
-    "supportHelp": "支援與幫助",
-    "myDevice": "我的設備",
     "device": "本機設備",
     "computers": "電腦設備",
     "general": "通用"
@@ -20,29 +17,16 @@
     "offline": "離線",
     "notConnected": "未連接"
   },
-  "myDevice": {
-    "label": "我的設備名稱",
-    "hint": "此名稱將在 PC 端顯示",
-    "lockedHint": "傳輸進行中，暫不可修改設備名稱"
-  },
   "photoPermission": {
     "title": "照片權限未開啟",
     "body": "需要允許存取照片後才能繼續自動同步。",
     "openSettings": "開啟系統設定"
   },
   "rows": {
-    "latestSync": "最近同步",
-    "appVersion": "應用版本",
     "language": "語言",
     "faq": "常見問題",
     "faqDesc": "操作說明與常見問題",
     "diagnosticsDesc": "匯出日誌和設備狀態以方便排查問題"
-  },
-  "language": {
-    "system": "跟隨系統",
-    "traditionalChinese": "繁中",
-    "simplifiedChinese": "簡中",
-    "english": "English"
   },
   "diagnosticsExport": {
     "button": "匯出診斷包",
@@ -51,19 +35,12 @@
     }
   },
   "actions": {
-    "exportDiagnostics": "匯出診斷包",
-    "exportingDiagnostics": "正在匯出診斷包…",
     "help": "幫助",
-    "resetSyncStatus": "重置同步狀態",
-    "switch": "切換",
-    "forgetDesktop": "遺忘此電腦",
     "switchDevice": "切換設備",
     "switchDeviceDesc": "將斷開當前設備並重新連接其他電腦"
   },
   "status": {
-    "noRecord": "暫無記錄",
-    "reading": "讀取中…",
-    "notBound": "未綁定"
+    "noRecord": "暫無記錄"
   },
   "dates": {
     "todayAt": "今天 {{time}}",
@@ -71,21 +48,6 @@
     "fullDate": "{{year}}/{{month}}/{{day}} {{time}}"
   },
   "dialogs": {
-    "switchDeviceWhileUploading": {
-      "title": "正在上傳中",
-      "body": "目前有上傳任務正在進行，切換設備將中斷上傳，是否繼續？",
-      "confirm": "繼續切換"
-    },
-    "resetSync": {
-      "title": "重置所有同步狀態",
-      "body": "將清除所有同步記錄並斷開當前設備連接，需要重新輸入連接碼配對。手機和電腦上的照片不會被刪除。",
-      "confirm": "確定重置"
-    },
-    "forgetDesktop": {
-      "title": "遺忘此電腦",
-      "body": "確定要遺忘並中斷與電腦「{{name}}」的連接嗎？這將會清除本地的連接紀錄與綁定狀態。",
-      "confirm": "確定遺忘"
-    },
     "exportUnavailable": {
       "title": "無法導出",
       "body": "目前版本暫不支援匯出診斷包"
@@ -105,7 +67,6 @@
     "deviceName": "設備名稱",
     "editDeviceName": "編輯設備名稱",
     "appVersionShort": "版本",
-    "update": "更新",
     "back": "返回",
     "languageTitle": "語言",
     "systemLanguage": "跟隨系統語言",
@@ -117,7 +78,6 @@
     "cancel": "取消",
     "errorDeviceNameEmpty": "請輸入設備名稱",
     "errorDeviceNameSave": "儲存失敗，請稍後重試",
-    "gotIt": "知道了",
     "exportDiagnosticsTitle": "匯出診斷包",
     "statusUnknown": "狀態未知",
     "connected": "已連接",

@@ -79,9 +79,6 @@ import { DeviceDiscoveryScreen } from '../DeviceDiscoveryScreen';
 const mockNativeSyncEngine = {
   startDiscovery: jest.fn().mockResolvedValue(undefined),
   stopDiscovery: jest.fn().mockResolvedValue(undefined),
-  exportDiagnostics: jest
-    .fn()
-    .mockResolvedValue('/tmp/discovery-diagnostics.zip'),
   getClientId: jest.fn().mockResolvedValue('mobile-client-id'),
   addListener: jest.fn(),
   removeListeners: jest.fn(),

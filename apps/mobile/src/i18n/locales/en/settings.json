@@ -3,9 +3,6 @@
   "title": "Settings",
   "versionLabel": "v{{version}} ({{build}})",
   "sections": {
-    "connectedDevice": "Connected Device",
-    "supportHelp": "Support & Help",
-    "myDevice": "My Device",
     "device": "Local Device",
     "computers": "Computer Devices",
     "general": "General"
@@ -20,29 +17,16 @@
     "offline": "Offline",
     "notConnected": "Not connected"
   },
-  "myDevice": {
-    "label": "My Device Name",
-    "hint": "This name will be shown on your PC.",
-    "lockedHint": "A transfer is in progress, device name can't be changed right now."
-  },
   "photoPermission": {
     "title": "Photo Access Is Off",
     "body": "Allow access to Photos to keep auto-sync running.",
     "openSettings": "Open System Settings"
   },
   "rows": {
-    "latestSync": "Latest Sync",
-    "appVersion": "App Version",
     "language": "Language",
     "faq": "FAQ",
     "faqDesc": "Usage instructions & FAQ",
     "diagnosticsDesc": "Export logs and device status for troubleshooting"
-  },
-  "language": {
-    "system": "System",
-    "traditionalChinese": "繁中",
-    "simplifiedChinese": "简中",
-    "english": "English"
   },
   "diagnosticsExport": {
     "button": "Export diagnostics",
@@ -51,19 +35,12 @@
     }
   },
   "actions": {
-    "exportDiagnostics": "Export Diagnostics",
-    "exportingDiagnostics": "Exporting diagnostics...",
     "help": "Help",
-    "resetSyncStatus": "Reset Sync Status",
-    "switch": "Switch",
-    "forgetDesktop": "Forget Desktop",
     "switchDevice": "Switch Device",
     "switchDeviceDesc": "Disconnect current device and connect to another computer"
   },
   "status": {
-    "noRecord": "No records yet",
-    "reading": "Loading...",
-    "notBound": "Not bound"
+    "noRecord": "No records yet"
   },
   "dates": {
     "todayAt": "Today at {{time}}",
@@ -71,21 +48,6 @@
     "fullDate": "{{year}}/{{month}}/{{day}} {{time}}"
   },
   "dialogs": {
-    "switchDeviceWhileUploading": {
-      "title": "Upload in Progress",
-      "body": "An upload is currently running. Switching devices will interrupt it. Continue?",
-      "confirm": "Switch Anyway"
-    },
-    "resetSync": {
-      "title": "Reset All Sync State",
-      "body": "This clears all sync records and disconnects the current device. You will need to re-enter a pairing code. Photos on your phone and Mac will not be deleted.",
-      "confirm": "Confirm Reset"
-    },
-    "forgetDesktop": {
-      "title": "Forget Desktop",
-      "body": "Are you sure you want to forget and disconnect from the desktop \"{{name}}\"? This will clear local connection records and binding state.",
-      "confirm": "Forget"
-    },
     "exportUnavailable": {
       "title": "Cannot Export",
       "body": "This build does not support exporting the diagnostics bundle."
@@ -105,7 +67,6 @@
     "deviceName": "Device Name",
     "editDeviceName": "Edit device name",
     "appVersionShort": "Version",
-    "update": "Update",
     "back": "Back",
     "languageTitle": "Language",
     "systemLanguage": "Follow System Language",
@@ -117,7 +78,6 @@
     "cancel": "Cancel",
     "errorDeviceNameEmpty": "Please enter a device name",
     "errorDeviceNameSave": "Failed to save, please try again later",
-    "gotIt": "Got It",
     "exportDiagnosticsTitle": "Export Diagnostics",
     "statusUnknown": "Unknown status",
     "connected": "Connected",

@@ -1011,7 +1011,7 @@ export function DeviceDiscoveryScreen() {
                     void handleExportDiagnostics();
                   }}
                 >
-                  <Icon name="cloud-upload-outline" size={20} color="#3b9fd8" />
+                  <Icon name="share-outline" size={20} color="#3b9fd8" />
                   <Text style={styles.popoverText}>
                     {isExportingDiagnostics
                       ? t('settings.diagnosticsExport.progress.title')

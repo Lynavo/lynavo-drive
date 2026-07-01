@@ -1,30 +1,6 @@
 {
-  "title": "帮助中心",
   "sections": {
-    "gettingStarted": "快速上手",
-    "faq": "常见问题",
     "contact": "联系支持"
-  },
-  "product": {
-    "title": "Lynavo Drive",
-    "description": "局域网素材无线同步工具，手机照片和视频极速传至电脑"
-  },
-  "steps": {
-    "step0": {
-      "title": "下载 PC 端",
-      "description": "电脑浏览器访问 lynavo.com 下载安装"
-    },
-    "step1": {
-      "title": "连接设备",
-      "description": "手机扫码或输入 6 位连接码"
-    },
-    "step2": {
-      "title": "开启同步",
-      "description": "开启自动上传后，新增照片和视频会同步至电脑"
-    }
-  },
-  "download": {
-    "label": "PC 端下载：www.lynavo.com"
   },
   "faq": {
     "item0": {
@@ -37,7 +13,7 @@
     },
     "item2": {
       "title": "上传失败怎么处理？",
-      "answer": "检查网络稳定性，确认 PC 端仍在运行。可在传输页点击失败任务重试，或导出诊断包联系客服协助排查。"
+      "answer": "请保持手机和电脑在同一 Wi-Fi 网络，并确认电脑端仍在运行。Lynavo Drive 会保留已完成文件并自动重试未完成队列；如果仍失败，可导出本地诊断包，通过邮件或系统分享发送给维护者/支持方。"
     },
     "item3": {
       "title": "无法扫码连接怎么办？",
