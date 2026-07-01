@@ -1,4 +1,4 @@
-describe('SyncEngineModule background service bridge', () => {
+describe('SyncEngineModule commercial background bridge', () => {
   const loadModule = (
     platform: 'android' | 'ios',
     options: { includeEntitlementBridge?: boolean } = {
@@ -41,33 +41,29 @@ describe('SyncEngineModule background service bridge', () => {
     jest.clearAllMocks();
   });
 
-  it('starts the Android foreground sync service without touching iOS silent audio', async () => {
+  it('does not export Android paid background service wrappers in OSS', () => {
     const { nativeSyncEngine, syncEngine } = loadModule('android');
 
-    await syncEngine.startBackgroundSyncService('manual_upload');
-    await syncEngine.stopBackgroundSyncService();
-
-    expect(nativeSyncEngine.startBackgroundSyncService).toHaveBeenCalledWith(
-      'manual_upload',
-    );
-    expect(nativeSyncEngine.stopBackgroundSyncService).toHaveBeenCalledTimes(1);
+    expect(syncEngine).not.toHaveProperty('startBackgroundSyncService');
+    expect(syncEngine).not.toHaveProperty('stopBackgroundSyncService');
+    expect(nativeSyncEngine.startBackgroundSyncService).not.toHaveBeenCalled();
+    expect(nativeSyncEngine.stopBackgroundSyncService).not.toHaveBeenCalled();
     expect(
       nativeSyncEngine.setBackgroundSilentAudioEnabled,
     ).not.toHaveBeenCalled();
   });
 
-  it('keeps the iOS silent audio bridge separate from Android foreground sync', async () => {
+  it('does not export iOS silent audio bridge wrappers in OSS', () => {
     const { nativeSyncEngine, syncEngine } = loadModule('ios');
 
-    await syncEngine.startBackgroundSyncService('manual_upload');
-    await syncEngine.stopBackgroundSyncService();
-    await syncEngine.setBackgroundSilentAudioEnabled(true);
-
+    expect(syncEngine).not.toHaveProperty('startBackgroundSyncService');
+    expect(syncEngine).not.toHaveProperty('stopBackgroundSyncService');
+    expect(syncEngine).not.toHaveProperty('setBackgroundSilentAudioEnabled');
     expect(nativeSyncEngine.startBackgroundSyncService).not.toHaveBeenCalled();
     expect(nativeSyncEngine.stopBackgroundSyncService).not.toHaveBeenCalled();
     expect(
       nativeSyncEngine.setBackgroundSilentAudioEnabled,
-    ).toHaveBeenCalledWith(true);
+    ).not.toHaveBeenCalled();
   });
 
   it('does not export commercial entitlement or tunnel bridge wrappers in OSS', () => {

@@ -68,9 +68,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     window = UIWindow(frame: UIScreen.main.bounds)
 
-    // Register background task handlers before app finishes launching
-    SyncEngineManager.shared.backgroundService.registerBackgroundTasks()
-
     // Configure audio session so video preview audio continues when backgrounded
     // and Picture-in-Picture can engage. Setting the category does not interrupt
     // other apps' audio — only activating the session during playback does.

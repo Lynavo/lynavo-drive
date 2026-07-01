@@ -93,16 +93,6 @@ export interface Spec extends TurboModule {
   pauseAutoUpload(): Promise<void>;
   disableAutoUpload(): Promise<void>;
   resumeAutoUpload(): Promise<void>;
-  getAndroidBackgroundKeepaliveStatus(): Promise<{
-    backgroundKeepaliveStrategy: string;
-    foregroundServiceActive: boolean;
-    foregroundServiceStopRequested: boolean;
-    batteryOptimizationIgnored: boolean;
-    postNotificationsGranted: boolean;
-    lastBackgroundStopReason: string | null;
-  }>;
-  isIgnoringBatteryOptimizations(): Promise<boolean>;
-  requestIgnoreBatteryOptimizations(): Promise<boolean>;
   // 设置
   renameBoundDeviceAlias(alias: string): Promise<void>;
   // 事件 (Codegen EventEmitter)

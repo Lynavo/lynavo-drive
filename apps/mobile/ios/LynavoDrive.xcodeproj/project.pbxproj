@@ -10,7 +10,6 @@
 		0C80B921A6F3F58F76C31292 /* libPods-LynavoDrive.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-LynavoDrive.a */; };
 		0DAC8ECE3480320FE184A423 /* SharedFilesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2C0A4C610F1EE6DEAF9DAB0 /* SharedFilesService.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		53B4077763B245D0B65F1815 /* BackgroundUploadService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 005CC8CEE5A448A49B965375 /* BackgroundUploadService.swift */; };
 		5A2D2F6B3480DB6500C3A12F /* AuthKeychainCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A2D2F6A3480DB6500C3A12F /* AuthKeychainCleaner.swift */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		79925496FECC53ED57FB261F /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 2A006A30AF22FE10FF0A2871 /* InfoPlist.strings */; };
@@ -24,7 +23,6 @@
 		D4E1C9FA2F94000100000001 /* PresenceReconnectPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9F92F94000100000001 /* PresenceReconnectPolicy.swift */; };
 		D4E1C9FC2F95000100000001 /* WakeOnLanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9FB2F95000100000001 /* WakeOnLanService.swift */; };
 		D4E1C9FE2F95000100000001 /* WakeMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9FD2F95000100000001 /* WakeMetadata.swift */; };
-		D4E1CA012F91000100000001 /* SilentAudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1CA002F91000100000001 /* SilentAudioService.swift */; };
 		D4E1CA042FA0000100000001 /* SidecarHostResolutionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1CA032FA0000100000001 /* SidecarHostResolutionPolicy.swift */; };
 		D4E1CA112F96000100000001 /* ReceivedLibraryMediaURLPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1CA102F96000100000001 /* ReceivedLibraryMediaURLPolicy.swift */; };
 		D4E1CA212FA1000100000001 /* ClientDisplayNameResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1CA202FA1000100000001 /* ClientDisplayNameResolver.swift */; };
@@ -48,7 +46,6 @@
 		FC3ECC612F6F0B00000460F8 /* NetworkPathObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC602F6F0B00000460F8 /* NetworkPathObserver.swift */; };
 		FC3ECC712F6F0C00000460F8 /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC702F6F0C00000460F8 /* Log.swift */; };
 		FC3ECCA02F7A0001000460F8 /* HMACAuthHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECCA12F7A0001000460F8 /* HMACAuthHelper.swift */; };
-		FC3ECCB02F8A0001000460F8 /* UploadResetStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECCB12F8A0001000460F8 /* UploadResetStateMachine.swift */; };
 		FC3ECCC02F8A0002000460F8 /* BackgroundTransitionRefCount.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECCC12F8A0002000460F8 /* BackgroundTransitionRefCount.swift */; };
 		FC3ECF2C2F6F05B5000460F8 /* LocalTCPProxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECF3C2F6F05B5000460F8 /* LocalTCPProxy.swift */; };
 		FFFF00000000000000000002 /* AppleAuthModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFFF00000000000000000001 /* AppleAuthModule.swift */; };
@@ -57,7 +54,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		005CC8CEE5A448A49B965375 /* BackgroundUploadService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundUploadService.swift; sourceTree = "<group>"; };
 		0EF759A8AFFF684CCC662C58 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* LynavoDrive.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LynavoDrive.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = LynavoDrive/Images.xcassets; sourceTree = "<group>"; };
@@ -81,7 +77,6 @@
 		D4E1C9F92F94000100000001 /* PresenceReconnectPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresenceReconnectPolicy.swift; sourceTree = "<group>"; };
 		D4E1C9FB2F95000100000001 /* WakeOnLanService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeOnLanService.swift; sourceTree = "<group>"; };
 		D4E1C9FD2F95000100000001 /* WakeMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeMetadata.swift; sourceTree = "<group>"; };
-		D4E1CA002F91000100000001 /* SilentAudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SilentAudioService.swift; sourceTree = "<group>"; };
 		D4E1CA032FA0000100000001 /* SidecarHostResolutionPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidecarHostResolutionPolicy.swift; sourceTree = "<group>"; };
 		D4E1CA102F96000100000001 /* ReceivedLibraryMediaURLPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceivedLibraryMediaURLPolicy.swift; sourceTree = "<group>"; };
 		D4E1CA202FA1000100000001 /* ClientDisplayNameResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientDisplayNameResolver.swift; sourceTree = "<group>"; };
@@ -104,7 +99,6 @@
 		FC3ECC602F6F0B00000460F8 /* NetworkPathObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPathObserver.swift; sourceTree = "<group>"; };
 		FC3ECC702F6F0C00000460F8 /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
 		FC3ECCA12F7A0001000460F8 /* HMACAuthHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HMACAuthHelper.swift; sourceTree = "<group>"; };
-		FC3ECCB12F8A0001000460F8 /* UploadResetStateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadResetStateMachine.swift; sourceTree = "<group>"; };
 		FC3ECCC12F8A0002000460F8 /* BackgroundTransitionRefCount.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTransitionRefCount.swift; sourceTree = "<group>"; };
 		FC3ECF3C2F6F05B5000460F8 /* LocalTCPProxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTCPProxy.swift; sourceTree = "<group>"; };
 		FFFF00000000000000000001 /* AppleAuthModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppleAuthModule.swift; path = LynavoDrive/AppleAuthModule.swift; sourceTree = "<group>"; };
@@ -197,9 +191,7 @@
 				FC3ECC1F2F6F05B5000460F8 /* AssetExportService.swift */,
 				FC3ECC202F6F05B5000460F8 /* BackgroundExecutionService.swift */,
 				D4E1C9F32F92000100000001 /* BackgroundHandoffPolicy.swift */,
-				005CC8CEE5A448A49B965375 /* BackgroundUploadService.swift */,
 				FC3ECCA12F7A0001000460F8 /* HMACAuthHelper.swift */,
-				FC3ECCB12F8A0001000460F8 /* UploadResetStateMachine.swift */,
 				FC3ECCC12F8A0002000460F8 /* BackgroundTransitionRefCount.swift */,
 				FC3ECC212F6F05B5000460F8 /* BindingService.swift */,
 				D4E1CA202FA1000100000001 /* ClientDisplayNameResolver.swift */,
@@ -210,7 +202,6 @@
 				FC3ECC252F6F05B5000460F8 /* RNBridge.m */,
 				FC3ECC262F6F05B5000460F8 /* RNBridge.swift */,
 				FC3ECC272F6F05B5000460F8 /* SessionService.swift */,
-				D4E1CA002F91000100000001 /* SilentAudioService.swift */,
 				D4E1C9F92F94000100000001 /* PresenceReconnectPolicy.swift */,
 				D4E1CA102F96000100000001 /* ReceivedLibraryMediaURLPolicy.swift */,
 				D4E1CA032FA0000100000001 /* SidecarHostResolutionPolicy.swift */,
@@ -401,9 +392,7 @@
 				FC3ECC372F6F05B5000460F8 /* PhotoScanner.swift in Sources */,
 				FC3ECC382F6F05B5000460F8 /* BackgroundExecutionService.swift in Sources */,
 				D4E1C9F42F92000100000001 /* BackgroundHandoffPolicy.swift in Sources */,
-				53B4077763B245D0B65F1815 /* BackgroundUploadService.swift in Sources */,
 				FC3ECCA02F7A0001000460F8 /* HMACAuthHelper.swift in Sources */,
-				FC3ECCB02F8A0001000460F8 /* UploadResetStateMachine.swift in Sources */,
 				FC3ECCC02F8A0002000460F8 /* BackgroundTransitionRefCount.swift in Sources */,
 				FC3ECC392F6F05B5000460F8 /* HistoryLedgerStore.swift in Sources */,
 				FC3ECC3A2F6F05B5000460F8 /* SyncEngineManager.swift in Sources */,
@@ -411,7 +400,6 @@
 				FC3ECC3B2F6F05B5000460F8 /* SyncEngineError.swift in Sources */,
 				FC3ECC3C2F6F05B5000460F8 /* ProtocolSession.swift in Sources */,
 				D4E1C9F62F7A000100000001 /* LynavoVersion.generated.swift in Sources */,
-				D4E1CA012F91000100000001 /* SilentAudioService.swift in Sources */,
 				9AAE6A8410E525480D8CD473 /* AlbumBrowserService.swift in Sources */,
 				A02C8AC4F1D2121BB74AD3E9 /* AutoUploadConfigStore.swift in Sources */,
 				BEA438F6884C0C6D0918C25E /* ManualUploadService.swift in Sources */,

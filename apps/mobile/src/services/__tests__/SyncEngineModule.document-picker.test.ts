@@ -37,9 +37,6 @@ describe('SyncEngineModule document picker bridge', () => {
         OS: 'ios',
       },
       PermissionsAndroid: {
-        PERMISSIONS: {
-          POST_NOTIFICATIONS: 'android.permission.POST_NOTIFICATIONS',
-        },
         RESULTS: {
           GRANTED: 'granted',
         },

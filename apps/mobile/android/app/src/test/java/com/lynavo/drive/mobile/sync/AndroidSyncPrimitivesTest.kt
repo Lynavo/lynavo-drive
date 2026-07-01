@@ -1870,54 +1870,13 @@ class AndroidSyncPrimitivesTest {
   }
 
   @Test
-  fun clearForegroundSyncStopRequestPreservesLastStopReasonDiagnostic() {
-    val next = AndroidSyncPrimitives.clearForegroundSyncStopRequest(
-      AndroidBackgroundKeepaliveStopState(
-        foregroundStopRequested = true,
-        lastStopReason = "notification_stop",
-      ),
-    )
-
-    assertFalse(next.foregroundStopRequested)
-    assertEquals("notification_stop", next.lastStopReason)
-  }
-
-  @Test
-  fun backgroundContinuationStopsForFreeUserWhenAppIsNotVisible() {
-    val decision = AndroidSyncPrimitives.backgroundContinuationDecision(
-      entitlement = AndroidDriveEntitlementSnapshot(
-        canUseBackgroundContinuation = false,
-        checkedAt = "2026-07-01T00:00:00Z",
-        expiresAt = null,
-      ),
-      runtimeState = AndroidBackgroundContinuationRuntimeState(
-        appVisible = false,
-        screenInteractive = true,
-        lockscreenLocked = false,
-        postNotificationsGranted = true,
-      ),
-      now = "2026-07-01T00:01:00Z",
-    )
-
-    assertFalse(decision.canContinue)
-    assertEquals("background_entitlement_missing", decision.reason)
-  }
-
-  @Test
-  fun backgroundContinuationAllowsForegroundLanForFreeUser() {
-    val decision = AndroidSyncPrimitives.backgroundContinuationDecision(
-      entitlement = AndroidDriveEntitlementSnapshot(
-        canUseBackgroundContinuation = false,
-        checkedAt = "2026-07-01T00:00:00Z",
-        expiresAt = null,
-      ),
-      runtimeState = AndroidBackgroundContinuationRuntimeState(
+  fun foregroundLanRuntimeAllowsVisibleInteractiveUnlockedApp() {
+    val decision = AndroidSyncPrimitives.foregroundLanRuntimeDecision(
+      AndroidForegroundLanRuntimeState(
         appVisible = true,
         screenInteractive = true,
         lockscreenLocked = false,
-        postNotificationsGranted = false,
       ),
-      now = "2026-07-01T00:01:00Z",
     )
 
     assertTrue(decision.canContinue)
@@ -1925,90 +1884,40 @@ class AndroidSyncPrimitivesTest {
   }
 
   @Test
-  fun backgroundContinuationAllowsEntitledUserInBackground() {
-    val decision = AndroidSyncPrimitives.backgroundContinuationDecision(
-      entitlement = AndroidDriveEntitlementSnapshot(
-        canUseBackgroundContinuation = true,
-        checkedAt = "2026-07-01T00:00:00Z",
-        expiresAt = "2026-07-02T00:00:00Z",
-      ),
-      runtimeState = AndroidBackgroundContinuationRuntimeState(
+  fun foregroundLanRuntimeStopsWhenAppIsNotVisible() {
+    val decision = AndroidSyncPrimitives.foregroundLanRuntimeDecision(
+      AndroidForegroundLanRuntimeState(
         appVisible = false,
         screenInteractive = true,
         lockscreenLocked = false,
-        postNotificationsGranted = true,
       ),
-      now = "2026-07-01T00:01:00Z",
-    )
-
-    assertTrue(decision.canContinue)
-    assertNull(decision.reason)
-  }
-
-  @Test
-  fun backgroundContinuationRequiresNotificationsOnlyWhenNotForegroundLan() {
-    val decision = AndroidSyncPrimitives.backgroundContinuationDecision(
-      entitlement = AndroidDriveEntitlementSnapshot(
-        canUseBackgroundContinuation = true,
-        checkedAt = "2026-07-01T00:00:00Z",
-        expiresAt = "2026-07-02T00:00:00Z",
-      ),
-      runtimeState = AndroidBackgroundContinuationRuntimeState(
-        appVisible = false,
-        screenInteractive = false,
-        lockscreenLocked = true,
-        postNotificationsGranted = false,
-      ),
-      now = "2026-07-01T00:01:00Z",
     )
 
     assertFalse(decision.canContinue)
-    assertEquals("notification_permission_missing", decision.reason)
+    assertEquals("foreground_lan_runtime_inactive", decision.reason)
   }
 
   @Test
-  fun backgroundContinuationFailsClosedForInvalidOrStaleEntitlementTimes() {
-    val runtimeState = AndroidBackgroundContinuationRuntimeState(
-      appVisible = false,
-      screenInteractive = true,
-      lockscreenLocked = false,
-      postNotificationsGranted = true,
+  fun foregroundLanRuntimeStopsWhenScreenIsOffOrLocked() {
+    val screenOff = AndroidSyncPrimitives.foregroundLanRuntimeDecision(
+      AndroidForegroundLanRuntimeState(
+        appVisible = true,
+        screenInteractive = false,
+        lockscreenLocked = false,
+      ),
+    )
+    val locked = AndroidSyncPrimitives.foregroundLanRuntimeDecision(
+      AndroidForegroundLanRuntimeState(
+        appVisible = true,
+        screenInteractive = true,
+        lockscreenLocked = true,
+      ),
     )
 
-    val missingExpiry = AndroidSyncPrimitives.backgroundContinuationDecision(
-      entitlement = AndroidDriveEntitlementSnapshot(
-        canUseBackgroundContinuation = true,
-        checkedAt = "2026-07-01T00:00:00Z",
-        expiresAt = null,
-      ),
-      runtimeState = runtimeState,
-      now = "2026-07-01T00:01:00Z",
-    )
-    val staleCheckedAt = AndroidSyncPrimitives.backgroundContinuationDecision(
-      entitlement = AndroidDriveEntitlementSnapshot(
-        canUseBackgroundContinuation = true,
-        checkedAt = "2026-06-29T23:59:59Z",
-        expiresAt = "2026-07-02T00:00:00Z",
-      ),
-      runtimeState = runtimeState,
-      now = "2026-07-01T00:01:00Z",
-    )
-    val futureCheckedAt = AndroidSyncPrimitives.backgroundContinuationDecision(
-      entitlement = AndroidDriveEntitlementSnapshot(
-        canUseBackgroundContinuation = true,
-        checkedAt = "2026-07-01T00:01:01Z",
-        expiresAt = "2026-07-02T00:00:00Z",
-      ),
-      runtimeState = runtimeState,
-      now = "2026-07-01T00:01:00Z",
-    )
-
-    assertFalse(missingExpiry.canContinue)
-    assertFalse(staleCheckedAt.canContinue)
-    assertFalse(futureCheckedAt.canContinue)
-    assertEquals("background_entitlement_missing", missingExpiry.reason)
-    assertEquals("background_entitlement_missing", staleCheckedAt.reason)
-    assertEquals("background_entitlement_missing", futureCheckedAt.reason)
+    assertFalse(screenOff.canContinue)
+    assertEquals("foreground_lan_runtime_inactive", screenOff.reason)
+    assertFalse(locked.canContinue)
+    assertEquals("foreground_lan_runtime_inactive", locked.reason)
   }
 
   private fun testUploadItem(

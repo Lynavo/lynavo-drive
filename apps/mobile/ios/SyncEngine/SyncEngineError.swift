@@ -12,6 +12,7 @@ enum SyncEngineError: Error, LocalizedError {
     case bindingChanged
     case autoUploadInterrupted
     case manualUploadCancelled
+    case backgroundRuntimePaused
 
     var errorDescription: String? {
         switch self {
@@ -26,6 +27,7 @@ enum SyncEngineError: Error, LocalizedError {
         case .bindingChanged: return "Binding changed while sync was running"
         case .autoUploadInterrupted: return "Auto upload interrupted by user"
         case .manualUploadCancelled: return "Manual upload cancelled by user"
+        case .backgroundRuntimePaused: return "Foreground LAN sync paused because the app entered background"
         }
     }
 

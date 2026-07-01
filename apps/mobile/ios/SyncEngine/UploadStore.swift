@@ -24,14 +24,6 @@ struct StoredBinding {
     let pairingTokenKeychainRef: String
 }
 
-struct BackgroundUploadTaskIdentity: Codable {
-    let schemaVersion: Int = 1
-    let serverId: String
-    let clientId: String
-    let fileKey: String
-    let bindingVersion: Int?
-}
-
 struct UploadItemRecord {
     let id: Int64?
     let assetLocalId: String
@@ -41,20 +33,12 @@ struct UploadItemRecord {
     var fileKey: String?
     var fileSize: Int64?
     var status: String  // MobileUploadItemStatus values: discovered, preparing, ready, cloud_downloading, uploading, completed, failed, skipped, cancelled
-    var tempFilePath: String?
     var ackedOffset: Int64
     var lastErrorCode: String?
     let updatedAt: String
     var source: String  // 'auto' | 'manual'
     var batchId: String?
     var priority: Int  // 0 = auto (default), 1 = manual (higher priority)
-    var transport: String? = nil
-    var requiresRemoteReset: Bool = false
-    var httpBodySha256: String? = nil
-    var httpBodySize: Int64? = nil
-    var backgroundTaskServerId: String? = nil
-    var backgroundTaskClientId: String? = nil
-    var backgroundTaskBindingVersion: Int? = nil
     var sourceKind: String = "photo"
     var sourceFilePath: String? = nil
     var mimeType: String? = nil
@@ -177,7 +161,6 @@ class UploadStore {
           file_key        TEXT,
           file_size       INTEGER,
           status          TEXT NOT NULL,
-          temp_file_path  TEXT,
           acked_offset    INTEGER NOT NULL DEFAULT 0,
           last_error_code TEXT,
           updated_at      TEXT NOT NULL,
@@ -235,7 +218,6 @@ class UploadStore {
                   file_key        TEXT,
                   file_size       INTEGER,
                   status          TEXT NOT NULL,
-                  temp_file_path  TEXT,
                   acked_offset    INTEGER NOT NULL DEFAULT 0,
                   last_error_code TEXT,
                   updated_at      TEXT NOT NULL,
@@ -289,23 +271,10 @@ class UploadStore {
             slog("[UploadStore] auto_upload_config state column migration complete")
         }
 
-        try addColumnIfMissing(table: "upload_items", column: "transport", definition: "TEXT")
-        try addColumnIfMissing(table: "upload_items", column: "requires_remote_reset", definition: "INTEGER NOT NULL DEFAULT 0")
-        try addColumnIfMissing(table: "upload_items", column: "http_body_sha256", definition: "TEXT")
-        try addColumnIfMissing(table: "upload_items", column: "http_body_size", definition: "INTEGER")
-        try addColumnIfMissing(table: "upload_items", column: "background_task_server_id", definition: "TEXT")
-        try addColumnIfMissing(table: "upload_items", column: "background_task_client_id", definition: "TEXT")
-        try addColumnIfMissing(table: "upload_items", column: "background_task_binding_version", definition: "INTEGER")
         try addColumnIfMissing(table: "upload_items", column: "source_kind", definition: "TEXT NOT NULL DEFAULT 'photo'")
         try addColumnIfMissing(table: "upload_items", column: "source_file_path", definition: "TEXT")
         try addColumnIfMissing(table: "upload_items", column: "mime_type", definition: "TEXT")
         try addColumnIfMissing(table: "binding", column: "wake_metadata_json", definition: "TEXT")
-        try executeInternal("""
-            CREATE INDEX IF NOT EXISTS idx_upload_items_transport_status
-              ON upload_items(transport, status);
-            CREATE INDEX IF NOT EXISTS idx_upload_items_background_task_identity
-              ON upload_items(background_task_server_id, background_task_client_id, file_key);
-        """)
     }
 
     private func addColumnIfMissing(table: String, column: String, definition: String) throws {
@@ -420,27 +389,6 @@ class UploadStore {
                 try? executeInternal("ROLLBACK")
                 throw error
             }
-        }
-    }
-
-    func setNeedsRepair(value: Bool, reason: String?) throws {
-        try queue.sync {
-            try executeInternal("BEGIN IMMEDIATE TRANSACTION")
-            do {
-                try setMetaValueInternal("needs_repair", value: value ? "1" : "0")
-                try setMetaValueInternal("needs_repair_reason", value: reason)
-                try executeInternal("COMMIT")
-            } catch {
-                try? executeInternal("ROLLBACK")
-                throw error
-            }
-        }
-    }
-
-    func getNeedsRepair() -> (flag: Bool, reason: String?) {
-        return queue.sync {
-            let flag = getMetaValueInternal("needs_repair") == "1"
-            return (flag, getMetaValueInternal("needs_repair_reason"))
         }
     }
 
@@ -630,300 +578,6 @@ class UploadStore {
         try updateUploadOffset(fileKey: fileKey, offset: 0)
     }
 
-    func updatePreparedTempFile(fileKey: String, path: String?, sha256: String?, size: Int64?) throws {
-        try queue.sync {
-            let now = ISO8601DateFormatter().string(from: Date())
-            let sql = """
-            UPDATE upload_items
-            SET temp_file_path = ?1,
-                http_body_sha256 = ?2,
-                http_body_size = ?3,
-                updated_at = ?4
-            WHERE file_key = ?5
-            """
-            try executeWithBindings(sql, bindings: [
-                .textOrNull(path),
-                .textOrNull(sha256),
-                .intOrNull(size),
-                .text(now),
-                .text(fileKey)
-            ])
-        }
-    }
-
-    func clearPreparedTempFile(fileKey: String, identity: BackgroundUploadTaskIdentity?) throws -> String? {
-        try queue.sync {
-            let selectSql: String
-            let selectBindings: [BindingValue]
-            if let identity = identity {
-                selectSql = """
-                SELECT temp_file_path FROM upload_items
-                WHERE file_key = ?1
-                  AND background_task_server_id = ?2
-                  AND background_task_client_id = ?3
-                  AND COALESCE(background_task_binding_version, -1) = COALESCE(?4, -1)
-                LIMIT 1
-                """
-                selectBindings = backgroundIdentityBindings(fileKey: fileKey, identity: identity)
-            } else {
-                selectSql = "SELECT temp_file_path FROM upload_items WHERE file_key = ?1 LIMIT 1"
-                selectBindings = [.text(fileKey)]
-            }
-            let previousPath = queryInternal(selectSql, bind: selectBindings).first?["temp_file_path"] as? String
-
-            let now = ISO8601DateFormatter().string(from: Date())
-            let updateSql: String
-            var updateBindings: [BindingValue]
-            if let identity = identity {
-                updateSql = """
-                UPDATE upload_items
-                SET temp_file_path = NULL,
-                    http_body_sha256 = NULL,
-                    http_body_size = NULL,
-                    updated_at = ?1
-                WHERE file_key = ?2
-                  AND background_task_server_id = ?3
-                  AND background_task_client_id = ?4
-                  AND COALESCE(background_task_binding_version, -1) = COALESCE(?5, -1)
-                """
-                updateBindings = [.text(now)] + backgroundIdentityBindings(fileKey: fileKey, identity: identity)
-            } else {
-                updateSql = """
-                UPDATE upload_items
-                SET temp_file_path = NULL,
-                    http_body_sha256 = NULL,
-                    http_body_size = NULL,
-                    updated_at = ?1
-                WHERE file_key = ?2
-                """
-                updateBindings = [.text(now), .text(fileKey)]
-            }
-            try executeWithBindings(updateSql, bindings: updateBindings)
-            return previousPath
-        }
-    }
-
-    func getPreparedHTTPBody(fileKey: String) -> (path: String, sha256: String, size: Int64)? {
-        return queue.sync {
-            let sql = """
-            SELECT temp_file_path, http_body_sha256, http_body_size
-            FROM upload_items
-            WHERE file_key = ?1
-            LIMIT 1
-            """
-            guard let row = queryInternal(sql, bind: [.text(fileKey)]).first,
-                  let path = row["temp_file_path"] as? String,
-                  !path.isEmpty,
-                  let sha256 = row["http_body_sha256"] as? String,
-                  !sha256.isEmpty,
-                  let expectedSize = row["http_body_size"] as? Int64 else {
-                return nil
-            }
-            guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
-                  let actualSize = attrs[.size] as? NSNumber,
-                  actualSize.int64Value == expectedSize else {
-                return nil
-            }
-            return (path, sha256, expectedSize)
-        }
-    }
-
-    func getItemsWithTempFiles() -> [UploadItemRecord] {
-        return queue.sync {
-            let sql = "SELECT * FROM upload_items WHERE temp_file_path IS NOT NULL AND temp_file_path != ''"
-            let rows = queryInternal(sql, bind: [])
-            return rows.compactMap { uploadItemFromRow($0) }
-        }
-    }
-
-    func getBackgroundHTTPQueueHead() -> UploadItemRecord? {
-        return queue.sync {
-            let sql = """
-            SELECT * FROM upload_items
-            WHERE status IN ('queued', 'discovered', 'preparing', 'ready', 'cloud_downloading', 'uploading')
-              AND (transport IS NULL OR transport = 'http')
-            ORDER BY priority DESC, id ASC
-            LIMIT 1
-            """
-            return queryInternal(sql, bind: []).first.flatMap { uploadItemFromRow($0) }
-        }
-    }
-
-    func getForegroundTCPQueueHead() -> UploadItemRecord? {
-        return queue.sync {
-            let sql = """
-            SELECT * FROM upload_items
-            WHERE status IN ('queued', 'discovered', 'preparing', 'ready', 'cloud_downloading', 'uploading')
-              AND (transport IS NULL OR transport = 'tcp')
-            ORDER BY priority DESC, id ASC
-            LIMIT 1
-            """
-            return queryInternal(sql, bind: []).first.flatMap { uploadItemFromRow($0) }
-        }
-    }
-
-    func updateTransport(fileKey: String, transport: String?) throws {
-        try queue.sync {
-            let now = ISO8601DateFormatter().string(from: Date())
-            let sql = "UPDATE upload_items SET transport = ?1, updated_at = ?2 WHERE file_key = ?3"
-            try executeWithBindings(sql, bindings: [
-                .textOrNull(transport),
-                .text(now),
-                .text(fileKey)
-            ])
-        }
-    }
-
-    func setBackgroundTaskIdentity(fileKey: String, identity: BackgroundUploadTaskIdentity?) throws {
-        try queue.sync {
-            let now = ISO8601DateFormatter().string(from: Date())
-            let sql = """
-            UPDATE upload_items
-            SET background_task_server_id = ?1,
-                background_task_client_id = ?2,
-                background_task_binding_version = ?3,
-                updated_at = ?4
-            WHERE file_key = ?5
-            """
-            try executeWithBindings(sql, bindings: [
-                .textOrNull(identity?.serverId),
-                .textOrNull(identity?.clientId),
-                .intOrNull(identity?.bindingVersion.map(Int64.init)),
-                .text(now),
-                .text(fileKey)
-            ])
-        }
-    }
-
-    func backgroundTaskIdentityMatches(fileKey: String, identity: BackgroundUploadTaskIdentity) -> Bool {
-        return queue.sync {
-            let sql = """
-            SELECT 1 FROM upload_items
-            WHERE file_key = ?1
-              AND background_task_server_id = ?2
-              AND background_task_client_id = ?3
-              AND COALESCE(background_task_binding_version, -1) = COALESCE(?4, -1)
-            LIMIT 1
-            """
-            return !queryInternal(sql, bind: backgroundIdentityBindings(fileKey: fileKey, identity: identity)).isEmpty
-        }
-    }
-
-    func clearBackgroundTaskIdentity(fileKey: String, identity: BackgroundUploadTaskIdentity) throws {
-        try queue.sync {
-            let now = ISO8601DateFormatter().string(from: Date())
-            let sql = """
-            UPDATE upload_items
-            SET background_task_server_id = NULL,
-                background_task_client_id = NULL,
-                background_task_binding_version = NULL,
-                updated_at = ?1
-            WHERE file_key = ?2
-              AND background_task_server_id = ?3
-              AND background_task_client_id = ?4
-              AND COALESCE(background_task_binding_version, -1) = COALESCE(?5, -1)
-            """
-            try executeWithBindings(sql, bindings: [.text(now)] + backgroundIdentityBindings(fileKey: fileKey, identity: identity))
-        }
-    }
-
-    func setRequiresRemoteReset(fileKey: String, value: Bool) throws {
-        try queue.sync {
-            let now = ISO8601DateFormatter().string(from: Date())
-            let sql = "UPDATE upload_items SET requires_remote_reset = ?1, updated_at = ?2 WHERE file_key = ?3"
-            try executeWithBindings(sql, bindings: [
-                .int(value ? 1 : 0),
-                .text(now),
-                .text(fileKey)
-            ])
-        }
-    }
-
-    func getRequiresRemoteReset(fileKey: String) -> Bool {
-        return queue.sync {
-            let sql = "SELECT requires_remote_reset FROM upload_items WHERE file_key = ?1 LIMIT 1"
-            let value = queryInternal(sql, bind: [.text(fileKey)]).first?["requires_remote_reset"] as? Int64 ?? 0
-            return value != 0
-        }
-    }
-
-    func beginBackgroundEnqueue(
-        fileKey: String,
-        identity: BackgroundUploadTaskIdentity,
-        initialStatus: String,
-        initialOffset: Int64,
-        requiresRemoteReset: Bool
-    ) throws {
-        try queue.sync {
-            let now = ISO8601DateFormatter().string(from: Date())
-            let sql = """
-            UPDATE upload_items
-            SET transport = 'http',
-                status = ?1,
-                acked_offset = ?2,
-                requires_remote_reset = ?3,
-                background_task_server_id = ?4,
-                background_task_client_id = ?5,
-                background_task_binding_version = ?6,
-                updated_at = ?7
-            WHERE file_key = ?8
-            """
-            try executeWithBindings(sql, bindings: [
-                .text(initialStatus),
-                .int(initialOffset),
-                .int(requiresRemoteReset ? 1 : 0),
-                .text(identity.serverId),
-                .text(identity.clientId),
-                .intOrNull(identity.bindingVersion.map(Int64.init)),
-                .text(now),
-                .text(fileKey)
-            ])
-        }
-    }
-
-    @discardableResult
-    func applyBackgroundCompletion(
-        fileKey: String,
-        identity: BackgroundUploadTaskIdentity,
-        status: String,
-        clearTransport: Bool,
-        requiresRemoteReset: Bool?,
-        resetOffset: Bool,
-        clearIdentity: Bool
-    ) throws -> Bool {
-        try queue.sync {
-            let now = ISO8601DateFormatter().string(from: Date())
-            var assignments = ["status = ?1", "updated_at = ?2"]
-            var bindings: [BindingValue] = [.text(status), .text(now)]
-            if clearTransport {
-                assignments.append("transport = NULL")
-            }
-            if let requiresRemoteReset = requiresRemoteReset {
-                assignments.append("requires_remote_reset = ?\(bindings.count + 1)")
-                bindings.append(.int(requiresRemoteReset ? 1 : 0))
-            }
-            if resetOffset {
-                assignments.append("acked_offset = 0")
-            }
-            if clearIdentity {
-                assignments.append("background_task_server_id = NULL")
-                assignments.append("background_task_client_id = NULL")
-                assignments.append("background_task_binding_version = NULL")
-            }
-            let predicateStart = bindings.count + 1
-            let sql = """
-            UPDATE upload_items
-            SET \(assignments.joined(separator: ", "))
-            WHERE file_key = ?\(predicateStart)
-              AND background_task_server_id = ?\(predicateStart + 1)
-              AND background_task_client_id = ?\(predicateStart + 2)
-              AND COALESCE(background_task_binding_version, -1) = COALESCE(?\(predicateStart + 3), -1)
-            """
-            bindings.append(contentsOf: backgroundIdentityBindings(fileKey: fileKey, identity: identity))
-            return try executeWithBindingsReturningChanges(sql, bindings: bindings) > 0
-        }
-    }
-
     func sweepOrphanUploadingOnStartup() throws {
         try queue.sync {
             let now = ISO8601DateFormatter().string(from: Date())
@@ -931,7 +585,6 @@ class UploadStore {
             UPDATE upload_items
             SET status = 'queued',
                 acked_offset = 0,
-                transport = NULL,
                 updated_at = ?1
             WHERE status = 'uploading'
             """
@@ -941,22 +594,20 @@ class UploadStore {
 
     private func upsertUploadItemsInternal(_ items: [UploadItemRecord]) throws {
         let sql = """
-        INSERT INTO upload_items (asset_local_id, modified_at, media_type, original_filename, file_key, file_size, status, temp_file_path, acked_offset, last_error_code, updated_at, source, batch_id, priority, transport, source_kind, source_file_path, mime_type)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
+        INSERT INTO upload_items (asset_local_id, modified_at, media_type, original_filename, file_key, file_size, status, acked_offset, last_error_code, updated_at, source, batch_id, priority, source_kind, source_file_path, mime_type)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
         ON CONFLICT(asset_local_id) DO UPDATE SET
           media_type = excluded.media_type,
           original_filename = excluded.original_filename,
           file_key = excluded.file_key,
           file_size = excluded.file_size,
           status = excluded.status,
-          temp_file_path = excluded.temp_file_path,
           acked_offset = excluded.acked_offset,
           last_error_code = excluded.last_error_code,
           updated_at = excluded.updated_at,
           source = excluded.source,
           batch_id = excluded.batch_id,
           priority = excluded.priority,
-          transport = excluded.transport,
           source_kind = excluded.source_kind,
           source_file_path = excluded.source_file_path,
           mime_type = excluded.mime_type
@@ -973,14 +624,12 @@ class UploadStore {
                     .textOrNull(item.fileKey),
                     .intOrNull(item.fileSize),
                     .text(item.status),
-                    .textOrNull(item.tempFilePath),
                     .int(item.ackedOffset),
                     .textOrNull(item.lastErrorCode),
                     .text(item.updatedAt),
                     .text(item.source),
                     .textOrNull(item.batchId),
                     .int(Int64(item.priority)),
-                    .textOrNull(item.transport),
                     .text(item.sourceKind),
                     .textOrNull(item.sourceFilePath),
                     .textOrNull(item.mimeType)
@@ -1411,15 +1060,6 @@ class UploadStore {
         ])
     }
 
-    private func backgroundIdentityBindings(fileKey: String, identity: BackgroundUploadTaskIdentity) -> [BindingValue] {
-        return [
-            .text(fileKey),
-            .text(identity.serverId),
-            .text(identity.clientId),
-            .intOrNull(identity.bindingVersion.map(Int64.init))
-        ]
-    }
-
     // MARK: - Row Mappers
 
     private func uploadItemFromRow(_ row: [String: Any]) -> UploadItemRecord? {
@@ -1438,20 +1078,12 @@ class UploadStore {
             fileKey: row["file_key"] as? String,
             fileSize: row["file_size"] as? Int64,
             status: status,
-            tempFilePath: row["temp_file_path"] as? String,
             ackedOffset: row["acked_offset"] as? Int64 ?? 0,
             lastErrorCode: row["last_error_code"] as? String,
             updatedAt: updatedAt,
             source: row["source"] as? String ?? "auto",
             batchId: row["batch_id"] as? String,
             priority: Int(row["priority"] as? Int64 ?? 0),
-            transport: row["transport"] as? String,
-            requiresRemoteReset: (row["requires_remote_reset"] as? Int64 ?? 0) != 0,
-            httpBodySha256: row["http_body_sha256"] as? String,
-            httpBodySize: row["http_body_size"] as? Int64,
-            backgroundTaskServerId: row["background_task_server_id"] as? String,
-            backgroundTaskClientId: row["background_task_client_id"] as? String,
-            backgroundTaskBindingVersion: (row["background_task_binding_version"] as? Int64).map(Int.init),
             sourceKind: row["source_kind"] as? String ?? "photo",
             sourceFilePath: row["source_file_path"] as? String,
             mimeType: row["mime_type"] as? String

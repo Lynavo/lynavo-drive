@@ -3,39 +3,13 @@ import CryptoKit
 import Security
 
 /// Shared HMAC auth helper for sidecar HTTP endpoints that use the
-/// `keyBytes = SHA256(pairingToken)` signing scheme (POST /upload/<cid>,
-/// DELETE /upload/<cid>/<fkey>).
+/// `keyBytes = SHA256(pairingToken)` signing scheme.
 ///
 /// Keeps the canonical-string construction and HMAC computation in one
-/// place so SyncEngineManager (DELETE reset) and BackgroundUploadService
-/// (POST upload) can't drift out of sync with the Go sidecar.
+/// place so SyncEngineManager's sidecar HTTP calls can't drift out of sync
+/// with the Go sidecar.
 ///
-/// Canonical format matches plan spec at
-/// docs/architecture/background-upload-plan.md:
-///   - POST: 12 fields, lines 101-131, separator LF, NO trailing LF after nonce
-///   - DELETE: 6 fields, lines 621-631, separator LF, NO trailing LF after nonce
-/// Sidecar `canonicalPOSTString` / `canonicalDELETEString` in
-/// services/sidecar-go/internal/api/handlers_upload.go emit the same form.
 enum HMACAuthHelper {
-    /// DELETE /upload/<clientId>/<fileKey> — 6-line canonical, LF separators,
-    /// no trailing LF after `nonce` (matches sidecar canonicalDELETEString).
-    static func canonicalDELETE(
-        path: String,
-        clientId: String,
-        fileKey: String,
-        timestamp: String,
-        nonce: String
-    ) -> String {
-        var out = ""
-        out.append("DELETE\n")
-        out.append(path); out.append("\n")
-        out.append(clientId); out.append("\n")
-        out.append(fileKey); out.append("\n")
-        out.append(timestamp); out.append("\n")
-        out.append(nonce)
-        return out
-    }
-
     /// GET /personal/* — 5-line canonical, LF separators, no trailing LF after
     /// `nonce` (matches sidecar personalAccessSignature).
     static func canonicalPersonalAccess(

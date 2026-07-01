@@ -3,11 +3,6 @@ import {
   normalizePublicIPv4,
   refreshNativeAppFeatureSettings,
 } from '../app-config-service';
-import { setBackgroundSilentAudioEnabled } from '../SyncEngineModule';
-
-jest.mock('../SyncEngineModule', () => ({
-  setBackgroundSilentAudioEnabled: jest.fn(),
-}));
 
 describe('app-config-service', () => {
   beforeEach(() => {
@@ -36,9 +31,7 @@ describe('app-config-service', () => {
     expect(normalizePublicIPv4('bad')).toBeNull();
   });
 
-  it('always disables native background silent audio in the OSS runtime', async () => {
-    await refreshNativeAppFeatureSettings();
-
-    expect(setBackgroundSilentAudioEnabled).toHaveBeenCalledWith(false);
+  it('does not call native paid-background feature toggles in the OSS runtime', async () => {
+    await expect(refreshNativeAppFeatureSettings()).resolves.toBeUndefined();
   });
 });

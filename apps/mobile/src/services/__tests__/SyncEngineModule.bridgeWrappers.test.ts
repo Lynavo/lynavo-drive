@@ -12,9 +12,6 @@ describe('SyncEngineModule shared bridge wrappers', () => {
         OS: 'ios',
       },
       PermissionsAndroid: {
-        PERMISSIONS: {
-          POST_NOTIFICATIONS: 'android.permission.POST_NOTIFICATIONS',
-        },
         RESULTS: {
           GRANTED: 'granted',
         },

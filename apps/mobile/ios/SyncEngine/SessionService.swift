@@ -10,7 +10,6 @@ class SessionService {
         case scanning
         case preparing
         case syncingForeground = "syncing_foreground"
-        case syncingBackground = "syncing_background"
         case backoffWaiting = "backoff_waiting"
         case pausedNoTarget = "paused_no_target"
         case pausedNoPermission = "paused_no_permission"

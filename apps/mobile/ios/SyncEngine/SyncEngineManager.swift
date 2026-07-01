@@ -198,7 +198,7 @@ private func syncDiagnosticsDumpToConsole(_ lines: [String]) {
 }
 
 @objc
-class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegate, BackgroundUploadBindingSource {
+class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegate {
     static let shared = SyncEngineManager()
 
     private enum BindingConnectionState: String {
@@ -242,39 +242,18 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private var manualUploadService: ManualUploadService?
     let sharedFilesService = SharedFilesService()
     private let wakeOnLanService = WakeOnLanService()
-    /// Live snapshot of the current binding. Takes priority over SQLite in
-    /// BackgroundUploadService.resolveCurrentBinding() so a just-paired
-    /// binding is visible before the row is flushed. Written by the pairing /
-    /// restore paths via `persistBinding(_:)`. Cleared by `clearBinding` /
-    /// wipe / logout paths.
+    /// Live snapshot of the current binding. Takes priority over SQLite so a
+    /// just-paired binding is visible before the row is flushed. Written by the
+    /// pairing / restore paths via `persistBinding(_:)`. Cleared by
+    /// `clearBinding` / wipe / logout paths.
     private(set) var currentBinding: StoredBinding?
     private let bindingMutationLock = NSRecursiveLock()
     private var sharedFilesReachabilityPayload: [String: Any]?
     /// Set while the app is transitioning to background. The foreground TCP
-    /// upload loop observes this between files and breaks out so the
-    /// BackgroundUploadService can take over.
+    /// upload loop observes this between files and breaks out; OSS builds do
+    /// not hand off to a background continuation runtime.
     var isTransitioningToBackground = false
     private var appIsInBackground = false
-    private let backgroundSilentAudioFeatureLock = NSLock()
-    private var backgroundSilentAudioFeatureEnabled = false
-    private let driveEntitlementsLock = NSLock()
-    private var driveEntitlementSnapshot: DriveEntitlementSnapshot?
-    private let driveEntitlementExpiryQueue = DispatchQueue(
-        label: "com.lynavo.drive.entitlement-expiry",
-        qos: .utility
-    )
-    private let driveEntitlementExpiryLock = NSLock()
-    private var driveEntitlementExpiryToken = UUID()
-    private var driveEntitlementExpiryWorkItem: DispatchWorkItem?
-    let backgroundUploadService = BackgroundUploadService.shared
-    /// Timeout / poll tuning for `transitionToBackgroundUpload`. Expressed as
-    /// private static lets so unit-level reasoning sees concrete numbers.
-    private static let transitionBackgroundWaitTimeoutSeconds: UInt64 = 25
-    private static let transitionPollIntervalMilliseconds: UInt64 = 100
-    /// Timeout for DELETE /upload cross-protocol reset. Not a background
-    /// URLSession request — fires on the short-lived HTTP client used by
-    /// `sidecarResetUpload`.
-    private static let crossProtocolResetDeleteTimeoutSeconds: TimeInterval = 10
     private var isAutoUploadInterrupted = false
     private var shouldAbortActiveAutoUpload = false
     private var shouldAbortActiveManualUpload = false
@@ -320,16 +299,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     /// extracted to `BackgroundTransitionRefCount` so it can be unit-tested
     /// without UIKit).
     ///
-    /// `appDidEnterBackground` and `transitionToBackgroundUpload` both call
-    /// `beginBackgroundTransitionIfNeeded` / `endBackgroundTransitionIfNeeded`
-    /// and nest: the outer pair spans the whole transition, the inner pair
-    /// only wraps the `transitionToBackgroundUpload` async body (via
-    /// `defer`). A pure bool / `== .invalid` gate would release the outer
-    /// UIApplication assertion the moment the inner `defer end()` ran,
-    /// leaving the outer caller with nothing to back it. The helper counts
-    /// open scopes and only ends the real UIApplication task when the count
-    /// drops back to zero; `forceEnd` clamps the count on terminal cleanup
-    /// paths.
+    /// Foreground-only OSS still uses short UIKit transition tasks to let
+    /// foreground TCP upload cleanup run to a clean idle state after the app
+    /// enters background. The helper counts open scopes and only ends the real
+    /// UIApplication task when the count drops back to zero; `forceEnd` clamps
+    /// the count on terminal cleanup paths.
     private lazy var backgroundTransitionRefCount: BackgroundTransitionRefCount<UIBackgroundTaskIdentifier> = {
         return BackgroundTransitionRefCount<UIBackgroundTaskIdentifier>(
             invalidToken: .invalid,
@@ -1377,48 +1351,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             name: ProcessInfo.thermalStateDidChangeNotification,
             object: nil
         )
-        // Sweep leftover export temp files from previous sessions (crash / jetsam kills leave
-        // large video files on disk that accumulate across launches and cause OOM).
-        //
-        // Phase 3.6: DO NOT delete temp files still referenced by
-        // upload_items.temp_file_path — those are the prepared HTTP bodies
-        // that BackgroundUploadService hands to URLSession. Unconditional
-        // removal here would orphan every in-flight background upload and
-        // cause a 422 body_size_mismatch chain on relaunch.
+        // Sweep leftover export temp files from previous sessions (crash /
+        // jetsam kills leave large video files on disk that accumulate across
+        // launches and cause OOM).
         let exportTempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("lynavo_drive_export", isDirectory: true)
-        let preservePaths: Set<String> = Set(
-            (uploadStore?.getItemsWithTempFiles() ?? [])
-                .compactMap { $0.tempFilePath }
-                .filter { !$0.isEmpty }
-        )
         if FileManager.default.fileExists(atPath: exportTempDir.path) {
-            if preservePaths.isEmpty {
-                try? FileManager.default.removeItem(at: exportTempDir)
-                slog("[SyncEngine] cleared export temp dir on init")
-            } else {
-                var preservedCount = 0
-                var deletedCount = 0
-                if let entries = try? FileManager.default.contentsOfDirectory(
-                    at: exportTempDir,
-                    includingPropertiesForKeys: nil,
-                    options: []
-                ) {
-                    for entry in entries {
-                        if preservePaths.contains(entry.path) {
-                            preservedCount += 1
-                            continue
-                        }
-                        try? FileManager.default.removeItem(at: entry)
-                        deletedCount += 1
-                    }
-                }
-                slog(
-                    "[SyncEngine] export temp dir sweep: preserved=%d deleted=%d (prepared HTTP bodies kept)",
-                    preservedCount,
-                    deletedCount
-                )
-            }
+            try? FileManager.default.removeItem(at: exportTempDir)
+            slog("[SyncEngine] cleared export temp dir on init")
         }
 
         // Start the passive network-path observer. Pure instrumentation:
@@ -1430,389 +1370,41 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     // MARK: - App State Transitions
 
-    func setBackgroundSilentAudioEnabled(_ enabled: Bool) {
-        backgroundSilentAudioFeatureLock.lock()
-        backgroundSilentAudioFeatureEnabled = enabled
-        backgroundSilentAudioFeatureLock.unlock()
-        if !enabled || !canUseBackgroundContinuationEntitlement() {
-            SilentAudioService.shared.stop()
-        }
-        slog("[SilentAudio] feature %@", enabled ? "enabled" : "disabled")
-        syncDiagnosticsLog("SilentAudio", "feature \(enabled ? "enabled" : "disabled")")
-    }
-
-    private func isBackgroundSilentAudioEnabled() -> Bool {
-        backgroundSilentAudioFeatureLock.lock()
-        defer { backgroundSilentAudioFeatureLock.unlock() }
-        return backgroundSilentAudioFeatureEnabled
-    }
-
-    func setDriveEntitlements(_ snapshot: DriveEntitlementSnapshot) {
-        driveEntitlementsLock.lock()
-        driveEntitlementSnapshot = snapshot
-        driveEntitlementsLock.unlock()
-        backgroundUploadService.setDriveEntitlements(snapshot)
-
-        let backgroundAllowed = BackgroundHandoffPolicy.canUseBackgroundContinuation(
-            snapshot: snapshot
-        )
-        if backgroundAllowed {
-            rescheduleBackgroundContinuationExpiryIfNeeded(reason: "entitlement_updated")
-        } else {
-            cancelBackgroundContinuationExpiry(reason: "entitlement_updated_denied")
-            stopBackgroundContinuationRuntime(reason: "entitlement_updated_denied", force: true)
-            if BackgroundHandoffPolicy.shouldForceForegroundPipelineYieldAfterEntitlementChange(
-                isAppInBackground: appIsInBackground,
-                isSyncing: isSyncing,
-                canUseBackgroundContinuation: false
-            ) {
-                isTransitioningToBackground = true
-                resumeWatchLoopIfNeeded()
-                syncDiagnosticsLog(
-                    "SyncPipeline",
-                    "background continuation entitlement revoked; foreground pipeline will yield at file boundary"
-                )
-            }
-        }
-        slog(
-            "[Entitlements] snapshot updated background=%@ expiresAt=%@",
-            backgroundAllowed ? "allowed" : "denied",
-            snapshot.expiresAt.map { "\($0)" } ?? "nil"
-        )
+    private func stopDisabledBackgroundRuntime(reason: String) {
         syncDiagnosticsLog(
-            "Entitlements",
-            "snapshot updated background=\(backgroundAllowed ? "allowed" : "denied") expiresAt=\(snapshot.expiresAt.map { "\($0)" } ?? "nil")"
+            "BackgroundExec",
+            "background runtime disabled in OSS reason=\(reason)"
         )
     }
 
-    private func currentDriveEntitlementSnapshot() -> DriveEntitlementSnapshot? {
-        driveEntitlementsLock.lock()
-        defer { driveEntitlementsLock.unlock() }
-        return driveEntitlementSnapshot
-    }
-
-    private func canUseBackgroundContinuationEntitlement(now: Date = Date()) -> Bool {
-        BackgroundHandoffPolicy.canUseBackgroundContinuation(
-            snapshot: currentDriveEntitlementSnapshot(),
-            now: now
-        )
-    }
-
-    private func cancelBackgroundContinuationExpiry(reason: String) {
-        driveEntitlementExpiryLock.lock()
-        driveEntitlementExpiryToken = UUID()
-        let workItem = driveEntitlementExpiryWorkItem
-        driveEntitlementExpiryWorkItem = nil
-        driveEntitlementExpiryLock.unlock()
-
-        if let workItem {
-            workItem.cancel()
-            syncDiagnosticsLog("Entitlements", "background continuation expiry cancelled reason=\(reason)")
-        }
-    }
-
-    private func currentBackgroundContinuationExpiryToken() -> UUID {
-        driveEntitlementExpiryLock.lock()
-        defer { driveEntitlementExpiryLock.unlock() }
-        return driveEntitlementExpiryToken
-    }
-
-    private func setBackgroundContinuationExpiryWorkItem(_ workItem: DispatchWorkItem?) {
-        driveEntitlementExpiryLock.lock()
-        driveEntitlementExpiryWorkItem = workItem
-        driveEntitlementExpiryLock.unlock()
-    }
-
-    private func rescheduleBackgroundContinuationExpiryIfNeeded(reason: String) {
-        cancelBackgroundContinuationExpiry(reason: "\(reason)_reschedule")
-        guard appIsInBackground else { return }
-        let now = Date()
-        let snapshot = currentDriveEntitlementSnapshot()
-        guard let expiryDate = BackgroundHandoffPolicy.backgroundContinuationExpiryDate(
-            snapshot: snapshot,
-            now: now
-        ) else {
-            if !canUseBackgroundContinuationEntitlement(now: now) {
-                stopBackgroundContinuationRuntime(reason: "\(reason)_expired")
-            }
-            return
-        }
-
-        let token = UUID()
-        driveEntitlementExpiryLock.lock()
-        driveEntitlementExpiryToken = token
-        driveEntitlementExpiryLock.unlock()
-
-        let delay = max(0, expiryDate.timeIntervalSince(now))
-        let workItem = DispatchWorkItem { [weak self] in
-            self?.enforceBackgroundContinuationExpiry(token: token)
-        }
-        setBackgroundContinuationExpiryWorkItem(workItem)
-        driveEntitlementExpiryQueue.asyncAfter(deadline: .now() + delay, execute: workItem)
-        syncDiagnosticsLog(
-            "Entitlements",
-            "background continuation expiry scheduled reason=\(reason) delay=\(String(format: "%.3f", delay))s expiresAt=\(expiryDate)"
-        )
-    }
-
-    private func enforceBackgroundContinuationExpiry(token: UUID) {
-        guard token == currentBackgroundContinuationExpiryToken() else { return }
-        setBackgroundContinuationExpiryWorkItem(nil)
-        guard appIsInBackground else { return }
-        guard !canUseBackgroundContinuationEntitlement(now: Date()) else {
-            rescheduleBackgroundContinuationExpiryIfNeeded(reason: "expiry_recheck_still_allowed")
-            return
-        }
-        stopBackgroundContinuationRuntime(reason: "entitlement_expired_local")
-        if isSyncing {
-            isTransitioningToBackground = true
-            resumeWatchLoopIfNeeded()
-            syncDiagnosticsLog(
-                "SyncPipeline",
-                "background continuation entitlement expired locally; foreground pipeline will yield at file boundary"
-            )
-        }
-    }
-
-    private func stopBackgroundContinuationRuntime(reason: String, force: Bool = false) {
-        guard force || BackgroundHandoffPolicy.shouldStopBackgroundContinuationRuntime(
-            isAppInBackground: appIsInBackground,
-            canUseBackgroundContinuation: false
-        ) else {
-            return
-        }
-        SilentAudioService.shared.stop()
-        backgroundService.cancelContinuedTask()
-        syncDiagnosticsLog(
-            "Entitlements",
-            "background continuation runtime stopped reason=\(reason)"
-        )
-    }
-
-    @discardableResult
-    private func enforceBackgroundContinuationRuntime(reason: String) -> Bool {
-        let backgroundAllowed = canUseBackgroundContinuationEntitlement()
-        if !backgroundAllowed {
-            stopBackgroundContinuationRuntime(reason: reason)
-        }
-        return backgroundAllowed
-    }
-
-    private func clearDriveEntitlementsForIdentityReset(reason: String) {
-        cancelBackgroundContinuationExpiry(reason: reason)
-        driveEntitlementsLock.lock()
-        driveEntitlementSnapshot = nil
-        driveEntitlementsLock.unlock()
-        backgroundUploadService.setDriveEntitlements(nil)
-        stopBackgroundContinuationRuntime(reason: reason, force: true)
+    private func clearDisabledCommercialRuntimeState(reason: String) {
+        stopDisabledBackgroundRuntime(reason: reason)
         clearP2PTunnelCredentials(reason: reason)
-        syncDiagnosticsLog("Entitlements", "snapshot cleared reason=\(reason)")
+        syncDiagnosticsLog("CommercialRuntime", "disabled commercial runtime state cleared reason=\(reason)")
     }
 
     @objc private func appDidEnterBackground() {
         appIsInBackground = true
         slog("[SyncEngine] app entered background, isSyncing=\(isSyncing)")
-        let canUseBackgroundContinuation = canUseBackgroundContinuationEntitlement()
-        let silentAudioStarted: Bool
-        if canUseBackgroundContinuation && isBackgroundSilentAudioEnabled() {
-            silentAudioStarted = SilentAudioService.shared.start()
-            if !silentAudioStarted {
-                syncDiagnosticsLog("SilentAudio", "background audio failed to start; falling back to background handoff")
-            }
-        } else {
-            silentAudioStarted = false
-            SilentAudioService.shared.stop()
-            syncDiagnosticsLog(
-                "SilentAudio",
-                canUseBackgroundContinuation
-                    ? "background audio skipped — feature disabled"
-                    : "background audio skipped — entitlement denied"
-            )
-        }
-        rescheduleBackgroundContinuationExpiryIfNeeded(reason: "didEnterBackground")
+        syncDiagnosticsLog("SilentAudio", "background audio disabled in OSS")
         if !isSyncing {
             stopPresenceHeartbeatTimer()
             stopPairingControlSession(reason: "app_entered_background")
             cancelPresenceRecoveryProbe(reason: "app_entered_background")
         }
         guard isSyncing else { return }
-        guard canUseBackgroundContinuation else {
-            isTransitioningToBackground = true
-            syncDiagnosticsLog(
-                "SyncPipeline",
-                "background continuation denied; foreground pipeline will yield at file boundary"
-            )
-            return
-        }
-        if silentAudioStarted {
-            if sessionService.state == .syncingForeground {
-                sessionService.transitionTo(.syncingBackground)
-            }
-            syncDiagnosticsLog("SyncPipeline", "continuing TCP pipeline in background with silent audio")
-            return
-        }
-        beginBackgroundTransitionIfNeeded(reason: "didEnterBackground")
         isTransitioningToBackground = true
-        if sessionService.state == .syncingForeground {
-            sessionService.transitionTo(.syncingBackground)
-        }
-        Task { [weak self] in
-            await self?.transitionToBackgroundUpload()
-        }
-    }
-
-    /// Invoked when the app moves to background while a foreground TCP upload
-    /// loop is in flight. Waits (bounded) for the active FILE to drain so we
-    /// don't slice mid-FILE_DATA, then hands off the next queue-head file to
-    /// BackgroundUploadService for URLSession background transport.
-    ///
-    /// The wait path uses `watchLoopContinuation` so the existing foreground
-    /// loop can `resumeWatchLoopIfNeeded()` as soon as it detects
-    /// `isTransitioningToBackground == true` between files.
-    private func transitionToBackgroundUpload() async {
-        guard canUseBackgroundContinuationEntitlement() else {
-            syncDiagnosticsLog("SyncEngine", "background handoff skipped — entitlement denied")
-            return
-        }
-        beginBackgroundTransitionIfNeeded(reason: "transitionToBackgroundUpload")
-        defer { endBackgroundTransitionIfNeeded(reason: "transitionToBackgroundUpload") }
-
-        // Clear the "foreground resume requested" flag before we enqueue a
-        // new background URLSession task. The flag is set every time the app
-        // enters the foreground (see appWillEnterForeground); without this
-        // clear, any subsequent bg→fg→bg cycle would leave it stuck true
-        // forever and chainNextIfAppropriate() would refuse to queue the
-        // next file after the first background completion.
-        //
-        // It must be cleared here (not in appDidEnterBackground) because
-        // background enqueue flows through transitionToBackgroundUpload
-        // only — clearing too early would also miss any direct call paths
-        // that bypass appDidEnterBackground.
-        backgroundUploadService.clearForegroundResumeRequest()
-
-        // (1) Install a sentinel watchLoopContinuation so the foreground TCP
-        //     loop can wake us at the next file boundary. The previous
-        //     implementation used `withTaskGroup` + `withCheckedContinuation`
-        //     racing against a timeout child; because `withCheckedContinuation`
-        //     does NOT exit on task cancellation, the group never returned if
-        //     the timeout branch won — the continuation child stayed suspended
-        //     waiting for `resume()`, `withTaskGroup` implicitly awaited all
-        //     children, and the handoff permanently deadlocked.
-        //
-        //     We now install a continuation whose ONLY purpose is to carry a
-        //     token the TCP loop can use to signal "I reached a file
-        //     boundary". We then poll-sleep on a bounded deadline instead of
-        //     awaiting the continuation. If the TCP loop resumes the
-        //     continuation (via `resumeWatchLoopIfNeeded()` in the file-boundary
-        //     check), it is cleared from the shared slot and the poll observes
-        //     that as "at file boundary". If the deadline elapses first the
-        //     poll exits; `resumeWatchLoopIfNeeded(expectedToken:)` below
-        //     cleans up whatever is still armed under our token.
-        let token = UUID()
-        // Park a sentinel continuation in the shared slot from a detached
-        // Task. The Task suspends on `withCheckedContinuation` until either
-        // the TCP loop (file boundary) or our own timeout path below calls
-        // `resumeWatchLoopIfNeeded(expectedToken: token)`, which resumes the
-        // sentinel and lets the detached Task finish. No continuation leak.
-        //
-        // We `await` an install-ack signal before starting the poll loop so
-        // there is no race where the poll observes an empty slot before the
-        // detached Task has parked the sentinel.
-        await withCheckedContinuation { (installAck: CheckedContinuation<Void, Never>) in
-            Task.detached { [weak self] in
-                guard let self else {
-                    installAck.resume()
-                    return
-                }
-                await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-                    self.watchLoopContinuationLock.lock()
-                    if let existing = self.watchLoopContinuation {
-                        existing.resume()
-                    }
-                    self.watchLoopContinuation = cont
-                    self.watchLoopContinuationToken = token
-                    self.watchLoopContinuationLock.unlock()
-                    // Slot is now armed with our sentinel; unblock the caller
-                    // to begin its deadline-bounded poll.
-                    installAck.resume()
-                }
-            }
-        }
-
-        let deadline = Date().addingTimeInterval(
-            TimeInterval(Self.transitionBackgroundWaitTimeoutSeconds)
-        )
-        while Date() < deadline {
-            if isTCPLoopAtFileBoundary(expectedToken: token) {
-                break
-            }
-            try? await Task.sleep(
-                nanoseconds: Self.transitionPollIntervalMilliseconds * 1_000_000
-            )
-        }
-        // On both exit paths (file-boundary reached OR timeout elapsed) we
-        // must resume any still-armed continuation under our token so the
-        // detached Task above unblocks and releases resources.
-        resumeWatchLoopIfNeeded(expectedToken: token)
-
-        // (2) Hand off to the background upload service, if we still have a
-        //     binding. Preparation is disabled here because the foreground
-        //     loop is responsible for exporting the next asset; the
-        //     background path only enqueues an already-prepared body.
-        //
-        //     M7 / Spec L52: the fast path is explicitly budgeted
-        //     `BackgroundUploadService.backgroundTransitionPreparationBudgetSeconds`
-        //     for export/SHA256 work. That constant is currently 0, so
-        //     `allowPreparation` MUST be false here — any row without a
-        //     prepared body is deferred to the next BGProcessing wake-up
-        //     where preparation is actually budgeted. If the constant ever
-        //     grows non-zero, this call site is the single place to
-        //     branch on it.
-        precondition(
-            BackgroundUploadService.backgroundTransitionPreparationBudgetSeconds == 0,
-            "M7: transitionToBackgroundUpload assumes zero preparation budget — re-evaluate allowPreparation before raising the constant"
-        )
-        guard let binding = BackgroundHandoffPolicy.resolveBinding(
-            live: currentBinding,
-            persisted: uploadStore?.getBinding()
-        ) else {
-            NSLog("[SyncEngine] background handoff skipped — no binding")
-            syncDiagnosticsLog("SyncEngine", "background handoff skipped — no binding")
-            return
-        }
-        let clientId = bindingService.getOrCreateClientId()
-        let result = await backgroundUploadService.enqueueNextPendingFileIfIdle(
-            binding: binding,
-            clientId: clientId,
-            allowPreparation: false
-        )
-        NSLog("[SyncEngine] background handoff result=%@", "\(result)")
         syncDiagnosticsLog(
-            "SyncEngine",
-            "background handoff result=\(result) clientId=\(clientId.prefix(8))…"
+            "SyncPipeline",
+            "background continuation disabled in OSS; foreground pipeline will yield at file boundary"
         )
     }
 
     @objc private func appWillEnterForeground() {
         slog("[SyncEngine] app entering foreground")
         appIsInBackground = false
-        cancelBackgroundContinuationExpiry(reason: "willEnterForeground")
-        SilentAudioService.shared.stop()
         isTransitioningToBackground = false
-        backgroundUploadService.requestForegroundResumeAfterBackgroundTask()
         endBackgroundTransitionIfNeeded(reason: "willEnterForeground")
-        // M7 / Spec L49: `BackgroundUploadService.foregroundBannerForRepairDelaySeconds`
-        // is the (currently 0) delay between this foreground transition
-        // and surfacing a repair banner when needs_repair is true. With
-        // the value pinned at 0 no DispatchQueue.asyncAfter hop is
-        // required — the RN layer reads needs_repair on the next render
-        // pass immediately after this method returns. Any future
-        // non-zero value should schedule the banner on this queue using
-        // the constant; wiring lives on the RN side today so no hard
-        // reference appears here yet.
-        if sessionService.state == .syncingBackground {
-            sessionService.transitionTo(.syncingForeground)
-        }
         // Returning to foreground removes the "background + non-nominal" defer
         // condition. If a rescan was deferred while backgrounded, trigger it now —
         // thermalStateDidChange() won't fire if thermal state hasn't changed.
@@ -3141,12 +2733,12 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         case .background:
             return "background"
         default:
-            return sessionService.state == .syncingBackground ? "background" : "foreground"
+            return "foreground"
         }
     }
 
     private func isAppBackgrounded() -> Bool {
-        sessionService.state == .syncingBackground
+        appIsInBackground
     }
 
     private func backgroundCaptureCooldownRemaining(now: CFAbsoluteTime = CFAbsoluteTimeGetCurrent()) -> CFTimeInterval {
@@ -3383,210 +2975,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
     }
 
-    // MARK: - Background upload wiring (Phase 5)
-
-    /// Called from AppDelegate.didFinishLaunchingWithOptions to wire the
-    /// BackgroundUploadService with the stores/services it needs. Safe to
-    /// call repeatedly — iOS may cold-relaunch purely to deliver URLSession
-    /// events and we want the delegate callbacks to land on fully-wired
-    /// collaborators.
-    func configureBackgroundUploadService() {
-        guard let uploadStore = uploadStore, let historyStore = historyStore else {
-            slog("[SyncEngine] configureBackgroundUploadService: stores not ready")
-            return
-        }
-        backgroundUploadService.configureBackgroundUploadService(
-            uploadStore: uploadStore,
-            historyStore: historyStore,
-            bindingService: bindingService,
-            exportService: exportService
-        )
-        backgroundUploadService.syncEngineManager = self
-        backgroundUploadService.setDriveEntitlements(currentDriveEntitlementSnapshot())
-        slog("[SyncEngine] configureBackgroundUploadService: wired")
-    }
-
-    // MARK: - Background task accessors (Phase 6)
-
-    /// Upload store handle exposed to BackgroundExecutionService so the
-    /// background task handlers can fall back to last_known_binding when
-    /// `currentBinding` is not yet populated (cold relaunch for URLSession
-    /// events).
-    var uploadStoreForBackground: UploadStore? { uploadStore }
-
-    /// Run an incremental photo scan suitable for the BGProcessing task
-    /// context. Unlike `scheduleIncrementalQueueRescan`, this bypasses the
-    /// `isSyncing` guard (background tasks don't go through startSync) and
-    /// still respects the thermal / backgrounded defer rules.
-    func performIncrementalPhotoScanIfBackgrounded() async {
-        guard let _ = uploadStore else { return }
-        let autoUploadActive = autoUploadConfigStore?.getConfig().state == "active"
-        guard BackgroundHandoffPolicy.shouldRunBackgroundIncrementalScan(
-            canUseBackgroundContinuation: canUseBackgroundContinuationEntitlement(),
-            autoUploadActive: autoUploadActive
-        ) else {
-            NSLog("[SyncEngine] background task: skipping scan — background continuation unavailable or auto upload not active")
-            return
-        }
-        let thermal = ProcessInfo.processInfo.thermalState
-        if thermal == .serious || thermal == .critical {
-            NSLog("[SyncEngine] background task: skipping scan — thermal %@", thermalStateLabel(thermal))
-            return
-        }
-        performIncrementalQueueRescanForBackgroundTask()
-    }
-
-    private func performIncrementalQueueRescanForBackgroundTask() {
-        guard let store = uploadStore else { return }
-        let clientId = bindingService.getOrCreateClientId()
-        let trackedFileKeys = Set(store.getAutoDiscoveryTrackedFileKeys())
-        guard let deltaResults = photoScanner.scanChangedAssets(
-            clientId: clientId,
-            trackedFileKeys: trackedFileKeys
-        ) else {
-            return
-        }
-        if deltaResults.isEmpty { return }
-        NSLog("[SyncEngine] background task: delta scan found %d new assets", deltaResults.count)
-        let now = ISO8601DateFormatter().string(from: Date())
-        let queuedItems = deltaResults.compactMap { asset -> UploadItemRecord? in
-            guard let photoAsset = asset.asset else { return nil }
-            return UploadItemRecord(
-                id: nil,
-                assetLocalId: photoAsset.localIdentifier,
-                modifiedAt: photoAsset.modificationDate?.iso8601String ?? "",
-                mediaType: asset.mediaType,
-                originalFilename: asset.originalFilename,
-                fileKey: asset.fileKey,
-                fileSize: asset.estimatedSize,
-                status: "queued",
-                tempFilePath: nil,
-                ackedOffset: 0,
-                lastErrorCode: nil,
-                updatedAt: now,
-                source: "auto",
-                batchId: nil,
-                priority: 0
-            )
-        }
-        try? store.upsertUploadItems(queuedItems)
-    }
-
-    // MARK: - Cross-protocol reset (DELETE /upload/<cid>/<fkey>)
-
-    /// T6 / M9 — the underlying enum + decision helper live in
-    /// `UploadResetStateMachine.swift` (module-level, Foundation-only)
-    /// so the state machine can be linked into test harnesses without
-    /// dragging UIKit/Photos. Re-export the nested-style names so
-    /// existing call sites like `SyncEngineManager.UploadResetResult`
-    /// keep compiling by aliasing to the top-level types in this
-    /// module.
-    typealias UploadResetResult = UploadResetResultT6
-    typealias CrossProtocolResetDecision = CrossProtocolResetDecisionT6
-    static func decideCrossProtocolReset(_ result: UploadResetResult) -> CrossProtocolResetDecision {
-        return decideCrossProtocolResetT6(result)
-    }
-
-    private lazy var resetUploadSession: URLSession = {
-        let cfg = URLSessionConfiguration.default
-        cfg.timeoutIntervalForRequest = Self.crossProtocolResetDeleteTimeoutSeconds
-        cfg.timeoutIntervalForResource = Self.crossProtocolResetDeleteTimeoutSeconds
-        cfg.waitsForConnectivity = false
-        cfg.allowsCellularAccess = true
-        cfg.requestCachePolicy = .reloadIgnoringLocalCacheData
-        return URLSession(configuration: cfg)
-    }()
-
-    /// Issue `DELETE /upload/<clientId>/<fileKey>` against the sidecar with
-    /// HMAC auth so a row that was last transported via HTTP can be safely
-    /// re-opened on the TCP path. This is the cross-protocol handshake: the
-    /// sidecar's .part file and committed_bytes are cleared before the TCP
-    /// pipeline re-sends FILE_DATA from offset 0.
-    ///
-    /// Returns:
-    ///   - `.reset`          — 200, rows/part cleared
-    ///   - `.notFound`       — 404, already clean, proceed
-    ///   - `.concurrentTransfer` — 409, another protocol owns the slot
-    ///   - `.failed`         — any network / status error (caller should bail)
-    private func sidecarResetUpload(
-        host: String,
-        port: Int,
-        clientId: String,
-        fileKey: String,
-        pairingToken: String
-    ) async -> UploadResetResult {
-        let scheme = "http"
-        let path = "/upload/\(clientId)/\(fileKey)"
-        let hostPart = host.contains(":") ? "[\(host)]" : host
-        guard let url = URL(string: "\(scheme)://\(hostPart):\(port)\(path)") else {
-            return .unknown("invalid_url")
-        }
-
-        let timestamp = String(Int64(Date().timeIntervalSince1970))
-        let nonce = HMACAuthHelper.randomHexNonce()
-        let canonical = HMACAuthHelper.canonicalDELETE(
-            path: path,
-            clientId: clientId,
-            fileKey: fileKey,
-            timestamp: timestamp,
-            nonce: nonce
-        )
-        let signature = HMACAuthHelper.hmacSHA256Hex(
-            pairingToken: pairingToken,
-            canonical: canonical
-        )
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
-        request.setValue(clientId, forHTTPHeaderField: "X-LynavoDrive-Client-Id")
-        request.setValue(fileKey, forHTTPHeaderField: "X-LynavoDrive-File-Key")
-        request.setValue(timestamp, forHTTPHeaderField: "X-LynavoDrive-Auth-Timestamp")
-        request.setValue(nonce, forHTTPHeaderField: "X-LynavoDrive-Auth-Nonce")
-        request.setValue(signature, forHTTPHeaderField: "X-LynavoDrive-Auth")
-
-        do {
-            let (data, response) = try await resetUploadSession.data(for: request)
-            guard let http = response as? HTTPURLResponse else {
-                return .unknown("non_http_response")
-            }
-            let body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
-            switch http.statusCode {
-            case 200:
-                return .reset
-            case 404:
-                return .notFound
-            case 409:
-                let via = (body?["activeProtocol"] as? String) ?? "unknown"
-                return .concurrentTransfer(via: via)
-            case 500...599:
-                return .serverError(http.statusCode)
-            default:
-                let status = (body?["status"] as? String) ?? "http_\(http.statusCode)"
-                return .unknown(status)
-            }
-        } catch {
-            // M9: classify transport-level errors into timeout vs generic
-            // network failure so callers / logs can treat retry budgets
-            // differently.
-            let nsError = error as NSError
-            if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorTimedOut {
-                return .timeout
-            }
-            if nsError.domain == NSURLErrorDomain {
-                return .networkError("\(nsError.code):\(nsError.localizedDescription)")
-            }
-            // M9: non-NSURLError catches fall through to .unknown — they're
-            // not transport-layer failures (those hit the branches above),
-            // so classifying them as .networkError would mislead retry logic.
-            return .unknown("\(error)")
-        }
-    }
-
     /// Persist a binding through UploadStore + last_known_binding snapshot
-    /// and update the in-memory `currentBinding` mirror. Single choke point
-    /// so the background upload pipeline can always resolve the latest
-    /// binding even immediately after pairing and before SQLite has caught
-    /// up.
+    /// and update the in-memory `currentBinding` mirror.
     private func persistBinding(_ binding: BindingRecord) throws {
         try withBindingMutationLock {
             try uploadStore?.saveBinding(binding)
@@ -3609,32 +2999,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             } catch {
                 NSLog("[SyncEngine] updateLastKnownBinding failed: %@", "\(error)")
             }
-            // H2 — bump the monotonic binding version so any background
-            // URLSession task enqueued after this point carries the new
-            // version and any in-flight callback from the previous binding
-            // fails the `applyBackgroundCompletion` predicate. Best-effort:
-            // a nil return just means no upload store was wired yet (tests).
             if let newVersion = bindingService.bumpBindingVersion() {
                 NSLog("[SyncEngine] bindingVersion bumped to %d (persistBinding)", newVersion)
-            }
-            // H8 Phase 2 (L805-830): a successful re-pair is the only legitimate
-            // exit from `needs_repair=true`. Clear the flag + reason only on the
-            // actual true→false transition so we don't persist a no-op write and
-            // emit a no-op event on every initial pair. The emit is likewise
-            // gated — RN's reducer memoises on value equality so a redundant
-            // event is harmless, but emitting only on real transitions keeps
-            // the native → RN channel noise-free and easier to trace.
-            let previousRepair = uploadStore?.getNeedsRepair()
-            if previousRepair?.flag == true {
-                do {
-                    try uploadStore?.setNeedsRepair(value: false, reason: nil)
-                } catch {
-                    NSLog("[SyncEngine] clearNeedsRepair (persistBinding) failed: %@", "\(error)")
-                }
-                NativeSyncEngineModule.shared?.emitRepairStateChanged(
-                    needsRepair: false,
-                    reason: nil
-                )
             }
         }
     }
@@ -3656,11 +3022,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     /// M8 — ref-counted begin. Each call increments the refcount; the
     /// first call acquires the physical UIApplication background task
-    /// assertion, subsequent calls are pure increments. Nested callers
-    /// (e.g. outer `appDidEnterBackground` + inner
-    /// `transitionToBackgroundUpload`) can safely pair begin/end
-    /// independently without the inner `end` releasing the outer caller's
-    /// assertion. Delegates to `BackgroundTransitionRefCount` (FU5).
+    /// assertion, subsequent calls are pure increments.
     private func beginBackgroundTransitionIfNeeded(reason: String) {
         backgroundTransitionRefCount.begin(reason: reason)
     }
@@ -3736,44 +3098,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
     }
 
-    private func shouldSuppressAutomaticBackgroundResume(reason: String) -> Bool {
-        let reconnectExhausted =
-            runtimeLastErrorCode == "RECONNECT_EXHAUSTED" ||
-            sessionService.state == .pausedNoTarget
-        guard reconnectExhausted && bindingConnectionState == .offline else {
-            return false
-        }
-        syncDiagnosticsLog(
-            "BackgroundExec",
-            "skipping automatic background resume (\(reason)) state=\(sessionService.state.rawValue) connection=\(bindingConnectionState.rawValue) lastError=\(runtimeLastErrorCode ?? "nil")"
-        )
-        return true
-    }
-
-    func resumeSyncFromContinuedBackgroundTask() -> Bool {
-        guard !shouldSuppressAutomaticBackgroundResume(reason: "continued_task") else {
-            return false
-        }
-        sessionService.transitionTo(.syncingBackground)
-        startSync()
-        return true
-    }
-
-    func handleContinuedBackgroundTaskExpiration() {
-        guard !shouldSuppressAutomaticBackgroundResume(reason: "continued_task_expiration") else {
-            return
-        }
-        sessionService.transitionTo(.idle)
-    }
-
-    func resumeSyncFromMaintenanceBackgroundTask() -> Bool {
-        guard !shouldSuppressAutomaticBackgroundResume(reason: "maintenance_task") else {
-            return false
-        }
-        startSync()
-        return true
-    }
-
     private struct UploadTuning {
         let perfLoggingEnabled: Bool
         let chunkSizeBytes: Int
@@ -3830,7 +3154,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let processInfo = ProcessInfo.processInfo
         let thermalState = processInfo.thermalState
         let isLowPowerModeEnabled = processInfo.isLowPowerModeEnabled
-        let isBackgroundSync = sessionService.state == .syncingBackground
+        let appBackgrounded = isAppBackgrounded()
         let isActiveBackgroundCapture = isBackgroundCaptureRecentlyActive()
         let targetDeviceType = targetDeviceTypeOverride ?? currentUploadTargetDeviceType()
 
@@ -3865,7 +3189,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             profileLabel = "low_power"
         }
 
-        if isBackgroundSync && profileLabel == "normal" {
+        if appBackgrounded && profileLabel == "normal" {
             if thermalState != .nominal {
                 // Backgrounded + thermal pressure → yield to foreground workload (e.g. video recording)
                 adjustedChunkMB = min(adjustedChunkMB, 2)
@@ -3962,7 +3286,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             switch syncError {
             case .networkError:
                 return true
-            case .databaseError, .pairingError, .structuredPairingError, .permissionError, .lowDiskPaused, .storageUnavailable, .reconnectExhausted, .bindingChanged, .autoUploadInterrupted, .manualUploadCancelled:
+            case .databaseError, .pairingError, .structuredPairingError, .permissionError, .lowDiskPaused, .storageUnavailable, .reconnectExhausted, .bindingChanged, .autoUploadInterrupted, .manualUploadCancelled, .backgroundRuntimePaused:
                 return false
             }
         }
@@ -4131,7 +3455,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 fileKey: asset.fileKey,
                 fileSize: asset.estimatedSize,
                 status: "queued",
-                tempFilePath: nil,
                 ackedOffset: 0,
                 lastErrorCode: nil,
                 updatedAt: now,
@@ -4188,13 +3511,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         slog("[SyncEngine] startSync")
         syncDiagnosticsLog("SyncEngine", "startSync")
         sessionService.transitionTo(.scanning)
-        if BackgroundHandoffPolicy.shouldSubmitBackgroundContinuedTask(
-            canUseBackgroundContinuation: canUseBackgroundContinuationEntitlement()
-        ) {
-            backgroundService.submitContinuedTask()
-        } else {
-            syncDiagnosticsLog("BackgroundExec", "continued task skipped — background entitlement denied")
-        }
+        syncDiagnosticsLog("BackgroundExec", "background runtime disabled in OSS")
 
         Task { [weak self] in
             await self?.runStartLynavoDriveFlow()
@@ -4325,6 +3642,17 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 logSyncOverviewEmission("pipeline_manual_cancelled", payload: payload)
                 NativeSyncEngineModule.shared?.emitSyncStateChanged(payload)
                 stopSyncLifecycle(finalState: .idle)
+            case .backgroundRuntimePaused:
+                slog("[SyncEngine] foreground LAN sync paused because app entered background")
+                syncDiagnosticsLog("SyncEngine", "foreground LAN sync paused because app entered background")
+                protocolSession?.disconnect()
+                protocolSession = nil
+                emitQueueToJS()
+                clearRuntimeSyncRoundProgress(uploadState: "idle")
+                let payload = runtimeSyncOverviewPayload(uploadState: "idle")
+                logSyncOverviewEmission("pipeline_background_runtime_paused", payload: payload)
+                NativeSyncEngineModule.shared?.emitSyncStateChanged(payload)
+                stopSyncLifecycle(finalState: .idle)
             case .bindingChanged:
                 slog("[SyncEngine] sync pipeline stopped because binding changed")
                 syncDiagnosticsLog("SyncEngine", "sync pipeline stopped because binding changed")
@@ -4379,7 +3707,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     updateBindingConnectionState(.offline, reason: "upload_reconnect_exhausted")
                 }
                 setRuntimeReconnectError(code: "RECONNECT_EXHAUSTED", message: message)
-                backgroundService.cancelContinuedTask()
                 stopSyncLifecycle(finalState: .pausedNoTarget)
             default:
                 slog("[SyncEngine] sync pipeline failed: \(error)")
@@ -4594,7 +3921,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                                 fileKey: asset.fileKey,
                                 fileSize: asset.estimatedSize,
                                 status: "queued",
-                                tempFilePath: nil,
                                 ackedOffset: 0,
                                 lastErrorCode: nil,
                                 updatedAt: ISO8601DateFormatter().string(from: Date()),
@@ -4768,18 +4094,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     )
                     uploaded = true
                     photoLibraryChanged = false // reset after round
-                    let canUseBackgroundContinuation = enforceBackgroundContinuationRuntime(
-                        reason: "upload_round_file_boundary"
-                    )
                     if !BackgroundHandoffPolicy.shouldContinueForegroundPipeline(
                         isTransitioningToBackground: isTransitioningToBackground,
-                        isSilentAudioPlaying: SilentAudioService.shared.isPlaying,
-                        canUseBackgroundContinuation: canUseBackgroundContinuation,
                         isAppInBackground: appIsInBackground
                     ) {
-                        slog("[SyncPipeline] foreground pipeline paused for background handoff")
-                        syncDiagnosticsLog("SyncPipeline", "foreground pipeline paused for background handoff")
-                        return
+                        slog("[SyncPipeline] foreground pipeline paused because background continuation is disabled in OSS")
+                        syncDiagnosticsLog("SyncPipeline", "foreground pipeline paused because background continuation is disabled in OSS")
+                        throw SyncEngineError.backgroundRuntimePaused
                     }
                 } catch {
                     if Task.isCancelled {
@@ -5110,24 +4431,17 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
 
         for (index, asset) in assets.enumerated() {
-            // File boundary: normally yield the TCP loop after a background
-            // transition so BackgroundUploadService can take over via
-            // URLSession. During the silent-audio keepalive experiment, keep
-            // the foreground TCP queue running while the audio session is
-            // active.
-            let canUseBackgroundContinuation = enforceBackgroundContinuationRuntime(
-                reason: "tcp_loop_file_boundary"
-            )
+            // File boundary: yield the foreground TCP loop after a background
+            // transition. OSS builds do not hand off to a background runtime.
             if !BackgroundHandoffPolicy.shouldContinueForegroundPipeline(
                 isTransitioningToBackground: isTransitioningToBackground,
-                isSilentAudioPlaying: SilentAudioService.shared.isPlaying,
-                canUseBackgroundContinuation: canUseBackgroundContinuation,
                 isAppInBackground: appIsInBackground
             ) {
                 slog("[SyncPipeline] breaking TCP loop — app backgrounded")
                 syncDiagnosticsLog("SyncPipeline", "breaking TCP loop — app backgrounded")
                 resumeWatchLoopIfNeeded()
-                break
+                await cancelPrefetchAndCleanup()
+                throw SyncEngineError.backgroundRuntimePaused
             }
 
             try throwIfBindingChanged(expectedDeviceId: binding.deviceId)
@@ -5238,54 +4552,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 exportService.cleanup(tempURL: exported.tempURL)
                 continue
             }
-
-            // Phase 3.7 cross-protocol reset: if this row was last
-            // transported via HTTP (or is flagged `requires_remote_reset`),
-            // ask the sidecar to clear its .part before we restart TCP
-            // FILE_DATA from offset 0. Concurrent-transfer / network
-            // failures abort the TCP round so we don't race the HTTP path.
-            //
-            // T6: the classification of the DELETE outcome lives in the
-            // pure helper `Self.decideCrossProtocolReset(_:)`. Keeping
-            // the decision table there means the state machine is
-            // testable in isolation and the pipeline here just applies
-            // the resulting side effects.
-            var abortRoundForCrossProtocol = false
-            if let item = uploadStore?.getUploadItemByFileKey(asset.fileKey),
-               item.requiresRemoteReset {
-                let pairingToken = resolvedPairingToken(for: binding) ?? token
-                let host = sidecarHost ?? binding.host
-                let resetResult = await sidecarResetUpload(
-                    host: host,
-                    port: binding.port,
-                    clientId: clientId,
-                    fileKey: asset.fileKey,
-                    pairingToken: pairingToken
-                )
-                let decision = Self.decideCrossProtocolReset(resetResult)
-                if decision.clearRequiresRemoteReset {
-                    try? uploadStore?.setRequiresRemoteReset(fileKey: asset.fileKey, value: false)
-                    try? uploadStore?.resetUploadOffset(fileKey: asset.fileKey)
-                }
-                if decision.abortRound {
-                    NSLog(
-                        "[SyncPipeline] cross-protocol reset aborted round code=%@ fileKey=%@",
-                        decision.diagnosticCode, asset.fileKey
-                    )
-                    syncDiagnosticsLog(
-                        "SyncPipeline",
-                        "cross-protocol reset aborted round code=\(decision.diagnosticCode) fileKey=\(asset.fileKey)"
-                    )
-                    exportService.cleanup(tempURL: exported.tempURL)
-                    abortRoundForCrossProtocol = true
-                }
-                if abortRoundForCrossProtocol {
-                    break
-                }
-            }
-            // Row is ours now — advance the transport marker so the
-            // history ledger and diagnostics know TCP owns this file.
-            try? uploadStore?.updateTransport(fileKey: asset.fileKey, transport: "tcp")
 
             do {
                 defer {
@@ -5924,6 +5190,20 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 streamOutcome = "STREAM_INTERRUPTED"
                 streamFailure = "auto upload interrupted by user"
                 throw SyncEngineError.autoUploadInterrupted
+            }
+            if !BackgroundHandoffPolicy.shouldContinueForegroundPipeline(
+                isTransitioningToBackground: isTransitioningToBackground,
+                isAppInBackground: appIsInBackground
+            ) {
+                streamOutcome = "STREAM_INTERRUPTED"
+                streamFailure = "foreground LAN runtime paused"
+                try? uploadStore?.updateUploadOffset(fileKey: fileKey, offset: acknowledgedOffset)
+                try? uploadStore?.updateUploadStatus(fileKey: fileKey, status: "queued")
+                syncDiagnosticsLog(
+                    "SyncPipeline",
+                    "foreground LAN stream paused because app backgrounded fileKey=\(fileKey) ackedOffset=\(acknowledgedOffset)"
+                )
+                throw SyncEngineError.backgroundRuntimePaused
             }
         }
 
@@ -6832,7 +6112,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         slog("[SyncEngine] disconnectAndUnbind")
         interruptActiveSyncForBindingChange(reason: "disconnect_and_unbind")
         clearBindingInvalidation()
-        clearDriveEntitlementsForIdentityReset(reason: "disconnectAndUnbind")
+        clearDisabledCommercialRuntimeState(reason: "disconnectAndUnbind")
         // Clear the token stored under the binding's per-device key (and the legacy
         // global key for bindings created before per-device storage was introduced).
         if let binding = uploadStore?.getBinding() {
@@ -7284,7 +6564,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     fileKey: asset.fileKey,
                     fileSize: asset.estimatedSize,
                     status: "completed",
-                    tempFilePath: nil,
                     ackedOffset: asset.estimatedSize,
                     lastErrorCode: nil,
                     updatedAt: now,
@@ -9711,7 +8990,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         slog("[SyncEngine] wipeSyncIdentity: begin (sentinel set)")
         syncDiagnosticsLog("SyncEngine", "wipeSyncIdentity: begin")
         clearBindingInvalidation()
-        clearDriveEntitlementsForIdentityReset(reason: "wipeSyncIdentity")
+        clearDisabledCommercialRuntimeState(reason: "wipeSyncIdentity")
 
         // 1. Tear down any live networking / timers so we don't race the wipe.
         stopPresenceHeartbeatTimer()
@@ -9760,18 +9039,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             slog("[SyncEngine] wipeSyncIdentity: clearBinding failed: %@", "\(error)")
         }
         currentBinding = nil
-
-        // 3a. Clear auth-repair meta so RN banner doesn't briefly re-appear
-        // on the next getRepairState() read before a fresh pair lands.
-        do {
-            try uploadStore?.setNeedsRepair(value: false, reason: nil)
-            NativeSyncEngineModule.shared?.emitRepairStateChanged(
-                needsRepair: false,
-                reason: nil
-            )
-        } catch {
-            NSLog("[SyncEngine] wipeSyncIdentity: setNeedsRepair clear failed: %@", "\(error)")
-        }
 
         // 4. Clear every pairing token we located. `clearPairingToken(forKey:)`
         // is already no-op safe when the entry is missing.
@@ -9876,21 +9143,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
     }
 
-    // MARK: - H8 Phase 2: needs_repair bridge surface
-    //
-    // Thin pass-through so the RN bridge doesn't need to reach into the
-    // private `uploadStore`. Matches the `(flag, reason)` tuple returned by
-    // `UploadStore.getNeedsRepair()` and normalises the "no store wired yet"
-    // case (cold boot before `configureStores` finishes) to `(false, nil)` —
-    // the banner should stay hidden until we can confirm the flag.
-
-    /// Read the current repair state for the RN bridge. Returns
-    /// `(flag: false, reason: nil)` when the upload store isn't ready yet so
-    /// JS doesn't flash the banner during the boot window.
-    func getRepairStateForBridge() -> (flag: Bool, reason: String?) {
-        guard let store = uploadStore else { return (false, nil) }
-        return store.getNeedsRepair()
-    }
+    // MARK: - Binding Invalidation Bridge Surface
 
     func getBindingInvalidationStateForBridge() -> [String: Any]? {
         guard let binding = uploadStore?.getBinding() else {

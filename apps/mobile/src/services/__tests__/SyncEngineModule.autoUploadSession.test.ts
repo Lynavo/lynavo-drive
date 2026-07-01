@@ -3,8 +3,6 @@ const mockResumeAutoUpload = jest.fn();
 const mockDisableAutoUpload = jest.fn();
 const mockGetAlbumStats = jest.fn();
 const mockRequestPhotoPermission = jest.fn();
-const mockNotificationPermissionCheck = jest.fn();
-const mockNotificationPermissionRequest = jest.fn();
 const mockAsyncStorageGetItem = jest.fn();
 const mockAsyncStorageSetItem = jest.fn();
 const mockAsyncStorageRemoveItem = jest.fn();
@@ -34,14 +32,11 @@ jest.mock('react-native', () => ({
     },
   },
   PermissionsAndroid: {
-    PERMISSIONS: {
-      POST_NOTIFICATIONS: 'android.permission.POST_NOTIFICATIONS',
-    },
     RESULTS: {
       GRANTED: 'granted',
     },
-    check: (...args: unknown[]) => mockNotificationPermissionCheck(...args),
-    request: (...args: unknown[]) => mockNotificationPermissionRequest(...args),
+    check: jest.fn(),
+    request: jest.fn(),
   },
   NativeModules: {
     NativeSyncEngine: {
@@ -93,8 +88,6 @@ describe('SyncEngineModule auto upload session baseline', () => {
     mockAsyncStorageGetItem.mockResolvedValue(null);
     mockAsyncStorageSetItem.mockResolvedValue(undefined);
     mockAsyncStorageRemoveItem.mockResolvedValue(undefined);
-    mockNotificationPermissionCheck.mockResolvedValue(true);
-    mockNotificationPermissionRequest.mockResolvedValue('granted');
     await clearAutoUploadSessionForTest();
     clearRememberedAutoUploadRoundProgressForTest();
     jest.clearAllMocks();
@@ -123,7 +116,6 @@ describe('SyncEngineModule auto upload session baseline', () => {
     await expect(enableAutoUpload()).resolves.toBeUndefined();
 
     expect(mockRequestPhotoPermission).toHaveBeenCalledTimes(1);
-    expect(mockNotificationPermissionRequest).not.toHaveBeenCalled();
     expect(mockResumeAutoUpload).toHaveBeenCalledTimes(1);
     expect(mockRequestPhotoPermission.mock.invocationCallOrder[0]).toBeLessThan(
       mockResumeAutoUpload.mock.invocationCallOrder[0],
@@ -141,27 +133,11 @@ describe('SyncEngineModule auto upload session baseline', () => {
     expect(mockResumeAutoUpload).not.toHaveBeenCalled();
   });
 
-  it('does not request Android notification permission before foreground LAN auto upload', async () => {
-    mockPlatformOS = 'android';
-    mockPlatformVersion = 33;
-    mockNotificationPermissionCheck.mockResolvedValueOnce(false);
-    mockNotificationPermissionRequest.mockResolvedValueOnce('denied');
-
-    await expect(enableAutoUpload()).resolves.toBeUndefined();
-
-    expect(mockNotificationPermissionCheck).not.toHaveBeenCalled();
-    expect(mockNotificationPermissionRequest).not.toHaveBeenCalled();
-    expect(mockResumeAutoUpload).toHaveBeenCalledTimes(1);
-  });
-
   it('keeps native foreground LAN rounds running when Android foreground service is unavailable', () => {
     const nativeSource = readNativeSyncEngineSource();
 
     expect(nativeSource).toContain(
-      'foreground service unavailable; continuing foreground LAN round',
-    );
-    expect(nativeSource).not.toContain(
-      'round aborted reason=$reason foregroundServiceAvailable=false',
+      'foreground service disabled in OSS reason=$reason',
     );
   });
 

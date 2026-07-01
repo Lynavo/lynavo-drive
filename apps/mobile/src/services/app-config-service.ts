@@ -1,5 +1,3 @@
-import { setBackgroundSilentAudioEnabled } from './SyncEngineModule';
-
 export interface AppConfig {
   backgroundSilentAudio: {
     enabled: boolean;
@@ -41,5 +39,5 @@ export async function getAppConfig(): Promise<AppConfig> {
 }
 
 export async function refreshNativeAppFeatureSettings(): Promise<void> {
-  await setBackgroundSilentAudioEnabled(false);
+  // OSS builds do not expose native paid-background feature toggles.
 }
