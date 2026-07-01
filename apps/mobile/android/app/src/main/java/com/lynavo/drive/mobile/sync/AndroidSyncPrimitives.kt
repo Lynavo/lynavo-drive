@@ -188,6 +188,25 @@ data class AndroidBackgroundKeepaliveStopState(
   val lastStopReason: String?,
 )
 
+data class AndroidDriveEntitlementSnapshot(
+  val canUseBackgroundContinuation: Boolean = false,
+  val canUseRemoteTunnel: Boolean = false,
+  val checkedAt: String? = null,
+  val expiresAt: String? = null,
+)
+
+data class AndroidBackgroundContinuationRuntimeState(
+  val appVisible: Boolean,
+  val screenInteractive: Boolean,
+  val lockscreenLocked: Boolean,
+  val postNotificationsGranted: Boolean,
+)
+
+data class AndroidBackgroundContinuationDecision(
+  val canContinue: Boolean,
+  val reason: String?,
+)
+
 object AndroidSyncPrimitives {
   private const val OSS_PUBLIC_WAKE_ENABLED = false
 
@@ -262,6 +281,37 @@ object AndroidSyncPrimitives {
     state: AndroidBackgroundKeepaliveStopState,
   ): AndroidBackgroundKeepaliveStopState =
     state.copy(foregroundStopRequested = false)
+
+  fun isForegroundLanContinuation(runtimeState: AndroidBackgroundContinuationRuntimeState): Boolean =
+    runtimeState.appVisible &&
+      runtimeState.screenInteractive &&
+      !runtimeState.lockscreenLocked
+
+  fun backgroundContinuationDecision(
+    entitlement: AndroidDriveEntitlementSnapshot,
+    runtimeState: AndroidBackgroundContinuationRuntimeState,
+    now: String,
+  ): AndroidBackgroundContinuationDecision {
+    if (isForegroundLanContinuation(runtimeState)) {
+      return AndroidBackgroundContinuationDecision(canContinue = true, reason = null)
+    }
+
+    if (!hasActiveBackgroundContinuationEntitlement(entitlement, now)) {
+      return AndroidBackgroundContinuationDecision(
+        canContinue = false,
+        reason = "background_entitlement_missing",
+      )
+    }
+
+    if (!runtimeState.postNotificationsGranted) {
+      return AndroidBackgroundContinuationDecision(
+        canContinue = false,
+        reason = "notification_permission_missing",
+      )
+    }
+
+    return AndroidBackgroundContinuationDecision(canContinue = true, reason = null)
+  }
 
   fun buildWakeOnLanMagicPacket(macAddress: String): ByteArray {
     val mac = parseMacAddress(macAddress)
@@ -1178,6 +1228,25 @@ object AndroidSyncPrimitives {
     }
   }
 
+  private fun hasActiveBackgroundContinuationEntitlement(
+    entitlement: AndroidDriveEntitlementSnapshot,
+    now: String,
+  ): Boolean {
+    if (!entitlement.canUseBackgroundContinuation) {
+      return false
+    }
+    val nowMs = parseIsoInstantMillis(now) ?: return false
+    val checkedAtMs = entitlement.checkedAt?.let { parseIsoInstantMillis(it) } ?: return false
+    val expiresAtMs = entitlement.expiresAt?.let { parseIsoInstantMillis(it) } ?: return false
+    if (checkedAtMs > nowMs) {
+      return false
+    }
+    if (nowMs - checkedAtMs > DRIVE_ENTITLEMENT_MAX_AGE_MS) {
+      return false
+    }
+    return expiresAtMs > nowMs
+  }
+
   private fun ipv4ToLong(ip: String): Long? {
     val parts = ip.trim().split(".")
     if (parts.size != 4) {
@@ -1254,6 +1323,7 @@ object AndroidSyncPrimitives {
   private const val CONNECTION_CODE_LENGTH = 6
   private const val ANDROID_13_API = 33
   private const val IPV4_MASK = 0xffffffffL
+  private const val DRIVE_ENTITLEMENT_MAX_AGE_MS = 86_400_000L
   private const val WAKE_SYNC_STREAM_SIZE = 6
   private const val WAKE_MAC_BYTES = 6
   private const val WAKE_MAGIC_PACKET_SIZE = WAKE_SYNC_STREAM_SIZE + WAKE_MAC_BYTES * 16

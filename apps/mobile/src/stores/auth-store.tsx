@@ -7,7 +7,11 @@ import React, {
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Keychain from 'react-native-keychain';
-import { setTunnelCredentials as nativeSetTunnelCredentials } from '../services/SyncEngineModule';
+import { resolveDriveEntitlements } from '@lynavo-drive/contracts';
+import {
+  setDriveEntitlements as nativeSetDriveEntitlements,
+  setTunnelCredentials as nativeSetTunnelCredentials,
+} from '../services/SyncEngineModule';
 import {
   applyVisualQaRemotePreviewFlag,
   getDevSkipAuthMockTokens,
@@ -239,9 +243,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Keep module-level tokens in sync whenever state changes. Community builds
   // never activate remote tunnels, so native TURN credentials are always
-  // cleared fail-closed.
+  // cleared fail-closed. Native entitlement snapshots are still synced so
+  // background continuation is explicitly revoked on startup/logout.
   useEffect(() => {
     syncTokensToModule(state.accessToken, state.refreshToken);
+    const entitlements = resolveDriveEntitlements({
+      isAuthenticated: Boolean(state.accessToken && state.refreshToken),
+      serverEntitlements: null,
+      officialCapabilitiesAvailable: false,
+      now: new Date(),
+    });
 
     let cancelled = false;
     void nativeSetTunnelCredentials('', '', '').catch(err => {
@@ -251,6 +262,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         err,
       );
     });
+    if (typeof nativeSetDriveEntitlements === 'function') {
+      void nativeSetDriveEntitlements(entitlements).catch(err => {
+        if (cancelled) return;
+        console.warn(
+          '[auth-store] failed to sync drive entitlements to native:',
+          err,
+        );
+      });
+    }
 
     return () => {
       cancelled = true;

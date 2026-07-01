@@ -110,6 +110,9 @@ final class BackgroundUploadService: NSObject {
     /// When set, a TCP foreground resume was requested. The service must not
     /// chain a new background task once the current in-flight task completes.
     private var shouldResumeForegroundAfterCurrent = false
+    /// Native entitlement snapshot provided by JS. Nil is intentionally
+    /// fail-closed for paid background continuation.
+    private var driveEntitlementSnapshot: DriveEntitlementSnapshot?
     private let lock = NSLock()
 
     // MARK: - Result enum
@@ -255,6 +258,12 @@ final class BackgroundUploadService: NSObject {
         lock.unlock()
     }
 
+    func setDriveEntitlements(_ snapshot: DriveEntitlementSnapshot?) {
+        lock.lock()
+        driveEntitlementSnapshot = snapshot
+        lock.unlock()
+    }
+
     /// Compare-and-clear the prepared temp file (path + sha256 + size) for a
     /// given fileKey/identity pair, then unlink the on-disk file. Never clears
     /// unconditionally — an older task completing late must not delete a
@@ -289,6 +298,10 @@ final class BackgroundUploadService: NSObject {
         clientId: String,
         allowPreparation: Bool
     ) async -> EnqueueResult {
+        guard canUseBackgroundContinuationEntitlement() else {
+            syncDiagnostics("enqueue_skipped_background_entitlement_denied")
+            return .emptyQueue
+        }
         guard let store = uploadStore else { return .missingBinding }
         guard !binding.serverId.isEmpty else { return .missingBinding }
         guard !binding.sidecarHost.isEmpty else { return .missingHost }
@@ -795,6 +808,13 @@ final class BackgroundUploadService: NSObject {
         let v = shouldResumeForegroundAfterCurrent
         lock.unlock()
         return v
+    }
+
+    fileprivate func canUseBackgroundContinuationEntitlement() -> Bool {
+        lock.lock()
+        let snapshot = driveEntitlementSnapshot
+        lock.unlock()
+        return BackgroundHandoffPolicy.canUseBackgroundContinuation(snapshot: snapshot)
     }
 }
 
@@ -1390,6 +1410,10 @@ extension BackgroundUploadService {
     /// defensive), and the ability to resolve binding/host/token from the
     /// persisted stores.
     func chainNextIfAppropriate() async {
+        guard canUseBackgroundContinuationEntitlement() else {
+            syncDiagnostics("chain_skipped_background_entitlement_denied")
+            return
+        }
         if readShouldResumeForeground() { return }
 
         guard let store = uploadStore else { return }

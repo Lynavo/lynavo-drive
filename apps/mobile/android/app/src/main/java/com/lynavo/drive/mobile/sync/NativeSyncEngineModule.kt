@@ -2,6 +2,7 @@ package com.lynavo.drive.mobile.sync
 
 import android.Manifest
 import android.app.Activity
+import android.app.KeyguardManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -24,12 +25,14 @@ import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.FileProvider
 import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.LifecycleEventListener
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
+import com.facebook.react.bridge.ReadableType
 import com.facebook.react.bridge.WritableArray
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.modules.core.DeviceEventManagerModule
@@ -95,7 +98,7 @@ private data class PickedDocumentMetadata(
 
 class NativeSyncEngineModule(
   reactContext: ReactApplicationContext,
-) : ReactContextBaseJavaModule(reactContext) {
+) : ReactContextBaseJavaModule(reactContext), LifecycleEventListener {
   private val discoveryLock = Any()
   private var nsdManager: NsdManager? = null
   private var discoveryListener: NsdManager.DiscoveryListener? = null
@@ -131,6 +134,8 @@ class NativeSyncEngineModule(
   private var pendingDiscoveryPermissionPromise: Promise? = null
   private val uploadStore by lazy { AndroidUploadStore(reactApplicationContext) }
   private val mediaStoreRepository by lazy { AndroidMediaStoreRepository(reactApplicationContext) }
+  @Volatile private var appVisible = false
+  @Volatile private var driveEntitlementSnapshot = AndroidDriveEntitlementSnapshot()
   @Volatile private var foregroundSyncStopRequested = false
   @Volatile private var lastBackgroundStopReason: String? = null
   private val foregroundSyncStopHandler: () -> Unit = {
@@ -151,6 +156,8 @@ class NativeSyncEngineModule(
   private val bindingMutationLock = Any()
   init {
     foregroundSyncStopCallback = foregroundSyncStopHandler
+    appVisible = reactApplicationContext.currentActivity != null
+    reactApplicationContext.addLifecycleEventListener(this)
     registerNetworkAvailabilityMonitor()
     resumePresenceHeartbeatFromStoredBinding(reason = "module_initialized")
   }
@@ -171,10 +178,23 @@ class NativeSyncEngineModule(
     stopPairingControlSession(reason = "module_invalidated")
     stopP2PTunnel()
     unregisterNetworkAvailabilityMonitor()
+    reactApplicationContext.removeLifecycleEventListener(this)
     if (foregroundSyncStopCallback === foregroundSyncStopHandler) {
       foregroundSyncStopCallback = null
     }
     super.invalidate()
+  }
+
+  override fun onHostResume() {
+    appVisible = true
+  }
+
+  override fun onHostPause() {
+    appVisible = false
+  }
+
+  override fun onHostDestroy() {
+    appVisible = false
   }
 
   @ReactMethod
@@ -1010,6 +1030,28 @@ class NativeSyncEngineModule(
   @ReactMethod
   fun startBackgroundSyncService(reason: String, promise: Promise) {
     try {
+      val decision = currentPaidBackgroundServiceDecision()
+      if (!decision.canContinue) {
+        val stopReason = decision.reason ?: "background_continuation_unavailable"
+        markBackgroundContinuationStopped(stopReason)
+        recordDiagnosticsLog(
+          "BackgroundSync",
+          "foreground service start rejected reason=$stopReason",
+        )
+        promise.reject(
+          if (stopReason == "notification_permission_missing") {
+            "ANDROID_BACKGROUND_SYNC_SERVICE_UNAVAILABLE"
+          } else {
+            "ANDROID_BACKGROUND_CONTINUATION_UNAVAILABLE"
+          },
+          if (stopReason == "notification_permission_missing") {
+            "Android 通知权限尚未开启，无法继续后台同步。"
+          } else {
+            "Android 后台 / 锁屏继续上传需要有效权益。"
+          },
+        )
+        return
+      }
       if (!startForegroundSyncService(reason.ifBlank { "manual_trigger" })) {
         promise.reject(
           "ANDROID_BACKGROUND_SYNC_SERVICE_UNAVAILABLE",
@@ -1030,6 +1072,21 @@ class NativeSyncEngineModule(
     if (shouldFinishService) {
       stopForegroundSyncService()
     }
+    promise.resolve(null)
+  }
+
+  @ReactMethod
+  fun setDriveEntitlements(params: ReadableMap, promise: Promise) {
+    driveEntitlementSnapshot = AndroidDriveEntitlementSnapshot(
+      canUseBackgroundContinuation = readableBoolean(params, "canUseBackgroundContinuation", defaultValue = false),
+      canUseRemoteTunnel = readableBoolean(params, "canUseRemoteTunnel", defaultValue = false),
+      checkedAt = readableStringOrNull(params, "checkedAt"),
+      expiresAt = readableStringOrNull(params, "expiresAt"),
+    )
+    recordDiagnosticsLog(
+      "Entitlements",
+      "snapshot updated background=${driveEntitlementSnapshot.canUseBackgroundContinuation} remote=${driveEntitlementSnapshot.canUseRemoteTunnel} checkedAt=${driveEntitlementSnapshot.checkedAt ?: "nil"} expiresAt=${driveEntitlementSnapshot.expiresAt ?: "nil"}",
+    )
     promise.resolve(null)
   }
 
@@ -1467,12 +1524,23 @@ class NativeSyncEngineModule(
   fun getAndroidBackgroundKeepaliveStatus(promise: Promise) {
     val result = Arguments.createMap().apply {
       val isForegroundServiceActive = synchronized(syncRunLock) { syncInProgress }
+      val runtimeState = currentBackgroundContinuationRuntimeState()
+      val continuationDecision = currentBackgroundContinuationDecision(runtimeState)
       putString("backgroundKeepaliveStrategy", currentAndroidBackgroundKeepaliveStrategy())
       putBoolean("foregroundServiceActive", isForegroundServiceActive)
       putBoolean("foregroundServiceStopRequested", foregroundSyncStopRequested)
       putBoolean("batteryOptimizationIgnored", isIgnoringBatteryOptimizationsValue())
       putBoolean("postNotificationsGranted", arePostNotificationsGranted())
       putString("lastBackgroundStopReason", lastBackgroundStopReason)
+      putBoolean("canUseBackgroundContinuation", driveEntitlementSnapshot.canUseBackgroundContinuation)
+      putBoolean("canUseRemoteTunnel", driveEntitlementSnapshot.canUseRemoteTunnel)
+      putString("entitlementCheckedAt", driveEntitlementSnapshot.checkedAt)
+      putString("entitlementExpiresAt", driveEntitlementSnapshot.expiresAt)
+      putBoolean("appVisible", runtimeState.appVisible)
+      putBoolean("screenInteractive", runtimeState.screenInteractive)
+      putBoolean("lockscreenLocked", runtimeState.lockscreenLocked)
+      putBoolean("backgroundContinuationAllowed", continuationDecision.canContinue)
+      putString("backgroundContinuationBlockedReason", continuationDecision.reason)
     }
     promise.resolve(result)
   }
@@ -2050,6 +2118,26 @@ class NativeSyncEngineModule(
     }
   }
 
+  private fun readableBoolean(params: ReadableMap, key: String, defaultValue: Boolean): Boolean =
+    if (params.hasKey(key) && !params.isNull(key)) {
+      when (params.getType(key)) {
+        ReadableType.Boolean -> params.getBoolean(key)
+        else -> defaultValue
+      }
+    } else {
+      defaultValue
+    }
+
+  private fun readableStringOrNull(params: ReadableMap, key: String): String? =
+    if (params.hasKey(key) && !params.isNull(key)) {
+      when (params.getType(key)) {
+        ReadableType.String -> params.getString(key)?.trim()?.takeIf { it.isNotBlank() }
+        else -> null
+      }
+    } else {
+      null
+    }
+
   private fun startForegroundSyncRound(
     reason: String,
     threadName: String,
@@ -2058,6 +2146,35 @@ class NativeSyncEngineModule(
     thread(name = threadName, isDaemon = true) {
       performSyncRound(reason = reason, notificationReason = notificationReason)
     }
+  }
+
+  private fun currentBackgroundContinuationRuntimeState(): AndroidBackgroundContinuationRuntimeState {
+    val powerManager = reactApplicationContext.getSystemService(Context.POWER_SERVICE) as? PowerManager
+    val keyguardManager = reactApplicationContext.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+    return AndroidBackgroundContinuationRuntimeState(
+      appVisible = appVisible,
+      screenInteractive = powerManager?.isInteractive ?: true,
+      lockscreenLocked = keyguardManager?.isKeyguardLocked ?: false,
+      postNotificationsGranted = arePostNotificationsGranted(),
+    )
+  }
+
+  private fun currentBackgroundContinuationDecision(
+    runtimeState: AndroidBackgroundContinuationRuntimeState = currentBackgroundContinuationRuntimeState(),
+  ): AndroidBackgroundContinuationDecision =
+    AndroidSyncPrimitives.backgroundContinuationDecision(
+      entitlement = driveEntitlementSnapshot,
+      runtimeState = runtimeState,
+      now = isoNow(),
+    )
+
+  private fun currentPaidBackgroundServiceDecision(): AndroidBackgroundContinuationDecision {
+    val runtimeState = currentBackgroundContinuationRuntimeState().copy(appVisible = false)
+    return currentBackgroundContinuationDecision(runtimeState)
+  }
+
+  private fun markBackgroundContinuationStopped(reason: String) {
+    lastBackgroundStopReason = reason
   }
 
   private fun startForegroundSyncService(reason: String): Boolean {
@@ -2313,12 +2430,44 @@ class NativeSyncEngineModule(
         emitIdleSyncState(binding)
         return
       }
-
-      foregroundServiceStarted = startForegroundSyncService(notificationReason)
-      if (!foregroundServiceStarted) {
+      val roundStartContinuationDecision = currentBackgroundContinuationDecision()
+      if (!roundStartContinuationDecision.canContinue) {
+        val stopReason = roundStartContinuationDecision.reason ?: "background_continuation_unavailable"
+        markBackgroundContinuationStopped(stopReason)
         recordDiagnosticsLog(
           "BackgroundSync",
-          "foreground service unavailable; continuing foreground LAN round reason=$reason",
+          "round stopped before scan reason=$reason stopReason=$stopReason",
+        )
+        emitIdleSyncState(binding)
+        return
+      }
+
+      val serviceRuntimeState = currentBackgroundContinuationRuntimeState()
+      val isForegroundLanRound = AndroidSyncPrimitives.isForegroundLanContinuation(serviceRuntimeState)
+      val shouldStartService = isForegroundLanRound ||
+        currentBackgroundContinuationDecision(serviceRuntimeState).canContinue
+      if (shouldStartService) {
+        foregroundServiceStarted = startForegroundSyncService(notificationReason)
+        if (!foregroundServiceStarted) {
+          if (isForegroundLanRound) {
+            recordDiagnosticsLog(
+              "BackgroundSync",
+              "foreground service unavailable; continuing foreground LAN round reason=$reason",
+            )
+          } else {
+            markBackgroundContinuationStopped("foreground_service_unavailable")
+            recordDiagnosticsLog(
+              "BackgroundSync",
+              "background round stopped because foreground service is unavailable reason=$reason",
+            )
+            emitIdleSyncState(binding)
+            return
+          }
+        }
+      } else {
+        recordDiagnosticsLog(
+          "BackgroundSync",
+          "foreground service skipped because background continuation is not allowed reason=$reason",
         )
       }
 
@@ -2346,6 +2495,17 @@ class NativeSyncEngineModule(
       emitQueueUpdated(uploadStore.queueToWritableArray(pending.take(100)))
       if (pending.isEmpty()) {
         recordDiagnosticsLog("Sync", "round idle reason=$reason pending=0")
+        emitIdleSyncState(binding)
+        return
+      }
+      val initialContinuationDecision = currentBackgroundContinuationDecision()
+      if (!initialContinuationDecision.canContinue) {
+        val stopReason = initialContinuationDecision.reason ?: "background_continuation_unavailable"
+        markBackgroundContinuationStopped(stopReason)
+        recordDiagnosticsLog(
+          "BackgroundSync",
+          "round stopped before upload reason=$reason stopReason=$stopReason pending=${pending.size}",
+        )
         emitIdleSyncState(binding)
         return
       }
@@ -2390,6 +2550,16 @@ class NativeSyncEngineModule(
             recordDiagnosticsLog(
               "BackgroundSync",
               "round stopped before next item reason=$reason completed=$completedCount/${pending.size}",
+            )
+            break
+          }
+          val continuationDecision = currentBackgroundContinuationDecision()
+          if (!continuationDecision.canContinue) {
+            val stopReason = continuationDecision.reason ?: "background_continuation_unavailable"
+            markBackgroundContinuationStopped(stopReason)
+            recordDiagnosticsLog(
+              "BackgroundSync",
+              "round stopped before next item reason=$reason stopReason=$stopReason completed=$completedCount/${pending.size}",
             )
             break
           }
@@ -2515,6 +2685,8 @@ class NativeSyncEngineModule(
 
   private fun buildAndroidBackgroundKeepaliveStatusJson(): JSONObject {
     val isForegroundServiceActive = synchronized(syncRunLock) { syncInProgress }
+    val runtimeState = currentBackgroundContinuationRuntimeState()
+    val continuationDecision = currentBackgroundContinuationDecision(runtimeState)
     return JSONObject().apply {
       put("backgroundKeepaliveStrategy", currentAndroidBackgroundKeepaliveStrategy())
       put("foregroundServiceActive", isForegroundServiceActive)
@@ -2522,6 +2694,15 @@ class NativeSyncEngineModule(
       put("batteryOptimizationIgnored", isIgnoringBatteryOptimizationsValue())
       put("postNotificationsGranted", arePostNotificationsGranted())
       put("lastBackgroundStopReason", lastBackgroundStopReason ?: JSONObject.NULL)
+      put("canUseBackgroundContinuation", driveEntitlementSnapshot.canUseBackgroundContinuation)
+      put("canUseRemoteTunnel", driveEntitlementSnapshot.canUseRemoteTunnel)
+      put("entitlementCheckedAt", driveEntitlementSnapshot.checkedAt ?: JSONObject.NULL)
+      put("entitlementExpiresAt", driveEntitlementSnapshot.expiresAt ?: JSONObject.NULL)
+      put("appVisible", runtimeState.appVisible)
+      put("screenInteractive", runtimeState.screenInteractive)
+      put("lockscreenLocked", runtimeState.lockscreenLocked)
+      put("backgroundContinuationAllowed", continuationDecision.canContinue)
+      put("backgroundContinuationBlockedReason", continuationDecision.reason ?: JSONObject.NULL)
     }
   }
 

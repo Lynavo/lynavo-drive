@@ -1880,6 +1880,142 @@ class AndroidSyncPrimitivesTest {
     assertEquals("notification_stop", next.lastStopReason)
   }
 
+  @Test
+  fun backgroundContinuationStopsForFreeUserWhenAppIsNotVisible() {
+    val decision = AndroidSyncPrimitives.backgroundContinuationDecision(
+      entitlement = AndroidDriveEntitlementSnapshot(
+        canUseBackgroundContinuation = false,
+        canUseRemoteTunnel = false,
+        checkedAt = "2026-07-01T00:00:00Z",
+        expiresAt = null,
+      ),
+      runtimeState = AndroidBackgroundContinuationRuntimeState(
+        appVisible = false,
+        screenInteractive = true,
+        lockscreenLocked = false,
+        postNotificationsGranted = true,
+      ),
+      now = "2026-07-01T00:01:00Z",
+    )
+
+    assertFalse(decision.canContinue)
+    assertEquals("background_entitlement_missing", decision.reason)
+  }
+
+  @Test
+  fun backgroundContinuationAllowsForegroundLanForFreeUser() {
+    val decision = AndroidSyncPrimitives.backgroundContinuationDecision(
+      entitlement = AndroidDriveEntitlementSnapshot(
+        canUseBackgroundContinuation = false,
+        canUseRemoteTunnel = false,
+        checkedAt = "2026-07-01T00:00:00Z",
+        expiresAt = null,
+      ),
+      runtimeState = AndroidBackgroundContinuationRuntimeState(
+        appVisible = true,
+        screenInteractive = true,
+        lockscreenLocked = false,
+        postNotificationsGranted = false,
+      ),
+      now = "2026-07-01T00:01:00Z",
+    )
+
+    assertTrue(decision.canContinue)
+    assertNull(decision.reason)
+  }
+
+  @Test
+  fun backgroundContinuationAllowsEntitledUserInBackground() {
+    val decision = AndroidSyncPrimitives.backgroundContinuationDecision(
+      entitlement = AndroidDriveEntitlementSnapshot(
+        canUseBackgroundContinuation = true,
+        canUseRemoteTunnel = false,
+        checkedAt = "2026-07-01T00:00:00Z",
+        expiresAt = "2026-07-02T00:00:00Z",
+      ),
+      runtimeState = AndroidBackgroundContinuationRuntimeState(
+        appVisible = false,
+        screenInteractive = true,
+        lockscreenLocked = false,
+        postNotificationsGranted = true,
+      ),
+      now = "2026-07-01T00:01:00Z",
+    )
+
+    assertTrue(decision.canContinue)
+    assertNull(decision.reason)
+  }
+
+  @Test
+  fun backgroundContinuationRequiresNotificationsOnlyWhenNotForegroundLan() {
+    val decision = AndroidSyncPrimitives.backgroundContinuationDecision(
+      entitlement = AndroidDriveEntitlementSnapshot(
+        canUseBackgroundContinuation = true,
+        canUseRemoteTunnel = false,
+        checkedAt = "2026-07-01T00:00:00Z",
+        expiresAt = "2026-07-02T00:00:00Z",
+      ),
+      runtimeState = AndroidBackgroundContinuationRuntimeState(
+        appVisible = false,
+        screenInteractive = false,
+        lockscreenLocked = true,
+        postNotificationsGranted = false,
+      ),
+      now = "2026-07-01T00:01:00Z",
+    )
+
+    assertFalse(decision.canContinue)
+    assertEquals("notification_permission_missing", decision.reason)
+  }
+
+  @Test
+  fun backgroundContinuationFailsClosedForInvalidOrStaleEntitlementTimes() {
+    val runtimeState = AndroidBackgroundContinuationRuntimeState(
+      appVisible = false,
+      screenInteractive = true,
+      lockscreenLocked = false,
+      postNotificationsGranted = true,
+    )
+
+    val missingExpiry = AndroidSyncPrimitives.backgroundContinuationDecision(
+      entitlement = AndroidDriveEntitlementSnapshot(
+        canUseBackgroundContinuation = true,
+        canUseRemoteTunnel = false,
+        checkedAt = "2026-07-01T00:00:00Z",
+        expiresAt = null,
+      ),
+      runtimeState = runtimeState,
+      now = "2026-07-01T00:01:00Z",
+    )
+    val staleCheckedAt = AndroidSyncPrimitives.backgroundContinuationDecision(
+      entitlement = AndroidDriveEntitlementSnapshot(
+        canUseBackgroundContinuation = true,
+        canUseRemoteTunnel = false,
+        checkedAt = "2026-06-29T23:59:59Z",
+        expiresAt = "2026-07-02T00:00:00Z",
+      ),
+      runtimeState = runtimeState,
+      now = "2026-07-01T00:01:00Z",
+    )
+    val futureCheckedAt = AndroidSyncPrimitives.backgroundContinuationDecision(
+      entitlement = AndroidDriveEntitlementSnapshot(
+        canUseBackgroundContinuation = true,
+        canUseRemoteTunnel = false,
+        checkedAt = "2026-07-01T00:01:01Z",
+        expiresAt = "2026-07-02T00:00:00Z",
+      ),
+      runtimeState = runtimeState,
+      now = "2026-07-01T00:01:00Z",
+    )
+
+    assertFalse(missingExpiry.canContinue)
+    assertFalse(staleCheckedAt.canContinue)
+    assertFalse(futureCheckedAt.canContinue)
+    assertEquals("background_entitlement_missing", missingExpiry.reason)
+    assertEquals("background_entitlement_missing", staleCheckedAt.reason)
+    assertEquals("background_entitlement_missing", futureCheckedAt.reason)
+  }
+
   private fun testUploadItem(
     fileKey: String,
     source: String,

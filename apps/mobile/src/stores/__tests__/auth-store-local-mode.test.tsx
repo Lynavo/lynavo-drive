@@ -30,12 +30,14 @@ jest.mock('../../services/SyncEngineModule', () => ({
   getOwnerUserId: jest.fn().mockResolvedValue('42'),
   setOwnerUserId: jest.fn().mockResolvedValue(undefined),
   wipeSyncIdentity: jest.fn().mockResolvedValue(undefined),
+  setDriveEntitlements: jest.fn().mockResolvedValue(undefined),
   setTunnelCredentials: jest.fn().mockResolvedValue(undefined),
 }));
 
 import { AuthProvider, useAuth } from '../auth-store';
 import {
   getOwnerUserId,
+  setDriveEntitlements,
   setOwnerUserId,
   setTunnelCredentials,
   wipeSyncIdentity,
@@ -89,6 +91,18 @@ describe('AuthProvider guest local mode bootstrap', () => {
     expect(getOwnerUserId).not.toHaveBeenCalled();
     expect(setOwnerUserId).not.toHaveBeenCalled();
     expect(wipeSyncIdentity).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(setDriveEntitlements).toHaveBeenCalledWith(
+        expect.objectContaining({
+          canUseLanForegroundAutoUpload: true,
+          canUseBackgroundContinuation: false,
+          canUseRemoteTunnel: false,
+          source: 'guest',
+          expiresAt: null,
+          checkedAt: expect.any(String),
+        }),
+      );
+    });
   });
 
   test('clears persisted official Keychain tokens and hydrates guest local mode', async () => {
@@ -132,6 +146,18 @@ describe('AuthProvider guest local mode bootstrap', () => {
     expect(wipeSyncIdentity).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(setTunnelCredentials).toHaveBeenCalledWith('', '', '');
+    });
+    await waitFor(() => {
+      expect(setDriveEntitlements).toHaveBeenCalledWith(
+        expect.objectContaining({
+          canUseLanForegroundAutoUpload: true,
+          canUseBackgroundContinuation: false,
+          canUseRemoteTunnel: false,
+          source: 'guest',
+          expiresAt: null,
+          checkedAt: expect.any(String),
+        }),
+      );
     });
   });
 
@@ -177,5 +203,17 @@ describe('AuthProvider guest local mode bootstrap', () => {
       '@lynavo-drive/auth/refresh_token',
     );
     expect(Keychain.setGenericPassword).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(setDriveEntitlements).toHaveBeenCalledWith(
+        expect.objectContaining({
+          canUseLanForegroundAutoUpload: true,
+          canUseBackgroundContinuation: false,
+          canUseRemoteTunnel: false,
+          source: 'guest',
+          expiresAt: null,
+          checkedAt: expect.any(String),
+        }),
+      );
+    });
   });
 });

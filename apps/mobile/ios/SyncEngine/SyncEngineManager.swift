@@ -254,8 +254,18 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     /// upload loop observes this between files and breaks out so the
     /// BackgroundUploadService can take over.
     var isTransitioningToBackground = false
+    private var appIsInBackground = false
     private let backgroundSilentAudioFeatureLock = NSLock()
     private var backgroundSilentAudioFeatureEnabled = false
+    private let driveEntitlementsLock = NSLock()
+    private var driveEntitlementSnapshot: DriveEntitlementSnapshot?
+    private let driveEntitlementExpiryQueue = DispatchQueue(
+        label: "com.lynavo.drive.entitlement-expiry",
+        qos: .utility
+    )
+    private let driveEntitlementExpiryLock = NSLock()
+    private var driveEntitlementExpiryToken = UUID()
+    private var driveEntitlementExpiryWorkItem: DispatchWorkItem?
     let backgroundUploadService = BackgroundUploadService.shared
     /// Timeout / poll tuning for `transitionToBackgroundUpload`. Expressed as
     /// private static lets so unit-level reasoning sees concrete numbers.
@@ -1424,7 +1434,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         backgroundSilentAudioFeatureLock.lock()
         backgroundSilentAudioFeatureEnabled = enabled
         backgroundSilentAudioFeatureLock.unlock()
-        if !enabled {
+        if !enabled || !canUseBackgroundContinuationEntitlement() {
             SilentAudioService.shared.stop()
         }
         slog("[SilentAudio] feature %@", enabled ? "enabled" : "disabled")
@@ -1437,10 +1447,175 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         return backgroundSilentAudioFeatureEnabled
     }
 
+    func setDriveEntitlements(_ snapshot: DriveEntitlementSnapshot) {
+        driveEntitlementsLock.lock()
+        driveEntitlementSnapshot = snapshot
+        driveEntitlementsLock.unlock()
+        backgroundUploadService.setDriveEntitlements(snapshot)
+
+        let backgroundAllowed = BackgroundHandoffPolicy.canUseBackgroundContinuation(
+            snapshot: snapshot
+        )
+        if backgroundAllowed {
+            rescheduleBackgroundContinuationExpiryIfNeeded(reason: "entitlement_updated")
+        } else {
+            cancelBackgroundContinuationExpiry(reason: "entitlement_updated_denied")
+            stopBackgroundContinuationRuntime(reason: "entitlement_updated_denied", force: true)
+            if BackgroundHandoffPolicy.shouldForceForegroundPipelineYieldAfterEntitlementChange(
+                isAppInBackground: appIsInBackground,
+                isSyncing: isSyncing,
+                canUseBackgroundContinuation: false
+            ) {
+                isTransitioningToBackground = true
+                resumeWatchLoopIfNeeded()
+                syncDiagnosticsLog(
+                    "SyncPipeline",
+                    "background continuation entitlement revoked; foreground pipeline will yield at file boundary"
+                )
+            }
+        }
+
+        slog(
+            "[Entitlements] snapshot updated background=%@ remote=%@ expiresAt=%@",
+            backgroundAllowed ? "allowed" : "denied",
+            snapshot.canUseRemoteTunnel ? "snapshot_true" : "snapshot_false",
+            snapshot.expiresAt.map { "\($0)" } ?? "nil"
+        )
+        syncDiagnosticsLog(
+            "Entitlements",
+            "snapshot updated background=\(backgroundAllowed ? "allowed" : "denied") remoteSnapshot=\(snapshot.canUseRemoteTunnel ? "true" : "false") expiresAt=\(snapshot.expiresAt.map { "\($0)" } ?? "nil")"
+        )
+    }
+
+    private func currentDriveEntitlementSnapshot() -> DriveEntitlementSnapshot? {
+        driveEntitlementsLock.lock()
+        defer { driveEntitlementsLock.unlock() }
+        return driveEntitlementSnapshot
+    }
+
+    private func canUseBackgroundContinuationEntitlement(now: Date = Date()) -> Bool {
+        BackgroundHandoffPolicy.canUseBackgroundContinuation(
+            snapshot: currentDriveEntitlementSnapshot(),
+            now: now
+        )
+    }
+
+    private func cancelBackgroundContinuationExpiry(reason: String) {
+        driveEntitlementExpiryLock.lock()
+        driveEntitlementExpiryToken = UUID()
+        let workItem = driveEntitlementExpiryWorkItem
+        driveEntitlementExpiryWorkItem = nil
+        driveEntitlementExpiryLock.unlock()
+
+        if let workItem {
+            workItem.cancel()
+            syncDiagnosticsLog("Entitlements", "background continuation expiry cancelled reason=\(reason)")
+        }
+    }
+
+    private func currentBackgroundContinuationExpiryToken() -> UUID {
+        driveEntitlementExpiryLock.lock()
+        defer { driveEntitlementExpiryLock.unlock() }
+        return driveEntitlementExpiryToken
+    }
+
+    private func setBackgroundContinuationExpiryWorkItem(_ workItem: DispatchWorkItem?) {
+        driveEntitlementExpiryLock.lock()
+        driveEntitlementExpiryWorkItem = workItem
+        driveEntitlementExpiryLock.unlock()
+    }
+
+    private func rescheduleBackgroundContinuationExpiryIfNeeded(reason: String) {
+        cancelBackgroundContinuationExpiry(reason: "\(reason)_reschedule")
+        guard appIsInBackground else { return }
+        let now = Date()
+        let snapshot = currentDriveEntitlementSnapshot()
+        guard let expiryDate = BackgroundHandoffPolicy.backgroundContinuationExpiryDate(
+            snapshot: snapshot,
+            now: now
+        ) else {
+            if !canUseBackgroundContinuationEntitlement(now: now) {
+                stopBackgroundContinuationRuntime(reason: "\(reason)_expired")
+            }
+            return
+        }
+
+        let token = UUID()
+        driveEntitlementExpiryLock.lock()
+        driveEntitlementExpiryToken = token
+        driveEntitlementExpiryLock.unlock()
+
+        let delay = max(0, expiryDate.timeIntervalSince(now))
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.enforceBackgroundContinuationExpiry(token: token)
+        }
+        setBackgroundContinuationExpiryWorkItem(workItem)
+        driveEntitlementExpiryQueue.asyncAfter(deadline: .now() + delay, execute: workItem)
+        syncDiagnosticsLog(
+            "Entitlements",
+            "background continuation expiry scheduled reason=\(reason) delay=\(String(format: "%.3f", delay))s expiresAt=\(expiryDate)"
+        )
+    }
+
+    private func enforceBackgroundContinuationExpiry(token: UUID) {
+        guard token == currentBackgroundContinuationExpiryToken() else { return }
+        setBackgroundContinuationExpiryWorkItem(nil)
+        guard appIsInBackground else { return }
+        guard !canUseBackgroundContinuationEntitlement(now: Date()) else {
+            rescheduleBackgroundContinuationExpiryIfNeeded(reason: "expiry_recheck_still_allowed")
+            return
+        }
+        stopBackgroundContinuationRuntime(reason: "entitlement_expired_local")
+        if isSyncing {
+            isTransitioningToBackground = true
+            resumeWatchLoopIfNeeded()
+            syncDiagnosticsLog(
+                "SyncPipeline",
+                "background continuation entitlement expired locally; foreground pipeline will yield at file boundary"
+            )
+        }
+    }
+
+    private func stopBackgroundContinuationRuntime(reason: String, force: Bool = false) {
+        guard force || BackgroundHandoffPolicy.shouldStopBackgroundContinuationRuntime(
+            isAppInBackground: appIsInBackground,
+            canUseBackgroundContinuation: false
+        ) else {
+            return
+        }
+        SilentAudioService.shared.stop()
+        backgroundService.cancelContinuedTask()
+        syncDiagnosticsLog(
+            "Entitlements",
+            "background continuation runtime stopped reason=\(reason)"
+        )
+    }
+
+    @discardableResult
+    private func enforceBackgroundContinuationRuntime(reason: String) -> Bool {
+        let backgroundAllowed = canUseBackgroundContinuationEntitlement()
+        if !backgroundAllowed {
+            stopBackgroundContinuationRuntime(reason: reason)
+        }
+        return backgroundAllowed
+    }
+
+    private func clearDriveEntitlementsForIdentityReset(reason: String) {
+        cancelBackgroundContinuationExpiry(reason: reason)
+        driveEntitlementsLock.lock()
+        driveEntitlementSnapshot = nil
+        driveEntitlementsLock.unlock()
+        backgroundUploadService.setDriveEntitlements(nil)
+        stopBackgroundContinuationRuntime(reason: reason, force: true)
+        syncDiagnosticsLog("Entitlements", "snapshot cleared reason=\(reason)")
+    }
+
     @objc private func appDidEnterBackground() {
+        appIsInBackground = true
         slog("[SyncEngine] app entered background, isSyncing=\(isSyncing)")
+        let canUseBackgroundContinuation = canUseBackgroundContinuationEntitlement()
         let silentAudioStarted: Bool
-        if isBackgroundSilentAudioEnabled() {
+        if canUseBackgroundContinuation && isBackgroundSilentAudioEnabled() {
             silentAudioStarted = SilentAudioService.shared.start()
             if !silentAudioStarted {
                 syncDiagnosticsLog("SilentAudio", "background audio failed to start; falling back to background handoff")
@@ -1448,14 +1623,28 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         } else {
             silentAudioStarted = false
             SilentAudioService.shared.stop()
-            syncDiagnosticsLog("SilentAudio", "background audio skipped — feature disabled")
+            syncDiagnosticsLog(
+                "SilentAudio",
+                canUseBackgroundContinuation
+                    ? "background audio skipped — feature disabled"
+                    : "background audio skipped — entitlement denied"
+            )
         }
+        rescheduleBackgroundContinuationExpiryIfNeeded(reason: "didEnterBackground")
         if !isSyncing {
             stopPresenceHeartbeatTimer()
             stopPairingControlSession(reason: "app_entered_background")
             cancelPresenceRecoveryProbe(reason: "app_entered_background")
         }
         guard isSyncing else { return }
+        guard canUseBackgroundContinuation else {
+            isTransitioningToBackground = true
+            syncDiagnosticsLog(
+                "SyncPipeline",
+                "background continuation denied; foreground pipeline will yield at file boundary"
+            )
+            return
+        }
         if silentAudioStarted {
             if sessionService.state == .syncingForeground {
                 sessionService.transitionTo(.syncingBackground)
@@ -1482,6 +1671,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     /// loop can `resumeWatchLoopIfNeeded()` as soon as it detects
     /// `isTransitioningToBackground == true` between files.
     private func transitionToBackgroundUpload() async {
+        guard canUseBackgroundContinuationEntitlement() else {
+            syncDiagnosticsLog("SyncEngine", "background handoff skipped — entitlement denied")
+            return
+        }
         beginBackgroundTransitionIfNeeded(reason: "transitionToBackgroundUpload")
         defer { endBackgroundTransitionIfNeeded(reason: "transitionToBackgroundUpload") }
 
@@ -1603,6 +1796,8 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     @objc private func appWillEnterForeground() {
         slog("[SyncEngine] app entering foreground")
+        appIsInBackground = false
+        cancelBackgroundContinuationExpiry(reason: "willEnterForeground")
         SilentAudioService.shared.stop()
         isTransitioningToBackground = false
         backgroundUploadService.requestForegroundResumeAfterBackgroundTask()
@@ -3298,6 +3493,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             exportService: exportService
         )
         backgroundUploadService.syncEngineManager = self
+        backgroundUploadService.setDriveEntitlements(currentDriveEntitlementSnapshot())
         slog("[SyncEngine] configureBackgroundUploadService: wired")
     }
 
@@ -3316,8 +3512,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     func performIncrementalPhotoScanIfBackgrounded() async {
         guard let _ = uploadStore else { return }
         let autoUploadActive = autoUploadConfigStore?.getConfig().state == "active"
-        guard autoUploadActive else {
-            NSLog("[SyncEngine] background task: skipping scan — auto upload not active")
+        guard BackgroundHandoffPolicy.shouldRunBackgroundIncrementalScan(
+            canUseBackgroundContinuation: canUseBackgroundContinuationEntitlement(),
+            autoUploadActive: autoUploadActive
+        ) else {
+            NSLog("[SyncEngine] background task: skipping scan — background continuation unavailable or auto upload not active")
             return
         }
         let thermal = ProcessInfo.processInfo.thermalState
@@ -4080,7 +4279,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         slog("[SyncEngine] startSync")
         syncDiagnosticsLog("SyncEngine", "startSync")
         sessionService.transitionTo(.scanning)
-        backgroundService.submitContinuedTask()
+        if BackgroundHandoffPolicy.shouldSubmitBackgroundContinuedTask(
+            canUseBackgroundContinuation: canUseBackgroundContinuationEntitlement()
+        ) {
+            backgroundService.submitContinuedTask()
+        } else {
+            syncDiagnosticsLog("BackgroundExec", "continued task skipped — background entitlement denied")
+        }
 
         Task { [weak self] in
             await self?.runStartLynavoDriveFlow()
@@ -4654,9 +4859,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     )
                     uploaded = true
                     photoLibraryChanged = false // reset after round
+                    let canUseBackgroundContinuation = enforceBackgroundContinuationRuntime(
+                        reason: "upload_round_file_boundary"
+                    )
                     if !BackgroundHandoffPolicy.shouldContinueForegroundPipeline(
                         isTransitioningToBackground: isTransitioningToBackground,
-                        isSilentAudioPlaying: SilentAudioService.shared.isPlaying
+                        isSilentAudioPlaying: SilentAudioService.shared.isPlaying,
+                        canUseBackgroundContinuation: canUseBackgroundContinuation,
+                        isAppInBackground: appIsInBackground
                     ) {
                         slog("[SyncPipeline] foreground pipeline paused for background handoff")
                         syncDiagnosticsLog("SyncPipeline", "foreground pipeline paused for background handoff")
@@ -4996,9 +5206,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             // URLSession. During the silent-audio keepalive experiment, keep
             // the foreground TCP queue running while the audio session is
             // active.
+            let canUseBackgroundContinuation = enforceBackgroundContinuationRuntime(
+                reason: "tcp_loop_file_boundary"
+            )
             if !BackgroundHandoffPolicy.shouldContinueForegroundPipeline(
                 isTransitioningToBackground: isTransitioningToBackground,
-                isSilentAudioPlaying: SilentAudioService.shared.isPlaying
+                isSilentAudioPlaying: SilentAudioService.shared.isPlaying,
+                canUseBackgroundContinuation: canUseBackgroundContinuation,
+                isAppInBackground: appIsInBackground
             ) {
                 slog("[SyncPipeline] breaking TCP loop — app backgrounded")
                 syncDiagnosticsLog("SyncPipeline", "breaking TCP loop — app backgrounded")
@@ -6708,6 +6923,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         slog("[SyncEngine] disconnectAndUnbind")
         interruptActiveSyncForBindingChange(reason: "disconnect_and_unbind")
         clearBindingInvalidation()
+        clearDriveEntitlementsForIdentityReset(reason: "disconnectAndUnbind")
         // Clear the token stored under the binding's per-device key (and the legacy
         // global key for bindings created before per-device storage was introduced).
         if let binding = uploadStore?.getBinding() {
@@ -9586,6 +9802,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         slog("[SyncEngine] wipeSyncIdentity: begin (sentinel set)")
         syncDiagnosticsLog("SyncEngine", "wipeSyncIdentity: begin")
         clearBindingInvalidation()
+        clearDriveEntitlementsForIdentityReset(reason: "wipeSyncIdentity")
 
         // 1. Tear down any live networking / timers so we don't race the wipe.
         stopPresenceHeartbeatTimer()

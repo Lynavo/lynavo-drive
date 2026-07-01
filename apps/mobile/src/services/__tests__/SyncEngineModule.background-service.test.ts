@@ -1,10 +1,20 @@
 describe('SyncEngineModule background service bridge', () => {
-  const loadModule = (platform: 'android' | 'ios') => {
+  const loadModule = (
+    platform: 'android' | 'ios',
+    options: { includeEntitlementBridge?: boolean } = {
+      includeEntitlementBridge: true,
+    },
+  ) => {
     jest.resetModules();
     const nativeSyncEngine = {
       startBackgroundSyncService: jest.fn().mockResolvedValue(undefined),
       stopBackgroundSyncService: jest.fn().mockResolvedValue(undefined),
       setBackgroundSilentAudioEnabled: jest.fn().mockResolvedValue(undefined),
+      ...(options.includeEntitlementBridge === false
+        ? {}
+        : {
+            setDriveEntitlements: jest.fn().mockResolvedValue(undefined),
+          }),
     };
 
     jest.doMock('react-native', () => ({
@@ -58,5 +68,42 @@ describe('SyncEngineModule background service bridge', () => {
     expect(
       nativeSyncEngine.setBackgroundSilentAudioEnabled,
     ).toHaveBeenCalledWith(true);
+  });
+
+  it('syncs drive entitlement snapshots to native when the bridge exists', async () => {
+    const { nativeSyncEngine, syncEngine } = loadModule('android');
+    const entitlements = {
+      canUseLanForegroundAutoUpload: true,
+      canUseBackgroundContinuation: false,
+      canUseRemoteTunnel: false,
+      source: 'guest',
+      expiresAt: null,
+      checkedAt: '2026-07-01T00:00:00.000Z',
+    } as const;
+
+    await syncEngine.setDriveEntitlements(entitlements);
+
+    expect(nativeSyncEngine.setDriveEntitlements).toHaveBeenCalledWith(
+      entitlements,
+    );
+  });
+
+  it('keeps entitlement sync optional for native builds without the bridge', async () => {
+    const { nativeSyncEngine, syncEngine } = loadModule('ios', {
+      includeEntitlementBridge: false,
+    });
+
+    await expect(
+      syncEngine.setDriveEntitlements({
+        canUseLanForegroundAutoUpload: true,
+        canUseBackgroundContinuation: false,
+        canUseRemoteTunnel: false,
+        source: 'guest',
+        expiresAt: null,
+        checkedAt: null,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(nativeSyncEngine).not.toHaveProperty('setDriveEntitlements');
   });
 });

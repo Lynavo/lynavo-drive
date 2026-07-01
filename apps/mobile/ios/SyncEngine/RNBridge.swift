@@ -800,6 +800,21 @@ class NativeSyncEngineModule: RCTEventEmitter {
         resolve(nil)
     }
 
+    @objc
+    func setDriveEntitlements(
+        _ params: NSDictionary,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        guard let rawParams = params as? [String: Any] else {
+            reject("INVALID_PARAMS", "Invalid entitlement snapshot object", nil)
+            return
+        }
+        let snapshot = DriveEntitlementSnapshot.fromBridgeParams(rawParams)
+        SyncEngineManager.shared.setDriveEntitlements(snapshot)
+        resolve(nil)
+    }
+
     // MARK: - Lynavo Drive: Shared Files
 
     @objc

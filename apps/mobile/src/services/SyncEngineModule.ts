@@ -10,6 +10,7 @@ import type {
   AutoUploadConfigDTO,
   BindingStateDTO,
   DirectoryListingDTO,
+  DriveEntitlements,
   HistoryLedgerCardDTO,
   PairingErrorMetadataDTO,
   ReadOnlyQueueItemDTO,
@@ -582,6 +583,15 @@ export async function stopBackgroundSyncService(): Promise<void> {
     return;
   }
   await NativeSyncEngine.stopBackgroundSyncService();
+}
+
+export async function setDriveEntitlements(
+  entitlements: DriveEntitlements,
+): Promise<void> {
+  if (typeof NativeSyncEngine.setDriveEntitlements !== 'function') {
+    return;
+  }
+  await NativeSyncEngine.setDriveEntitlements(entitlements);
 }
 
 export async function setBackgroundSilentAudioEnabled(
