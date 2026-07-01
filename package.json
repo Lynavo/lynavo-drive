@@ -42,6 +42,8 @@
     "typecheck": "turbo run typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "verify:oss-source-package": "node scripts/verify-oss-source-package.mjs",
+    "verify:oss-source-package:advisory": "node scripts/verify-oss-source-package.mjs --advisory",
     "verify:oss-boundary": "node scripts/verify-oss-boundary.mjs",
     "verify:oss-boundary:advisory": "node scripts/verify-oss-boundary.mjs --advisory",
     "verify:legacy-names": "node scripts/verify-legacy-name-allowlist.mjs --advisory",
@@ -50,7 +52,7 @@
     "verify:android-syncengine-bridge": "node scripts/verify-android-syncengine-bridge-parity.mjs",
     "sync:versions": "node scripts/sync-version-manifest.mjs",
     "sync:versions:check": "node scripts/sync-version-manifest.mjs --check",
-    "check": "pnpm sync:versions:check && pnpm verify:oss-boundary && turbo run build test typecheck",
+    "check": "pnpm sync:versions:check && pnpm verify:oss-source-package && pnpm verify:oss-boundary && turbo run build test typecheck",
     "clean": "turbo run clean && rm -rf node_modules/.cache .turbo"
   },
   "devDependencies": {

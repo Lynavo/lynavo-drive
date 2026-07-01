@@ -22,12 +22,27 @@ export APPLE_API_KEY_ID="${APPLE_API_KEY_ID:-${DEFAULT_API_KEY_ID}}"
 export APPLE_API_ISSUER="${APPLE_API_ISSUER:-${DEFAULT_API_ISSUER}}"
 export LYNAVO_BUILD_NUMBER="${LYNAVO_BUILD_NUMBER:-$(resolve_build_number)}"
 
+if [[ -z "${MAS_PROVISIONING_PROFILE:-}" ]]; then
+  echo "Missing MAS provisioning profile: export MAS_PROVISIONING_PROFILE=/absolute/path/to/profile.provisionprofile" >&2
+  exit 1
+fi
+
+if [[ "${MAS_PROVISIONING_PROFILE}" != /* ]]; then
+  MAS_PROVISIONING_PROFILE="${REPO_ROOT}/${MAS_PROVISIONING_PROFILE}"
+fi
+
+if [[ ! -f "${MAS_PROVISIONING_PROFILE}" ]]; then
+  echo "Missing MAS provisioning profile file: ${MAS_PROVISIONING_PROFILE}" >&2
+  exit 1
+fi
+
 if [[ -z "${LYNAVO_BUILD_NUMBER}" ]]; then
   echo "Failed to resolve build number from iOS project." >&2
   exit 1
 fi
 
 echo "Build number: ${LYNAVO_BUILD_NUMBER}"
+echo "MAS provisioning profile: ${MAS_PROVISIONING_PROFILE}"
 echo "Building sidecar..."
 
 cd "${REPO_ROOT}"
@@ -38,6 +53,7 @@ echo "Packaging for Mac App Store (MAS)..."
 pnpm --filter @lynavo-drive/desktop exec electron-builder --mac mas \
   "-c.buildVersion=${LYNAVO_BUILD_NUMBER}" \
   "-c.mas.bundleVersion=${LYNAVO_BUILD_NUMBER}" \
+  "-c.mas.provisioningProfile=${MAS_PROVISIONING_PROFILE}" \
   "-c.extraMetadata.lynavoDriveBuildNumber=${LYNAVO_BUILD_NUMBER}" \
   -c.mac.notarize=false
 

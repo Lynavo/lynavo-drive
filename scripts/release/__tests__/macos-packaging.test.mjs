@@ -74,3 +74,22 @@ test('signed macOS packaging resolves Lynavo Developer ID team without market br
   assert.match(script, /set CSC_TEAM_ID\/CSC_NAME explicitly/);
   assert.match(script, /Expected Team ID: \$\{EXPECTED_CSC_TEAM_ID\}/);
 });
+
+test('desktop builder config does not commit a MAS provisioning profile path', () => {
+  const builderConfig = readFileSync(resolve(repoRoot, 'apps/desktop/electron-builder.yml'), 'utf8');
+
+  assert.doesNotMatch(builderConfig, /embedded\.provisionprofile/);
+  assert.doesNotMatch(builderConfig, /^  provisioningProfile:/m);
+});
+
+test('MAS packaging requires an external provisioning profile input', () => {
+  const script = readFileSync(
+    resolve(repoRoot, 'apps/desktop/scripts/package-macos-mas.sh'),
+    'utf8',
+  );
+
+  assert.match(script, /MAS_PROVISIONING_PROFILE/);
+  assert.match(script, /Missing MAS provisioning profile/);
+  assert.match(script, /-c\.mas\.provisioningProfile=\$\{MAS_PROVISIONING_PROFILE\}/);
+  assert.doesNotMatch(script, /embedded\.provisionprofile/);
+});

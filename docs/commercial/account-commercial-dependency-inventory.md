@@ -1,6 +1,6 @@
 # Account And Commercial Dependency Inventory
 
-Status: collected on 2026-07-01 for the global-only community OSS baseline.
+Status: refreshed on 2026-07-02 for the global-only community OSS baseline.
 
 This inventory separates local-first LAN functionality from official commercial
 features. It is a planning artifact: it does not authorize deleting LAN sync,
@@ -42,18 +42,18 @@ browsing.
 
 ## Desktop Inventory
 
-| Area                    | Evidence                                                                                                                                                                               | Classification   | Next action                                                                                               |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------- |
-| Product distribution    | `apps/desktop/src/shared/product.ts:6` sets `PRODUCT_DISTRIBUTION = 'community'`.                                                                                                      | Keep baseline    | Keep as OSS identity guard.                                                                               |
-| Auth IPC/preload        | `apps/desktop/src/main/ipc-handlers.ts:30`, `apps/desktop/src/preload/index.ts:58`; guard tests in `ipc-handlers.test.ts:261` and `preload/__tests__/index.test.ts:71`.                | Keep baseline    | Preserve guard tests that no auth/session/subscription bridge is exposed.                                 |
-| Sidecar commercial sync | `apps/desktop/src/main/sidecar-client.ts` has no credential-sync helper; desktop tests assert the OSS client does not expose it.                                                       | Moved out of OSS | Keep removed; official overlays must own positive credential sync.                                        |
-| Remote sidecar plumbing | `apps/desktop/src/main/sidecar-client.ts` now targets the local sidecar base and no longer carries remote request helpers.                                                             | Moved out of OSS | Keep local-only dispatch in OSS.                                                                          |
-| Tunnel health read      | Desktop sidecar health no longer models a `tunnel` object.                                                                                                                             | Moved out of OSS | Keep health local-only.                                                                                   |
-| Settings store default  | Renderer initial settings no longer default `remoteAccessEnabled`.                                                                                                                     | Moved out of OSS | Keep absent; do not reintroduce a remote access toggle in OSS settings.                                   |
-| Misleading UI keys      | Desktop dashboard/setup copy now uses local-file-access keys instead of `remoteAccess*` for LAN file access.                                                                           | Moved out of OSS | Continue removing remaining unused auth copy.                                                             |
-| Unused auth copy        | Desktop renderer locale `authPage` blocks were removed after confirming no non-locale references.                                                                                      | Removed          | Keep absent; official account UI copy belongs in an overlay.                                              |
-| Support/update backend  | Desktop support/update network paths were removed; diagnostics now export a local archive only. The old unmounted support panel, reset-state IPC, and reset support copy were removed. | Removed from OSS | Keep official support upload, update-check clients, and destructive support reset entrypoints out of OSS. |
-| Local pairing/resources | Dashboard QR pairing, IPC local sidecar, received library and shared resources are local LAN features.                                                                                 | Keep baseline    | Do not remove; these are not manual mobile upload alternatives.                                           |
+| Area                    | Evidence                                                                                                                                                                               | Classification   | Next action                                                                                                      |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Product distribution    | `apps/desktop/src/shared/product.ts:6` sets `PRODUCT_DISTRIBUTION = 'community'`.                                                                                                      | Keep baseline    | Keep as OSS identity guard.                                                                                      |
+| Auth IPC/preload        | `apps/desktop/src/main/ipc-handlers.ts:30`, `apps/desktop/src/preload/index.ts:58`; guard tests in `ipc-handlers.test.ts:261` and `preload/__tests__/index.test.ts:71`.                | Keep baseline    | Preserve guard tests that no auth/session/subscription bridge is exposed.                                        |
+| Sidecar commercial sync | `apps/desktop/src/main/sidecar-client.ts` has no credential-sync helper; desktop tests assert the OSS client does not expose it.                                                       | Moved out of OSS | Keep removed; official overlays must own positive credential sync.                                               |
+| Remote sidecar plumbing | `apps/desktop/src/main/sidecar-client.ts` now targets the local sidecar base and no longer carries remote request helpers.                                                             | Moved out of OSS | Keep local-only dispatch in OSS.                                                                                 |
+| Tunnel health read      | Desktop sidecar health no longer models a `tunnel` object.                                                                                                                             | Moved out of OSS | Keep health local-only.                                                                                          |
+| Settings store default  | Renderer initial settings no longer default `remoteAccessEnabled`.                                                                                                                     | Moved out of OSS | Keep absent; do not reintroduce a remote access toggle in OSS settings.                                          |
+| Misleading UI keys      | Desktop dashboard/setup copy now uses local-file-access keys instead of `remoteAccess*` for LAN file access.                                                                           | Moved out of OSS | No active auth-copy cleanup remains; keep local-file-access wording and let boundary scanners catch regressions. |
+| Unused auth copy        | Desktop renderer locale `authPage` blocks were removed after confirming no non-locale references.                                                                                      | Removed          | Keep absent; official account UI copy belongs in an overlay.                                                     |
+| Support/update backend  | Desktop support/update network paths were removed; diagnostics now export a local archive only. The old unmounted support panel, reset-state IPC, and reset support copy were removed. | Removed from OSS | Keep official support upload, update-check clients, and destructive support reset entrypoints out of OSS.        |
+| Local pairing/resources | Dashboard QR pairing, IPC local sidecar, received library and shared resources are local LAN features.                                                                                 | Keep baseline    | Do not remove; these are not manual mobile upload alternatives.                                                  |
 
 ## Mobile JS Inventory
 
@@ -106,17 +106,32 @@ browsing.
 
 ## Documentation And QA Drift
 
-| Area                   | Evidence                                                                                                                                                             | Classification | Next action                                          |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ---------------------------------------------------- |
-| Community build docs   | `docs/open-source/community-build.md:23` states commercial remote/tunnel/background native runtime is absent from community builds.                                  | Keep baseline  | Keep aligned as OSS removals continue.               |
-| Beta matrix background | `docs/testing/beta-test-matrix.md` now treats OSS background as fail-closed and validates foreground pending-queue recovery instead of paid background continuation. | Keep baseline  | Keep aligned as native background removals continue. |
-| Feature boundary       | `docs/commercial/feature-boundary.md:25` requires official capability and entitlement for paid features.                                                             | Keep baseline  | Use as the migration rule for follow-up tasks.       |
+| Area                    | Evidence                                                                                                                                                                 | Classification | Next action                                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- | ---------------------------------------------------------------------------------------------------------- |
+| Community build docs    | `docs/open-source/community-build.md:23` states commercial remote/tunnel/background native runtime is absent from community builds.                                      | Keep baseline  | Keep aligned with release and QA gates.                                                                    |
+| Beta matrix background  | `docs/testing/beta-test-matrix.md` now treats OSS background as fail-closed and validates foreground pending-queue recovery instead of paid background continuation.     | Keep baseline  | Keep aligned with foreground recovery smoke evidence.                                                      |
+| Feature boundary        | `docs/commercial/feature-boundary.md:25` requires official capability and entitlement for paid features.                                                                 | Keep baseline  | Use as the migration rule for follow-up tasks.                                                             |
+| Release boundary checks | `scripts/release/release-profiles.mjs` only defines `review` and `prod`; release tests guard against market, support, update, diagnostics, and legacy API env injection. | Hardened       | Keep `verify:oss-boundary`, `verify:legacy-names:strict`, and source-package auditing in the release gate. |
+| Beta tag doc drift      | `AGENTS.md`, `docs/release/market-release-flow.md`, and `docs/release/release-playbook.md` must stay aligned on the current cross-repo beta tag paths.                   | Harden         | Reconcile before the next TestFlight/tag run.                                                              |
 
 ## Recommended Follow-up Order
 
-1. Keep desktop and mobile diagnostics on local export/share/email only; do not
-   reintroduce one-click upload to official support APIs in OSS.
-2. Keep positive support IPC/preload tests focused on diagnostics export and
-   retain negative coverage for removed upload/update IPC channels.
-3. Remove dead support/settings renderer components that are no longer mounted
-   by the OSS desktop UI.
+1. Reconcile release documentation drift before the next TestFlight/tag run:
+   align `docs/release/release-playbook.md`,
+   `docs/release/market-release-flow.md`, and `AGENTS.md` on the current
+   `review` / `prod` release profiles and the correct cross-repo beta tag
+   paths.
+2. Make current boundary verification explicit in the release/QA gate: run or
+   wire `pnpm verify:oss-source-package`, `pnpm verify:oss-boundary`,
+   `pnpm verify:legacy-names:strict`, and
+   `pnpm release --profile <review|prod> --targets ios,android,mac,win,linux --dry-run`.
+   Allowed legacy/commercial hits should stay limited to negative fixtures,
+   scanner definitions, compatibility migrations, and historical docs.
+3. Capture one beta-smoke evidence pass for preserved OSS baseline behavior:
+   guest local LAN pairing/upload, pending-queue recovery, `/personal/*`
+   paired-device HMAC access with bearer-token rejection, local diagnostics
+   export/share/email only, and no support upload/update/reset-state IPC.
+4. Keep deferred migrations separate from this commercial cleanup inventory:
+   package scope, mDNS service, old data-dir/keychain/shared-preference,
+   native package/bundle IDs, and store-listing continuity need dedicated
+   migration plans.

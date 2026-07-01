@@ -20,7 +20,8 @@
 说明：
 
 1. 根目录的 `.p8` 已加入 `.gitignore`，只作为本机打包输入，不应提交
-2. 如果 API key 路径不同，可以通过环境变量覆盖，不要求强绑到仓库根目录
+2. MAS provisioning profile 通过 `MAS_PROVISIONING_PROFILE` 指向本机绝对路径，不提交到仓库
+3. 如果 API key 路径不同，可以通过环境变量覆盖，不要求强绑到仓库根目录
 
 ## 2. 当前默认签名材料
 
@@ -100,6 +101,14 @@ pnpm --filter @lynavo-drive/desktop package:signed
 1. `CSC_NAME` 不要写成完整证书名
 2. 不能带 `Developer ID Application:` 前缀
 3. electron-builder 只接受去掉前缀后的 identity 名称
+
+如果单独执行 MAS 打包入口，另需把 App Store provisioning profile 放在本机
+路径并显式传入：
+
+```bash
+export MAS_PROVISIONING_PROFILE='/absolute/path/to/profile.provisionprofile'
+pnpm --filter @lynavo-drive/desktop package:mas
+```
 
 ## 6. 结果校验
 

@@ -135,10 +135,15 @@ const ALLOWED_EXACT_PATHS = new Map([
     'scripts/verify-legacy-name-allowlist.mjs',
     allowAny('Legacy-name verifier quotes historical docs paths and compatibility module names.'),
   ],
+  [
+    'scripts/verify-oss-source-package.mjs',
+    allowAny('Source-package verifier names sensitive path patterns so it can block them.'),
+  ],
   ['scripts/dev/oss-env-scrubber.cjs', allowAny(NEGATIVE_ASSERTION_REASON)],
   ['scripts/dev/__tests__/release-profile-dev.test.mjs', allowAny(NEGATIVE_ASSERTION_REASON)],
   ['scripts/release/__tests__/macos-packaging.test.mjs', allowAny(NEGATIVE_ASSERTION_REASON)],
   ['scripts/release/__tests__/oss-boundary.test.mjs', allowAny(NEGATIVE_ASSERTION_REASON)],
+  ['scripts/release/__tests__/oss-source-package.test.mjs', allowAny(NEGATIVE_ASSERTION_REASON)],
   ['scripts/release/__tests__/release-cli.test.mjs', allowAny(NEGATIVE_ASSERTION_REASON)],
   ['scripts/release/__tests__/release-profiles.test.mjs', allowAny(NEGATIVE_ASSERTION_REASON)],
   [

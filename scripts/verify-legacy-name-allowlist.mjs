@@ -127,6 +127,10 @@ const ALLOWED_EXACT_PATHS = new Map([
     allowAny('The verifier owns the legacy-name pattern and compatibility allowlist.'),
   ],
   [
+    'scripts/verify-oss-source-package.mjs',
+    allowAny('Source-package verifier owns the legacy path pattern it blocks.'),
+  ],
+  [
     'scripts/release/__tests__/legacy-name-allowlist.test.mjs',
     allowAny('Regression test fixture for unallowlisted legacy-name detection.'),
   ],
@@ -162,6 +166,16 @@ const ALLOWED_EXACT_PATHS = new Map([
   [
     'scripts/release/__tests__/release-cli.test.mjs',
     allowAny('Regression test fixture asserts release CLI ignores legacy envs.'),
+  ],
+  [
+    'scripts/release/__tests__/oss-source-package.test.mjs',
+    allowAny('Regression test fixture asserts legacy source-package paths stay blocked.'),
+  ],
+  [
+    'docs/release/release-playbook.md',
+    allowAny(
+      'Release playbook quotes the current external repository path used by beta tag automation.',
+    ),
   ],
   [
     'scripts/verify-vscode-android-debug.mjs',

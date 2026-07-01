@@ -204,12 +204,12 @@ pnpm package:linux -- --arch arm64
 
 TestFlight 打包上傳觸發 beta tag 時，必須讓兩個倉庫都有同一個測試 tag：
 
-1. `/Volumes/T7/Dev/Web/LynavoDrive`
+1. `/Volumes/T7/Dev/Web/SyncFlow`
 2. `/Volumes/T7/Dev/Web/vivi-drop-server`
 
-tag 名稱沿用本文件的 `beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION>`，例如 `beta/v1.0.0-b37`。不要只在 LynavoDrive 單邊打 tag；若要推送遠端 tag，也必須兩邊都推送。
+tag 名稱沿用本文件的 `beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION>`，例如 `beta/v1.0.0-b37`。不要只在 Lynavo Drive repo 單邊打 tag；若要推送遠端 tag，也必須兩邊都推送。
 
-先在 LynavoDrive 執行：
+先在 Lynavo Drive repo 執行：
 
 ```bash
 pnpm tag:beta
@@ -222,7 +222,7 @@ cd /Volumes/T7/Dev/Web/vivi-drop-server
 git tag -a beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION> -m "Lynavo Drive beta <MARKETING_VERSION> (<CURRENT_PROJECT_VERSION>)"
 ```
 
-如果要推遠端 tag，LynavoDrive 可直接執行：
+如果要推遠端 tag，Lynavo Drive repo 可直接執行：
 
 ```bash
 pnpm tag:beta:push
@@ -246,7 +246,7 @@ git push origin beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION>
 5. 出 macOS signed DMG
 6. 如本輪包含 Windows，出 Windows NSIS / ZIP
 7. 如本輪包含 Linux，出 Ubuntu 22.04+ `.deb`
-8. 給 LynavoDrive 和 vivi-drop-server 打同一個 Lynavo Drive beta tag
+8. 給 Lynavo Drive repo 和 vivi-drop-server 打同一個 Lynavo Drive beta tag
 9. 確認工作區乾淨
 10. 推程式碼和 tag
 11. 等 TestFlight processing 完成後再擴大測試範圍
@@ -336,6 +336,15 @@ Android release target 會透過 Gradle 從
 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION`，不要在
 `apps/mobile/android/app/build.gradle` 另外手動維護 Android
 `versionName` / `versionCode`。
+
+Android release signing material 必須從本機 Gradle properties 提供，不提交
+`debug.keystore` / `release.keystore` 到 source package。正式執行
+`android` target 前至少提供：
+
+- `MYAPP_RELEASE_STORE_FILE`
+- `MYAPP_RELEASE_STORE_PASSWORD`
+- `MYAPP_RELEASE_KEY_ALIAS`
+- `MYAPP_RELEASE_KEY_PASSWORD`
 
 可用 `--dry-run` 檢查實際會執行的 release channel、base URL 與命令，不會打包或上傳：
 

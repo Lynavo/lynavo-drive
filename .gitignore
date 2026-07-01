@@ -7,6 +7,16 @@ out/
 *.exe
 *.dmg
 *.docx
+.env
+.env.*
+*.cer
+*.crt
+*.key
+*.keystore
+*.mobileprovision
+*.p12
+*.pem
+*.provisionprofile
 !apps/desktop/src/renderer/i18n/locales/**/settings.json
 tmp
 # Playwright
@@ -15,6 +25,9 @@ tmp
 # Desktop release/resources
 apps/desktop/release/
 apps/desktop/resources/.sidecar-build/
+apps/desktop/resources/embedded.provisionprofile
+apps/desktop/resources/lynavo-drive-sidecar
+apps/desktop/resources/lynavo-drive-sidecar.exe
 tools/node/
 
 # Go sidecar

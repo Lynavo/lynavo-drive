@@ -45,7 +45,6 @@ mas:
     NSDownloadsFolderUsageDescription: Lynavo Drive 需要存取下載資料夾，用於同步、儲存與開啟素材。
   entitlements: resources/entitlements.mas.plist
   entitlementsInherit: resources/entitlements.mas.inherit.plist
-  provisioningProfile: resources/embedded.provisionprofile
   notarize: null
 win:
   artifactName: LynavoDrive-${version}-${arch}.${ext}
