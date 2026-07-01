@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sidecarClient, syncCredentialsToSidecar } from '../sidecar-client';
+import { sidecarClient, type SidecarHealth } from '../sidecar-client';
 
 describe('sidecarClient OSS commercial boundary', () => {
   it('does not expose commercial auth, gift-card, config, subscription, or tunnel methods', () => {
@@ -19,9 +19,15 @@ describe('sidecarClient OSS commercial boundary', () => {
     expect(sidecarClient).not.toHaveProperty('fetchTurnCredentials');
     expect(sidecarClient).not.toHaveProperty('syncTunnelCredentials');
     expect(sidecarClient).not.toHaveProperty('syncAccountContext');
+    expect(sidecarClient).not.toHaveProperty('syncCredentialsToSidecar');
   });
 
-  it('keeps commercial credential sync inert in the OSS runtime', async () => {
-    await expect(syncCredentialsToSidecar()).resolves.toBe(false);
+  it('does not model tunnel health in the OSS desktop client', () => {
+    const health: SidecarHealth = {
+      ok: true,
+      service: 'lynavo-drive-sidecar',
+    };
+
+    expect(health).not.toHaveProperty('tunnel');
   });
 });

@@ -23,7 +23,7 @@
           },
           {
             "title": "How to upload media",
-            "body": "Both automatic and manual uploads are supported. Automatic upload silently syncs new media in the background. Manual upload lets you select photos and videos from the album and submit them together."
+            "body": "Automatic incremental upload is supported on the same LAN while the mobile app is in the foreground. The phone scans local media into a pending queue and uploads new items one file at a time."
           },
           {
             "title": "How to access the shared folder",
@@ -39,11 +39,11 @@
           },
           {
             "title": "Enable automatic upload",
-            "body": "Go to the album page, expand the Automatic Upload panel, and turn on the switch. New media will then transfer to the computer automatically in the background."
+            "body": "Go to the album page, expand the Automatic Upload panel, and turn on the switch. New media will transfer to the computer automatically while the phone stays foregrounded on the same LAN."
           },
           {
-            "title": "Manual upload",
-            "body": "Select the photos or videos you want to upload on the album page. Already transferred items are disabled. Tap the Upload button at the bottom to submit them to the transfer queue."
+            "title": "Foreground LAN queue",
+            "body": "The phone keeps an append-only pending queue from local media scanning. If the app backgrounds, locks, or disconnects, unfinished items stay queued and continue after foreground LAN connectivity returns."
           },
           {
             "title": "View the shared folder",
@@ -54,8 +54,8 @@
       "upload": {
         "items": [
           {
-            "title": "Automatic upload vs manual upload",
-            "body": "Automatic upload continuously watches for new album media and silently syncs while connected. Manual upload is initiated by selecting files on the album page, which is useful for curated transfers."
+            "title": "Automatic incremental upload",
+            "body": "Automatic upload scans local media and syncs new pending items while the phone and computer are connected on the same LAN. The OSS runtime does not provide manual file picking or background continuation."
           },
           {
             "title": "received folder and shared folder",
@@ -126,7 +126,7 @@
       },
       {
         "title": "How to upload media",
-        "description": "Enable automatic upload in the mobile album or manually select media to upload. The system automatically performs incremental filtering, transmitting only new media to avoid duplication."
+        "description": "Enable automatic upload in the mobile album. The system performs incremental filtering and transmits only new pending media on the foreground LAN connection to avoid duplication."
       },
       {
         "title": "How to access shared folders",
@@ -151,7 +151,7 @@
       },
       {
         "title": "Upload media",
-        "description": "Enable automatic upload in the phone album, or manually choose media to upload to the computer"
+        "description": "Enable automatic upload in the phone album so new pending media syncs to the computer on the foreground LAN connection"
       },
       {
         "title": "View files on the computer",
@@ -177,7 +177,7 @@
       },
       {
         "title": "Upload media",
-        "description": "Enable automatic upload in the phone album, or manually choose media to upload to the computer"
+        "description": "Enable automatic upload in the phone album so new pending media syncs to the computer on the foreground LAN connection"
       },
       {
         "title": "View files on the computer",
@@ -332,11 +332,11 @@
   "uploadRules": {
     "title": "📤 Upload Rules",
     "items": [
-      "Automatic and manual uploads can coexist. Manual uploads take priority.",
-      "After each file completes, the queue head is selected again so manual media stays prioritized.",
-      "Manual uploads form an append-only batch; new media is deduplicated before appending.",
+      "Automatic upload is the only OSS upload path; media enters the pending queue through local mobile scanning.",
+      "After each file completes, the queue head is selected again from the persisted pending queue.",
+      "New media is deduplicated before appending, and unfinished items remain queued across foreground reconnects.",
       "Only one file may transfer at a time. The queue uploads in order.",
-      "Pause/resume automatic upload and cancel manual batches are supported. Per-item deletion or reordering is not supported."
+      "Per-item deletion, manual file selection, and queue reordering are not supported."
     ]
   },
   "faq": {

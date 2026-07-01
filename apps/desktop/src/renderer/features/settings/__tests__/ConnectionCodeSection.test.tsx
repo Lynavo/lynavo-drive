@@ -33,7 +33,6 @@ describe('ConnectionCodeSection', () => {
         shareAddress: '',
         shareStatus: 'unknown',
         shareName: 'LynavoDrive',
-        remoteAccessEnabled: true,
         allowCrossDeviceReceivedAccess: true,
       },
       shareStatusInfo: {

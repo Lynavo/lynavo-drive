@@ -842,6 +842,11 @@ export function resolveDriveEntitlements(input: {
 
 ### Phase 9：Remote tunnel paid gate 和官方服务端边界
 
+当前 OSS 分支已改为彻底开源基线：remote tunnel、relay、TURN
+credentials、account-backed proxy wake 和 `remoteAccessEnabled` 设置不在 OSS
+树内保留正向入口。本 Phase 以下内容仅作为早期 commercial-overlay 方案的
+历史背景；后续 OSS task 不应继续按“paid + remoteAccessEnabled”路径实现。
+
 目标：远程穿透不能是登录即有，也不能因为 OSS 自编译绕过官方服务。
 
 当前候选文件：
@@ -867,29 +872,29 @@ export function resolveDriveEntitlements(input: {
 - 后端 `/tunnel/turn-credentials` 必须校验 entitlement：
   - 未登录：401。
   - 登录未付费 / 过期：403 或明确业务错误码。
-- Desktop 拆分：
-  - `syncAccountContextToSidecar()`
-  - `syncTunnelCredentialsToSidecar()`
-  - `clearTunnelCredentialsFromSidecar()`
-- `remoteAccessEnabled` 是用户隐私设置，不是付费状态；商业 entitlement 由 official overlay 负责。
+- 旧方案中的 desktop credential-sync helpers 已不适用于当前 OSS 基线，不应在本仓库重新引入。
+- 旧方案曾把 `remoteAccessEnabled` 作为用户隐私设置；当前 OSS 基线不再建模该设置。
 
-- Sidecar 做最后防线：
-  - `/tunnel/credentials` 拒绝 guest/free/expired。
-  - personal / remote API 同时检查 user setting、entitlement、account context、device authorization。
-  - Bonjour/local discovery metadata 不对未授权状态宣传 remote 可用。
-  - 日志区分 disabled by setting / entitlement / missing account。
+- 当前 OSS Sidecar 做最后防线：
+  - 不注册 `/account/context`、`/tunnel/credentials`、`/wake/proxy`。
+  - personal / local shared files API 只保留 paired-device / LAN baseline。
+  - Bonjour/local discovery metadata 不宣传 remote/tunnel 可用。
+  - 日志不应引导用户开启不存在的 remote/tunnel setting。
 
 验收：
 
 - guest/free 抓包或日志中没有 TURN credential 请求。
-- paid + remoteAccessEnabled=true 可建立远程访问。
-- paid + remoteAccessEnabled=false 不启动 tunnel，local LAN 不受影响。
-- entitlement 过期后 remote 显示付费状态，不误报网络故障。
-- 直接绕过 UI 打 sidecar remote API，guest/free 被拒绝。
+- OSS clone/build 中不存在可开启的 tunnel/relay/remote-access 设置。
+- local LAN 不受登录、订阅或商业模块缺失影响。
+- entitlement 过期不会改变 OSS 行为；OSS 不呈现付费 remote 状态或网络故障伪装。
+- 直接绕过 UI 打 sidecar commercial endpoint，OSS sidecar 返回 404。
 
 ---
 
 ### Phase 10：Official commercial module / overlay
+
+当前 OSS 分支只保留 local LAN baseline。下列 overlay 结构仍可作为未来私有
+商业发行的外部参考，但不再是本仓库当前实施目标。
 
 目标：避免 OSS 开源基线与商业能力混在一起，尤其是后台 continuation 这种本地能力。
 
@@ -952,17 +957,16 @@ commercial-overlays/official-release/
   - “自动上传” = 前台局域网自动扫描和上传，免费。
   - “后台 / 锁屏继续上传” = 付费。
 - Remote Access：
-  - guest 显示登录入口。
-  - free 显示升级入口。
-  - paid 且 remoteAccessEnabled=true 显示可用状态。
+  - 当前 OSS 基线不显示 remote tunnel / relay / paid gate。
+  - LAN 个人目录浏览应使用 local computer / shared-files 命名。
 
 ### Desktop
 
 - 未登录打开就是 local shell。
 - 登录入口不遮挡本地接收。
 - Remote Access 设置区：
-  - guest/free：解释需要官方订阅。
-  - paid：允许开启 / 关闭 remoteAccessEnabled。
+  - 当前 OSS 基线不提供 Remote Access 设置区。
+  - 本地文件访问设置不得暗示可开启公网 tunnel。
 - 本地模式文案：
   - “Local network only”
   - “No account required”

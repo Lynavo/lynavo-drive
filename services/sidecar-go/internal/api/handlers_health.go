@@ -22,10 +22,5 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 			"revokesPairingsOnCodeRotation": true,
 			"wakeOnLanSupported":            wakeSupported,
 		},
-		"tunnel": map[string]any{
-			"enabled":                   false,
-			"signalingAuthState":        "disabled",
-			"credentialRefreshRequired": false,
-		},
 	})
 }

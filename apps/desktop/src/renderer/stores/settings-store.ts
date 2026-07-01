@@ -37,7 +37,6 @@ const initialSettings: SettingsDTO = {
   shareAddress: '',
   shareStatus: 'unknown' as const,
   shareName: '',
-  remoteAccessEnabled: true,
   allowCrossDeviceReceivedAccess: true,
 };
 

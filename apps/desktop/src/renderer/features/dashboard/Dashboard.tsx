@@ -306,10 +306,10 @@ export function Dashboard() {
                 </div>
                 <div className="min-w-0">
                   <h2 className="text-base font-semibold text-[#17191c]">
-                    {t('dashboard.share.remoteAccess.title')}
+                    {t('dashboard.share.localFileAccess.title')}
                   </h2>
                   <p className="mt-1 text-xs text-[#7b8490]">
-                    {t('dashboard.share.remoteAccess.description')}
+                    {t('dashboard.share.localFileAccess.description')}
                   </p>
                 </div>
               </div>
@@ -321,7 +321,7 @@ export function Dashboard() {
                 <div className="flex min-w-0 items-center gap-2">
                   <ShieldAlert className="h-4 w-4 shrink-0 text-amber-500" />
                   <p className="text-xs text-amber-700">
-                    {t('dashboard.share.remoteAccess.folderPermissionWarning')}
+                    {t('dashboard.share.localFileAccess.folderPermissionWarning')}
                   </p>
                 </div>
                 <button
@@ -330,7 +330,7 @@ export function Dashboard() {
                   onClick={handleRequestFolderPermission}
                   className="shrink-0 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-600 active:scale-[0.97]"
                 >
-                  {t('dashboard.share.remoteAccess.authorize')}
+                  {t('dashboard.share.localFileAccess.authorize')}
                 </button>
               </div>
             )}

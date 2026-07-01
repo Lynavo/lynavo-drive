@@ -47,7 +47,7 @@
         "title": "Enter pairing code",
         "description": "Enter this pairing code on the phone to connect this computer. Photos and files sync automatically on the same LAN."
       },
-      "remoteAccess": {
+      "localFileAccess": {
         "title": "Browse local computer files",
         "description": "After pairing succeeds, phones on the same LAN can browse local files shared by this computer."
       }

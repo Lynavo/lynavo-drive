@@ -49,7 +49,7 @@ describe('HelpDialog', () => {
 
     expect(screen.getByText('连接电脑')).toBeInTheDocument();
     expect(screen.getByText('开启自动上传')).toBeInTheDocument();
-    expect(screen.getByText('手动上传')).toBeInTheDocument();
+    expect(screen.getByText('前台局域网队列')).toBeInTheDocument();
     expect(screen.getByText('查看共享目录')).toBeInTheDocument();
   });
 
@@ -58,7 +58,7 @@ describe('HelpDialog', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '上传与共享说明' }));
 
-    expect(screen.getByText('自动上传 vs 手动上传')).toBeInTheDocument();
+    expect(screen.getByText('自动增量上传')).toBeInTheDocument();
     expect(screen.getByText('received 目录与 shared 目录')).toBeInTheDocument();
     expect(screen.getByText('共享目录是只读访问')).toBeInTheDocument();
   });

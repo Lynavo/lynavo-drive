@@ -168,7 +168,6 @@ describe('@lynavo-drive/contracts exports', () => {
       shareAddress: '',
       shareStatus: 'ready',
       shareName: 'Office Mac',
-      remoteAccessEnabled: true,
       allowCrossDeviceReceivedAccess: true,
     };
 

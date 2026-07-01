@@ -499,22 +499,6 @@ func assertRecorderErrorReason(t *testing.T, resp *httptest.ResponseRecorder, wa
 
 const ossCommercialDisabledReason = "oss_commercial_disabled"
 
-func tunnelCredentialsBody(signalingURL, accessToken, accountID string) string {
-	accountPart := ""
-	if accountID != "" {
-		accountPart = `,"accountId":` + strconv.Quote(accountID)
-	}
-	return `{"signalingUrl":` + strconv.Quote(signalingURL) +
-		`,"accessToken":` + strconv.Quote(accessToken) +
-		accountPart + `,"iceServers":[]}`
-}
-
-func accountContextBody(authBaseURL, accessToken, accountID string) string {
-	return `{"authBaseUrl":` + strconv.Quote(authBaseURL) +
-		`,"accessToken":` + strconv.Quote(accessToken) +
-		`,"accountId":` + strconv.Quote(accountID) + `}`
-}
-
 func TestHealthEndpoint(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	handler := func() http.Handler {
@@ -570,40 +554,6 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 	if _, ok := capabilities["wake"]; ok {
 		t.Fatal("health must not expose full wake metadata")
-	}
-}
-
-func TestHealthEndpointReportsTunnelDisabledInOSS(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	_, handler := api.NewServer(st, cfg, hub, nil)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	resp, err := http.Get(srv.URL + "/health")
-	if err != nil {
-		t.Fatalf("GET /health: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("GET /health status=%d, want 200", resp.StatusCode)
-	}
-
-	var body map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	tunnel, ok := body["tunnel"].(map[string]any)
-	if !ok {
-		t.Fatalf("missing tunnel object in %#v", body)
-	}
-	if tunnel["enabled"] != false {
-		t.Fatalf("tunnel enabled=%v, want false", tunnel["enabled"])
-	}
-	if tunnel["signalingAuthState"] != "disabled" {
-		t.Fatalf("signalingAuthState=%v, want disabled", tunnel["signalingAuthState"])
-	}
-	if tunnel["credentialRefreshRequired"] != false {
-		t.Fatalf("credentialRefreshRequired=%v, want false", tunnel["credentialRefreshRequired"])
 	}
 }
 
@@ -808,19 +758,6 @@ func TestPresenceBlockedPairedClientDoesNotTouchBroadcastOrExposeMetadata(t *tes
 	}
 }
 
-func TestProxyWakeDisabledInOSS(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	_, handler := api.NewServer(st, cfg, hub, nil)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	resp, err := http.Post(srv.URL+"/wake/proxy", "application/json", strings.NewReader(`{}`))
-	if err != nil {
-		t.Fatalf("POST /wake/proxy: %v", err)
-	}
-	assertErrorReason(t, resp, http.StatusForbidden, ossCommercialDisabledReason)
-}
-
 func TestPowerStateUpdateIsLocalOnly(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	_, handler := api.NewServer(st, cfg, hub, nil)
@@ -862,169 +799,8 @@ func TestPowerStateUpdateIsLocalOnly(t *testing.T) {
 	}
 }
 
-func TestAccountContextSyncIsLocalOnly(t *testing.T) {
+func TestOSSSettingsDoNotExposeRemoteAccess(t *testing.T) {
 	st, cfg, hub := testEnv(t)
-	_, handler := api.NewServer(st, cfg, hub, nil)
-
-	remoteReq := httptest.NewRequest(
-		http.MethodPost,
-		"/account/context",
-		strings.NewReader(`{"authBaseUrl":"https://auth.example.test","accessToken":"token","accountId":"acct-1"}`),
-	)
-	remoteReq.RemoteAddr = "192.168.1.50:61234"
-	remoteReq.Header.Set("Content-Type", "application/json")
-	remoteResp := httptest.NewRecorder()
-
-	handler.ServeHTTP(remoteResp, remoteReq)
-
-	if remoteResp.Code != http.StatusForbidden {
-		t.Fatalf("remote account context sync status = %d, want %d", remoteResp.Code, http.StatusForbidden)
-	}
-}
-
-func TestTunnelCredentialsSyncIsLocalOnly(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	_, handler := api.NewServer(st, cfg, hub, nil)
-
-	remoteReq := httptest.NewRequest(
-		http.MethodPost,
-		"/tunnel/credentials",
-		strings.NewReader(`{"signalingUrl":"https://signal.example.test","accessToken":"token","accountId":"acct-1","iceServers":[]}`),
-	)
-	remoteReq.RemoteAddr = "192.168.1.50:61234"
-	remoteReq.Header.Set("Content-Type", "application/json")
-	remoteResp := httptest.NewRecorder()
-
-	handler.ServeHTTP(remoteResp, remoteReq)
-
-	if remoteResp.Code != http.StatusForbidden {
-		t.Fatalf("remote tunnel credentials sync status = %d, want %d", remoteResp.Code, http.StatusForbidden)
-	}
-}
-
-func TestOSSCommercialSyncEndpointsAreDisabledForLocalRequests(t *testing.T) {
-	tests := []struct {
-		name string
-		path string
-		body string
-	}{
-		{
-			name: "account context",
-			path: "/account/context",
-			body: accountContextBody("https://auth.example.test", "token", "acct-1"),
-		},
-		{
-			name: "account context malformed body",
-			path: "/account/context",
-			body: "{",
-		},
-		{
-			name: "tunnel credentials",
-			path: "/tunnel/credentials",
-			body: tunnelCredentialsBody("https://signaling.example.test", "token", "acct-1"),
-		},
-		{
-			name: "tunnel credentials malformed body",
-			path: "/tunnel/credentials",
-			body: "{",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			st, cfg, hub := testEnv(t)
-			_, handler := api.NewServer(st, cfg, hub, nil)
-			srv := httptest.NewServer(handler)
-			defer srv.Close()
-
-			resp, err := http.Post(srv.URL+tt.path, "application/json", strings.NewReader(tt.body))
-			if err != nil {
-				t.Fatalf("POST %s: %v", tt.path, err)
-			}
-			assertErrorReason(t, resp, http.StatusForbidden, ossCommercialDisabledReason)
-		})
-	}
-}
-
-func TestOSSSettingsExposeRemoteAccessDisabledAndRejectEnable(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	if err := st.SetSetting("remote_access_enabled", "true"); err != nil {
-		t.Fatalf("SetSetting(remote_access_enabled): %v", err)
-	}
-
-	_, handler := api.NewServer(st, cfg, hub, nil)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	resp, err := http.Get(srv.URL + "/settings")
-	if err != nil {
-		t.Fatalf("GET /settings: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("GET /settings status=%d, want 200", resp.StatusCode)
-	}
-	var settings struct {
-		RemoteAccessEnabled bool `json:"remoteAccessEnabled"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
-		t.Fatalf("decode settings: %v", err)
-	}
-	if settings.RemoteAccessEnabled {
-		t.Fatal("remoteAccessEnabled=true, want false in OSS runtime")
-	}
-
-	req, err := http.NewRequest(http.MethodPut, srv.URL+"/settings", strings.NewReader(`{"remoteAccessEnabled":true}`))
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("PUT /settings: %v", err)
-	}
-	assertErrorReason(t, resp, http.StatusForbidden, ossCommercialDisabledReason)
-}
-
-func TestUpdateSettingsRejectsRemoteAccessEnableBeforeMutatingOtherFields(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	if err := st.SetDeviceName("Before Reject"); err != nil {
-		t.Fatalf("SetDeviceName: %v", err)
-	}
-
-	_, handler := api.NewServer(st, cfg, hub, nil)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-
-	req, err := http.NewRequest(
-		http.MethodPut,
-		srv.URL+"/settings",
-		strings.NewReader(`{"deviceName":"Mutated Before Reject","remoteAccessEnabled":true}`),
-	)
-	if err != nil {
-		t.Fatalf("new settings request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("PUT /settings: %v", err)
-	}
-	assertErrorReason(t, resp, http.StatusForbidden, ossCommercialDisabledReason)
-
-	deviceName, err := st.GetDeviceName()
-	if err != nil {
-		t.Fatalf("GetDeviceName: %v", err)
-	}
-	if deviceName != "Before Reject" {
-		t.Fatalf("device name mutated to %q after rejected remote access enable", deviceName)
-	}
-}
-
-func TestRemoteGuardDoesNotBlockLocalSettingsOrPresence(t *testing.T) {
-	st, cfg, hub := testEnv(t)
-	if err := st.SetSetting("remote_access_enabled", "false"); err != nil {
-		t.Fatalf("SetSetting(remote_access_enabled): %v", err)
-	}
 
 	_, handler := api.NewServer(st, cfg, hub, nil)
 	srv := httptest.NewServer(handler)
@@ -1034,9 +810,16 @@ func TestRemoteGuardDoesNotBlockLocalSettingsOrPresence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /settings: %v", err)
 	}
-	settingsResp.Body.Close()
+	defer settingsResp.Body.Close()
 	if settingsResp.StatusCode != http.StatusOK {
 		t.Fatalf("GET /settings status=%d, want 200", settingsResp.StatusCode)
+	}
+	var settings map[string]any
+	if err := json.NewDecoder(settingsResp.Body).Decode(&settings); err != nil {
+		t.Fatalf("decode settings: %v", err)
+	}
+	if _, ok := settings["remoteAccessEnabled"]; ok {
+		t.Fatal("settings must not expose remoteAccessEnabled in OSS runtime")
 	}
 
 	presenceResp, err := http.Post(srv.URL+"/presence/phone-local", "application/json", strings.NewReader("{}"))
@@ -2697,16 +2480,13 @@ func TestPersonalPairedDeviceAccessDoesNotRequireAccountContext(t *testing.T) {
 	}
 }
 
-func TestPersonalPairedDeviceHMACBypassesRemoteAccessSettingButAccountBearerDoesNot(t *testing.T) {
+func TestPersonalPairedDeviceHMACBypassesAccountBearerDisabled(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	if err := os.MkdirAll(cfg.PersonalDir(), 0o755); err != nil {
 		t.Fatalf("mkdir personal dir: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(cfg.PersonalDir(), "notes.txt"), []byte("personal notes"), 0o644); err != nil {
 		t.Fatalf("write personal file: %v", err)
-	}
-	if err := st.SetSetting("remote_access_enabled", "false"); err != nil {
-		t.Fatalf("SetSetting(remote_access_enabled): %v", err)
 	}
 	const (
 		clientID     = "phone-hmac-local"

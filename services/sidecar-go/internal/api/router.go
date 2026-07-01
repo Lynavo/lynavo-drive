@@ -200,12 +200,8 @@ func NewServer(s *store.Store, cfg *config.Config, hub *events.Hub, csp ClientSt
 	mux.HandleFunc("GET /personal/thumbnail/{path...}", srv.handlePersonalThumbnail)
 	mux.HandleFunc("GET /personal/download/{path...}", srv.handlePersonalDownload)
 	mux.HandleFunc("GET /personal/stream/{path...}", srv.handlePersonalStream)
-	mux.HandleFunc("POST /wake/proxy", withJSON(srv.handleProxyWake))
 	// Transfer state
 	mux.HandleFunc("GET /transfer/active", withJSON(srv.handleTransferActive))
-	// Commercial compatibility endpoints: retained so old consumers fail closed.
-	mux.HandleFunc("POST /account/context", withJSON(srv.handleSyncAccountContext))
-	mux.HandleFunc("POST /tunnel/credentials", withJSON(srv.handleSyncTunnelCredentials))
 	// WebSocket
 	mux.HandleFunc("GET /events/stream", srv.handleEventStream)
 

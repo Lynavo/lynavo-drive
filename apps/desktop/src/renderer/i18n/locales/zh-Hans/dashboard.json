@@ -34,9 +34,9 @@
     "toast": {
       "connectionCodeCopied": "连接码已复制",
       "copyFailed": "复制失败",
-      "remoteAccessEnabled": "本地文件访问已可用",
-      "remoteAccessDisabled": "本地文件访问已关闭",
-      "remoteAccessUpdateFailed": "无法更新本地文件访问状态",
+      "localFileAccessReady": "本地文件访问已可用",
+      "localFileAccessUnavailable": "本地文件访问已关闭",
+      "localFileAccessUpdateFailed": "无法更新本地文件访问状态",
       "folderPermissionGranted": "文件夹访问权限已授权",
       "folderPermissionDenied": "未获得文件夹权限，请在系统设置中手动授权",
       "folderPermissionRequestFailed": "权限请求失败",
@@ -63,7 +63,7 @@
       "downloadApp": "下载 App",
       "downloadInstruction": "，在同一 Wi-Fi 下扫描，选择该设备，扫码或输入连接码连接设备"
     },
-    "remoteAccess": {
+    "localFileAccess": {
       "title": "本地文件访问",
       "description": "同一局域网内的已配对手机可以浏览这台电脑共享的文件。",
       "toggle": "本地文件访问状态",

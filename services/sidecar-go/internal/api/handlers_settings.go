@@ -23,7 +23,6 @@ type settingsDTO struct {
 	ShareAddress                   string `json:"shareAddress"`
 	ShareStatus                    string `json:"shareStatus"`
 	ShareName                      string `json:"shareName"`
-	RemoteAccessEnabled            bool   `json:"remoteAccessEnabled"`
 	AllowCrossDeviceReceivedAccess bool   `json:"allowCrossDeviceReceivedAccess"`
 }
 
@@ -32,12 +31,10 @@ type updateSettingsRequest struct {
 	RootPath                       *string `json:"rootPath,omitempty"`
 	ReceivePath                    *string `json:"receivePath,omitempty"`
 	PersonalPath                   *string `json:"personalPath,omitempty"`
-	RemoteAccessEnabled            *bool   `json:"remoteAccessEnabled,omitempty"`
 	AllowCrossDeviceReceivedAccess *bool   `json:"allowCrossDeviceReceivedAccess,omitempty"`
 }
 
 const personalShareRootSettingKey = "personal_share_root"
-const remoteAccessEnabledSettingKey = "remote_access_enabled"
 const allowCrossDeviceReceivedAccessSettingKey = "allow_cross_device_received_access"
 
 func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
@@ -56,11 +53,6 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.RemoteAccessEnabled != nil && *req.RemoteAccessEnabled {
-		s.writeOSSCommercialDisabled(w, r, "settings.remote_access")
-		return
-	}
-
 	if req.DeviceName != nil {
 		if err := s.store.SetDeviceName(*req.DeviceName); err != nil {
 			slog.Error("update device_name", "err", err)
@@ -214,15 +206,6 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if req.RemoteAccessEnabled != nil {
-		if err := s.store.SetSetting(remoteAccessEnabledSettingKey, "false"); err != nil {
-			slog.Error("update remote access enabled", "err", err)
-			writeError(w, http.StatusInternalServerError, "failed to update settings")
-			return
-		}
-		slog.Info("remote access setting remains disabled in OSS runtime")
-	}
-
 	if req.AllowCrossDeviceReceivedAccess != nil {
 		val := "false"
 		if *req.AllowCrossDeviceReceivedAccess {
@@ -296,25 +279,6 @@ func (s *Server) assembleSettingsDTO() (*settingsDTO, error) {
 		ShareAddress:                   shareConfig.ShareURL,
 		ShareStatus:                    shareConfig.ShareStatus,
 		ShareName:                      shareConfig.ShareName,
-		RemoteAccessEnabled:            false,
 		AllowCrossDeviceReceivedAccess: allowCrossDeviceReceivedAccess,
 	}, nil
-}
-
-func (s *Server) handleSyncAccountContext(w http.ResponseWriter, r *http.Request) {
-	if !isLocalRequest(r) {
-		writeError(w, http.StatusForbidden, "account context sync is local only")
-		return
-	}
-
-	s.writeOSSCommercialDisabled(w, r, "account.context")
-}
-
-func (s *Server) handleSyncTunnelCredentials(w http.ResponseWriter, r *http.Request) {
-	if !isLocalRequest(r) {
-		writeError(w, http.StatusForbidden, "tunnel credentials sync is local only")
-		return
-	}
-
-	s.writeOSSCommercialDisabled(w, r, "tunnel.credentials")
 }

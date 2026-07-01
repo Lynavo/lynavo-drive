@@ -11,7 +11,7 @@ export type SharedFilesReachabilityState =
   | 'wake_setup_required'
   | 'wake_unavailable';
 
-export type SharedFilesRouteKind = 'lan' | 'tunnel' | 'relay';
+export type SharedFilesRouteKind = 'lan';
 
 export type UploadState =
   | 'idle'

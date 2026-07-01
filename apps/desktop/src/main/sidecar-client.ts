@@ -1,6 +1,4 @@
 import http from 'node:http';
-import https from 'node:https';
-import log from 'electron-log';
 import { APP_COMPATIBILITY_VERSION, SIDECAR_HTTP_PORT } from '@lynavo-drive/contracts';
 import type {
   AddSharedResourcePayload,
@@ -16,7 +14,6 @@ import type {
   ReceivedLibraryPageDTO,
   SortDirection,
 } from '@lynavo-drive/contracts';
-import { desktopClientHeaders } from './app-info';
 
 const BASE = `http://127.0.0.1:${SIDECAR_HTTP_PORT}`;
 export const SIDECAR_HEALTH_SERVICE_NAMES = ['lynavo-drive-sidecar'] as const;
@@ -35,7 +32,6 @@ export type PowerEventSnapshot = {
   updatedAt: string;
 };
 
-const DEFAULT_REMOTE_REQUEST_TIMEOUT_MS = 15_000;
 const DEFAULT_SIDECAR_REQUEST_TIMEOUT_MS = 30_000;
 
 function parsePositiveInteger(value: string | undefined, fallback: number): number {
@@ -46,22 +42,10 @@ function parsePositiveInteger(value: string | undefined, fallback: number): numb
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-const REMOTE_REQUEST_TIMEOUT_MS = parsePositiveInteger(
-  process.env.LYNAVO_REMOTE_REQUEST_TIMEOUT_MS,
-  DEFAULT_REMOTE_REQUEST_TIMEOUT_MS,
-);
 const SIDECAR_REQUEST_TIMEOUT_MS = parsePositiveInteger(
   process.env.LYNAVO_SIDECAR_REQUEST_TIMEOUT_MS,
   DEFAULT_SIDECAR_REQUEST_TIMEOUT_MS,
 );
-
-function remoteApiHeaders(baseUrl: string): Record<string, string> {
-  return baseUrl === BASE ? {} : desktopClientHeaders();
-}
-
-function requestTimeoutMs(baseUrl: string): number {
-  return baseUrl === BASE ? SIDECAR_REQUEST_TIMEOUT_MS : REMOTE_REQUEST_TIMEOUT_MS;
-}
 
 function encodeSharedFilePath(path: string): string {
   return path
@@ -73,29 +57,6 @@ function encodeSharedFilePath(path: string): string {
     .join('/');
 }
 
-function errorDiagnostics(error: Error): Record<string, unknown> {
-  const diagnostics: Record<string, unknown> = {
-    name: error.name,
-    message: error.message,
-  };
-  const record = error as Error & {
-    code?: unknown;
-    cause?: unknown;
-  };
-  if (record.code) {
-    diagnostics.code = record.code;
-  }
-  if (record.cause instanceof Error) {
-    diagnostics.cause = {
-      name: record.cause.name,
-      message: record.cause.message,
-    };
-  } else if (record.cause) {
-    diagnostics.cause = String(record.cause);
-  }
-  return diagnostics;
-}
-
 export interface SidecarHealth {
   ok: boolean;
   service: string;
@@ -104,10 +65,6 @@ export interface SidecarHealth {
     connectionDeviceManagement?: boolean;
     revokesPairingsOnCodeRotation?: boolean;
     wakeOnLanSupported?: boolean;
-  };
-  tunnel?: {
-    signalingAuthState?: 'ok' | 'refresh_required' | string;
-    credentialRefreshRequired?: boolean;
   };
 }
 
@@ -126,12 +83,10 @@ async function request<T>(
   method: string,
   path: string,
   body?: unknown,
-  baseUrl = BASE,
   headers?: Record<string, string>,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
-    const url = new URL(path, baseUrl);
-    const transport = url.protocol === 'https:' ? https : http;
+    const url = new URL(path, BASE);
     const options: http.RequestOptions = {
       method,
       protocol: url.protocol,
@@ -140,7 +95,6 @@ async function request<T>(
       path: url.pathname + url.search,
       headers: {
         'Content-Type': 'application/json',
-        ...remoteApiHeaders(baseUrl),
         ...headers,
       },
     };
@@ -149,13 +103,6 @@ async function request<T>(
     const rejectOnce = (error: Error) => {
       if (!settled) {
         settled = true;
-        if (baseUrl !== BASE) {
-          log.error('[sidecar-client] Remote API request failed.', {
-            method,
-            url: `${url.origin}${url.pathname}${url.search}`,
-            ...errorDiagnostics(error),
-          });
-        }
         reject(error);
       }
     };
@@ -166,7 +113,7 @@ async function request<T>(
       }
     };
 
-    const req = transport.request(options, (res) => {
+    const req = http.request(options, (res) => {
       let data = '';
       res.on('data', (chunk) => (data += chunk));
       res.on('end', () => {
@@ -183,7 +130,7 @@ async function request<T>(
     });
 
     req.on('error', (error) => rejectOnce(error));
-    const timeoutMs = requestTimeoutMs(baseUrl);
+    const timeoutMs = SIDECAR_REQUEST_TIMEOUT_MS;
     if (typeof req.setTimeout === 'function') {
       req.setTimeout(timeoutMs, () => {
         const error = new Error(
@@ -308,8 +255,3 @@ export const sidecarClient = {
     };
   },
 };
-
-export async function syncCredentialsToSidecar(): Promise<boolean> {
-  log.info('[sidecar-client] OSS runtime skips commercial credential sync.');
-  return false;
-}

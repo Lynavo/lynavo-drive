@@ -126,8 +126,8 @@ function ConnectionCodeSetupPage({ onComplete }: ConnectionCodeSetupPageProps) {
     },
     {
       icon: RefreshCw,
-      title: t('layout.connectionSetup.steps.remoteAccess.title'),
-      description: t('layout.connectionSetup.steps.remoteAccess.description'),
+      title: t('layout.connectionSetup.steps.localFileAccess.title'),
+      description: t('layout.connectionSetup.steps.localFileAccess.description'),
     },
   ];
 

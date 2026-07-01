@@ -264,7 +264,7 @@ func TestEnsureCoreRuntimeDirsSkipsUnavailableStorageRoot(t *testing.T) {
 	}
 }
 
-func TestBonjourShareMetadataIgnoresRemoteAccessSettingInOSS(t *testing.T) {
+func TestBonjourShareMetadataAdvertisesLocalLANShare(t *testing.T) {
 	dir := t.TempDir()
 	st, err := store.New(filepath.Join(dir, "sidecar.db"))
 	if err != nil {
@@ -274,7 +274,7 @@ func TestBonjourShareMetadataIgnoresRemoteAccessSettingInOSS(t *testing.T) {
 
 	enabled, shareName := bonjourShareMetadata(st)
 	if !enabled {
-		t.Fatal("default remote access should advertise share enabled")
+		t.Fatal("default local LAN share should advertise share enabled")
 	}
 	if shareName == "" {
 		t.Fatal("expected non-empty share name")
@@ -294,22 +294,6 @@ func TestBonjourShareMetadataIgnoresRemoteAccessSettingInOSS(t *testing.T) {
 	_, shareName = bonjourShareMetadata(st)
 	if shareName != "DeskShare" {
 		t.Fatalf("custom shareName = %q, want DeskShare", shareName)
-	}
-
-	if err := st.SetSetting("remote_access_enabled", "false"); err != nil {
-		t.Fatalf("SetSetting false: %v", err)
-	}
-	enabled, _ = bonjourShareMetadata(st)
-	if !enabled {
-		t.Fatal("local LAN share advertisement must remain enabled when remote access is disabled")
-	}
-
-	if err := st.SetSetting("remote_access_enabled", "true"); err != nil {
-		t.Fatalf("SetSetting true: %v", err)
-	}
-	enabled, _ = bonjourShareMetadata(st)
-	if !enabled {
-		t.Fatal("local LAN share advertisement should remain enabled regardless of remote setting")
 	}
 }
 

@@ -28,30 +28,30 @@ browsing.
    from the OSS contract surface.
 3. Mobile native background continuation runtime has been removed from the OSS
    baseline. The largest remaining mobile residue is legacy auth/account UI,
-   RemoteAccess naming for LAN browsing, and compatibility-only contract or
-   sidecar tunnel surfaces that must stay fail-closed until moved out or renamed.
+   RemoteAccess naming for LAN browsing, mobile native tunnel/wake route logic,
+   and manual file-selection upload surfaces.
 4. "RemoteAccess" often means LAN personal-directory browsing in current mobile
    and desktop UI. Do not delete it as paid tunnel code without first splitting
    the naming and route policy.
-5. Sidecar keeps commercial compatibility endpoints (`/account/context`,
-   `/tunnel/credentials`, `/wake/proxy`) and returns OSS-disabled errors. That is
-   acceptable as a temporary fail-closed stub, but the positive implementation
-   belongs in an official overlay.
+5. Sidecar and desktop no longer expose commercial credential sync, tunnel
+   health, remote-access settings, or account/tunnel/wake proxy HTTP endpoints in
+   the OSS tree. Positive commercial implementations belong outside this
+   baseline.
 
 ## Desktop Inventory
 
-| Area                    | Evidence                                                                                                                                                                                       | Classification           | Next action                                                                  |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------- |
-| Product distribution    | `apps/desktop/src/shared/product.ts:6` sets `PRODUCT_DISTRIBUTION = 'community'`.                                                                                                              | Keep baseline            | Keep as OSS identity guard.                                                  |
-| Auth IPC/preload        | `apps/desktop/src/main/ipc-handlers.ts:30`, `apps/desktop/src/preload/index.ts:58`; guard tests in `ipc-handlers.test.ts:261` and `preload/__tests__/index.test.ts:71`.                        | Keep baseline            | Preserve guard tests that no auth/session/subscription bridge is exposed.    |
-| Sidecar commercial sync | `apps/desktop/src/main/sidecar-client.ts:312` skips commercial credential sync; `sidecar-manager.test.ts:146` and `:188` guard no credential refresh even when tunnel health asks for refresh. | Keep fail-closed stub    | Keep stub until official overlay owns positive credential sync.              |
-| Remote sidecar plumbing | `apps/desktop/src/main/sidecar-client.ts:38` has remote header/timeout helpers, but default methods use local `127.0.0.1`.                                                                     | Move to official overlay | Remove or isolate remote base URL dispatch from OSS once no caller needs it. |
-| Tunnel health read      | `apps/desktop/src/main/sidecar-client.ts:99` reads optional `tunnel` health only.                                                                                                              | Keep fail-closed stub    | Keep read-only health; do not trigger credential refresh in OSS.             |
-| Settings store default  | `apps/desktop/src/renderer/stores/settings-store.ts:40` defaults `remoteAccessEnabled: true` while sidecar always returns false.                                                               | Delete or rename         | Change OSS initial value to false/absent in a follow-up.                     |
-| Misleading UI keys      | `apps/desktop/src/renderer/features/dashboard/Dashboard.tsx:301`, `apps/desktop/src/renderer/i18n/locales/en/dashboard.json:32` use `remoteAccess*` keys for local file access.                | Delete or rename         | Rename to local-file-access keys after snapshot/test impact is scoped.       |
-| Unused auth copy        | `apps/desktop/src/renderer/i18n/locales/en/common.json:84` and zh locale peers keep `authPage` copy with no non-locale references.                                                             | Delete or rename         | Remove unused auth locale blocks.                                            |
-| Support/update backend  | `apps/desktop/src/main/diagnostics.ts:473` and `:712` can call official support/update APIs.                                                                                                   | Keep baseline with note  | Treat as support service dependency, not account/tunnel sync.                |
-| Local pairing/resources | Dashboard QR pairing, IPC local sidecar, received library and shared resources are local LAN features.                                                                                         | Keep baseline            | Do not remove; these are not manual mobile upload alternatives.              |
+| Area                    | Evidence                                                                                                                                                                | Classification          | Next action                                                               |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------- |
+| Product distribution    | `apps/desktop/src/shared/product.ts:6` sets `PRODUCT_DISTRIBUTION = 'community'`.                                                                                       | Keep baseline           | Keep as OSS identity guard.                                               |
+| Auth IPC/preload        | `apps/desktop/src/main/ipc-handlers.ts:30`, `apps/desktop/src/preload/index.ts:58`; guard tests in `ipc-handlers.test.ts:261` and `preload/__tests__/index.test.ts:71`. | Keep baseline           | Preserve guard tests that no auth/session/subscription bridge is exposed. |
+| Sidecar commercial sync | `apps/desktop/src/main/sidecar-client.ts` has no credential-sync helper; desktop tests assert the OSS client does not expose it.                                        | Moved out of OSS        | Keep removed; official overlays must own positive credential sync.        |
+| Remote sidecar plumbing | `apps/desktop/src/main/sidecar-client.ts` now targets the local sidecar base and no longer carries remote request helpers.                                              | Moved out of OSS        | Keep local-only dispatch in OSS.                                          |
+| Tunnel health read      | Desktop sidecar health no longer models a `tunnel` object.                                                                                                              | Moved out of OSS        | Keep health local-only.                                                   |
+| Settings store default  | Renderer initial settings no longer default `remoteAccessEnabled`.                                                                                                      | Moved out of OSS        | Keep absent; do not reintroduce a remote access toggle in OSS settings.   |
+| Misleading UI keys      | Desktop dashboard/setup copy now uses local-file-access keys instead of `remoteAccess*` for LAN file access.                                                            | Moved out of OSS        | Continue removing remaining unused auth copy.                             |
+| Unused auth copy        | `apps/desktop/src/renderer/i18n/locales/en/common.json:84` and zh locale peers keep `authPage` copy with no non-locale references.                                      | Delete or rename        | Remove unused auth locale blocks.                                         |
+| Support/update backend  | `apps/desktop/src/main/diagnostics.ts:473` and `:712` can call official support/update APIs.                                                                            | Keep baseline with note | Treat as support service dependency, not account/tunnel sync.             |
+| Local pairing/resources | Dashboard QR pairing, IPC local sidecar, received library and shared resources are local LAN features.                                                                  | Keep baseline           | Do not remove; these are not manual mobile upload alternatives.           |
 
 ## Mobile JS Inventory
 
@@ -85,20 +85,20 @@ browsing.
 
 ## Sidecar And Contracts Inventory
 
-| Area                      | Evidence                                                                                               | Classification           | Next action                                                                        |
-| ------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------ | ---------------------------------------------------------------------------------- |
-| Entitlement contract      | `packages/contracts/src/types.ts` keeps only the foreground LAN entitlement and resolver metadata.     | Keep baseline            | Keep OSS contract surface free of commercial background/tunnel fields.             |
-| Subscription DTOs         | `packages/contracts/src/types.ts:667`.                                                                 | Move to official overlay | Remove/move paywall DTOs after no OSS package exports require them.                |
-| Tunnel/signaling DTOs     | `packages/contracts/src/enums.ts:14`, `packages/contracts/src/types.ts:714`.                           | Move to official overlay | Keep only LAN route DTOs in OSS or mark tunnel/relay as official-only.             |
-| Service endpoints         | `packages/contracts/src/service-endpoints.ts:1`.                                                       | Delete or rename         | Audit whether OSS needs official API constants outside update/support diagnostics. |
-| TCP sync                  | `services/sidecar-go/internal/server/connection.go:214`, `handler_sync.go:21`, `handler_hello.go:360`. | Keep baseline            | Preserve pairing/HMAC authenticated foreground LAN sync.                           |
-| Commercial HTTP endpoints | `services/sidecar-go/internal/api/router.go:206`, `handlers_settings.go:304`, `:313`.                  | Keep fail-closed stub    | Keep temporary 403 compatibility or remove after desktop/mobile callers are gone.  |
-| Remote setting            | `handlers_settings.go:217`, `:288` force `remoteAccessEnabled=false`.                                  | Keep fail-closed stub    | Keep false in OSS; avoid UI defaults that imply it can be enabled.                 |
-| Tunnel health             | `handlers_health.go:25` reports tunnel disabled.                                                       | Keep fail-closed stub    | Keep as explicit OSS health signal.                                                |
-| Proxy wake                | `router.go:203`, `handlers_wake.go:5`.                                                                 | Keep fail-closed stub    | Keep disabled unless official overlay implements account-backed proxy wake.        |
-| Personal API              | `handlers_personal.go:41`; test at `router_test.go:2673` says no account context required.             | Keep baseline            | Treat as local paired-device HMAC browsing, not official account remote access.    |
-| Mobile resources/presence | `handlers_resources.go:1027`, `presence.go:76` use paired `clientId` checks without HMAC.              | Harden                   | Add paired-device HMAC or narrower local-only rules before public OSS release.     |
-| Store schema              | `001_initial.sql:1`, `005_desktop_local_management.sql:25`.                                            | Keep baseline            | No account/tunnel/entitlement persistence exists in sidecar store.                 |
+| Area                      | Evidence                                                                                               | Classification   | Next action                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------------------------------ | ---------------- | ---------------------------------------------------------------------------------- |
+| Entitlement contract      | `packages/contracts/src/types.ts` keeps only the foreground LAN entitlement and resolver metadata.     | Keep baseline    | Keep OSS contract surface free of commercial background/tunnel fields.             |
+| Subscription DTOs         | Paywall subscription plan DTOs were removed from `packages/contracts/src/types.ts`.                    | Moved out of OSS | Keep removed from public contracts.                                                |
+| Tunnel/signaling DTOs     | `SharedFilesRouteKind` is LAN-only and TURN/signaling registration DTOs were removed from contracts.   | Moved out of OSS | Keep only LAN route DTOs in OSS.                                                   |
+| Service endpoints         | `packages/contracts/src/service-endpoints.ts:1`.                                                       | Delete or rename | Audit whether OSS needs official API constants outside update/support diagnostics. |
+| TCP sync                  | `services/sidecar-go/internal/server/connection.go:214`, `handler_sync.go:21`, `handler_hello.go:360`. | Keep baseline    | Preserve pairing/HMAC authenticated foreground LAN sync.                           |
+| Commercial HTTP endpoints | `/account/context`, `/tunnel/credentials`, and `/wake/proxy` route registrations were removed.         | Moved out of OSS | Keep absent unless an external commercial distribution adds them.                  |
+| Remote setting            | Sidecar settings DTO/update request no longer model `remoteAccessEnabled`.                             | Moved out of OSS | Keep absent; local LAN sharing is independent of account/tunnel state.             |
+| Tunnel health             | `/health` no longer reports a tunnel status object.                                                    | Moved out of OSS | Keep health local-only.                                                            |
+| Proxy wake                | Account-backed proxy wake handler was removed from the OSS sidecar.                                    | Moved out of OSS | Keep absent; only same-LAN wake behavior can remain in OSS.                        |
+| Personal API              | `handlers_personal.go:41`; test at `router_test.go:2673` says no account context required.             | Keep baseline    | Treat as local paired-device HMAC browsing, not official account remote access.    |
+| Mobile resources/presence | `handlers_resources.go:1027`, `presence.go:76` use paired `clientId` checks without HMAC.              | Harden           | Add paired-device HMAC or narrower local-only rules before public OSS release.     |
+| Store schema              | `001_initial.sql:1`, `005_desktop_local_management.sql:25`.                                            | Keep baseline    | No account/tunnel/entitlement persistence exists in sidecar store.                 |
 
 ## Documentation And QA Drift
 
@@ -110,14 +110,15 @@ browsing.
 
 ## Recommended Follow-up Order
 
-1. Mobile auth cleanup: remove `isFeatureAccessAllowed` and sync activity auth
+1. Mobile native tunnel/wake cleanup: remove or hard-disable remaining tunnel
+   route retry code, public wake DTO plumbing, tunnel scripts, and native tests
+   that still exercise relay/tunnel paths.
+2. Mobile auth cleanup: remove `isFeatureAccessAllowed` and sync activity auth
    dependency, then shrink legacy auth store and owner-user-id bridges.
-2. Naming cleanup: split LAN personal-directory browsing from paid remote
-   tunnel by renaming `RemoteAccess*`, `remoteAccessEnabled`, and related copy.
-3. Contracts split: keep the foreground LAN resolver and LAN DTOs in OSS;
-   move subscription plan, TURN, signaling, and tunnel/relay positive DTOs to
-   official overlay.
-4. Sidecar HTTP hardening: add HMAC/local-only protection to mobile resource and
+3. Naming cleanup: split LAN personal-directory browsing from paid remote
+   tunnel by renaming `RemoteAccess*` services/screens/copy to local computer or
+   shared-files terminology.
+4. Manual upload cleanup: remove document picker/manual-selection upload paths
+   so the true upload set only comes from the mobile pending queue.
+5. Sidecar HTTP hardening: add HMAC/local-only protection to mobile resource and
    presence routes, while keeping `/personal/*` as paired-device local browsing.
-5. Documentation cleanup: align beta matrix and community-build docs with the
-   actual current fail-closed state.

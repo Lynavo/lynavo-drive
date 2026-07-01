@@ -47,7 +47,7 @@
         "title": "输入连接码配对",
         "description": "在手机端输入此连接码即可连接此电脑，同一局域网下自动同步手机相册和文件到此电脑"
       },
-      "remoteAccess": {
+      "localFileAccess": {
         "title": "浏览电脑本地文件",
         "description": "配对成功后，同一局域网内的手机可以浏览这台电脑共享的本地文件。"
       }

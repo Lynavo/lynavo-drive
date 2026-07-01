@@ -390,7 +390,6 @@ export interface SettingsDTO {
   shareAddress: string;
   shareStatus: ShareStatus;
   shareName: string;
-  remoteAccessEnabled?: boolean;
   allowCrossDeviceReceivedAccess?: boolean;
 }
 
@@ -520,18 +519,9 @@ export interface WakeTargetDTO {
   ports: number[];
 }
 
-export interface PublicWakeTargetDTO {
-  kind: 'router_wan_udp';
-  host: string;
-  port: number;
-  enabled: boolean;
-  updatedAt: string;
-}
-
 export interface WakeCapabilityDTO {
   supported: boolean;
   targets: WakeTargetDTO[];
-  publicTarget?: PublicWakeTargetDTO | null;
   updatedAt: string;
 }
 
@@ -639,80 +629,3 @@ export type SharedFileDTO = DirectoryFileDTO;
 
 /** Shared directory listing response */
 export type SharedDirectoryDTO = Omit<DirectoryListingDTO, 'scope'>;
-
-/**
- * Platforms the paywall catalog supports. Kept as a string literal union
- * (not enum) so server-side additions do not break older clients — an
- * unknown platform string is treated as "filtered out" rather than a hard
- * parse error.
- */
-export type SubscriptionPlanPlatform = 'ios' | 'android';
-export type SubscriptionPlanTier = 'monthly' | 'yearly';
-
-/**
- * Server-controlled paywall entry. Returned by GET /api/v1/subscription/plans.
- *
- * The server owns the *business* layer: which SKUs to show, in what
- * order, with what marketing copy. iOS price / currency / period come from
- * Apple StoreKit at render time. Mainland Android wallet rows may carry a
- * server-owned fixed amount because there is no StoreKit product lookup.
- *
- * Date fields are ISO 8601 strings (Go time.Time default format, RFC 3339).
- */
-export interface SubscriptionPlanDto {
-  id: number;
-  /** Apple IAP product identifier, retained only for legacy diagnostic payload shape. */
-  product_id: string;
-  /** Backend entitlement tier this SKU grants. Configured by admin, not inferred from SKU text. */
-  plan: SubscriptionPlanTier;
-  platform: SubscriptionPlanPlatform;
-  /** Display name for the card header (Chinese by default). */
-  name: string;
-  /** One-line subtitle shown under the name. */
-  description: string;
-  /** Minor currency units for fixed-price wallet plans, e.g. 9900 = CNY 99.00. */
-  amount_cents?: number;
-  /** ISO 4217 currency for fixed-price wallet plans. */
-  currency?: string;
-  /** Short marketing labels (e.g. "8.8 折", "限時"). Always an array — never null. */
-  badges: string[];
-  /** Highlighted card in the paywall. At most one plan per platform should be flagged. */
-  recommended: boolean;
-  /** Ascending order; lower values render first. */
-  sort_order: number;
-  /** Soft-delete flag. Server filters inactive rows before responding, so clients will not normally observe `false`. */
-  active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-/** Envelope returned by GET /api/v1/subscription/plans. */
-export interface SubscriptionPlansResponse {
-  plans: SubscriptionPlanDto[];
-}
-
-// ── P2P Tunneling & Signaling ──
-
-export interface TurnCredentialsDTO {
-  username: string;
-  credential: string;
-  urls: string[];
-}
-
-export interface SignalingMessageDTO {
-  type: 'offer' | 'answer' | 'candidate';
-  payload: string; // Serialized SDP or ICE candidate JSON
-  senderId: string;
-  receiverId: string;
-}
-
-export interface PairedDeviceInfo {
-  clientId: string;
-  pairingToken: string;
-}
-
-export interface DesktopRegisterMessage {
-  type: 'register_desktop';
-  clientId: string;
-  pairedDevices: PairedDeviceInfo[];
-}

@@ -34,9 +34,9 @@
     "toast": {
       "connectionCodeCopied": "Pairing code copied",
       "copyFailed": "Copy failed",
-      "remoteAccessEnabled": "Local file access ready",
-      "remoteAccessDisabled": "Local file access unavailable",
-      "remoteAccessUpdateFailed": "Failed to update local file access",
+      "localFileAccessReady": "Local file access ready",
+      "localFileAccessUnavailable": "Local file access unavailable",
+      "localFileAccessUpdateFailed": "Failed to update local file access",
       "folderPermissionGranted": "Folder access permission granted",
       "folderPermissionDenied": "Folder permission was not granted. Please authorize it manually in System Settings.",
       "folderPermissionRequestFailed": "Permission request failed",
@@ -63,7 +63,7 @@
       "downloadApp": "Download App",
       "downloadInstruction": ", scan on the same Wi-Fi, select this device, then scan or enter the pairing code to connect."
     },
-    "remoteAccess": {
+    "localFileAccess": {
       "title": "Local file access",
       "description": "Paired phones on the same LAN can browse files shared by this computer.",
       "toggle": "Local file access status",
