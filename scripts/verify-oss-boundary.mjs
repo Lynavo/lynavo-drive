@@ -101,10 +101,6 @@ function allowAny(reason) {
   return { reason };
 }
 
-function allowTerms(terms, reason) {
-  return { terms: new Set(terms), reason };
-}
-
 function allowMatches(matchers, reason) {
   return {
     matchers: matchers.map((matcher) => ({
@@ -121,24 +117,10 @@ const APPLE_SIGNING_ENTITLEMENTS_REASON =
 const NEGATIVE_ASSERTION_REASON =
   'Regression test or scrubber names commercial/account inputs to prove the OSS runtime does not expose them.';
 
-const CURRENT_ACCOUNT_COMPAT_REASON =
-  'Current OSS baseline still contains account/subscription compatibility names in shared contracts and fail-closed stubs; tracked for later deletion behind this explicit allowlist.';
-
-const OSS_INFO_EXCLUSION_COPY_REASON =
-  'OSS information locale copy names excluded billing and remote-tunnel flows to explain they are unavailable in the community runtime.';
-
 const ALLOWED_EXACT_PATHS = new Map([
   [
     'scripts/verify-oss-boundary.mjs',
     allowAny('The verifier owns the OSS boundary patterns and allowlist.'),
-  ],
-  [
-    'scripts/release/__tests__/oss-boundary.test.mjs',
-    allowAny('Regression test fixture for OSS boundary scanning.'),
-  ],
-  [
-    'docs/oss/oss-boundary-allowlist.md',
-    allowAny('This allowlist document necessarily names OSS boundary terms.'),
   ],
   [
     'scripts/verify-legacy-name-allowlist.mjs',
@@ -146,8 +128,6 @@ const ALLOWED_EXACT_PATHS = new Map([
   ],
   ['scripts/dev/oss-env-scrubber.cjs', allowAny(NEGATIVE_ASSERTION_REASON)],
   ['scripts/dev/__tests__/release-profile-dev.test.mjs', allowAny(NEGATIVE_ASSERTION_REASON)],
-  ['scripts/release/__tests__/release-cli.test.mjs', allowAny(NEGATIVE_ASSERTION_REASON)],
-  ['scripts/release/__tests__/release-profiles.test.mjs', allowAny(NEGATIVE_ASSERTION_REASON)],
   [
     'apps/desktop/scripts/__tests__/run-electron-vite-config.test.mjs',
     allowAny(NEGATIVE_ASSERTION_REASON),
@@ -168,39 +148,6 @@ const ALLOWED_EXACT_PATHS = new Map([
     allowAny(NEGATIVE_ASSERTION_REASON),
   ],
   ['apps/mobile/src/config/__tests__/app-config.test.ts', allowAny(NEGATIVE_ASSERTION_REASON)],
-  ['packages/contracts/src/types.ts', allowAny(CURRENT_ACCOUNT_COMPAT_REASON)],
-  ['packages/contracts/src/__tests__/exports.test.ts', allowAny(CURRENT_ACCOUNT_COMPAT_REASON)],
-  ['apps/mobile/src/stores/auth-store.tsx', allowAny(CURRENT_ACCOUNT_COMPAT_REASON)],
-  [
-    'apps/mobile/src/stores/__tests__/auth-store-local-mode.test.tsx',
-    allowAny(CURRENT_ACCOUNT_COMPAT_REASON),
-  ],
-  ['apps/mobile/src/services/api.ts', allowAny(CURRENT_ACCOUNT_COMPAT_REASON)],
-  [
-    'apps/mobile/src/services/__tests__/api-dev-sandbox.test.ts',
-    allowAny(CURRENT_ACCOUNT_COMPAT_REASON),
-  ],
-  [
-    'apps/mobile/src/navigation/__tests__/RootNavigator.local-mode.test.tsx',
-    allowAny(CURRENT_ACCOUNT_COMPAT_REASON),
-  ],
-  [
-    'apps/mobile/src/navigation/__tests__/RootNavigator.pairingInvalidation.test.tsx',
-    allowAny(CURRENT_ACCOUNT_COMPAT_REASON),
-  ],
-  [
-    'apps/mobile/src/screens/__tests__/SharedFilesDownloadGate.test.tsx',
-    allowAny(CURRENT_ACCOUNT_COMPAT_REASON),
-  ],
-  [
-    'apps/mobile/src/screens/__tests__/HelpGlobalScreen.test.tsx',
-    allowAny(CURRENT_ACCOUNT_COMPAT_REASON),
-  ],
-  [
-    'apps/mobile/src/i18n/locales/en/oss.json',
-    allowTerms(['billing', 'remote tunnel'], OSS_INFO_EXCLUSION_COPY_REASON),
-  ],
-  ['apps/mobile/src/i18n/locales/en/help.json', allowAny(CURRENT_ACCOUNT_COMPAT_REASON)],
   [
     'apps/mobile/ios/LynavoDrive.xcodeproj/project.pbxproj',
     allowAny(APPLE_SIGNING_ENTITLEMENTS_REASON),

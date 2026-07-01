@@ -2,31 +2,23 @@ import type { SignedOutTransition } from '../stores/auth-store';
 
 // ---------------------------------------------------------------------------
 // Module-level reference to auth store actions.
-// Set once by AuthProvider on mount so we can update tokens / clear auth
-// from the API layer without importing React context directly.
+// Set once by AuthProvider on mount so API error handling can clear the local
+// dev session without importing React context directly.
 // ---------------------------------------------------------------------------
 
-let _storeSetTokens: ((access: string, refresh: string) => void) | null = null;
 let _storeClearAuth: ((transition?: SignedOutTransition) => void) | null = null;
 
 /**
- * Called by AuthProvider to wire up store actions that the API layer can invoke
- * during token refresh or forced auth clear.
+ * Called by AuthProvider to wire up the clear action that the API layer can
+ * invoke when a server reports the current local dev session was replaced.
  */
-export function registerAuthStoreActions(
-  setTokens: (access: string, refresh: string) => void,
+export function registerSessionClearAction(
   clearAuth: (transition?: SignedOutTransition) => void,
 ) {
-  _storeSetTokens = setTokens;
   _storeClearAuth = clearAuth;
 }
 
-/** @internal — used by api.ts during token refresh */
-export function _setTokensFromApi(accessToken: string, refreshToken: string) {
-  _storeSetTokens?.(accessToken, refreshToken);
-}
-
-/** @internal — used by api.ts when refresh fails */
+/** @internal — used by api.ts when the local dev session must be cleared. */
 export function _clearAuthFromApi(transition?: SignedOutTransition) {
   _storeClearAuth?.(transition);
 }

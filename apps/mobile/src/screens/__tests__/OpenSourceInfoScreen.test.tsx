@@ -30,10 +30,10 @@ jest.mock('react-i18next', () => ({
           'The open-source edition syncs over your local LAN without an official account.',
         'oss.pointLan':
           'Pair with a desktop on the same network for automatic incremental sync.',
-        'oss.pointNoBilling':
-          'Store payment and redemption flows are not included in this runtime.',
-        'oss.pointDocs':
-          'Remote tunnel and background commercial services stay disabled in this community runtime.',
+        'oss.pointNoStore':
+          'App-store purchases and redemption flows are not included in this runtime.',
+        'oss.pointServices':
+          'Off-LAN and background commercial services stay disabled in this community runtime.',
         'oss.primary': 'Pair a computer',
         'oss.secondary': 'Back to sync',
         'common.back': 'Back',
@@ -83,12 +83,12 @@ describe('OpenSourceInfoScreen OSS information route', () => {
     ).toBeTruthy();
     expect(
       getByText(
-        'Store payment and redemption flows are not included in this runtime.',
+        'App-store purchases and redemption flows are not included in this runtime.',
       ),
     ).toBeTruthy();
     expect(
       getByText(
-        'Remote tunnel and background commercial services stay disabled in this community runtime.',
+        'Off-LAN and background commercial services stay disabled in this community runtime.',
       ),
     ).toBeTruthy();
     expect(queryByText('Subscribe Now')).toBeNull();

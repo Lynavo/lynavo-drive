@@ -27,11 +27,11 @@ Excluded by default:
 
 ## Allowed Compatibility Buckets
 
-| Bucket                                           | Rationale                                                                                                                               |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Negative assertion tests and env scrubbers       | These files name commercial/account inputs only to prove OSS runtime surfaces do not expose them.                                       |
-| OSS exclusion locale copy                        | User-facing OSS information may name billing or remote-tunnel flows only to clarify that they are unavailable in the community runtime. |
-| Current account/subscription compatibility state | Shared contract tests and fail-closed stubs still name account/plan inputs until the public contract boundary is fully simplified.      |
-| Apple signing entitlements                       | Code-signing entitlements are platform packaging metadata, not commercial feature entitlements.                                         |
+| Bucket                                     | Rationale                                                                                         |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Negative assertion tests and env scrubbers | These files name commercial/account inputs only to prove OSS runtime surfaces do not expose them. |
+| React Native event subscriptions           | Listener handles named `subscription` are framework cleanup objects, not commercial state.        |
+| LAN protocol auth wording                  | The iOS sync protocol comment uses `/auth/` for pairing/HMAC wire terminology, not account login. |
+| Apple signing entitlements                 | Code-signing entitlements are platform packaging metadata, not commercial feature entitlements.   |
 
 Every allowed hit is encoded in `scripts/verify-oss-boundary.mjs`. New hits should either be removed or added with a narrow path and rationale; do not broaden the default scan exclusions for active code.

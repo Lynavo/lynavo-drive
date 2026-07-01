@@ -2,8 +2,8 @@
   "title": "Lynavo Drive Community",
   "body": "The open-source edition syncs over your local LAN without an official account.",
   "pointLan": "Pair with a desktop on the same network for automatic incremental sync.",
-  "pointNoBilling": "App-store billing and redemption flows are not included in this runtime.",
-  "pointDocs": "Remote tunnel and background commercial services stay disabled in this community runtime.",
+  "pointNoStore": "App-store purchases and redemption flows are not included in this runtime.",
+  "pointServices": "Off-LAN and background commercial services stay disabled in this community runtime.",
   "primary": "Pair a computer",
   "secondary": "Back to sync"
 }

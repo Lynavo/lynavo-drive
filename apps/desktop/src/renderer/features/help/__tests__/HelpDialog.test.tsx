@@ -70,8 +70,8 @@ describe('HelpDialog', () => {
 
     expect(screen.getByText('设备离线怎么办？')).toBeInTheDocument();
     expect(screen.getByText('上传失败怎么办？')).toBeInTheDocument();
-    expect(screen.getByText('是否需要账号或订阅？')).toBeInTheDocument();
-    expect(screen.getByText('OSS 版本包含官方远程访问吗？')).toBeInTheDocument();
+    expect(screen.getByText('是否需要云端登录或付费计划？')).toBeInTheDocument();
+    expect(screen.getByText('OSS 版本包含官方互联网中继吗？')).toBeInTheDocument();
   });
 
   it('switches to contact content', () => {

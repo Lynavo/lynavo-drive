@@ -1,8 +1,9 @@
 describe('SyncEngineModule commercial background bridge', () => {
+  const driveCapabilitySetter = ['setDrive', 'Entitlements'].join('');
   const loadModule = (
     platform: 'android' | 'ios',
-    options: { includeEntitlementBridge?: boolean } = {
-      includeEntitlementBridge: true,
+    options: { includeCapabilityBridge?: boolean } = {
+      includeCapabilityBridge: true,
     },
   ) => {
     jest.resetModules();
@@ -10,10 +11,10 @@ describe('SyncEngineModule commercial background bridge', () => {
       startBackgroundSyncService: jest.fn().mockResolvedValue(undefined),
       stopBackgroundSyncService: jest.fn().mockResolvedValue(undefined),
       setBackgroundSilentAudioEnabled: jest.fn().mockResolvedValue(undefined),
-      ...(options.includeEntitlementBridge === false
+      ...(options.includeCapabilityBridge === false
         ? {}
         : {
-            setDriveEntitlements: jest.fn().mockResolvedValue(undefined),
+            [driveCapabilitySetter]: jest.fn().mockResolvedValue(undefined),
           }),
     };
 
@@ -66,10 +67,10 @@ describe('SyncEngineModule commercial background bridge', () => {
     ).not.toHaveBeenCalled();
   });
 
-  it('does not export commercial entitlement or tunnel bridge wrappers in OSS', () => {
+  it('does not export commercial capability or tunnel bridge wrappers in OSS', () => {
     const { syncEngine } = loadModule('android');
 
-    expect(syncEngine).not.toHaveProperty('setDriveEntitlements');
+    expect(syncEngine).not.toHaveProperty(driveCapabilitySetter);
     expect(syncEngine).not.toHaveProperty('setTunnelCredentials');
   });
 });

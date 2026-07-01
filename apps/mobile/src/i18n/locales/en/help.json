@@ -44,7 +44,7 @@
       "answer": "Aim the phone camera at the QR code shown on the PC. If scanning fails, connect by manually entering the 6-digit pairing code."
     },
     "item4": {
-      "title": "Does the open-source edition require a subscription?",
+      "title": "Does the open-source edition require a paid plan?",
       "answer": "No. The OSS edition keeps local LAN pairing, foreground sync, and shared-folder browsing available without an official account."
     },
     "item5": {

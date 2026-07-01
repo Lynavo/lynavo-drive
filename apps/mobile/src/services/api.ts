@@ -52,8 +52,6 @@ const CLIENT_APP_HEADER = 'X-Client-App';
 const CLIENT_PLATFORM_HEADER = 'X-Client-Platform';
 const CLIENT_VERSION_HEADER = 'X-Client-Version';
 const CLIENT_BUILD_HEADER = 'X-Client-Build';
-const OFFICIAL_AUTH_UNSUPPORTED_MESSAGE =
-  'Official account authentication is unavailable in the OSS runtime.';
 
 // On iOS, the first fetch after a cold start can fail with
 // NSURLErrorCannotFindHost (-1003) when the DNS resolver hasn't warmed up.
@@ -69,11 +67,6 @@ const NETWORK_RETRY_DELAY_MS = 1_000;
 interface RequestOptions {
   /** Legacy option retained for callers; OSS requests never inject bearer auth. */
   skipAuth?: boolean;
-  /**
-   * Legacy option retained for callers; OSS requests surface TOKEN_INVALID
-   * without token rotation or /auth/refresh.
-   */
-  skipRefresh?: boolean;
   /** Override the default request timeout (ms). */
   timeoutMs?: number;
   /** Route this request to a specific API base URL. */
@@ -182,14 +175,7 @@ async function request<T>(
   _retried = false,
   _networkRetried = false,
 ): Promise<T> {
-  const { skipAuth = false, skipRefresh = false, timeoutMs } = options;
-
-  if (path === '/auth/refresh') {
-    throw new ApiError(
-      ERROR_CODE.TOKEN_INVALID,
-      OFFICIAL_AUTH_UNSUPPORTED_MESSAGE,
-    );
-  }
+  const { skipAuth = false, timeoutMs } = options;
 
   const headers = await buildRequestHeaders();
 
@@ -249,11 +235,6 @@ async function request<T>(
   if (json.code === ERROR_CODE.SESSION_REPLACED && !skipAuth) {
     await clearAuthFromModule('session_replaced');
     throw new ApiError(json.code, json.message);
-  }
-
-  if (json.code === ERROR_CODE.TOKEN_INVALID && !skipAuth && !skipRefresh) {
-    // Official auth refresh is intentionally disabled in the OSS runtime. Let
-    // the typed error surface without calling /auth/refresh or rotating tokens.
   }
 
   throw new ApiError(json.code, json.message);

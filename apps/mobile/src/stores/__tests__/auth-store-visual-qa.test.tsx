@@ -1,34 +1,14 @@
 import React from 'react';
 import { Text } from 'react-native';
 import { render, screen, waitFor } from '@testing-library/react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Keychain from 'react-native-keychain';
 
 declare const process: { env: Record<string, string | undefined> };
 
 type TestGlobal = typeof globalThis & { __DEV__?: boolean };
 const testGlobal = globalThis as TestGlobal;
 
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  __esModule: true,
-  default: {
-    getItem: jest.fn().mockResolvedValue(null),
-    setItem: jest.fn().mockResolvedValue(undefined),
-    removeItem: jest.fn().mockResolvedValue(undefined),
-  },
-}));
-
-jest.mock('react-native-keychain', () => ({
-  getGenericPassword: jest.fn().mockResolvedValue(false),
-  setGenericPassword: jest.fn().mockResolvedValue(true),
-  resetGenericPassword: jest.fn().mockResolvedValue(true),
-  ACCESSIBLE: {
-    AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 'AfterFirstUnlockThisDeviceOnly',
-  },
-}));
-
 jest.mock('../../services/auth-service', () => ({
-  registerAuthStoreActions: jest.fn(),
+  registerSessionClearAction: jest.fn(),
 }));
 
 import { AuthProvider, useAuth } from '../auth-store';
@@ -38,8 +18,7 @@ function AuthProbe() {
   return (
     <Text testID="auth-state">
       {JSON.stringify({
-        accessToken: auth.accessToken,
-        refreshToken: auth.refreshToken,
+        isLoggedIn: auth.isLoggedIn,
       })}
     </Text>
   );
@@ -57,8 +36,6 @@ describe('AuthProvider visual QA bootstrap', () => {
     delete process.env.LYNAVO_VISUAL_QA_EMAIL;
     delete process.env.LYNAVO_DEV_SKIP_AUTH;
     delete process.env.LYNAVO_DEV_SKIP_AUTH_EMAIL;
-    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(null);
-    (Keychain.getGenericPassword as jest.Mock).mockResolvedValue(false);
   });
 
   afterAll(() => {
@@ -66,7 +43,7 @@ describe('AuthProvider visual QA bootstrap', () => {
     process.env = originalEnv;
   });
 
-  test('hydrates mock tokens only when enabled and no persisted tokens exist', async () => {
+  test('enables local dev session when visual QA is enabled', async () => {
     process.env.LYNAVO_VISUAL_QA = '1';
     process.env.LYNAVO_VISUAL_QA_EMAIL = 'designer@example.com';
 
@@ -80,26 +57,16 @@ describe('AuthProvider visual QA bootstrap', () => {
       const state = JSON.parse(
         screen.getByTestId('auth-state').props.children,
       ) as {
-        accessToken: string | null;
-        refreshToken: string | null;
+        isLoggedIn: boolean;
       };
 
       expect(state).toEqual({
-        accessToken: 'mock-sandbox-access-token:designer@example.com',
-        refreshToken: 'mock-sandbox-refresh-token',
+        isLoggedIn: true,
       });
     });
-    expect(Keychain.setGenericPassword).toHaveBeenCalledWith(
-      'tokens',
-      JSON.stringify({
-        access: 'mock-sandbox-access-token:designer@example.com',
-        refresh: 'mock-sandbox-refresh-token',
-      }),
-      expect.any(Object),
-    );
   });
 
-  test('hydrates dev skip-auth tokens without enabling visual QA route mocks', async () => {
+  test('enables dev skip-auth session without enabling visual QA route mocks', async () => {
     process.env.LYNAVO_DEV_SKIP_AUTH = '1';
     process.env.LYNAVO_DEV_SKIP_AUTH_EMAIL = 'functional@example.com';
     process.env.LYNAVO_VISUAL_QA_ROUTE = 'DeviceDiscovery';
@@ -114,36 +81,16 @@ describe('AuthProvider visual QA bootstrap', () => {
       const state = JSON.parse(
         screen.getByTestId('auth-state').props.children,
       ) as {
-        accessToken: string | null;
-        refreshToken: string | null;
+        isLoggedIn: boolean;
       };
 
       expect(state).toEqual({
-        accessToken: 'mock-sandbox-access-token:functional@example.com',
-        refreshToken: 'mock-sandbox-refresh-token',
+        isLoggedIn: true,
       });
     });
-    expect(Keychain.setGenericPassword).toHaveBeenCalledWith(
-      'tokens',
-      JSON.stringify({
-        access: 'mock-sandbox-access-token:functional@example.com',
-        refresh: 'mock-sandbox-refresh-token',
-      }),
-      expect.any(Object),
-    );
   });
 
-  test('clears stale persisted official tokens before hydrating visual QA tokens', async () => {
-    process.env.LYNAVO_VISUAL_QA = '1';
-    process.env.LYNAVO_VISUAL_QA_EMAIL = 'designer@example.com';
-    (Keychain.getGenericPassword as jest.Mock).mockResolvedValue({
-      username: 'tokens',
-      password: JSON.stringify({
-        access: 'persisted-access',
-        refresh: 'persisted-refresh',
-      }),
-    });
-
+  test('keeps guest session when visual QA and dev skip-auth are disabled', async () => {
     render(
       <AuthProvider>
         <AuthProbe />
@@ -154,22 +101,12 @@ describe('AuthProvider visual QA bootstrap', () => {
       const state = JSON.parse(
         screen.getByTestId('auth-state').props.children,
       ) as {
-        accessToken: string | null;
-        refreshToken: string | null;
+        isLoggedIn: boolean;
       };
 
-      expect(state.accessToken).toBe(
-        'mock-sandbox-access-token:designer@example.com',
-      );
-      expect(state.refreshToken).toBe('mock-sandbox-refresh-token');
+      expect(state).toEqual({
+        isLoggedIn: false,
+      });
     });
-    expect(Keychain.resetGenericPassword).toHaveBeenCalledWith({
-      service: 'com.lynavo.drive.auth',
-    });
-    expect(Keychain.setGenericPassword).toHaveBeenCalledWith(
-      'tokens',
-      expect.stringContaining('mock-sandbox-access-token'),
-      expect.any(Object),
-    );
   });
 });

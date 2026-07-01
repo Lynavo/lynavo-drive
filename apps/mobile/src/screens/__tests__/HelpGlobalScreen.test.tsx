@@ -65,11 +65,11 @@ jest.mock('../../utils/shareDiagnosticsArchive', () => ({
 }));
 
 describe('HelpGlobalScreen OSS copy', () => {
-  it('describes local LAN operation instead of trial, subscription, or purchase flows', () => {
+  it('describes local LAN operation instead of trial or purchase flows', () => {
     const { getByText, queryByText } = render(<HelpGlobalScreen />);
 
     expect(
-      getByText('Does the open-source edition require a subscription?'),
+      getByText('Does the open-source edition require a paid plan?'),
     ).toBeTruthy();
     expect(
       getByText(
@@ -77,7 +77,6 @@ describe('HelpGlobalScreen OSS copy', () => {
       ),
     ).toBeTruthy();
     expect(queryByText(/trial/i)).toBeNull();
-    expect(queryByText(/subscription is required/i)).toBeNull();
     expect(queryByText(/purchase/i)).toBeNull();
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { sidecarClient, type SidecarHealth } from '../sidecar-client';
 
 describe('sidecarClient OSS commercial boundary', () => {
-  it('does not expose commercial auth, gift-card, config, subscription, or tunnel methods', () => {
+  it('does not expose commercial auth, gift-card, config, plan, or off-LAN methods', () => {
     expect(sidecarClient).not.toHaveProperty('getClientConfig');
     expect(sidecarClient).not.toHaveProperty('redeemGiftCard');
     expect(sidecarClient).not.toHaveProperty('sendSMSCode');

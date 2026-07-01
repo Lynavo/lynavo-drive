@@ -1,6 +1,3 @@
-const mockGetAccessToken = jest.fn<string | null, []>();
-const mockGetRefreshToken = jest.fn<string | null, []>();
-
 jest.mock('react-native', () => ({
   NativeModules: {
     NativeSyncEngine: {
@@ -10,13 +7,7 @@ jest.mock('react-native', () => ({
   Platform: { OS: 'android' },
 }));
 
-jest.mock('../../stores/auth-store', () => ({
-  getAccessToken: () => mockGetAccessToken(),
-  getRefreshToken: () => mockGetRefreshToken(),
-}));
-
 jest.mock('../auth-service', () => ({
-  _setTokensFromApi: jest.fn(),
   _clearAuthFromApi: jest.fn(),
 }));
 
@@ -48,8 +39,6 @@ function mockJsonResponse<T>(data: T): Response {
 describe('api client headers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetAccessToken.mockReturnValue('stale-official-access-token');
-    mockGetRefreshToken.mockReturnValue('stale-official-refresh-token');
     testGlobal.fetch = jest.fn();
   });
 
@@ -66,7 +55,7 @@ describe('api client headers', () => {
     });
   });
 
-  test('does not attach Authorization even when stale official tokens remain in memory', async () => {
+  test('does not attach Authorization to OSS API requests', async () => {
     testGlobal.fetch.mockResolvedValueOnce(
       mockJsonResponse({
         code: 0,
@@ -94,7 +83,7 @@ describe('api client headers', () => {
     );
   });
 
-  test('does not call auth refresh when an OSS API response reports TOKEN_INVALID', async () => {
+  test('surfaces TOKEN_INVALID without retrying token rotation', async () => {
     testGlobal.fetch
       .mockResolvedValueOnce(
         mockJsonResponse({

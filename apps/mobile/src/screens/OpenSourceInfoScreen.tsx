@@ -46,8 +46,8 @@ export function OpenSourceInfoScreen() {
 
           <View style={styles.points}>
             <InfoPoint text={t('oss.pointLan')} />
-            <InfoPoint text={t('oss.pointNoBilling')} />
-            <InfoPoint text={t('oss.pointDocs')} />
+            <InfoPoint text={t('oss.pointNoStore')} />
+            <InfoPoint text={t('oss.pointServices')} />
           </View>
 
           <TouchableOpacity

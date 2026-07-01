@@ -16,7 +16,7 @@ describe('app-config-service', () => {
     });
   });
 
-  it('does not ship the unused remote tunnel credentials service module', () => {
+  it('does not ship the unused off-LAN credential service module', () => {
     const modulePath = [
       '..',
       ['tunnel', 'credentials', 'service'].join('-'),

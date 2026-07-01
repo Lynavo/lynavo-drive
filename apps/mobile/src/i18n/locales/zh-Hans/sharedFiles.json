@@ -33,7 +33,7 @@
   "localComputer": {
     "title": "电脑文件",
     "desc": "浏览电脑端共享的目录结构并下载文件",
-    "ossDesc": "通过本地局域网浏览已配对电脑的文件，无需订阅或远程隧道。",
+    "ossDesc": "通过本地局域网浏览已配对电脑的文件，无需付费计划。",
     "ossBadge": "局域网",
     "badgeDesktop": "桌面目录",
     "badgeView": "列表/网格",

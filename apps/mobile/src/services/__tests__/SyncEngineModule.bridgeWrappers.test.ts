@@ -1,8 +1,5 @@
 describe('SyncEngineModule shared bridge wrappers', () => {
-  const loadModule = (
-    nativeSyncEngine: Record<string, unknown>,
-    options: { accessToken?: string | null } = {},
-  ) => {
+  const loadModule = (nativeSyncEngine: Record<string, unknown>) => {
     jest.resetModules();
     jest.doMock('react-native', () => ({
       NativeModules: {
@@ -27,17 +24,12 @@ describe('SyncEngineModule shared bridge wrappers', () => {
         removeItem: jest.fn().mockResolvedValue(undefined),
       },
     }));
-    jest.doMock('../../stores/auth-store', () => ({
-      getAccessToken: jest.fn(() => options.accessToken ?? null),
-    }));
-
     return require('../SyncEngineModule') as typeof import('../SyncEngineModule');
   };
 
   afterEach(() => {
     jest.dontMock('react-native');
     jest.dontMock('@react-native-async-storage/async-storage');
-    jest.dontMock('../../stores/auth-store');
     jest.resetModules();
     jest.clearAllMocks();
   });
@@ -319,7 +311,7 @@ describe('SyncEngineModule shared bridge wrappers', () => {
     );
   });
 
-  it('does not forward stale official access tokens for personal file operations', async () => {
+  it('does not inject account tokens for personal file operations', async () => {
     const directoryListing = {
       scope: 'personal',
       path: '',
@@ -343,9 +335,7 @@ describe('SyncEngineModule shared bridge wrappers', () => {
         ),
       prepareSharedFilePreview: jest.fn().mockResolvedValue('/cache/notes.txt'),
     };
-    const syncEngine = loadModule(nativeSyncEngine, {
-      accessToken: 'stale-official-token',
-    });
+    const syncEngine = loadModule(nativeSyncEngine);
 
     await expect(syncEngine.browseDirectory('personal')).resolves.toEqual(
       directoryListing,

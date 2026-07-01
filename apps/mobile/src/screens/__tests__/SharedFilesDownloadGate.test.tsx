@@ -94,7 +94,7 @@ jest.mock('react-i18next', () => {
             'sharedFiles.localComputer.desc':
               '流覽電腦端共享的目錄結構並下載文件',
             'sharedFiles.localComputer.ossDesc':
-              '通过同一局域网访问已配对电脑文件，不需要订阅。',
+              '通过同一局域网访问已配对电脑文件，不需要付费计划。',
             'sharedFiles.localComputer.badgeDesktop': '电脑',
             'sharedFiles.localComputer.badgeView': '浏览',
             'sharedFiles.localComputer.ossBadge': '局域网',
@@ -608,14 +608,14 @@ describe('SharedFilesGlobalScreen', () => {
     );
   });
 
-  it('keeps global local computer local-LAN without a paid entitlement gate', () => {
+  it('keeps global local computer local-LAN without a paid service gate', () => {
     const { getByText, queryByText } = render(
       <SharedFilesGlobalScreen showBottomTabBar={false} />,
     );
 
     expect(getByText('局域网')).toBeTruthy();
     expect(
-      getByText('通过同一局域网访问已配对电脑文件，不需要订阅。'),
+      getByText('通过同一局域网访问已配对电脑文件，不需要付费计划。'),
     ).toBeTruthy();
     fireEvent.press(getByText('電腦檔案'));
 
@@ -694,7 +694,7 @@ describe('LocalComputerGlobalScreen', () => {
     });
   });
 
-  it('lists shared files without a paid tunnel entitlement gate', async () => {
+  it('lists shared files without a paid off-LAN gate', async () => {
     mockListGlobalLocalComputerResources.mockResolvedValueOnce([]);
 
     const { queryByText } = render(
@@ -706,7 +706,7 @@ describe('LocalComputerGlobalScreen', () => {
     await waitFor(() => {
       expect(mockListGlobalLocalComputerResources).toHaveBeenCalledWith();
     });
-    expect(queryByText('需要订阅才能访问电脑文件')).toBeNull();
+    expect(queryByText('需要付费计划才能访问电脑文件')).toBeNull();
     expect(queryByText('网络断开')).toBeNull();
   });
 

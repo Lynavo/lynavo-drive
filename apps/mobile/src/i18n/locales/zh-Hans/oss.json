@@ -2,8 +2,8 @@
   "title": "Lynavo Drive Community",
   "body": "开源版通过本地局域网同步，无需登录官方账号。",
   "pointLan": "与同一网络内的桌面端配对后，可自动增量同步素材。",
-  "pointNoBilling": "开源运行时不包含应用商店计费或兑换流程。",
-  "pointDocs": "远程隧道和后台商业服务在社区版中保持关闭。",
+  "pointNoStore": "开源运行时不包含应用商店购买或兑换流程。",
+  "pointServices": "非局域网和后台商业服务在社区版中保持关闭。",
   "primary": "配对电脑",
   "secondary": "返回同步"
 }

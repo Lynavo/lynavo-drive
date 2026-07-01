@@ -5,8 +5,6 @@ import React, {
   useEffect,
   useReducer,
 } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Keychain from 'react-native-keychain';
 import {
   applyVisualQaSharedFilesPreviewFlag,
   getDevSkipAuthMockTokens,
@@ -24,39 +22,8 @@ export type SignedOutTransition = 'session_replaced' | null;
 export interface AuthState {
   isLoggedIn: boolean;
   isLoading: boolean;
-  accessToken: string | null;
-  refreshToken: string | null;
   /** Short-lived exit transition shown before we land on local LAN screens. */
   signedOutTransition: SignedOutTransition;
-}
-
-// ---------------------------------------------------------------------------
-// Module-level token storage so api.ts can read tokens without React context
-// ---------------------------------------------------------------------------
-
-// OSS token location. Community startup only hydrates explicit visual QA/dev
-// mock tokens and clears everything else fail-closed.
-const KEYCHAIN_SERVICE = 'com.lynavo.drive.auth';
-const KEYCHAIN_USER = 'tokens';
-const STORAGE_KEY_ACCESS = '@lynavo-drive/auth/access_token';
-const STORAGE_KEY_REFRESH = '@lynavo-drive/auth/refresh_token';
-const DEV_SANDBOX_ACCESS_TOKEN_PREFIX = 'mock-sandbox-access-token';
-const DEV_SANDBOX_REFRESH_TOKEN = 'mock-sandbox-refresh-token';
-
-let _accessToken: string | null = null;
-let _refreshToken: string | null = null;
-
-export function getAccessToken(): string | null {
-  return _accessToken;
-}
-
-export function getRefreshToken(): string | null {
-  return _refreshToken;
-}
-
-function syncTokensToModule(access: string | null, refresh: string | null) {
-  _accessToken = access;
-  _refreshToken = refresh;
 }
 
 function loadAuthService(): Promise<typeof import('../services/auth-service')> {
@@ -65,63 +32,12 @@ function loadAuthService(): Promise<typeof import('../services/auth-service')> {
   );
 }
 
-// Persist tokens to the Keychain. Fire-and-forget: in-memory tokens drive the
-// current session, the Keychain copy is only consulted on cold start.
-function isAllowedOssRuntimeTokenPair(
-  access: string,
-  refresh: string,
-): boolean {
-  return (
-    access.startsWith(DEV_SANDBOX_ACCESS_TOKEN_PREFIX) &&
-    refresh === DEV_SANDBOX_REFRESH_TOKEN
-  );
-}
-
-function persistTokens(access: string | null, refresh: string | null): void {
-  const task =
-    access === null ||
-    refresh === null ||
-    !isAllowedOssRuntimeTokenPair(access, refresh)
-      ? Keychain.resetGenericPassword({ service: KEYCHAIN_SERVICE })
-      : Keychain.setGenericPassword(
-          KEYCHAIN_USER,
-          JSON.stringify({ access, refresh }),
-          {
-            service: KEYCHAIN_SERVICE,
-            // Tokens accessible after first device unlock, never synced to
-            // iCloud, never restored to a different device via backup.
-            accessible: Keychain.ACCESSIBLE.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
-          },
-        );
-  task.catch((err: unknown) => {
-    console.warn('[auth-store] failed to persist tokens to keychain', err);
-  });
-}
-
-async function clearPersistedOfficialTokens(): Promise<void> {
-  try {
-    await Keychain.resetGenericPassword({ service: KEYCHAIN_SERVICE });
-  } catch (err) {
-    console.warn('[auth-store] keychain official-token cleanup failed', err);
-  }
-
-  try {
-    await Promise.all([
-      AsyncStorage.removeItem(STORAGE_KEY_ACCESS),
-      AsyncStorage.removeItem(STORAGE_KEY_REFRESH),
-    ]);
-  } catch (err) {
-    console.warn('[auth-store] legacy official-token cleanup failed', err);
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Reducer
 // ---------------------------------------------------------------------------
 
 type AuthAction =
-  | { type: 'HYDRATE'; accessToken: string | null; refreshToken: string | null }
-  | { type: 'SET_TOKENS'; accessToken: string; refreshToken: string }
+  | { type: 'HYDRATE'; isLoggedIn: boolean }
   | { type: 'SET_SIGNED_OUT_TRANSITION'; transition: SignedOutTransition }
   | { type: 'CLEAR' };
 
@@ -130,8 +46,6 @@ type AuthAction =
 const initialState: AuthState = {
   isLoggedIn: false,
   isLoading: true,
-  accessToken: null,
-  refreshToken: null,
   signedOutTransition: null,
 };
 
@@ -141,16 +55,8 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
       return {
         ...state,
         isLoading: false,
-        isLoggedIn: Boolean(action.accessToken && action.refreshToken),
-        accessToken: action.accessToken,
-        refreshToken: action.refreshToken,
+        isLoggedIn: action.isLoggedIn,
         signedOutTransition: null,
-      };
-    case 'SET_TOKENS':
-      return {
-        ...state,
-        accessToken: action.accessToken,
-        refreshToken: action.refreshToken,
       };
     case 'SET_SIGNED_OUT_TRANSITION':
       return { ...state, signedOutTransition: action.transition };
@@ -172,7 +78,6 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 // ---------------------------------------------------------------------------
 
 interface AuthActions {
-  setTokens: (accessToken: string, refreshToken: string) => void;
   setSignedOutTransition: (transition: SignedOutTransition) => void;
   clearAuth: (transition?: SignedOutTransition) => void;
 }
@@ -188,44 +93,22 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // Keep module-level tokens in sync whenever state changes. OSS startup does
-  // not hydrate commercial entitlements or remote tunnel credentials.
-  useEffect(() => {
-    syncTokensToModule(state.accessToken, state.refreshToken);
-  }, [state.accessToken, state.refreshToken]);
-
-  // Clear stale official-auth tokens on mount before the navigator decides where
-  // to go. Only explicit visual QA/dev skip-auth mock tokens may hydrate.
+  // Only explicit visual QA/dev skip-auth flags may enter the authenticated
+  // route shape. Normal OSS startup enters guest LAN sync.
   useEffect(() => {
     let cancelled = false;
-    clearPersistedOfficialTokens().then(() => {
-      if (cancelled) return;
-      const visualQaTokens =
-        getDevSkipAuthMockTokens() ?? getVisualQaMockTokens();
-      const hydratedAccessToken = visualQaTokens?.accessToken ?? null;
-      const hydratedRefreshToken = visualQaTokens?.refreshToken ?? null;
-      if (visualQaTokens) {
-        persistTokens(visualQaTokens.accessToken, visualQaTokens.refreshToken);
+    Promise.resolve().then(() => {
+      if (cancelled) {
+        return;
       }
-      syncTokensToModule(hydratedAccessToken, hydratedRefreshToken);
-      dispatch({
-        type: 'HYDRATE',
-        accessToken: hydratedAccessToken,
-        refreshToken: hydratedRefreshToken,
-      });
+      const hasDevSession = Boolean(
+        getDevSkipAuthMockTokens() ?? getVisualQaMockTokens(),
+      );
+      dispatch({ type: 'HYDRATE', isLoggedIn: hasDevSession });
     });
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  const setTokens = useCallback((accessToken: string, refreshToken: string) => {
-    if (!isAllowedOssRuntimeTokenPair(accessToken, refreshToken)) {
-      persistTokens(null, null);
-      return;
-    }
-    dispatch({ type: 'SET_TOKENS', accessToken, refreshToken });
-    persistTokens(accessToken, refreshToken);
   }, []);
 
   const setSignedOutTransition = useCallback(
@@ -240,46 +123,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: 'SET_SIGNED_OUT_TRANSITION', transition });
     }
     dispatch({ type: 'CLEAR' });
-    syncTokensToModule(null, null);
-    persistTokens(null, null);
   }, []);
 
-  // Register store actions so the API layer can update tokens or clear stale
-  // auth without importing React context directly. Lazy require avoids circular dep.
+  // Register a narrow clear callback so API session-replaced responses can
+  // return the app to the guest LAN route without importing React context.
   useEffect(() => {
-    loadAuthService().then(({ registerAuthStoreActions }) =>
-      registerAuthStoreActions(
-        (access, refresh) => {
-          if (!isAllowedOssRuntimeTokenPair(access, refresh)) {
-            persistTokens(null, null);
-            return;
-          }
+    loadAuthService().then(({ registerSessionClearAction }) =>
+      registerSessionClearAction(transition => {
+        if (transition !== undefined) {
           dispatch({
-            type: 'SET_TOKENS',
-            accessToken: access,
-            refreshToken: refresh,
+            type: 'SET_SIGNED_OUT_TRANSITION',
+            transition,
           });
-          syncTokensToModule(access, refresh);
-          persistTokens(access, refresh);
-        },
-        transition => {
-          if (transition !== undefined) {
-            dispatch({
-              type: 'SET_SIGNED_OUT_TRANSITION',
-              transition,
-            });
-          }
-          dispatch({ type: 'CLEAR' });
-          syncTokensToModule(null, null);
-          persistTokens(null, null);
-        },
-      ),
+        }
+        dispatch({ type: 'CLEAR' });
+      }),
     );
   }, []);
 
   const value: AuthContextValue = {
     ...state,
-    setTokens,
     setSignedOutTransition,
     clearAuth,
   };
