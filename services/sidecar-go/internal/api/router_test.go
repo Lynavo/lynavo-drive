@@ -809,7 +809,7 @@ func TestPowerStateUpdateIsLocalOnly(t *testing.T) {
 	}
 }
 
-func TestSidecarHTTPRejectsPublicRemoteAccess(t *testing.T) {
+func TestSidecarHTTPRejectsPublicNonLANRequests(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	insertPairedDeviceWithStableID(t, st, "client-1", "Nick iPhone", "client-1", "stable-1", time.Now().UTC().Format(time.RFC3339Nano))
 	_, handler := api.NewServer(st, cfg, hub, nil)

@@ -36,7 +36,7 @@
     "language": "語言",
     "faq": "常見問題",
     "faqDesc": "操作說明與常見問題",
-    "diagnosticsDesc": "上傳日誌和設備狀態以方便排查問題"
+    "diagnosticsDesc": "匯出日誌和設備狀態以方便排查問題"
   },
   "language": {
     "system": "跟隨系統",
@@ -44,30 +44,10 @@
     "simplifiedChinese": "簡中",
     "english": "English"
   },
-  "uploadDiagnostic": {
-    "button": "上傳診斷包",
-    "confirm": {
-      "title": "上傳診斷包",
-      "message": "請簡述你遇到的問題（例如：上傳卡住、團隊共享目錄看不到檔案），系統會打包當前運行狀態一起上傳給 Lynavo Drive 支援團隊。",
-      "placeholder": "例如：上傳卡在 30%",
-      "ok": "繼續",
-      "cancel": "取消"
-    },
+  "diagnosticsExport": {
+    "button": "匯出診斷包",
     "progress": {
-      "title": "上傳中…",
-      "cancel": "取消"
-    },
-    "success": {
-      "toast": "上傳成功，編號 {{refId}}（已複製到剪貼板）"
-    },
-    "failure": {
-      "toast": "上傳失敗，請稍後再試"
-    },
-    "tooLarge": {
-      "toast": "診斷包過大，請聯繫支援"
-    },
-    "aborted": {
-      "toast": "已取消上傳"
+      "title": "正在匯出…"
     }
   },
   "actions": {
@@ -138,15 +118,7 @@
     "errorDeviceNameEmpty": "請輸入設備名稱",
     "errorDeviceNameSave": "儲存失敗，請稍後重試",
     "gotIt": "知道了",
-    "uploadDiagnosticsTitle": "上傳診斷包",
-    "uploadDiagnosticsDesc": "請簡要描述您遇到的問題，方便我們快速定位。",
-    "diagnosticsPlaceholder": "例如：傳輸到一半會自動中斷",
-    "upload": "上傳",
-    "uploading": "上傳中…",
-    "uploadSuccessTitle": "上傳成功",
-    "uploadSuccessMsg": "診斷包已上傳，感謝您的回饋！",
-    "uploadFailureTitle": "上傳失敗",
-    "uploadFailureMsg": "上傳診斷包時發生錯誤，請檢查網路連線後重試。",
+    "exportDiagnosticsTitle": "匯出診斷包",
     "statusUnknown": "狀態未知",
     "connected": "已連接",
     "connecting": "連接中",

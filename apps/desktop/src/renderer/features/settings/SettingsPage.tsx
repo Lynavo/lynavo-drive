@@ -8,7 +8,6 @@ import {
   Languages,
   Mail,
   Power,
-  RefreshCw,
   Send,
   Smartphone,
   Wifi,
@@ -60,8 +59,7 @@ export function SettingsPage() {
 
   const [localIps, setLocalIps] = useState<string[]>([]);
   const [powerState, setPowerState] = useState<PowerSaveState | null>(null);
-  const [checkingUpdates, setCheckingUpdates] = useState(false);
-  const [uploadingLogs, setUploadingLogs] = useState(false);
+  const [exportingDiagnostics, setExportingDiagnostics] = useState(false);
   const [powerLoading, setPowerLoading] = useState(true);
   const [languageOpen, setLanguageOpen] = useState(false);
   const [languageSearch, setLanguageSearch] = useState('');
@@ -170,33 +168,27 @@ export function SettingsPage() {
     }
   };
 
-  const handleCheckUpdates = async () => {
-    setCheckingUpdates(true);
-    try {
-      await window.electronAPI?.support.checkForUpdates();
-      toast.success(t('settings.profile.toasts.upToDate'));
-    } catch {
-      toast.error(t('settings.profile.toasts.checkUpdateFailed'));
-    } finally {
-      setCheckingUpdates(false);
-    }
-  };
-
   const handleUploadLogs = async () => {
     const description = diagnosticsDescription.trim();
-    setUploadingLogs(true);
+    setExportingDiagnostics(true);
     try {
-      await window.electronAPI?.support.uploadDiagnostics({
-        description: description || 'Manual upload from desktop settings',
-        locale: i18n.resolvedLanguage ?? i18n.language,
+      const archivePath = await window.electronAPI?.support.exportDiagnostics(
+        i18n.resolvedLanguage ?? i18n.language,
+        description,
+      );
+      if (archivePath) {
+        toast.success(t('errors.settings.diagnosticsExported'), {
+          description: archivePath,
+        });
+        setDiagnosticsDescription('');
+        setUploadDialogOpen(false);
+      }
+    } catch (error) {
+      toast.error(t('errors.settings.diagnosticsExportFailed'), {
+        description: error instanceof Error ? error.message : t('errors.common.retryLater'),
       });
-      toast.success(t('settings.profile.toasts.diagnosticsUploaded'));
-      setDiagnosticsDescription('');
-      setUploadDialogOpen(false);
-    } catch {
-      toast.error(t('settings.profile.toasts.diagnosticsUploadFailed'));
     } finally {
-      setUploadingLogs(false);
+      setExportingDiagnostics(false);
     }
   };
 
@@ -397,17 +389,6 @@ export function SettingsPage() {
                 caption={t('settings.profile.version.caption', {
                   version: installedVersionLabel,
                 })}
-                action={
-                  <button
-                    type="button"
-                    onClick={handleCheckUpdates}
-                    disabled={checkingUpdates}
-                    className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-md bg-white/60 px-3 text-xs font-semibold text-[#59616d] transition hover:bg-white/82 disabled:cursor-not-allowed disabled:text-[#aab2bd]"
-                  >
-                    <RefreshCw className={`h-3.5 w-3.5 ${checkingUpdates ? 'animate-spin' : ''}`} />
-                    {t('settings.support.checkUpdates')}
-                  </button>
-                }
               />
             </SettingsCard>
 
@@ -475,24 +456,20 @@ export function SettingsPage() {
               <SettingsItem
                 icon={FileUp}
                 tone="sky"
-                title={t('settings.support.uploadDiagnostics')}
+                title={t('settings.support.exportDiagnostics')}
                 caption={
-                  uploadingLogs
-                    ? t('settings.profile.diagnostics.uploadingCaption')
+                  exportingDiagnostics
+                    ? t('settings.profile.diagnostics.exportingCaption')
                     : t('settings.profile.diagnostics.caption')
                 }
                 action={
                   <button
                     type="button"
                     onClick={() => setUploadDialogOpen(true)}
-                    disabled={uploadingLogs}
+                    disabled={exportingDiagnostics}
                     className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-md bg-white/60 px-3 text-xs font-semibold text-[#59616d] transition hover:bg-white/82 disabled:cursor-not-allowed disabled:text-[#aab2bd]"
                   >
-                    {uploadingLogs ? (
-                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <FileUp className="h-3.5 w-3.5" />
-                    )}
+                    <FileUp className="h-3.5 w-3.5" />
                     {t('settings.support.diagnosticsSubmit')}
                   </button>
                 }
@@ -501,7 +478,7 @@ export function SettingsPage() {
                 <DialogContent className="border border-white/80 bg-white/90 shadow-2xl backdrop-blur-xl">
                   <DialogHeader>
                     <DialogTitle className="text-lg font-semibold text-[#17191c]">
-                      {t('settings.support.uploadDiagnostics')}
+                      {t('settings.support.exportDiagnostics')}
                     </DialogTitle>
                     <DialogDescription className="text-xs text-[#7b8490]">
                       {t('settings.profile.diagnostics.description')}
@@ -521,7 +498,7 @@ export function SettingsPage() {
                       placeholder={t('settings.profile.diagnostics.placeholder')}
                       maxLength={500}
                       className="min-h-28 w-full resize-none rounded-lg border border-white/80 bg-white/70 px-3 py-2.5 text-sm leading-6 text-[#17191c] outline-none transition placeholder:text-[#a4acb7] focus:border-[#66c6ff] focus:ring-2 focus:ring-[#66c6ff]/18 disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={uploadingLogs}
+                      disabled={exportingDiagnostics}
                     />
                     <div className="flex justify-end text-[11px] text-[#9aa3af]">
                       {diagnosticsDescription.length}/500
@@ -531,7 +508,7 @@ export function SettingsPage() {
                     <button
                       type="button"
                       data-testid="cancel-diagnostics-btn"
-                      disabled={uploadingLogs}
+                      disabled={exportingDiagnostics}
                       onClick={() => {
                         setUploadDialogOpen(false);
                         setDiagnosticsDescription('');
@@ -543,15 +520,11 @@ export function SettingsPage() {
                     <button
                       type="button"
                       data-testid="submit-diagnostics-btn"
-                      disabled={uploadingLogs}
+                      disabled={exportingDiagnostics}
                       onClick={() => void handleUploadLogs()}
                       className="inline-flex items-center justify-center gap-1.5 rounded-md bg-[#17191c] px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_22px_rgba(23,25,28,0.16)] transition hover:bg-[#2b2f36] disabled:cursor-not-allowed disabled:bg-[#cfd6df]"
                     >
-                      {uploadingLogs ? (
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <FileUp className="h-4 w-4" />
-                      )}
+                      <FileUp className="h-4 w-4" />
                       {t('settings.support.diagnosticsSubmit')}
                     </button>
                   </DialogFooter>

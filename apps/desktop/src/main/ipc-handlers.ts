@@ -15,13 +15,7 @@ import {
   copyToClipboard,
 } from './file-operations';
 import type { SidecarManager } from './sidecar-manager';
-import {
-  checkForUpdates,
-  exportDiagnostics,
-  getAppInfo,
-  uploadDiagnostics,
-  type DiagnosticsUploadRequest,
-} from './diagnostics';
+import { exportDiagnostics, getAppInfo } from './diagnostics';
 import { installBonjourForWindows } from './bonjour-installer';
 import { usesTitleBarOverlayControls } from '../shared/platform-capabilities';
 import { getTitleBarOverlayOptions } from './window-chrome';
@@ -57,9 +51,7 @@ export const IPC = {
   SIDECAR_ADD_SHARED_RESOURCE: 'sidecar:add-shared-resource',
   SIDECAR_REMOVE_SHARED_RESOURCE: 'sidecar:remove-shared-resource',
   SIDECAR_RECEIVED_LIBRARY: 'sidecar:received-library',
-  SUPPORT_UPLOAD_DIAGNOSTICS: 'support:upload-diagnostics',
   SUPPORT_EXPORT_DIAGNOSTICS: 'support:export-diagnostics',
-  SUPPORT_CHECK_FOR_UPDATES: 'support:check-for-updates',
   SUPPORT_APP_INFO: 'support:app-info',
   FILES_OPEN_FOLDER: 'files:open-folder',
   FILES_OPEN_FILE: 'files:open-file',
@@ -164,13 +156,9 @@ export function registerIpcHandlers(
       powerSave.setPreventSleepDuringTransfer(enabled),
     );
   }
-  ipcMain.handle(IPC.SUPPORT_UPLOAD_DIAGNOSTICS, (_e, request: DiagnosticsUploadRequest) =>
-    uploadDiagnostics(sidecarManager, request),
-  );
   ipcMain.handle(IPC.SUPPORT_EXPORT_DIAGNOSTICS, (_e, locale?: string, description?: string) =>
     exportDiagnostics(sidecarManager, locale, description),
   );
-  ipcMain.handle(IPC.SUPPORT_CHECK_FOR_UPDATES, () => checkForUpdates());
   ipcMain.handle(IPC.SUPPORT_APP_INFO, () => getAppInfo());
   ipcMain.handle(IPC.WINDOW_SET_MODAL_OVERLAY_ACTIVE, async (event, active: boolean) => {
     if (!usesTitleBarOverlayControls()) {

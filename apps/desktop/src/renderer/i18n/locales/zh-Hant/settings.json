@@ -174,9 +174,9 @@
       "mailBody": "問題描述：\n{{description}}\n\n聯絡方式：\n{{contact}}\n\n目前版本：v{{version}}"
     },
     "diagnostics": {
-      "uploadingCaption": "正在上傳診斷包",
-      "caption": "上傳記錄與執行狀態給支援團隊",
-      "description": "上傳診斷包，協助定位傳輸、配對或共享問題。",
+      "exportingCaption": "正在匯出診斷包",
+      "caption": "本機保存記錄與執行狀態",
+      "description": "匯出本機診斷包，協助排查傳輸、配對或共享問題。",
       "placeholder": "請描述出現問題的步驟、手機型號、網路環境或錯誤現象（選填）"
     },
     "toasts": {
@@ -185,10 +185,6 @@
       "preventSleepDisabled": "已關閉防止待機",
       "preventSleepFailed": "無法更新電源設定",
       "receivedAccessFailed": "修改已接收檔案瀏覽權限失敗",
-      "upToDate": "目前已是最新版本",
-      "checkUpdateFailed": "暫時無法檢查更新",
-      "diagnosticsUploaded": "診斷包上傳成功，感謝您的回饋",
-      "diagnosticsUploadFailed": "診斷包上傳失敗，請稍後再試",
       "feedbackOpened": "已開啟郵件回饋"
     },
     "community": {
@@ -200,28 +196,19 @@
   },
   "support": {
     "title": "支援與診斷",
-    "description": "上傳診斷包給支援團隊；只有網路不可用時才會改為本機匯出。",
-    "uploadDiagnostics": "上傳診斷包",
+    "description": "匯出本機診斷包，需要時可手動分享。",
     "exportDiagnostics": "匯出診斷包",
     "diagnosticsDescriptionLabel": "問題描述",
     "diagnosticsDescriptionPlaceholder": "請描述出現問題的步驟、手機型號、網路環境或錯誤現象",
-    "diagnosticsDescriptionHelp": "描述會隨診斷包一起上傳，方便定位問題。",
+    "diagnosticsDescriptionHelp": "描述會保存在本機診斷包中。",
     "diagnosticsCancel": "取消",
-    "diagnosticsSubmit": "上傳",
+    "diagnosticsSubmit": "匯出",
     "confirmReset": "確認重置",
     "reset": "重置資料",
     "lastSuccessfulSync": "最近成功同步",
     "advertisedIp": "廣播 IP",
     "sameLanHint": "請確認手機和電腦連到同一個區域網路。",
     "desktopVersion": "桌面端版本",
-    "buildNumber": "{{buildNumber}}",
-    "checkUpdates": "檢查更新",
-    "checkingUpdates": "正在檢查",
-    "updateAvailable": "有新版本 v{{version}} 可用",
-    "upToDate": "已是最新版本",
-    "updateUnavailable": "暫時無法檢查更新",
-    "minimumRequired": "此版本需要更新後繼續使用。",
-    "openDownload": "開啟下載頁",
-    "releaseNotes": "更新內容"
+    "buildNumber": "{{buildNumber}}"
   }
 }

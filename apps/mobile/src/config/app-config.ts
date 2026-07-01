@@ -1,14 +1,10 @@
 import {
-  LYNAVO_REVIEW_SUPPORT_API_BASE_URL,
-  LYNAVO_SUPPORT_API_BASE_URL,
   LYNAVO_SUPPORT_EMAIL,
   LYNAVO_WEB_BASE_URL,
 } from '@lynavo-drive/contracts';
 
 interface AppConfigEndpoints {
   readonly webBaseUrl: string;
-  readonly supportApiBaseUrl: string;
-  readonly reviewSupportApiBaseUrl: string;
   readonly supportEmail: string;
 }
 
@@ -26,8 +22,6 @@ export interface AppConfig {
 
 const LYNAVO_ENDPOINTS: AppConfigEndpoints = {
   webBaseUrl: LYNAVO_WEB_BASE_URL,
-  supportApiBaseUrl: LYNAVO_SUPPORT_API_BASE_URL,
-  reviewSupportApiBaseUrl: LYNAVO_REVIEW_SUPPORT_API_BASE_URL,
   supportEmail: LYNAVO_SUPPORT_EMAIL,
 };
 

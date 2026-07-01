@@ -89,7 +89,6 @@ function printPlan(plan, dryRun) {
   console.log(`Profile:  ${plan.profile.name}`);
   console.log(`Channel:  ${plan.profile.channel}`);
   console.log(`Review:   ${plan.profile.review ? 'yes' : 'no'}`);
-  console.log(`Support API URL: ${plan.profile.supportApiBaseUrl}`);
   console.log(`Targets:  ${plan.steps.map((step) => step.target).join(', ')}`);
   console.log(`Mode:     ${dryRun ? 'DRY RUN' : 'execute'}`);
   console.log('');

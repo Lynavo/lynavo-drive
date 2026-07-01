@@ -119,7 +119,6 @@ function printPlan(plan, options) {
   console.log(`Profile:  ${plan.profile.name}`);
   console.log(`Channel:  ${plan.profile.channel}`);
   console.log(`Review:   ${plan.profile.review ? 'yes' : 'no'}`);
-  console.log(`Support API URL: ${plan.profile.supportApiBaseUrl}`);
   console.log(`Target:   ${plan.target}`);
   console.log(
     `Mode:     ${options.dryRun ? 'DRY RUN' : options.setMobileProfileOnly ? 'set mobile profile only' : 'run'}`,

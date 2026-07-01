@@ -17,10 +17,6 @@ jest.mock('react-native-localize', () => ({
   ],
 }));
 
-jest.mock('../services/config', () => ({
-  loadDebugBaseUrlOverride: jest.fn().mockResolvedValue(undefined),
-}));
-
 jest.mock('../services/app-config-service', () => ({
   refreshNativeAppFeatureSettings: jest.fn().mockResolvedValue(undefined),
 }));

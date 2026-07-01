@@ -49,10 +49,7 @@ export function buildSourceDefaultMobileReleaseProfileSource() {
   name: 'source-default',
   channel: 'dev',
   review: false,
-  supportApiBaseUrl: '',
 } as const;
-
-export const releaseSupportApiBaseUrl = mobileReleaseProfile.supportApiBaseUrl.trim() || null;
 `;
 }
 

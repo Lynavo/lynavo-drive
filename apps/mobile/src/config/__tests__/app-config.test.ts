@@ -12,16 +12,16 @@ describe('appConfig', () => {
     expect(JSON.stringify(appConfig)).not.toContain('"cn"');
   });
 
-  test('uses Lynavo global support endpoints and contacts', () => {
+  test('uses Lynavo global web endpoint and support contact only', () => {
     expect(appConfig.endpoints).toEqual({
       webBaseUrl: 'https://www.lynavo.com',
-      supportApiBaseUrl: 'https://api.lynavo.com',
-      reviewSupportApiBaseUrl: 'https://review-api.lynavo.com',
       supportEmail: 'support@lynavo.com',
     });
     expect('turnUrl' in appConfig.endpoints).toBe(false);
     expect('apiBaseUrl' in appConfig.endpoints).toBe(false);
     expect('reviewApiBaseUrl' in appConfig.endpoints).toBe(false);
+    expect('supportApiBaseUrl' in appConfig.endpoints).toBe(false);
+    expect('reviewSupportApiBaseUrl' in appConfig.endpoints).toBe(false);
     expect(appConfig.legal).toEqual({
       privacyUrl: 'https://www.lynavo.com/privacy',
       termsUrl: 'https://www.lynavo.com/terms',

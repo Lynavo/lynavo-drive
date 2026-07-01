@@ -19,9 +19,9 @@ pnpm release --profile review --targets ios,android,mac,win,linux --dry-run
 
 規則：
 
-1. `review` 必須使用 review API，供 App Review、TestFlight 或內部審核包驗證。
-2. `prod` 不得使用 review API。
-3. release profile 負責注入 `LYNAVO_RELEASE_CHANNEL` 和 Lynavo API base URL。
+1. `review` 必須使用 review release channel，供 App Review、TestFlight 或內部審核包驗證。
+2. `prod` 不得使用 review channel。
+3. release profile 負責注入 `LYNAVO_RELEASE_CHANNEL` 和打包配置；OSS 不注入 support/update/diagnostics API URL。
 4. 不允許用歷史 market env 或手動 base URL 拼接替代 profile。
 5. `package:desktop:*`、Gradle、Xcode 或 Electron builder 單平台命令只用於本地驗證；正式發佈仍以 `pnpm release` 為入口。
 

@@ -1,52 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { dialog } from 'electron';
 import type { SidecarManager } from '../sidecar-manager';
-
-async function readBlobBytes(blob: Blob): Promise<Uint8Array> {
-  if (typeof blob.arrayBuffer === 'function') {
-    return new Uint8Array(await blob.arrayBuffer());
-  }
-  const stream = (blob as Blob & { stream?: () => ReadableStream<Uint8Array> }).stream?.();
-  if (!stream) {
-    type FileReaderLike = {
-      error: Error | null;
-      result: ArrayBuffer | string | null;
-      onerror: (() => void) | null;
-      onload: (() => void) | null;
-      readAsArrayBuffer(value: Blob): void;
-    };
-    const FileReaderCtor = (globalThis as { FileReader?: new () => FileReaderLike }).FileReader;
-    if (FileReaderCtor) {
-      return await new Promise<Uint8Array>((resolve, reject) => {
-        const reader = new FileReaderCtor();
-        reader.onerror = () => reject(reader.error ?? new Error('failed to read bundle blob'));
-        reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
-        reader.readAsArrayBuffer(blob);
-      });
-    }
-    throw new Error('bundle blob is not readable');
-  }
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-  }
-  const total = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return bytes;
-}
 
 const appState = vi.hoisted(() => ({
   isPackaged: false,
@@ -67,8 +25,6 @@ const legacyViviApiBaseEnv = ['VIVI', 'DROP_API_BASE_URL'].join('');
 const legacySyncApiBaseEnv = ['SYNC', 'FLOW_API_BASE_URL'].join('');
 const legacyViviUpdateEnv = ['VIVI', 'DROP_DESKTOP_UPDATE_URL'].join('');
 const legacyViviDiagnosticsUploadEnv = ['VIVI', 'DROP_DIAGNOSTICS_UPLOAD_URL'].join('');
-const legacyViviDiagnosticsTokenEnv = ['VIVI', 'DROP_DIAGNOSTICS_TOKEN'].join('');
-const legacyViviApiTokenEnv = ['VIVI', 'DROP_API_TOKEN'].join('');
 
 vi.mock('electron', () => ({
   app: {
@@ -105,157 +61,6 @@ function resetDiagnosticsFs() {
 function ensureDesktopLogDir() {
   mkdirSync(join(diagnosticsPaths.root, 'desktop'), { recursive: true });
 }
-
-describe('checkForUpdates', () => {
-  const updateCheckQuery = `platform=${process.platform}&arch=${process.arch}&version=0.1.0`;
-
-  beforeEach(() => {
-    appState.isPackaged = false;
-    delete process.env.LYNAVO_SUPPORT_API_BASE_URL;
-    delete process.env.LYNAVO_API_BASE_URL;
-    delete process.env.LYNAVO_DESKTOP_UPDATE_URL;
-    delete process.env[legacyViviApiBaseEnv];
-    delete process.env[legacySyncApiBaseEnv];
-    delete process.env[legacyViviUpdateEnv];
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('uses the review API by default in development mode', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({
-        update_available: false,
-        latest_version: '0.1.0',
-        checked_at: '2026-05-08T08:00:00Z',
-      }),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    const { checkForUpdates } = await import('../diagnostics');
-
-    await checkForUpdates();
-
-    const requestUrl = fetchMock.mock.calls[0]?.[0];
-    expect(requestUrl).toEqual(
-      `https://review-api.lynavo.com/api/v1/desktop/update-check?${updateCheckQuery}`,
-    );
-  });
-
-  it('uses the production API by default in packaged builds', async () => {
-    appState.isPackaged = true;
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({
-        update_available: false,
-        latest_version: '0.1.0',
-        checked_at: '2026-05-08T08:00:00Z',
-      }),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    const { checkForUpdates } = await import('../diagnostics');
-
-    await checkForUpdates();
-
-    const requestUrl = fetchMock.mock.calls[0]?.[0];
-    expect(requestUrl).toEqual(
-      `https://api.lynavo.com/api/v1/desktop/update-check?${updateCheckQuery}`,
-    );
-  });
-
-  it('prefers an explicit Lynavo support API base URL over the development default', async () => {
-    process.env.LYNAVO_SUPPORT_API_BASE_URL = 'http://localhost:9090';
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({
-        update_available: false,
-        latest_version: '0.1.0',
-        checked_at: '2026-05-08T08:00:00Z',
-      }),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    const { checkForUpdates } = await import('../diagnostics');
-
-    await checkForUpdates();
-
-    const requestUrl = fetchMock.mock.calls[0]?.[0];
-    expect(requestUrl).toEqual(
-      `http://localhost:9090/api/v1/desktop/update-check?${updateCheckQuery}`,
-    );
-  });
-
-  it('ignores stale broad API base URL env when no support API base URL is configured', async () => {
-    process.env.LYNAVO_API_BASE_URL = 'http://lynavo.localhost:9090';
-    process.env[legacyViviApiBaseEnv] = 'http://legacy.localhost:9090';
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({
-        update_available: false,
-        latest_version: '0.1.0',
-        checked_at: '2026-05-08T08:00:00Z',
-      }),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    const { checkForUpdates } = await import('../diagnostics');
-
-    await checkForUpdates();
-
-    const requestUrl = fetchMock.mock.calls[0]?.[0];
-    expect(requestUrl).toEqual(
-      `https://review-api.lynavo.com/api/v1/desktop/update-check?${updateCheckQuery}`,
-    );
-  });
-
-  it('ignores legacy API base URLs when no Lynavo base URL is configured', async () => {
-    process.env[legacyViviApiBaseEnv] = 'http://legacy-vd.localhost:9090';
-    process.env[legacySyncApiBaseEnv] = 'http://legacy-sf.localhost:9090';
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({
-        update_available: false,
-        latest_version: '0.1.0',
-        checked_at: '2026-05-08T08:00:00Z',
-      }),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    const { checkForUpdates } = await import('../diagnostics');
-
-    await checkForUpdates();
-
-    const requestUrl = fetchMock.mock.calls[0]?.[0];
-    expect(requestUrl).toEqual(
-      `https://review-api.lynavo.com/api/v1/desktop/update-check?${updateCheckQuery}`,
-    );
-  });
-
-  it('ignores legacy desktop update URL env', async () => {
-    process.env[legacyViviUpdateEnv] = 'https://legacy.example/update';
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({
-        update_available: false,
-        latest_version: '0.1.0',
-        checked_at: '2026-05-08T08:00:00Z',
-      }),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    const { checkForUpdates } = await import('../diagnostics');
-
-    await checkForUpdates();
-
-    const requestUrl = fetchMock.mock.calls[0]?.[0];
-    expect(requestUrl).toEqual(
-      `https://review-api.lynavo.com/api/v1/desktop/update-check?${updateCheckQuery}`,
-    );
-  });
-});
 
 describe('exportDiagnostics', () => {
   beforeEach(() => {
@@ -387,13 +192,11 @@ describe('exportDiagnostics', () => {
     const diagnostics = JSON.parse(diagnosticsJson) as {
       issue?: { description?: string };
       process?: { electron?: string; node?: string; chrome?: string };
-      supportApi?: { updateCheckUrl?: string; diagnosticsUploadUrl?: string };
       paths?: { userData?: string; logs?: string[] };
     };
     expect(diagnostics.issue?.description).toBe('Wi-Fi drops when the phone locks');
     expect(diagnostics.process?.node).toBeTruthy();
-    expect(diagnostics.supportApi?.updateCheckUrl).toContain('/api/v1/desktop/update-check');
-    expect(diagnostics.supportApi?.diagnosticsUploadUrl).toContain('/api/v1/diagnostics/upload');
+    expect('supportApi' in diagnostics).toBe(false);
     expect('api' in diagnostics).toBe(false);
     expect(diagnostics.paths?.userData).toBe(diagnosticsPaths.userData);
     expect(diagnostics.paths?.logs).toContain(diagnosticsPaths.desktopLog);
@@ -455,10 +258,11 @@ describe('exportDiagnostics', () => {
     rmSync(tempRoot, { recursive: true, force: true });
   });
 
-  it('redacts credentials in API URLs written to diagnostics.json', async () => {
+  it('omits stale support and update URL env from diagnostics.json', async () => {
     const tempRoot = mkdtempSync(join(tmpdir(), 'lynavo-drive-diagnostics-test-'));
     const archivePath = join(tempRoot, 'diagnostics.zip');
     ensureDesktopLogDir();
+    process.env.LYNAVO_SUPPORT_API_BASE_URL = 'https://user:secret@example.test/api?token=abc';
     process.env.LYNAVO_DESKTOP_UPDATE_URL =
       'https://user:secret@example.test/update?token=abc&keep=ok';
     process.env.LYNAVO_DIAGNOSTICS_UPLOAD_URL = 'https://example.test/upload?api_key=abc&keep=ok';
@@ -482,14 +286,15 @@ describe('exportDiagnostics', () => {
       encoding: 'utf8',
     });
     const diagnostics = JSON.parse(diagnosticsJson) as {
-      supportApi?: { updateCheckUrl?: string; diagnosticsUploadUrl?: string };
+      supportApi?: unknown;
+      api?: unknown;
+      env?: Record<string, string>;
     };
-    expect(diagnostics.supportApi?.updateCheckUrl).toBe(
-      'https://redacted:redacted@example.test/update?token=redacted&keep=ok',
-    );
-    expect(diagnostics.supportApi?.diagnosticsUploadUrl).toBe(
-      'https://example.test/upload?api_key=redacted&keep=ok',
-    );
+    expect('supportApi' in diagnostics).toBe(false);
+    expect('api' in diagnostics).toBe(false);
+    expect(diagnostics.env?.LYNAVO_SUPPORT_API_BASE_URL).toBeUndefined();
+    expect(diagnostics.env?.LYNAVO_DESKTOP_UPDATE_URL).toBeUndefined();
+    expect(diagnostics.env?.LYNAVO_DIAGNOSTICS_UPLOAD_URL).toBeUndefined();
 
     rmSync(tempRoot, { recursive: true, force: true });
   });
@@ -537,129 +342,5 @@ describe('writePowerDiagnostics', () => {
     expect(content).not.toContain('Assertions');
 
     rmSync(tempRoot, { recursive: true, force: true });
-  });
-});
-
-describe('uploadDiagnostics', () => {
-  beforeEach(() => {
-    appState.isPackaged = false;
-    delete process.env.LYNAVO_SUPPORT_API_BASE_URL;
-    delete process.env.LYNAVO_API_BASE_URL;
-    delete process.env.LYNAVO_DESKTOP_UPDATE_URL;
-    delete process.env.LYNAVO_DIAGNOSTICS_UPLOAD_URL;
-    delete process.env.LYNAVO_DIAGNOSTICS_TOKEN;
-    delete process.env.LYNAVO_API_TOKEN;
-    delete process.env[legacyViviApiBaseEnv];
-    delete process.env[legacySyncApiBaseEnv];
-    delete process.env[legacyViviUpdateEnv];
-    delete process.env[legacyViviDiagnosticsUploadEnv];
-    delete process.env[legacyViviDiagnosticsTokenEnv];
-    delete process.env[legacyViviApiTokenEnv];
-    resetDiagnosticsFs();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
-    delete process.env.LYNAVO_SUPPORT_API_BASE_URL;
-    delete process.env.LYNAVO_API_BASE_URL;
-    delete process.env.LYNAVO_DESKTOP_UPDATE_URL;
-    delete process.env.LYNAVO_DIAGNOSTICS_UPLOAD_URL;
-    delete process.env.LYNAVO_DIAGNOSTICS_TOKEN;
-    delete process.env.LYNAVO_API_TOKEN;
-    delete process.env[legacyViviApiBaseEnv];
-    delete process.env[legacySyncApiBaseEnv];
-    delete process.env[legacyViviUpdateEnv];
-    delete process.env[legacyViviDiagnosticsUploadEnv];
-    delete process.env[legacyViviDiagnosticsTokenEnv];
-    delete process.env[legacyViviApiTokenEnv];
-    resetDiagnosticsFs();
-  });
-
-  it('uploads a compact diagnostics bundle when fresh logs and the database are large', async () => {
-    const tempRoot = mkdtempSync(join(tmpdir(), 'lynavo-drive-diagnostics-upload-test-'));
-    const archivePath = join(tempRoot, 'uploaded.zip');
-    const uploaded: { bundle?: Uint8Array } = {};
-    ensureDesktopLogDir();
-    mkdirSync(join(diagnosticsPaths.userData, 'logs'), { recursive: true });
-    writeFileSync(diagnosticsPaths.desktopLog, randomBytes(1024 * 1024));
-    writeFileSync(
-      join(diagnosticsPaths.userData, 'logs', 'sidecar.log'),
-      randomBytes(2 * 1024 * 1024),
-    );
-    writeFileSync(join(diagnosticsPaths.userData, 'sidecar.db'), randomBytes(2 * 1024 * 1024));
-    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
-      const form = init?.body as FormData;
-      const bundle = form.get('bundle');
-      if (!(bundle instanceof Blob)) {
-        throw new Error('bundle field missing');
-      }
-      uploaded.bundle = await readBlobBytes(bundle);
-      return new Response(
-        JSON.stringify({ ref_id: 'DIA1234', uploaded_at: '2026-05-18T09:00:00Z' }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      );
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    const { uploadDiagnostics } = await import('../diagnostics');
-
-    await uploadDiagnostics(
-      {
-        getState: () => ({ status: 'healthy' }),
-      } as unknown as SidecarManager,
-      { description: 'Upload fails with 413', locale: 'en' },
-    );
-
-    const bundleBytes = uploaded.bundle;
-    if (!bundleBytes) {
-      throw new Error('uploaded bundle was not captured');
-    }
-    expect(bundleBytes.byteLength).toBeLessThan(900 * 1024);
-    writeFileSync(archivePath, bundleBytes);
-    const entries = execFileSync('unzip', ['-Z1', archivePath], { encoding: 'utf8' })
-      .split('\n')
-      .filter(Boolean);
-    expect(entries).toContain('files/main.log');
-    expect(entries).toContain('files/sidecar.log');
-    expect(entries).not.toContain('files/sidecar.db');
-    expect(entries).toContain('files/sidecar.db.omitted.txt');
-    const uploadedSidecarLog = execFileSync('unzip', ['-p', archivePath, 'files/sidecar.log']);
-    expect(uploadedSidecarLog.byteLength).toBeLessThan(280 * 1024);
-
-    rmSync(tempRoot, { recursive: true, force: true });
-  });
-
-  it('ignores legacy diagnostics upload URL and broad token env', async () => {
-    process.env[legacyViviDiagnosticsUploadEnv] = 'https://legacy.example/diagnostics';
-    process.env[legacyViviApiTokenEnv] = 'legacy-token';
-    process.env.LYNAVO_API_TOKEN = 'broad-token';
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => {
-      return new Response(
-        JSON.stringify({ ref_id: 'DIA-LEGACY', uploaded_at: '2026-05-18T09:00:00Z' }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      );
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    const { uploadDiagnostics } = await import('../diagnostics');
-
-    await uploadDiagnostics(
-      {
-        getState: () => ({ status: 'healthy' }),
-      } as unknown as SidecarManager,
-      { description: 'legacy env ignored', locale: 'en' },
-    );
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      'https://review-api.lynavo.com/api/v1/diagnostics/upload',
-    );
-    const headers = fetchMock.mock.calls[0]?.[1]?.headers;
-    const authorization =
-      headers instanceof Headers
-        ? headers.get('Authorization')
-        : (headers as Record<string, string> | undefined)?.Authorization;
-    expect(authorization).toBeUndefined();
   });
 });

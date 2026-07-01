@@ -174,9 +174,9 @@
       "mailBody": "Issue description:\n{{description}}\n\nContact:\n{{contact}}\n\nCurrent version: v{{version}}"
     },
     "diagnostics": {
-      "uploadingCaption": "Uploading diagnostics bundle",
-      "caption": "Send logs and runtime status to support",
-      "description": "Upload a diagnostics bundle to help locate transfer, pairing, or sharing issues.",
+      "exportingCaption": "Exporting diagnostics bundle",
+      "caption": "Save logs and runtime status locally",
+      "description": "Export a local diagnostics bundle to help investigate transfer, pairing, or sharing issues.",
       "placeholder": "Describe the steps, phone model, network environment, or error symptoms (optional)"
     },
     "toasts": {
@@ -185,10 +185,6 @@
       "preventSleepDisabled": "Computer sleep prevention disabled",
       "preventSleepFailed": "Unable to update power setting",
       "receivedAccessFailed": "Failed to update received file browsing access",
-      "upToDate": "You are up to date",
-      "checkUpdateFailed": "Unable to check for updates",
-      "diagnosticsUploaded": "Diagnostics bundle uploaded. Thanks for your feedback.",
-      "diagnosticsUploadFailed": "Unable to upload diagnostics bundle",
       "feedbackOpened": "Feedback email opened"
     },
     "community": {
@@ -200,28 +196,19 @@
   },
   "support": {
     "title": "Support and diagnostics",
-    "description": "Upload a diagnostics bundle to support. Local export is only used when the network is unavailable.",
-    "uploadDiagnostics": "Upload diagnostics",
+    "description": "Export a local diagnostics bundle and share it manually when needed.",
     "exportDiagnostics": "Export diagnostics",
     "diagnosticsDescriptionLabel": "Issue description",
     "diagnosticsDescriptionPlaceholder": "Describe the steps, phone model, network environment, or error symptoms",
-    "diagnosticsDescriptionHelp": "The description is uploaded with the diagnostics bundle for troubleshooting.",
+    "diagnosticsDescriptionHelp": "The description is saved inside the local diagnostics bundle.",
     "diagnosticsCancel": "Cancel",
-    "diagnosticsSubmit": "Upload",
+    "diagnosticsSubmit": "Export",
     "confirmReset": "Confirm reset",
     "reset": "Reset data",
     "lastSuccessfulSync": "Last successful sync",
     "advertisedIp": "Advertised IP",
     "sameLanHint": "Confirm the phone and computer are connected to the same LAN.",
     "desktopVersion": "Desktop version",
-    "buildNumber": "{{buildNumber}}",
-    "checkUpdates": "Check for updates",
-    "checkingUpdates": "Checking",
-    "updateAvailable": "Version v{{version}} is available",
-    "upToDate": "You are up to date",
-    "updateUnavailable": "Unable to check for updates",
-    "minimumRequired": "This version must be updated before continuing.",
-    "openDownload": "Open download page",
-    "releaseNotes": "Update content"
+    "buildNumber": "{{buildNumber}}"
   }
 }

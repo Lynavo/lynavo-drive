@@ -11,12 +11,7 @@ const androidModule = readFileSync(
   'utf8',
 );
 
-const requiredReactMethods = [
-  'getClientId',
-  'getKnownDeviceIds',
-  'getAssetPreviewSource',
-  'uploadDiagnosticsArchive',
-];
+const requiredReactMethods = ['getClientId', 'getKnownDeviceIds', 'getAssetPreviewSource'];
 
 for (const method of requiredReactMethods) {
   assert.match(

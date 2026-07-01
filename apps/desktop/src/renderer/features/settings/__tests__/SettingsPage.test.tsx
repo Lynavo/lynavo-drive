@@ -40,8 +40,7 @@ function setElectronPlatform(
         version: '1.0.1',
         buildNumber: '56',
       }),
-      checkForUpdates: vi.fn().mockResolvedValue(null),
-      uploadDiagnostics: vi.fn().mockResolvedValue(null),
+      exportDiagnostics: vi.fn().mockResolvedValue('/tmp/lynavo-drive-diagnostics.zip'),
     },
     files: {
       openExternal: vi.fn().mockResolvedValue(null),
@@ -215,16 +214,11 @@ describe('SettingsPage', () => {
     expect(screen.queryByText('Windows 文件共享')).not.toBeInTheDocument();
   });
 
-  it('renders check for updates and triggers check updates action', async () => {
+  it('does not render desktop update checks', async () => {
     render(<SettingsPage />);
-    const updateBtn = screen.getByRole('button', { name: '检查更新' });
-    expect(updateBtn).toBeInTheDocument();
 
-    fireEvent.click(updateBtn);
-    expect(window.electronAPI?.support.checkForUpdates).toHaveBeenCalled();
-    await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith('已是最新版本');
-    });
+    expect(screen.queryByRole('button', { name: '检查更新' })).not.toBeInTheDocument();
+    expect(screen.queryByText('已是最新版本')).not.toBeInTheDocument();
   });
 
   it('renders the installed desktop version from app info', async () => {
@@ -240,12 +234,12 @@ describe('SettingsPage', () => {
     expect(screen.queryByText('Lynavo Drive Desktop')).not.toBeInTheDocument();
   });
 
-  it('renders support section and handles log upload', async () => {
+  it('renders support section and exports diagnostics locally', async () => {
     render(<SettingsPage />);
-    const uploadBtn = screen.getByRole('button', { name: '上传' });
-    expect(uploadBtn).toBeInTheDocument();
+    const exportBtn = screen.getByRole('button', { name: '导出' });
+    expect(exportBtn).toBeInTheDocument();
 
-    fireEvent.click(uploadBtn);
+    fireEvent.click(exportBtn);
 
     // Dialog should be open, find the description textarea
     const textarea = screen.getByPlaceholderText(
@@ -260,12 +254,14 @@ describe('SettingsPage', () => {
     const submitBtn = screen.getByTestId('submit-diagnostics-btn');
     fireEvent.click(submitBtn);
 
-    expect(window.electronAPI?.support.uploadDiagnostics).toHaveBeenCalledWith({
-      description: 'Test log description',
-      locale: expect.any(String),
-    });
+    expect(window.electronAPI?.support.exportDiagnostics).toHaveBeenCalledWith(
+      expect.any(String),
+      'Test log description',
+    );
     await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith('诊断包上传成功！感谢您的反馈');
+      expect(toast.success).toHaveBeenCalledWith('诊断包已导出', {
+        description: '/tmp/lynavo-drive-diagnostics.zip',
+      });
     });
   });
 

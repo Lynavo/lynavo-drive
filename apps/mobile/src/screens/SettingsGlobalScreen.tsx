@@ -36,15 +36,12 @@ import { ModalBlurBackdrop } from '../components/shared/ModalBlurBackdrop';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { androidBoxShadow } from '../utils/androidShadow';
 import {
-  exportDiagnostics,
   getAppInfo,
   getBindingState,
   getClientDisplayName,
-  getClientId,
   setClientDisplayName,
   type AppInfo,
 } from '../services/SyncEngineModule';
-import { diagnosticUploadService } from '../services/diagnostic-upload-service';
 import {
   loadStoredLanguagePreference,
   resolveLanguagePreference,
@@ -53,6 +50,10 @@ import {
 } from '../i18n/language-preference';
 import i18n from '../i18n';
 import { useTranslation } from 'react-i18next';
+import {
+  isDiagnosticsExportUnavailable,
+  shareDiagnosticsArchive,
+} from '../utils/shareDiagnosticsArchive';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'Settings'>;
 type TabKey = 'home' | 'files' | 'settings';
@@ -179,9 +180,7 @@ export function SettingsGlobalScreen({
     useState<LanguagePreference>('system');
   const [languageError, setLanguageError] = useState<string | null>(null);
   const [showEditDevice, setShowEditDevice] = useState(false);
-  const [isUploadingDiagnostics, setIsUploadingDiagnostics] = useState(false);
-  const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false);
-  const [diagnosticsNote, setDiagnosticsNote] = useState('');
+  const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -303,37 +302,26 @@ export function SettingsGlobalScreen({
     }
   };
 
-  const handleUploadDiagnostics = async () => {
-    if (isUploadingDiagnostics) return;
-    setIsUploadingDiagnostics(true);
-    const note = diagnosticsNote.trim();
-    const controller = new AbortController();
+  const handleExportDiagnostics = async () => {
+    if (isExportingDiagnostics) return;
+    setIsExportingDiagnostics(true);
     try {
-      const [zipPath, clientId] = await Promise.all([
-        exportDiagnostics(),
-        getClientId(),
-      ]);
-      await diagnosticUploadService.upload(
-        zipPath,
-        clientId,
-        controller.signal,
-        undefined,
-        note || 'Manual upload from mobile settings',
-      );
-      setShowDiagnosticsModal(false);
-      setDiagnosticsNote('');
-      Alert.alert(
-        t('settings.global.uploadSuccessTitle'),
-        t('settings.global.uploadSuccessMsg'),
-      );
+      await shareDiagnosticsArchive();
     } catch (error) {
-      console.warn('[SettingsGlobal] uploadDiagnostics failed:', error);
-      Alert.alert(
-        t('settings.global.uploadFailureTitle'),
-        t('settings.global.uploadFailureMsg'),
-      );
+      console.warn('[SettingsGlobal] exportDiagnostics failed:', error);
+      if (isDiagnosticsExportUnavailable(error)) {
+        Alert.alert(
+          t('settings.dialogs.exportUnavailable.title'),
+          t('settings.dialogs.exportUnavailable.body'),
+        );
+      } else {
+        Alert.alert(
+          t('settings.dialogs.exportFailed.title'),
+          t('settings.dialogs.exportFailed.body'),
+        );
+      }
     } finally {
-      setIsUploadingDiagnostics(false);
+      setIsExportingDiagnostics(false);
     }
   };
 
@@ -465,13 +453,12 @@ export function SettingsGlobalScreen({
               icon={ArrowUpToLine}
               iconBackground="#E4F5FF"
               iconColor="#1677D2"
-              title={t('settings.uploadDiagnostic.button')}
+              title={t('settings.global.exportDiagnosticsTitle')}
               subtitle={t('settings.rows.diagnosticsDesc')}
               showChevron
               last
               onPress={() => {
-                setDiagnosticsNote('');
-                setShowDiagnosticsModal(true);
+                void handleExportDiagnostics();
               }}
             />
           </SettingsSection>
@@ -527,61 +514,6 @@ export function SettingsGlobalScreen({
                 {isSavingDeviceName
                   ? t('settings.global.saving')
                   : t('settings.global.save')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </GlobalSettingsModalFrame>
-      ) : null}
-
-      {showDiagnosticsModal ? (
-        <GlobalSettingsModalFrame
-          title={t('settings.global.uploadDiagnosticsTitle')}
-          description={t('settings.global.uploadDiagnosticsDesc')}
-          icon={ArrowUpToLine}
-          tone="blue"
-          onClose={() => {
-            if (!isUploadingDiagnostics) {
-              setShowDiagnosticsModal(false);
-            }
-          }}
-        >
-          <TextInput
-            style={styles.modalNoteInput}
-            value={diagnosticsNote}
-            onChangeText={setDiagnosticsNote}
-            placeholder={t('settings.global.diagnosticsPlaceholder')}
-            placeholderTextColor="#A4ABB6"
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-            editable={!isUploadingDiagnostics}
-            returnKeyType="default"
-          />
-          <View style={styles.modalSplitActions}>
-            <TouchableOpacity
-              style={styles.modalSecondaryButton}
-              accessibilityRole="button"
-              activeOpacity={0.72}
-              disabled={isUploadingDiagnostics}
-              onPress={() => setShowDiagnosticsModal(false)}
-            >
-              <Text style={styles.modalSecondaryButtonText}>
-                {t('settings.global.cancel')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.modalPrimaryButton}
-              accessibilityRole="button"
-              activeOpacity={0.72}
-              disabled={isUploadingDiagnostics}
-              onPress={() => {
-                void handleUploadDiagnostics();
-              }}
-            >
-              <Text style={styles.modalPrimaryButtonText}>
-                {isUploadingDiagnostics
-                  ? t('settings.global.uploading')
-                  : t('settings.global.upload')}
               </Text>
             </TouchableOpacity>
           </View>

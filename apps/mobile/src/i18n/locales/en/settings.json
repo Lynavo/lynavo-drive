@@ -36,7 +36,7 @@
     "language": "Language",
     "faq": "FAQ",
     "faqDesc": "Usage instructions & FAQ",
-    "diagnosticsDesc": "Send logs and device status for troubleshooting"
+    "diagnosticsDesc": "Export logs and device status for troubleshooting"
   },
   "language": {
     "system": "System",
@@ -44,30 +44,10 @@
     "simplifiedChinese": "简中",
     "english": "English"
   },
-  "uploadDiagnostic": {
-    "button": "Upload diagnostics",
-    "confirm": {
-      "title": "Upload diagnostics",
-      "message": "Briefly describe the issue you ran into (e.g. upload stuck, team shared folder not loading). We'll bundle current runtime state along with your note and send it to the Lynavo Drive support team.",
-      "placeholder": "e.g. Upload stuck at 30%",
-      "ok": "Continue",
-      "cancel": "Cancel"
-    },
+  "diagnosticsExport": {
+    "button": "Export diagnostics",
     "progress": {
-      "title": "Uploading…",
-      "cancel": "Cancel"
-    },
-    "success": {
-      "toast": "Uploaded — reference {{refId}} (copied to clipboard)"
-    },
-    "failure": {
-      "toast": "Upload failed, please try again later"
-    },
-    "tooLarge": {
-      "toast": "Diagnostic bundle too large, please contact support"
-    },
-    "aborted": {
-      "toast": "Upload cancelled"
+      "title": "Exporting…"
     }
   },
   "actions": {
@@ -138,15 +118,7 @@
     "errorDeviceNameEmpty": "Please enter a device name",
     "errorDeviceNameSave": "Failed to save, please try again later",
     "gotIt": "Got It",
-    "uploadDiagnosticsTitle": "Upload Diagnostics",
-    "uploadDiagnosticsDesc": "Please briefly describe the issue you encountered to help us troubleshoot.",
-    "diagnosticsPlaceholder": "e.g., Transfer gets interrupted halfway",
-    "upload": "Upload",
-    "uploading": "Uploading...",
-    "uploadSuccessTitle": "Uploaded Successfully",
-    "uploadSuccessMsg": "Diagnostics bundle uploaded. Thank you for your feedback!",
-    "uploadFailureTitle": "Upload Failed",
-    "uploadFailureMsg": "An error occurred while uploading the diagnostics bundle. Please check your network and try again.",
+    "exportDiagnosticsTitle": "Export Diagnostics",
     "statusUnknown": "Unknown status",
     "connected": "Connected",
     "connecting": "Connecting",

@@ -20,26 +20,6 @@ import type { SidecarEvent } from '@lynavo-drive/contracts';
 import type { BonjourInstallResult } from '../shared/bonjour';
 import type { SidecarRuntimeState } from '../shared/sidecar-runtime';
 
-export type DiagnosticsUploadRequest = {
-  description: string;
-  locale?: string;
-};
-
-export type DiagnosticsUploadResult = {
-  refId: string;
-  uploadedAt: string;
-};
-
-export type UpdateCheckResult = {
-  updateAvailable: boolean;
-  latestVersion: string;
-  latestBuildNumber?: string;
-  minimumRequired?: boolean;
-  downloadUrl?: string;
-  releaseNotes?: string;
-  checkedAt: string;
-};
-
 export type PowerSaveState = {
   preventSleepDuringTransfer: boolean;
   blockingSleep: boolean;
@@ -117,9 +97,7 @@ export interface ElectronAPI {
     getLocalIPs(): string[];
   };
   support: {
-    uploadDiagnostics(request: DiagnosticsUploadRequest): Promise<DiagnosticsUploadResult>;
     exportDiagnostics(locale?: string, description?: string): Promise<string | null>;
-    checkForUpdates(): Promise<UpdateCheckResult>;
     getAppInfo(): Promise<{ name: string; version: string; buildNumber: string }>;
   };
   power: {

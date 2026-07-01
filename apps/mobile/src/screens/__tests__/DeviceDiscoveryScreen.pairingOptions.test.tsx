@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   Alert,
-  Clipboard,
   NativeEventEmitter,
   NativeModules,
   Platform,
@@ -53,23 +52,11 @@ jest.mock('../../components/Icon', () => ({
   },
 }));
 
-const mockUploadDiagnostics = jest.fn();
-jest.mock('../../services/diagnostic-upload-service', () => {
-  class DiagnosticUploadError extends Error {
-    readonly detail: { kind: string; status?: number };
-    constructor(detail: { kind: string; status?: number }) {
-      super(detail.kind);
-      this.detail = detail;
-      this.name = 'DiagnosticUploadError';
-    }
-  }
-  return {
-    DiagnosticUploadError,
-    diagnosticUploadService: {
-      upload: (...args: unknown[]) => mockUploadDiagnostics(...args),
-    },
-  };
-});
+const mockShareDiagnosticsArchive = jest.fn();
+jest.mock('../../utils/shareDiagnosticsArchive', () => ({
+  shareDiagnosticsArchive: () => mockShareDiagnosticsArchive(),
+  isDiagnosticsExportUnavailable: jest.fn(() => false),
+}));
 
 jest.mock('../../utils/onboardingStorage', () => ({
   hasSeenUnconnectedGuide: jest.fn().mockResolvedValue(true),
@@ -107,10 +94,9 @@ describe('DeviceDiscoveryScreen pairing options', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUploadDiagnostics.mockResolvedValue({
-      refId: 'DISC1234',
-      uploadedAt: '2026-05-07T12:00:00.000Z',
-    });
+    mockShareDiagnosticsArchive.mockResolvedValue(
+      '/tmp/discovery-diagnostics.zip',
+    );
     Object.defineProperty(Platform, 'OS', {
       configurable: true,
       value: 'ios',
@@ -120,8 +106,6 @@ describe('DeviceDiscoveryScreen pairing options', () => {
       .spyOn(NativeEventEmitter.prototype, 'addListener')
       .mockReturnValue({ remove: jest.fn() } as any);
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
-    (Alert as typeof Alert & { prompt: jest.Mock }).prompt = jest.fn();
-    jest.spyOn(Clipboard, 'setString').mockImplementation(() => undefined);
   });
 
   it('opens the v0-style manual IP pairing sheet from the pairing menu', async () => {
@@ -160,7 +144,7 @@ describe('DeviceDiscoveryScreen pairing options', () => {
     await waitFor(() => {
       expect(getByText('手動輸入 IP')).toBeTruthy();
       expect(getByText('掃碼配對')).toBeTruthy();
-      expect(getByText('上傳診斷包')).toBeTruthy();
+      expect(getByText('匯出診斷包')).toBeTruthy();
     });
     expect(queryByText('去哪裡找連接碼和 IP？')).toBeNull();
 
@@ -171,86 +155,35 @@ describe('DeviceDiscoveryScreen pairing options', () => {
     });
   });
 
-  it('prompts for a diagnostic note before uploading from the pairing popover on iOS', async () => {
+  it('exports diagnostics from the pairing popover on iOS', async () => {
     const { getByText } = render(<DeviceDiscoveryScreen />);
 
     fireEvent.press(getByText('手動配對'));
-    await waitFor(() => expect(getByText('上傳診斷包')).toBeTruthy());
+    await waitFor(() => expect(getByText('匯出診斷包')).toBeTruthy());
 
-    fireEvent.press(getByText('上傳診斷包'));
-
-    await waitFor(() => {
-      expect(Alert.prompt).toHaveBeenCalledWith(
-        '上傳診斷包',
-        expect.stringContaining('請簡述你遇到的問題'),
-        expect.any(Array),
-        'plain-text',
-        '',
-      );
-    });
-
-    const promptButtons = (Alert.prompt as jest.Mock).mock
-      .calls[0][2] as Array<{
-      text: string;
-      onPress?: (note?: string) => void;
-    }>;
-    const continueButton = promptButtons.find(button => button.text === '繼續');
-    expect(continueButton?.onPress).toBeDefined();
-
-    await act(async () => {
-      continueButton?.onPress?.('  搜尋設備頁上傳卡住  ');
-    });
+    fireEvent.press(getByText('匯出診斷包'));
 
     await waitFor(() => {
-      expect(mockNativeSyncEngine.exportDiagnostics).toHaveBeenCalled();
-      expect(mockNativeSyncEngine.getClientId).toHaveBeenCalled();
-      expect(mockUploadDiagnostics).toHaveBeenCalledWith(
-        'file:///tmp/discovery-diagnostics.zip',
-        'mobile-client-id',
-        expect.any(AbortSignal),
-        expect.any(Function),
-        '搜尋設備頁上傳卡住',
-      );
+      expect(mockShareDiagnosticsArchive).toHaveBeenCalledTimes(1);
     });
-    expect(Clipboard.setString).toHaveBeenCalledWith('DISC1234');
   });
 
-  it('shows a diagnostic note modal before uploading from the pairing popover on Android', async () => {
+  it('exports diagnostics from the pairing popover on Android', async () => {
     Object.defineProperty(Platform, 'OS', {
       configurable: true,
       value: 'android',
     });
 
-    const { getByPlaceholderText, getByText } = render(
-      <DeviceDiscoveryScreen />,
-    );
+    const { getByText } = render(<DeviceDiscoveryScreen />);
 
     fireEvent.press(getByText('手動配對'));
-    await waitFor(() => expect(getByText('上傳診斷包')).toBeTruthy());
+    await waitFor(() => expect(getByText('匯出診斷包')).toBeTruthy());
 
-    fireEvent.press(getByText('上傳診斷包'));
-
-    const noteInput = await waitFor(() =>
-      getByPlaceholderText('例如：上傳卡在 30%'),
-    );
-    fireEvent.changeText(noteInput, '  Android 找不到設備  ');
-
-    await act(async () => {
-      fireEvent.press(getByText('繼續'));
-    });
+    fireEvent.press(getByText('匯出診斷包'));
 
     await waitFor(() => {
-      expect(Alert.prompt).not.toHaveBeenCalled();
-      expect(mockNativeSyncEngine.exportDiagnostics).toHaveBeenCalled();
-      expect(mockUploadDiagnostics).toHaveBeenCalledWith(
-        'file:///tmp/discovery-diagnostics.zip',
-        'mobile-client-id',
-        expect.any(AbortSignal),
-        expect.any(Function),
-        'Android 找不到設備',
-      );
+      expect(mockShareDiagnosticsArchive).toHaveBeenCalledTimes(1);
     });
-    expect(Clipboard.setString).toHaveBeenCalledWith('DISC1234');
   });
 
   it('navigates to QRScanner from the scan pairing option', async () => {

@@ -38,10 +38,12 @@ test('prints the review release plan without running build commands in dry-run m
   assert.match(result.stdout, /Channel:\s+review/);
   assert.doesNotMatch(result.stdout, /Market:/);
   assert.doesNotMatch(result.stdout, /market/i);
-  assert.match(result.stdout, /Support API URL:\s+https:\/\/review-api\.lynavo\.com/);
   assert.match(result.stdout, /DRY RUN/);
   assert.match(result.stdout, /LYNAVO_RELEASE_CHANNEL=review/);
-  assert.match(result.stdout, /LYNAVO_SUPPORT_API_BASE_URL=https:\/\/review-api\.lynavo\.com/);
+  assert.doesNotMatch(result.stdout, /Support API URL:/);
+  assert.doesNotMatch(result.stdout, /LYNAVO_SUPPORT_API_BASE_URL=/);
+  assert.doesNotMatch(result.stdout, /LYNAVO_DESKTOP_UPDATE_URL=/);
+  assert.doesNotMatch(result.stdout, /LYNAVO_DIAGNOSTICS_UPLOAD_URL=/);
   assert.doesNotMatch(result.stdout, /LYNAVO_API_BASE_URL=/);
   assert.doesNotMatch(result.stdout, /LYNAVO_CLIENT_CONFIG_BASE_URL=/);
   assert.doesNotMatch(result.stdout, /LYNAVO_GIFTCARD_REDEEM_BASE_URL=/);
@@ -69,10 +71,12 @@ test('prints the prod release plan without market or legacy API env in dry-run m
   assert.match(result.stdout, /Channel:\s+prod/);
   assert.doesNotMatch(result.stdout, /Market:/);
   assert.doesNotMatch(result.stdout, /market/i);
-  assert.match(result.stdout, /Support API URL:\s+https:\/\/api\.lynavo\.com/);
   assert.match(result.stdout, /DRY RUN/);
   assert.match(result.stdout, /LYNAVO_RELEASE_CHANNEL=prod/);
-  assert.match(result.stdout, /LYNAVO_SUPPORT_API_BASE_URL=https:\/\/api\.lynavo\.com/);
+  assert.doesNotMatch(result.stdout, /Support API URL:/);
+  assert.doesNotMatch(result.stdout, /LYNAVO_SUPPORT_API_BASE_URL=/);
+  assert.doesNotMatch(result.stdout, /LYNAVO_DESKTOP_UPDATE_URL=/);
+  assert.doesNotMatch(result.stdout, /LYNAVO_DIAGNOSTICS_UPLOAD_URL=/);
   assert.doesNotMatch(result.stdout, /LYNAVO_API_BASE_URL=/);
   assert.doesNotMatch(result.stdout, /SYNCFLOW_MARKET=/);
   assert.doesNotMatch(result.stdout, /SYNCFLOW_API_BASE_URL=/);
@@ -123,7 +127,9 @@ test('release execution scrubs stale commercial and legacy parent env before spa
     const childEnv = JSON.parse(readFileSync(capturePath, 'utf8'));
 
     assert.equal(childEnv.LYNAVO_RELEASE_CHANNEL, 'review');
-    assert.equal(childEnv.LYNAVO_SUPPORT_API_BASE_URL, 'https://review-api.lynavo.com');
+    assert.equal(Object.hasOwn(childEnv, 'LYNAVO_SUPPORT_API_BASE_URL'), false);
+    assert.equal(Object.hasOwn(childEnv, 'LYNAVO_DESKTOP_UPDATE_URL'), false);
+    assert.equal(Object.hasOwn(childEnv, 'LYNAVO_DIAGNOSTICS_UPLOAD_URL'), false);
     assert.equal(Object.hasOwn(childEnv, 'LYNAVO_API_BASE_URL'), false);
     assert.equal(childEnv.ELECTRON_BUILDER_CONFIG, 'electron-builder.yml');
     assert.equal(Object.hasOwn(childEnv, 'SYNCFLOW_MARKET'), false);

@@ -826,36 +826,6 @@ class NativeSyncEngineModule(
   }
 
   @ReactMethod
-  fun uploadDiagnosticsArchive(params: ReadableMap, promise: Promise) {
-    thread(name = "NativeSyncEngineDiagnosticsUpload", isDaemon = true) {
-      try {
-        val uploadUrl = params.getStringOrNull("url")?.trim().orEmpty()
-        val archivePath = params.getStringOrNull("archivePath")?.trim().orEmpty()
-        val note = params.getStringOrNull("note")?.trim().orEmpty()
-        val headers = if (params.hasKey("headers") && !params.isNull("headers")) {
-          params.getMap("headers")
-        } else {
-          null
-        }
-
-        val result = performDiagnosticsArchiveUpload(
-          uploadUrl = uploadUrl,
-          archivePath = archivePath,
-          note = note,
-          headers = readableMapToStringMap(headers),
-        )
-        promise.resolve(result)
-      } catch (error: NativeBridgeException) {
-        diagnosticsUploadLog("failed code=${error.nativeCode} message=${error.message.orEmpty()}")
-        promise.reject(error.nativeCode, error.message, error)
-      } catch (error: Throwable) {
-        diagnosticsUploadLog("failed code=NETWORK_ERROR message=${error.message.orEmpty()}")
-        promise.reject("NETWORK_ERROR", error.message ?: "Diagnostics upload failed", error)
-      }
-    }
-  }
-
-  @ReactMethod
   fun recordDiagnosticsLog(category: String, message: String) {
     recordNativeLog(category.trim().ifBlank { "JS" }, message)
   }
@@ -5433,105 +5403,6 @@ class NativeSyncEngineModule(
     }
   }
 
-  private fun readableMapToStringMap(map: ReadableMap?): Map<String, String> {
-    if (map == null) {
-      return emptyMap()
-    }
-
-    val result = mutableMapOf<String, String>()
-    val iterator = map.keySetIterator()
-    while (iterator.hasNextKey()) {
-      val key = iterator.nextKey()
-      if (!map.isNull(key)) {
-        result[key] = map.getString(key).orEmpty()
-      }
-    }
-    return result
-  }
-
-  private fun performDiagnosticsArchiveUpload(
-    uploadUrl: String,
-    archivePath: String,
-    note: String,
-    headers: Map<String, String>,
-  ): WritableMap {
-    if (uploadUrl.isBlank()) {
-      throw NativeBridgeException("INVALID_UPLOAD_URL", "Missing diagnostics upload URL")
-    }
-
-    val archive = diagnosticsArchiveFileFromPath(archivePath)
-    if (!archive.isFile) {
-      throw NativeBridgeException("FILE_NOT_FOUND", "Diagnostics archive does not exist")
-    }
-
-    val boundary = "lynavo-drive-${UUID.randomUUID()}"
-    val connection = URL(uploadUrl).openConnection() as HttpURLConnection
-    try {
-      connection.requestMethod = "POST"
-      connection.doOutput = true
-      connection.connectTimeout = DIAGNOSTICS_UPLOAD_TIMEOUT_MS
-      connection.readTimeout = DIAGNOSTICS_UPLOAD_TIMEOUT_MS
-      connection.setChunkedStreamingMode(0)
-
-      for ((key, value) in headers) {
-        if (!key.equals("Content-Type", ignoreCase = true) && key.isNotBlank()) {
-          connection.setRequestProperty(key, value)
-        }
-      }
-      connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-      diagnosticsUploadLog(
-        "started url=$uploadUrl archive=${archive.name} bytes=${archive.length()} noteLen=${note.length}",
-      )
-
-      BufferedOutputStream(connection.outputStream).use { output ->
-        writeMultipartField(output, boundary, "client_id", getOrCreateClientId())
-        writeMultipartField(output, boundary, "platform", "android")
-        if (note.isNotBlank()) {
-          writeMultipartField(output, boundary, "note", note)
-        }
-        writeMultipartFile(output, boundary, "bundle", archive)
-        writeUtf8(output, "--$boundary--\r\n")
-      }
-
-      val statusCode = connection.responseCode
-      val responseBody = readResponseBody(connection, statusCode)
-      diagnosticsUploadLog(
-        "completed status=$statusCode responseBytes=${responseBody.toByteArray(StandardCharsets.UTF_8).size}",
-      )
-
-      if (statusCode == HttpURLConnection.HTTP_ENTITY_TOO_LARGE) {
-        throw NativeBridgeException("BUNDLE_TOO_LARGE", "Diagnostics bundle too large")
-      }
-      if (statusCode != HttpURLConnection.HTTP_OK) {
-        throw NativeBridgeException(
-          "SERVER_ERROR",
-          responseBody.takeIf { it.isNotBlank() } ?: "Diagnostics upload failed with HTTP $statusCode",
-        )
-      }
-
-      val json = JSONObject(responseBody)
-      val refId = json.optString("ref_id").takeIf { it.isNotBlank() }
-        ?: throw NativeBridgeException("SERVER_ERROR", "Diagnostics upload response missing ref_id")
-      val uploadedAt = json.optString("uploaded_at").takeIf { it.isNotBlank() }
-        ?: throw NativeBridgeException("SERVER_ERROR", "Diagnostics upload response missing uploaded_at")
-
-      return Arguments.createMap().apply {
-        putString("ref_id", refId)
-        putString("uploaded_at", uploadedAt)
-      }
-    } finally {
-      connection.disconnect()
-    }
-  }
-
-  private fun diagnosticsArchiveFileFromPath(rawPath: String): File {
-    val normalized = rawPath.trim()
-    if (normalized.startsWith("file://")) {
-      return File(Uri.parse(normalized).path.orEmpty())
-    }
-    return File(normalized)
-  }
-
   private fun writeDiagnosticsArchive(
     archive: File,
     diagnosticsPayload: JSONObject,
@@ -5548,40 +5419,6 @@ class NativeSyncEngineModule(
         engineLogLines = engineLogLines,
       ),
     )
-  }
-
-  private fun diagnosticsUploadLog(message: String) {
-    recordNativeLog("DiagnosticsUpload", message)
-  }
-
-  private fun writeMultipartField(
-    output: OutputStream,
-    boundary: String,
-    name: String,
-    value: String,
-  ) {
-    writeUtf8(output, "--$boundary\r\n")
-    writeUtf8(output, "Content-Disposition: form-data; name=\"$name\"\r\n\r\n")
-    writeUtf8(output, value)
-    writeUtf8(output, "\r\n")
-  }
-
-  private fun writeMultipartFile(
-    output: OutputStream,
-    boundary: String,
-    name: String,
-    file: File,
-  ) {
-    writeUtf8(output, "--$boundary\r\n")
-    writeUtf8(
-      output,
-      "Content-Disposition: form-data; name=\"$name\"; filename=\"${file.name}\"\r\n",
-    )
-    writeUtf8(output, "Content-Type: application/zip\r\n\r\n")
-    BufferedInputStream(file.inputStream()).use { input ->
-      input.copyTo(output)
-    }
-    writeUtf8(output, "\r\n")
   }
 
   private fun writeUtf8(output: OutputStream, value: String) {
@@ -6616,7 +6453,6 @@ class NativeSyncEngineModule(
     private const val MAX_DIAGNOSTICS_LOG_LINES = 2_000
     private const val PHOTO_PERMISSION_REQUEST_CODE = 39_394
     private const val DISCOVERY_PERMISSION_REQUEST_CODE = 39_395
-    private const val DIAGNOSTICS_UPLOAD_TIMEOUT_MS = 30_000
     private const val ANDROID_14_API = 34
     private const val PERMISSION_READ_MEDIA_VISUAL_USER_SELECTED =
       "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"

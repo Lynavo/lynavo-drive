@@ -8,7 +8,6 @@ import * as RNLocalize from 'react-native-localize';
 import { AuthProvider } from './stores/auth-store';
 import { RecentDesktopsProvider } from './stores/recent-desktops-store';
 import { RootNavigator } from './navigation/RootNavigator';
-import { loadDebugBaseUrlOverride } from './services/config';
 import { refreshNativeAppFeatureSettings } from './services/app-config-service';
 import i18n from './i18n';
 import {
@@ -19,9 +18,6 @@ import {
 export function App() {
   const isDarkMode = useColorScheme() === 'dark';
 
-  // Load any persisted dev-only API base URL override BEFORE the AuthProvider
-  // mounts and triggers its first request — see services/config.ts for the
-  // real-device debug instructions.
   useEffect(() => {
     let isDisposed = false;
     let refreshInFlight = false;
@@ -43,7 +39,6 @@ export function App() {
     };
 
     void (async () => {
-      await loadDebugBaseUrlOverride();
       if (!isDisposed) {
         await refreshAppStartupSettings();
       }

@@ -56,6 +56,6 @@
     "supportEmail": "客服邮箱",
     "exportDiagnostics": "导出诊断包",
     "exportingDiagnostics": "正在导出…",
-    "exportHint": "将日志发送给客服以协助排查问题"
+    "exportHint": "需要时可通过系统分享或邮件发送给维护者/支持方"
   }
 }

@@ -11,7 +11,6 @@ import { requestMacFilesAndFoldersPermissionsOnStartup } from './macos-files-fol
 import { attachRendererLogging } from './renderer-logging';
 import { SidecarManager } from './sidecar-manager';
 import { sidecarClient } from './sidecar-client';
-import { checkForUpdatesOnStartup } from './startup-update-check';
 import { createVideoThumbnailEventHandler } from './video-thumbnail-generator';
 import { WsBridge } from './ws-bridge';
 import { getMainWindowChromeOptions, getMainWindowSizeOptions } from './window-chrome';
@@ -121,7 +120,6 @@ app.whenReady().then(async () => {
     log.error('Failed to start sidecar:', err);
   });
   await createMainWindow();
-  void checkForUpdatesOnStartup(() => mainWindow);
 
   app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) {

@@ -14,10 +14,6 @@ jest.mock('../src/i18n', () => ({
   __esModule: true,
 }));
 
-jest.mock('../src/services/config', () => ({
-  loadDebugBaseUrlOverride: jest.fn(),
-}));
-
 jest.mock('../src/stores/auth-store', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => children,
 }));

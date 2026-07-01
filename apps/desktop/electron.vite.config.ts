@@ -7,9 +7,6 @@ const projectRoot = fileURLToPath(new URL('.', import.meta.url));
 
 const envDefine = {
   'process.env.LYNAVO_RELEASE_CHANNEL': JSON.stringify(process.env.LYNAVO_RELEASE_CHANNEL || ''),
-  'process.env.LYNAVO_SUPPORT_API_BASE_URL': JSON.stringify(
-    process.env.LYNAVO_SUPPORT_API_BASE_URL || '',
-  ),
 };
 
 export default defineConfig({

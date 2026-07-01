@@ -13,22 +13,22 @@ test('defines the supported release channels', () => {
 });
 
 test('keeps production profiles off the review server', () => {
-  assert.equal(getReleaseProfile('prod').supportApiBaseUrl, 'https://api.lynavo.com');
   assert.equal(getReleaseProfile('prod').review, false);
+  assert.equal(Object.hasOwn(getReleaseProfile('prod'), 'supportApiBaseUrl'), false);
 });
 
-test('keeps review profiles on the review server without a market', () => {
+test('keeps review profiles without official API endpoints or a market', () => {
   assert.deepEqual(
     {
       channel: getReleaseProfile('review').channel,
       review: getReleaseProfile('review').review,
-      supportApiBaseUrl: getReleaseProfile('review').supportApiBaseUrl,
+      hasSupportApiBaseUrl: Object.hasOwn(getReleaseProfile('review'), 'supportApiBaseUrl'),
       hasMarket: Object.hasOwn(getReleaseProfile('review'), 'market'),
     },
     {
       channel: 'review',
       review: true,
-      supportApiBaseUrl: 'https://review-api.lynavo.com',
+      hasSupportApiBaseUrl: false,
       hasMarket: false,
     },
   );
@@ -40,7 +40,9 @@ test('does not bake an explicit auth base URL into production release env', () =
     targets: ['mac'],
   });
 
-  assert.equal(plan.env.LYNAVO_SUPPORT_API_BASE_URL, 'https://api.lynavo.com');
+  assert.equal(Object.hasOwn(plan.env, 'LYNAVO_SUPPORT_API_BASE_URL'), false);
+  assert.equal(Object.hasOwn(plan.env, 'LYNAVO_DESKTOP_UPDATE_URL'), false);
+  assert.equal(Object.hasOwn(plan.env, 'LYNAVO_DIAGNOSTICS_UPLOAD_URL'), false);
   assert.equal(Object.hasOwn(plan.env, 'LYNAVO_API_BASE_URL'), false);
   assert.equal(Object.hasOwn(plan.env, 'LYNAVO_GIFTCARD_REDEEM_BASE_URL'), false);
   assert.equal(Object.hasOwn(plan.env, 'SYNCFLOW_AUTH_BASE_URL'), false);
@@ -67,8 +69,11 @@ test('builds commands and env from the selected profile', () => {
   assert.equal(plan.profile.name, 'review');
   assert.equal(plan.profile.channel, 'review');
   assert.equal(Object.hasOwn(plan.profile, 'market'), false);
+  assert.equal(Object.hasOwn(plan.profile, 'supportApiBaseUrl'), false);
   assert.equal(plan.env.LYNAVO_RELEASE_CHANNEL, 'review');
-  assert.equal(plan.env.LYNAVO_SUPPORT_API_BASE_URL, 'https://review-api.lynavo.com');
+  assert.equal(Object.hasOwn(plan.env, 'LYNAVO_SUPPORT_API_BASE_URL'), false);
+  assert.equal(Object.hasOwn(plan.env, 'LYNAVO_DESKTOP_UPDATE_URL'), false);
+  assert.equal(Object.hasOwn(plan.env, 'LYNAVO_DIAGNOSTICS_UPLOAD_URL'), false);
   assert.equal(Object.hasOwn(plan.env, 'LYNAVO_API_BASE_URL'), false);
   assert.equal(Object.hasOwn(plan.env, 'LYNAVO_CLIENT_CONFIG_BASE_URL'), false);
   assert.equal(Object.hasOwn(plan.env, 'LYNAVO_GIFTCARD_REDEEM_BASE_URL'), false);
@@ -78,12 +83,8 @@ test('builds commands and env from the selected profile', () => {
   assert.equal(plan.env.ELECTRON_BUILDER_CONFIG, 'electron-builder.yml');
   assert.equal(plan.mobileReleaseProfileSource.includes("name: 'review'"), true);
   assert.equal(plan.mobileReleaseProfileSource.includes("channel: 'review'"), true);
-  assert.equal(
-    plan.mobileReleaseProfileSource.includes(
-      "supportApiBaseUrl: 'https://review-api.lynavo.com'",
-    ),
-    true,
-  );
+  assert.equal(plan.mobileReleaseProfileSource.includes('supportApiBaseUrl'), false);
+  assert.equal(plan.mobileReleaseProfileSource.includes('releaseSupportApiBaseUrl'), false);
   assert.equal(plan.mobileReleaseProfileSource.includes('releaseApiBaseUrl'), false);
   assert.doesNotMatch(plan.mobileReleaseProfileSource, /\bmarket\b/i);
 

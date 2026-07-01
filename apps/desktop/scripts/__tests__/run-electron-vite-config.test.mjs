@@ -16,14 +16,16 @@ test('desktop dev bootstrap does not resolve official OAuth config from sibling 
   assert.doesNotMatch(script, /SYNCFLOW_APPLE_SIGN_CONFIG_DIR\s*=/);
 });
 
-test('desktop dev bootstrap references Lynavo env and does not default legacy market', () => {
+test('desktop dev bootstrap references only OSS release env and does not default legacy market', () => {
   const script = readFileSync(new URL('../run-electron-vite.cjs', import.meta.url), 'utf8');
   const viteConfig = readFileSync(
     new URL('../../electron.vite.config.ts', import.meta.url),
     'utf8',
   );
 
-  assert.match(script, /LYNAVO_SUPPORT_API_BASE_URL/);
+  assert.doesNotMatch(script, /LYNAVO_SUPPORT_API_BASE_URL/);
+  assert.doesNotMatch(script, /LYNAVO_DESKTOP_UPDATE_URL/);
+  assert.doesNotMatch(script, /LYNAVO_DIAGNOSTICS_UPLOAD_URL/);
   assert.doesNotMatch(script, /LYNAVO_API_BASE_URL/);
   assert.match(script, /LYNAVO_RELEASE_CHANNEL/);
   assert.doesNotMatch(script, /LYNAVO_GIFTCARD_REDEEM_BASE_URL/);
@@ -41,6 +43,8 @@ test('desktop dev bootstrap strips official OAuth env from the OSS runtime', () 
     parentEnv: {
       LYNAVO_API_BASE_URL: 'https://api.lynavo.com',
       LYNAVO_SUPPORT_API_BASE_URL: 'https://api.lynavo.com',
+      LYNAVO_DESKTOP_UPDATE_URL: 'https://api.lynavo.com/update',
+      LYNAVO_DIAGNOSTICS_UPLOAD_URL: 'https://api.lynavo.com/diagnostics',
       SYNCFLOW_GOOGLE_CLIENT_CONFIG_FILE: '/secure/google-client.json',
       GOOGLE_CLIENT_SECRET_FILE: '/secure/google-secret.json',
       GOOGLE_CLIENT_ID: 'google-client-id',
@@ -62,9 +66,12 @@ test('desktop dev bootstrap strips official OAuth env from the OSS runtime', () 
   assert.equal(Object.hasOwn(env, 'APPLE_REDIRECT_URI'), false);
   assert.equal(Object.hasOwn(env, 'SYNCFLOW_GOOGLE_CLIENT_CONFIG_DIR'), false);
   assert.equal(Object.hasOwn(env, 'SYNCFLOW_APPLE_SIGN_CONFIG_DIR'), false);
+  assert.equal(Object.hasOwn(env, 'LYNAVO_SUPPORT_API_BASE_URL'), false);
+  assert.equal(Object.hasOwn(env, 'LYNAVO_DESKTOP_UPDATE_URL'), false);
+  assert.equal(Object.hasOwn(env, 'LYNAVO_DIAGNOSTICS_UPLOAD_URL'), false);
 });
 
-test('desktop dev bootstrap bridges only the OSS support API URL over stale legacy API env', () => {
+test('desktop dev bootstrap bridges only release channel over stale official and legacy API env', () => {
   const projectRoot = path.join('/tmp/workspace/SyncFlow', 'apps', 'desktop');
   const env = buildElectronViteEnv({
     command: 'dev',
@@ -72,6 +79,8 @@ test('desktop dev bootstrap bridges only the OSS support API URL over stale lega
       LYNAVO_RELEASE_CHANNEL: 'prod',
       LYNAVO_API_BASE_URL: 'https://api.lynavo.com',
       LYNAVO_SUPPORT_API_BASE_URL: 'https://api.lynavo.com',
+      LYNAVO_DESKTOP_UPDATE_URL: 'https://api.lynavo.com/update',
+      LYNAVO_DIAGNOSTICS_UPLOAD_URL: 'https://api.lynavo.com/diagnostics',
       LYNAVO_CLIENT_CONFIG_BASE_URL: 'https://config.lynavo.com',
       LYNAVO_GIFTCARD_REDEEM_BASE_URL: 'https://gift.lynavo.com',
       SYNCFLOW_API_BASE_URL: 'https://old.example',
@@ -82,7 +91,9 @@ test('desktop dev bootstrap bridges only the OSS support API URL over stale lega
   });
 
   assert.equal(env.LYNAVO_RELEASE_CHANNEL, 'prod');
-  assert.equal(env.LYNAVO_SUPPORT_API_BASE_URL, 'https://api.lynavo.com');
+  assert.equal(Object.hasOwn(env, 'LYNAVO_SUPPORT_API_BASE_URL'), false);
+  assert.equal(Object.hasOwn(env, 'LYNAVO_DESKTOP_UPDATE_URL'), false);
+  assert.equal(Object.hasOwn(env, 'LYNAVO_DIAGNOSTICS_UPLOAD_URL'), false);
   assert.equal(Object.hasOwn(env, 'LYNAVO_API_BASE_URL'), false);
   assert.equal(Object.hasOwn(env, 'VIVIDROP_API_BASE_URL'), false);
   assert.equal(Object.hasOwn(env, 'SYNCFLOW_API_BASE_URL'), false);
@@ -107,7 +118,9 @@ test('desktop dev bootstrap removes explicit legacy auth in the OSS runtime', ()
   });
 
   assert.equal(Object.hasOwn(env, 'SYNCFLOW_API_BASE_URL'), false);
-  assert.equal(env.LYNAVO_SUPPORT_API_BASE_URL, 'https://review-api.lynavo.com');
+  assert.equal(Object.hasOwn(env, 'LYNAVO_SUPPORT_API_BASE_URL'), false);
+  assert.equal(Object.hasOwn(env, 'LYNAVO_DESKTOP_UPDATE_URL'), false);
+  assert.equal(Object.hasOwn(env, 'LYNAVO_DIAGNOSTICS_UPLOAD_URL'), false);
   assert.equal(Object.hasOwn(env, 'LYNAVO_API_BASE_URL'), false);
   assert.equal(Object.hasOwn(env, 'SYNCFLOW_AUTH_BASE_URL'), false);
 });

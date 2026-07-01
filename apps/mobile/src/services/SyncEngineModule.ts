@@ -513,8 +513,7 @@ export async function getClientId(): Promise<string> {
 /**
  * Ask the native layer to collect logs, snapshots, and the local SQLite
  * database into a zip archive.  Returns the local file-system path to the
- * generated archive, which can be passed directly to
- * `diagnosticUploadService.upload()` or shared via the system share sheet.
+ * generated archive, which can be shared via the system share sheet.
  */
 export async function exportDiagnostics(): Promise<string> {
   const result = await NativeSyncEngine.exportDiagnostics();

@@ -148,16 +148,7 @@ const mockAPI: ElectronAPI = {
   platform: mockPlatform,
   power: mockPower,
   support: {
-    uploadDiagnostics: async () => ({
-      refId: 'local-mock',
-      uploadedAt: new Date().toISOString(),
-    }),
     exportDiagnostics: async () => null,
-    checkForUpdates: async () => ({
-      updateAvailable: false,
-      latestVersion: '0.1.1',
-      checkedAt: new Date().toISOString(),
-    }),
     getAppInfo: async () => ({ name: 'LynavoDrive', version: '0.1.1', buildNumber: '5' }),
   },
 };

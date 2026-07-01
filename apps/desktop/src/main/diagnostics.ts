@@ -1,25 +1,17 @@
 import { app, dialog, shell } from 'electron';
 import log from 'electron-log';
 import { execFile, type ExecFileOptions } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { hostname, networkInterfaces, release, tmpdir, type } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
-import {
-  LYNAVO_REVIEW_SUPPORT_API_BASE_URL,
-  LYNAVO_SUPPORT_API_BASE_URL,
-} from '@lynavo-drive/contracts';
-import { desktopClientHeaders, getAppInfo, type AppInfo } from './app-info';
+import { getAppInfo, type AppInfo } from './app-info';
 import { sidecarClient } from './sidecar-client';
 import type { SidecarManager } from './sidecar-manager';
 import { getMainStrings } from '../shared/main-i18n';
 
 const execFileAsync = promisify(execFile);
 const DIAGNOSTICS_LOG_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
-const DIAGNOSTICS_UPLOAD_LOG_TAIL_BYTES = 256 * 1024;
-const DIAGNOSTICS_UPLOAD_DB_MAX_BYTES = 128 * 1024;
-const DIAGNOSTICS_UPLOAD_ARCHIVE_MAX_BYTES = 900 * 1024;
 const MACOS_POWER_LOG_MAX_BUFFER_BYTES = 2 * 1024 * 1024;
 const MACOS_POWER_LOG_TIMEOUT_MS = 1_500;
 
@@ -69,12 +61,6 @@ type DiagnosticSnapshot = {
     node: string;
     v8: string | null;
   };
-  supportApi: {
-    diagnosticsUploadUrl: string;
-    updateCheckUrl: string;
-    baseUrl: string;
-    baseUrlSource: string;
-  };
   device: {
     model: string;
     osVersion: string;
@@ -103,8 +89,6 @@ type DiagnosticSnapshot = {
   };
 };
 
-type DiagnosticsBundleMode = 'export' | 'upload';
-
 type CommandRunner = (
   file: string,
   args?: readonly string[],
@@ -122,40 +106,6 @@ export type PowerDiagnosticsResult = {
   source: string;
   error?: string;
 };
-
-export type DiagnosticsUploadRequest = {
-  description: string;
-  locale?: string;
-};
-
-export type DiagnosticsUploadResult = {
-  refId: string;
-  uploadedAt: string;
-};
-
-export type UpdateCheckResult = {
-  updateAvailable: boolean;
-  latestVersion: string;
-  latestBuildNumber?: string;
-  minimumRequired?: boolean;
-  downloadUrl?: string;
-  releaseNotes?: string;
-  checkedAt: string;
-};
-
-export class DiagnosticsUploadError extends Error {
-  constructor(
-    public readonly code:
-      | 'NETWORK_UNREACHABLE'
-      | 'BUNDLE_TOO_LARGE'
-      | 'SERVER_ERROR'
-      | 'INVALID_RESPONSE',
-    message: string,
-  ) {
-    super(`${code}: ${message}`);
-    this.name = 'DiagnosticsUploadError';
-  }
-}
 
 function diagnosticsTimestamp(): string {
   const now = new Date();
@@ -181,57 +131,12 @@ async function isRecentDiagnosticLog(path: string, now = Date.now()): Promise<bo
   }
 }
 
-async function copyDiagnosticLogFile(
-  sourcePath: string,
-  destinationPath: string,
-  mode: DiagnosticsBundleMode,
-): Promise<void> {
-  if (mode === 'export') {
-    await copyFile(sourcePath, destinationPath);
-    return;
-  }
-
-  const info = await stat(sourcePath);
-  if (info.size <= DIAGNOSTICS_UPLOAD_LOG_TAIL_BYTES) {
-    await copyFile(sourcePath, destinationPath);
-    return;
-  }
-
-  const content = await readFile(sourcePath);
-  const tail = content.subarray(content.byteLength - DIAGNOSTICS_UPLOAD_LOG_TAIL_BYTES);
-  const notice = Buffer.from(
-    `[Lynavo Drive diagnostics] This log was truncated for upload. Original size: ${info.size} bytes. Included tail bytes: ${tail.byteLength}.\n\n`,
-    'utf8',
-  );
-  await writeFile(destinationPath, Buffer.concat([notice, tail]));
+async function copyDiagnosticLogFile(sourcePath: string, destinationPath: string): Promise<void> {
+  await copyFile(sourcePath, destinationPath);
 }
 
-async function copyDiagnosticDatabase(
-  sourcePath: string,
-  destinationPath: string,
-  omittedMarkerPath: string,
-  mode: DiagnosticsBundleMode,
-): Promise<void> {
+async function copyDiagnosticDatabase(sourcePath: string, destinationPath: string): Promise<void> {
   if (!(await exists(sourcePath))) return;
-
-  if (mode === 'upload') {
-    const info = await stat(sourcePath);
-    if (info.size > DIAGNOSTICS_UPLOAD_DB_MAX_BYTES) {
-      await writeFile(
-        omittedMarkerPath,
-        [
-          'sidecar.db was omitted from the uploaded diagnostics bundle.',
-          `Original size: ${info.size} bytes.`,
-          `Upload limit for database snapshots: ${DIAGNOSTICS_UPLOAD_DB_MAX_BYTES} bytes.`,
-          'Use Export diagnostics locally if a full database snapshot is required.',
-          '',
-        ].join('\n'),
-        'utf8',
-      );
-      return;
-    }
-  }
-
   await copyFile(sourcePath, destinationPath);
 }
 
@@ -432,8 +337,8 @@ async function listSidecarLogFiles(sidecarDataDir: string): Promise<string[]> {
 
 /**
  * Electron-log can create main, renderer, and rotated files in the same log
- * directory. Collecting recent files gives support enough history to debug
- * renderer-only failures without attaching stale multi-day logs to uploads.
+ * directory. Collecting recent files gives local diagnostic bundles enough
+ * history to debug renderer-only failures without attaching stale multi-day logs.
  */
 async function listDesktopLogFiles(activeLogPath: string): Promise<string[]> {
   const logsDir = dirname(activeLogPath);
@@ -471,63 +376,6 @@ async function listDesktopLogFiles(activeLogPath: string): Promise<string[]> {
   }
 
   return Array.from(present);
-}
-
-function defaultSupportApiBaseUrl(): string {
-  return app.isPackaged ? LYNAVO_SUPPORT_API_BASE_URL : LYNAVO_REVIEW_SUPPORT_API_BASE_URL;
-}
-
-function configuredSupportApiBase(): { baseUrl: string; source: string } {
-  const supportBase = process.env.LYNAVO_SUPPORT_API_BASE_URL?.trim();
-  if (supportBase) return { baseUrl: supportBase, source: 'LYNAVO_SUPPORT_API_BASE_URL' };
-
-  return {
-    baseUrl: defaultSupportApiBaseUrl(),
-    source: app.isPackaged ? 'packaged-default' : 'dev-default',
-  };
-}
-
-function configuredUrl(envNames: readonly string[], fallbackPath: string): string {
-  for (const envName of envNames) {
-    const explicit = process.env[envName]?.trim();
-    if (explicit) return explicit;
-  }
-  const { baseUrl: base } = configuredSupportApiBase();
-  return new URL(fallbackPath, base.endsWith('/') ? base : `${base}/`).toString();
-}
-
-function redactUrlForDiagnostics(value: string): string {
-  try {
-    const url = new URL(value);
-    if (url.username) url.username = 'redacted';
-    if (url.password) url.password = 'redacted';
-    for (const key of ['token', 'access_token', 'api_key', 'apikey', 'key', 'secret']) {
-      if (url.searchParams.has(key)) {
-        url.searchParams.set(key, 'redacted');
-      }
-    }
-    return url.toString();
-  } catch {
-    return value;
-  }
-}
-
-function diagnosticsUploadUrl(): string {
-  return configuredUrl(['LYNAVO_DIAGNOSTICS_UPLOAD_URL'], '/api/v1/diagnostics/upload');
-}
-
-function updateCheckUrl(): string {
-  return configuredUrl(['LYNAVO_DESKTOP_UPDATE_URL'], '/api/v1/desktop/update-check');
-}
-
-function optionalDiagnosticsToken(): string | null {
-  return process.env.LYNAVO_DIAGNOSTICS_TOKEN?.trim() || null;
-}
-
-function desktopClientId(): string {
-  const source = `${app.getPath('userData')}|${hostname()}`;
-  const digest = createHash('sha256').update(source).digest('hex').slice(0, 16);
-  return `desktop-${digest}`;
 }
 
 export async function exportDiagnostics(
@@ -572,7 +420,6 @@ async function createDiagnosticsBundle(
   locale?: string,
   timestamp = diagnosticsTimestamp(),
   description?: string,
-  mode: DiagnosticsBundleMode = 'export',
 ): Promise<{ tempRoot: string; bundleDir: string }> {
   const strings = getMainStrings(locale);
   const tempRoot = join(tmpdir(), `lynavo-drive-diagnostics-${timestamp}`);
@@ -591,7 +438,6 @@ async function createDiagnosticsBundle(
   const sidecarLogFiles = await listSidecarLogFiles(sidecarDataDir);
   const powerLog = await writePowerDiagnostics(filesDir);
   const environment = await captureEnvironmentSnapshot();
-  const supportApiBase = configuredSupportApiBase();
   const snapshot: DiagnosticSnapshot = {
     generatedAt: new Date().toISOString(),
     issue: {
@@ -611,12 +457,6 @@ async function createDiagnosticsBundle(
       chrome: process.versions.chrome ?? null,
       node: process.versions.node,
       v8: process.versions.v8 ?? null,
-    },
-    supportApi: {
-      diagnosticsUploadUrl: redactUrlForDiagnostics(diagnosticsUploadUrl()),
-      updateCheckUrl: redactUrlForDiagnostics(updateCheckUrl()),
-      baseUrl: redactUrlForDiagnostics(supportApiBase.baseUrl),
-      baseUrlSource: supportApiBase.source,
     },
     device: {
       model: `${type()} ${process.arch}`,
@@ -650,20 +490,15 @@ async function createDiagnosticsBundle(
   await writeFile(join(bundleDir, 'README.txt'), strings.diagnostics.readme.join('\n'), 'utf8');
 
   for (const desktopLogFile of desktopLogFiles) {
-    await copyDiagnosticLogFile(desktopLogFile, join(filesDir, basename(desktopLogFile)), mode);
+    await copyDiagnosticLogFile(desktopLogFile, join(filesDir, basename(desktopLogFile)));
   }
-  await copyDiagnosticDatabase(
-    sidecarDbPath,
-    join(filesDir, 'sidecar.db'),
-    join(filesDir, 'sidecar.db.omitted.txt'),
-    mode,
-  );
+  await copyDiagnosticDatabase(sidecarDbPath, join(filesDir, 'sidecar.db'));
   // Copy every rotated sidecar log file so the bundle retains history
   // across size-based rotations. Names preserved so .1/.2 ordering is
   // obvious when the receiver opens the ZIP.
   for (const logPath of sidecarLogFiles) {
     const baseName = logPath.split(/[/\\]/).pop() ?? 'sidecar.log';
-    await copyDiagnosticLogFile(logPath, join(filesDir, baseName), mode);
+    await copyDiagnosticLogFile(logPath, join(filesDir, baseName));
   }
 
   return { tempRoot, bundleDir };
@@ -695,157 +530,4 @@ async function compressBundle(
   } else {
     await execFileAsync('ditto', ['-c', '-k', '--sequesterRsrc', bundleDir, outputPath]);
   }
-}
-
-function parseDiagnosticsUploadResponse(value: unknown): DiagnosticsUploadResult {
-  if (!value || typeof value !== 'object') {
-    throw new DiagnosticsUploadError('INVALID_RESPONSE', 'upload response is not an object');
-  }
-  const data = value as Record<string, unknown>;
-  const refId = data.ref_id ?? data.refId;
-  const uploadedAt = data.uploaded_at ?? data.uploadedAt;
-  if (typeof refId !== 'string' || typeof uploadedAt !== 'string') {
-    throw new DiagnosticsUploadError('INVALID_RESPONSE', 'upload response missing ref_id');
-  }
-  return { refId, uploadedAt };
-}
-
-export async function uploadDiagnostics(
-  sidecarManager: SidecarManager,
-  request: DiagnosticsUploadRequest,
-): Promise<DiagnosticsUploadResult> {
-  const description = request.description.trim();
-  const timestamp = diagnosticsTimestamp();
-  const { tempRoot, bundleDir } = await createDiagnosticsBundle(
-    sidecarManager,
-    request.locale,
-    timestamp,
-    description,
-    'upload',
-  );
-  const archivePath = join(tempRoot, `upload-${timestamp}.zip`);
-
-  try {
-    await compressBundle(bundleDir, archivePath, false);
-
-    const form = new FormData();
-    form.append('client_id', desktopClientId());
-    if (description) {
-      form.append('note', description);
-    }
-    const zipBytes = await readFile(archivePath);
-    if (zipBytes.byteLength > DIAGNOSTICS_UPLOAD_ARCHIVE_MAX_BYTES) {
-      throw new DiagnosticsUploadError(
-        'BUNDLE_TOO_LARGE',
-        `diagnostics bundle is ${zipBytes.byteLength} bytes after compaction`,
-      );
-    }
-    form.append(
-      'bundle',
-      new Blob([new Uint8Array(zipBytes)], { type: 'application/zip' }),
-      'diagnostics.zip',
-    );
-
-    const headers: Record<string, string> = desktopClientHeaders();
-    const token = optionalDiagnosticsToken();
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
-    let response: Response;
-    try {
-      response = await fetch(diagnosticsUploadUrl(), {
-        method: 'POST',
-        headers,
-        body: form,
-      });
-    } catch (error) {
-      throw new DiagnosticsUploadError(
-        'NETWORK_UNREACHABLE',
-        error instanceof Error ? error.message : String(error),
-      );
-    }
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      if (response.status === 413) {
-        throw new DiagnosticsUploadError('BUNDLE_TOO_LARGE', body || 'bundle too large');
-      }
-      throw new DiagnosticsUploadError('SERVER_ERROR', body || `HTTP ${response.status}`);
-    }
-
-    return parseDiagnosticsUploadResponse(await response.json());
-  } finally {
-    await rm(tempRoot, { recursive: true, force: true });
-  }
-}
-
-function numericVersionParts(version: string): number[] {
-  return version
-    .split(/[.-]/)
-    .map((part) => Number.parseInt(part, 10))
-    .map((part) => (Number.isFinite(part) ? part : 0));
-}
-
-function compareVersions(left: string, right: string): number {
-  const a = numericVersionParts(left);
-  const b = numericVersionParts(right);
-  const length = Math.max(a.length, b.length);
-  for (let i = 0; i < length; i += 1) {
-    const diff = (a[i] ?? 0) - (b[i] ?? 0);
-    if (diff !== 0) return diff;
-  }
-  return 0;
-}
-
-function parseUpdateCheckResponse(value: unknown, current: AppInfo): UpdateCheckResult {
-  if (!value || typeof value !== 'object') {
-    throw new Error('update check response is not an object');
-  }
-  const data = value as Record<string, unknown>;
-  const latestVersion = data.latest_version ?? data.latestVersion;
-  if (typeof latestVersion !== 'string' || !latestVersion) {
-    throw new Error('update check response missing latest version');
-  }
-
-  const explicitUpdate = data.update_available ?? data.updateAvailable;
-  const updateAvailable =
-    typeof explicitUpdate === 'boolean'
-      ? explicitUpdate
-      : compareVersions(latestVersion, current.version) > 0;
-  const latestBuildNumber = data.latest_build_number ?? data.latestBuildNumber;
-  const minimumRequired = data.minimum_required ?? data.minimumRequired;
-  const downloadUrl = data.download_url ?? data.downloadUrl;
-  const releaseNotes = data.release_notes ?? data.releaseNotes;
-  const checkedAt = data.checked_at ?? data.checkedAt;
-
-  return {
-    updateAvailable,
-    latestVersion,
-    latestBuildNumber: typeof latestBuildNumber === 'string' ? latestBuildNumber : undefined,
-    minimumRequired: typeof minimumRequired === 'boolean' ? minimumRequired : undefined,
-    downloadUrl: typeof downloadUrl === 'string' ? downloadUrl : undefined,
-    releaseNotes: typeof releaseNotes === 'string' ? releaseNotes : undefined,
-    checkedAt: typeof checkedAt === 'string' ? checkedAt : new Date().toISOString(),
-  };
-}
-
-export async function checkForUpdates(): Promise<UpdateCheckResult> {
-  const appInfo = getAppInfo();
-  const url = new URL(updateCheckUrl());
-  url.searchParams.set('platform', process.platform);
-  url.searchParams.set('arch', process.arch);
-  url.searchParams.set('version', appInfo.version);
-  if (appInfo.buildNumber) {
-    url.searchParams.set('build', appInfo.buildNumber);
-  }
-
-  const response = await fetch(url.toString(), {
-    headers: desktopClientHeaders(),
-  });
-  if (!response.ok) {
-    throw new Error(`update check failed: HTTP ${response.status}`);
-  }
-
-  return parseUpdateCheckResponse(await response.json(), appInfo);
 }

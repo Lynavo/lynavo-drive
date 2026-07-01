@@ -8,7 +8,7 @@ import {
   type ReceivedLibraryItemDTO,
 } from '@lynavo-drive/contracts';
 import { IPC, registerIpcHandlers } from '../ipc-handlers';
-import { checkForUpdates, uploadDiagnostics } from '../diagnostics';
+import { exportDiagnostics } from '../diagnostics';
 import { sidecarClient } from '../sidecar-client';
 
 type IpcHandler = (...args: unknown[]) => unknown;
@@ -185,9 +185,7 @@ function compatibleHealth(capabilities?: { connectionDeviceManagement?: boolean 
 
 vi.mock('../diagnostics', () => ({
   exportDiagnostics: vi.fn(),
-  uploadDiagnostics: vi.fn(),
   getAppInfo: vi.fn(() => ({ name: 'Lynavo Drive', version: '0.1.0', buildNumber: '1' })),
-  checkForUpdates: vi.fn(),
 }));
 
 describe('registerIpcHandlers', () => {
@@ -236,26 +234,24 @@ describe('registerIpcHandlers', () => {
     expect(sidecarClient.setConnectionCode).toHaveBeenCalledWith('238416');
   });
 
-  it('registers diagnostics upload IPC with description payload', async () => {
+  it('registers diagnostics export IPC with description payload', async () => {
     const manager = { retryStart: vi.fn(), getState: vi.fn() };
-    vi.mocked(uploadDiagnostics).mockResolvedValue({
-      refId: 'DIA1234',
-      uploadedAt: '2026-05-08T03:00:00Z',
-    });
+    vi.mocked(exportDiagnostics).mockResolvedValue('/tmp/lynavo-drive-diagnostics.zip');
 
     registerIpcHandlers(manager as never);
-    const handler = handlers.get(IPC.SUPPORT_UPLOAD_DIAGNOSTICS);
+    const handler = handlers.get(IPC.SUPPORT_EXPORT_DIAGNOSTICS);
 
-    await expect(
-      handler?.(undefined, { description: 'Wi-Fi 断线', locale: 'zh-Hans' }),
-    ).resolves.toEqual({
-      refId: 'DIA1234',
-      uploadedAt: '2026-05-08T03:00:00Z',
-    });
-    expect(uploadDiagnostics).toHaveBeenCalledWith(manager, {
-      description: 'Wi-Fi 断线',
-      locale: 'zh-Hans',
-    });
+    await expect(handler?.(undefined, 'zh-Hans', 'Wi-Fi 断线')).resolves.toBe(
+      '/tmp/lynavo-drive-diagnostics.zip',
+    );
+    expect(exportDiagnostics).toHaveBeenCalledWith(manager, 'zh-Hans', 'Wi-Fi 断线');
+  });
+
+  it('does not register support update check or diagnostics upload IPC handlers', async () => {
+    registerIpcHandlers({ retryStart: vi.fn() } as never);
+
+    expect(handlers.has('support:check-for-updates')).toBe(false);
+    expect(handlers.has('support:upload-diagnostics')).toBe(false);
   });
 
   it('does not register commercial gift-card, client-config, or auth IPC handlers', async () => {
@@ -392,24 +388,6 @@ describe('registerIpcHandlers', () => {
     });
     expect(sidecarClient.removeSharedResource).toHaveBeenCalledWith('res-1');
     expect(sidecarClient.getReceivedLibrary).toHaveBeenCalledWith({ page: 2, pageSize: 30 });
-  });
-
-  it('registers update-check IPC', async () => {
-    vi.mocked(checkForUpdates).mockResolvedValue({
-      updateAvailable: true,
-      latestVersion: '0.2.0',
-      checkedAt: '2026-05-08T03:00:00Z',
-    });
-
-    registerIpcHandlers({ retryStart: vi.fn() } as never);
-    const handler = handlers.get(IPC.SUPPORT_CHECK_FOR_UPDATES);
-
-    await expect(handler?.()).resolves.toEqual({
-      updateAvailable: true,
-      latestVersion: '0.2.0',
-      checkedAt: '2026-05-08T03:00:00Z',
-    });
-    expect(checkForUpdates).toHaveBeenCalledTimes(1);
   });
 
   it('registers power-save preference IPC', async () => {

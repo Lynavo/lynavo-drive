@@ -181,14 +181,14 @@ describe('@lynavo-drive/contracts exports', () => {
     expect(legacyEndpoints in contracts).toBe(false);
   });
 
-  it('exports Lynavo Drive support endpoints without broad account API constants', () => {
+  it('exports Lynavo Drive web and support contact without official API endpoints', () => {
     expect(contracts.LYNAVO_ROOT_DOMAIN).toBe('lynavo.com');
     expect(contracts.LYNAVO_WEB_BASE_URL).toBe('https://www.lynavo.com');
-    expect(contracts.LYNAVO_SUPPORT_API_BASE_URL).toBe('https://api.lynavo.com');
-    expect(contracts.LYNAVO_REVIEW_SUPPORT_API_BASE_URL).toBe('https://review-api.lynavo.com');
     expect(contracts.LYNAVO_SUPPORT_EMAIL).toBe('support@lynavo.com');
     expect('LYNAVO_API_BASE_URL' in contracts).toBe(false);
     expect('LYNAVO_REVIEW_API_BASE_URL' in contracts).toBe(false);
+    expect('LYNAVO_SUPPORT_API_BASE_URL' in contracts).toBe(false);
+    expect('LYNAVO_REVIEW_SUPPORT_API_BASE_URL' in contracts).toBe(false);
     expect('LYNAVO_SERVICE_ENDPOINTS' in contracts).toBe(false);
     expect('LYNAVO_SUPPORT_ENDPOINTS' in contracts).toBe(false);
     expect('LYNAVO_REVIEW_EMAIL' in contracts).toBe(false);

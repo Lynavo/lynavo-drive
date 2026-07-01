@@ -174,9 +174,9 @@
       "mailBody": "问题描述：\n{{description}}\n\n联系方式：\n{{contact}}\n\n当前版本：v{{version}}"
     },
     "diagnostics": {
-      "uploadingCaption": "正在上传诊断包",
-      "caption": "上传日志与运行状态给支持团队",
-      "description": "上传诊断包，帮助定位传输、配对或共享问题。",
+      "exportingCaption": "正在导出诊断包",
+      "caption": "本地保存日志与运行状态",
+      "description": "导出本地诊断包，帮助排查传输、配对或共享问题。",
       "placeholder": "请描述出现问题的步骤、手机型号、网络环境或错误现象（选填）"
     },
     "toasts": {
@@ -185,10 +185,6 @@
       "preventSleepDisabled": "已关闭防止待机",
       "preventSleepFailed": "无法更新电源设置",
       "receivedAccessFailed": "修改已接收文件浏览权限失败",
-      "upToDate": "已是最新版本",
-      "checkUpdateFailed": "暂时无法检查更新",
-      "diagnosticsUploaded": "诊断包上传成功！感谢您的反馈",
-      "diagnosticsUploadFailed": "诊断包上传失败，请稍后重试",
       "feedbackOpened": "已打开邮件反馈"
     },
     "community": {
@@ -200,28 +196,19 @@
   },
   "support": {
     "title": "支持与诊断",
-    "description": "上传诊断包给支持团队；只有网络不可用时才会改为本地导出。",
-    "uploadDiagnostics": "上传诊断包",
+    "description": "导出本地诊断包，需要时可手动分享。",
     "exportDiagnostics": "导出诊断包",
     "diagnosticsDescriptionLabel": "问题描述",
     "diagnosticsDescriptionPlaceholder": "请描述出现问题的步骤、手机型号、网络环境或错误现象",
-    "diagnosticsDescriptionHelp": "描述会随诊断包一起上传，方便定位问题。",
+    "diagnosticsDescriptionHelp": "描述会保存在本地诊断包中。",
     "diagnosticsCancel": "取消",
-    "diagnosticsSubmit": "上传",
+    "diagnosticsSubmit": "导出",
     "confirmReset": "确认重置",
     "reset": "重置数据",
     "lastSuccessfulSync": "最近成功同步",
     "advertisedIp": "广播 IP",
     "sameLanHint": "请确认手机和电脑连接到同一个局域网。",
     "desktopVersion": "桌面端版本",
-    "buildNumber": "{{buildNumber}}",
-    "checkUpdates": "检查更新",
-    "checkingUpdates": "正在检查",
-    "updateAvailable": "有新版本 v{{version}} 可用",
-    "upToDate": "已是最新版本",
-    "updateUnavailable": "暂时无法检查更新",
-    "minimumRequired": "此版本需要更新后继续使用。",
-    "openDownload": "打开下载页",
-    "releaseNotes": "更新内容"
+    "buildNumber": "{{buildNumber}}"
   }
 }

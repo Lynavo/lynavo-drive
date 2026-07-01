@@ -26,29 +26,17 @@ const transferringDevice: DashboardDeviceDTO = {
 };
 
 function setElectronAPI(overrides?: {
-  uploadDiagnostics?: ReturnType<typeof vi.fn>;
   exportDiagnostics?: ReturnType<typeof vi.fn>;
-  checkForUpdates?: ReturnType<typeof vi.fn>;
   openExternal?: ReturnType<typeof vi.fn>;
 }) {
   (window as Window & { electronAPI?: unknown }).electronAPI = {
     support: {
-      uploadDiagnostics:
-        overrides?.uploadDiagnostics ??
-        vi.fn().mockResolvedValue({ refId: 'DIA1234', uploadedAt: '2026-05-08T03:00:00Z' }),
       exportDiagnostics: overrides?.exportDiagnostics ?? vi.fn().mockResolvedValue(null),
       getAppInfo: vi.fn().mockResolvedValue({
         name: 'Lynavo Drive',
         version: '0.1.0',
         buildNumber: '1',
       }),
-      checkForUpdates:
-        overrides?.checkForUpdates ??
-        vi.fn().mockResolvedValue({
-          updateAvailable: false,
-          latestVersion: '0.1.0',
-          checkedAt: '2026-05-08T03:00:00Z',
-        }),
     },
     files: {
       openExternal: overrides?.openExternal ?? vi.fn().mockResolvedValue(undefined),
@@ -93,25 +81,20 @@ describe('SupportSection', () => {
     expect(await screen.findByText('Lynavo Drive v0.1.0 (1)')).toBeInTheDocument();
   });
 
-  it('requires a description before uploading diagnostics', async () => {
-    const uploadDiagnostics = vi
-      .fn()
-      .mockResolvedValue({ refId: 'DIA1234', uploadedAt: '2026-05-08T03:00:00Z' });
-    setElectronAPI({ uploadDiagnostics });
+  it('exports diagnostics locally with an optional description', async () => {
+    const exportDiagnostics = vi.fn().mockResolvedValue('/tmp/lynavo-drive-diagnostics.zip');
+    setElectronAPI({ exportDiagnostics });
 
     render(<SupportSection />);
 
-    fireEvent.click(screen.getByRole('button', { name: /上传诊断包/ }));
+    fireEvent.click(screen.getByRole('button', { name: /导出诊断包/ }));
     fireEvent.change(screen.getByLabelText('问题描述'), {
       target: { value: 'Wi-Fi 断开后无法继续同步' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /^上传$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^导出$/ }));
 
     await waitFor(() => {
-      expect(uploadDiagnostics).toHaveBeenCalledWith({
-        description: 'Wi-Fi 断开后无法继续同步',
-        locale: 'zh-Hans',
-      });
+      expect(exportDiagnostics).toHaveBeenCalledWith('zh-Hans', 'Wi-Fi 断开后无法继续同步');
     });
   });
 
@@ -131,74 +114,14 @@ describe('SupportSection', () => {
     expect(overlayRef.current).toBeInstanceOf(HTMLDivElement);
   });
 
-  it('falls back to local export only when diagnostics upload reports network unreachable', async () => {
-    const networkError = Object.assign(new Error('offline'), { code: 'NETWORK_UNREACHABLE' });
-    const uploadDiagnostics = vi.fn().mockRejectedValue(networkError);
-    const exportDiagnostics = vi.fn().mockResolvedValue('/tmp/vivi-drop-diagnostics.zip');
-    setElectronAPI({ uploadDiagnostics, exportDiagnostics });
+  it('does not render update check content', async () => {
+    const exportDiagnostics = vi.fn().mockResolvedValue('/tmp/lynavo-drive-diagnostics.zip');
+    setElectronAPI({ exportDiagnostics });
 
     render(<SupportSection />);
 
-    fireEvent.click(screen.getByRole('button', { name: /上传诊断包/ }));
-    fireEvent.change(screen.getByLabelText('问题描述'), {
-      target: { value: '公司网络无法上传' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^上传$/ }));
-
-    await waitFor(() => {
-      expect(exportDiagnostics).toHaveBeenCalledWith('zh-Hans', '公司网络无法上传');
-    });
-  });
-
-  it('falls back to local export when diagnostics upload reports bundle too large', async () => {
-    const tooLargeError = Object.assign(new Error('too large'), { code: 'BUNDLE_TOO_LARGE' });
-    const uploadDiagnostics = vi.fn().mockRejectedValue(tooLargeError);
-    const exportDiagnostics = vi.fn().mockResolvedValue('/tmp/vivi-drop-diagnostics.zip');
-    setElectronAPI({ uploadDiagnostics, exportDiagnostics });
-
-    render(<SupportSection />);
-
-    fireEvent.click(screen.getByRole('button', { name: /上传诊断包/ }));
-    fireEvent.change(screen.getByLabelText('问题描述'), {
-      target: { value: '日志太大无法上传' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^上传$/ }));
-
-    await waitFor(() => {
-      expect(exportDiagnostics).toHaveBeenCalledWith('zh-Hans', '日志太大无法上传');
-    });
-  });
-
-  it('shows update availability and opens the download URL', async () => {
-    const checkForUpdates = vi.fn().mockResolvedValue({
-      updateAvailable: true,
-      latestVersion: '0.2.0',
-      downloadUrl: 'https://www.lynavo.com/download',
-      checkedAt: '2026-05-08T03:00:00Z',
-    });
-    const openExternal = vi.fn().mockResolvedValue(undefined);
-    setElectronAPI({ checkForUpdates, openExternal });
-
-    render(<SupportSection />);
-
-    expect(await screen.findByText('有新版本 v0.2.0 可用')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /打开下载页/ }));
-
-    expect(openExternal).toHaveBeenCalledWith('https://www.lynavo.com/download');
-  });
-
-  it('does not render update content when release notes are blank', async () => {
-    const checkForUpdates = vi.fn().mockResolvedValue({
-      updateAvailable: true,
-      latestVersion: '0.2.0',
-      releaseNotes: '   ',
-      checkedAt: '2026-05-08T03:00:00Z',
-    });
-    setElectronAPI({ checkForUpdates });
-
-    render(<SupportSection />);
-
-    expect(await screen.findByText('有新版本 v0.2.0 可用')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /检查更新/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/有新版本/)).not.toBeInTheDocument();
     expect(screen.queryByText(/更新内容/)).not.toBeInTheDocument();
   });
 });

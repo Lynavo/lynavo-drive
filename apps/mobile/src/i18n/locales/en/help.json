@@ -56,6 +56,6 @@
     "supportEmail": "Support Email",
     "exportDiagnostics": "Export Diagnostics",
     "exportingDiagnostics": "Exporting...",
-    "exportHint": "Send logs to support to help diagnose issues."
+    "exportHint": "Share the local diagnostics bundle with a maintainer or support contact when needed."
   }
 }
