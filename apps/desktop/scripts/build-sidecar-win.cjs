@@ -35,7 +35,7 @@ const child = spawn(
     '-s -w',
     '-o',
     outputPath,
-    './cmd/syncflow-sidecar/',
+    './cmd/lynavo-drive-sidecar/',
   ],
   {
     cwd: sidecarRoot,

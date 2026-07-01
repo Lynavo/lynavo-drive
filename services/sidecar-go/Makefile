@@ -1,7 +1,7 @@
 .PHONY: build run test clean dev
 
 BINARY := lynavo-drive-sidecar
-CMD := ./cmd/syncflow-sidecar/
+CMD := ./cmd/lynavo-drive-sidecar/
 
 # Build the sidecar binary
 build:
@@ -26,7 +26,7 @@ test-v:
 # Clean build artifacts and database
 clean:
 	rm -f $(BINARY)
-	rm -f syncflow.db syncflow.db-wal syncflow.db-shm
+	rm -f sidecar.db sidecar.db-wal sidecar.db-shm
 
 # Format code
 fmt:

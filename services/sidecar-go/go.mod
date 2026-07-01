@@ -1,4 +1,4 @@
-module github.com/nicksyncflow/sidecar
+module github.com/lynavo/lynavo-drive/services/sidecar-go
 
 go 1.25.6
 

@@ -60,7 +60,7 @@ export class SidecarManager extends EventEmitter {
   private getSpawnArgs(): { command: string; args: string[] } {
     if (isDev) {
       // Dev mode: use `go run` from source
-      return { command: 'go', args: ['run', './cmd/syncflow-sidecar/'] };
+      return { command: 'go', args: ['run', './cmd/lynavo-drive-sidecar/'] };
     }
     // Production: bundled binary in app resources
     return { command: join(process.resourcesPath, sidecarBinaryName), args: [] };

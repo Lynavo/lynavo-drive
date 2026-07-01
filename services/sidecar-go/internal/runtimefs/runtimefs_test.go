@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/nicksyncflow/sidecar/internal/config"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/config"
 )
 
 func TestEnsureRuntimeDirsRecreatesManagedDirectories(t *testing.T) {

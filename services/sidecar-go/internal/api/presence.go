@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nicksyncflow/sidecar/internal/events"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/events"
 )
 
 // PresenceTracker tracks lightweight heartbeats from mobile clients.

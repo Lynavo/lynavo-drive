@@ -1114,9 +1114,9 @@ class SharedFilesService {
             nonce: nonce
         )
         return [
-            URLQueryItem(name: "X-SyncFlow-Auth", value: signature),
-            URLQueryItem(name: "X-SyncFlow-Auth-Timestamp", value: timestamp),
-            URLQueryItem(name: "X-SyncFlow-Auth-Nonce", value: nonce),
+            URLQueryItem(name: "X-LynavoDrive-Auth", value: signature),
+            URLQueryItem(name: "X-LynavoDrive-Auth-Timestamp", value: timestamp),
+            URLQueryItem(name: "X-LynavoDrive-Auth-Nonce", value: nonce),
         ]
     }
 

@@ -496,41 +496,41 @@ PY
 }
 
 ensure_sidecar_running() {
-  if pgrep -f syncflow-sidecar >/dev/null 2>&1; then
+  if pgrep -f lynavo-drive-sidecar >/dev/null 2>&1; then
     return 0
   fi
   if [ -n "$UPLOAD_PERF_LOG" ] && [ "$UPLOAD_PERF_LOG" != "0" ]; then
-    (cd "$SIDECAR_DIR" && nohup env LYNAVO_UPLOAD_PERF_LOG=1 go run ./cmd/syncflow-sidecar/ >"$LOG_ROOT/sidecar-restart.log" 2>&1 &)
+    (cd "$SIDECAR_DIR" && nohup env LYNAVO_UPLOAD_PERF_LOG=1 go run ./cmd/lynavo-drive-sidecar/ >"$LOG_ROOT/sidecar-restart.log" 2>&1 &)
   else
-    (cd "$SIDECAR_DIR" && nohup go run ./cmd/syncflow-sidecar/ >"$LOG_ROOT/sidecar-restart.log" 2>&1 &)
+    (cd "$SIDECAR_DIR" && nohup go run ./cmd/lynavo-drive-sidecar/ >"$LOG_ROOT/sidecar-restart.log" 2>&1 &)
   fi
   sleep 2
 }
 
 stop_sidecar() {
-  pkill -f 'go run ./cmd/syncflow-sidecar/' || true
-  pkill -f '/syncflow-sidecar' || true
+  pkill -f 'go run ./cmd/lynavo-drive-sidecar/' || true
+  pkill -f '/lynavo-drive-sidecar' || true
   sleep 1
 }
 
 pause_sidecar() {
-  pkill -STOP -f 'go run ./cmd/syncflow-sidecar/' || true
-  pkill -STOP -f '/syncflow-sidecar' || true
+  pkill -STOP -f 'go run ./cmd/lynavo-drive-sidecar/' || true
+  pkill -STOP -f '/lynavo-drive-sidecar' || true
   sleep 1
 }
 
 resume_sidecar() {
-  pkill -CONT -f 'go run ./cmd/syncflow-sidecar/' || true
-  pkill -CONT -f '/syncflow-sidecar' || true
+  pkill -CONT -f 'go run ./cmd/lynavo-drive-sidecar/' || true
+  pkill -CONT -f '/lynavo-drive-sidecar' || true
   sleep 1
 }
 
 restart_sidecar() {
   stop_sidecar
   if [ -n "$UPLOAD_PERF_LOG" ] && [ "$UPLOAD_PERF_LOG" != "0" ]; then
-    (cd "$SIDECAR_DIR" && nohup env LYNAVO_UPLOAD_PERF_LOG=1 go run ./cmd/syncflow-sidecar/ >"$LOG_ROOT/sidecar-restart.log" 2>&1 &)
+    (cd "$SIDECAR_DIR" && nohup env LYNAVO_UPLOAD_PERF_LOG=1 go run ./cmd/lynavo-drive-sidecar/ >"$LOG_ROOT/sidecar-restart.log" 2>&1 &)
   else
-    (cd "$SIDECAR_DIR" && nohup go run ./cmd/syncflow-sidecar/ >"$LOG_ROOT/sidecar-restart.log" 2>&1 &)
+    (cd "$SIDECAR_DIR" && nohup go run ./cmd/lynavo-drive-sidecar/ >"$LOG_ROOT/sidecar-restart.log" 2>&1 &)
   fi
   sleep 2
 }

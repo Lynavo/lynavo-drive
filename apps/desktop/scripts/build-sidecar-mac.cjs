@@ -61,7 +61,7 @@ function buildArch(arch, sdkPath) {
 
   console.log(`Building macOS sidecar for ${arch}...`);
 
-  run('go', ['build', '-o', output, './cmd/syncflow-sidecar/'], {
+  run('go', ['build', '-o', output, './cmd/lynavo-drive-sidecar/'], {
     cwd: sidecarRoot,
     env: {
       ...process.env,

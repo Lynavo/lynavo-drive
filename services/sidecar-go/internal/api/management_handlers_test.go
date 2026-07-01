@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nicksyncflow/sidecar/internal/api"
-	"github.com/nicksyncflow/sidecar/internal/store"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/api"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/store"
 )
 
 func TestManagementDevicesListsBlockStateAndUnblocksDevice(t *testing.T) {

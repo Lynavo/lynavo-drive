@@ -491,21 +491,21 @@ final class BackgroundUploadService: NSObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
-        request.setValue(fileKey, forHTTPHeaderField: "X-SyncFlow-File-Key")
-        request.setValue(filenameB64, forHTTPHeaderField: "X-SyncFlow-Filename-B64")
-        request.setValue(mediaType, forHTTPHeaderField: "X-SyncFlow-Media-Type")
-        request.setValue(String(fileSize), forHTTPHeaderField: "X-SyncFlow-File-Size")
-        request.setValue(prepared.sha256, forHTTPHeaderField: "X-SyncFlow-SHA256")
-        request.setValue("background_http", forHTTPHeaderField: "X-SyncFlow-Upload-Mode")
+        request.setValue(fileKey, forHTTPHeaderField: "X-LynavoDrive-File-Key")
+        request.setValue(filenameB64, forHTTPHeaderField: "X-LynavoDrive-Filename-B64")
+        request.setValue(mediaType, forHTTPHeaderField: "X-LynavoDrive-Media-Type")
+        request.setValue(String(fileSize), forHTTPHeaderField: "X-LynavoDrive-File-Size")
+        request.setValue(prepared.sha256, forHTTPHeaderField: "X-LynavoDrive-SHA256")
+        request.setValue("background_http", forHTTPHeaderField: "X-LynavoDrive-Upload-Mode")
         if !createdAtHeader.isEmpty {
-            request.setValue(createdAtHeader, forHTTPHeaderField: "X-SyncFlow-Created-At")
+            request.setValue(createdAtHeader, forHTTPHeaderField: "X-LynavoDrive-Created-At")
         }
         if !modifiedAtHeader.isEmpty {
-            request.setValue(modifiedAtHeader, forHTTPHeaderField: "X-SyncFlow-Modified-At")
+            request.setValue(modifiedAtHeader, forHTTPHeaderField: "X-LynavoDrive-Modified-At")
         }
-        request.setValue(authHex, forHTTPHeaderField: "X-SyncFlow-Auth")
-        request.setValue(timestamp, forHTTPHeaderField: "X-SyncFlow-Auth-Timestamp")
-        request.setValue(nonce, forHTTPHeaderField: "X-SyncFlow-Auth-Nonce")
+        request.setValue(authHex, forHTTPHeaderField: "X-LynavoDrive-Auth")
+        request.setValue(timestamp, forHTTPHeaderField: "X-LynavoDrive-Auth-Timestamp")
+        request.setValue(nonce, forHTTPHeaderField: "X-LynavoDrive-Auth-Nonce")
 
         // --- 7. Create + describe + resume task ---
         let tempURL = URL(fileURLWithPath: prepared.path)

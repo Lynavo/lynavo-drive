@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/nicksyncflow/sidecar/internal/store"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/store"
 )
 
 // ensureDirMu serialises receive-dir-name generation so two goroutines

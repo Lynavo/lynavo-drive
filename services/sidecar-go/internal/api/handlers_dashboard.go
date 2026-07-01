@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/nicksyncflow/sidecar/internal/disk"
-	"github.com/nicksyncflow/sidecar/internal/uploadfs"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/disk"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/uploadfs"
 )
 
 const dashboardPresenceGraceWindow = 75 * time.Second

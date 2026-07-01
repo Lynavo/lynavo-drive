@@ -14,7 +14,7 @@
   "scripts": {
     "dev": "node ./scripts/run-electron-vite.cjs dev",
     "build": "electron-vite build",
-    "build:sidecar": "cd ../../services/sidecar-go && go build -o ../../apps/desktop/resources/lynavo-drive-sidecar ./cmd/syncflow-sidecar/",
+    "build:sidecar": "rm -f ./resources/lynavo-drive-sidecar && cd ../../services/sidecar-go && go build -o ../../apps/desktop/resources/lynavo-drive-sidecar ./cmd/lynavo-drive-sidecar/",
     "build:sidecar:mac": "node ./scripts/build-sidecar-mac.cjs universal",
     "build:sidecar:win": "node ./scripts/build-sidecar-win.cjs",
     "build:sidecar:linux": "node ./scripts/build-sidecar-linux.cjs",

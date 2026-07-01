@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nicksyncflow/sidecar/internal/events"
-	"github.com/nicksyncflow/sidecar/internal/runtimefs"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/events"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/runtimefs"
 )
 
 const personalAccessSignatureMaxSkew = 5 * time.Minute
@@ -162,17 +162,17 @@ func (s *Server) rememberPersonalAccessNonce(clientID, nonce string, expiresAt t
 }
 
 func personalAccessAuthValues(r *http.Request, allowQuery bool) (signature, timestamp, nonce string, attempted bool, credentialsAllowed bool) {
-	headerSignature := strings.TrimSpace(r.Header.Get("X-SyncFlow-Auth"))
-	headerTimestamp := strings.TrimSpace(r.Header.Get("X-SyncFlow-Auth-Timestamp"))
-	headerNonce := strings.TrimSpace(r.Header.Get("X-SyncFlow-Auth-Nonce"))
+	headerSignature := strings.TrimSpace(r.Header.Get("X-LynavoDrive-Auth"))
+	headerTimestamp := strings.TrimSpace(r.Header.Get("X-LynavoDrive-Auth-Timestamp"))
+	headerNonce := strings.TrimSpace(r.Header.Get("X-LynavoDrive-Auth-Nonce"))
 	if headerSignature != "" || headerTimestamp != "" || headerNonce != "" {
 		return headerSignature, headerTimestamp, headerNonce, true, true
 	}
 
 	query := r.URL.Query()
-	querySignature := strings.TrimSpace(query.Get("X-SyncFlow-Auth"))
-	queryTimestamp := strings.TrimSpace(query.Get("X-SyncFlow-Auth-Timestamp"))
-	queryNonce := strings.TrimSpace(query.Get("X-SyncFlow-Auth-Nonce"))
+	querySignature := strings.TrimSpace(query.Get("X-LynavoDrive-Auth"))
+	queryTimestamp := strings.TrimSpace(query.Get("X-LynavoDrive-Auth-Timestamp"))
+	queryNonce := strings.TrimSpace(query.Get("X-LynavoDrive-Auth-Nonce"))
 	if querySignature == "" && queryTimestamp == "" && queryNonce == "" {
 		return "", "", "", false, true
 	}

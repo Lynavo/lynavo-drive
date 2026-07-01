@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/nicksyncflow/sidecar/internal/uploadfs"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/uploadfs"
 )
 
 type receivedLibraryScope struct {

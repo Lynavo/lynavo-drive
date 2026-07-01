@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	internalserver "github.com/nicksyncflow/sidecar/internal/server"
-	"github.com/nicksyncflow/sidecar/internal/store"
+	internalserver "github.com/lynavo/lynavo-drive/services/sidecar-go/internal/server"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/store"
 )
 
 func (s *Server) deviceDirPath(deviceID string) string {

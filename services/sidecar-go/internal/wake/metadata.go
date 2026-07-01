@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nicksyncflow/sidecar/internal/protocol"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/protocol"
 )
 
 var wakePorts = []int{9, 7}

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/nicksyncflow/sidecar/internal/config"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/config"
 )
 
 type EnsureResult struct {

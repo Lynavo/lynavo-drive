@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nicksyncflow/sidecar/internal/share"
-	"github.com/nicksyncflow/sidecar/internal/store"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/share"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/store"
 )
 
 type shareStatusDTO struct {

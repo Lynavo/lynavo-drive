@@ -4116,9 +4116,9 @@ class NativeSyncEngineModule(
       escapedPath = route.escapedPath,
       clientId = getOrCreateClientId(),
     ) ?: return
-    connection.setRequestProperty("X-SyncFlow-Auth", signature.signature)
-    connection.setRequestProperty("X-SyncFlow-Auth-Timestamp", signature.timestamp)
-    connection.setRequestProperty("X-SyncFlow-Auth-Nonce", signature.nonce)
+    connection.setRequestProperty("X-LynavoDrive-Auth", signature.signature)
+    connection.setRequestProperty("X-LynavoDrive-Auth-Timestamp", signature.timestamp)
+    connection.setRequestProperty("X-LynavoDrive-Auth-Nonce", signature.nonce)
   }
 
   private fun appendSharedDirectoryAccessToken(url: URL, route: SharedFileRoute, escapedPath: String): URL {
@@ -4158,9 +4158,9 @@ class NativeSyncEngineModule(
             clientId = clientId,
           )
           if (signature != null) {
-            queryItems.add("X-SyncFlow-Auth" to signature.signature)
-            queryItems.add("X-SyncFlow-Auth-Timestamp" to signature.timestamp)
-            queryItems.add("X-SyncFlow-Auth-Nonce" to signature.nonce)
+            queryItems.add("X-LynavoDrive-Auth" to signature.signature)
+            queryItems.add("X-LynavoDrive-Auth-Timestamp" to signature.timestamp)
+            queryItems.add("X-LynavoDrive-Auth-Nonce" to signature.nonce)
           }
         }
       }

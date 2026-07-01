@@ -16,14 +16,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/nicksyncflow/sidecar/internal/api"
-	"github.com/nicksyncflow/sidecar/internal/config"
-	"github.com/nicksyncflow/sidecar/internal/events"
-	"github.com/nicksyncflow/sidecar/internal/logging"
-	"github.com/nicksyncflow/sidecar/internal/mdns"
-	"github.com/nicksyncflow/sidecar/internal/runtimefs"
-	"github.com/nicksyncflow/sidecar/internal/server"
-	"github.com/nicksyncflow/sidecar/internal/store"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/api"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/config"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/events"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/logging"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/mdns"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/runtimefs"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/server"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/store"
 )
 
 const (
@@ -32,7 +32,7 @@ const (
 )
 
 func main() {
-	cfgPath := "syncflow-sidecar.yml"
+	cfgPath := "lynavo-drive-sidecar.yml"
 	if v := os.Getenv("LYNAVO_CONFIG"); v != "" {
 		cfgPath = v
 	}

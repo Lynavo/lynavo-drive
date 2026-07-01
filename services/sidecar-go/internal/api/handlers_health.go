@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/nicksyncflow/sidecar/internal/protocol"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/protocol"
 )
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {

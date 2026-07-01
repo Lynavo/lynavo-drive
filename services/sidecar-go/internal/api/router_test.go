@@ -22,12 +22,12 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/nicksyncflow/sidecar/internal/api"
-	"github.com/nicksyncflow/sidecar/internal/config"
-	"github.com/nicksyncflow/sidecar/internal/events"
-	"github.com/nicksyncflow/sidecar/internal/protocol"
-	internalserver "github.com/nicksyncflow/sidecar/internal/server"
-	"github.com/nicksyncflow/sidecar/internal/store"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/api"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/config"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/events"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/protocol"
+	internalserver "github.com/lynavo/lynavo-drive/services/sidecar-go/internal/server"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/store"
 )
 
 const (
@@ -317,9 +317,9 @@ func signedPersonalURLWithQuery(t *testing.T, srv *httptest.Server, path, client
 	nonce := "test-nonce-query"
 	signature := personalAccessSignature(t, http.MethodGet, parsed.EscapedPath(), clientID, timestamp, nonce, pairingToken)
 	query := parsed.Query()
-	query.Set("X-SyncFlow-Auth", signature)
-	query.Set("X-SyncFlow-Auth-Timestamp", timestamp)
-	query.Set("X-SyncFlow-Auth-Nonce", nonce)
+	query.Set("X-LynavoDrive-Auth", signature)
+	query.Set("X-LynavoDrive-Auth-Timestamp", timestamp)
+	query.Set("X-LynavoDrive-Auth-Nonce", nonce)
 	parsed.RawQuery = query.Encode()
 
 	return parsed.String()
@@ -341,9 +341,9 @@ func addSignedPersonalHeaders(t *testing.T, req *http.Request, clientID, pairing
 	timestamp := time.Now().UTC().Format(time.RFC3339Nano)
 	nonce := "test-nonce-header-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	signature := personalAccessSignature(t, req.Method, req.URL.EscapedPath(), clientID, timestamp, nonce, pairingToken)
-	req.Header.Set("X-SyncFlow-Auth", signature)
-	req.Header.Set("X-SyncFlow-Auth-Timestamp", timestamp)
-	req.Header.Set("X-SyncFlow-Auth-Nonce", nonce)
+	req.Header.Set("X-LynavoDrive-Auth", signature)
+	req.Header.Set("X-LynavoDrive-Auth-Timestamp", timestamp)
+	req.Header.Set("X-LynavoDrive-Auth-Nonce", nonce)
 }
 
 func personalAccessSignature(t *testing.T, method, escapedPath, clientID, timestamp, nonce, pairingToken string) string {

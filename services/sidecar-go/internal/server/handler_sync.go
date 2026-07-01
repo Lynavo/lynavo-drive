@@ -8,12 +8,12 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/nicksyncflow/sidecar/internal/disk"
-	"github.com/nicksyncflow/sidecar/internal/events"
-	"github.com/nicksyncflow/sidecar/internal/protocol"
-	"github.com/nicksyncflow/sidecar/internal/runtimefs"
-	"github.com/nicksyncflow/sidecar/internal/store"
-	"github.com/nicksyncflow/sidecar/internal/uploadfs"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/disk"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/events"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/protocol"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/runtimefs"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/store"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/uploadfs"
 )
 
 // handleSyncBegin processes SYNC_BEGIN_REQ, creating a session and

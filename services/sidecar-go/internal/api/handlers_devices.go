@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/nicksyncflow/sidecar/internal/store"
-	"github.com/nicksyncflow/sidecar/internal/uploadfs"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/store"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/uploadfs"
 )
 
 func (s *Server) handleDeviceDetail(w http.ResponseWriter, r *http.Request) {

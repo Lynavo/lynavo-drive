@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/nicksyncflow/sidecar/internal/config"
-	"github.com/nicksyncflow/sidecar/internal/protocol"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/config"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/protocol"
 )
 
 func TestIsDiskFullError(t *testing.T) {

@@ -16,9 +16,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nicksyncflow/sidecar/internal/config"
-	"github.com/nicksyncflow/sidecar/internal/events"
-	"github.com/nicksyncflow/sidecar/internal/store"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/config"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/events"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/store"
 )
 
 const (
@@ -440,7 +440,7 @@ func addSignedWindowsPersonalHeaders(t *testing.T, req *http.Request) {
 		timestamp,
 		nonce,
 	}, "\n")))
-	req.Header.Set("X-SyncFlow-Auth", hex.EncodeToString(mac.Sum(nil)))
-	req.Header.Set("X-SyncFlow-Auth-Timestamp", timestamp)
-	req.Header.Set("X-SyncFlow-Auth-Nonce", nonce)
+	req.Header.Set("X-LynavoDrive-Auth", hex.EncodeToString(mac.Sum(nil)))
+	req.Header.Set("X-LynavoDrive-Auth-Timestamp", timestamp)
+	req.Header.Set("X-LynavoDrive-Auth-Nonce", nonce)
 }

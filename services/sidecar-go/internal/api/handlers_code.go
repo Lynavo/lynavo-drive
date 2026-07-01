@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"sort"
 
-	"github.com/nicksyncflow/sidecar/internal/events"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/events"
 )
 
 type setConnectionCodeRequest struct {

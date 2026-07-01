@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nicksyncflow/sidecar/internal/store"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/store"
 )
 
 // newTestStoreForDir creates a fresh SQLite store in a temp dir.

@@ -34,10 +34,6 @@ function allowAny(reason) {
   return { reason };
 }
 
-function allowTerms(terms, reason) {
-  return { terms: new Set(terms), reason };
-}
-
 function allowMatches(matchers, reason) {
   return {
     matchers: matchers.map((matcher) => ({
@@ -46,16 +42,6 @@ function allowMatches(matchers, reason) {
     })),
     reason,
   };
-}
-
-const GO_CMD_PATH_PATTERN =
-  /(?:^|[^A-Za-z0-9_./-])\.\/cmd\/syncflow-sidecar\/(?:[^A-Za-z0-9_./-]|$)/;
-const GO_MODULE_OR_CMD_PATTERN =
-  /github\.com\/nicksyncflow\/sidecar|(?:^|[^A-Za-z0-9_./-])\.\/cmd\/syncflow-sidecar\/(?:[^A-Za-z0-9_./-]|$)|(?:^|[^A-Za-z0-9_.-])syncflow-sidecar(?:[^A-Za-z0-9_.-]|$)|(?:^|[^A-Za-z0-9_.-])syncflow\.db(?:-(?:wal|shm))?(?:[^A-Za-z0-9_.-]|$)/;
-const SYNCFLOW_HEADER_PATTERN = /X-SyncFlow-/;
-
-function allowGoCmdPath(reason) {
-  return allowMatches([{ terms: ['syncflow'], linePattern: GO_CMD_PATH_PATTERN }], reason);
 }
 
 const HISTORICAL_SUPERPOWERS_DOC_REASON =
@@ -144,34 +130,6 @@ const ALLOWED_EXACT_PATHS = new Map([
     allowAny('Regression test fixture for unallowlisted legacy-name detection.'),
   ],
   [
-    'apps/desktop/package.json',
-    allowGoCmdPath(
-      'Desktop build script keeps Go cmd path ./cmd/syncflow-sidecar/ until cmd directory rename.',
-    ),
-  ],
-  [
-    'apps/desktop/src/main/sidecar-manager.ts',
-    allowGoCmdPath('Desktop dev mode keeps Go cmd path ./cmd/syncflow-sidecar/ until cmd rename.'),
-  ],
-  [
-    'apps/desktop/scripts/build-sidecar-linux.cjs',
-    allowGoCmdPath(
-      'Sidecar build script keeps Go cmd path ./cmd/syncflow-sidecar/ until cmd directory rename.',
-    ),
-  ],
-  [
-    'apps/desktop/scripts/build-sidecar-mac.cjs',
-    allowGoCmdPath(
-      'Sidecar build script keeps Go cmd path ./cmd/syncflow-sidecar/ until cmd directory rename.',
-    ),
-  ],
-  [
-    'apps/desktop/scripts/build-sidecar-win.cjs',
-    allowGoCmdPath(
-      'Sidecar build script keeps Go cmd path ./cmd/syncflow-sidecar/ until cmd directory rename.',
-    ),
-  ],
-  [
     'scripts/release/__tests__/desktop-branding.test.mjs',
     allowMatches(
       [{ terms: ['syncflow'], linePattern: /assert\.doesNotMatch\(.*syncflow-sidecar/ }],
@@ -212,13 +170,6 @@ const ALLOWED_EXACT_PATHS = new Map([
     ),
   ],
   [
-    'scripts/ios/lynavo_upload_eval.sh',
-    allowMatches(
-      [{ terms: ['syncflow'], linePattern: GO_MODULE_OR_CMD_PATTERN }],
-      'iOS upload evaluation script controls the current sidecar cmd/binary before cmd rename.',
-    ),
-  ],
-  [
     'scripts/verify-vscode-android-debug.mjs',
     allowMatches(
       [{ terms: ['SyncFlow'], linePattern: /SyncFlowMobileGlobal/ }],
@@ -252,104 +203,6 @@ const ALLOWED_EXACT_PATHS = new Map([
     ),
   ],
   [
-    'apps/mobile/android/app/src/main/java/com/lynavo/drive/mobile/sync/NativeSyncEngineModule.kt',
-    allowMatches(
-      [{ terms: ['SyncFlow'], linePattern: SYNCFLOW_HEADER_PATTERN }],
-      'LAN personal-download protocol headers retain X-SyncFlow-* until protocol rename.',
-    ),
-  ],
-  [
-    'apps/mobile/ios/SyncEngine/BackgroundUploadService.swift',
-    allowMatches(
-      [{ terms: ['SyncFlow'], linePattern: SYNCFLOW_HEADER_PATTERN }],
-      'Background upload protocol headers retain X-SyncFlow-* until protocol rename.',
-    ),
-  ],
-  [
-    'apps/mobile/ios/SyncEngine/SharedFilesService.swift',
-    allowMatches(
-      [{ terms: ['SyncFlow'], linePattern: SYNCFLOW_HEADER_PATTERN }],
-      'Shared-files protocol headers retain X-SyncFlow-* until protocol rename.',
-    ),
-  ],
-  [
-    'apps/mobile/src/services/download-records-service.ts',
-    allowMatches(
-      [{ terms: ['SyncFlow'], linePattern: SYNCFLOW_HEADER_PATTERN }],
-      'Downloaded record sanitizer documents X-SyncFlow-* signed URL params.',
-    ),
-  ],
-  [
-    'apps/mobile/src/services/__tests__/download-records-service.test.ts',
-    allowMatches(
-      [{ terms: ['SyncFlow'], linePattern: SYNCFLOW_HEADER_PATTERN }],
-      'Downloaded record tests cover stripping X-SyncFlow-* signed URL params.',
-    ),
-  ],
-  [
-    'services/sidecar-go/internal/api/handlers_personal.go',
-    allowMatches(
-      [{ terms: ['SyncFlow'], linePattern: SYNCFLOW_HEADER_PATTERN }],
-      'Personal file API still accepts X-SyncFlow-* signed request params.',
-    ),
-  ],
-  [
-    'services/sidecar-go/internal/api/router_test.go',
-    allowMatches(
-      [
-        { terms: ['syncflow'], linePattern: GO_MODULE_OR_CMD_PATTERN },
-        { terms: ['SyncFlow'], linePattern: SYNCFLOW_HEADER_PATTERN },
-      ],
-      'Go tests import the current module path and cover X-SyncFlow-* signed params.',
-    ),
-  ],
-  [
-    'services/sidecar-go/internal/api/personal_virtual_drives_test.go',
-    allowMatches(
-      [
-        { terms: ['syncflow'], linePattern: GO_MODULE_OR_CMD_PATTERN },
-        { terms: ['SyncFlow'], linePattern: SYNCFLOW_HEADER_PATTERN },
-      ],
-      'Go tests import the current module path and cover X-SyncFlow-* signed params.',
-    ),
-  ],
-  [
-    'services/sidecar-go/go.mod',
-    allowTerms(['syncflow'], 'Go module path before sidecar module rename.'),
-  ],
-  [
-    'services/sidecar-go/go.sum',
-    allowTerms(['syncflow'], 'Go module path checksums before sidecar module rename.'),
-  ],
-  [
-    'services/sidecar-go/Makefile',
-    allowMatches(
-      [
-        { terms: ['syncflow'], linePattern: GO_CMD_PATH_PATTERN },
-        {
-          terms: ['syncflow'],
-          linePattern: /(?:^|[^A-Za-z0-9_.-])syncflow\.db(?:-(?:wal|shm))?(?:[^A-Za-z0-9_.-]|$)/,
-        },
-      ],
-      'Go command path and local legacy dev database cleanup remain before cmd/data-dir rename.',
-    ),
-  ],
-  [
-    'services/sidecar-go/internal/config/config.go',
-    allowTerms(['SYNCFLOW'], 'Device IP override env name remains before env rename.'),
-  ],
-  [
-    'services/sidecar-go/cmd/syncflow-sidecar/main.go',
-    allowTerms(
-      ['syncflow', 'SYNCFLOW'],
-      'Go module path and sidecar config entrypoint names remain before cmd/module rename.',
-    ),
-  ],
-  [
-    'services/sidecar-go/cmd/syncflow-sidecar/main_test.go',
-    allowTerms(['syncflow'], 'Go module import path remains before module rename.'),
-  ],
-  [
     'apps/mobile/ios/LynavoDrive/AuthKeychainCleaner.swift',
     allowAny('Keychain migration strings preserve access to existing credentials.'),
   ],
@@ -380,13 +233,6 @@ for (const path of HISTORICAL_DOC_PATHS) {
 }
 
 const ALLOWED_PATH_PREFIXES = [
-  [
-    'services/sidecar-go/',
-    allowMatches(
-      [{ terms: ['syncflow'], linePattern: GO_MODULE_OR_CMD_PATTERN }],
-      'Go source imports retain github.com/nicksyncflow/sidecar until module rename.',
-    ),
-  ],
   [
     'apps/mobile/ios/Frameworks/SyncFlowMobileTunnel.xcframework/',
     allowAny('Prebuilt tunnel xcframework retains its current binary/module name.'),

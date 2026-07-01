@@ -34,7 +34,7 @@ const LEGACY_MOCK_PATH_PREFIX = '/mock/path/';
 
 /**
  * personal-dir: records carry time-limited HMAC signatures
- * (X-SyncFlow-Auth / X-SyncFlow-Auth-Timestamp) that expire after
+ * (X-LynavoDrive-Auth / X-LynavoDrive-Auth-Timestamp) that expire after
  * 5 minutes.  Persisting those URLs causes permanent thumbnail and
  * preview failures once the signature window closes.  For these
  * records we rely on localPath for display instead.

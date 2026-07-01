@@ -87,7 +87,7 @@ test('includes hidden files while keeping generated artifacts ignored', () => {
   }
 });
 
-test('applies exact-path allowlists only to their allowed terms', () => {
+test('rejects legacy Go module paths after sidecar module rename', () => {
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'legacy-name-allowlist-'));
   try {
     const sidecarDir = join(fixtureRoot, 'services', 'sidecar-go');
@@ -97,16 +97,16 @@ test('applies exact-path allowlists only to their allowed terms', () => {
     const result = runVerifier(['--root', fixtureRoot]);
 
     assert.equal(result.status, 1, result.stderr);
-    assert.match(result.stdout, /Allowed legacy name hits: 1/);
-    assert.match(result.stdout, /Unallowlisted legacy name hits: 1/);
+    assert.match(result.stdout, /Allowed legacy name hits: 0/);
+    assert.match(result.stdout, /Unallowlisted legacy name hits: 2/);
+    assert.match(result.stdout, /services\/sidecar-go\/go\.mod:1 syncflow/);
     assert.match(result.stdout, /services\/sidecar-go\/go\.mod:2 SyncFlow/);
-    assert.doesNotMatch(result.stdout, /services\/sidecar-go\/go\.mod:1 syncflow/);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }
 });
 
-test('narrows desktop build script allowlists to the Go command path', () => {
+test('rejects legacy sidecar binary and command paths after cmd rename', () => {
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'legacy-name-allowlist-'));
   try {
     const scriptDir = join(fixtureRoot, 'apps', 'desktop', 'scripts');
@@ -122,10 +122,10 @@ test('narrows desktop build script allowlists to the Go command path', () => {
     const result = runVerifier(['--root', fixtureRoot]);
 
     assert.equal(result.status, 1, result.stderr);
-    assert.match(result.stdout, /Allowed legacy name hits: 1/);
-    assert.match(result.stdout, /Unallowlisted legacy name hits: 1/);
+    assert.match(result.stdout, /Allowed legacy name hits: 0/);
+    assert.match(result.stdout, /Unallowlisted legacy name hits: 2/);
     assert.match(result.stdout, /apps\/desktop\/scripts\/build-sidecar-mac\.cjs:1 syncflow/);
-    assert.doesNotMatch(result.stdout, /apps\/desktop\/scripts\/build-sidecar-mac\.cjs:2 syncflow/);
+    assert.match(result.stdout, /apps\/desktop\/scripts\/build-sidecar-mac\.cjs:2 syncflow/);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }

@@ -57,7 +57,7 @@ function run() {
 
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 
-  const child = spawn('go', ['build', '-o', outputPath, './cmd/syncflow-sidecar/'], {
+  const child = spawn('go', ['build', '-o', outputPath, './cmd/lynavo-drive-sidecar/'], {
     cwd: sidecarRoot,
     env: buildLinuxSidecarEnv(arch),
     stdio: 'inherit',

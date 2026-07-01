@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/nicksyncflow/sidecar/internal/events"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/events"
 )
 
 type settingsDTO struct {

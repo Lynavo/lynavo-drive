@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nicksyncflow/sidecar/internal/config"
-	"github.com/nicksyncflow/sidecar/internal/events"
-	"github.com/nicksyncflow/sidecar/internal/protocol"
-	"github.com/nicksyncflow/sidecar/internal/store"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/config"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/events"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/protocol"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/store"
 )
 
 type fakePresenceStateProvider struct {

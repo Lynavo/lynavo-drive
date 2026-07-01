@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/nicksyncflow/sidecar/internal/store"
-	"github.com/nicksyncflow/sidecar/internal/uploadfs"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/store"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/uploadfs"
 )
 
 func (s *Server) handleManagementDevices(w http.ResponseWriter, r *http.Request) {

@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nicksyncflow/sidecar/internal/events"
+	"github.com/lynavo/lynavo-drive/services/sidecar-go/internal/events"
 )
 
 const (

@@ -18,17 +18,10 @@ apps/desktop/resources/.sidecar-build/
 tools/node/
 
 # Go sidecar
-# Legacy local artifacts may still be produced by the current Go cmd/db names until
-# the sidecar module/cmd migration lands. Keep them ignored so verification runs
-# do not leave generated files in git status.
-services/sidecar-go/syncflow-sidecar
-services/sidecar-go/syncflow.db
-services/sidecar-go/syncflow.db-wal
-services/sidecar-go/syncflow.db-shm
 services/sidecar-go/lynavo-drive-sidecar
-services/sidecar-go/lynavo-drive.db
-services/sidecar-go/lynavo-drive.db-wal
-services/sidecar-go/lynavo-drive.db-shm
+services/sidecar-go/sidecar.db
+services/sidecar-go/sidecar.db-wal
+services/sidecar-go/sidecar.db-shm
 tmp/sidecar-eval.db
 AuthKey_*.p8
 
