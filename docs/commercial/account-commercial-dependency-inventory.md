@@ -14,6 +14,7 @@ browsing.
 | Keep baseline            | Required for community OSS local LAN behavior.                                         |
 | Keep fail-closed stub    | Compatibility surface may stay, but must never enable paid behavior in OSS.            |
 | Move to official overlay | Positive commercial behavior should live outside the OSS baseline.                     |
+| Moved out of OSS         | Commercial runtime surface has been removed from the OSS baseline in the current tree. |
 | Delete or rename         | Remove unused commercial residue or rename misleading local-LAN names.                 |
 | Harden                   | Not a commercial feature by itself, but should be tightened before public OSS release. |
 
@@ -22,12 +23,13 @@ browsing.
 1. Foreground local LAN sync is mostly fail-open already. Desktop has no auth
    shell, mobile routes guests into `LanSyncStack`, and sidecar TCP sync gates on
    pairing/HMAC rather than account state.
-2. Commercial entitlement types exist in `@lynavo-drive/contracts`, but the OSS
-   resolver is intentionally fail-closed for background continuation and remote
-   tunnel.
-3. Mobile still carries the largest commercial residue: legacy auth state,
-   native tunnel credential bridges, native P2P tunnel implementations, iOS
-   background URLSession/BGTask code, and Android foreground service coupling.
+2. `@lynavo-drive/contracts` now exposes only the community foreground LAN
+   entitlement. Commercial background and tunnel entitlement fields were removed
+   from the OSS contract surface.
+3. Mobile still carries the largest commercial residue outside tunnel runtime:
+   legacy auth state, iOS background URLSession/BGTask code, and Android
+   foreground service coupling. Native tunnel credential bridges and bundled
+   MobileTunnel artifacts have been removed from the OSS runtime.
 4. "RemoteAccess" often means LAN personal-directory browsing in current mobile
    and desktop UI. Do not delete it as paid tunnel code without first splitting
    the naming and route policy.
@@ -61,7 +63,7 @@ browsing.
 | API bearer auth               | `apps/mobile/src/services/api.ts:94` returns no auth headers; `:187` rejects `/auth/refresh`.                              | Keep fail-closed stub    | Keep until all official account API callers are absent; then simplify.                                            |
 | Auth service bridge           | `apps/mobile/src/services/auth-service.ts:34` documents official helpers absent.                                           | Keep fail-closed stub    | Remove only after `api.ts` no longer needs clear-auth callbacks.                                                  |
 | App config                    | `apps/mobile/src/services/app-config-service.ts:36` disables silent audio and public IP.                                   | Keep fail-closed stub    | Keep OSS default false; official overlay may inject config later.                                                 |
-| Native tunnel bridge          | `apps/mobile/src/services/SyncEngineModule.ts:750` exposes `setTunnelCredentials`.                                         | Move to official overlay | OSS native bridge should reject non-empty credentials or be removed with MobileTunnel.                            |
+| Native tunnel bridge          | `apps/mobile/src/services/SyncEngineModule.ts` no longer exports a tunnel credential bridge; native bridges were removed.  | Moved out of OSS         | Keep removed; official overlays must own any positive tunnel credential path.                                     |
 | Legacy owner marker           | `apps/mobile/src/services/SyncEngineModule.ts:712`, `:741`.                                                                | Delete or rename         | Remove if no OSS caller needs account-owner mismatch repair.                                                      |
 | RemoteAccess naming           | `apps/mobile/src/services/desktop-local-service.ts:689`, `:1112`; `RemoteAccessGlobalScreen.tsx` uses personal LAN browse. | Delete or rename         | Keep LAN behavior, rename from remote access to personal/local computer browsing.                                 |
 | Subscription locale namespace | `apps/mobile/src/i18n/resources.ts:12`, `OpenSourceInfoScreen.tsx:44`, `subscription.json:1`.                              | Delete or rename         | Rename `subscription` namespace to OSS/community info after UI impact is scoped.                                  |
@@ -76,54 +78,52 @@ browsing.
 | iOS silent audio                 | `app-config-service.ts:36`; `SyncEngineManager.swift:1423` and `:1440` stop/skip when disabled.                                                  | Keep fail-closed stub    | Keep disabled in OSS; positive capability belongs in official overlay.                                             |
 | iOS background URLSession/BGTask | `BackgroundExecutionService.swift:66`, `BackgroundUploadService.swift:17`, `SyncEngineManager.swift:1484`, `:3289`.                              | Move to official overlay | Add entitlement/capability gate or remove from OSS build.                                                          |
 | Android foreground service       | `AndroidManifest.xml:48`, `AndroidForegroundSyncService.kt:17`.                                                                                  | Move to official overlay | Split foreground LAN transfer from paid background continuation.                                                   |
-| iOS P2P tunnel                   | `RNBridge.swift:361`, `LocalTCPProxy.swift:40`, `SyncEngineManager.swift:2066`.                                                                  | Move to official overlay | OSS must not accept non-empty tunnel credentials or start MobileTunnel.                                            |
-| Android P2P tunnel               | `NativeSyncEngineModule.kt:190`, `:3709`, `AndroidSyncPrimitives.kt:226`.                                                                        | Move to official overlay | OSS must reject non-empty tunnel credentials and prefer direct LAN only.                                           |
+| iOS P2P tunnel                   | RN bridge credential entrypoints and the former iOS tunnel xcframework were removed; `LocalTCPProxy` is an OSS no-op.                            | Moved out of OSS         | Keep no-op/direct-LAN behavior unless an official overlay supplies the private tunnel runtime.                     |
+| Android P2P tunnel               | RN bridge credential entrypoints and bundled MobileTunnel AAR/JAR were removed; route policy resolves to direct LAN only.                        | Moved out of OSS         | Keep direct-LAN behavior unless an official overlay supplies the private tunnel runtime.                           |
 | Public wake                      | `SharedFilesRoutePolicy.swift:14`, `AndroidSyncPrimitives.kt:191` are fail-closed.                                                               | Keep fail-closed stub    | Keep disabled; same-LAN WoL can remain local baseline if not account/relay backed.                                 |
 | Manual file selection            | `SyncEngineModule.ts:314`, `AutoUploadSettingsGlobalScreen.tsx:347`, `NativeSyncEngineModule.kt:1210`.                                           | Harden                   | Separate non-commercial invariant risk: OSS must not offer manual file selection as an upload replacement.         |
 
 ## Sidecar And Contracts Inventory
 
-| Area                      | Evidence                                                                                               | Classification           | Next action                                                                         |
-| ------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------ | ----------------------------------------------------------------------------------- |
-| Entitlement contract      | `packages/contracts/src/types.ts:20`, `:35`, `:101`, `:141`.                                           | Keep fail-closed stub    | Keep resolver in OSS; official overlay should supply positive entitlement resolver. |
-| Subscription DTOs         | `packages/contracts/src/types.ts:667`.                                                                 | Move to official overlay | Remove/move paywall DTOs after no OSS package exports require them.                 |
-| Tunnel/signaling DTOs     | `packages/contracts/src/enums.ts:14`, `packages/contracts/src/types.ts:714`.                           | Move to official overlay | Keep only LAN route DTOs in OSS or mark tunnel/relay as official-only.              |
-| Service endpoints         | `packages/contracts/src/service-endpoints.ts:1`.                                                       | Delete or rename         | Audit whether OSS needs official API constants outside update/support diagnostics.  |
-| TCP sync                  | `services/sidecar-go/internal/server/connection.go:214`, `handler_sync.go:21`, `handler_hello.go:360`. | Keep baseline            | Preserve pairing/HMAC authenticated foreground LAN sync.                            |
-| Commercial HTTP endpoints | `services/sidecar-go/internal/api/router.go:206`, `handlers_settings.go:304`, `:313`.                  | Keep fail-closed stub    | Keep temporary 403 compatibility or remove after desktop/mobile callers are gone.   |
-| Remote setting            | `handlers_settings.go:217`, `:288` force `remoteAccessEnabled=false`.                                  | Keep fail-closed stub    | Keep false in OSS; avoid UI defaults that imply it can be enabled.                  |
-| Tunnel health             | `handlers_health.go:25` reports tunnel disabled.                                                       | Keep fail-closed stub    | Keep as explicit OSS health signal.                                                 |
-| Proxy wake                | `router.go:203`, `handlers_wake.go:5`.                                                                 | Keep fail-closed stub    | Keep disabled unless official overlay implements account-backed proxy wake.         |
-| Personal API              | `handlers_personal.go:41`; test at `router_test.go:2673` says no account context required.             | Keep baseline            | Treat as local paired-device HMAC browsing, not official account remote access.     |
-| Mobile resources/presence | `handlers_resources.go:1027`, `presence.go:76` use paired `clientId` checks without HMAC.              | Harden                   | Add paired-device HMAC or narrower local-only rules before public OSS release.      |
-| Store schema              | `001_initial.sql:1`, `005_desktop_local_management.sql:25`.                                            | Keep baseline            | No account/tunnel/entitlement persistence exists in sidecar store.                  |
+| Area                      | Evidence                                                                                               | Classification           | Next action                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------ | ---------------------------------------------------------------------------------- |
+| Entitlement contract      | `packages/contracts/src/types.ts` keeps only the foreground LAN entitlement and resolver metadata.     | Keep baseline            | Keep OSS contract surface free of commercial background/tunnel fields.             |
+| Subscription DTOs         | `packages/contracts/src/types.ts:667`.                                                                 | Move to official overlay | Remove/move paywall DTOs after no OSS package exports require them.                |
+| Tunnel/signaling DTOs     | `packages/contracts/src/enums.ts:14`, `packages/contracts/src/types.ts:714`.                           | Move to official overlay | Keep only LAN route DTOs in OSS or mark tunnel/relay as official-only.             |
+| Service endpoints         | `packages/contracts/src/service-endpoints.ts:1`.                                                       | Delete or rename         | Audit whether OSS needs official API constants outside update/support diagnostics. |
+| TCP sync                  | `services/sidecar-go/internal/server/connection.go:214`, `handler_sync.go:21`, `handler_hello.go:360`. | Keep baseline            | Preserve pairing/HMAC authenticated foreground LAN sync.                           |
+| Commercial HTTP endpoints | `services/sidecar-go/internal/api/router.go:206`, `handlers_settings.go:304`, `:313`.                  | Keep fail-closed stub    | Keep temporary 403 compatibility or remove after desktop/mobile callers are gone.  |
+| Remote setting            | `handlers_settings.go:217`, `:288` force `remoteAccessEnabled=false`.                                  | Keep fail-closed stub    | Keep false in OSS; avoid UI defaults that imply it can be enabled.                 |
+| Tunnel health             | `handlers_health.go:25` reports tunnel disabled.                                                       | Keep fail-closed stub    | Keep as explicit OSS health signal.                                                |
+| Proxy wake                | `router.go:203`, `handlers_wake.go:5`.                                                                 | Keep fail-closed stub    | Keep disabled unless official overlay implements account-backed proxy wake.        |
+| Personal API              | `handlers_personal.go:41`; test at `router_test.go:2673` says no account context required.             | Keep baseline            | Treat as local paired-device HMAC browsing, not official account remote access.    |
+| Mobile resources/presence | `handlers_resources.go:1027`, `presence.go:76` use paired `clientId` checks without HMAC.              | Harden                   | Add paired-device HMAC or narrower local-only rules before public OSS release.     |
+| Store schema              | `001_initial.sql:1`, `005_desktop_local_management.sql:25`.                                            | Keep baseline            | No account/tunnel/entitlement persistence exists in sidecar store.                 |
 
 ## Documentation And QA Drift
 
-| Area                   | Evidence                                                                                                                                                  | Classification   | Next action                                                           |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | --------------------------------------------------------------------- |
-| Community build docs   | `docs/open-source/community-build.md:23` says commercial native modules are not built in, while mobile native code still contains tunnel/background code. | Delete or rename | Update wording or remove native modules from OSS.                     |
-| Beta matrix background | `docs/testing/beta-test-matrix.md:140` says OSS background is fail-closed, but `:264` lists background upload/lock soak as covered.                       | Delete or rename | Mark those as paid official coverage or foreground recovery coverage. |
-| Feature boundary       | `docs/commercial/feature-boundary.md:25` requires official capability and entitlement for paid features.                                                  | Keep baseline    | Use as the migration rule for follow-up tasks.                        |
+| Area                   | Evidence                                                                                                                                                                        | Classification   | Next action                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | --------------------------------------------------------------------- |
+| Community build docs   | `docs/open-source/community-build.md:23` says commercial native modules are not built in; tunnel binaries are now removed while background continuation still needs split work. | Delete or rename | Update wording after the background continuation split.               |
+| Beta matrix background | `docs/testing/beta-test-matrix.md:140` says OSS background is fail-closed, but `:264` lists background upload/lock soak as covered.                                             | Delete or rename | Mark those as paid official coverage or foreground recovery coverage. |
+| Feature boundary       | `docs/commercial/feature-boundary.md:25` requires official capability and entitlement for paid features.                                                                        | Keep baseline    | Use as the migration rule for follow-up tasks.                        |
 
 ## Recommended Follow-up Order
 
 1. Android foreground fail-open: foreground LAN sync must not abort because
    Android notification permission or foreground-service background support is
    unavailable.
-2. Native tunnel hard fail-closed: reject non-empty `setTunnelCredentials` in
-   OSS or move MobileTunnel/P2P route code into official overlay.
-3. Background continuation split: gate or remove iOS BGTask/background
+2. Background continuation split: gate or remove iOS BGTask/background
    URLSession, Android background service, and silent-audio positive paths from
    OSS.
-4. Mobile auth cleanup: remove `isFeatureAccessAllowed` and sync activity auth
+3. Mobile auth cleanup: remove `isFeatureAccessAllowed` and sync activity auth
    dependency, then shrink legacy auth store and owner-user-id bridges.
-5. Naming cleanup: split LAN personal-directory browsing from paid remote
+4. Naming cleanup: split LAN personal-directory browsing from paid remote
    tunnel by renaming `RemoteAccess*`, `remoteAccessEnabled`, and related copy.
-6. Contracts split: keep entitlement fail-closed resolver and LAN DTOs in OSS;
+5. Contracts split: keep the foreground LAN resolver and LAN DTOs in OSS;
    move subscription plan, TURN, signaling, and tunnel/relay positive DTOs to
    official overlay.
-7. Sidecar HTTP hardening: add HMAC/local-only protection to mobile resource and
+6. Sidecar HTTP hardening: add HMAC/local-only protection to mobile resource and
    presence routes, while keeping `/personal/*` as paired-device local browsing.
-8. Documentation cleanup: align beta matrix and community-build docs with the
+7. Documentation cleanup: align beta matrix and community-build docs with the
    actual current fail-closed state.

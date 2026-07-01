@@ -10,7 +10,6 @@ import type {
   AutoUploadConfigDTO,
   BindingStateDTO,
   DirectoryListingDTO,
-  DriveEntitlements,
   HistoryLedgerCardDTO,
   PairingErrorMetadataDTO,
   ReadOnlyQueueItemDTO,
@@ -585,15 +584,6 @@ export async function stopBackgroundSyncService(): Promise<void> {
   await NativeSyncEngine.stopBackgroundSyncService();
 }
 
-export async function setDriveEntitlements(
-  entitlements: DriveEntitlements,
-): Promise<void> {
-  if (typeof NativeSyncEngine.setDriveEntitlements !== 'function') {
-    return;
-  }
-  await NativeSyncEngine.setDriveEntitlements(entitlements);
-}
-
 export async function setBackgroundSilentAudioEnabled(
   enabled: boolean,
 ): Promise<void> {
@@ -718,18 +708,6 @@ export async function setOwnerUserId(userId: number | string): Promise<void> {
 export async function getKnownDeviceIds(): Promise<string[]> {
   const result = await NativeSyncEngine.getKnownDeviceIds();
   return (result ?? []) as string[];
-}
-
-export async function setTunnelCredentials(
-  signalingUrl: string,
-  accessToken: string,
-  iceServersJSON: string,
-): Promise<void> {
-  await NativeSyncEngine.setTunnelCredentials(
-    signalingUrl,
-    accessToken,
-    iceServersJSON,
-  );
 }
 
 export class PairingError extends Error {

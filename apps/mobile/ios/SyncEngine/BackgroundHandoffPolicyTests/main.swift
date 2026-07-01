@@ -137,7 +137,6 @@ expect(
 
 let activeEntitlement = DriveEntitlementSnapshot(
     canUseBackgroundContinuation: true,
-    canUseRemoteTunnel: true,
     checkedAt: Date(timeIntervalSince1970: 1_799_999_000),
     expiresAt: Date(timeIntervalSince1970: 1_800_000_100)
 )
@@ -158,7 +157,6 @@ expect(
 
 let maxAgeLimitedEntitlement = DriveEntitlementSnapshot(
     canUseBackgroundContinuation: true,
-    canUseRemoteTunnel: true,
     checkedAt: Date(timeIntervalSince1970: 1_799_900_000),
     expiresAt: Date(timeIntervalSince1970: 1_800_100_000)
 )
@@ -179,13 +177,6 @@ expect(
 
 let disabledEntitlement = DriveEntitlementSnapshot(
     canUseBackgroundContinuation: false,
-    canUseRemoteTunnel: true,
-    checkedAt: Date(timeIntervalSince1970: 1_799_999_000),
-    expiresAt: Date(timeIntervalSince1970: 1_800_000_100)
-)
-let remoteDisabledEntitlement = DriveEntitlementSnapshot(
-    canUseBackgroundContinuation: true,
-    canUseRemoteTunnel: false,
     checkedAt: Date(timeIntervalSince1970: 1_799_999_000),
     expiresAt: Date(timeIntervalSince1970: 1_800_000_100)
 )
@@ -206,7 +197,6 @@ expect(
 
 let expiredEntitlement = DriveEntitlementSnapshot(
     canUseBackgroundContinuation: true,
-    canUseRemoteTunnel: true,
     checkedAt: Date(timeIntervalSince1970: 1_799_999_000),
     expiresAt: Date(timeIntervalSince1970: 1_799_999_999)
 )
@@ -218,73 +208,8 @@ expect(
     "background continuation should fail closed after entitlement expiry"
 )
 
-expect(
-    BackgroundHandoffPolicy.shouldAcceptRemoteTunnelCredentials(
-        snapshot: activeEntitlement,
-        now: Date(timeIntervalSince1970: 1_800_000_000)
-    ),
-    "remote tunnel credentials should be accepted while remote entitlement is true and unexpired"
-)
-expect(
-    !BackgroundHandoffPolicy.shouldAcceptRemoteTunnelCredentials(
-        snapshot: remoteDisabledEntitlement,
-        now: Date(timeIntervalSince1970: 1_800_000_000)
-    ),
-    "remote tunnel credentials should be rejected when remote entitlement is false"
-)
-expect(
-    !BackgroundHandoffPolicy.shouldAcceptRemoteTunnelCredentials(
-        snapshot: expiredEntitlement,
-        now: Date(timeIntervalSince1970: 1_800_000_000)
-    ),
-    "remote tunnel credentials should be rejected after entitlement expiry"
-)
-expect(
-    !BackgroundHandoffPolicy.shouldClearRemoteTunnelOnEntitlementUpdate(
-        snapshot: activeEntitlement,
-        now: Date(timeIntervalSince1970: 1_800_000_000)
-    ),
-    "remote tunnel should stay active while entitlement remains valid"
-)
-expect(
-    BackgroundHandoffPolicy.shouldClearRemoteTunnelOnEntitlementUpdate(
-        snapshot: remoteDisabledEntitlement,
-        now: Date(timeIntervalSince1970: 1_800_000_000)
-    ),
-    "remote tunnel should be cleared when entitlement is revoked"
-)
-expect(
-    BackgroundHandoffPolicy.shouldClearRemoteTunnelOnEntitlementUpdate(
-        snapshot: expiredEntitlement,
-        now: Date(timeIntervalSince1970: 1_800_000_000)
-    ),
-    "remote tunnel should be cleared after entitlement expiry"
-)
-expect(
-    BackgroundHandoffPolicy.remoteTunnelExpiryDate(
-        snapshot: activeEntitlement,
-        now: Date(timeIntervalSince1970: 1_800_000_000)
-    ) == Date(timeIntervalSince1970: 1_800_000_100),
-    "remote tunnel expiry should use expiresAt when it arrives before checkedAt plus max age"
-)
-expect(
-    BackgroundHandoffPolicy.remoteTunnelExpiryDate(
-        snapshot: maxAgeLimitedEntitlement,
-        now: Date(timeIntervalSince1970: 1_799_901_000)
-    ) == Date(timeIntervalSince1970: 1_799_986_400),
-    "remote tunnel expiry should use checkedAt plus max age when it arrives before expiresAt"
-)
-expect(
-    BackgroundHandoffPolicy.remoteTunnelExpiryDate(
-        snapshot: remoteDisabledEntitlement,
-        now: Date(timeIntervalSince1970: 1_800_000_000)
-    ) == nil,
-    "disabled remote tunnel should not schedule an expiry"
-)
-
 let noExpiryEntitlement = DriveEntitlementSnapshot(
     canUseBackgroundContinuation: true,
-    canUseRemoteTunnel: true,
     checkedAt: Date(timeIntervalSince1970: 1_799_999_000),
     expiresAt: nil
 )
@@ -305,7 +230,6 @@ expect(
 
 let staleEntitlement = DriveEntitlementSnapshot(
     canUseBackgroundContinuation: true,
-    canUseRemoteTunnel: true,
     checkedAt: Date(timeIntervalSince1970: 1_799_913_599),
     expiresAt: Date(timeIntervalSince1970: 1_800_000_100)
 )
@@ -326,7 +250,6 @@ expect(
 
 let futureCheckedAtEntitlement = DriveEntitlementSnapshot(
     canUseBackgroundContinuation: true,
-    canUseRemoteTunnel: true,
     checkedAt: Date(timeIntervalSince1970: 1_800_000_001),
     expiresAt: Date(timeIntervalSince1970: 1_800_000_100)
 )
@@ -381,7 +304,6 @@ expect(
 
 let missingExpiryBridgeSnapshot = DriveEntitlementSnapshot.fromBridgeParams([
     "canUseBackgroundContinuation": true,
-    "canUseRemoteTunnel": true,
     "checkedAt": "2026-07-01T00:00:00.000Z"
 ])
 expect(
@@ -394,7 +316,6 @@ expect(
 
 let invalidBridgeSnapshot = DriveEntitlementSnapshot.fromBridgeParams([
     "canUseBackgroundContinuation": "yes",
-    "canUseRemoteTunnel": true,
     "checkedAt": "not-a-date",
     "expiresAt": "also-not-a-date"
 ])

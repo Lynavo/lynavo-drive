@@ -207,11 +207,7 @@ describe('@lynavo-drive/contracts exports', () => {
   it('exports Lynavo Drive release, distribution, feature, and entitlement types', () => {
     const channel: ReleaseChannel = 'prod';
     const distribution: Distribution = 'official';
-    const features: DriveFeatureKey[] = [
-      'lan_foreground_auto_upload',
-      'background_continuation',
-      'remote_tunnel',
-    ];
+    const features: DriveFeatureKey[] = ['lan_foreground_auto_upload'];
     const sources: EntitlementSource[] = [
       'guest',
       'free_account',
@@ -224,8 +220,6 @@ describe('@lynavo-drive/contracts exports', () => {
     ];
     const entitlements: DriveEntitlements = {
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'free_account',
       expiresAt: null,
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -233,11 +227,7 @@ describe('@lynavo-drive/contracts exports', () => {
 
     expect(channel).toBe('prod');
     expect(distribution).toBe('official');
-    expect(features).toEqual([
-      'lan_foreground_auto_upload',
-      'background_continuation',
-      'remote_tunnel',
-    ]);
+    expect(features).toEqual(['lan_foreground_auto_upload']);
     expect(sources).toEqual([
       'guest',
       'free_account',
@@ -248,21 +238,19 @@ describe('@lynavo-drive/contracts exports', () => {
       'official_override',
       'unknown',
     ]);
-    expect(entitlements.canUseRemoteTunnel).toBe(false);
+    expect(entitlements).not.toHaveProperty('canUseRemoteTunnel');
+    expect(entitlements).not.toHaveProperty('canUseBackgroundContinuation');
   });
 
-  it('resolves guest entitlements with foreground LAN fail-open and paid features fail-closed', () => {
+  it('resolves guest entitlements with foreground LAN fail-open and no commercial capability fields', () => {
     expect(
       contracts.resolveDriveEntitlements({
         isAuthenticated: false,
         serverEntitlements: null,
-        officialCapabilitiesAvailable: false,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'guest',
       expiresAt: null,
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -274,13 +262,10 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: null,
-        officialCapabilitiesAvailable: true,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'free_account',
       expiresAt: null,
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -292,19 +277,14 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: {
-          canUseBackgroundContinuation: true,
-          canUseRemoteTunnel: true,
           source: 'subscription',
           expiresAt: '2026-07-29T00:00:00.000Z',
           checkedAt: '2026-06-29T00:00:00.000Z',
         },
-        officialCapabilitiesAvailable: true,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'subscription',
       expiresAt: '2026-07-29T00:00:00.000Z',
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -316,19 +296,14 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: {
-          canUseBackgroundContinuation: true,
-          canUseRemoteTunnel: true,
           source: 'trial',
           expiresAt: '2026-06-28T23:59:59.999Z',
           checkedAt: '2026-06-28T00:00:00.000Z',
         },
-        officialCapabilitiesAvailable: true,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'trial',
       expiresAt: '2026-06-28T23:59:59.999Z',
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -340,19 +315,14 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: {
-          canUseBackgroundContinuation: true,
-          canUseRemoteTunnel: true,
           source: 'subscription',
           expiresAt: 'not-a-date',
           checkedAt: '2026-06-29T00:00:00.000Z',
         },
-        officialCapabilitiesAvailable: true,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'subscription',
       expiresAt: 'not-a-date',
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -364,19 +334,14 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: {
-          canUseBackgroundContinuation: true,
-          canUseRemoteTunnel: true,
           source: 'subscription',
           expiresAt: '2026-07-29T00:00:00.000Z',
           checkedAt: '2026-06-29T00:00:00.000Z',
         },
-        officialCapabilitiesAvailable: true,
         now: new Date('not-a-date'),
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'subscription',
       expiresAt: '2026-07-29T00:00:00.000Z',
       checkedAt: null,
@@ -388,19 +353,14 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: {
-          canUseBackgroundContinuation: true,
-          canUseRemoteTunnel: true,
           source: 'subscription',
           expiresAt: null,
           checkedAt: '2026-06-29T00:00:00.000Z',
         },
-        officialCapabilitiesAvailable: true,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'subscription',
       expiresAt: null,
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -412,19 +372,14 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: {
-          canUseBackgroundContinuation: true,
-          canUseRemoteTunnel: true,
           source: 'trial',
           expiresAt: null,
           checkedAt: '2026-06-29T00:00:00.000Z',
         },
-        officialCapabilitiesAvailable: true,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'trial',
       expiresAt: null,
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -439,18 +394,13 @@ describe('@lynavo-drive/contracts exports', () => {
         contracts.resolveDriveEntitlements({
           isAuthenticated: true,
           serverEntitlements: {
-            canUseBackgroundContinuation: true,
-            canUseRemoteTunnel: true,
             source,
             checkedAt: '2026-06-29T00:00:00.000Z',
           },
-          officialCapabilitiesAvailable: true,
           now: '2026-06-29T00:00:00.000Z',
         }),
       ).toEqual({
         canUseLanForegroundAutoUpload: true,
-        canUseBackgroundContinuation: false,
-        canUseRemoteTunnel: false,
         source,
         expiresAt: null,
         checkedAt: '2026-06-29T00:00:00.000Z',
@@ -463,19 +413,14 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: {
-          canUseBackgroundContinuation: true,
-          canUseRemoteTunnel: true,
           source: 'gift_card',
           expiresAt: null,
           checkedAt: '2026-06-29T00:00:00.000Z',
         },
-        officialCapabilitiesAvailable: true,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'gift_card',
       expiresAt: null,
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -487,19 +432,14 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: {
-          canUseBackgroundContinuation: true,
-          canUseRemoteTunnel: true,
           source: 'legacy',
           expiresAt: null,
           checkedAt: '2026-06-29T00:00:00.000Z',
         },
-        officialCapabilitiesAvailable: true,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'legacy',
       expiresAt: null,
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -511,19 +451,14 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: {
-          canUseBackgroundContinuation: true,
-          canUseRemoteTunnel: true,
           source: 'official_override',
           expiresAt: null,
           checkedAt: '2026-06-29T00:00:00.000Z',
         },
-        officialCapabilitiesAvailable: true,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'official_override',
       expiresAt: null,
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -535,19 +470,14 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: {
-          canUseBackgroundContinuation: true,
-          canUseRemoteTunnel: true,
           source: 'gift_card',
           expiresAt: 'not-a-date',
           checkedAt: '2026-06-29T00:00:00.000Z',
         },
-        officialCapabilitiesAvailable: true,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'gift_card',
       expiresAt: 'not-a-date',
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -559,19 +489,14 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: {
-          canUseBackgroundContinuation: true,
-          canUseRemoteTunnel: true,
           source: 'gift_card',
           expiresAt: null,
           checkedAt: '2026-06-29T00:00:00.000Z',
         },
-        officialCapabilitiesAvailable: true,
         now: 'not-a-date',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'gift_card',
       expiresAt: null,
       checkedAt: null,
@@ -583,19 +508,14 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: {
-          canUseBackgroundContinuation: true,
-          canUseRemoteTunnel: true,
           source: 'gift_card',
           expiresAt: '2026-06-29T00:00:00.000Z',
           checkedAt: '2026-06-29T00:00:00.000Z',
         },
-        officialCapabilitiesAvailable: true,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'gift_card',
       expiresAt: '2026-06-29T00:00:00.000Z',
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -607,18 +527,13 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: {
-          canUseBackgroundContinuation: true,
-          canUseRemoteTunnel: true,
           source: 'subscription',
           expiresAt: '2026-07-29T00:00:00.000Z',
         },
-        officialCapabilitiesAvailable: true,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'subscription',
       expiresAt: '2026-07-29T00:00:00.000Z',
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -630,19 +545,14 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: {
-          canUseBackgroundContinuation: true,
-          canUseRemoteTunnel: true,
           source: 'subscription',
           expiresAt: '2026-07-29T00:00:00.000Z',
           checkedAt: 'not-a-date',
         },
-        officialCapabilitiesAvailable: true,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'subscription',
       expiresAt: '2026-07-29T00:00:00.000Z',
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -654,19 +564,14 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: {
-          canUseBackgroundContinuation: true,
-          canUseRemoteTunnel: true,
           source: 'subscription',
           expiresAt: '2026-07-29T00:00:00.000Z',
           checkedAt: '2026-06-27T23:59:59.999Z',
         },
-        officialCapabilitiesAvailable: true,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'subscription',
       expiresAt: '2026-07-29T00:00:00.000Z',
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -678,19 +583,14 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: {
-          canUseBackgroundContinuation: true,
-          canUseRemoteTunnel: true,
           source: 'subscription',
           expiresAt: '2026-07-29T00:00:00.000Z',
           checkedAt: '2026-06-29T00:00:00.001Z',
         },
-        officialCapabilitiesAvailable: true,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'subscription',
       expiresAt: '2026-07-29T00:00:00.000Z',
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -702,13 +602,10 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: { plan: 'unknown' },
-        officialCapabilitiesAvailable: true,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'unknown',
       expiresAt: null,
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -720,19 +617,14 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: {
-          canUseBackgroundContinuation: true,
-          canUseRemoteTunnel: true,
           source: '__invalid__',
           expiresAt: '2026-07-29T00:00:00.000Z',
           checkedAt: '2026-06-29T00:00:00.000Z',
         },
-        officialCapabilitiesAvailable: true,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'unknown',
       expiresAt: '2026-07-29T00:00:00.000Z',
       checkedAt: '2026-06-29T00:00:00.000Z',
@@ -744,19 +636,14 @@ describe('@lynavo-drive/contracts exports', () => {
       contracts.resolveDriveEntitlements({
         isAuthenticated: true,
         serverEntitlements: {
-          canUseBackgroundContinuation: true,
-          canUseRemoteTunnel: true,
           source: 'subscription',
           expiresAt: '2026-07-29T00:00:00.000Z',
           checkedAt: '2026-06-29T00:00:00.000Z',
         },
-        officialCapabilitiesAvailable: false,
         now: '2026-06-29T00:00:00.000Z',
       }),
     ).toEqual({
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'subscription',
       expiresAt: '2026-07-29T00:00:00.000Z',
       checkedAt: '2026-06-29T00:00:00.000Z',

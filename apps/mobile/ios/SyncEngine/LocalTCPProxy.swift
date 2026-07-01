@@ -1,42 +1,7 @@
 import Foundation
-import SyncFlowMobileTunnel
 
-/// Swift wrapper that delegates P2P loopback proxying to the Go mobile library (SyncFlowMobileTunnel).
+/// OSS builds do not include the remote tunnel implementation.
 class LocalTCPProxy {
-    private var activePort: Int?
-    private var diagnosticsDrainTimer: DispatchSourceTimer?
-    private let diagnosticsDrainQueue = DispatchQueue(label: "com.lynavo.drive.mobileTunnelDiagnostics", qos: .utility)
-
-    private func flushMobileTunnelDiagnostics(reason: String) {
-        let snapshot = MobiletunnelTakeDiagnosticsLog()
-        let lines = snapshot
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        guard !lines.isEmpty else { return }
-
-        syncDiagnosticsLog("MobileTunnel", "diagnostics drain reason=\(reason) lineCount=\(lines.count)")
-        for line in lines {
-            syncDiagnosticsLog("MobileTunnel", line)
-        }
-    }
-
-    private func startMobileTunnelDiagnosticsDrain() {
-        stopMobileTunnelDiagnosticsDrain()
-        let timer = DispatchSource.makeTimerSource(queue: diagnosticsDrainQueue)
-        timer.schedule(deadline: .now() + 5, repeating: 5)
-        timer.setEventHandler { [weak self] in
-            self?.flushMobileTunnelDiagnostics(reason: "periodic")
-        }
-        diagnosticsDrainTimer = timer
-        timer.resume()
-    }
-
-    private func stopMobileTunnelDiagnosticsDrain() {
-        diagnosticsDrainTimer?.cancel()
-        diagnosticsDrainTimer = nil
-    }
-
     func start(
         signalingURL: String,
         clientID: String,
@@ -45,46 +10,19 @@ class LocalTCPProxy {
         pairingToken: String,
         iceServersJSON: String
     ) -> Int {
-        slog("[LocalTCPProxy] Starting P2P tunnel connection with signaling: %@", signalingURL)
-        syncDiagnosticsLog("LocalTCPProxy", "starting P2P tunnel signaling=\(signalingURL) target=\(targetClientID)")
-        stopMobileTunnelDiagnosticsDrain()
-        flushMobileTunnelDiagnostics(reason: "before_start")
-        let port = MobiletunnelStartTunnel(signalingURL, clientID, targetClientID, token, pairingToken, iceServersJSON)
-        flushMobileTunnelDiagnostics(reason: "after_start")
-        if port > 0 {
-            activePort = port
-            startMobileTunnelDiagnosticsDrain()
-            slog("[LocalTCPProxy] P2P tunnel started successfully on port %ld", port)
-            syncDiagnosticsLog("LocalTCPProxy", "P2P tunnel active port=\(port)")
-        } else {
-            activePort = nil
-            stopMobileTunnelDiagnosticsDrain()
-            slog("[LocalTCPProxy] Failed to start P2P tunnel, return code: %ld", port)
-            syncDiagnosticsLog("LocalTCPProxy", "P2P tunnel failed returnCode=\(port)")
-        }
-        return port
+        syncDiagnosticsLog("LocalTCPProxy", "P2P tunnel start skipped target=\(targetClientID); remote tunnel disabled in OSS")
+        return 0
     }
 
     func stop() {
-        let port = activePort
-        if let port {
-            slog("[LocalTCPProxy] Stopping P2P tunnel")
-            syncDiagnosticsLog("LocalTCPProxy", "stopping P2P tunnel activePort=\(port)")
-        } else {
-            slog("[LocalTCPProxy] Stopping P2P tunnel without active Swift port")
-            syncDiagnosticsLog("LocalTCPProxy", "stopping P2P tunnel without active Swift port; issuing best-effort stop")
-        }
-        stopMobileTunnelDiagnosticsDrain()
-        MobiletunnelStopTunnel()
-        flushMobileTunnelDiagnostics(reason: "after_stop")
-        activePort = nil
+        syncDiagnosticsLog("LocalTCPProxy", "P2P tunnel stop skipped; remote tunnel disabled in OSS")
     }
 
     func getActivePort() -> Int? {
-        return activePort
+        return nil
     }
 
     func currentSelectedICERoute() -> String {
-        return MobiletunnelCurrentSelectedICERoute()
+        return ""
     }
 }

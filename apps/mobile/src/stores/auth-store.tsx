@@ -7,11 +7,6 @@ import React, {
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Keychain from 'react-native-keychain';
-import { resolveDriveEntitlements } from '@lynavo-drive/contracts';
-import {
-  setDriveEntitlements as nativeSetDriveEntitlements,
-  setTunnelCredentials as nativeSetTunnelCredentials,
-} from '../services/SyncEngineModule';
 import {
   applyVisualQaRemotePreviewFlag,
   getDevSkipAuthMockTokens,
@@ -241,40 +236,10 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // Keep module-level tokens in sync whenever state changes. Community builds
-  // never activate remote tunnels, so native TURN credentials are always
-  // cleared fail-closed. Native entitlement snapshots are still synced so
-  // background continuation is explicitly revoked on startup/logout.
+  // Keep module-level tokens in sync whenever state changes. OSS startup does
+  // not hydrate commercial entitlements or remote tunnel credentials.
   useEffect(() => {
     syncTokensToModule(state.accessToken, state.refreshToken);
-    const entitlements = resolveDriveEntitlements({
-      isAuthenticated: Boolean(state.accessToken && state.refreshToken),
-      serverEntitlements: null,
-      officialCapabilitiesAvailable: false,
-      now: new Date(),
-    });
-
-    let cancelled = false;
-    void nativeSetTunnelCredentials('', '', '').catch(err => {
-      if (cancelled) return;
-      console.warn(
-        '[auth-store] failed to clear tunnel credentials from native:',
-        err,
-      );
-    });
-    if (typeof nativeSetDriveEntitlements === 'function') {
-      void nativeSetDriveEntitlements(entitlements).catch(err => {
-        if (cancelled) return;
-        console.warn(
-          '[auth-store] failed to sync drive entitlements to native:',
-          err,
-        );
-      });
-    }
-
-    return () => {
-      cancelled = true;
-    };
   }, [state.accessToken, state.refreshToken]);
 
   // Clear stale official-auth tokens on mount before the navigator decides where

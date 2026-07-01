@@ -187,10 +187,7 @@ export const DESKTOP_APP_ID = 'com.lynavo.drive.desktop';
 建议改成：
 
 ```ts
-export type DriveFeatureKey =
-  | 'lan_foreground_auto_upload'
-  | 'background_continuation'
-  | 'remote_tunnel';
+export type DriveFeatureKey = 'lan_foreground_auto_upload';
 
 export type EntitlementSource =
   | 'guest'
@@ -204,8 +201,6 @@ export type EntitlementSource =
 
 export interface DriveEntitlements {
   canUseLanForegroundAutoUpload: boolean;
-  canUseBackgroundContinuation: boolean;
-  canUseRemoteTunnel: boolean;
   source: EntitlementSource;
   expiresAt: string | null;
   checkedAt: string | null;
@@ -214,19 +209,17 @@ export interface DriveEntitlements {
 
 默认策略：
 
-| 用户 / 构建状态                   | 局域网前台自动上传 | 后台 / 锁屏继续    | 远程穿透           |
-| --------------------------------- | ------------------ | ------------------ | ------------------ |
-| OSS guest                         | 允许               | 不允许             | 不允许             |
-| Official guest                    | 允许               | 不允许             | 不允许             |
-| Official logged-in free           | 允许               | 不允许             | 不允许             |
-| Official paid / valid entitlement | 允许               | 按后端 entitlement | 按后端 entitlement |
-| entitlement unknown / expired     | 允许               | 不允许             | 不允许             |
+| 用户 / 构建状态               | 局域网前台自动上传 | 后台 / 锁屏继续     | 远程穿透            |
+| ----------------------------- | ------------------ | ------------------- | ------------------- |
+| OSS guest                     | 允许               | 不允许              | 不允许              |
+| Official overlay              | 允许               | 由私有 overlay 决定 | 由私有 overlay 决定 |
+| entitlement unknown / expired | 允许               | 不允许              | 不允许              |
 
 Fail-open / fail-closed：
 
 - `lan_foreground_auto_upload` 对 guest、离线、订阅未知 fail-open。
-- `background_continuation` 和 `remote_tunnel` fail-closed。
-- OSS build 中如果没有官方商业模块，background / remote 的 resolver 应始终返回 false。
+- 商业后台继续和远程穿透不再作为 OSS contract 字段存在。
+- OSS build 中如果没有官方商业模块，不应保留可被本地打开的商业 native path。
 
 ### 3.4 商业能力的开源边界
 
@@ -245,8 +238,8 @@ Fail-open / fail-closed：
 
 - OSS 仓库保留前台同步需要的最小 native 能力。
 - Paid background 的持续后台调度、silent audio、background URLSession 链式推进、Android background FGS continuation 放到 `@lynavo-drive/commercial-mobile` 或私有 native patch。
-- OSS 中只保留接口 / stub，例如 `setDriveEntitlements()`、`canUseBackgroundContinuation`，但没有完整 paid continuation 实现。
-- 远程穿透可保留协议接口，但 TURN credential 获取和官方 signaling 由服务端 entitlement + official config 控制；如需更强保护，也可将 tunnel manager 官方化。
+- OSS 中不保留可从 JS 打开的商业 entitlement bridge；后台 continuation / tunnel 的正向实现放入官方 overlay。
+- 远程穿透的 TURN credential 获取、官方 signaling 和 native tunnel runtime 不进入 OSS baseline。
 
 ---
 
@@ -281,13 +274,7 @@ if (isGlobalMarket() && isSubscribed) {
 }
 ```
 
-推荐：
-
-```ts
-if (entitlements.canUseRemoteTunnel && remoteAccessEnabled) {
-  enableRemoteTunnel();
-}
-```
+推荐：OSS baseline 只保留前台 LAN 同步能力；商业远程 tunnel 条件和启动逻辑不出现在 OSS runtime 中。
 
 ### 4.3 删除 cn 时要删除测试和文档断言
 
@@ -721,15 +708,10 @@ cd apps/mobile/android && ./gradlew assembleRelease bundleRelease
 - 新增 feature entitlement 类型：
 
 ```ts
-export type DriveFeatureKey =
-  | 'lan_foreground_auto_upload'
-  | 'background_continuation'
-  | 'remote_tunnel';
+export type DriveFeatureKey = 'lan_foreground_auto_upload';
 
 export interface DriveEntitlements {
   canUseLanForegroundAutoUpload: boolean;
-  canUseBackgroundContinuation: boolean;
-  canUseRemoteTunnel: boolean;
   source: EntitlementSource;
   expiresAt: string | null;
   checkedAt: string | null;
@@ -742,16 +724,15 @@ export interface DriveEntitlements {
 export function resolveDriveEntitlements(input: {
   isAuthenticated: boolean;
   serverEntitlements: Partial<DriveEntitlements> | null;
-  officialCapabilitiesAvailable: boolean;
   now: string;
 }): DriveEntitlements;
 ```
 
 默认逻辑：
 
-- guest/free/unknown：foreground LAN true，background false，remote false。
-- paid：foreground LAN true，background/remote 由后端 boolean 决定。
-- OSS no official module：background/remote false，即使本地 mock server 返回 true 也不启用缺失的 native/commercial implementation。
+- guest/free/unknown：foreground LAN true。
+- 商业后台/远程字段不属于 OSS contract；official overlay 自行定义和注入商业能力。
+- OSS no official module：不启用缺失的 native/commercial implementation。
 
 验收：
 
@@ -781,9 +762,8 @@ export function resolveDriveEntitlements(input: {
 - `RootNavigator` 默认进入 local app flow。
 - 登录 / 订阅只作为商业入口。
 - 拆掉 `isFeatureAccessAllowed()` 这种 broad gate：
-  - `canUseLanForegroundAutoUpload`
-  - `canUseBackgroundContinuation`
-  - `canUseRemoteTunnel`
+  - OSS 中只保留 foreground LAN gate
+  - 商业后台 / 远程能力不在 OSS runtime 里推导
 - 移除“未订阅阻止上传 / 自动上传”的逻辑。
 - 保留真实技术 gate：相册权限、局域网权限、设备发现、配对、安全码、网络可达性。
 - 不新增手动选择文件作为免费替代路径。
@@ -829,7 +809,6 @@ export function resolveDriveEntitlements(input: {
 ```swift
 struct DriveEntitlementSnapshot {
   let canUseBackgroundContinuation: Bool
-  let canUseRemoteTunnel: Bool
   let updatedAt: Date
   let expiresAt: Date?
 }
@@ -894,7 +873,7 @@ struct DriveEntitlementSnapshot {
 
 任务：
 
-- 只有 `loggedIn && canUseRemoteTunnel && remoteAccessEnabled` 时请求 TURN credentials。
+- 只有 official overlay 明确允许远程 tunnel 且用户隐私设置打开时才请求 TURN credentials。
 - guest/free/expired：
   - 不请求 `/tunnel/turn-credentials`。
   - 不向 native 或 sidecar 下发真实 credentials。
@@ -906,11 +885,7 @@ struct DriveEntitlementSnapshot {
   - `syncAccountContextToSidecar()`
   - `syncTunnelCredentialsToSidecar()`
   - `clearTunnelCredentialsFromSidecar()`
-- `remoteAccessEnabled` 是用户隐私设置，不是付费状态；最终条件为：
-
-```ts
-remoteAccessEnabled && entitlements.canUseRemoteTunnel;
-```
+- `remoteAccessEnabled` 是用户隐私设置，不是付费状态；商业 entitlement 由 official overlay 负责。
 
 - Sidecar 做最后防线：
   - `/tunnel/credentials` 拒绝 guest/free/expired。

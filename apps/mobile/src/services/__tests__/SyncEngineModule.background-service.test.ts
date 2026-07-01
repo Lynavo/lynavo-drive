@@ -70,40 +70,10 @@ describe('SyncEngineModule background service bridge', () => {
     ).toHaveBeenCalledWith(true);
   });
 
-  it('syncs drive entitlement snapshots to native when the bridge exists', async () => {
-    const { nativeSyncEngine, syncEngine } = loadModule('android');
-    const entitlements = {
-      canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
-      source: 'guest',
-      expiresAt: null,
-      checkedAt: '2026-07-01T00:00:00.000Z',
-    } as const;
+  it('does not export commercial entitlement or tunnel bridge wrappers in OSS', () => {
+    const { syncEngine } = loadModule('android');
 
-    await syncEngine.setDriveEntitlements(entitlements);
-
-    expect(nativeSyncEngine.setDriveEntitlements).toHaveBeenCalledWith(
-      entitlements,
-    );
-  });
-
-  it('keeps entitlement sync optional for native builds without the bridge', async () => {
-    const { nativeSyncEngine, syncEngine } = loadModule('ios', {
-      includeEntitlementBridge: false,
-    });
-
-    await expect(
-      syncEngine.setDriveEntitlements({
-        canUseLanForegroundAutoUpload: true,
-        canUseBackgroundContinuation: false,
-        canUseRemoteTunnel: false,
-        source: 'guest',
-        expiresAt: null,
-        checkedAt: null,
-      }),
-    ).resolves.toBeUndefined();
-
-    expect(nativeSyncEngine).not.toHaveProperty('setDriveEntitlements');
+    expect(syncEngine).not.toHaveProperty('setDriveEntitlements');
+    expect(syncEngine).not.toHaveProperty('setTunnelCredentials');
   });
 });

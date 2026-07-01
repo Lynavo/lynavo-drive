@@ -31,13 +31,7 @@ jest.mock('../../services/auth-service', () => ({
   registerAuthStoreActions: jest.fn(),
 }));
 
-jest.mock('../../services/SyncEngineModule', () => ({
-  setDriveEntitlements: jest.fn().mockResolvedValue(undefined),
-  setTunnelCredentials: jest.fn().mockResolvedValue(undefined),
-}));
-
 import { AuthProvider, useAuth } from '../auth-store';
-import { setDriveEntitlements } from '../../services/SyncEngineModule';
 
 function AuthProbe() {
   const auth = useAuth();
@@ -106,18 +100,6 @@ describe('AuthProvider visual QA bootstrap', () => {
       }),
       expect.any(Object),
     );
-    await waitFor(() => {
-      expect(setDriveEntitlements).toHaveBeenCalledWith(
-        expect.objectContaining({
-          canUseLanForegroundAutoUpload: true,
-          canUseBackgroundContinuation: false,
-          canUseRemoteTunnel: false,
-          source: 'free_account',
-          expiresAt: null,
-          checkedAt: expect.any(String),
-        }),
-      );
-    });
   });
 
   test('hydrates dev skip-auth tokens without enabling visual QA route mocks', async () => {

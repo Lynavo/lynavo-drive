@@ -147,10 +147,9 @@ node scripts/dev/run-release-profile.mjs --profile review --target mobile-metro 
 resolveDriveEntitlements({
   isAuthenticated: false,
   serverEntitlements: null,
-  officialCapabilitiesAvailable: false,
   now: '2026-06-29T00:00:00.000Z',
 });
-// foreground true, background false, remote false, source 'guest'
+// foreground true, source 'guest'
 ```
 
 **Verification:**
@@ -496,7 +495,7 @@ pnpm format:check README.md AGENTS.md docs/release docs/open-source docs/commerc
 **Verification:**
 
 ```bash
-rg -n "SubscriptionGlobalScreen|iap|purchase|restore|gift.?card|turn-credentials|canUseRemoteTunnel|canUseBackgroundContinuation|LYNAVO_GIFTCARD|subscription/status" apps packages scripts services docs --glob '!**/node_modules/**'
+rg -n "SubscriptionGlobalScreen|iap|purchase|restore|gift.?card|turn-credentials|LYNAVO_GIFTCARD|subscription/status" apps packages scripts services docs --glob '!**/node_modules/**'
 pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 pnpm --filter @lynavo-drive/desktop test
 pnpm --filter @lynavo-drive/desktop typecheck

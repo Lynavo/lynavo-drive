@@ -17,10 +17,7 @@ export type ReleaseChannel = 'dev' | 'review' | 'prod';
 
 export type Distribution = 'community' | 'official';
 
-export type DriveFeatureKey =
-  | 'lan_foreground_auto_upload'
-  | 'background_continuation'
-  | 'remote_tunnel';
+export type DriveFeatureKey = 'lan_foreground_auto_upload';
 
 export type EntitlementSource =
   | 'guest'
@@ -34,8 +31,6 @@ export type EntitlementSource =
 
 export interface DriveEntitlements {
   canUseLanForegroundAutoUpload: boolean;
-  canUseBackgroundContinuation: boolean;
-  canUseRemoteTunnel: boolean;
   source: EntitlementSource;
   expiresAt: string | null;
   checkedAt: string | null;
@@ -44,14 +39,11 @@ export interface DriveEntitlements {
 export interface ResolveDriveEntitlementsInput {
   isAuthenticated: boolean;
   serverEntitlements: unknown;
-  officialCapabilitiesAvailable: boolean;
   now: string | Date;
 }
 
 interface ServerDriveEntitlements {
   canUseLanForegroundAutoUpload?: unknown;
-  canUseBackgroundContinuation?: unknown;
-  canUseRemoteTunnel?: unknown;
   source?: unknown;
   expiresAt?: unknown;
   checkedAt?: unknown;
@@ -66,8 +58,6 @@ function isServerDriveEntitlements(value: unknown): value is ServerDriveEntitlem
 
   return (
     typeof entitlements.canUseLanForegroundAutoUpload === 'boolean' ||
-    typeof entitlements.canUseBackgroundContinuation === 'boolean' ||
-    typeof entitlements.canUseRemoteTunnel === 'boolean' ||
     typeof entitlements.source === 'string' ||
     typeof entitlements.expiresAt === 'string' ||
     typeof entitlements.checkedAt === 'string'
@@ -104,8 +94,6 @@ export function resolveDriveEntitlements(input: ResolveDriveEntitlementsInput): 
   if (!input.isAuthenticated) {
     return {
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'guest',
       expiresAt: null,
       checkedAt,
@@ -115,8 +103,6 @@ export function resolveDriveEntitlements(input: ResolveDriveEntitlementsInput): 
   if (input.serverEntitlements === null) {
     return {
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'free_account',
       expiresAt: null,
       checkedAt,
@@ -126,8 +112,6 @@ export function resolveDriveEntitlements(input: ResolveDriveEntitlementsInput): 
   if (!isServerDriveEntitlements(input.serverEntitlements)) {
     return {
       canUseLanForegroundAutoUpload: true,
-      canUseBackgroundContinuation: false,
-      canUseRemoteTunnel: false,
       source: 'unknown',
       expiresAt: null,
       checkedAt,
@@ -140,8 +124,6 @@ export function resolveDriveEntitlements(input: ResolveDriveEntitlementsInput): 
 
   return {
     canUseLanForegroundAutoUpload: true,
-    canUseBackgroundContinuation: false,
-    canUseRemoteTunnel: false,
     source,
     expiresAt,
     checkedAt,

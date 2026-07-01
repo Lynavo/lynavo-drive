@@ -266,9 +266,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private let driveEntitlementExpiryLock = NSLock()
     private var driveEntitlementExpiryToken = UUID()
     private var driveEntitlementExpiryWorkItem: DispatchWorkItem?
-    private let remoteTunnelEntitlementExpiryLock = NSLock()
-    private var remoteTunnelEntitlementExpiryToken = UUID()
-    private var remoteTunnelEntitlementExpiryWorkItem: DispatchWorkItem?
     let backgroundUploadService = BackgroundUploadService.shared
     /// Timeout / poll tuning for `transitionToBackgroundUpload`. Expressed as
     /// private static lets so unit-level reasoning sees concrete numbers.
@@ -1477,22 +1474,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                 )
             }
         }
-        if BackgroundHandoffPolicy.shouldAcceptRemoteTunnelCredentials(snapshot: snapshot) {
-            rescheduleRemoteTunnelEntitlementExpiryIfNeeded(reason: "entitlement_updated")
-        } else {
-            cancelRemoteTunnelEntitlementExpiry(reason: "entitlement_updated_denied")
-            clearP2PTunnelCredentialsIfRemoteEntitlementDenied(reason: "remote_entitlement_revoked")
-        }
-
         slog(
-            "[Entitlements] snapshot updated background=%@ remote=%@ expiresAt=%@",
+            "[Entitlements] snapshot updated background=%@ expiresAt=%@",
             backgroundAllowed ? "allowed" : "denied",
-            snapshot.canUseRemoteTunnel ? "snapshot_true" : "snapshot_false",
             snapshot.expiresAt.map { "\($0)" } ?? "nil"
         )
         syncDiagnosticsLog(
             "Entitlements",
-            "snapshot updated background=\(backgroundAllowed ? "allowed" : "denied") remoteSnapshot=\(snapshot.canUseRemoteTunnel ? "true" : "false") expiresAt=\(snapshot.expiresAt.map { "\($0)" } ?? "nil")"
+            "snapshot updated background=\(backgroundAllowed ? "allowed" : "denied") expiresAt=\(snapshot.expiresAt.map { "\($0)" } ?? "nil")"
         )
     }
 
@@ -1585,75 +1574,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         }
     }
 
-    private func cancelRemoteTunnelEntitlementExpiry(reason: String) {
-        remoteTunnelEntitlementExpiryLock.lock()
-        remoteTunnelEntitlementExpiryToken = UUID()
-        let workItem = remoteTunnelEntitlementExpiryWorkItem
-        remoteTunnelEntitlementExpiryWorkItem = nil
-        remoteTunnelEntitlementExpiryLock.unlock()
-
-        if let workItem {
-            workItem.cancel()
-            syncDiagnosticsLog("Entitlements", "remote tunnel expiry cancelled reason=\(reason)")
-        }
-    }
-
-    private func currentRemoteTunnelEntitlementExpiryToken() -> UUID {
-        remoteTunnelEntitlementExpiryLock.lock()
-        defer { remoteTunnelEntitlementExpiryLock.unlock() }
-        return remoteTunnelEntitlementExpiryToken
-    }
-
-    private func setRemoteTunnelEntitlementExpiryWorkItem(_ workItem: DispatchWorkItem?) {
-        remoteTunnelEntitlementExpiryLock.lock()
-        remoteTunnelEntitlementExpiryWorkItem = workItem
-        remoteTunnelEntitlementExpiryLock.unlock()
-    }
-
-    private func rescheduleRemoteTunnelEntitlementExpiryIfNeeded(reason: String) {
-        cancelRemoteTunnelEntitlementExpiry(reason: "\(reason)_reschedule")
-        let now = Date()
-        let snapshot = currentDriveEntitlementSnapshot()
-        guard let expiryDate = BackgroundHandoffPolicy.remoteTunnelExpiryDate(
-            snapshot: snapshot,
-            now: now
-        ) else {
-            if !BackgroundHandoffPolicy.shouldAcceptRemoteTunnelCredentials(snapshot: snapshot, now: now) {
-                clearP2PTunnelCredentialsIfRemoteEntitlementDenied(reason: "\(reason)_expired")
-            }
-            return
-        }
-
-        let token = UUID()
-        remoteTunnelEntitlementExpiryLock.lock()
-        remoteTunnelEntitlementExpiryToken = token
-        remoteTunnelEntitlementExpiryLock.unlock()
-
-        let delay = max(0, expiryDate.timeIntervalSince(now))
-        let workItem = DispatchWorkItem { [weak self] in
-            self?.enforceRemoteTunnelEntitlementExpiry(token: token)
-        }
-        setRemoteTunnelEntitlementExpiryWorkItem(workItem)
-        driveEntitlementExpiryQueue.asyncAfter(deadline: .now() + delay, execute: workItem)
-        syncDiagnosticsLog(
-            "Entitlements",
-            "remote tunnel expiry scheduled reason=\(reason) delay=\(String(format: "%.3f", delay))s expiresAt=\(expiryDate)"
-        )
-    }
-
-    private func enforceRemoteTunnelEntitlementExpiry(token: UUID) {
-        guard token == currentRemoteTunnelEntitlementExpiryToken() else { return }
-        setRemoteTunnelEntitlementExpiryWorkItem(nil)
-        guard !BackgroundHandoffPolicy.shouldAcceptRemoteTunnelCredentials(
-            snapshot: currentDriveEntitlementSnapshot(),
-            now: Date()
-        ) else {
-            rescheduleRemoteTunnelEntitlementExpiryIfNeeded(reason: "expiry_recheck_still_allowed")
-            return
-        }
-        clearP2PTunnelCredentialsIfRemoteEntitlementDenied(reason: "remote_entitlement_expired_local")
-    }
-
     private func stopBackgroundContinuationRuntime(reason: String, force: Bool = false) {
         guard force || BackgroundHandoffPolicy.shouldStopBackgroundContinuationRuntime(
             isAppInBackground: appIsInBackground,
@@ -1680,7 +1600,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     private func clearDriveEntitlementsForIdentityReset(reason: String) {
         cancelBackgroundContinuationExpiry(reason: reason)
-        cancelRemoteTunnelEntitlementExpiry(reason: reason)
         driveEntitlementsLock.lock()
         driveEntitlementSnapshot = nil
         driveEntitlementsLock.unlock()
@@ -2338,51 +2257,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         )
     }
 
-    func setTunnelCredentials(signalingURL: String, accessToken: String, iceServersJSON: String) {
-        let trimmedURL = signalingURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedToken = accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedIceServersJSON = iceServersJSON.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !trimmedURL.isEmpty, !trimmedToken.isEmpty else {
-            p2pTunnelQueue.async { [weak self] in
-                guard let self else { return }
-                self.clearP2PTunnelCredentialsLocked(reason: "credentials_cleared")
-            }
-            return
-        }
-        guard BackgroundHandoffPolicy.shouldAcceptRemoteTunnelCredentials(
-            snapshot: currentDriveEntitlementSnapshot()
-        ) else {
-            clearP2PTunnelCredentials(reason: "remote_entitlement_denied")
-            syncDiagnosticsLog(
-                "SyncEngine",
-                "tunnel credentials rejected: remote entitlement denied"
-            )
-            return
-        }
-        rescheduleRemoteTunnelEntitlementExpiryIfNeeded(reason: "credentials_received")
-
-        let credentials = P2PTunnelCredentials(
-            signalingURL: trimmedURL,
-            accessToken: trimmedToken,
-            iceServersJSON: trimmedIceServersJSON
-        )
-        p2pTunnelQueue.async { [weak self] in
-            guard let self else { return }
-            let changed = self.p2pTunnelCredentials != credentials
-            self.p2pTunnelCredentials = credentials
-            if changed {
-                self.stopP2PTunnelLocked(reason: "credentials_changed")
-            }
-            slog("[SyncEngine] setTunnelCredentials received signalingUrl=%@", trimmedURL)
-            syncDiagnosticsLog("SyncEngine", "setTunnelCredentials received signalingUrl=\(trimmedURL)")
-            if !trimmedIceServersJSON.isEmpty {
-                syncDiagnosticsLog("SyncEngine", "setTunnelCredentials received ICE servers JSON")
-            }
-            self.startP2PTunnelIfNeededLocked(reason: "credentials_received")
-        }
-    }
-
     private func startP2PTunnelIfNeeded(reason: String) {
         p2pTunnelQueue.async { [weak self] in
             self?.startP2PTunnelIfNeededLocked(reason: reason)
@@ -2390,26 +2264,14 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     }
 
     private func currentP2PTunnelRouteStateLocked() -> P2PTunnelRouteState {
-        if hasP2PTunnelStateLocked(),
-           !BackgroundHandoffPolicy.shouldAcceptRemoteTunnelCredentials(
-               snapshot: currentDriveEntitlementSnapshot()
-           ) {
-            clearP2PTunnelCredentialsLocked(reason: "remote_entitlement_denied")
-            return P2PTunnelRouteState(
-                hasCredentials: false,
-                isActive: false,
-                isStarting: false,
-                port: nil,
-                selectedICERoute: localTCPProxy.currentSelectedICERoute(),
-                routeMode: p2pTunnelRouteMode
-            )
+        if hasP2PTunnelStateLocked() {
+            clearP2PTunnelCredentialsLocked(reason: "oss_tunnel_disabled")
         }
-        let port = sharedFilesService.tunnelPort
         return P2PTunnelRouteState(
-            hasCredentials: p2pTunnelCredentials != nil,
-            isActive: sharedFilesService.isTunnelActive && port != nil,
+            hasCredentials: false,
+            isActive: false,
             isStarting: p2pTunnelStarting,
-            port: port,
+            port: nil,
             selectedICERoute: localTCPProxy.currentSelectedICERoute(),
             routeMode: p2pTunnelRouteMode
         )
@@ -2552,105 +2414,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     }
 
     private func startP2PTunnelIfNeededLocked(reason: String) {
-        guard let credentials = p2pTunnelCredentials else {
-            syncDiagnosticsLog("SyncEngine", "P2P tunnel skipped: credentials missing (\(reason))")
-            return
+        if hasP2PTunnelStateLocked() {
+            clearP2PTunnelCredentialsLocked(reason: "oss_tunnel_disabled")
         }
-        guard BackgroundHandoffPolicy.shouldAcceptRemoteTunnelCredentials(
-            snapshot: currentDriveEntitlementSnapshot()
-        ) else {
-            clearP2PTunnelCredentialsLocked(reason: "remote_entitlement_denied")
-            syncDiagnosticsLog("SyncEngine", "P2P tunnel skipped: remote entitlement denied")
-            return
-        }
-        if p2pTunnelStarting { return }
-        if sharedFilesService.isTunnelActive, sharedFilesService.tunnelPort != nil {
-            syncDiagnosticsLog(
-                "SyncEngine",
-                "P2P tunnel start skipped: already active reason=\(reason) port=\(sharedFilesService.tunnelPort.map(String.init) ?? "nil") selectedRoute=\(normalizedICERouteLabel(localTCPProxy.currentSelectedICERoute()))"
-            )
-            return
-        }
-
-        guard let binding = uploadStore?.getBinding() else {
-            syncDiagnosticsLog("SyncEngine", "P2P tunnel skipped: no bound desktop (\(reason))")
-            return
-        }
-        guard let pairingToken = resolvedPairingToken(for: binding),
-              !pairingToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            syncDiagnosticsLog("SyncEngine", "P2P tunnel skipped: pairing token missing target=\(binding.deviceId)")
-            if PresenceReconnectPolicy.shouldInvalidatePairing(
-                responsePaired: nil,
-                tokenMissingForPersistedBinding: true,
-                authRejected: false
-            ) {
-                invalidateCurrentPairing(
-                    reason: "pairing_token_missing",
-                    expectedDeviceId: binding.deviceId,
-                    expectedPairingToken: nil
-                )
-            }
-            return
-        }
-
-        let clientId = bindingService.getOrCreateClientId()
-        let generation = p2pTunnelGeneration
-        p2pTunnelStarting = true
-        syncDiagnosticsLog(
-            "SyncEngine",
-            "P2P tunnel starting target=\(binding.deviceId) reason=\(reason) routeMode=\(p2pTunnelRouteMode) networkPath=\(SharedFilesRoutePolicy.diagnosticNetworkPathSummary(NetworkPathObserver.shared.snapshot()))"
-        )
-        let iceServersJSON = SharedFilesRoutePolicy.tunnelOptionsJSON(
-            iceServersJSON: credentials.iceServersJSON,
-            routeMode: p2pTunnelRouteMode
-        )
-        let port = localTCPProxy.start(
-            signalingURL: credentials.signalingURL,
-            clientID: clientId,
-            targetClientID: binding.deviceId,
-            token: credentials.accessToken,
-            pairingToken: pairingToken,
-            iceServersJSON: iceServersJSON
-        )
-
-        let credentialsStillCurrent = generation == p2pTunnelGeneration &&
-            p2pTunnelCredentials == credentials
-        let remoteEntitlementStillAllowed =
-            BackgroundHandoffPolicy.shouldAcceptRemoteTunnelCredentials(
-                snapshot: currentDriveEntitlementSnapshot()
-            )
-        if credentialsStillCurrent && !remoteEntitlementStillAllowed {
-            p2pTunnelCredentials = nil
-            sharedFilesService.tunnelPort = nil
-            sharedFilesService.isTunnelActive = false
-            syncDiagnosticsLog("SyncEngine", "P2P tunnel discarded: remote entitlement denied")
-        }
-        let shouldCommit = credentialsStillCurrent && remoteEntitlementStillAllowed
-        if shouldCommit, port > 0, port <= Int(UInt16.max) {
-            sharedFilesService.tunnelPort = UInt16(port)
-            sharedFilesService.isTunnelActive = true
-            p2pTunnelStarting = false
-            syncDiagnosticsLog("SyncEngine", "P2P tunnel active on local port \(port) selectedRoute=\(normalizedICERouteLabel(localTCPProxy.currentSelectedICERoute()))")
-            return
-        }
-
-        if port > 0 {
-            localTCPProxy.stop()
-        }
-        if shouldCommit {
-            let failedRouteMode = p2pTunnelRouteMode
-            let nextRouteMode = SharedFilesRoutePolicy.storedP2PTunnelRouteModeAfterStartFailure(
-                currentRouteMode: failedRouteMode
-            )
-            p2pTunnelRouteMode = nextRouteMode
-            sharedFilesService.tunnelPort = nil
-            sharedFilesService.isTunnelActive = false
-            syncDiagnosticsLog(
-                "SyncEngine",
-                "P2P tunnel failed to start routeMode=\(failedRouteMode), fallback to route selection nextRouteMode=\(nextRouteMode)"
-            )
-        }
-        p2pTunnelStarting = false
+        syncDiagnosticsLog("SyncEngine", "P2P tunnel skipped: remote tunnel disabled in OSS (\(reason))")
     }
 
     private func stopP2PTunnel(reason: String) {
@@ -2662,18 +2429,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private func clearP2PTunnelCredentials(reason: String) {
         p2pTunnelQueue.async { [weak self] in
             self?.clearP2PTunnelCredentialsLocked(reason: reason)
-        }
-    }
-
-    private func clearP2PTunnelCredentialsIfRemoteEntitlementDenied(reason: String) {
-        p2pTunnelQueue.async { [weak self] in
-            guard let self, self.hasP2PTunnelStateLocked() else { return }
-            guard !BackgroundHandoffPolicy.shouldAcceptRemoteTunnelCredentials(
-                snapshot: self.currentDriveEntitlementSnapshot()
-            ) else {
-                return
-            }
-            self.clearP2PTunnelCredentialsLocked(reason: reason)
         }
     }
 

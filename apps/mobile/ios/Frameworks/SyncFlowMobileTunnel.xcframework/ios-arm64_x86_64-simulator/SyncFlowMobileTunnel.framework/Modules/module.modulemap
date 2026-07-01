@@ -1,8 +1,0 @@
-framework module "SyncFlowMobileTunnel" {
-	header "ref.h"
-    header "Mobiletunnel.objc.h"
-    header "Universe.objc.h"
-    header "SyncFlowMobileTunnel.h"
-
-    export *
-}

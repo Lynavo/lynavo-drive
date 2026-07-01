@@ -357,26 +357,6 @@ class NativeSyncEngineModule: RCTEventEmitter {
         )
     }
 
-    @objc
-    func setTunnelCredentials(
-        _ signalingUrl: NSString,
-        accessToken: NSString,
-        iceServersJSON: NSString,
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
-    ) {
-        let url = signalingUrl as String
-        let token = accessToken as String
-        let iceJSON = iceServersJSON as String
-
-        SyncEngineManager.shared.setTunnelCredentials(
-            signalingURL: url,
-            accessToken: token,
-            iceServersJSON: iceJSON
-        )
-        resolve(nil)
-    }
-
     // MARK: - Bridge Methods
 
     @objc
@@ -797,21 +777,6 @@ class NativeSyncEngineModule: RCTEventEmitter {
         reject: @escaping RCTPromiseRejectBlock
     ) {
         SyncEngineManager.shared.setBackgroundSilentAudioEnabled(enabled)
-        resolve(nil)
-    }
-
-    @objc
-    func setDriveEntitlements(
-        _ params: NSDictionary,
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
-    ) {
-        guard let rawParams = params as? [String: Any] else {
-            reject("INVALID_PARAMS", "Invalid entitlement snapshot object", nil)
-            return
-        }
-        let snapshot = DriveEntitlementSnapshot.fromBridgeParams(rawParams)
-        SyncEngineManager.shared.setDriveEntitlements(snapshot)
         resolve(nil)
     }
 

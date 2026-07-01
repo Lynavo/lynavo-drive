@@ -37,14 +37,8 @@ jest.mock('../../services/auth-service', () => ({
   ),
 }));
 
-jest.mock('../../services/SyncEngineModule', () => ({
-  setDriveEntitlements: jest.fn().mockResolvedValue(undefined),
-  setTunnelCredentials: jest.fn().mockResolvedValue(undefined),
-}));
-
 import { AuthProvider, useAuth } from '../auth-store';
 import * as Keychain from 'react-native-keychain';
-import { setDriveEntitlements } from '../../services/SyncEngineModule';
 
 function AuthProbe() {
   const auth = useAuth();
@@ -101,7 +95,7 @@ describe('AuthProvider token refresh bridge', () => {
     );
   });
 
-  test('syncs guest entitlements to native after registered auth clear', async () => {
+  test('clears accepted mock tokens after registered auth clear', async () => {
     render(
       <AuthProvider>
         <AuthProbe />
@@ -127,27 +121,24 @@ describe('AuthProvider token refresh bridge', () => {
         'mock-sandbox-access-token:functional@example.com',
       );
     });
-    const callsBeforeClear = (setDriveEntitlements as jest.Mock).mock.calls
-      .length;
-
     await act(async () => {
       mockRegisteredClearAuth?.();
     });
 
     await waitFor(() => {
-      expect(
-        (setDriveEntitlements as jest.Mock).mock.calls.length,
-      ).toBeGreaterThan(callsBeforeClear);
+      const state = JSON.parse(
+        screen.getByTestId('auth-state').props.children,
+      ) as {
+        accessToken: string | null;
+        profileLoading: boolean;
+        userId: number | null;
+      };
+
+      expect(state).toEqual({
+        accessToken: null,
+        profileLoading: false,
+        userId: null,
+      });
     });
-    expect(setDriveEntitlements).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        canUseLanForegroundAutoUpload: true,
-        canUseBackgroundContinuation: false,
-        canUseRemoteTunnel: false,
-        source: 'guest',
-        expiresAt: null,
-        checkedAt: expect.any(String),
-      }),
-    );
   });
 });

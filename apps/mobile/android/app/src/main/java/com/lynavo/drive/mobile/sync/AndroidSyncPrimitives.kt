@@ -190,7 +190,6 @@ data class AndroidBackgroundKeepaliveStopState(
 
 data class AndroidDriveEntitlementSnapshot(
   val canUseBackgroundContinuation: Boolean = false,
-  val canUseRemoteTunnel: Boolean = false,
   val checkedAt: String? = null,
   val expiresAt: String? = null,
 )
@@ -248,32 +247,13 @@ object AndroidSyncPrimitives {
     hasTunnelCredentials: Boolean,
     directHost: String,
     directPort: Int,
-  ): AndroidSharedFilesRouteDecision {
-    if (isTunnelActive && tunnelPort != null) {
-      return AndroidSharedFilesRouteDecision(
-        mode = AndroidSharedFilesRouteMode.TUNNEL,
-        host = "127.0.0.1",
-        port = tunnelPort,
-        isTunnel = true,
-      )
-    }
-
-    if (hasTunnelCredentials) {
-      return AndroidSharedFilesRouteDecision(
-        mode = AndroidSharedFilesRouteMode.WAIT_FOR_TUNNEL,
-        host = "",
-        port = 0,
-        isTunnel = false,
-      )
-    }
-
-    return AndroidSharedFilesRouteDecision(
+  ): AndroidSharedFilesRouteDecision =
+    AndroidSharedFilesRouteDecision(
       mode = AndroidSharedFilesRouteMode.DIRECT_LAN,
       host = directHost.trim(),
       port = directPort,
       isTunnel = false,
     )
-  }
 
   fun shouldRetrySharedFilesRouteAfterFailure(isTunnelRoute: Boolean): Boolean = isTunnelRoute
 
@@ -312,33 +292,6 @@ object AndroidSyncPrimitives {
 
     return AndroidBackgroundContinuationDecision(canContinue = true, reason = null)
   }
-
-  fun shouldAcceptRemoteTunnelCredentials(
-    entitlement: AndroidDriveEntitlementSnapshot,
-    now: String,
-  ): Boolean =
-    hasActiveDriveEntitlement(
-      enabled = entitlement.canUseRemoteTunnel,
-      checkedAt = entitlement.checkedAt,
-      expiresAt = entitlement.expiresAt,
-      now = now,
-    )
-
-  fun shouldClearRemoteTunnelOnEntitlementUpdate(
-    entitlement: AndroidDriveEntitlementSnapshot,
-    now: String,
-  ): Boolean = !shouldAcceptRemoteTunnelCredentials(entitlement, now)
-
-  fun remoteTunnelExpiryDelayMillis(
-    entitlement: AndroidDriveEntitlementSnapshot,
-    now: String,
-  ): Long? =
-    driveEntitlementExpiryDelayMillis(
-      enabled = entitlement.canUseRemoteTunnel,
-      checkedAt = entitlement.checkedAt,
-      expiresAt = entitlement.expiresAt,
-      now = now,
-    )
 
   fun buildWakeOnLanMagicPacket(macAddress: String): ByteArray {
     val mac = parseMacAddress(macAddress)

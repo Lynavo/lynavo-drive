@@ -2,7 +2,6 @@ import Foundation
 
 struct DriveEntitlementSnapshot: Equatable {
     let canUseBackgroundContinuation: Bool
-    let canUseRemoteTunnel: Bool
     let checkedAt: Date?
     let expiresAt: Date?
 }
@@ -12,9 +11,6 @@ extension DriveEntitlementSnapshot {
         return DriveEntitlementSnapshot(
             canUseBackgroundContinuation: boolValue(
                 params["canUseBackgroundContinuation"]
-            ),
-            canUseRemoteTunnel: boolValue(
-                params["canUseRemoteTunnel"]
             ),
             checkedAt: dateValue(params["checkedAt"]),
             expiresAt: dateValue(params["expiresAt"])
@@ -143,46 +139,6 @@ enum BackgroundHandoffPolicy {
             expiresAt: snapshot?.expiresAt,
             now: now
         )
-    }
-
-    static func canUseRemoteTunnel(
-        snapshot: DriveEntitlementSnapshot?,
-        now: Date = Date()
-    ) -> Bool {
-        canUsePaidFeature(
-            enabled: snapshot?.canUseRemoteTunnel,
-            checkedAt: snapshot?.checkedAt,
-            expiresAt: snapshot?.expiresAt,
-            now: now
-        )
-    }
-
-    static func shouldAcceptRemoteTunnelCredentials(
-        snapshot: DriveEntitlementSnapshot?,
-        now: Date = Date()
-    ) -> Bool {
-        canUseRemoteTunnel(snapshot: snapshot, now: now)
-    }
-
-    static func shouldClearRemoteTunnelOnEntitlementUpdate(
-        snapshot: DriveEntitlementSnapshot?,
-        now: Date = Date()
-    ) -> Bool {
-        !shouldAcceptRemoteTunnelCredentials(snapshot: snapshot, now: now)
-    }
-
-    static func remoteTunnelExpiryDate(
-        snapshot: DriveEntitlementSnapshot?,
-        now: Date = Date()
-    ) -> Date? {
-        guard canUseRemoteTunnel(snapshot: snapshot, now: now),
-              let checkedAt = snapshot?.checkedAt,
-              let expiresAt = snapshot?.expiresAt
-        else {
-            return nil
-        }
-        let deadline = min(expiresAt, checkedAt.addingTimeInterval(entitlementMaxAge))
-        return deadline >= now ? deadline : nil
     }
 
     static func backgroundContinuationExpiryDate(

@@ -51,7 +51,6 @@
 		FC3ECCB02F8A0001000460F8 /* UploadResetStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECCB12F8A0001000460F8 /* UploadResetStateMachine.swift */; };
 		FC3ECCC02F8A0002000460F8 /* BackgroundTransitionRefCount.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECCC12F8A0002000460F8 /* BackgroundTransitionRefCount.swift */; };
 		FC3ECF2C2F6F05B5000460F8 /* LocalTCPProxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECF3C2F6F05B5000460F8 /* LocalTCPProxy.swift */; };
-		FC3ECF3E2F6F0C55000460F8 /* SyncFlowMobileTunnel.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = FC3ECF3F2F6F0D00000460F8 /* SyncFlowMobileTunnel.xcframework */; };
 		FFFF00000000000000000002 /* AppleAuthModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFFF00000000000000000001 /* AppleAuthModule.swift */; };
 		FFFF00000000000000000004 /* AppleAuthModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = FFFF00000000000000000003 /* AppleAuthModuleBridge.m */; };
 		VD0000000000000000000002 /* LynavoBlurViewManager.m in Sources */ = {isa = PBXBuildFile; fileRef = VD0000000000000000000001 /* LynavoBlurViewManager.m */; };
@@ -108,7 +107,6 @@
 		FC3ECCB12F8A0001000460F8 /* UploadResetStateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadResetStateMachine.swift; sourceTree = "<group>"; };
 		FC3ECCC12F8A0002000460F8 /* BackgroundTransitionRefCount.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTransitionRefCount.swift; sourceTree = "<group>"; };
 		FC3ECF3C2F6F05B5000460F8 /* LocalTCPProxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTCPProxy.swift; sourceTree = "<group>"; };
-		FC3ECF3F2F6F0D00000460F8 /* SyncFlowMobileTunnel.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = SyncFlowMobileTunnel.xcframework; path = Frameworks/SyncFlowMobileTunnel.xcframework; sourceTree = "<group>"; };
 		FFFF00000000000000000001 /* AppleAuthModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppleAuthModule.swift; path = LynavoDrive/AppleAuthModule.swift; sourceTree = "<group>"; };
 		FFFF00000000000000000003 /* AppleAuthModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = AppleAuthModuleBridge.m; path = LynavoDrive/AppleAuthModuleBridge.m; sourceTree = "<group>"; };
 		VD0000000000000000000001 /* LynavoBlurViewManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = LynavoBlurViewManager.m; path = LynavoDrive/LynavoBlurViewManager.m; sourceTree = "<group>"; };
@@ -119,7 +117,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				FC3ECF3E2F6F0C55000460F8 /* SyncFlowMobileTunnel.xcframework in Frameworks */,
 				0C80B921A6F3F58F76C31292 /* libPods-LynavoDrive.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -146,7 +143,6 @@
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				FC3ECF3F2F6F0D00000460F8 /* SyncFlowMobileTunnel.xcframework */,
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				5DCACB8F33CDC322A6C60F78 /* libPods-LynavoDrive.a */,
 			);
