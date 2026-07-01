@@ -90,7 +90,6 @@
 - `scanning`
 - `preparing`
 - `syncing_foreground`
-- `syncing_background`
 - `backoff_waiting`
 - `paused_no_target`
 - `paused_no_permission`

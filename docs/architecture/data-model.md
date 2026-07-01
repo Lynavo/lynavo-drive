@@ -114,7 +114,6 @@ mobile SQLite 由 `UploadStore.swift` 管理。
 - `file_key`
 - `file_size`
 - `status`
-- `temp_file_path`
 - `acked_offset`
 - `last_error_code`
 - `updated_at`

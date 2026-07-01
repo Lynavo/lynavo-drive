@@ -26,10 +26,10 @@ browsing.
 2. `@lynavo-drive/contracts` now exposes only the community foreground LAN
    entitlement. Commercial background and tunnel entitlement fields were removed
    from the OSS contract surface.
-3. Mobile still carries the largest commercial residue outside tunnel runtime:
-   legacy auth state, iOS background URLSession/BGTask code, and Android
-   foreground service coupling. Native tunnel credential bridges and bundled
-   MobileTunnel artifacts have been removed from the OSS runtime.
+3. Mobile native background continuation runtime has been removed from the OSS
+   baseline. The largest remaining mobile residue is legacy auth/account UI,
+   RemoteAccess naming for LAN browsing, and compatibility-only contract or
+   sidecar tunnel surfaces that must stay fail-closed until moved out or renamed.
 4. "RemoteAccess" often means LAN personal-directory browsing in current mobile
    and desktop UI. Do not delete it as paid tunnel code without first splitting
    the naming and route policy.
@@ -62,7 +62,7 @@ browsing.
 | Broad feature gate            | `apps/mobile/src/stores/auth-store.tsx:371`; `SyncActivityScreen.tsx:654` consumes it.                                     | Delete or rename         | Remove `isFeatureAccessAllowed` and the `useAuth` dependency from sync activity; it is a dead compatibility gate. |
 | API bearer auth               | `apps/mobile/src/services/api.ts:94` returns no auth headers; `:187` rejects `/auth/refresh`.                              | Keep fail-closed stub    | Keep until all official account API callers are absent; then simplify.                                            |
 | Auth service bridge           | `apps/mobile/src/services/auth-service.ts:34` documents official helpers absent.                                           | Keep fail-closed stub    | Remove only after `api.ts` no longer needs clear-auth callbacks.                                                  |
-| App config                    | `apps/mobile/src/services/app-config-service.ts:36` disables silent audio and public IP.                                   | Keep fail-closed stub    | Keep OSS default false; official overlay may inject config later.                                                 |
+| App config                    | `apps/mobile/src/services/app-config-service.ts` no longer calls paid native feature toggles.                              | Keep fail-closed stub    | Keep OSS no-op; official overlay must own positive native config.                                                 |
 | Native tunnel bridge          | `apps/mobile/src/services/SyncEngineModule.ts` no longer exports a tunnel credential bridge; native bridges were removed.  | Moved out of OSS         | Keep removed; official overlays must own any positive tunnel credential path.                                     |
 | Legacy owner marker           | `apps/mobile/src/services/SyncEngineModule.ts:712`, `:741`.                                                                | Delete or rename         | Remove if no OSS caller needs account-owner mismatch repair.                                                      |
 | RemoteAccess naming           | `apps/mobile/src/services/desktop-local-service.ts:689`, `:1112`; `RemoteAccessGlobalScreen.tsx` uses personal LAN browse. | Delete or rename         | Keep LAN behavior, rename from remote access to personal/local computer browsing.                                 |
@@ -71,17 +71,17 @@ browsing.
 
 ## Mobile Native Inventory
 
-| Area                             | Evidence                                                                                                                                         | Classification           | Next action                                                                                                        |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| iOS foreground LAN               | `SyncEngineManager.swift:4047`, `:4332`, `:4411` gates on local sync state, binding, pairing token and photo permission.                         | Keep baseline            | Preserve as guest/local sync path.                                                                                 |
-| Android foreground LAN           | `NativeSyncEngineModule.kt:2270`, `:2317` starts `AndroidForegroundSyncService`; JS permission failure is surfaced at `SyncEngineModule.ts:594`. | Harden                   | Foreground LAN sync must not abort only because notification/foreground-service background support is unavailable. |
-| iOS silent audio                 | `app-config-service.ts:36`; `SyncEngineManager.swift:1423` and `:1440` stop/skip when disabled.                                                  | Keep fail-closed stub    | Keep disabled in OSS; positive capability belongs in official overlay.                                             |
-| iOS background URLSession/BGTask | `BackgroundExecutionService.swift:66`, `BackgroundUploadService.swift:17`, `SyncEngineManager.swift:1484`, `:3289`.                              | Move to official overlay | Add entitlement/capability gate or remove from OSS build.                                                          |
-| Android foreground service       | `AndroidManifest.xml:48`, `AndroidForegroundSyncService.kt:17`.                                                                                  | Move to official overlay | Split foreground LAN transfer from paid background continuation.                                                   |
-| iOS P2P tunnel                   | RN bridge credential entrypoints and the former iOS tunnel xcframework were removed; `LocalTCPProxy` is an OSS no-op.                            | Moved out of OSS         | Keep no-op/direct-LAN behavior unless an official overlay supplies the private tunnel runtime.                     |
-| Android P2P tunnel               | RN bridge credential entrypoints and bundled MobileTunnel AAR/JAR were removed; route policy resolves to direct LAN only.                        | Moved out of OSS         | Keep direct-LAN behavior unless an official overlay supplies the private tunnel runtime.                           |
-| Public wake                      | `SharedFilesRoutePolicy.swift:14`, `AndroidSyncPrimitives.kt:191` are fail-closed.                                                               | Keep fail-closed stub    | Keep disabled; same-LAN WoL can remain local baseline if not account/relay backed.                                 |
-| Manual file selection            | `SyncEngineModule.ts:314`, `AutoUploadSettingsGlobalScreen.tsx:347`, `NativeSyncEngineModule.kt:1210`.                                           | Harden                   | Separate non-commercial invariant risk: OSS must not offer manual file selection as an upload replacement.         |
+| Area                          | Evidence                                                                                                                                                                                                                   | Classification        | Next action                                                                                                |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------- |
+| iOS foreground LAN            | `SyncEngineManager.swift:4047`, `:4332`, `:4411` gates on local sync state, binding, pairing token and photo permission.                                                                                                   | Keep baseline         | Preserve as guest/local sync path.                                                                         |
+| Android foreground LAN        | `NativeSyncEngineModule.kt` now runs foreground LAN rounds without Android notification or foreground-service permission gates.                                                                                            | Keep baseline         | Preserve foreground-only runtime checks; official overlays must own any background service path.           |
+| iOS silent audio              | The silent-audio service and bridge toggle were removed from OSS.                                                                                                                                                          | Moved out of OSS      | Keep removed; positive capability belongs in official overlay.                                             |
+| iOS background upload runtime | Background URLSession/BGTask registration, upload service code, HTTP reset state machine, UploadStore HTTP/background metadata, and the old background upload plan were removed; only short UIKit transition tasks remain. | Moved out of OSS      | Keep OSS foreground-only; official overlays must own paid background upload runtime.                       |
+| Android background service    | Android foreground-service class, manifest service declaration and notification resources were removed.                                                                                                                    | Moved out of OSS      | Keep removed; official overlays must own paid background continuation.                                     |
+| iOS P2P tunnel                | RN bridge credential entrypoints and the former iOS tunnel xcframework were removed; `LocalTCPProxy` is an OSS no-op.                                                                                                      | Moved out of OSS      | Keep no-op/direct-LAN behavior unless an official overlay supplies the private tunnel runtime.             |
+| Android P2P tunnel            | RN bridge credential entrypoints and bundled MobileTunnel AAR/JAR were removed; route policy resolves to direct LAN only.                                                                                                  | Moved out of OSS      | Keep direct-LAN behavior unless an official overlay supplies the private tunnel runtime.                   |
+| Public wake                   | `SharedFilesRoutePolicy.swift:14`, `AndroidSyncPrimitives.kt:191` are fail-closed.                                                                                                                                         | Keep fail-closed stub | Keep disabled; same-LAN WoL can remain local baseline if not account/relay backed.                         |
+| Manual file selection         | `SyncEngineModule.ts:314`, `AutoUploadSettingsGlobalScreen.tsx:347`, `NativeSyncEngineModule.kt:1210`.                                                                                                                     | Harden                | Separate non-commercial invariant risk: OSS must not offer manual file selection as an upload replacement. |
 
 ## Sidecar And Contracts Inventory
 
@@ -102,28 +102,22 @@ browsing.
 
 ## Documentation And QA Drift
 
-| Area                   | Evidence                                                                                                                                                                        | Classification   | Next action                                                           |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | --------------------------------------------------------------------- |
-| Community build docs   | `docs/open-source/community-build.md:23` says commercial native modules are not built in; tunnel binaries are now removed while background continuation still needs split work. | Delete or rename | Update wording after the background continuation split.               |
-| Beta matrix background | `docs/testing/beta-test-matrix.md:140` says OSS background is fail-closed, but `:264` lists background upload/lock soak as covered.                                             | Delete or rename | Mark those as paid official coverage or foreground recovery coverage. |
-| Feature boundary       | `docs/commercial/feature-boundary.md:25` requires official capability and entitlement for paid features.                                                                        | Keep baseline    | Use as the migration rule for follow-up tasks.                        |
+| Area                   | Evidence                                                                                                                                                             | Classification | Next action                                          |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ---------------------------------------------------- |
+| Community build docs   | `docs/open-source/community-build.md:23` states commercial remote/tunnel/background native runtime is absent from community builds.                                  | Keep baseline  | Keep aligned as OSS removals continue.               |
+| Beta matrix background | `docs/testing/beta-test-matrix.md` now treats OSS background as fail-closed and validates foreground pending-queue recovery instead of paid background continuation. | Keep baseline  | Keep aligned as native background removals continue. |
+| Feature boundary       | `docs/commercial/feature-boundary.md:25` requires official capability and entitlement for paid features.                                                             | Keep baseline  | Use as the migration rule for follow-up tasks.       |
 
 ## Recommended Follow-up Order
 
-1. Android foreground fail-open: foreground LAN sync must not abort because
-   Android notification permission or foreground-service background support is
-   unavailable.
-2. Background continuation split: gate or remove iOS BGTask/background
-   URLSession, Android background service, and silent-audio positive paths from
-   OSS.
-3. Mobile auth cleanup: remove `isFeatureAccessAllowed` and sync activity auth
+1. Mobile auth cleanup: remove `isFeatureAccessAllowed` and sync activity auth
    dependency, then shrink legacy auth store and owner-user-id bridges.
-4. Naming cleanup: split LAN personal-directory browsing from paid remote
+2. Naming cleanup: split LAN personal-directory browsing from paid remote
    tunnel by renaming `RemoteAccess*`, `remoteAccessEnabled`, and related copy.
-5. Contracts split: keep the foreground LAN resolver and LAN DTOs in OSS;
+3. Contracts split: keep the foreground LAN resolver and LAN DTOs in OSS;
    move subscription plan, TURN, signaling, and tunnel/relay positive DTOs to
    official overlay.
-6. Sidecar HTTP hardening: add HMAC/local-only protection to mobile resource and
+4. Sidecar HTTP hardening: add HMAC/local-only protection to mobile resource and
    presence routes, while keeping `/personal/*` as paired-device local browsing.
-7. Documentation cleanup: align beta matrix and community-build docs with the
+5. Documentation cleanup: align beta matrix and community-build docs with the
    actual current fail-closed state.

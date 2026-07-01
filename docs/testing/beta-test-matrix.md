@@ -143,8 +143,8 @@ bash /Volumes/workspace/work/sync-flow/scripts/ios/lynavo_upload_eval.sh \
 
 1. 传输中切后台
 2. 锁屏保持一段时间
-3. paid official build：sidecar `committed_bytes` 持续增长
-4. community / guest build：不承诺后台持续增长，回到前台后进度继续推进
+3. community / guest build：不承诺后台持续增长，当前文件在安全边界暂停
+4. 回到前台后通过 LAN pending queue 继续推进
 
 ### 4.4.1 Guest local LAN mode
 
@@ -261,8 +261,8 @@ bash /Volumes/workspace/work/sync-flow/scripts/ios/lynavo_upload_eval.sh \
 3. `sidecar pause/resume` 恢复
 4. `app` 重启恢复
 5. Wi‑Fi 断开后重连恢复
-6. 切后台继续上传
-7. 锁屏长时上传 soak
+6. 切后台后暂停，回前台继续 pending queue
+7. 锁屏期间不启用商业后台续传
 8. ACK 定时 flush 不再卡住 `0 进度 / 0 速度`
 9. iOS thermal 降载策略需要随本轮改动补一次手工回归
 

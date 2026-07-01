@@ -20,7 +20,7 @@ Community build 不提供这些替代路径：
 1. 不提供手动选择文件来替代自动增量同步。
 2. 不提供手动挑选本轮上传集合。
 3. 不提供按市场切换 CN / Global 配置。
-4. 不内置官方商业 remote relay、tunnel credentials 或 background continuation native module。
+4. 不内置官方商业 remote relay、tunnel credentials 或 background continuation native runtime。
 
 ## Fail-open / Fail-closed
 
@@ -33,7 +33,7 @@ Community build 不提供这些替代路径：
 商业能力 fail-closed：
 
 1. remote access、tunnel、relay 和 cloud-assisted route 缺少有效 entitlement 时关闭。
-2. background silent continuation 缺少官方 capability 或有效 entitlement 时关闭。
+2. background / lockscreen continuation 在 community build 中没有正向 native runtime。
 3. entitlement 缺失、过期、无法确认或格式异常时，按不可用处理。
 
 ## Deferred Migrations

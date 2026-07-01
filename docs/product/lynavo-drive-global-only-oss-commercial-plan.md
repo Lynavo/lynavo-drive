@@ -583,7 +583,6 @@ defaultConfig {
 
 ```xml
 <string name="app_name">Lynavo Drive</string>
-<string name="background_sync_notification_channel_description">Persistent notification shown while Lynavo Drive uploads files in the background.</string>
 ```
 
 - `SyncFlowVersion.kt` 路径和 package 更新。
@@ -798,23 +797,11 @@ export function resolveDriveEntitlements(input: {
 
 - `apps/mobile/ios/SyncEngine/SyncEngineManager.swift`
 - `apps/mobile/ios/SyncEngine/BackgroundExecutionService.swift`
-- `apps/mobile/ios/SyncEngine/BackgroundUploadService.swift`
-- `apps/mobile/ios/SyncEngine/SilentAudioService.swift`
 - iOS RN bridge / native module
 
 任务：
 
-- 增加 native entitlement snapshot：
-
-```swift
-struct DriveEntitlementSnapshot {
-  let canUseBackgroundContinuation: Bool
-  let updatedAt: Date
-  let expiresAt: Date?
-}
-```
-
-- JS 在启动、登录、退出、订阅变更、entitlement 过期后同步给 native。
+- OSS 主线删除 silent-audio、background URLSession、BGTask 正向链路；official overlay 若恢复后台继续，必须在私有模块内维护 native entitlement snapshot。
 - 无 background entitlement 时：
   - 不启用 silent audio。
   - `appDidEnterBackground` 不进入 background handoff。
@@ -828,7 +815,6 @@ struct DriveEntitlementSnapshot {
 当前候选文件：
 
 - `apps/mobile/android/.../NativeSyncEngineModule.kt`
-- `apps/mobile/android/.../AndroidForegroundSyncService.kt`
 - lifecycle / screen lock listener
 
 任务：
@@ -841,7 +827,7 @@ struct DriveEntitlementSnapshot {
   - App 不可见、screen off、lockscreen 时停止继续推进。
   - 不因 notification permission 缺失中止前台同步。
 - paid：
-  - 开启后台继续时启动合规 Foreground Service。
+  - 开启后台继续时由 official overlay 启动合规 Foreground Service。
   - Android 13+ notification permission 是 paid background continuation 的平台前置条件。
 
 验收：
