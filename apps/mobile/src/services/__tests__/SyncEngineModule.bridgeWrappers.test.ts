@@ -151,6 +151,13 @@ describe('SyncEngineModule shared bridge wrappers', () => {
     await expect(syncEngine.getBindingState()).resolves.toBeNull();
   });
 
+  it('does not expose legacy owner marker bridge wrappers', () => {
+    const syncEngine = loadModule({}) as Record<string, unknown>;
+
+    expect(syncEngine.getOwnerUserId).toBeUndefined();
+    expect(syncEngine.setOwnerUserId).toBeUndefined();
+  });
+
   it('guards optional display-name and app-info bridge methods', async () => {
     const syncEngine = loadModule({});
 

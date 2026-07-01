@@ -37,19 +37,6 @@ jest.mock('react-i18next', () => ({
   }),
 }));
 
-jest.mock('../../stores/auth-store', () => ({
-  useAuth: () => ({
-    isLoggedIn: false,
-    accessToken: null,
-    refreshToken: null,
-    user: null,
-    subscription: null,
-    clearAuth: jest.fn(),
-    setSignedOutTransition: jest.fn(),
-  }),
-  isFeatureAccessAllowed: () => true,
-}));
-
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
 }));

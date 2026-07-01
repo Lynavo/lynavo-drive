@@ -32,14 +32,6 @@ jest.mock('../../components/Icon', () => ({
   Icon: () => null,
 }));
 
-jest.mock('../../stores/auth-store', () => ({
-  useAuth: () => ({
-    isLoggedIn: false,
-    user: null,
-  }),
-  isFeatureAccessAllowed: () => true,
-}));
-
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(),
   setItem: jest.fn(),
@@ -1381,11 +1373,10 @@ describe('shouldKickAutoUploadSyncAfterGateRelease', () => {
 });
 
 describe('shouldResetAutoUploadGateKickAttempt', () => {
-  it('keeps the gate-release kick marked as attempted across screen blur', () => {
+  it('keeps the gate-release kick marked as attempted for active bound auto-upload', () => {
     expect(
       shouldResetAutoUploadGateKickAttempt({
         autoUploadState: 'active',
-        featureAccessAllowed: true,
         bindingDeviceId: 'device-1',
       }),
     ).toBe(false);
@@ -1395,21 +1386,12 @@ describe('shouldResetAutoUploadGateKickAttempt', () => {
     expect(
       shouldResetAutoUploadGateKickAttempt({
         autoUploadState: 'disabled',
-        featureAccessAllowed: true,
         bindingDeviceId: 'device-1',
       }),
     ).toBe(true);
     expect(
       shouldResetAutoUploadGateKickAttempt({
         autoUploadState: 'active',
-        featureAccessAllowed: false,
-        bindingDeviceId: 'device-1',
-      }),
-    ).toBe(true);
-    expect(
-      shouldResetAutoUploadGateKickAttempt({
-        autoUploadState: 'active',
-        featureAccessAllowed: true,
         bindingDeviceId: null,
       }),
     ).toBe(true);

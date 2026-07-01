@@ -605,21 +605,6 @@ export async function wipeSyncIdentity(): Promise<void> {
   await NativeSyncEngine.wipeSyncIdentity();
 }
 
-/** Read the legacy owner id last bound to the sync identity on this device.
- *  `null` means "no owner recorded yet" (fresh install, post-wipe, or an
- *  older build that never wrote the field).
- *
- *  Returned as a string so backend ids above 2^53 round-trip losslessly —
- *  the native bridge would otherwise demote through `Double` on both
- *  iOS (`NSNumber`) and Android (`Long`). */
-export async function getOwnerUserId(): Promise<string | null> {
-  const result = await NativeSyncEngine.getOwnerUserId();
-  if (typeof result !== 'string' || result.length === 0) {
-    return null;
-  }
-  return result;
-}
-
 export async function getClientId(): Promise<string> {
   const result = await NativeSyncEngine.getClientId();
   return String(result);
@@ -634,15 +619,6 @@ export async function getClientId(): Promise<string> {
 export async function exportDiagnostics(): Promise<string> {
   const result = await NativeSyncEngine.exportDiagnostics();
   return String(result);
-}
-
-/** Record a legacy owner id for the sync identity on this device.
- *
- *  Accepts either `number | string` for caller convenience; we stringify
- *  before the native call so the bridge layer never sees `Double` and
- *  can't lose precision on ids above 2^53. */
-export async function setOwnerUserId(userId: number | string): Promise<void> {
-  await NativeSyncEngine.setOwnerUserId(String(userId));
 }
 
 export async function getKnownDeviceIds(): Promise<string[]> {

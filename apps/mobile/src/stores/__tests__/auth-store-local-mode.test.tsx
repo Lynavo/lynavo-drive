@@ -27,17 +27,11 @@ jest.mock('../../services/auth-service', () => ({
 }));
 
 jest.mock('../../services/SyncEngineModule', () => ({
-  getOwnerUserId: jest.fn().mockResolvedValue('42'),
-  setOwnerUserId: jest.fn().mockResolvedValue(undefined),
   wipeSyncIdentity: jest.fn().mockResolvedValue(undefined),
 }));
 
 import { AuthProvider, useAuth } from '../auth-store';
-import {
-  getOwnerUserId,
-  setOwnerUserId,
-  wipeSyncIdentity,
-} from '../../services/SyncEngineModule';
+import { wipeSyncIdentity } from '../../services/SyncEngineModule';
 
 function AuthProbe() {
   const auth = useAuth();
@@ -84,8 +78,6 @@ describe('AuthProvider guest local mode bootstrap', () => {
       });
     });
 
-    expect(getOwnerUserId).not.toHaveBeenCalled();
-    expect(setOwnerUserId).not.toHaveBeenCalled();
     expect(wipeSyncIdentity).not.toHaveBeenCalled();
   });
 
@@ -125,8 +117,6 @@ describe('AuthProvider guest local mode bootstrap', () => {
     expect(Keychain.resetGenericPassword).toHaveBeenCalledWith({
       service: 'com.lynavo.drive.auth',
     });
-    expect(getOwnerUserId).not.toHaveBeenCalled();
-    expect(setOwnerUserId).not.toHaveBeenCalled();
     expect(wipeSyncIdentity).not.toHaveBeenCalled();
   });
 

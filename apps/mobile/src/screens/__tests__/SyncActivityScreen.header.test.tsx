@@ -89,21 +89,6 @@ jest.mock('../../services/desktop-local-service', () => ({
   listHistory: jest.fn().mockResolvedValue([]),
 }));
 
-jest.mock('../../stores/auth-store', () => ({
-  useAuth: () => ({
-    isLoggedIn: true,
-    user: {
-      status: 'trialing',
-      trialEnd: null,
-    },
-    subscription: {
-      status: 'trialing',
-      trialEnd: null,
-    },
-  }),
-  isFeatureAccessAllowed: () => true,
-}));
-
 import { SyncActivityScreen } from '../SyncActivityScreen';
 import { retryLanReconnect } from '../../services/SyncEngineModule';
 

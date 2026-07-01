@@ -64,7 +64,6 @@ import {
   getSyncActivityProgressPercent,
   type SyncActivityMainCardState,
 } from '../utils/syncActivityTransferState';
-import { useAuth, isFeatureAccessAllowed } from '../stores/auth-store';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 // ---------------------------------------------------------------------------
@@ -409,14 +408,9 @@ export function shouldKickAutoUploadSyncAfterGateRelease(snapshot: {
 
 export function shouldResetAutoUploadGateKickAttempt(snapshot: {
   autoUploadState?: AutoUploadState | null;
-  featureAccessAllowed: boolean;
   bindingDeviceId?: string | null;
 }): boolean {
-  return (
-    snapshot.autoUploadState !== 'active' ||
-    !snapshot.featureAccessAllowed ||
-    !snapshot.bindingDeviceId
-  );
+  return snapshot.autoUploadState !== 'active' || !snapshot.bindingDeviceId;
 }
 
 export function getSyncActivityDisplayProgressPercent(
@@ -549,7 +543,6 @@ export function SyncActivityScreen() {
   const navigation = useNavigation<SyncActivityNav>();
   const isScreenFocused = useIsFocused();
   const { t } = useTranslation();
-  const auth = useAuth();
   const [overview, setOverview] = useState<SyncOverview>(EMPTY_OVERVIEW);
   const [bindingState, setBindingState] = useState<BindingState | null>(null);
   const [todayStats, setTodayStats] = useState<TodayStats>({
@@ -651,10 +644,6 @@ export function SyncActivityScreen() {
     currentFilename?: string;
     currentSpeedMbps: number;
   } | null>(null);
-  const featureAccessAllowed = isFeatureAccessAllowed(
-    auth.subscription?.status ?? auth.user?.status,
-  );
-
   const measureSyncActivityTourTarget = useCallback(
     (
       target: TourTarget,
@@ -885,14 +874,12 @@ export function SyncActivityScreen() {
   useEffect(() => {
     if (
       !isScreenFocused ||
-      !featureAccessAllowed ||
       !bindingState?.deviceId ||
       overview.autoUploadState !== 'active'
     ) {
       if (
         shouldResetAutoUploadGateKickAttempt({
           autoUploadState: overview.autoUploadState,
-          featureAccessAllowed,
           bindingDeviceId: bindingState?.deviceId,
         })
       ) {
@@ -932,7 +919,6 @@ export function SyncActivityScreen() {
       });
   }, [
     isScreenFocused,
-    featureAccessAllowed,
     bindingState?.deviceId,
     overview.autoUploadState,
     overview.uploadState,

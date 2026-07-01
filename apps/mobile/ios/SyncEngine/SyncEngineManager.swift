@@ -8088,15 +8088,6 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     /// the next cold start treats the wipe as interrupted and re-runs it. See
     /// AppDelegate for the launch-time self-heal branch.
     private static let wipeInProgressKey = "vivi_wipe_in_progress"
-    /// UserDefaults key that remembers the last auth user id bound to the
-    /// current sync identity. Used by the JS login flow to detect "user B
-    /// logging in on a device that still has user A's sync state" and trigger
-    /// a wipe. Stored as `String` so backend ids above 2^53 round-trip
-    /// losslessly across the RN bridge; absence means "no owner recorded yet".
-    /// Writes go through `setOwnerUserId(_:)` which flushes synchronously; see
-    /// there for rationale — this marker is the Phase-2 durability anchor and
-    /// a process kill before flush would defeat the owner-mismatch guard.
-    private static let ownerUserIdKey = "lastSyncOwnerUserId"
 
     /// Prefixes of Keychain accounts that represent per-device pairing tokens.
     /// The current build writes `lynavo_pairing_token_<serverId>`; historical
@@ -8213,11 +8204,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             slog("[SyncEngine] wipeSyncIdentity: resetAutoUploadConfig failed: %@", "\(error)")
         }
 
-        // 8. Forget the previously-recorded owner so we don't false-trigger the
-        // owner-mismatch path on the very next login.
-        defaults.removeObject(forKey: Self.ownerUserIdKey)
-
-        // 9. Push fresh empty state to JS so any foregrounded UI does not keep
+        // 8. Push fresh empty state to JS so any foregrounded UI does not keep
         // rendering stale data (binding card, queue, history).
         clearSharedFilesReachability(reason: "wipeSyncIdentity")
         NativeSyncEngineModule.shared?.emitBindingStateChanged(nil)
@@ -8227,57 +8214,11 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             runtimeSyncOverviewPayload(uploadState: "idle")
         )
 
-        // 10. Clear the sentinel last — any crash before this point causes a
+        // 9. Clear the sentinel last — any crash before this point causes a
         // self-heal retry on next launch.
         defaults.removeObject(forKey: Self.wipeInProgressKey)
         slog("[SyncEngine] wipeSyncIdentity: complete (sentinel cleared)")
         syncDiagnosticsLog("SyncEngine", "wipeSyncIdentity: complete")
-    }
-
-    /// Last auth user id bound to the current sync identity, or `nil` if no
-    /// owner has been recorded yet (fresh install / post-wipe). The value is
-    /// a `String` so backend ids above 2^53 round-trip without hitting the
-    /// `NSNumber`/`Double` precision ceiling — the JS bootstrap compares
-    /// against `String(profile.id)`. `UserDefaults` is thread-safe, so this
-    /// accessor is safe to call off the main actor.
-    @objc
-    func getOwnerUserId() -> String? {
-        let defaults = UserDefaults.standard
-        return defaults.string(forKey: Self.ownerUserIdKey)
-    }
-
-    /// Write the owner id as a string to preserve full precision across the
-    /// RN bridge. `UserDefaults` is thread-safe; no main-actor hop needed.
-    ///
-    /// Returns `true` iff the write was durably flushed to disk. The caller
-    /// (RNBridge.setOwnerUserId) rejects the JS promise on `false` so
-    /// `bootstrapAuthedSession` can fail the bootstrap rather than flipping
-    /// the navigator into `AuthedStack` with an un-marked owner that a
-    /// future cold start can't detect.
-    @objc
-    func setOwnerUserId(_ id: String) -> Bool {
-        let defaults = UserDefaults.standard
-        defaults.set(id, forKey: Self.ownerUserIdKey)
-        // Durable flush — this marker is the ONLY signal the Phase-2 owner
-        // guard uses on next cold start. `UserDefaults` batches writes to
-        // disk, so a process kill between `set(...)` and the OS's eventual
-        // flush would leave the marker unobservable and bypass the guard.
-        // `synchronize()` is formally deprecated but remains the documented
-        // escape hatch for forced flush, and we are already using it for
-        // the install_marker and wipe_in_progress sentinels for the same
-        // reason (see AppDelegate.swift + wipeSyncIdentity above).
-        //
-        // `synchronize()` returns `false` if the write failed (disk full,
-        // sandbox permissions, etc.). We propagate that up so the JS layer
-        // can fail the bootstrap; silently treating it as success would
-        // leave us one process-kill away from a Phase-2 bypass.
-        let flushed = defaults.synchronize()
-        if !flushed {
-            slog("[SyncEngine] owner user id set FAILED to flush for %@", id)
-        } else {
-            slog("[SyncEngine] owner user id set to %@", id)
-        }
-        return flushed
     }
 
     func getKnownDeviceIds() -> [String] {

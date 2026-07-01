@@ -1014,50 +1014,6 @@ class NativeSyncEngineModule(
   }
 
   @ReactMethod
-  fun getOwnerUserId(promise: Promise) {
-    // Stored as String so backend ids above 2^53 round-trip losslessly
-    // across the RN bridge (a Double/Long hop would truncate the low bits).
-    // The JS bootstrap compares against `String(profile.id)`.
-    val stored = prefs.getString(PREF_OWNER_USER_ID, null)
-    promise.resolve(stored)
-  }
-
-  @ReactMethod
-  fun setOwnerUserId(userId: String, promise: Promise) {
-    // String-typed arg avoids the Double demotion that would otherwise
-    // silently clip ids above 2^53.
-    //
-    // `commit()` not `apply()` — this write is the Phase-2 owner marker
-    // and MUST be durable before the promise resolves. A process kill
-    // between apply()'s in-memory commit and the eventual async flush
-    // would leave `storedOwnerId` null on next launch, causing the
-    // owner-mismatch guard in bootstrapAuthedSession to mis-classify
-    // user B as a fresh install and skip the wipe — defeating the
-    // entire Phase 2 defense. We already use commit() for the
-    // install_marker and wipe_in_progress sentinels for the same
-    // reason (see runInstallSentinel + performWipeSyncIdentity).
-    //
-    // Reject the JS promise if `commit()` returns `false` (disk full,
-    // SharedPreferences corruption, etc.). Silently resolving on a
-    // failed write would leave us one cold start away from a Phase-2
-    // bypass — the marker is the only signal the owner-mismatch guard
-    // has.
-    val flushed = prefs.edit().putString(PREF_OWNER_USER_ID, userId).commit()
-    if (flushed) {
-      promise.resolve(null)
-    } else {
-      android.util.Log.w(
-        "NativeSyncEngineModule",
-        "setOwnerUserId: SharedPreferences.commit() returned false for $PREF_OWNER_USER_ID",
-      )
-      promise.reject(
-        "SET_OWNER_USER_ID_FLUSH_FAILED",
-        "SharedPreferences.commit() returned false — owner marker not durably written",
-      )
-    }
-  }
-
-  @ReactMethod
   fun browseAlbum(params: ReadableMap, promise: Promise) {
     runAsync(promise) {
       promise.resolve(
@@ -7003,9 +6959,6 @@ class NativeSyncEngineModule(
     /** 2-phase wipe flag. Set before clearing, removed after. If present on
      *  cold start the wipe was killed mid-way and the sentinel retries. */
     const val PREF_WIPE_IN_PROGRESS = "lynavo_wipe_in_progress"
-    /** Numeric auth user id last bound to this sync identity. Absent means
-     *  "no owner recorded" (fresh install / post-wipe). */
-    const val PREF_OWNER_USER_ID = "lastSyncOwnerUserId"
     private const val SOCKET_TIMEOUT_MS = 5_000
     private const val BINDING_PROBE_TIMEOUT_MS = 1_200
     private const val PRESENCE_HEARTBEAT_TIMEOUT_MS = 5_000

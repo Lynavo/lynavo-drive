@@ -91,21 +91,6 @@ jest.mock('../../services/SyncEngineModule', () => ({
   retryLanReconnect: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('../../stores/auth-store', () => ({
-  useAuth: () => ({
-    isLoggedIn: true,
-    user: {
-      status: 'trialing',
-      trialEnd: null,
-    },
-    subscription: {
-      status: 'trialing',
-      trialEnd: null,
-    },
-  }),
-  isFeatureAccessAllowed: () => true,
-}));
-
 jest.mock('../../utils/onboardingStorage', () => ({
   hasSeenSyncActivityTour: () => mockHasSeenSyncActivityTour(),
   markSyncActivityTourSeen: () => mockMarkSyncActivityTourSeen(),
@@ -187,6 +172,7 @@ describe('SyncActivityScreen onboarding', () => {
         deviceName: 'Mini4',
         connectionState: 'connected',
       }),
+      getReadOnlyQueue: jest.fn().mockResolvedValue([]),
       getHistoryDays: jest.fn().mockResolvedValue({ items: [] }),
       getSyncOverview: jest.fn().mockResolvedValue({
         uploadState: 'idle',

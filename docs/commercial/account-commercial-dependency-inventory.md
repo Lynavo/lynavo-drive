@@ -55,19 +55,19 @@ browsing.
 
 ## Mobile JS Inventory
 
-| Area                          | Evidence                                                                                                                   | Classification           | Next action                                                                                                       |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| Guest LAN routing             | `apps/mobile/src/navigation/RootNavigator.tsx:86` and `:102` route unauthenticated users into LAN sync.                    | Keep baseline            | Preserve fail-open guest local LAN behavior.                                                                      |
-| Auth state shell              | `apps/mobile/src/stores/auth-store.tsx:23`, `:57`, `:115`, `:146`, `:240`.                                                 | Keep fail-closed stub    | Keep token cleanup now; shrink legacy `UserProfile`/`SubscriptionInfo` after callers are removed.                 |
-| Broad feature gate            | `apps/mobile/src/stores/auth-store.tsx:371`; `SyncActivityScreen.tsx:654` consumes it.                                     | Delete or rename         | Remove `isFeatureAccessAllowed` and the `useAuth` dependency from sync activity; it is a dead compatibility gate. |
-| API bearer auth               | `apps/mobile/src/services/api.ts:94` returns no auth headers; `:187` rejects `/auth/refresh`.                              | Keep fail-closed stub    | Keep until all official account API callers are absent; then simplify.                                            |
-| Auth service bridge           | `apps/mobile/src/services/auth-service.ts:34` documents official helpers absent.                                           | Keep fail-closed stub    | Remove only after `api.ts` no longer needs clear-auth callbacks.                                                  |
-| App config                    | `apps/mobile/src/services/app-config-service.ts` no longer calls paid native feature toggles.                              | Keep fail-closed stub    | Keep OSS no-op; official overlay must own positive native config.                                                 |
-| Native tunnel bridge          | `apps/mobile/src/services/SyncEngineModule.ts` no longer exports a tunnel credential bridge; native bridges were removed.  | Moved out of OSS         | Keep removed; official overlays must own any positive tunnel credential path.                                     |
-| Legacy owner marker           | `apps/mobile/src/services/SyncEngineModule.ts:712`, `:741`.                                                                | Delete or rename         | Remove if no OSS caller needs account-owner mismatch repair.                                                      |
-| RemoteAccess naming           | `apps/mobile/src/services/desktop-local-service.ts:689`, `:1112`; `RemoteAccessGlobalScreen.tsx` uses personal LAN browse. | Delete or rename         | Keep LAN behavior, rename from remote access to personal/local computer browsing.                                 |
-| Subscription locale namespace | `apps/mobile/src/i18n/resources.ts:12`, `OpenSourceInfoScreen.tsx:44`, `subscription.json:1`.                              | Delete or rename         | Rename `subscription` namespace to OSS/community info after UI impact is scoped.                                  |
-| Social login residue          | `AppleAuthModule.swift` rejects login; Google Sign-In dependency and URL scheme remain but JS is unused.                   | Move to official overlay | Remove from OSS native/deps or keep only explicit unsupported stubs.                                              |
+| Area                               | Evidence                                                                                                                                | Classification           | Next action                                                                                       |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------- |
+| Guest LAN routing                  | `apps/mobile/src/navigation/RootNavigator.tsx:86` and `:102` route unauthenticated users into LAN sync.                                 | Keep baseline            | Preserve fail-open guest local LAN behavior.                                                      |
+| Auth state shell                   | `apps/mobile/src/stores/auth-store.tsx:23`, `:57`, `:115`, `:146`, `:240`.                                                              | Keep fail-closed stub    | Keep token cleanup now; shrink legacy `UserProfile`/`SubscriptionInfo` after callers are removed. |
+| Broad feature gate                 | `isFeatureAccessAllowed` was removed from `auth-store`; `SyncActivityScreen.tsx` no longer consumes auth state for local sync activity. | Removed from OSS         | Keep foreground LAN sync activity independent of account/subscription state.                      |
+| API bearer auth                    | `apps/mobile/src/services/api.ts:94` returns no auth headers; `:187` rejects `/auth/refresh`.                                           | Keep fail-closed stub    | Keep until all official account API callers are absent; then simplify.                            |
+| Auth service bridge                | `apps/mobile/src/services/auth-service.ts:34` documents official helpers absent.                                                        | Keep fail-closed stub    | Remove only after `api.ts` no longer needs clear-auth callbacks.                                  |
+| App config                         | `apps/mobile/src/services/app-config-service.ts` no longer calls paid native feature toggles.                                           | Keep fail-closed stub    | Keep OSS no-op; official overlay must own positive native config.                                 |
+| Native tunnel bridge               | `apps/mobile/src/services/SyncEngineModule.ts` no longer exports a tunnel credential bridge; native bridges were removed.               | Moved out of OSS         | Keep removed; official overlays must own any positive tunnel credential path.                     |
+| Legacy account-owner compatibility | Removed from OSS mobile JS and native sync bridges.                                                                                     | Removed from OSS         | Official overlays must own any future account-owner mismatch repair path.                         |
+| RemoteAccess naming                | `apps/mobile/src/services/desktop-local-service.ts:689`, `:1112`; `RemoteAccessGlobalScreen.tsx` uses personal LAN browse.              | Delete or rename         | Keep LAN behavior, rename from remote access to personal/local computer browsing.                 |
+| Subscription locale namespace      | `apps/mobile/src/i18n/resources.ts:12`, `OpenSourceInfoScreen.tsx:44`, `subscription.json:1`.                                           | Delete or rename         | Rename `subscription` namespace to OSS/community info after UI impact is scoped.                  |
+| Social login residue               | `AppleAuthModule.swift` rejects login; Google Sign-In dependency and URL scheme remain but JS is unused.                                | Move to official overlay | Remove from OSS native/deps or keep only explicit unsupported stubs.                              |
 
 ## Mobile Native Inventory
 
@@ -110,8 +110,8 @@ browsing.
 
 ## Recommended Follow-up Order
 
-1. Mobile auth cleanup: remove `isFeatureAccessAllowed` and sync activity auth
-   dependency, then shrink legacy auth store and owner-user-id bridges.
+1. Mobile auth cleanup: shrink legacy auth store after remaining callers are
+   removed.
 2. Naming cleanup: split LAN personal-directory browsing from paid remote
    tunnel by renaming `RemoteAccess*` services/screens/copy to local computer or
    shared-files terminology.

@@ -348,17 +348,3 @@ export function useAuth(): AuthContextValue {
   }
   return ctx;
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * OSS compatibility gate for legacy callers. Foreground LAN sync, auto upload,
- * and shared-file browsing must fail open without official profile state.
- */
-export function isFeatureAccessAllowed(
-  _status: AccountStatus | undefined | null,
-): boolean {
-  return true;
-}
