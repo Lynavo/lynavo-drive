@@ -37,6 +37,7 @@
     "tag:beta:push": "bash ./scripts/release/create-beta-tag.sh --push",
     "test:sidecar": "cd services/sidecar-go && make test",
     "test:release": "node --test scripts/release/__tests__/*.mjs scripts/dev/__tests__/*.mjs",
+    "gate:release": "pnpm sync:versions:check && pnpm verify:oss-source-package && pnpm verify:oss-boundary && pnpm verify:legacy-names:strict && pnpm test:release && pnpm release --profile review --targets ios,android,mac,win,linux --dry-run && pnpm release --profile prod --targets ios,android,mac,win,linux --dry-run",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
@@ -52,7 +53,7 @@
     "verify:android-syncengine-bridge": "node scripts/verify-android-syncengine-bridge-parity.mjs",
     "sync:versions": "node scripts/sync-version-manifest.mjs",
     "sync:versions:check": "node scripts/sync-version-manifest.mjs --check",
-    "check": "pnpm sync:versions:check && pnpm verify:oss-source-package && pnpm verify:oss-boundary && turbo run build test typecheck",
+    "check": "pnpm gate:release && turbo run build test typecheck",
     "clean": "turbo run clean && rm -rf node_modules/.cache .turbo"
   },
   "devDependencies": {

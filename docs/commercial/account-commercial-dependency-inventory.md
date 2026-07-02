@@ -106,13 +106,13 @@ browsing.
 
 ## Documentation And QA Drift
 
-| Area                    | Evidence                                                                                                                                                                 | Classification | Next action                                                                                                |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- | ---------------------------------------------------------------------------------------------------------- |
-| Community build docs    | `docs/open-source/community-build.md:23` states commercial remote/tunnel/background native runtime is absent from community builds.                                      | Keep baseline  | Keep aligned with release and QA gates.                                                                    |
-| Beta matrix background  | `docs/testing/beta-test-matrix.md` now treats OSS background as fail-closed and validates foreground pending-queue recovery instead of paid background continuation.     | Keep baseline  | Keep aligned with foreground recovery smoke evidence.                                                      |
-| Feature boundary        | `docs/commercial/feature-boundary.md:25` requires official capability and entitlement for paid features.                                                                 | Keep baseline  | Use as the migration rule for follow-up tasks.                                                             |
-| Release boundary checks | `scripts/release/release-profiles.mjs` only defines `review` and `prod`; release tests guard against market, support, update, diagnostics, and legacy API env injection. | Hardened       | Keep `verify:oss-boundary`, `verify:legacy-names:strict`, and source-package auditing in the release gate. |
-| Beta tag doc drift      | `AGENTS.md`, `docs/release/market-release-flow.md`, and `docs/release/release-playbook.md` must stay aligned on the current cross-repo beta tag paths.                   | Harden         | Reconcile before the next TestFlight/tag run.                                                              |
+| Area                    | Evidence                                                                                                                                                                                                                                                                                | Classification | Next action                                                          |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | -------------------------------------------------------------------- |
+| Community build docs    | `docs/open-source/community-build.md:23` states commercial remote/tunnel/background native runtime is absent from community builds.                                                                                                                                                     | Keep baseline  | Keep aligned with release and QA gates.                              |
+| Beta matrix background  | `docs/testing/beta-test-matrix.md` now treats OSS background as fail-closed and validates foreground pending-queue recovery instead of paid background continuation.                                                                                                                    | Keep baseline  | Keep aligned with foreground recovery smoke evidence.                |
+| Feature boundary        | `docs/commercial/feature-boundary.md:25` requires official capability and entitlement for paid features.                                                                                                                                                                                | Keep baseline  | Use as the migration rule for follow-up tasks.                       |
+| Release boundary checks | `scripts/release/release-profiles.mjs` only defines `review` and `prod`; `pnpm gate:release` runs source-package, OSS boundary, legacy-name strict checks, release tests, and review/prod dry-runs. GitHub Actions `OSS Release Gate` runs this gate without native build/package jobs. | Hardened       | Keep `gate:release` as the branch-protection release boundary check. |
+| Beta tag doc drift      | `AGENTS.md`, `docs/release/market-release-flow.md`, and `docs/release/release-playbook.md` must stay aligned on the current cross-repo beta tag paths.                                                                                                                                  | Harden         | Reconcile before the next TestFlight/tag run.                        |
 
 ## Recommended Follow-up Order
 
@@ -121,12 +121,13 @@ browsing.
    `docs/release/market-release-flow.md`, and `AGENTS.md` on the current
    `review` / `prod` release profiles and the correct cross-repo beta tag
    paths.
-2. Make current boundary verification explicit in the release/QA gate: run or
-   wire `pnpm verify:oss-source-package`, `pnpm verify:oss-boundary`,
-   `pnpm verify:legacy-names:strict`, and
-   `pnpm release --profile <review|prod> --targets ios,android,mac,win,linux --dry-run`.
-   Allowed legacy/commercial hits should stay limited to negative fixtures,
-   scanner definitions, compatibility migrations, and historical docs.
+2. Keep the current release/QA gate wired through `pnpm gate:release` and
+   `.github/workflows/oss-release-gate.yml`. It runs
+   `pnpm verify:oss-source-package`, `pnpm verify:oss-boundary`,
+   `pnpm verify:legacy-names:strict`, release tests, and review/prod release
+   dry-runs without native build/package jobs. Allowed legacy/commercial hits
+   should stay limited to negative fixtures, scanner definitions,
+   compatibility migrations, and historical docs.
 3. Use the captured OSS beta smoke evidence in
    `docs/testing/global-only-qa.md#2026-07-02-oss-beta-smoke-evidence` as the
    current automated baseline for guest LAN route behavior, pending-queue

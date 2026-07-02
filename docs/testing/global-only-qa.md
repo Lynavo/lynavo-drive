@@ -4,7 +4,23 @@
 
 ## Release Profile Smoke
 
-必须验证：
+CI / release gate 入口：
+
+```bash
+pnpm gate:release
+```
+
+该 gate 会依次执行：
+
+1. `pnpm sync:versions:check`
+2. `pnpm verify:oss-source-package`
+3. `pnpm verify:oss-boundary`
+4. `pnpm verify:legacy-names:strict`
+5. `pnpm test:release`
+6. `pnpm release --profile review --targets ios,android,mac,win,linux --dry-run`
+7. `pnpm release --profile prod --targets ios,android,mac,win,linux --dry-run`
+
+如果只验证 release profile dry-run，可单独执行：
 
 ```bash
 pnpm release --profile review --targets ios,android,mac,win,linux --dry-run
@@ -17,6 +33,8 @@ pnpm release --profile prod --targets ios,android,mac,win,linux --dry-run
 2. dry-run 输出只设置 `LYNAVO_RELEASE_CHANNEL`、中性的 `ELECTRON_BUILDER_CONFIG=electron-builder.yml` 和打包命令。
 3. dry-run 输出不要求或展示 API base、support upload endpoint、update check endpoint 或历史 market。
 4. `prod` 不复用 `review` channel。
+5. GitHub Actions `OSS Release Gate` 只执行 `pnpm gate:release`，不执行
+   native build、desktop package、TestFlight upload 或 Android Gradle package。
 
 ## Guest Local LAN
 
