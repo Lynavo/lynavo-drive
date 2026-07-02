@@ -1,182 +1,229 @@
-# Lynavo Drive 排障手冊
+# Lynavo Drive Troubleshooting Guide
 
-本文件給接手同事一個統一的排障入口。優先用「分層定位」而不是盲猜。
+This document gives new contributors a unified troubleshooting entry point. Use
+layered diagnosis before guessing.
 
-## 1. 先看哪一層
+## 1. Identify The Layer First
 
-遇到問題時，先判斷問題屬於哪一層：
+When an issue appears, first decide which layer it belongs to:
 
-1. **desktop / sidecar 層**
-   - 桌面端沒監聽、沒廣播、Windows 防火牆擋住、Bonjour 執行時缺失、本地包打不開、共享檢測錯誤
-2. **mobile 發現 / 綁定層**
-   - 掃不到設備、連接失敗、重啟 app 後恢復
-3. **mobile 佇列 / 匯出層**
-   - 佇列很多但不起傳、iCloud 下載慢、列表狀態不對
-4. **傳輸層**
-   - `FILE_ACK timeout`、重連、續傳、hash mismatch
-5. **統計 / UI 層**
-   - 今天/昨天不一致、完成時間顯示異常、detail 分頁/排序問題
+1. **desktop / sidecar layer**
+   - Desktop is not listening or broadcasting, Windows firewall blocks it,
+     Bonjour runtime is missing, a local package will not open, or sharing
+     detection is wrong.
+2. **mobile discovery / binding layer**
+   - Device not found, connection failure, or recovery after app restart.
+3. **mobile queue / export layer**
+   - Many queued items but no upload, slow iCloud download, or incorrect list
+     state.
+4. **transport layer**
+   - `FILE_ACK timeout`, reconnect, resume, or hash mismatch.
+5. **statistics / UI layer**
+   - Today/yesterday mismatch, abnormal completion time display, or detail
+     pagination/sorting issues.
 
-## 2. 先收什麼材料
+## 2. Collect These Materials First
 
 ### 2.1 Desktop / sidecar
 
-優先要：
+Prioritize:
 
-1. desktop 診斷包
-2. 目前 DMG / NSIS 安裝包或執行的 app 版本
+1. Desktop diagnostics package.
+2. Current DMG / NSIS package or running app version.
 3. `desktop-main.log`
 4. `sidecar.db`
 
 ### 2.2 Mobile
 
-優先要：
+Prioritize:
 
-1. mobile 診斷包 zip
-2. app 版本 / build
-3. 當時是前景還是背景
-4. 是否存在 iCloud 素材
+1. Mobile diagnostics zip.
+2. App version / build.
+3. Whether the app was foreground or background at the time.
+4. Whether iCloud assets were involved.
 
-## 3. 常見問題判斷路徑
+## 3. Common Issue Diagnosis Paths
 
-## 3.1 「app 提示連接失敗，重啟後恢復」
+## 3.1 App Shows Connection Failure, Then Recovers After Restart
 
-先看：
+Check first:
 
-1. sidecar 是否健康
-2. 日誌裡是否有 `HELLO_REQ / AUTH_REQ` 成功
-3. 是否真正進入 `SYNC_BEGIN`
-4. mobile 診斷包裡是否還有大量 pending
+1. Whether the sidecar is healthy.
+2. Whether logs show successful `HELLO_REQ / AUTH_REQ`.
+3. Whether it really entered `SYNC_BEGIN`.
+4. Whether mobile diagnostics still show many pending items.
 
-高概率根因：
+Likely causes:
 
-- app 主循環沒有從本地 pending 佇列繼續推進
-- 鑑權成功後沒有進入真實同步輪次
-- UI 最終落成了「連接失敗」而不是「等待下一輪」
+- The app main loop did not continue from the local pending queue.
+- Authentication succeeded but the real sync round did not start.
+- The UI settled on connection failed instead of waiting for next round.
 
-不是這類問題時才考慮：
+Consider these only when the above does not fit:
 
-- sidecar 真不可達
-- pairing 失效
-- desktop 連接埠未監聽
+- The sidecar is truly unreachable.
+- Pairing expired or became invalid.
+- Desktop ports are not listening.
 
-## 3.2 「佇列很多，但 `queueCount=1` 或傳完一條就停住」
+## 3.2 Many Queued Items, But `queueCount=1` Or Upload Stops After One File
 
-這是一個非常典型的 mobile 佇列問題。
+This is a typical mobile queue issue.
 
-檢查：
+Check:
 
-1. mobile `queue.json` 是否仍有大量 pending
-2. sidecar 日誌裡的 `sync session started ... queueCount=` 是多少
-3. 是否傳完一個檔案後沒有立即起下一條
+1. Whether mobile `queue.json` still has many pending items.
+2. The `sync session started ... queueCount=` value in sidecar logs.
+3. Whether the next file starts immediately after one file completes.
 
-高概率根因：
+Likely causes:
 
-- app 真實上傳集合沒有從 pending 佇列建構
-- 只拿了本輪新掃描素材
+- The app did not build the real upload set from the pending queue.
+- It only used assets newly scanned in the current round.
 
-## 3.3 「顯示斷開連接，但又繼續上傳」
+## 3.3 UI Shows Disconnected, But Upload Continues
 
-分兩件事看：
+Separate two questions:
 
-1. 是否真有 `FILE_ACK timeout` 或短重連
-2. 重連是否幾秒內恢復，檔案是否繼續完成
+1. Was there a real `FILE_ACK timeout` or short reconnect?
+2. Did reconnect recover within seconds, and did the file continue completing?
 
-如果是短時自動恢復：
+If it was short automatic recovery:
 
-- 這是「真實短重連 + UI 文案過重」
-- 應視為「正在重連」，不是最終失敗
+- Treat it as a real short reconnect with overly severe UI wording.
+- It should read as reconnecting, not final failure.
 
-## 3.4 「電腦睡眠後局域網傳輸中斷」
+## 3.4 LAN Transfer Interrupts After Computer Sleep
 
-先判斷是否為睡眠造成的正常網路斷線：
+First determine whether sleep caused a normal network interruption:
 
-1. desktop 日誌在中斷前是否沒有 sidecar crash 或 app quit
-2. mobile 診斷包是否仍保留 pending 佇列
-3. 電腦喚醒後是否能重新掃到同一台 desktop
-4. 喚醒後是否重新進入 `HELLO / AUTH / SYNC_BEGIN`
+1. Desktop logs show no sidecar crash or app quit before interruption.
+2. Mobile diagnostics still retain the pending queue.
+3. After wake, the same desktop can be discovered again.
+4. After wake, the flow enters `HELLO / AUTH / SYNC_BEGIN` again.
 
-處理方式：
+Handling:
 
-- 建議在 desktop 設定開啟「同步時防止電腦睡眠」
-- 傳輸期間 desktop 會阻止顯示器睡眠，任務結束後恢復系統待機設定
-- 若電腦已經睡眠，LAN 連線會斷開；喚醒並恢復網路後，mobile 應保留已完成檔案並自動繼續未完成佇列
-- 若喚醒後沒有恢復，優先檢查 mobile pending 佇列、`SYNC_BEGIN` 是否重新發起，以及 desktop `39393 / 39394` 是否仍在監聽
+- Recommend enabling "prevent computer sleep while syncing" in desktop
+  settings.
+- During transfer, desktop prevents display sleep and restores system standby
+  settings after the task ends.
+- If the computer has slept, the LAN connection breaks. After wake and network
+  recovery, mobile should retain completed files and automatically continue the
+  unfinished queue.
+- If recovery does not happen after wake, first check the mobile pending queue,
+  whether `SYNC_BEGIN` was sent again, and whether desktop `39393 / 39394` are
+  still listening.
 
-LAN Wake-on-LAN 檢查：
+LAN Wake-on-LAN checks:
 
-- 目前喚醒是 best-effort LAN 功能，只在使用者明確操作時觸發：打開 `我的電腦` 根目錄，或在同步狀態/同步動態按 `重新連接`
-- app 啟動、回到前景、或只是顯示離線狀態，不應觸發喚醒
-- `重新連接` 是 LAN / VPN-LAN retry，不是 public Wake-on-WAN 按鈕
-- 手機和電腦不在同一個 LAN 時，除非 VPN 讓手機等同進入該 LAN 且 wake 封包可送達，否則同 LAN WoL 不保證有效
-- OSS build 不提供 router helper、third-party wake helper、public relay wake 或 peer proxy wake
-- 只有一台睡眠中的電腦且沒有 LAN/VPN-LAN 可達路徑時，mobile 不能憑空喚醒 NAT 後面的電腦
-- macOS 需確認系統設定中的 `Wake for network access`；Ethernet 通常比睡眠 Wi-Fi 穩定
-- Windows 需確認 BIOS/UEFI WoL、網卡 `Allow this device to wake the computer`、`Only allow a magic packet to wake the computer`；Modern Standby、休眠、關機狀態會依機型不同
-- paired mobile 會快取 sidecar 在清醒時下發的 wake metadata；如果桌面換網路、DHCP 變更、換網卡或路由器變更，metadata 可能過期，失敗後仍應回到既有 P2P/direct fallback
+- Current wake is a best-effort LAN feature triggered only by explicit user
+  action: opening the `My Computer` root directory, or pressing `Reconnect` from
+  sync status/activity.
+- App launch, foreground return, or merely showing offline should not trigger
+  wake.
+- `Reconnect` is LAN / VPN-LAN retry, not a public Wake-on-WAN button.
+- When phone and computer are not on the same LAN, same-LAN WoL is not expected
+  to work unless VPN effectively places the phone into that LAN and wake packets
+  can reach it.
+- OSS builds do not provide router helpers, third-party wake helpers, public
+  relay wake, or peer proxy wake.
+- With only one sleeping computer and no LAN/VPN-LAN reachable path, mobile
+  cannot wake a computer behind NAT from nowhere.
+- On macOS, confirm `Wake for network access`; Ethernet is usually more stable
+  than Wi-Fi during sleep.
+- On Windows, confirm BIOS/UEFI WoL, NIC `Allow this device to wake the
+computer`, and `Only allow a magic packet to wake the computer`; Modern
+  Standby, hibernate, and power-off behavior vary by model.
+- Paired mobile caches wake metadata sent by the sidecar while the desktop is
+  awake. If the desktop changes network, DHCP, NIC, or router, metadata can
+  expire. After failure, the app should still return to the existing P2P/direct
+  fallback.
 
-排查時優先看：
+For troubleshooting, check first:
 
-1. desktop 清醒時，paired `HELLO` / presence 是否帶有 `wake.supported=true` 和可用 targets
-2. mobile 診斷包 `bindingState.wake`，或 Android diagnostics 的 `wakeSupported` / `wakeTargetCount`
-3. shared-files 入口 metadata 缺失時，`engine.log` 是否有 `wake skipped reason=<reason> metadata_missing_or_unusable`
-4. `重新連接` metadata 缺失時，`engine.log` 是否有 `wake skipped reason=manual_lan_reconnect metadata_missing_or_unusable`
-5. direct same-LAN wake 是否有 `wake packets sent packets=<n>`，成功時是否有 `wake LAN reachable host=<ip>` / `wake recovered LAN host`，失敗時是否有 `wake polling exhausted` / `wake probe timed out`
-6. 舊版或摘要型日誌是否有 `wake packets sent`、`wake recovered LAN host`、`wake polling exhausted`
-7. 喚醒後 `/health` 是否恢復，`39393 / 39394` 是否重新可達
-8. 是否誤把外網未設定 VPN-LAN 的情境當作可支援情境
+1. While desktop is awake, whether paired `HELLO` / presence includes
+   `wake.supported=true` and usable targets.
+2. Mobile diagnostics `bindingState.wake`, or Android diagnostics
+   `wakeSupported` / `wakeTargetCount`.
+3. If shared-files entry metadata is missing, whether `engine.log` has
+   `wake skipped reason=<reason> metadata_missing_or_unusable`.
+4. If `Reconnect` metadata is missing, whether `engine.log` has
+   `wake skipped reason=manual_lan_reconnect metadata_missing_or_unusable`.
+5. For direct same-LAN wake, whether logs show `wake packets sent packets=<n>`;
+   on success, `wake LAN reachable host=<ip>` / `wake recovered LAN host`; on
+   failure, `wake polling exhausted` / `wake probe timed out`.
+6. Whether older or summary logs show `wake packets sent`,
+   `wake recovered LAN host`, or `wake polling exhausted`.
+7. Whether `/health` recovers after wake and `39393 / 39394` become reachable
+   again.
+8. Whether an external-network scenario without VPN-LAN was mistaken for a
+   supported scenario.
 
-### 3.4.1 `我的電腦` 或 `重新連接` 沒有喚醒 desktop
+### 3.4.1 `My Computer` Or `Reconnect` Did Not Wake The Desktop
 
-先不要直接判定為 app regression。Wake-on-LAN 受 OS、網卡、睡眠狀態、路由器與網段限制影響，排查順序如下：
+Do not immediately treat this as an app regression. Wake-on-LAN is affected by
+OS, network adapter, sleep state, router, and subnet limits. Troubleshoot in
+this order:
 
-1. 在 desktop 清醒時重新連接一次，確認 mobile 能快取 wake metadata；若看到 `wake skipped reason=<reason> metadata_missing_or_unusable`，代表 mobile 沒有可用 targets
-2. 確認手機和 desktop 位於同一 LAN；若是 VPN，必須等同 VPN-LAN 且允許 wake packet 進入 target LAN
-3. macOS 先確認 `Wake for network access`，Windows 先確認 BIOS/UEFI 與 NIC magic packet wake
-4. 確認 mobile diagnostics 出現 `wake packets sent packets=<n>`
-5. 若出現 `wake polling exhausted` / `wake probe timed out`，代表封包送出後 `/health` 未在限定時間內恢復，應檢查平台 WoL 設定、路由器 broadcast 行為、睡眠模式與 `http://<desktop-lan-ip>:39394/health`
+1. Reconnect once while desktop is awake to confirm mobile can cache wake
+   metadata. If `wake skipped reason=<reason> metadata_missing_or_unusable`
+   appears, mobile has no usable targets.
+2. Confirm phone and desktop are on the same LAN. For VPN, it must behave as
+   VPN-LAN and allow wake packets into the target LAN.
+3. On macOS, first confirm `Wake for network access`; on Windows, first confirm
+   BIOS/UEFI and NIC magic packet wake.
+4. Confirm mobile diagnostics show `wake packets sent packets=<n>`.
+5. If `wake polling exhausted` / `wake probe timed out` appears, `/health` did
+   not recover within the bounded time after the packet was sent. Check platform
+   WoL settings, router broadcast behavior, sleep mode, and
+   `http://<desktop-lan-ip>:39394/health`.
 
-## 3.5 「發現頁能掃到設備，但實際連不上」
+## 3.5 Discovery Shows Device, But Connection Fails
 
-先查：
+Check first:
 
-1. sidecar 是否真的監聽 `39393 / 39394`
-2. 本機是否有殘留的 `dns-sd` Bonjour 廣播孤兒行程
-3. mobile 實際選到的是 IPv4 還是 `fe80::` IPv6
-4. Windows 下 `Lynavo Drive Sidecar TCP / Lynavo Drive Sidecar HTTP / Lynavo Drive mDNS UDP` 防火牆規則是否生效，`Bonjour Service` 是否正在執行
+1. Whether the sidecar is really listening on `39393 / 39394`.
+2. Whether the local machine has leftover `dns-sd` Bonjour broadcast orphan
+   processes.
+3. Whether mobile selected IPv4 or `fe80::` IPv6.
+4. On Windows, whether `Lynavo Drive Sidecar TCP / Lynavo Drive Sidecar HTTP /
+Lynavo Drive mDNS UDP` firewall rules are effective and `Bonjour Service` is
+   running.
 
-歷史上常見根因：
+Historically common causes:
 
-- 殘留 `dns-sd` 導致假在線
-- 舊路徑優先用了 `fe80::` link-local IPv6
-- Windows 防火牆放行規則缺失或被策略覆蓋，尤其是 Android fallback 需要的 `39394/TCP` sidecar HTTP `/health`
-- Windows 未安裝 / 未啟動 Bonjour for Windows，導致只能走相容廣播或發現失敗
+- Leftover `dns-sd` caused stale online status.
+- Older paths preferred `fe80::` link-local IPv6.
+- Windows firewall allow rules were missing or overridden by policy, especially
+  `39394/TCP` sidecar HTTP `/health` needed by Android fallback.
+- Bonjour for Windows was not installed or running, leaving only compatible
+  broadcast or failed discovery.
 
-## 3.6 「同一天統計在 app 和 desktop 不一致」
+## 3.6 Same-Day Statistics Differ Between App And Desktop
 
-先對總量：
+Compare totals first:
 
-1. 檔案數總量是否一致
-2. 總位元組數總量是否一致
+1. Whether total file count matches.
+2. Whether total bytes match.
 
-如果總量一致但分桶不一致：
+If totals match but buckets differ:
 
-- 先懷疑是歷史分桶口徑不一致
-- 目前正確口徑應以 sidecar/desktop 完成日為準
+- First suspect inconsistent history bucketing semantics.
+- The current correct rule is sidecar/desktop completion day.
 
-## 3.7 「iCloud 素材看起來卡住」
+## 3.7 iCloud Assets Appear Stuck
 
-先確認：
+Confirm first:
 
-1. 佇列項是否標記 `iCloud`
-2. 目前狀態是否是 `cloud_downloading / preparing`
-3. 並不是已經進入真實上傳但網路無流量
+1. Whether the queue item is marked `iCloud`.
+2. Whether the current state is `cloud_downloading / preparing`.
+3. Whether it has not already entered real upload with no network flow.
 
-iCloud 問題通常卡在匯出階段，而不是 TCP 傳輸階段。
+iCloud issues usually block at export, not TCP transfer.
 
-## 4. 關鍵日誌關鍵字
+## 4. Key Log Keywords
 
-### 4.1 正常進入同步
+### 4.1 Normal Sync Entry
 
 - `startSync`
 - `scan result`
@@ -186,7 +233,7 @@ iCloud 問題通常卡在匯出階段，而不是 TCP 傳輸階段。
 - `sync session started`
 - `FILE_INIT_REQ`
 
-### 4.2 典型異常
+### 4.2 Typical Exceptions
 
 - `FILE_ACK timeout`
 - `ACK_WAIT_FAILED`
@@ -196,42 +243,42 @@ iCloud 問題通常卡在匯出階段，而不是 TCP 傳輸階段。
 - `Network is down`
 - `EOF`
 
-## 5. 什麼時候懷疑哪一端
+## 5. Which Side To Suspect
 
-### 5.1 先懷疑 sidecar
+### 5.1 Suspect Sidecar First
 
-當出現：
+When:
 
-1. `39393 / 39394` 根本沒監聽
-2. `desktop-main.log` 明確報 sidecar 啟動失敗
-3. 多台設備同時受影響
-4. DMG 安裝後 sidecar 本體就沒跑起來
-5. Windows 下 Bonjour 執行時或防火牆規則沒有準備好
+1. `39393 / 39394` are not listening at all.
+2. `desktop-main.log` clearly reports sidecar startup failure.
+3. Multiple devices are affected at the same time.
+4. The sidecar itself does not start after DMG installation.
+5. Bonjour runtime or firewall rules are not ready on Windows.
 
-### 5.2 先懷疑 mobile
+### 5.2 Suspect Mobile First
 
-當出現：
+When:
 
-1. `HELLO / AUTH` 成功但沒有 `SYNC_BEGIN`
-2. 佇列很多但 `queueCount` 異常小
-3. 檔案切換後頂部狀態殘留
-4. 重啟 app 後恢復
+1. `HELLO / AUTH` succeeds but `SYNC_BEGIN` does not happen.
+2. The queue is large but `queueCount` is abnormally small.
+3. Header state remains after switching files.
+4. Restarting the app recovers.
 
-### 5.3 先懷疑 UI
+### 5.3 Suspect UI First
 
-當出現：
+When:
 
-1. 統計總量一致，但某個頁面顯示不一致
-2. 傳輸仍在推進，但文案提示已失敗
-3. 排序、分頁、滾動等表現異常
+1. Statistics totals match, but a page displays inconsistent values.
+2. Transfer is still progressing, but copy says it failed.
+3. Sorting, pagination, scrolling, or similar presentation is abnormal.
 
-## 6. 最小排查順序
+## 6. Minimum Troubleshooting Order
 
-每次遇到線上問題，建議按這個順序走：
+For each field issue, use this order:
 
-1. 看版本：desktop build、mobile build 是否對齊
-2. 看 desktop 診斷包
-3. 看 mobile 診斷包
-4. 對照是否進入了 `SYNC_BEGIN`
-5. 對照 queue 真實來源是不是 pending 佇列
-6. 再決定是修 sidecar、mobile 狀態機，還是 UI 映射
+1. Check versions: whether desktop build and mobile build align.
+2. Inspect desktop diagnostics.
+3. Inspect mobile diagnostics.
+4. Check whether `SYNC_BEGIN` happened.
+5. Check whether the real queue source is the pending queue.
+6. Then decide whether to fix sidecar, mobile state machine, or UI mapping.

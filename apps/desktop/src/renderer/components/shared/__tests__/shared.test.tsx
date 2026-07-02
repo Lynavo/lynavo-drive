@@ -5,19 +5,19 @@ import { FileIcon, getFileIconConfig } from '../FileIcon';
 import { CopyButton } from '../CopyButton';
 
 describe('StatusBadge', () => {
-  it('renders "传输中" for transferring status', () => {
+  it('renders "Transferring" for transferring status', () => {
     render(<StatusBadge status="transferring" />);
-    expect(screen.getByText('传输中')).toBeInTheDocument();
+    expect(screen.getByText('Transferring')).toBeInTheDocument();
   });
 
-  it('renders "已连接" for connected_idle status', () => {
+  it('renders "Connected" for connected_idle status', () => {
     render(<StatusBadge status="connected_idle" />);
-    expect(screen.getByText('已连接')).toBeInTheDocument();
+    expect(screen.getByText('Connected')).toBeInTheDocument();
   });
 
-  it('renders "未连接" for offline status', () => {
+  it('renders "Offline" for offline status', () => {
     render(<StatusBadge status="offline" />);
-    expect(screen.getByText('未连接')).toBeInTheDocument();
+    expect(screen.getByText('Offline')).toBeInTheDocument();
   });
 });
 

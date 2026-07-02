@@ -78,7 +78,7 @@
       "captionDisabled": "Phones can only browse files synced from the same physical device to this computer"
     },
     "version": {
-      "caption": "v{{version}} · Current version installed"
+      "caption": "v{{version}} \u00b7 Current version installed"
     },
     "actions": {
       "cancel": "Cancel",

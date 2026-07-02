@@ -124,12 +124,12 @@ jest.mock('../../components/Icon', () => ({
 
 describe('AlbumWorkbenchScreen', () => {
   beforeAll(async () => {
-    await i18n.changeLanguage('zh-Hans');
+    await i18n.changeLanguage('en');
   });
 
   afterAll(async () => {
     await ReactTestRenderer.act(async () => {
-      await i18n.changeLanguage('zh-Hans');
+      await i18n.changeLanguage('en');
     });
   });
 
@@ -212,7 +212,7 @@ describe('AlbumWorkbenchScreen', () => {
         fileSize: 1024,
         creationDate: '2026-05-01T00:00:00Z',
         thumbnailUri: 'content://media/external/images/media/1',
-        isTransferred: false,
+        isUploaded: false,
         isQueued: false,
       },
     ]);
@@ -270,7 +270,7 @@ describe('AlbumWorkbenchScreen', () => {
     );
     const transferredTab = pressables.find(node => {
       const textNodes = node.findAllByType(Text);
-      return textNodes.some(textNode => textNode.props.children === '已传');
+      return textNodes.some(textNode => textNode.props.children === 'Uploaded');
     });
 
     expect(transferredTab).toBeDefined();
@@ -292,9 +292,9 @@ describe('AlbumWorkbenchScreen', () => {
       return typeof value === 'string' ? [value] : [];
     });
 
-    expect(textValues).toContain('暂无已传素材');
-    expect(textValues).toContain('全部');
-    expect(textValues).toContain('已传');
+    expect(textValues).toContain('No Uploaded Items Yet');
+    expect(textValues).toContain('All');
+    expect(textValues).toContain('Uploaded');
   });
 
   it('does not show full-screen loading when switching away from an empty transferred tab', async () => {
@@ -323,14 +323,14 @@ describe('AlbumWorkbenchScreen', () => {
           return textNodes.some(textNode => textNode.props.children === label);
         });
 
-    const transferredTab = findTab('已传');
+    const transferredTab = findTab('Uploaded');
     expect(transferredTab).toBeDefined();
 
     await ReactTestRenderer.act(async () => {
       transferredTab!.props.onPress();
     });
 
-    const untransferredTab = findTab('未传');
+    const untransferredTab = findTab('Pending');
     expect(untransferredTab).toBeDefined();
 
     await ReactTestRenderer.act(async () => {
@@ -344,8 +344,8 @@ describe('AlbumWorkbenchScreen', () => {
         return typeof value === 'string' ? [value] : [];
       });
 
-    expect(textValuesDuringPending).not.toContain('正在加载相册...');
-    expect(textValuesDuringPending).toContain('未传');
+    expect(textValuesDuringPending).not.toContain('Loading album...');
+    expect(textValuesDuringPending).toContain('Pending');
 
     await ReactTestRenderer.act(async () => {
       resolveBrowse?.([]);
@@ -361,7 +361,7 @@ describe('AlbumWorkbenchScreen', () => {
       fileSize: 1024,
       creationDate: '2026-04-01T00:00:00Z',
       thumbnailUri: 'file:///tmp/stale.jpg',
-      isTransferred: true,
+      isUploaded: true,
       isQueued: false,
     };
     const freshAsset = {
@@ -371,7 +371,7 @@ describe('AlbumWorkbenchScreen', () => {
       fileSize: 1024,
       creationDate: '2026-04-02T00:00:00Z',
       thumbnailUri: 'file:///tmp/fresh.jpg',
-      isTransferred: false,
+      isUploaded: false,
       isQueued: false,
     };
 
@@ -400,11 +400,11 @@ describe('AlbumWorkbenchScreen', () => {
         });
 
     await ReactTestRenderer.act(async () => {
-      findTab('已传')!.props.onPress();
+      findTab('Uploaded')!.props.onPress();
     });
 
     await ReactTestRenderer.act(async () => {
-      findTab('未传')!.props.onPress();
+      findTab('Pending')!.props.onPress();
     });
 
     await ReactTestRenderer.act(async () => {
@@ -444,9 +444,9 @@ describe('AlbumWorkbenchScreen', () => {
     });
 
     // Should show the limited-access guidance, NOT the generic empty state
-    expect(textValues).toContain('尚未选择照片');
-    expect(textValues).toContain('选择照片');
-    expect(textValues).not.toContain('暂无素材');
+    expect(textValues).toContain('No Photos Selected');
+    expect(textValues).toContain('Select Photos');
+    expect(textValues).not.toContain('No Items');
   });
 
   it('calls presentLimitedPhotoPicker when the CTA button is pressed', async () => {
@@ -465,13 +465,15 @@ describe('AlbumWorkbenchScreen', () => {
       tree = createAlbumWorkbenchScreen();
     });
 
-    // Find the "选择照片" button
+    // Find the "Select Photos" button
     const pressables = tree!.root.findAll(
       node => typeof node.props.onPress === 'function',
     );
     const pickerButton = pressables.find(node => {
       const textNodes = node.findAllByType(Text);
-      return textNodes.some(textNode => textNode.props.children === '选择照片');
+      return textNodes.some(
+        textNode => textNode.props.children === 'Select Photos',
+      );
     });
 
     expect(pickerButton).toBeDefined();
@@ -505,8 +507,8 @@ describe('AlbumWorkbenchScreen', () => {
     });
 
     // Should show the generic empty state, not the limited CTA
-    expect(textValues).not.toContain('尚未选择照片');
-    expect(textValues).toContain('暂无素材');
+    expect(textValues).not.toContain('No Photos Selected');
+    expect(textValues).toContain('No Items');
   });
 
   it('still shows limited-access CTA when auto upload is active', async () => {
@@ -536,8 +538,8 @@ describe('AlbumWorkbenchScreen', () => {
       return typeof value === 'string' ? [value] : [];
     });
 
-    expect(textValues).toContain('尚未选择照片');
-    expect(textValues).toContain('选择照片');
+    expect(textValues).toContain('No Photos Selected');
+    expect(textValues).toContain('Select Photos');
   });
 
   it('opens preview modal when item body is tapped', async () => {
@@ -549,7 +551,7 @@ describe('AlbumWorkbenchScreen', () => {
         fileSize: 1024,
         creationDate: '2026-04-01T00:00:00Z',
         thumbnailUri: 'file:///tmp/a1.jpg',
-        isTransferred: false,
+        isUploaded: false,
         isQueued: false,
       },
     ]);
@@ -630,7 +632,7 @@ describe('AlbumWorkbenchScreen', () => {
       .findAll(node => typeof node.props.onPress === 'function')
       .find(node => {
         const textNodes = node.findAllByType(Text);
-        return textNodes.some(t => t.props.children === '此时此刻');
+        return textNodes.some(t => t.props.children === 'From Now');
       });
     expect(fromNowChip).toBeDefined();
     expect(fromNowChip!.props.disabled).toBe(true);
@@ -671,10 +673,10 @@ describe('AlbumWorkbenchScreen', () => {
       const itemTextValues = node
         .findAllByType(Text)
         .flatMap(text => flattenTextChildren(text.props.children));
-      return itemTextValues.includes('本次已传');
+      return itemTextValues.includes('Uploaded');
     });
 
-    expect(allTextValues).toContain('本次已传');
+    expect(allTextValues).toContain('Uploaded');
     expect(transferredSummaryItem).toBeDefined();
     expect(
       transferredSummaryItem!
@@ -725,7 +727,7 @@ describe('AlbumWorkbenchScreen', () => {
       const itemTextValues = node
         .findAllByType(Text)
         .flatMap(text => flattenTextChildren(text.props.children));
-      return itemTextValues.includes('本次已传');
+      return itemTextValues.includes('Uploaded');
     });
 
     expect(transferredSummaryItem).toBeDefined();
@@ -784,7 +786,7 @@ describe('AlbumWorkbenchScreen', () => {
       const itemTextValues = node
         .findAllByType(Text)
         .flatMap(text => flattenTextChildren(text.props.children));
-      return itemTextValues.includes('本次已传');
+      return itemTextValues.includes('Uploaded');
     });
 
     expect(transferredSummaryItem).toBeDefined();
@@ -843,7 +845,7 @@ describe('AlbumWorkbenchScreen', () => {
       const itemTextValues = node
         .findAllByType(Text)
         .flatMap(text => flattenTextChildren(text.props.children));
-      return itemTextValues.includes('本次已传');
+      return itemTextValues.includes('Uploaded');
     });
 
     expect(transferredSummaryItem).toBeDefined();

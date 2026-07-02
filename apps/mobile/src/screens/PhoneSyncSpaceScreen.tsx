@@ -129,9 +129,9 @@ export function PhoneSyncSpaceScreen() {
     const isImage =
       mediaType === 'image' ||
       /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(filename);
-    if (isVideo) return '視頻';
-    if (isImage) return '照片';
-    return '文件';
+    if (isVideo) return 'Video';
+    if (isImage) return 'Photo';
+    return 'File';
   };
 
   const formatItemTime = (isoString?: string) => {
@@ -150,18 +150,19 @@ export function PhoneSyncSpaceScreen() {
     });
 
     if (date.toDateString() === today.toDateString()) {
-      return `今天 ${timeString}`;
+      return `Today ${timeString}`;
     }
     if (date.toDateString() === yesterday.toDateString()) {
-      return `昨天 ${timeString}`;
+      return `Yesterday ${timeString}`;
     }
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${timeString}`;
   };
 
   const handleSelect = () => {
     Alert.alert(
-      t('sharedFiles.phoneSyncSpace.select') || '選擇檔案',
-      t('sharedFiles.phoneSyncSpace.selectFeature') || '該功能正在開發中',
+      t('sharedFiles.phoneSyncSpace.select') || 'SelectFile',
+      t('sharedFiles.phoneSyncSpace.selectFeature') ||
+        'This feature is under development',
     );
   };
 
@@ -176,7 +177,9 @@ export function PhoneSyncSpaceScreen() {
         const { NativeSyncEngine } = NativeModules;
         const bindingState = await NativeSyncEngine?.getBindingState();
         if (!bindingState || !bindingState.host) {
-          Alert.alert(t('sharedFiles.deviceUnavailable.title') || '設備不可用');
+          Alert.alert(
+            t('sharedFiles.deviceUnavailable.title') || 'Device Unavailable',
+          );
           return;
         }
 
@@ -197,23 +200,23 @@ export function PhoneSyncSpaceScreen() {
         });
 
         Alert.alert(
-          t('sharedFiles.dialogs.downloadComplete') || '下載完成',
+          t('sharedFiles.dialogs.downloadComplete') || 'Download complete',
           savedToPhotos
             ? t('sharedFiles.dialogs.downloadSavedToPhotos', {
                 name: filename,
                 location:
-                  t('sharedFiles.dialogs.savedLocationPhotos') || '相簿',
-              }) || `${filename} 已儲存至相簿`
+                  t('sharedFiles.dialogs.savedLocationPhotos') || 'Photos',
+              }) || `${filename} saved to Photos`
             : t('sharedFiles.dialogs.downloadSavedToFiles', {
                 name: filename,
-              }) || `${filename} 已保存到文件`,
+              }) || `${filename} saved to Files`,
         );
       } catch (err) {
         console.warn('[PhoneSyncSpaceScreen] Download failed:', err);
         Alert.alert(
-          t('sharedFiles.dialogs.downloadFailed') || '下載失敗',
+          t('sharedFiles.dialogs.downloadFailed') || 'Download Failed',
           t('sharedFiles.dialogs.downloadFailedMessage') ||
-            '無法下載檔案，請稍後重試',
+            'Could not download the file. Please try again later',
         );
       } finally {
         setDownloadingId(null);
@@ -229,7 +232,9 @@ export function PhoneSyncSpaceScreen() {
         const { NativeSyncEngine } = NativeModules;
         const bindingState = await NativeSyncEngine?.getBindingState();
         if (!bindingState || !bindingState.host) {
-          Alert.alert(t('sharedFiles.deviceUnavailable.title') || '設備不可用');
+          Alert.alert(
+            t('sharedFiles.deviceUnavailable.title') || 'Device Unavailable',
+          );
           return;
         }
 
@@ -257,9 +262,9 @@ export function PhoneSyncSpaceScreen() {
               err,
             );
             Alert.alert(
-              t('sharedFiles.dialogs.previewFailed') || '預覽失敗',
+              t('sharedFiles.dialogs.previewFailed') || 'Preview Failed',
               t('sharedFiles.dialogs.previewFailedMessage') ||
-                '無法取得檔案預覽',
+                'Could not load file preview',
             );
           }
           return;
@@ -274,8 +279,9 @@ export function PhoneSyncSpaceScreen() {
       } catch (err) {
         console.warn('[PhoneSyncSpaceScreen] Preview failed:', err);
         Alert.alert(
-          t('sharedFiles.dialogs.previewFailed') || '預覽失敗',
-          t('sharedFiles.dialogs.previewFailedMessage') || '無法取得檔案預覽',
+          t('sharedFiles.dialogs.previewFailed') || 'Preview Failed',
+          t('sharedFiles.dialogs.previewFailedMessage') ||
+            'Could not load file preview',
         );
       }
     },
@@ -301,9 +307,9 @@ export function PhoneSyncSpaceScreen() {
         (item.desktopDeviceId &&
           (item.desktopDeviceId.includes('-') ||
             item.desktopDeviceId.length > 12))
-        ? binding.deviceAlias || binding.deviceName || '已同步的电脑'
+        ? binding.deviceAlias || binding.deviceName || 'Synced computer'
         : item.desktopDeviceId
-      : item.desktopDeviceId || '未知設備';
+      : item.desktopDeviceId || 'Unknown device';
 
     return (
       <TouchableOpacity
@@ -312,7 +318,7 @@ export function PhoneSyncSpaceScreen() {
         onPress={() => handleOpenItem(item)}
         disabled={isDeleted}
         accessibilityRole="button"
-        accessibilityLabel="預覽已同步檔案"
+        accessibilityLabel="Preview synced file"
         accessibilityState={{ disabled: isDeleted }}
       >
         <View style={[styles.iconWrapper, { backgroundColor: iconConfig.bg }]}>
@@ -324,7 +330,7 @@ export function PhoneSyncSpaceScreen() {
           </Text>
           <View style={styles.metaRow}>
             <Text style={styles.metaText}>
-              {`${fileType} · ${formatBytes(item.fileSize)}`}
+              {`${fileType} - ${formatBytes(item.fileSize)}`}
             </Text>
             <Text style={styles.timeText}>{formattedTime}</Text>
           </View>
@@ -332,13 +338,14 @@ export function PhoneSyncSpaceScreen() {
         <View style={styles.rightWrapper}>
           {item.shareStatus === 'missing' && (
             <View style={styles.missingBadge}>
-              <Text style={styles.missingText}>僅電腦端存在</Text>
+              <Text style={styles.missingText}>Only exists on computer</Text>
             </View>
           )}
           {isDeleted && (
             <View style={styles.missingBadge}>
               <Text style={styles.missingText}>
-                {t('sharedFiles.phoneSyncSpace.desktopDeleted') || '電腦已刪除'}
+                {t('sharedFiles.phoneSyncSpace.desktopDeleted') ||
+                  'Deleted on computer'}
               </Text>
             </View>
           )}
@@ -354,7 +361,7 @@ export function PhoneSyncSpaceScreen() {
             activeOpacity={0.7}
             disabled={isDeleted || isDownloading || downloadingId !== null}
             accessibilityRole="button"
-            accessibilityLabel="下載已同步檔案"
+            accessibilityLabel="Download synced file"
             accessibilityState={{ disabled: isDeleted || isDownloading }}
           >
             {isDownloading ? (
@@ -385,7 +392,7 @@ export function PhoneSyncSpaceScreen() {
             <Icon name="arrow-back" size={24} color="#1e293b" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
-            {t('sharedFiles.phoneSyncSpace.title') || '手機同步空間'}
+            {t('sharedFiles.phoneSyncSpace.title') || 'Phone Sync Space'}
           </Text>
           <TouchableOpacity
             style={styles.selectButton}
@@ -393,7 +400,7 @@ export function PhoneSyncSpaceScreen() {
             activeOpacity={0.7}
           >
             <Text style={styles.selectButtonText}>
-              {t('sharedFiles.phoneSyncSpace.select') || '選擇'}
+              {t('sharedFiles.phoneSyncSpace.select') || 'Select'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -406,7 +413,7 @@ export function PhoneSyncSpaceScreen() {
             onPress={() => setSortDesc(!sortDesc)}
           >
             <Text style={styles.filterButtonText}>
-              {sortDesc ? '時間 ⬇' : '時間 ⬆'}
+              {sortDesc ? 'Time ⬇' : 'Time ⬆'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -419,17 +426,18 @@ export function PhoneSyncSpaceScreen() {
           <View style={styles.centered}>
             <Icon name="alert-circle-outline" size={48} color="#ef4444" />
             <Text style={styles.emptyText}>
-              {t('sharedFiles.networkError.title') || '載入失敗'}
+              {t('sharedFiles.networkError.title') || 'Failed to Load'}
             </Text>
             <Text style={styles.errorSubtitle}>
-              {t('sharedFiles.networkError.message') || '請稍後重試'}
+              {t('sharedFiles.networkError.message') ||
+                'Please try again later'}
             </Text>
           </View>
         ) : sortedItems.length === 0 ? (
           <View style={styles.centered}>
             <Icon name="folder-open-outline" size={48} color="#94a3b8" />
             <Text style={styles.emptyText}>
-              {t('sharedFiles.phoneSyncSpace.empty') || '尚無同步檔案'}
+              {t('sharedFiles.phoneSyncSpace.empty') || 'No synced files yet'}
             </Text>
           </View>
         ) : (
@@ -478,7 +486,7 @@ function PhoneSyncPreviewModal({
           <TouchableOpacity
             style={styles.previewCloseButton}
             accessibilityRole="button"
-            accessibilityLabel="關閉預覽"
+            accessibilityLabel="Close Preview"
             activeOpacity={0.7}
             onPress={onClose}
           >

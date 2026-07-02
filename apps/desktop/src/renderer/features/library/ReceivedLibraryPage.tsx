@@ -150,11 +150,11 @@ function FileItemRow({
           >
             {t(mediaLabel.labelKey)}
           </span>
-          <span className="text-[12px] text-[#97a3b0]">·</span>
+          <span className="text-[12px] text-[#97a3b0]">{'\u00b7'}</span>
           <span className="text-[12px] font-medium text-[#8a96a3]">
             {formatBytes(item.fileSize)}
           </span>
-          <span className="text-[12px] text-[#97a3b0]">·</span>
+          <span className="text-[12px] text-[#97a3b0]">{'\u00b7'}</span>
           <span className="text-[12px] text-[#8a96a3]">{formatSmartDate(item.completedAt)}</span>
         </div>
       </div>

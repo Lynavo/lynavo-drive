@@ -220,7 +220,7 @@ func (s *Server) handleMobileSharedResources(w http.ResponseWriter, r *http.Requ
 	if runtime.GOOS == "windows" {
 		for _, root := range windowsPersonalDriveRoots() {
 			drivePath := root.Path
-			displayName := root.ID + " 盘"
+			displayName := root.ID + " drive"
 			virtualResources = append(virtualResources, store.SharedResource{
 				ResourceID:      "drive_" + root.ID,
 				DesktopDeviceID: desktopDeviceID,
@@ -237,7 +237,7 @@ func (s *Server) handleMobileSharedResources(w http.ResponseWriter, r *http.Requ
 				ResourceID:      "user_home",
 				DesktopDeviceID: desktopDeviceID,
 				Kind:            "shared_folder",
-				DisplayName:     "电脑个人目录",
+				DisplayName:     "Computer Home",
 				LocalPath:       &home,
 				Status:          "available",
 			})
@@ -1065,7 +1065,7 @@ func (s *Server) resolveSharedResourceHelper(desktopDeviceID, resourceID string)
 			ResourceID:      "user_home",
 			DesktopDeviceID: desktopDeviceID,
 			Kind:            "shared_folder",
-			DisplayName:     "电脑个人目录",
+			DisplayName:     "Computer Home",
 			LocalPath:       &home,
 			Status:          "available",
 		}, nil
@@ -1073,7 +1073,7 @@ func (s *Server) resolveSharedResourceHelper(desktopDeviceID, resourceID string)
 	if strings.HasPrefix(resourceID, "drive_") && len(resourceID) == 7 {
 		driveLetter := string(resourceID[6])
 		drivePath := driveLetter + ":\\"
-		displayName := driveLetter + " 盘"
+		displayName := driveLetter + " drive"
 		return store.SharedResource{
 			ResourceID:      resourceID,
 			DesktopDeviceID: desktopDeviceID,

@@ -50,31 +50,34 @@ const BLUE = '#1677D2';
 const DARK = '#17191C';
 const MUTED_ICON = '#7B8490';
 const FALLBACK_COPY = {
-  title: '自动上传',
-  subtitle: '设置手机内容同步到电脑',
-  planTitle: '同步计划',
-  enableSwitchTitle: '自动上传开关',
-  enableSwitchDescOn: '已开启，会按同步范围自动同步相册新增素材',
-  enableSwitchDescOff: '已关闭，不会自动同步相册新增素材',
-  sourcesTitle: '同步来源',
-  albumTitle: '照片和视频',
-  albumDesc: '同步系统相册中的媒体内容',
-  rangeTitle: '同步范围',
-  rangeAllTitle: '全部内容',
-  rangeAllDesc: '同步现有照片和视频',
-  rangeNowTitle: '从现在开始',
-  rangeNowDesc: '仅同步后续新增内容',
-  rangeCustomTitle: '自定义时间',
-  rangeCustomDesc: '按指定时间起点同步',
-  confirmEnable: '开启自动上传',
-  confirmDisable: '关闭自动上传',
-  customPickerSave: '保存',
-  infoAlbum: '相册照片和视频将同步到电脑。',
-  infoAutoOff: '自动上传关闭后，不会同步后续新增素材。',
-  infoEmpty: '请选择至少一个同步来源。',
-  loadingConfig: '正在读取自动上传设置...',
-  loadConfigFailed: '自动上传设置读取失败，请稍后重试。',
-  disabledSuccess: '自动上传已关闭',
+  title: 'Auto Upload',
+  subtitle: 'Set up phone content sync to computer',
+  planTitle: 'Sync Plan',
+  enableSwitchTitle: 'Auto Upload Switch',
+  enableSwitchDescOn:
+    'Enabled. New album media will sync automatically based on sync range',
+  enableSwitchDescOff: 'Disabled. New album media will not sync automatically',
+  sourcesTitle: 'Sync Sources',
+  albumTitle: 'Photos and Videos',
+  albumDesc: 'Sync media content from system album',
+  rangeTitle: 'Sync Range',
+  rangeAllTitle: 'All Content',
+  rangeAllDesc: 'Sync existing photos and videos',
+  rangeNowTitle: 'From Now On',
+  rangeNowDesc: 'Only sync newly added content from now on',
+  rangeCustomTitle: 'Custom Time',
+  rangeCustomDesc: 'Sync from the specified start time',
+  confirmEnable: 'Enable Auto Upload',
+  confirmDisable: 'Disable Auto Upload',
+  customPickerSave: 'Save',
+  infoAlbum: 'Album photos and videos will sync to your computer.',
+  infoAutoOff:
+    'After auto upload is disabled, newly added media will not sync.',
+  infoEmpty: 'Please select at least one sync source.',
+  loadingConfig: 'Reading auto upload settings...',
+  loadConfigFailed:
+    'Failed to read auto upload settings. Please try again later.',
+  disabledSuccess: 'Auto upload is disabled',
 };
 
 function toUploadRange(mode: AutoUploadTimeRangeMode): AutoUploadRange {
@@ -284,9 +287,9 @@ export function AutoUploadSettingsGlobalScreen() {
         setAutoUploadEnabled(false);
       }
       Alert.alert(
-        t('syncActivity.dialogs.enableAutoFailed.title') || '操作失敗',
+        t('syncActivity.dialogs.enableAutoFailed.title') || 'Action Failed',
         t('syncActivity.dialogs.enableAutoFailed.body') ||
-          '無法開啟自動上傳，請稍後重試',
+          'Could not enable auto upload. Please try again later',
       );
     } finally {
       savingRef.current = false;
@@ -310,9 +313,9 @@ export function AutoUploadSettingsGlobalScreen() {
         console.warn('[AutoUploadSettings] disable auto upload failed:', e);
         setAutoUploadEnabled(true);
         Alert.alert(
-          t('syncActivity.dialogs.enableAutoFailed.title') || '操作失敗',
+          t('syncActivity.dialogs.enableAutoFailed.title') || 'Action Failed',
           t('syncActivity.dialogs.enableAutoFailed.body') ||
-            '無法開啟自動上傳，請稍後重試',
+            'Could not enable auto upload. Please try again later',
         );
       } finally {
         savingRef.current = false;
@@ -393,8 +396,9 @@ export function AutoUploadSettingsGlobalScreen() {
       : uploadRange === 'now'
         ? copy.rangeNowTitle
         : copy.rangeCustomTitle;
-  const planRangeLabel =
-    autoUploadEnabled ? activeRangeLabel : t('common.notApplicable') || '不适用';
+  const planRangeLabel = autoUploadEnabled
+    ? activeRangeLabel
+    : t('common.notApplicable') || 'N/A';
   const infoText = renderInfoText();
 
   return (
@@ -407,7 +411,7 @@ export function AutoUploadSettingsGlobalScreen() {
             style={styles.backButton}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel={t('common.back') || '返回'}
+            accessibilityLabel={t('common.back') || 'Back'}
             onPress={handleBack}
           >
             <ChevronLeft
@@ -448,19 +452,19 @@ export function AutoUploadSettingsGlobalScreen() {
             <View style={styles.planStatsRow}>
               <View style={styles.planStatItem}>
                 <Text style={styles.planStatLabel}>
-                  {t('syncActivity.autoUploadSettings.planSource') || '来源'}
+                  {t('syncActivity.autoUploadSettings.planSource') || 'Sources'}
                 </Text>
                 <Text style={styles.planStatValue}>{planSourceCount}</Text>
               </View>
               <View style={styles.planStatItem}>
                 <Text style={styles.planStatLabel}>
-                  {t('syncActivity.autoUploadSettings.planFile') || '文件'}
+                  {t('syncActivity.autoUploadSettings.planFile') || 'File'}
                 </Text>
                 <Text style={styles.planStatValue}>{planFileCount}</Text>
               </View>
               <View style={styles.planStatItem}>
                 <Text style={styles.planStatLabel}>
-                  {t('syncActivity.autoUploadSettings.planRange') || '范围'}
+                  {t('syncActivity.autoUploadSettings.planRange') || 'Range'}
                 </Text>
                 <Text style={styles.planStatValue} numberOfLines={1}>
                   {planRangeLabel}
@@ -506,9 +510,7 @@ export function AutoUploadSettingsGlobalScreen() {
                     testID="auto-upload-source-album"
                     accessibilityState={{ selected: true }}
                   >
-                    <View
-                      style={[styles.sourceIconBox, styles.iconBoxActive]}
-                    >
+                    <View style={[styles.sourceIconBox, styles.iconBoxActive]}>
                       <ImageIcon
                         testID="auto-upload-source-album-icon"
                         size={20}
@@ -567,9 +569,7 @@ export function AutoUploadSettingsGlobalScreen() {
                       <Text style={styles.optionTitle}>
                         {copy.rangeAllTitle}
                       </Text>
-                      <Text style={styles.optionDesc}>
-                        {copy.rangeAllDesc}
-                      </Text>
+                      <Text style={styles.optionDesc}>{copy.rangeAllDesc}</Text>
                     </View>
                     <SelectionIndicator
                       selected={uploadRange === 'all'}
@@ -608,9 +608,7 @@ export function AutoUploadSettingsGlobalScreen() {
                       <Text style={styles.optionTitle}>
                         {copy.rangeNowTitle}
                       </Text>
-                      <Text style={styles.optionDesc}>
-                        {copy.rangeNowDesc}
-                      </Text>
+                      <Text style={styles.optionDesc}>{copy.rangeNowDesc}</Text>
                     </View>
                     <SelectionIndicator
                       selected={uploadRange === 'now'}
@@ -691,7 +689,7 @@ export function AutoUploadSettingsGlobalScreen() {
                   onPress={() => setShowDatePicker(false)}
                 >
                   <Text style={styles.pickerCancelText}>
-                    {t('common.cancel') || '取消'}
+                    {t('common.cancel') || 'Cancel'}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity

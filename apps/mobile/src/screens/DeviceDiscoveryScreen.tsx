@@ -584,7 +584,7 @@ export function DeviceDiscoveryScreen() {
       setCodeError(
         err?.message ||
           t('errors.pairingConnectFailed') ||
-          '配對失敗，請稍後重試。',
+          'Pairing failed. Please try again later.',
       );
     }
   }, [selectedDevice, connectionCode, addDesktop, navigation, t]);
@@ -657,7 +657,7 @@ export function DeviceDiscoveryScreen() {
           <View style={styles.deviceInfo}>
             <Text style={styles.deviceName}>{item.name}</Text>
             <Text style={styles.deviceMeta}>
-              {item.type === 'win' ? 'Windows' : 'macOS'} {'·'} {item.ip}
+              {item.type === 'win' ? 'Windows' : 'macOS'} {'-'} {item.ip}
             </Text>
           </View>
           {isCurrentDevice && (
@@ -1137,12 +1137,12 @@ export function DeviceDiscoveryScreen() {
                 <View style={styles.pairModalHeader}>
                   <Text style={styles.pairModalTitle}>
                     {t('deviceDiscovery.connectionMethod.title') ||
-                      '选择连接方式'}
+                      'Select Connection Method'}
                   </Text>
                   <Text style={styles.pairModalSubtitle}>
                     {t('deviceDiscovery.connectionMethod.selected', {
                       name: selectedDevice?.name,
-                    }) || `已选择 ${selectedDevice?.name}`}
+                    }) || `Selected ${selectedDevice?.name}`}
                   </Text>
                 </View>
 
@@ -1166,12 +1166,13 @@ export function DeviceDiscoveryScreen() {
                     <View style={styles.methodInfo}>
                       <Text style={styles.methodTitle}>
                         {t('deviceDiscovery.connectionMethod.qrTitle') ||
-                          '扫码连接'}
+                          'Scan QR Code'}
                       </Text>
                       <Text style={styles.methodDesc} numberOfLines={1}>
                         {t('deviceDiscovery.connectionMethod.qrDesc', {
                           name: selectedDevice?.name,
-                        }) || `扫描 ${selectedDevice?.name} 上显示的二维码`}
+                        }) ||
+                          `Scan the QR code shown on ${selectedDevice?.name}`}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -1195,12 +1196,13 @@ export function DeviceDiscoveryScreen() {
                     <View style={styles.methodInfo}>
                       <Text style={styles.methodTitle}>
                         {t('deviceDiscovery.connectionMethod.codeTitle') ||
-                          '输入连接码'}
+                          'Enter pairing code'}
                       </Text>
                       <Text style={styles.methodDesc} numberOfLines={1}>
                         {t('deviceDiscovery.connectionMethod.codeDesc', {
                           name: selectedDevice?.name,
-                        }) || `输入 ${selectedDevice?.name} 显示的连接码`}
+                        }) ||
+                          `Enter the pairing code shown on ${selectedDevice?.name}`}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -1212,7 +1214,7 @@ export function DeviceDiscoveryScreen() {
                   onPress={() => setShowMethodModal(false)}
                 >
                   <Text style={styles.pairModalCancelText}>
-                    {t('deviceDiscovery.connectionMethod.cancel') || '取消'}
+                    {t('deviceDiscovery.connectionMethod.cancel') || 'Cancel'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1241,13 +1243,13 @@ export function DeviceDiscoveryScreen() {
                   <View style={styles.pairModalHeader}>
                     <Text style={styles.pairModalTitle}>
                       {t('deviceDiscovery.connectionMethod.connectCodeTitle') ||
-                        '输入连接码'}
+                        'Enter pairing code'}
                     </Text>
                     <Text style={styles.pairModalSubtitle}>
                       {t('deviceDiscovery.connectionMethod.connectCodeDesc', {
                         name: selectedDevice?.name,
                       }) ||
-                        `输入 ${selectedDevice?.name} 显示的连接码以完成连接。`}
+                        `Enter the pairing code shown on ${selectedDevice?.name} to complete connection.`}
                     </Text>
                   </View>
 
@@ -1261,7 +1263,7 @@ export function DeviceDiscoveryScreen() {
                       placeholder={
                         t(
                           'deviceDiscovery.connectionMethod.inputPlaceholder',
-                        ) || '输入连接码'
+                        ) || 'Enter pairing code'
                       }
                       placeholderTextColor="#a0aec0"
                       autoFocus
@@ -1277,7 +1279,7 @@ export function DeviceDiscoveryScreen() {
                         <ActivityIndicator size="small" color="#3b82f6" />
                         <Text style={styles.verifyingText}>
                           {t('deviceDiscovery.connectionMethod.verifying') ||
-                            '正在验证连接码…'}
+                            'Verifying code...'}
                         </Text>
                       </View>
                     )}
@@ -1298,7 +1300,8 @@ export function DeviceDiscoveryScreen() {
                       onPress={() => setShowCodeModal(false)}
                     >
                       <Text style={styles.pairModalFooterButtonText}>
-                        {t('deviceDiscovery.connectionMethod.cancel') || '取消'}
+                        {t('deviceDiscovery.connectionMethod.cancel') ||
+                          'Cancel'}
                       </Text>
                     </TouchableOpacity>
 
@@ -1318,7 +1321,7 @@ export function DeviceDiscoveryScreen() {
                         ]}
                       >
                         {t('deviceDiscovery.connectionMethod.connect') ||
-                          '连接'}
+                          'Connect'}
                       </Text>
                     </TouchableOpacity>
                   </View>

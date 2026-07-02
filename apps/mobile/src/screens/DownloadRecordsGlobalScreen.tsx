@@ -122,7 +122,10 @@ export function DownloadRecordsGlobalScreen() {
         }
       }
       if (!previewUrl) {
-        Alert.alert('無法預覽', '這筆紀錄沒有可用的本機或預覽來源。');
+        Alert.alert(
+          'Cannot Preview',
+          'This record has no available local or preview source.',
+        );
         return;
       }
       setPreview({ record, url: previewUrl });
@@ -130,7 +133,7 @@ export function DownloadRecordsGlobalScreen() {
     }
 
     if (!record.localPath) {
-      Alert.alert('無法開啟', '這筆紀錄沒有可用的本機檔案。');
+      Alert.alert('Cannot Open', 'This record has no available local file.');
       return;
     }
 
@@ -147,7 +150,7 @@ export function DownloadRecordsGlobalScreen() {
       });
     } catch (err) {
       console.warn('[DownloadRecordsGlobalScreen] Preview failed:', err);
-      Alert.alert('預覽失敗', '無法取得檔案預覽。');
+      Alert.alert('Preview Failed', 'Could not load file preview.');
     }
   }, []);
 
@@ -162,22 +165,25 @@ export function DownloadRecordsGlobalScreen() {
       const result = await redownloadRecord(record, desktop);
       if (!isDownloadSavedLocally(result)) {
         Alert.alert(
-          '無法重新下載',
-          '這筆紀錄沒有可用的本機檔案，也沒有足夠的電腦端下載資訊可重新下載。',
+          'Cannot Download Again',
+          'This record has no local file and not enough computer download information to download again.',
         );
         return;
       }
 
       const savedToPhotos = isDownloadSavedToPhotos(result);
       Alert.alert(
-        '下載完成',
+        'Download complete',
         savedToPhotos
-          ? `${record.filename} 已儲存到相簿`
-          : `${record.filename} 已儲存到檔案`,
+          ? `${record.filename} saved to Photos`
+          : `${record.filename} saved to Files`,
       );
     } catch (err) {
       console.warn('[DownloadRecordsGlobalScreen] Re-download failed:', err);
-      Alert.alert('下載失敗', '無法下載檔案，請稍後重試。');
+      Alert.alert(
+        'Download Failed',
+        'Could not download the file. Please try again later.',
+      );
     }
   }, []);
 
@@ -192,7 +198,7 @@ export function DownloadRecordsGlobalScreen() {
           >
             <Icon name="chevron-back" size={22} color="#59616D" />
           </TouchableOpacity>
-          <Text style={styles.title}>最近下载</Text>
+          <Text style={styles.title}>Recent Downloads</Text>
         </View>
 
         {loading ? (
@@ -205,9 +211,10 @@ export function DownloadRecordsGlobalScreen() {
               <View style={styles.emptyIcon}>
                 <Icon name="cloud-download-outline" size={24} color={BLUE} />
               </View>
-              <Text style={styles.emptyTitle}>暂无最近下载</Text>
+              <Text style={styles.emptyTitle}>No Recent Downloads</Text>
               <Text style={styles.emptyMessage}>
-                从电脑下载到本机的文件会出现在这里。
+                Files downloaded from your computer to this device will appear
+                here.
               </Text>
             </View>
           </View>
@@ -235,7 +242,7 @@ export function DownloadRecordsGlobalScreen() {
                       {record.filename}
                     </Text>
                     <Text style={styles.recordMeta}>
-                      {getDownloadRecordTypeLabel(record)} ·{' '}
+                      {getDownloadRecordTypeLabel(record)} -{' '}
                       {formatBytes(record.fileSize ?? 0)}
                     </Text>
                     <Text style={styles.recordTime}>
@@ -247,7 +254,7 @@ export function DownloadRecordsGlobalScreen() {
                   testID={`download-record-download-${record.id}`}
                   style={styles.downloadIconButton}
                   accessibilityRole="button"
-                  accessibilityLabel={`開啟或分享 ${record.filename}`}
+                  accessibilityLabel={`Open or share ${record.filename}`}
                   activeOpacity={0.7}
                   onPress={() => {
                     void handleDownloadPress(record);
@@ -280,9 +287,9 @@ function getDownloadRecordPreviewKind(record: DownloadRecord): PreviewKind {
 
 function getDownloadRecordTypeLabel(record: DownloadRecord): string {
   const kind = getDownloadRecordPreviewKind(record);
-  if (kind === 'photo') return '照片';
-  if (kind === 'video') return '影片';
-  return '文件';
+  if (kind === 'photo') return 'Photo';
+  if (kind === 'video') return 'Video';
+  return 'File';
 }
 
 function getDownloadRecordPreviewUri(record: DownloadRecord): string | null {
@@ -548,7 +555,7 @@ function DownloadRecordMediaPreviewModal({
           <TouchableOpacity
             style={styles.mediaPreviewCloseButton}
             accessibilityRole="button"
-            accessibilityLabel="關閉預覽"
+            accessibilityLabel="Close Preview"
             activeOpacity={0.7}
             onPress={onClose}
           >
@@ -603,8 +610,8 @@ function formatDownloadTime(iso: string): string {
   const dayDiff = Math.round(
     (today.getTime() - targetDay.getTime()) / (24 * 60 * 60 * 1000),
   );
-  if (dayDiff === 0) return `今天 ${time}`;
-  if (dayDiff === 1) return `昨天 ${time}`;
+  if (dayDiff === 0) return `Today ${time}`;
+  if (dayDiff === 1) return `Yesterday ${time}`;
   return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(
     date.getDate(),
   ).padStart(2, '0')} ${time}`;

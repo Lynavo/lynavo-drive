@@ -74,40 +74,45 @@ jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => {
       const copy: Record<string, string> = {
-        'syncActivity.autoUploadSettings.title': '自动上传',
-        'syncActivity.autoUploadSettings.subtitle': '设置手机内容同步到电脑',
-        'syncActivity.autoUploadSettings.planTitle': '同步计划',
-        'syncActivity.autoUploadSettings.enableSwitchTitle': '自动上传开关',
+        'syncActivity.autoUploadSettings.title': 'Auto Upload',
+        'syncActivity.autoUploadSettings.subtitle':
+          'Set up phone content sync to computer',
+        'syncActivity.autoUploadSettings.planTitle': 'Sync Plan',
+        'syncActivity.autoUploadSettings.enableSwitchTitle':
+          'Auto Upload Switch',
         'syncActivity.autoUploadSettings.enableSwitchDescOn':
-          '已开启，会按同步范围自动同步相册新增素材',
+          'Enabled. New album media will sync automatically based on sync range',
         'syncActivity.autoUploadSettings.enableSwitchDescOff':
-          '已关闭，不会自动同步相册新增素材',
-        'syncActivity.autoUploadSettings.sourcesTitle': '同步来源',
-        'syncActivity.autoUploadSettings.albumTitle': '照片和视频',
+          'Disabled. New album media will not sync automatically',
+        'syncActivity.autoUploadSettings.sourcesTitle': 'Sync Sources',
+        'syncActivity.autoUploadSettings.albumTitle': 'Photos and Videos',
         'syncActivity.autoUploadSettings.albumDesc':
-          '同步系统相册中的媒体内容',
-        'syncActivity.autoUploadSettings.rangeTitle': '同步范围',
-        'syncActivity.autoUploadSettings.rangeAllTitle': '全部内容',
-        'syncActivity.autoUploadSettings.rangeAllDesc': '同步现有照片和视频',
-        'syncActivity.autoUploadSettings.rangeNowTitle': '从现在开始',
-        'syncActivity.autoUploadSettings.rangeNowDesc': '仅同步后续新增内容',
-        'syncActivity.autoUploadSettings.rangeCustomTitle': '自定义时间',
-        'syncActivity.autoUploadSettings.rangeCustomDesc': '按指定时间起点同步',
-        'syncActivity.autoUploadSettings.customPickerSave': '保存',
+          'Sync media content from system album',
+        'syncActivity.autoUploadSettings.rangeTitle': 'Sync Range',
+        'syncActivity.autoUploadSettings.rangeAllTitle': 'All Content',
+        'syncActivity.autoUploadSettings.rangeAllDesc':
+          'Sync existing photos and videos',
+        'syncActivity.autoUploadSettings.rangeNowTitle': 'From Now On',
+        'syncActivity.autoUploadSettings.rangeNowDesc':
+          'Only sync newly added content from now on',
+        'syncActivity.autoUploadSettings.rangeCustomTitle': 'CustomTime',
+        'syncActivity.autoUploadSettings.rangeCustomDesc':
+          'Sync from the specified start time',
+        'syncActivity.autoUploadSettings.customPickerSave': 'Save',
         'syncActivity.autoUploadSettings.infoAlbum':
-          '相册照片和视频将同步到电脑。',
+          'Album photos and videos will sync to your computer.',
         'syncActivity.autoUploadSettings.infoAutoOff':
-          '自动上传关闭后，不会同步后续新增素材。',
+          'After auto upload is disabled, newly added media will not sync.',
         'syncActivity.autoUploadSettings.loadingConfig':
-          '正在读取自动上传设置...',
+          'Reading auto upload settings...',
         'syncActivity.autoUploadSettings.loadConfigFailed':
-          '自动上传设置读取失败，请稍后重试。',
-        'syncActivity.dialogs.enableAutoFailed.title': '操作失败',
+          'Failed to read auto upload settings. Please try again later.',
+        'syncActivity.dialogs.enableAutoFailed.title': 'Action Failed',
         'syncActivity.dialogs.enableAutoFailed.body':
-          '无法开启自动上传，请稍后重试',
-        'common.back': '返回',
-        'common.cancel': '取消',
-        'common.notApplicable': '不适用',
+          'Could not enable auto upload. Please try again later',
+        'common.back': 'Back',
+        'common.cancel': 'Cancel',
+        'common.notApplicable': 'N/A',
       };
       return copy[key] ?? '';
     },
@@ -169,20 +174,24 @@ describe('AutoUploadSettingsGlobalScreen', () => {
     const tree = await renderScreen();
     const textValues = getTextValues(tree);
 
-    expect(textValues).toContain('同步计划');
-    expect(textValues).toContain('自动上传开关');
-    expect(textValues).toContain('相册照片和视频将同步到电脑。');
-    expect(textValues).toContain('同步来源');
-    expect(textValues).toContain('照片和视频');
-    expect(textValues).toContain('同步系统相册中的媒体内容');
-    expect(textValues).toContain('同步范围');
-    expect(textValues).toContain('同步现有照片和视频');
-    expect(textValues).toContain('仅同步后续新增内容');
-    expect(textValues).toContain('自定义时间');
-    expect(textValues).not.toContain('指定文件');
-    expect(textValues).not.toContain('从系统文件中选择需要同步的内容');
-    expect(textValues).not.toContain('添加');
-    expect(textValues).not.toContain('已选文件');
+    expect(textValues).toContain('Sync Plan');
+    expect(textValues).toContain('Auto Upload Switch');
+    expect(textValues).toContain(
+      'Album photos and videos will sync to your computer.',
+    );
+    expect(textValues).toContain('Sync Sources');
+    expect(textValues).toContain('Photos and Videos');
+    expect(textValues).toContain('Sync media content from system album');
+    expect(textValues).toContain('Sync Range');
+    expect(textValues).toContain('Sync existing photos and videos');
+    expect(textValues).toContain('Only sync newly added content from now on');
+    expect(textValues).toContain('CustomTime');
+    expect(textValues).not.toContain('Specified Files');
+    expect(textValues).not.toContain(
+      'Select content to sync from system files',
+    );
+    expect(textValues).not.toContain('Add');
+    expect(textValues).not.toContain('Selected Files');
     expect(
       tree.root.findAllByProps({ testID: 'auto-upload-add-file' }),
     ).toHaveLength(0);
@@ -222,7 +231,7 @@ describe('AutoUploadSettingsGlobalScreen', () => {
       tree.root.findAllByProps({ testID: 'auto-upload-range-all' }),
     ).toHaveLength(0);
     expect(getTextValues(tree)).toContain(
-      '自动上传关闭后，不会同步后续新增素材。',
+      'After auto upload is disabled, newly added media will not sync.',
     );
   });
 
@@ -250,7 +259,7 @@ describe('AutoUploadSettingsGlobalScreen', () => {
   it('keeps title and icon containers aligned with the global reference layout', async () => {
     const tree = await renderScreen();
     const titleNode = tree.root.findAllByType(Text).find(node => {
-      return node.props.children === '自动上传';
+      return node.props.children === 'Auto Upload';
     });
     const backIcon = tree.root.findByProps({
       testID: 'auto-upload-back-icon',
@@ -360,7 +369,9 @@ describe('AutoUploadSettingsGlobalScreen', () => {
     const tree = await renderScreen();
 
     expect(getAutoUploadSwitch(tree).props.disabled).toBe(true);
-    expect(getTextValues(tree)).toContain('自动上传设置读取失败，请稍后重试。');
+    expect(getTextValues(tree)).toContain(
+      'Failed to read auto upload settings. Please try again later.',
+    );
 
     await ReactTestRenderer.act(async () => {
       await getAutoUploadSwitch(tree).props.onValueChange(true);
@@ -385,7 +396,7 @@ describe('AutoUploadSettingsGlobalScreen', () => {
         testID: 'auto-upload-range-custom',
       }).props.accessibilityState,
     ).toMatchObject({ selected: true });
-    expect(getTextValues(tree)).toContain('保存');
+    expect(getTextValues(tree)).toContain('Save');
     expect(
       tree.root.findAllByType(
         'DateTimePicker' as unknown as React.ComponentType,

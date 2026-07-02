@@ -14,74 +14,76 @@ describe('HelpDialog', () => {
   it('renders the reference help center shell', () => {
     render(<HelpDialog />);
 
-    expect(screen.getByText('帮助中心')).toBeInTheDocument();
-    expect(screen.getByRole('navigation', { name: '帮助分类' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '基础功能介绍' })).toHaveAttribute(
+    expect(screen.getByText('Help Center')).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Help categories' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Introduction' })).toHaveAttribute(
       'aria-current',
       'true',
     );
-    expect(screen.getByRole('button', { name: '首次使用引导' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '上传与共享说明' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '常见问题' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '联系我们' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'First-use guide' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upload and sharing' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'FAQ' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Contact us' })).toBeInTheDocument();
   });
 
   it('does not render dialog content when open is false', () => {
     useAppStore.setState({ isHelpOpen: false });
     render(<HelpDialog />);
 
-    expect(screen.queryByText('帮助中心')).not.toBeInTheDocument();
+    expect(screen.queryByText('Help Center')).not.toBeInTheDocument();
   });
 
   it('shows the basic feature introduction by default', () => {
     render(<HelpDialog />);
 
-    expect(screen.getByText('Lynavo Drive 是什么')).toBeInTheDocument();
-    expect(screen.getByText('如何连接电脑')).toBeInTheDocument();
-    expect(screen.getByText('如何上传素材')).toBeInTheDocument();
-    expect(screen.getByText('如何访问共享目录')).toBeInTheDocument();
+    expect(screen.getByText('What is Lynavo Drive')).toBeInTheDocument();
+    expect(screen.getByText('How to connect to the computer')).toBeInTheDocument();
+    expect(screen.getByText('How to upload media')).toBeInTheDocument();
+    expect(screen.getByText('How to access the shared folder')).toBeInTheDocument();
   });
 
   it('switches to the first-use guide section', () => {
     render(<HelpDialog />);
 
-    fireEvent.click(screen.getByRole('button', { name: '首次使用引导' }));
+    fireEvent.click(screen.getByRole('button', { name: 'First-use guide' }));
 
-    expect(screen.getByText('连接电脑')).toBeInTheDocument();
-    expect(screen.getByText('开启自动上传')).toBeInTheDocument();
-    expect(screen.getByText('前台局域网队列')).toBeInTheDocument();
-    expect(screen.getByText('查看共享目录')).toBeInTheDocument();
+    expect(screen.getByText('Connect to the computer')).toBeInTheDocument();
+    expect(screen.getByText('Enable automatic upload')).toBeInTheDocument();
+    expect(screen.getByText('Foreground LAN queue')).toBeInTheDocument();
+    expect(screen.getByText('View the shared folder')).toBeInTheDocument();
   });
 
   it('switches to upload and sharing instructions', () => {
     render(<HelpDialog />);
 
-    fireEvent.click(screen.getByRole('button', { name: '上传与共享说明' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Upload and sharing' }));
 
-    expect(screen.getByText('自动增量上传')).toBeInTheDocument();
-    expect(screen.getByText('received 目录与 shared 目录')).toBeInTheDocument();
-    expect(screen.getByText('共享目录是只读访问')).toBeInTheDocument();
+    expect(screen.getByText('Automatic incremental upload')).toBeInTheDocument();
+    expect(screen.getByText('received folder and shared folder')).toBeInTheDocument();
+    expect(screen.getByText('Shared folder access is read-only')).toBeInTheDocument();
   });
 
   it('switches to faq content', () => {
     render(<HelpDialog />);
 
-    fireEvent.click(screen.getByRole('button', { name: '常见问题' }));
+    fireEvent.click(screen.getByRole('button', { name: 'FAQ' }));
 
-    expect(screen.getByText('设备离线怎么办？')).toBeInTheDocument();
-    expect(screen.getByText('上传失败怎么办？')).toBeInTheDocument();
-    expect(screen.getByText('是否需要云端登录或付费计划？')).toBeInTheDocument();
-    expect(screen.getByText('OSS 版本包含官方互联网中继吗？')).toBeInTheDocument();
+    expect(screen.getByText('What if the device is offline?')).toBeInTheDocument();
+    expect(screen.getByText('What if upload fails?')).toBeInTheDocument();
+    expect(screen.getByText('Do I need a cloud login?')).toBeInTheDocument();
+    expect(
+      screen.getByText('Does the OSS edition include official internet relay?'),
+    ).toBeInTheDocument();
   });
 
   it('switches to contact content', () => {
     render(<HelpDialog />);
 
-    fireEvent.click(screen.getByRole('button', { name: '联系我们' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Contact us' }));
 
-    expect(screen.getByText('社区支持')).toBeInTheDocument();
+    expect(screen.getByText('Community support')).toBeInTheDocument();
     expect(screen.getByText(/GitHub issue/)).toBeInTheDocument();
-    expect(screen.getByText('导出诊断包')).toBeInTheDocument();
-    expect(screen.getByText('反馈入口')).toBeInTheDocument();
+    expect(screen.getByText('Export diagnostics package')).toBeInTheDocument();
+    expect(screen.getByText('Feedback entry')).toBeInTheDocument();
   });
 });

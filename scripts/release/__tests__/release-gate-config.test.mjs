@@ -26,6 +26,7 @@ test('package scripts expose an OSS release gate without native builds', () => {
       'pnpm verify:oss-source-package:head',
       'pnpm verify:oss-boundary',
       'pnpm verify:legacy-names:strict',
+      'pnpm verify:no-chinese',
       'pnpm test:release',
       'pnpm release --profile review --targets ios,android,mac,win,linux --dry-run',
       'pnpm release --profile prod --targets ios,android,mac,win,linux --dry-run',

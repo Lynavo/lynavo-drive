@@ -43,10 +43,10 @@ describe('SystemGuideSection', () => {
   it('renders only the macOS file sharing guide on macOS', () => {
     render(<SystemGuideSection />);
 
-    expect(screen.getByText('macOS 文件共享')).toBeInTheDocument();
-    expect(screen.queryByText('Windows 文件共享')).not.toBeInTheDocument();
-    expect(screen.queryByText('Linux 文件共享')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /打开高级共享/ })).not.toBeInTheDocument();
+    expect(screen.getByText('macOS File Sharing')).toBeInTheDocument();
+    expect(screen.queryByText('Windows File Sharing')).not.toBeInTheDocument();
+    expect(screen.queryByText('Linux File Sharing')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Open advanced sharing/ })).not.toBeInTheDocument();
   });
 
   it('renders only Windows guidance and actions on Windows', () => {
@@ -54,11 +54,11 @@ describe('SystemGuideSection', () => {
 
     render(<SystemGuideSection />);
 
-    expect(screen.getByText('Windows 文件共享')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /打开高级共享/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /打开团队共享目录/ })).toBeInTheDocument();
-    expect(screen.queryByText('macOS 文件共享')).not.toBeInTheDocument();
-    expect(screen.queryByText('Linux 文件共享')).not.toBeInTheDocument();
+    expect(screen.getByText('Windows File Sharing')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open advanced sharing/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open team shared folder/ })).toBeInTheDocument();
+    expect(screen.queryByText('macOS File Sharing')).not.toBeInTheDocument();
+    expect(screen.queryByText('Linux File Sharing')).not.toBeInTheDocument();
   });
 
   it('renders neutral Linux manual sharing guidance with an open folder action', () => {
@@ -66,16 +66,18 @@ describe('SystemGuideSection', () => {
 
     render(<SystemGuideSection />);
 
-    expect(screen.getByText('Linux 文件共享')).toBeInTheDocument();
+    expect(screen.getByText('Linux File Sharing')).toBeInTheDocument();
     expect(
-      screen.getByText('在系统中手动配置 Samba 或文件共享后，回到 Lynavo Drive 重新检测。'),
+      screen.getByText(
+        'Configure Samba or file sharing in the system, then return to Lynavo Drive and check again.',
+      ),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /打开团队共享目录/ })).toBeInTheDocument();
-    expect(screen.queryByText('macOS 文件共享')).not.toBeInTheDocument();
-    expect(screen.queryByText('Windows 文件共享')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /打开高级共享/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open team shared folder/ })).toBeInTheDocument();
+    expect(screen.queryByText('macOS File Sharing')).not.toBeInTheDocument();
+    expect(screen.queryByText('Windows File Sharing')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Open advanced sharing/ })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /打开团队共享目录/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Open team shared folder/ }));
 
     expect(openFolder).toHaveBeenCalledWith('/Users/alice/Lynavo Drive/shared');
   });

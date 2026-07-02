@@ -54,9 +54,9 @@ describe('ShareAddressSection', () => {
   it('shows Windows share status and refresh action', () => {
     render(<ShareAddressSection />);
 
-    expect(screen.getByText('需要手动开启共享')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /重新检测/ })).toBeInTheDocument();
-    expect(screen.getByText('Windows 快速配置')).toBeInTheDocument();
+    expect(screen.getByText('Manual sharing setup required')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Check again/ })).toBeInTheDocument();
+    expect(screen.getByText('Windows quick setup')).toBeInTheDocument();
   });
 
   it('uses neutral Linux copy when sharing needs manual setup', () => {
@@ -64,10 +64,12 @@ describe('ShareAddressSection', () => {
 
     render(<ShareAddressSection />);
 
-    expect(screen.getByText('需要手动开启共享')).toBeInTheDocument();
-    expect(screen.getByText('请在系统中手动配置文件共享后重新检测。')).toBeInTheDocument();
-    expect(screen.queryByText('Windows 快速配置')).not.toBeInTheDocument();
-    expect(screen.queryByText('系统指引')).not.toBeInTheDocument();
+    expect(screen.getByText('Manual sharing setup required')).toBeInTheDocument();
+    expect(
+      screen.getByText('Configure file sharing in Linux system settings, then check again.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Windows quick setup')).not.toBeInTheDocument();
+    expect(screen.queryByText('System guide')).not.toBeInTheDocument();
   });
 
   it('uses neutral Linux copy while validating sharing status', () => {
@@ -78,10 +80,10 @@ describe('ShareAddressSection', () => {
 
     render(<ShareAddressSection />);
 
-    expect(screen.getByText('正在检测共享状态')).toBeInTheDocument();
-    expect(screen.getByText('正在检查系统文件共享配置。')).toBeInTheDocument();
-    expect(screen.queryByText('正在检查 Windows 共享配置。')).not.toBeInTheDocument();
-    expect(screen.queryByText('Windows 快速配置')).not.toBeInTheDocument();
+    expect(screen.getByText('Checking sharing status')).toBeInTheDocument();
+    expect(screen.getByText('Checking system file sharing settings.')).toBeInTheDocument();
+    expect(screen.queryByText('Checking Windows sharing settings.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Windows quick setup')).not.toBeInTheDocument();
   });
 
   it('uses neutral Linux copy when the share is registered', () => {
@@ -99,10 +101,14 @@ describe('ShareAddressSection', () => {
 
     render(<ShareAddressSection />);
 
-    expect(screen.getByText('团队共享目录已登记')).toBeInTheDocument();
-    expect(screen.getByText('团队共享目录已登记，请确认系统文件共享可用。')).toBeInTheDocument();
-    expect(screen.queryByText('Windows 快速配置')).not.toBeInTheDocument();
-    expect(screen.queryByText('系统指引')).not.toBeInTheDocument();
+    expect(screen.getByText('Team shared folder registered')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'The team shared folder is registered. Confirm system file sharing is available.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Windows quick setup')).not.toBeInTheDocument();
+    expect(screen.queryByText('System guide')).not.toBeInTheDocument();
   });
 
   it('hides Windows quick actions when Windows sharing is ready', () => {
@@ -122,7 +128,7 @@ describe('ShareAddressSection', () => {
 
     render(<ShareAddressSection />);
 
-    expect(screen.getByText('共享已就绪')).toBeInTheDocument();
-    expect(screen.queryByText('Windows 快速配置')).not.toBeInTheDocument();
+    expect(screen.getByText('Sharing is ready')).toBeInTheDocument();
+    expect(screen.queryByText('Windows quick setup')).not.toBeInTheDocument();
   });
 });

@@ -47,28 +47,31 @@ jest.mock('react-i18next', () => ({
     },
     t: (key: string) =>
       ({
-        'deviceDiscovery.onboarding.unconnected.skip': '跳過',
-        'deviceDiscovery.onboarding.unconnected.title': '開始使用 Lynavo Drive',
+        'deviceDiscovery.onboarding.unconnected.skip': 'Skip',
+        'deviceDiscovery.onboarding.unconnected.title':
+          'Start using Lynavo Drive',
         'deviceDiscovery.onboarding.unconnected.subtitle':
-          '手機與電腦無線同步素材，三步搞定',
+          'Sync media wirelessly from phone to computer in three steps',
         'deviceDiscovery.onboarding.unconnected.downloadStep.title':
-          '下載 PC 端',
+          'Install PC App',
         'deviceDiscovery.onboarding.unconnected.downloadStep.body':
-          '在電腦上安裝 Lynavo Drive',
-        'deviceDiscovery.onboarding.unconnected.connectStep.title': '手機連接',
+          'Install Lynavo Drive on your computer',
+        'deviceDiscovery.onboarding.unconnected.connectStep.title':
+          'Connect Phone',
         'deviceDiscovery.onboarding.unconnected.connectStep.body':
-          '輸入連接碼或掃碼連接',
-        'deviceDiscovery.onboarding.unconnected.syncStep.title': '開始同步',
+          'Enter a pairing code or scan QR',
+        'deviceDiscovery.onboarding.unconnected.syncStep.title':
+          'Start Syncing',
         'deviceDiscovery.onboarding.unconnected.syncStep.body':
-          '素材自動傳輸到電腦',
-        'deviceDiscovery.onboarding.unconnected.copy': '複製',
-        'deviceDiscovery.onboarding.unconnected.copyFailed': '複製失敗',
+          'Media transfers to your computer',
+        'deviceDiscovery.onboarding.unconnected.copy': 'Copy',
+        'deviceDiscovery.onboarding.unconnected.copyFailed': 'Copy failed',
         'deviceDiscovery.onboarding.unconnected.copyHint':
-          '複製後在電腦瀏覽器中打開即可下載',
+          'Copy and open it in your computer browser to download',
         'deviceDiscovery.onboarding.unconnected.start':
-          '我已經下載好了，去連接設備',
+          'I installed it. Connect device',
         'deviceDiscovery.onboarding.unconnected.footerNote':
-          '首次使用引導 · 可在幫助頁重新查看',
+          'First-time guide - Available again from Help',
       })[key] ?? key,
   }),
 }));
@@ -135,16 +138,18 @@ describe('DeviceDiscoveryScreen onboarding', () => {
     const screen = render(<DeviceDiscoveryScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('開始使用 Lynavo Drive')).toBeTruthy();
+      expect(screen.getByText('Start using Lynavo Drive')).toBeTruthy();
     });
-    expect(screen.getByText('首次使用引導 · 可在幫助頁重新查看')).toBeTruthy();
+    expect(
+      screen.getByText('First-time guide - Available again from Help'),
+    ).toBeTruthy();
 
-    fireEvent.press(screen.getByText('我已經下載好了，去連接設備'));
+    fireEvent.press(screen.getByText('I installed it. Connect device'));
 
     await waitFor(
       () => {
         expect(mockMarkUnconnectedGuideSeen).toHaveBeenCalledTimes(1);
-        expect(screen.queryByText('開始使用 Lynavo Drive')).toBeNull();
+        expect(screen.queryByText('Start using Lynavo Drive')).toBeNull();
       },
       { timeout: 3000 },
     );
@@ -158,6 +163,6 @@ describe('DeviceDiscoveryScreen onboarding', () => {
     await waitFor(() => {
       expect(mockHasSeenUnconnectedGuide).toHaveBeenCalledTimes(1);
     });
-    expect(screen.queryByText('開始使用 Lynavo Drive')).toBeNull();
+    expect(screen.queryByText('Start using Lynavo Drive')).toBeNull();
   });
 });

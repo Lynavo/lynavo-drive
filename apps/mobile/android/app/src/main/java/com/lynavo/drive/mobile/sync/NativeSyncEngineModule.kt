@@ -195,7 +195,7 @@ class NativeSyncEngineModule(
       recordNativeLog("PhotoPermission", "request unavailable activity=${activity?.javaClass?.simpleName ?: "null"}", Log.WARN)
       emitError(
         code = "ANDROID_PHOTO_PERMISSION_UNAVAILABLE",
-        message = "Android 当前 Activity 不支持相簿权限请求。",
+        message = "The current Android Activity does not support photo permission requests.",
       )
       promise.resolve(currentState)
       return
@@ -270,7 +270,7 @@ class NativeSyncEngineModule(
       emitDiscoveredDevicesChanged()
       emitError(
         code = "ANDROID_DISCOVERY_PERMISSION_UNAVAILABLE",
-        message = "目前無法請求附近裝置權限，無法搜尋桌面端。",
+        message = "Nearby device permission cannot be requested right now, so desktop discovery cannot start.",
       )
       promise.resolve(null)
       return
@@ -306,7 +306,7 @@ class NativeSyncEngineModule(
           emitDiscoveredDevicesChanged()
           emitError(
             code = "ANDROID_DISCOVERY_PERMISSION_DENIED",
-            message = "需要允許「附近裝置」權限，才能在區網中搜尋桌面端。",
+            message = "Allow Nearby Devices permission to search for desktops on the local network.",
           )
           pendingPromise.resolve(null)
           return@requestPermissions true
@@ -322,7 +322,7 @@ class NativeSyncEngineModule(
       emitDiscoveredDevicesChanged()
       emitError(
         code = "ANDROID_DISCOVERY_PERMISSION_FAILED",
-        message = "請求附近裝置權限失敗：${error.message ?: "unknown error"}",
+        message = "Nearby device permission request failed:${error.message ?: "unknown error"}",
       )
       promise.resolve(null)
     }
@@ -340,7 +340,7 @@ class NativeSyncEngineModule(
       emitDiscoveredDevicesChanged()
       emitError(
         code = "ANDROID_DISCOVERY_UNAVAILABLE",
-        message = "Android 系统未提供局域网发现服务，无法扫描电脑端设备。",
+        message = "Android did not provide the local network discovery service, so desktop devices cannot be scanned.",
       )
       return false
     }
@@ -372,7 +372,7 @@ class NativeSyncEngineModule(
       recordNativeLog("Discovery", "startDiscovery failed: ${error.message ?: error.javaClass.simpleName}", Log.ERROR)
       emitError(
         code = "ANDROID_DISCOVERY_START_FAILED",
-        message = "启动 Android 局域网发现失败：${error.message ?: "unknown error"}",
+        message = "Failed to start Android local network discovery:${error.message ?: "unknown error"}",
       )
     }
     return false
@@ -1048,13 +1048,13 @@ class NativeSyncEngineModule(
       if (shouldStartRound && !isBindingConnected(binding)) {
         recordDiagnosticsLog("AutoUpload", "resume blocked because desktop is offline")
         emitIdleSyncState(binding)
-        promise.reject("ANDROID_SYNC_TARGET_OFFLINE", "桌面端未连接，无法开启自动上传。")
+        promise.reject("ANDROID_SYNC_TARGET_OFFLINE", "Desktop is not connected, so auto upload cannot be enabled.")
         return@runAsync
       }
       if (shouldStartRound && currentPhotoPermissionState() == "denied") {
         recordDiagnosticsLog("AutoUpload", "resume blocked because photo permission is denied")
         emitIdleSyncState(binding)
-        promise.reject("ANDROID_PHOTO_PERMISSION_DENIED", "Android 相簿权限尚未开启，无法扫描同步素材。")
+        promise.reject("ANDROID_PHOTO_PERMISSION_DENIED", "Android photo permission is not enabled, so sync media cannot be scanned.")
         return@runAsync
       }
 
@@ -1114,7 +1114,7 @@ class NativeSyncEngineModule(
       if (shouldStartRound && !isBindingConnected(binding)) {
         recordDiagnosticsLog("AutoUpload", "config enable blocked because desktop is offline")
         emitIdleSyncState(binding)
-        promise.reject("ANDROID_SYNC_TARGET_OFFLINE", "桌面端未连接，无法开启自动上传。")
+        promise.reject("ANDROID_SYNC_TARGET_OFFLINE", "Desktop is not connected, so auto upload cannot be enabled.")
         return@runAsync
       }
 
@@ -1752,7 +1752,7 @@ class NativeSyncEngineModule(
       if (helloResponse.optInt("appCompatibilityVersion", -1) != APP_COMPATIBILITY_VERSION) {
         throw structuredNativeError(
           code = "APP_VERSION_INCOMPATIBLE",
-          rawMessage = "手機與桌面 App 版本不相容，請同時更新兩端後再連線。",
+          rawMessage = "Phone and desktop app versions are incompatible. Please update both apps before reconnecting.",
           meta = null,
         )
       }
@@ -1854,14 +1854,14 @@ class NativeSyncEngineModule(
       if (binding == null) {
         recordDiagnosticsLog("Sync", "round paused reason=$reason no binding")
         emitSyncState(null, "paused_no_target")
-        emitError("ANDROID_SYNC_NO_BINDING", "尚未绑定桌面端，无法同步。")
+        emitError("ANDROID_SYNC_NO_BINDING", "No desktop is bound, so sync cannot start.")
         return
       }
       val permissionState = currentPhotoPermissionState()
       if (permissionState == "denied") {
         recordDiagnosticsLog("Sync", "round paused reason=$reason photoPermission=denied")
         emitSyncState(binding, "paused_no_permission")
-        emitError("ANDROID_PHOTO_PERMISSION_DENIED", "Android 相簿权限尚未开启，无法扫描同步素材。")
+        emitError("ANDROID_PHOTO_PERMISSION_DENIED", "Android photo permission is not enabled, so sync media cannot be scanned.")
         return
       }
       val config = loadAutoUploadConfig()
@@ -2620,10 +2620,10 @@ class NativeSyncEngineModule(
   }
 
   private fun defaultStructuredErrorMessage(code: String): String = when (code) {
-    "PAIRING_CODE_INVALID" -> "連接碼錯誤，請重新輸入"
-    "PAIRING_CLIENT_BLOCKED" -> "這支手機已被此電腦封鎖，請在桌面端設定解除封鎖後再試。"
-    "PAIR_TOKEN_INVALID" -> "連線授權已失效，請重新輸入桌面端連接碼。"
-    "APP_VERSION_INCOMPATIBLE" -> "手機與桌面 App 版本不相容，請同時更新兩端後再連線。"
+    "PAIRING_CODE_INVALID" -> "Pairing code is incorrect. Please enter it again."
+    "PAIRING_CLIENT_BLOCKED" -> "This phone is blocked by this computer. Unblock it in desktop settings and try again."
+    "PAIR_TOKEN_INVALID" -> "Connection authorization expired. Enter the desktop pairing code again."
+    "APP_VERSION_INCOMPATIBLE" -> "Phone and desktop app versions are incompatible. Please update both apps before reconnecting."
     else -> "Pairing rejected"
   }
 
@@ -3076,7 +3076,7 @@ class NativeSyncEngineModule(
       ?: AndroidSyncPrimitives.mimeTypeForFilename(safeFilename)
     val totalBytes = connection.contentLengthLong.takeIf { it > 0L } ?: 0L
 
-    // 1. 一律先下载至 App 内部私有沙盒中
+    // 1. Always download to the app private sandbox first
     val tempDir = File(reactApplicationContext.filesDir, "lynavo_shared_downloads")
     if (!tempDir.exists()) {
       tempDir.mkdirs()
@@ -3142,7 +3142,7 @@ class NativeSyncEngineModule(
       }
     }
 
-    // 2. 对于普通文件，保存到公共 Downloads 文件夹
+    // 2. For regular files, save to the public Downloads folder
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
       val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
       val savedLocation = "${Environment.DIRECTORY_DOWNLOADS}/Lynavo Drive"
@@ -3162,7 +3162,7 @@ class NativeSyncEngineModule(
       values.clear()
       values.put(MediaStore.MediaColumns.IS_PENDING, 0)
       reactApplicationContext.contentResolver.update(uri, values, null, null)
-      tempFile.delete() // 已存入公共 Downloads，删除私有临时备份
+      tempFile.delete() // Stored in public Downloads; remove the private temporary backup
       recordNativeLog(
         "SharedFiles",
         "persistHttpDownload saved_to_downloads filename=$safeFilename saved_location=$savedLocation local_path=$uri expose_uri=true",
@@ -3192,7 +3192,7 @@ class NativeSyncEngineModule(
         input.copyTo(output)
       }
     }
-    tempFile.delete() // 已存入公共 Downloads，删除私有临时备份
+    tempFile.delete() // Stored in public Downloads; remove the private temporary backup
     recordNativeLog(
       "SharedFiles",
       "persistHttpDownload saved_to_downloads filename=$safeFilename saved_location=${Environment.DIRECTORY_DOWNLOADS}/Lynavo Drive local_path=${destFile.absolutePath}",
@@ -5472,7 +5472,7 @@ class NativeSyncEngineModule(
         handleDiscoveryFailure(
           generation = generation,
           code = "ANDROID_DISCOVERY_START_FAILED",
-          message = "Android 局域网发现启动失败（$errorCode）",
+          message = "Android local network discovery failed to start($errorCode)",
         )
       }
 
@@ -5480,7 +5480,7 @@ class NativeSyncEngineModule(
         handleDiscoveryFailure(
           generation = generation,
           code = "ANDROID_DISCOVERY_STOP_FAILED",
-          message = "Android 局域网发现停止失败（$errorCode）",
+          message = "Android local network discovery failed to stop($errorCode)",
         )
       }
 

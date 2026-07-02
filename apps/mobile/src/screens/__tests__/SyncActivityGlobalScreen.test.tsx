@@ -125,7 +125,7 @@ jest.mock('../components/GlobalSyncActivityHomeSections', () => ({
           ReactInner.createElement(
             Text,
             { key: `${day.key}-stats` },
-            `${day.totalFiles} 个 · ${day.totalSize}`,
+            `${day.totalFiles} items - ${day.totalSize}`,
           ),
           ...day.records.map(record =>
             ReactInner.createElement(
@@ -298,14 +298,14 @@ describe('SyncActivityGlobalScreen', () => {
 
     expect(
       queryByText(
-        'syncActivity.home.syncing · syncActivity.home.currentTransferProgress',
+        'syncActivity.home.syncing - syncActivity.home.currentTransferProgress',
       ),
     ).toBeNull();
 
     await waitFor(() => {
       expect(
         getByText(
-          'syncActivity.home.syncing · syncActivity.home.currentTransferProgress',
+          'syncActivity.home.syncing - syncActivity.home.currentTransferProgress',
         ),
       ).toBeTruthy();
     });
@@ -343,7 +343,7 @@ describe('SyncActivityGlobalScreen', () => {
     expect(getByText('syncActivity.stats.currentFile')).toBeTruthy();
     expect(getByText('Clip-A.mov')).toBeTruthy();
     expect(
-      getByText('syncActivity.home.latestSyncTimeLabel：2026-06-16 17:45'),
+      getByText('syncActivity.home.latestSyncTimeLabel:2026-06-16 17:45'),
     ).toBeTruthy();
     expect(getByText('Studio Mac 1m 15s')).toBeTruthy();
     expect(getByText('6.0 MB')).toBeTruthy();
@@ -403,11 +403,11 @@ describe('SyncActivityGlobalScreen', () => {
     );
     expect(
       queryByText(
-        'syncActivity.home.syncing · syncActivity.home.currentTransferProgress',
+        'syncActivity.home.syncing - syncActivity.home.currentTransferProgress',
       ),
     ).toBeNull();
     expect(queryByText('0 MB/s')).toBeNull();
-    expect(queryByText('准备中')).toBeNull();
+    expect(queryByText('Preparing')).toBeNull();
     expect(getByText('Studio Mac <1s')).toBeTruthy();
   });
 

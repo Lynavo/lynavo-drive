@@ -54,7 +54,7 @@ export function SharedFilesGlobalScreen({
       <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>
-            {t('sharedFiles.title') || '文件'}
+            {t('sharedFiles.title') || 'File'}
           </Text>
           <Text style={styles.headerSubtitle}>
             {t('sharedFiles.headerSubtitle')}
@@ -77,11 +77,11 @@ export function SharedFilesGlobalScreen({
             </View>
             <View style={styles.cardInfo}>
               <Text style={styles.cardTitle}>
-                {t('sharedFiles.phoneSyncSpace.title') || '手機同步空間'}
+                {t('sharedFiles.phoneSyncSpace.title') || 'Phone Sync Space'}
               </Text>
               <Text style={styles.cardDescription}>
                 {t('sharedFiles.phoneSyncSpace.desc') ||
-                  '檢視已同步至電腦的檔案與上傳來源'}
+                  'View files synced to your computer and their upload sources'}
               </Text>
               <View style={styles.badgeRow}>
                 <View style={styles.badge}>
@@ -114,7 +114,7 @@ export function SharedFilesGlobalScreen({
             </View>
             <View style={styles.cardInfo}>
               <Text style={styles.cardTitle}>
-                {t('sharedFiles.localComputer.title') || '電腦檔案'}
+                {t('sharedFiles.localComputer.title') || 'Computer Files'}
               </Text>
               <Text style={styles.cardDescription}>
                 {localComputerDescription}

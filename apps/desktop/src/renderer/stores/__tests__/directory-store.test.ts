@@ -209,7 +209,7 @@ describe('directory-store', () => {
     await useDirectoryStore.getState().fetchSharedFiles();
 
     expect(useDirectoryStore.getState().sharedFiles).toEqual([]);
-    expect(useDirectoryStore.getState().sharedError).toBe('加载团队共享文件列表失败');
+    expect(useDirectoryStore.getState().sharedError).toBe('Failed to load team shared files');
   });
 
   it('fetchSharedFiles uses storage unavailable copy when the directory is missing', async () => {
@@ -227,7 +227,7 @@ describe('directory-store', () => {
 
     expect(useDirectoryStore.getState().sharedFiles).toEqual([]);
     expect(useDirectoryStore.getState().sharedError).toBe(
-      '团队共享目录不可用，请重新选择或恢复文件夹',
+      'The team shared folder is unavailable. Choose another folder or restore it.',
     );
   });
 
@@ -245,7 +245,7 @@ describe('directory-store', () => {
     await useDirectoryStore.getState().fetchReceivedFiles();
 
     expect(useDirectoryStore.getState().receivedError).toBe(
-      '接收目录不可用，请重新选择或恢复文件夹',
+      'The receive folder is unavailable. Choose another folder or restore it.',
     );
   });
 
@@ -263,7 +263,7 @@ describe('directory-store', () => {
     } as unknown as Window['electronAPI'];
 
     // Pre-set an error to verify it gets cleared
-    useDirectoryStore.setState({ sharedError: '加载共享文件列表失败' });
+    useDirectoryStore.setState({ sharedError: 'Failed to load shared files' });
 
     await useDirectoryStore.getState().fetchSharedFiles();
 

@@ -12,7 +12,7 @@
     "desktopDeleted": "Deleted on computer",
     "desktopDeletedMessage": "This file was deleted from the computer.",
     "deletedDownloadMessage": "Deleted files cannot be downloaded.",
-    "summary": "{{count}} files · {{size}}",
+    "summary": "{{count}} files - {{size}}",
     "filesCount": "{{count}} files",
     "unnamedFile": "Unnamed File",
     "previewSyncedFile": "Preview synced file",

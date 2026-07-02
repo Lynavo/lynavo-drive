@@ -1,7 +1,7 @@
 import type { SettingsDTO } from '@lynavo-drive/contracts';
 
 export const mockSettings: SettingsDTO = {
-  deviceName: 'Alice 的 MacBook Pro',
+  deviceName: "Alice's MacBook Pro",
   connectionCode: '839274',
   rootPath: '/Users/alice/LynavoDrive',
   receivePath: '/Users/alice/LynavoDrive/Received',

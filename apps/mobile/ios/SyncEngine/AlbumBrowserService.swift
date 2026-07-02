@@ -249,7 +249,7 @@ class AlbumBrowserService {
             guard count > 0 else { return }
             results.append([
                 "collectionId": collection.localIdentifier,
-                "title": collection.localizedTitle ?? "未命名",
+                "title": collection.localizedTitle ?? "Untitled",
                 "count": count,
             ])
         }
@@ -263,7 +263,7 @@ class AlbumBrowserService {
             guard count > 0 else { return }
             results.append([
                 "collectionId": collection.localIdentifier,
-                "title": collection.localizedTitle ?? "未命名",
+                "title": collection.localizedTitle ?? "Untitled",
                 "count": count,
             ])
         }

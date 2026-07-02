@@ -116,11 +116,11 @@ func TestDetectFromSharePoints_NeedsManualEnable_WhenNoSMBShares(t *testing.T) {
 func TestParseSharePoints(t *testing.T) {
 	output := `
 			List of Share Points
-name:		“blooming”的公共文件夹
+name:		blooming Public Folder
 path:		/Users/blooming/Public
 	smb:	{
-    		name:		“blooming”的公共文件夹
-    		shared:	1
+		name:		blooming Public Folder
+		shared:	1
 	}
 
 name:		syncFolwData

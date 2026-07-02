@@ -1,44 +1,47 @@
 # Lynavo Drive OSS Verification Matrix
 
-本文件记录长期 OSS baseline 的验证范围、执行方式和验收口径。它不是产品规格；
-实际行为以当前代码和 `@lynavo-drive/contracts` 为准。
+This document records the long-term OSS baseline verification scope, execution
+method, and acceptance criteria. It is not a product spec; actual behavior
+follows the current code and `@lynavo-drive/contracts`.
 
-## 1. 目标
+## 1. Goals
 
-OSS baseline 需要持续确认 4 类能力：
+The OSS baseline must continuously verify four capability groups:
 
-1. 基础可用：发现、配对、扫描、上传、完成
-2. 异常恢复：断线、重连、断点续传、进程重启后继续
-3. OSS 边界：guest/local 前景 LAN 同步 fail-open；远程访问、官方 tunnel、
-   后台静默续传等非 OSS 能力保持关闭
-4. 本地可构建：共享包、sidecar、mobile 类型检查、移动端原生构建和 desktop
-   package verification 可复现
+1. Basic availability: discovery, pairing, scan, upload, completion.
+2. Error recovery: disconnect, reconnect, resume, and continue after process
+   restart.
+3. OSS boundaries: guest/local foreground LAN sync is fail-open; remote access,
+   official tunnel, silent background continuation, and other non-OSS
+   capabilities remain off.
+4. Local buildability: shared packages, sidecar, mobile typecheck, native mobile
+   builds, and desktop package verification are reproducible.
 
-## 2. 自动化验证
+## 2. Automated Verification
 
 ### 2.1 Sidecar
 
-执行命令：
+Command:
 
 ```bash
 cd services/sidecar-go
 go test ./...
 ```
 
-关键用例：
+Key cases:
 
-| 用例                 | 位置                                  | 覆盖点                                   |
-| -------------------- | ------------------------------------- | ---------------------------------------- |
-| 默认配置加载         | `internal/config/config_test.go`      | 默认端口、目录、设备名                   |
-| 完整配对+传输        | `internal/server/connection_test.go`  | `HELLO -> PAIR -> SYNC -> FILE_END`      |
-| 断线后续传           | `internal/server/connection_test.go`  | 部分写入、重连、`RESUME`、最终 hash 正确 |
-| ACK 定时 flush       | `internal/server/connection_test.go`  | 没有新 frame 时仍能按间隔发 ACK          |
-| 错误路径             | `internal/server/connection_test.go`  | 错误连接码、重复文件、hash mismatch      |
-| FileWriter 续传 seek | `internal/server/file_writer_test.go` | `.part` 恢复后写指针正确                 |
+| Case                   | Location                              | Coverage                                             |
+| ---------------------- | ------------------------------------- | ---------------------------------------------------- |
+| Default config loading | `internal/config/config_test.go`      | Default ports, directories, device name              |
+| Full pairing+transfer  | `internal/server/connection_test.go`  | `HELLO -> PAIR -> SYNC -> FILE_END`                  |
+| Resume after drop      | `internal/server/connection_test.go`  | Partial write, reconnect, `RESUME`, final hash       |
+| Timed ACK flush        | `internal/server/connection_test.go`  | ACK still flushes on interval with no new frame      |
+| Error paths            | `internal/server/connection_test.go`  | Wrong connection code, duplicate file, hash mismatch |
+| FileWriter resume seek | `internal/server/file_writer_test.go` | Write pointer is correct after `.part` resume        |
 
-### 2.2 Mobile 类型与原生构建
+### 2.2 Mobile Types And Native Builds
 
-执行命令：
+Commands:
 
 ```bash
 pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
@@ -52,44 +55,47 @@ cd ../android
 ./gradlew assembleRelease
 ```
 
-验收口径：
+Acceptance criteria:
 
-1. TypeScript 通过
-2. iOS Debug 构建通过
-3. iOS generic Release source build 通过
-4. Android Debug / Release 构建通过
+1. TypeScript passes.
+2. iOS Debug build passes.
+3. iOS generic Release source build passes.
+4. Android Debug / Release builds pass.
 
 ### 2.3 OSS Release Gate
 
-执行命令：
+Command:
 
 ```bash
 pnpm gate:release
 ```
 
-该 gate 覆盖：
+The gate covers:
 
-1. version manifest 一致性
-2. source package 边界
-3. 账号、远程访问和后台能力的 OSS 边界扫描
-4. legacy name allowlist
-5. release/dev script tests
-6. release profile dry-run
+1. Version manifest consistency.
+2. Source package boundaries.
+3. OSS boundary scan for account, remote access, and background capability.
+4. Legacy name allowlist.
+5. Release/dev script tests.
+6. Release profile dry-run.
 
-验收口径：
+Acceptance criteria:
 
-1. dry-run 只展示本地 iOS / Android / desktop build/package 命令
-2. dry-run 不展示 API base、远端诊断提交端点、桌面自动更新端点、上传命令或历史 market
-3. GitHub Actions `OSS Release Gate` 只执行 `pnpm gate:release`，不执行 native build 或 desktop package
-4. source package 扫描不包含 secrets、诊断包、本地数据库、生成包或第三方专有二进制
+1. Dry-run shows only local iOS / Android / desktop build/package commands.
+2. Dry-run does not show API base, remote diagnostics submission endpoints,
+   desktop auto-update endpoints, upload commands, or historical markets.
+3. GitHub Actions `OSS Release Gate` runs only `pnpm gate:release`, not native
+   builds or desktop package jobs.
+4. Source package scans include no secrets, diagnostics packages, local
+   databases, generated packages, or third-party proprietary binaries.
 
-## 3. 真机脚本回归
+## 3. Device Script Regression
 
-脚本：
+Script:
 
 - [scripts/ios/lynavo_upload_eval.sh](../../scripts/ios/lynavo_upload_eval.sh)
 
-基础调用：
+Basic invocation:
 
 ```bash
 bash scripts/ios/lynavo_upload_eval.sh \
@@ -99,19 +105,19 @@ bash scripts/ios/lynavo_upload_eval.sh \
   --file-key <FILE_KEY>
 ```
 
-可复跑模式：
+Repeatable modes:
 
-| 模式                     | 目的              | 说明                                           |
-| ------------------------ | ----------------- | ---------------------------------------------- |
-| `batch`                  | 标准上传回归      | 单轮或多轮传输，观察吞吐与完成状态             |
-| `recovery-app`           | App 重启恢复      | 传输中杀 app，再拉起，看是否 `RESUME`          |
-| `recovery-sidecar`       | Sidecar 重启恢复  | 传输中重启 sidecar，看是否自动续传             |
-| `recovery-late-sidecar`  | Sidecar 晚启动    | app 先进入 backoff，再启动 sidecar，看是否恢复 |
-| `recovery-sidecar-pause` | ACK 黑洞/链路冻结 | `SIGSTOP` sidecar 一段时间，再恢复             |
-| `recovery-app-suspend`   | App 挂起恢复      | 传输中 suspend app，再恢复                     |
-| `all`                    | 全套串跑          | 依次执行上面所有模式                           |
+| Mode                     | Purpose                    | Notes                                                        |
+| ------------------------ | -------------------------- | ------------------------------------------------------------ |
+| `batch`                  | Standard upload regression | Single or multiple rounds; observe throughput and completion |
+| `recovery-app`           | App restart recovery       | Kill app during transfer, relaunch, and check for `RESUME`   |
+| `recovery-sidecar`       | Sidecar restart recovery   | Restart sidecar during transfer and check automatic resume   |
+| `recovery-late-sidecar`  | Late sidecar start         | App enters backoff first; start sidecar and check recovery   |
+| `recovery-sidecar-pause` | ACK black hole/link freeze | `SIGSTOP` sidecar for a period, then resume                  |
+| `recovery-app-suspend`   | App suspend recovery       | Suspend app during transfer, then resume                     |
+| `all`                    | Full serial run            | Run all modes above in order                                 |
 
-建议最小回归集：
+Suggested minimum regression set:
 
 1. `batch`
 2. `recovery-sidecar`
@@ -119,149 +125,177 @@ bash scripts/ios/lynavo_upload_eval.sh \
 4. `recovery-sidecar-pause`
 5. `recovery-app`
 
-如改动涉及移动端生命周期、热控或平台原生传输，再追加 `recovery-app-suspend`
-和对应手工回归。
+If changes touch mobile lifecycle, thermal control, or platform-native transfer,
+also run `recovery-app-suspend` and matching manual regression.
 
-## 4. 手工冒烟清单
+## 4. Manual Smoke Checklist
 
-### 4.1 首次安装与配对
+### 4.1 First Install And Pairing
 
-1. 启动 desktop（macOS / Windows 本地包或开发态）和 sidecar
-2. 安装 mobile app（iOS / Android）
-3. mobile 能发现 desktop
-4. 配对成功
-5. 首页和设置页显示已连接或可达状态
+1. Start desktop (macOS / Windows local package or development mode) and
+   sidecar.
+2. Install the mobile app (iOS / Android).
+3. Mobile can discover the desktop.
+4. Pairing succeeds.
+5. Home and settings pages show connected or reachable state.
 
-### 4.2 基础上传
+### 4.2 Basic Upload
 
-1. 触发一轮真实素材同步
-2. 首页进度、速度、队列项正常变化
-3. sidecar 收到文件并落盘
-4. 完成后首页进入完成态
-5. 历史以 sidecar / desktop 完成日分桶
+1. Trigger one real media sync round.
+2. Home progress, speed, and queue items update normally.
+3. The sidecar receives and writes files.
+4. Home enters completed state after completion.
+5. History is bucketed by sidecar / desktop completion day.
 
-### 4.3 异常恢复
+### 4.3 Error Recovery
 
-1. 传输中关闭 Wi-Fi 或阻断 sidecar
-2. 首页显示重连或等待网络恢复语义
-3. 恢复网络或 sidecar 后自动 `RESUME`
-4. 不从 0 重传
-5. pending queue 不被清空、重排或跳过
+1. Turn off Wi-Fi or block the sidecar during transfer.
+2. Home shows reconnecting or waiting-for-network semantics.
+3. After restoring network or sidecar, upload automatically `RESUME`s.
+4. It does not retransmit from 0.
+5. The pending queue is not cleared, reordered, or skipped.
 
-### 4.4 前景 LAN 与生命周期补偿
+### 4.4 Foreground LAN And Lifecycle Compensation
 
-OSS baseline 只承诺前景 LAN 自动同步。切后台、锁屏或系统挂起期间可安全暂停；
-回到前景后应通过 pending queue 继续补偿同步。
+The OSS baseline only promises foreground LAN automatic sync. Backgrounding,
+locking, or system suspension may pause safely; after foreground return, sync
+should continue through the pending queue.
 
-1. 传输中切后台或锁屏
-2. 观察当前文件安全暂停或进入可恢复状态
-3. 回到前景后继续扫描 pending queue
-4. 已完成文件不重复写坏，未完成文件继续 `RESUME`
-5. 不启用官方后台静默续传或远程 tunnel 路径
+1. Background or lock during transfer.
+2. Observe the current file safely pause or enter a recoverable state.
+3. After foreground return, continue scanning the pending queue.
+4. Completed files are not rewritten badly; unfinished files continue with
+   `RESUME`.
+5. Official silent background continuation or remote tunnel paths are not
+   enabled.
 
 ### 4.5 Guest Local LAN Mode
 
-1. mobile 未登录、无订阅、无 server entitlement
-2. desktop 与 mobile 位于同一 LAN
-3. mobile 可以发现 desktop、完成配对并触发前景自动同步
-4. 上传集合来自 mobile 本地 pending queue
-5. UI 不提供手动勾选文件、跳过文件或删除队列项作为替代路径
-6. 断网恢复后继续 `RESUME`，不因 guest 身份清空 sync identity 或 pending queue
+1. Mobile is not signed in, has no subscription, and has no server entitlement.
+2. Desktop and mobile are on the same LAN.
+3. Mobile can discover desktop, complete pairing, and trigger foreground
+   automatic sync.
+4. The upload set comes from the mobile local pending queue.
+5. The UI does not provide manual file checkboxes, skip, or delete queue actions
+   as alternate paths.
+6. After network recovery, upload continues with `RESUME` and does not clear sync
+   identity or pending queue because of guest state.
 
-### 4.6 非 OSS 能力边界
+### 4.6 Non-OSS Capability Boundaries
 
-本节是负向边界 sanity check，不是正向功能验收。
+This section is a negative boundary sanity check, not positive feature
+acceptance.
 
-1. OSS runtime 不请求官方 tunnel credentials
-2. OSS runtime 不展示官方 tunnel 激活入口，也不向 sidecar 下发 credentials
-3. 缺少官方平台能力时，后台静默续传入口保持关闭
-4. 前景 LAN 同步仍可用，并在回到前景后通过 pending queue 补偿
+1. OSS runtime does not request official tunnel credentials.
+2. OSS runtime does not show an official tunnel activation entry and does not
+   send credentials to the sidecar.
+3. Without official platform capability, silent background continuation entry
+   points remain off.
+4. Foreground LAN sync remains available and compensates through the pending
+   queue after foreground return.
 
 ### 4.7 Windows Desktop
 
-1. 从本地 Windows 包 fresh install
-2. 确认 `Lynavo Drive Sidecar TCP`、`Lynavo Drive Sidecar HTTP` 和
-   `Lynavo Drive mDNS UDP` 防火墙规则存在，覆盖 `39393/TCP`、`39394/TCP`
-   和 `5353/UDP`
-3. 设置页能看到 Bonjour 可用状态或 zeroconf-compatible fallback 状态
-4. mobile 能发现并配对
-5. 触发一轮真实素材同步
+1. Fresh install from a local Windows package.
+2. Confirm `Lynavo Drive Sidecar TCP`, `Lynavo Drive Sidecar HTTP`, and
+   `Lynavo Drive mDNS UDP` firewall rules exist and cover `39393/TCP`,
+   `39394/TCP`, and `5353/UDP`.
+3. The settings page shows Bonjour available state or zeroconf-compatible
+   fallback state.
+4. Mobile can discover and pair.
+5. Trigger one real media sync round.
 
 ### 4.8 Linux Package Verification
 
-Linux 不是当前用户支持平台。OSS baseline 只保留本地 source-build / package
-verification；真机配对属于 maintainer experimental，不作为默认验收门槛。
+Linux is not a current user support platform. The OSS baseline keeps only local
+source-build / package verification; device pairing is maintainer experimental
+and not a default acceptance gate.
 
-本地 package verification：
+Local package verification:
 
-1. 在 Linux host 上执行 `pnpm package:desktop:linux`
-2. 确认生成 `.deb` 产物
-3. fresh install 后启动 app
-4. 确认 sidecar health 进入 healthy
-5. 确认 `39393/TCP`、`39394/TCP` 可监听，`5353/UDP` 发现路径按当前实现可用
+1. Run `pnpm package:desktop:linux` on a Linux host.
+2. Confirm a `.deb` artifact is generated.
+3. Fresh install and launch the app.
+4. Confirm sidecar health becomes healthy.
+5. Confirm `39393/TCP` and `39394/TCP` are listening, and the `5353/UDP`
+   discovery path works according to current implementation.
 
-maintainer experimental：
+Maintainer experimental:
 
-1. 维护者可在明确标记 experimental 的记录中验证 iOS / Android 与 Linux desktop
-   的发现、配对和上传
-2. 失败不阻断 macOS / Windows desktop 的 OSS baseline 验收
-3. 不把 Linux 真机配对写成用户支持承诺
+1. Maintainers may verify iOS / Android discovery, pairing, and upload with
+   Linux desktop in records clearly marked experimental.
+2. Failure does not block macOS / Windows desktop OSS baseline acceptance.
+3. Do not document Linux device pairing as a user support promise.
 
 ### 4.9 iOS Thermal
 
-如改动涉及 iOS 热控或上传调参，追加以下手工验证：
+If changes touch iOS thermal control or upload tuning, add these manual checks:
 
-1. 用长视频或大文件触发持续上传
-2. 制造高热场景，确认同步不中断但速度下降
-3. serious / critical thermal 下日志出现 `THERMAL_THROTTLE`、`THERMAL_PAUSE`
-   或 `THERMAL_RESUME`
-4. 热状态恢复后继续 pending queue，不误报为最终失败
-5. 新拍摄素材在恢复到可扫描状态后被发现并入队
+1. Use a long video or large file to trigger sustained upload.
+2. Create a high-thermal scenario and confirm sync does not interrupt but slows
+   down.
+3. Under serious / critical thermal state, logs show `THERMAL_THROTTLE`,
+   `THERMAL_PAUSE`, or `THERMAL_RESUME`.
+4. After thermal recovery, the pending queue continues and is not reported as
+   final failure.
+5. Newly captured assets are discovered and queued after returning to a
+   scannable state.
 
 ### 4.10 Same-LAN Wake-on-LAN
 
-本节只验证 same-LAN wake。VPN 只作 fallback 情境，不作主流程；OSS build
-不提供 public Wake-on-WAN、router helper 或 relay wake。
+This section verifies same-LAN wake only. VPN is only a fallback scenario, not
+the main flow. OSS builds do not provide public Wake-on-WAN, router helpers, or
+relay wake.
 
-前置条件：
+Prerequisites:
 
-1. mobile 和 desktop 已完成配对，且 desktop 清醒时 sidecar 曾下发 wake metadata
-2. mobile 与 desktop 在同一 LAN
-3. macOS 已开启 `Wake for network access`，或 Windows 已开启 BIOS/UEFI WoL
-   与网卡 magic packet wake
+1. Mobile and desktop are paired, and while desktop was awake the sidecar sent
+   wake metadata.
+2. Mobile and desktop are on the same LAN.
+3. macOS has `Wake for network access` enabled, or Windows has BIOS/UEFI WoL and
+   NIC magic packet wake enabled.
 
-验收口径：
+Acceptance criteria:
 
-1. 打开 `我的电脑` 根目录或点击 `重新连接` 时，才允许尝试 bounded LAN wake
-2. app 启动、回前景、或单纯显示离线状态，不应发送 wake packet
-3. 成功时 `/health` 恢复，连接状态回到可达
-4. 失败时显示 unavailable / offline / backoff，不改动 pending queue
-5. 外网无 VPN-LAN fallback 时，不把该能力描述成 public Wake-on-WAN
+1. Bounded LAN wake may be attempted only when opening the `My Computer` root
+   directory or clicking `Reconnect`.
+2. App launch, foreground return, or simply showing offline must not send a wake
+   packet.
+3. On success, `/health` recovers and connection state returns to reachable.
+4. On failure, show unavailable / offline / backoff and do not modify the pending
+   queue.
+5. Without VPN-LAN fallback on an external network, do not describe this
+   capability as public Wake-on-WAN.
 
-## 5. 长期验收门槛
+## 5. Long-Term Acceptance Gates
 
-常规改动至少满足：
+Regular changes must at least satisfy:
 
-1. 相关单元测试或脚本测试通过
-2. `pnpm gate:release` 通过
-3. 触及 sidecar 时运行 `go test ./...`
-4. 触及 mobile 时运行 TypeScript 检查和对应平台构建
-5. 触及 desktop packaging 时运行目标平台 package verification
-6. 触及同步状态、队列或恢复链路时完成至少一轮真机或脚本回归
+1. Relevant unit tests or script tests pass.
+2. `pnpm gate:release` passes.
+3. Run `go test ./...` when touching sidecar.
+4. Run TypeScript checks and relevant platform builds when touching mobile.
+5. Run target platform package verification when touching desktop packaging.
+6. Complete at least one device or script regression round when touching sync
+   state, queue, or recovery paths.
 
-平台补充：
+Platform additions:
 
-1. Windows packaging 改动至少完成 fresh install + 配对上传冒烟
-2. Linux 只要求本地 package verification；真机配对仅作 maintainer experimental
-3. iOS thermal 或生命周期改动需追加热控 / 前后台补偿验证
-4. Wake-on-LAN 改动需确认 same-LAN wake 是显式操作触发，且失败不影响 pending queue
+1. Windows packaging changes require at least fresh install plus pairing/upload
+   smoke test.
+2. Linux only requires local package verification; device pairing is maintainer
+   experimental.
+3. iOS thermal or lifecycle changes require additional thermal and
+   foreground/background compensation verification.
+4. Wake-on-LAN changes must confirm same-LAN wake is explicitly user-triggered
+   and failures do not affect the pending queue.
 
-## 6. 日志与临时产物
+## 6. Logs And Temporary Artifacts
 
-真机脚本默认输出：
+Device scripts output by default:
 
-1. 结果 CSV：`/tmp/lynavo-drive-upload-eval`
-2. App / sidecar 日志：`/tmp/lynavo-drive-upload-eval-logs`
+1. Result CSV: `/tmp/lynavo-drive-upload-eval`
+2. App / sidecar logs: `/tmp/lynavo-drive-upload-eval-logs`
 
-这些目录是临时产物，不应该作为版本化测试记录保存，也不应未经脱敏上传到
-公开 issue。
+These directories are temporary artifacts. Do not save them as versioned test
+records or upload them to public issues without redaction.

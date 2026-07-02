@@ -52,7 +52,7 @@ export function BottomTabBar({ activeTab }: BottomTabBarProps) {
             activeTab === 'home' && styles.activeTabLabel,
           ]}
         >
-          {t('common.tabs.home') || '首頁'}
+          {t('common.tabs.home') || 'Home'}
         </Text>
       </TouchableOpacity>
 
@@ -72,7 +72,7 @@ export function BottomTabBar({ activeTab }: BottomTabBarProps) {
             activeTab === 'files' && styles.activeTabLabel,
           ]}
         >
-          {t('common.tabs.files') || '電腦檔案'}
+          {t('common.tabs.files') || 'Computer Files'}
         </Text>
       </TouchableOpacity>
 
@@ -92,7 +92,7 @@ export function BottomTabBar({ activeTab }: BottomTabBarProps) {
             activeTab === 'settings' && styles.activeTabLabel,
           ]}
         >
-          {t('common.tabs.settings') || '我的'}
+          {t('common.tabs.settings') || 'Me'}
         </Text>
       </TouchableOpacity>
     </View>

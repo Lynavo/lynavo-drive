@@ -18,8 +18,8 @@ jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => {
       const map: Record<string, string> = {
-        'common.back': '返回',
-        'history.title': '历史记录',
+        'common.back': 'Back',
+        'history.title': 'History',
       };
       return map[key] || key;
     },
@@ -103,7 +103,7 @@ describe('HistoryGlobalScreen', () => {
     });
 
     await waitFor(() => {
-      expect(getByText('暂无同步记录')).toBeTruthy();
+      expect(getByText('No sync history yet')).toBeTruthy();
     });
     expect(queryByText('openimdeMac-mini')).toBeNull();
   });
@@ -134,9 +134,11 @@ describe('HistoryGlobalScreen', () => {
     });
 
     await waitFor(() => {
-      expect(getByText('历史加载失败')).toBeTruthy();
+      expect(getByText('History load failed')).toBeTruthy();
     });
-    expect(getByText('无法加载同步历史，请稍后重试')).toBeTruthy();
+    expect(
+      getByText('Unable to load sync history. Please try again later'),
+    ).toBeTruthy();
     expect(queryByText('openimdeMac-mini')).toBeNull();
   });
 
@@ -146,7 +148,7 @@ describe('HistoryGlobalScreen', () => {
     const { getByText, queryByText } = render(<HistoryGlobalScreen />);
 
     await waitFor(() => {
-      expect(getByText('暂无同步记录')).toBeTruthy();
+      expect(getByText('No sync history yet')).toBeTruthy();
     });
     expect(mockedListHistory).not.toHaveBeenCalled();
     expect(queryByText('openimdeMac-mini')).toBeNull();

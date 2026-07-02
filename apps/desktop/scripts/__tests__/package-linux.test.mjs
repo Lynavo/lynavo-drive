@@ -223,7 +223,10 @@ test('desktop OSS package scripts do not ship official Apple signing or upload h
   assert.equal(packageJson.scripts[token(['upload', ':test', 'flight'])], undefined);
 
   const builderConfig = readFileSync(path.join(desktopRoot, 'electron-builder.yml'), 'utf8');
-  assert.match(builderConfig, /^files:\n  - out\/\*\*\/\*\n  - node_modules\/\*\*\/\*\n  - package\.json$/m);
+  assert.match(
+    builderConfig,
+    /^files:\n  - out\/\*\*\/\*\n  - node_modules\/\*\*\/\*\n  - package\.json$/m,
+  );
   assert.match(builderConfig, /^  identity: null$/m);
   assert.match(builderConfig, /^  forceCodeSigning: false$/m);
   assert.match(builderConfig, /^  verifyUpdateCodeSignature: false$/m);
@@ -239,7 +242,10 @@ test('desktop OSS package scripts do not ship official Apple signing or upload h
 });
 
 test('desktop electron-builder wrapper disables local signing auto discovery', () => {
-  const wrapper = readFileSync(path.join(desktopRoot, 'scripts', 'run-electron-builder.cjs'), 'utf8');
+  const wrapper = readFileSync(
+    path.join(desktopRoot, 'scripts', 'run-electron-builder.cjs'),
+    'utf8',
+  );
 
   assert.match(wrapper, /CSC_IDENTITY_AUTO_DISCOVERY:\s+'false'/);
   assert.match(wrapper, /ELECTRON_BUILDER_DISABLE_BUILD_CACHE:\s+'true'/);

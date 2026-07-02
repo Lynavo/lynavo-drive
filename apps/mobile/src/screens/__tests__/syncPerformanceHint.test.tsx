@@ -24,7 +24,7 @@ import {
 describe('SyncPerformanceHint', () => {
   beforeAll(async () => {
     await act(async () => {
-      await i18n.changeLanguage('zh-Hans');
+      await i18n.changeLanguage('en');
     });
   });
 
@@ -36,13 +36,13 @@ describe('SyncPerformanceHint', () => {
         <SyncPerformanceHint
           uploadState="uploading"
           performanceHint="thermal_limited"
-          performanceMessage="设备温度较高，已降低传输强度"
+          performanceMessage="Device is running hot — transfer throttled."
         />,
       );
     });
 
     expect(tree?.root.findByType(Text).props.children).toBe(
-      '设备温度较高，已降低传输强度',
+      'Device is running hot — transfer throttled.',
     );
   });
 
@@ -52,7 +52,7 @@ describe('SyncPerformanceHint', () => {
         {
           uploadState: 'completed',
           performanceHint: 'thermal_limited',
-          performanceMessage: '设备温度较高，已降低传输强度',
+          performanceMessage: 'Device is running hot — transfer throttled.',
         },
         i18n.t.bind(i18n),
       ),
@@ -69,6 +69,6 @@ describe('SyncPerformanceHint', () => {
         },
         i18n.t.bind(i18n),
       ),
-    ).toBe('设备温度较高，已降低传输强度');
+    ).toBe('Device is running hot — transfer throttled.');
   });
 });

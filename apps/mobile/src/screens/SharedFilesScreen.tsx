@@ -35,7 +35,7 @@ export function SharedFilesScreen() {
       <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>
-            {t('sharedFiles.title') || '文件'}
+            {t('sharedFiles.title') || 'File'}
           </Text>
         </View>
 
@@ -55,11 +55,11 @@ export function SharedFilesScreen() {
             </View>
             <View style={styles.cardInfo}>
               <Text style={styles.cardTitle}>
-                {t('sharedFiles.phoneSyncSpace.title') || '手機同步空間'}
+                {t('sharedFiles.phoneSyncSpace.title') || 'Phone Sync Space'}
               </Text>
               <Text style={styles.cardDescription}>
                 {t('sharedFiles.phoneSyncSpace.desc') ||
-                  '檢視已同步至電腦的檔案與上傳來源'}
+                  'View files synced to your computer and their upload sources'}
               </Text>
             </View>
             <Icon name="chevron-forward" size={24} color="#94a3b8" />
@@ -80,11 +80,11 @@ export function SharedFilesScreen() {
             </View>
             <View style={styles.cardInfo}>
               <Text style={styles.cardTitle}>
-                {t('sharedFiles.localComputer.title') || '電腦檔案'}
+                {t('sharedFiles.localComputer.title') || 'Computer Files'}
               </Text>
               <Text style={styles.cardDescription}>
                 {t('sharedFiles.localComputer.desc') ||
-                  '流覽電腦端共享的目錄結構並下載文件'}
+                  'Browse your computer shared directory and download files'}
               </Text>
             </View>
             <Icon name="chevron-forward" size={24} color="#94a3b8" />

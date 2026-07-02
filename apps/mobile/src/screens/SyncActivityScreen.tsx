@@ -1164,7 +1164,7 @@ export function SyncActivityScreen() {
   //   (a) buildOverview clears currentFilename/bytes on 'completed' — the
   //       filename <Text> unmounts and speed dips to 0.
   //   (b) shouldRenderPreparationPhase would flip the running card into the
-  //       "Establishing connection…" UI and back.
+  //       "Establishing connection..." UI and back.
   // Gate on completedCount > 0 so the genuine round-start preparation
   // (first item of a round) still shows the connection UI normally.
   const isBetweenItems = shouldTreatSyncActivityAsBetweenItems(
@@ -1723,10 +1723,7 @@ export function SyncActivityScreen() {
                 </View>
                 <Text style={styles.queueInfoText}>
                   {t('syncActivity.running.queueInfo', {
-                    queued: Math.max(
-                      queue.length,
-                      overview.autoPending ?? 0,
-                    ),
+                    queued: Math.max(queue.length, overview.autoPending ?? 0),
                   })}
                 </Text>
                 <TouchableOpacity
@@ -1745,7 +1742,8 @@ export function SyncActivityScreen() {
           {queue.length > 0 && (
             <View style={styles.queueSection}>
               <Text style={styles.sectionLabel}>
-                {t('syncActivity.queue.title') || '待同步佇列'} ({queue.length})
+                {t('syncActivity.queue.title') || 'Pending Sync Queue'} (
+                {queue.length})
               </Text>
               <View style={styles.queueList}>
                 {queue.map((item, index) => {
@@ -1797,7 +1795,7 @@ export function SyncActivityScreen() {
                               <Text style={styles.uploadingLabel}>
                                 {t('syncStatus.queue.itemStatus.transferring', {
                                   percent: progressPercent,
-                                }) || `傳輸中 ${progressPercent}%`}
+                                }) || `Transferring ${progressPercent}%`}
                               </Text>
                             </View>
                           )}
@@ -1807,7 +1805,7 @@ export function SyncActivityScreen() {
                               <Text style={styles.uploadingLabel}>
                                 {t(
                                   'syncStatus.queue.itemStatus.cloudDownloading',
-                                ) || 'iCloud 下載中'}
+                                ) || 'iCloud downloading'}
                               </Text>
                             </View>
                           )}
@@ -1816,7 +1814,7 @@ export function SyncActivityScreen() {
                               <View style={styles.uploadingDot} />
                               <Text style={styles.uploadingLabel}>
                                 {t('syncStatus.queue.itemStatus.preparing') ||
-                                  '準備中'}
+                                  'Preparing'}
                               </Text>
                             </View>
                           )}
@@ -1965,9 +1963,7 @@ export function buildOverview(
     'lastCompletedTaskSource',
   );
   const payloadLastCompletedTaskSource =
-    payload.lastCompletedTaskSource === 'auto'
-      ? 'auto'
-      : undefined;
+    payload.lastCompletedTaskSource === 'auto' ? 'auto' : undefined;
   const hasLastErrorCode = Object.prototype.hasOwnProperty.call(
     payload,
     'lastErrorCode',

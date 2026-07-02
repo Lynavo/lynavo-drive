@@ -17,6 +17,9 @@ jest.mock('react-native-localize', () => ({
 
 import i18n from '../index';
 
+const zhHansErrors = require('../locales/zh-Hans/errors.json');
+const zhHantErrors = require('../locales/zh-Hant/errors.json');
+
 function Demo() {
   const { t } = useTranslation();
   return <Text testID="demo">{t('errors.networkTitle')}</Text>;
@@ -38,7 +41,7 @@ describe('i18n bootstrap', () => {
         <Demo />
       </I18nextProvider>,
     );
-    expect(getByTestId('demo').props.children).toBe('网路错误');
+    expect(getByTestId('demo').props.children).toBe(zhHansErrors.networkTitle);
   });
 
   it('renders the traditional Chinese label when language is zh-Hant', async () => {
@@ -50,7 +53,7 @@ describe('i18n bootstrap', () => {
         <Demo />
       </I18nextProvider>,
     );
-    expect(getByTestId('demo').props.children).toBe('網路錯誤');
+    expect(getByTestId('demo').props.children).toBe(zhHantErrors.networkTitle);
   });
 
   it('renders the English label when language is en', async () => {

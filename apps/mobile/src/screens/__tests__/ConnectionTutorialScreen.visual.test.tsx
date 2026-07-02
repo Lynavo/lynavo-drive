@@ -18,52 +18,53 @@ jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) =>
       ({
-        'common.back': '返回',
-        'connectionTutorial.title': '連接教程',
+        'common.back': 'Back',
+        'connectionTutorial.title': 'Connection Tutorial',
         'connectionTutorial.prerequisite':
-          '前提：請確保電腦已安裝並打開 Lynavo Drive 客戶端',
-        'connectionTutorial.tabs.lan': '搜尋',
-        'connectionTutorial.tabs.qr': '掃碼',
-        'connectionTutorial.tabs.code': '連接碼',
-        'connectionTutorial.tabs.ip': 'IP 直連',
+          'Prerequisite: make sure Lynavo Drive is installed and open on your computer',
+        'connectionTutorial.tabs.lan': 'Search',
+        'connectionTutorial.tabs.qr': 'Scan QR',
+        'connectionTutorial.tabs.code': 'Pairing Code',
+        'connectionTutorial.tabs.ip': 'Direct IP',
         'connectionTutorial.cards.lan.steps.0':
-          '確保手機與電腦接入同一個 Wi-Fi 或區域網路',
+          'Make sure your phone and computer are on the same Wi-Fi or local network',
         'connectionTutorial.cards.lan.steps.1':
-          '在電腦打開 Lynavo Drive 客戶端並保持執行',
+          'Open Lynavo Drive on your computer and keep it running',
         'connectionTutorial.cards.lan.steps.2':
-          '手機端進入搜尋設備，稍等片刻即可發現電腦',
+          'Open device search on the phone and wait a moment for the computer to appear',
         'connectionTutorial.cards.lan.warning':
-          '還沒有電腦端？請在電腦瀏覽器訪問 {{host}} 安裝。',
+          'No desktop app yet? Visit {{host}} in your computer browser to install it.',
         'connectionTutorial.cards.qr.steps.0':
-          '在電腦端 Lynavo Drive「全域設定」中顯示二維碼',
+          'Show the QR code in Lynavo Drive desktop Global Settings',
         'connectionTutorial.cards.qr.steps.1':
-          '手機端點擊「掃碼配對」打開攝像頭',
+          'Tap QR pairing on the phone to open the camera',
         'connectionTutorial.cards.qr.steps.2':
-          '對準螢幕上的二維碼，識別後自動進入配對流程',
+          'Point at the QR code on the screen to enter pairing automatically',
         'connectionTutorial.cards.code.steps.0':
-          '在電腦端「全域設定」中查看 6 位數字連接碼',
+          'View the 6-digit pairing code in desktop Global Settings',
         'connectionTutorial.cards.code.steps.1':
-          '連接碼不會自動刷新，需手動點擊「重新產生」才會變更',
+          'The pairing code does not refresh automatically. Click Regenerate manually to change it',
         'connectionTutorial.cards.code.steps.2':
-          '在手機端輸入連接碼，驗證通過後完成配對',
+          'Enter the pairing code on the phone to complete pairing after verification',
         'connectionTutorial.cards.ip.steps.0':
-          '在電腦端左側導覽列打開「全域設定」',
+          'Open Global Settings from the desktop sidebar',
         'connectionTutorial.cards.ip.steps.1':
-          '找到「廣播 IP（iPhone 連接地址）」',
+          'Find Broadcast IP (iPhone connection address)',
         'connectionTutorial.cards.ip.steps.2':
-          '在手機端「手動配對」中輸入該地址並繼續',
-        'connectionTutorial.troubleshoot.entry': '一直搜不到設備？',
-        'connectionTutorial.troubleshoot.cta': '查看排障指南 >',
-        'connectionTutorial.troubleshoot.title': '連接排障指南',
+          'Enter that address in Manual Pairing on the phone and continue',
+        'connectionTutorial.troubleshoot.entry': "Still can't find a device?",
+        'connectionTutorial.troubleshoot.cta': 'View troubleshooting guide >',
+        'connectionTutorial.troubleshoot.title':
+          'Connection Troubleshooting Guide',
         'connectionTutorial.troubleshoot.items.0':
-          '確認手機與電腦在同一個 Wi-Fi 下。',
+          'Confirm the phone and computer are on the same Wi-Fi.',
         'connectionTutorial.troubleshoot.items.1':
-          '檢查手機或電腦是否開啟 VPN / 代理。',
+          'Check whether VPN or proxy is enabled on the phone or computer.',
         'connectionTutorial.troubleshoot.items.2':
-          '仍然無法連接時，改用手動方式完成配對。',
-        'connectionTutorial.troubleshoot.supportTitle': '仍然無法解決？',
+          'If it still cannot connect, use manual pairing.',
+        'connectionTutorial.troubleshoot.supportTitle': 'Still not resolved?',
         'connectionTutorial.troubleshoot.supportBody':
-          '請匯出診斷包並開 GitHub issue。',
+          'Export diagnostics and open a GitHub issue.',
         'connectionTutorial.troubleshoot.supportIssue': 'GitHub Issues',
       })[key] ?? key,
   }),
@@ -89,13 +90,13 @@ describe('ConnectionTutorialScreen visuals', () => {
 
     expect(screen.getByTestId('connection-tutorial-visual-lan')).toBeTruthy();
 
-    fireEvent.press(screen.getByText('掃碼'));
+    fireEvent.press(screen.getByText('Scan QR'));
     expect(screen.getByTestId('connection-tutorial-visual-qr')).toBeTruthy();
 
-    fireEvent.press(screen.getByText('連接碼'));
+    fireEvent.press(screen.getByText('Pairing Code'));
     expect(screen.getByTestId('connection-tutorial-visual-code')).toBeTruthy();
 
-    fireEvent.press(screen.getByText('IP 直連'));
+    fireEvent.press(screen.getByText('Direct IP'));
     expect(screen.getByTestId('connection-tutorial-visual-ip')).toBeTruthy();
   });
 
@@ -110,7 +111,7 @@ describe('ConnectionTutorialScreen visuals', () => {
       },
     });
 
-    expect(screen.getByText('掃碼').props.style).toEqual(
+    expect(screen.getByText('Scan QR').props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ color: '#ffffff' })]),
     );
 
@@ -121,7 +122,7 @@ describe('ConnectionTutorialScreen visuals', () => {
       },
     });
 
-    expect(screen.getByText('搜尋').props.style).toEqual(
+    expect(screen.getByText('Search').props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ color: '#ffffff' })]),
     );
   });

@@ -397,7 +397,7 @@ function CompletionCard({
       </Text>
       <View style={styles.completionMeta}>
         <Text style={styles.completionStats}>
-          {fileCount} {t('syncStatus.completion.filesUnit')} {'·'} {totalSize}
+          {fileCount} {t('syncStatus.completion.filesUnit')} {'-'} {totalSize}
         </Text>
         <Text style={styles.completionSubtext}>
           {t('syncStatus.completion.subtitle')}
@@ -1207,7 +1207,7 @@ export function SyncStatusScreen() {
             totalSize={formatBytes(todayStats.totalBytes)}
             latestSyncLabel={
               latestSync
-                ? `${formatDateTimeLabel(latestSync.updatedAt, t)} · ${latestSync.deviceName}`
+                ? `${formatDateTimeLabel(latestSync.updatedAt, t)} - ${latestSync.deviceName}`
                 : undefined
             }
             t={t}

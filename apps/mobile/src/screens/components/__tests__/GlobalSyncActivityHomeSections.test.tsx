@@ -51,7 +51,7 @@ jest.mock('react-native-svg', () => {
 const placeholders: RecentDownloadPlaceholder[] = [
   {
     key: 'photo',
-    label: '照片',
+    label: 'Photo',
     iconName: 'image-outline',
     iconColor: '#1677D2',
     iconBackground: '#B8DDF8',
@@ -59,7 +59,7 @@ const placeholders: RecentDownloadPlaceholder[] = [
   },
   {
     key: 'video',
-    label: '视频',
+    label: 'Video',
     iconName: 'play-circle-outline',
     iconColor: '#ffffff',
     iconBackground: '#AAB7FF',
@@ -89,7 +89,7 @@ describe('RecentDownloadsSection', () => {
     expect(textValues).toContain('syncActivity.recentDownload.emptyTitle');
     expect(textValues).toContain('syncActivity.recentDownload.emptyMessage');
     expect(textValues).not.toContain('syncActivity.empty.title');
-    expect(textValues).not.toContain('照片');
+    expect(textValues).not.toContain('Photo');
     expect(textValues).not.toContain('arrow-down-circle-outline');
 
     expect(

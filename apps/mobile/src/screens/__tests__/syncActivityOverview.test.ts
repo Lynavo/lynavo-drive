@@ -1348,11 +1348,11 @@ describe('shouldResetAutoUploadGateKickAttempt', () => {
 describe('resolveSyncErrorAlertMessage', () => {
   const t = ((key: string) => {
     const values: Record<string, string> = {
-      'errors.unknown': '未知錯誤',
+      'errors.unknown': 'Unknown error',
       'syncActivity.dialogs.syncError.lowDiskPaused':
-        '接收磁碟剩餘空間小於 500MB，已暫停新的接收任務',
+        'Receiving disk space is below 500 MB. New receive tasks have been paused',
       'syncActivity.dialogs.syncError.storageUnavailable':
-        '電腦端接收目錄不可用，請在電腦端重新選擇或恢復資料夾',
+        'The receive folder on your computer is unavailable. Choose another folder or restore it on the computer',
     };
     return values[key] ?? key;
   }) as TFunction;
@@ -1366,7 +1366,9 @@ describe('resolveSyncErrorAlertMessage', () => {
         },
         t,
       ),
-    ).toBe('接收磁碟剩餘空間小於 500MB，已暫停新的接收任務');
+    ).toBe(
+      'Receiving disk space is below 500 MB. New receive tasks have been paused',
+    );
   });
 
   it('keeps the native message for other errors', () => {
@@ -1387,6 +1389,8 @@ describe('resolveSyncErrorAlertMessage', () => {
         },
         t,
       ),
-    ).toBe('電腦端接收目錄不可用，請在電腦端重新選擇或恢復資料夾');
+    ).toBe(
+      'The receive folder on your computer is unavailable. Choose another folder or restore it on the computer',
+    );
   });
 });

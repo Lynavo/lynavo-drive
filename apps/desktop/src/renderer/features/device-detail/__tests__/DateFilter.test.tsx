@@ -26,9 +26,9 @@ describe('DateFilter', () => {
       />,
     );
 
-    expect(screen.getByText('完成日期')).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: '开始完成日期' })).not.toBeDisabled();
-    expect(screen.getByRole('combobox', { name: '结束完成日期' })).not.toBeDisabled();
+    expect(screen.getByText('Completed date')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Start completed date' })).not.toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'End completed date' })).not.toBeDisabled();
   });
 
   it('disables date selectors when there is only one completion date', () => {
@@ -45,8 +45,8 @@ describe('DateFilter', () => {
       />,
     );
 
-    expect(screen.getByRole('combobox', { name: '开始完成日期' })).toBeDisabled();
-    expect(screen.getByRole('combobox', { name: '结束完成日期' })).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Start completed date' })).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'End completed date' })).toBeDisabled();
     expect(onStartDateChange).not.toHaveBeenCalled();
     expect(onEndDateChange).not.toHaveBeenCalled();
   });

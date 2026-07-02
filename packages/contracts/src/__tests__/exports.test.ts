@@ -184,9 +184,7 @@ describe('@lynavo-drive/contracts exports', () => {
   it('exports OSS repository support links without official API endpoints', () => {
     expect(contracts.LYNAVO_REPOSITORY_URL).toBe('https://github.com/lynavo/lynavo-drive');
     expect(contracts.LYNAVO_WEB_BASE_URL).toBe('https://github.com/lynavo/lynavo-drive');
-    expect(contracts.LYNAVO_SUPPORT_URL).toBe(
-      'https://github.com/lynavo/lynavo-drive/issues',
-    );
+    expect(contracts.LYNAVO_SUPPORT_URL).toBe('https://github.com/lynavo/lynavo-drive/issues');
     expect(contracts.LYNAVO_SECURITY_ADVISORY_URL).toBe(
       'https://github.com/lynavo/lynavo-drive/security/advisories/new',
     );

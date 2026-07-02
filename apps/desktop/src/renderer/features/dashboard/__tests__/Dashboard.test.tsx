@@ -88,11 +88,11 @@ describe('Dashboard', () => {
   it('renders the local LAN cards without a remote access toggle', () => {
     render(<Dashboard />);
 
-    expect(screen.getByText('连接码')).toBeInTheDocument();
-    expect(screen.getByText('本地文件访问')).toBeInTheDocument();
-    expect(screen.queryByText('远程访问')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '远程访问开关' })).not.toBeInTheDocument();
-    expect(screen.getByText('接收目录')).toBeInTheDocument();
+    expect(screen.getByText('Pairing code')).toBeInTheDocument();
+    expect(screen.getByText('Local file access')).toBeInTheDocument();
+    expect(screen.queryByText('Remote access')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remote access toggle' })).not.toBeInTheDocument();
+    expect(screen.getByText('Receive folder')).toBeInTheDocument();
   });
 
   it('displays masked connection code by default and toggles mask', () => {
@@ -101,7 +101,7 @@ describe('Dashboard', () => {
     // Masked code is 6 dots
     expect(screen.getByText('••••••')).toBeInTheDocument();
 
-    const toggleBtn = screen.getByRole('button', { name: '显示连接码' });
+    const toggleBtn = screen.getByRole('button', { name: 'Show pairing code' });
     expect(toggleBtn).toBeInTheDocument();
 
     fireEvent.click(toggleBtn);
@@ -111,18 +111,20 @@ describe('Dashboard', () => {
   it('expands the connection QR code from the connection code card', () => {
     render(<Dashboard />);
 
-    expect(screen.queryByText('手机扫码配对该电脑')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Scan with your phone to pair this computer'),
+    ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '显示连接二维码' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show pairing QR code' }));
 
-    expect(screen.getByText('手机扫码配对该电脑')).toBeInTheDocument();
-    expect(screen.getByTitle('Lynavo Drive 连接二维码')).toBeInTheDocument();
+    expect(screen.getByText('Scan with your phone to pair this computer')).toBeInTheDocument();
+    expect(screen.getByTitle('Lynavo Drive pairing QR code')).toBeInTheDocument();
   });
 
   it('includes the desktop LAN IP in the connection QR code payload', () => {
     render(<Dashboard />);
 
-    fireEvent.click(screen.getByRole('button', { name: '显示连接二维码' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show pairing QR code' }));
 
     const qrValue = screen.getByTestId('connection-qr-code').getAttribute('data-value');
 
@@ -132,29 +134,31 @@ describe('Dashboard', () => {
   it('triggers copy connection code', async () => {
     render(<Dashboard />);
     // Reveal first to make it copyable or test copy directly
-    const copyBtn = screen.getByRole('button', { name: '复制' });
+    const copyBtn = screen.getByRole('button', { name: 'Copy' });
     fireEvent.click(copyBtn);
 
     expect(window.electronAPI?.files.copyToClipboard).toHaveBeenCalledWith('998877');
     await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith('连接码已复制');
+      expect(toast.success).toHaveBeenCalledWith('Pairing code copied');
     });
   });
 
   it('triggers regenerate connection code on double click', async () => {
     render(<Dashboard />);
     // First reveal
-    fireEvent.click(screen.getByRole('button', { name: '显示连接码' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show pairing code' }));
 
     const codeSpan = screen.getByText('998877');
     fireEvent.doubleClick(codeSpan);
 
     expect(window.confirm).toHaveBeenCalledWith(
-      '修改配对码会中断当前已配对的手机，所有手机需使用新配对码重新配对。要继续吗？',
+      'Changing the pairing code will invalidate all currently paired phones. They will need to pair again with the new code. Continue?',
     );
     expect(window.electronAPI?.sidecar.regenerateConnectionCode).toHaveBeenCalled();
     await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith('连接码已重新生成！旧配对设备已失效');
+      expect(toast.success).toHaveBeenCalledWith(
+        'Pairing code regenerated. Previously paired devices are no longer valid.',
+      );
     });
   });
 
@@ -162,11 +166,11 @@ describe('Dashboard', () => {
     window.confirm = vi.fn().mockReturnValue(false);
     render(<Dashboard />);
 
-    fireEvent.click(screen.getByRole('button', { name: '显示连接码' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show pairing code' }));
     fireEvent.doubleClick(screen.getByText('998877'));
 
     expect(window.confirm).toHaveBeenCalledWith(
-      '修改配对码会中断当前已配对的手机，所有手机需使用新配对码重新配对。要继续吗？',
+      'Changing the pairing code will invalidate all currently paired phones. They will need to pair again with the new code. Continue?',
     );
     expect(window.electronAPI?.sidecar.regenerateConnectionCode).not.toHaveBeenCalled();
   });
@@ -176,9 +180,9 @@ describe('Dashboard', () => {
 
     expect(screen.getByText('/tmp/received')).toBeInTheDocument();
     // 71500000000 bytes ~ 66.6 GB
-    expect(screen.getByText(/剩余 66.6 GB/)).toBeInTheDocument();
+    expect(screen.getByText(/Remaining 66.6 GB/)).toBeInTheDocument();
 
-    const modifyBtn = screen.getByRole('button', { name: '修改目录' });
+    const modifyBtn = screen.getByRole('button', { name: 'Change folder' });
     fireEvent.click(modifyBtn);
 
     expect(window.electronAPI?.files.selectFolder).toHaveBeenCalled();
@@ -186,7 +190,7 @@ describe('Dashboard', () => {
       expect(window.electronAPI?.sidecar.updateSettings).toHaveBeenCalledWith({
         rootPath: '/new/receive/path',
       });
-      expect(toast.success).toHaveBeenCalledWith('接收目录修改成功');
+      expect(toast.success).toHaveBeenCalledWith('Receive folder updated');
     });
   });
 });

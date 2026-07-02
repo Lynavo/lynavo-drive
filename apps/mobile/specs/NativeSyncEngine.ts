@@ -13,12 +13,12 @@ import type {
 } from '@lynavo-drive/contracts';
 
 export interface Spec extends TurboModule {
-  // 权限
+  // Permissions
   requestPhotoPermission(): Promise<'granted' | 'limited' | 'denied'>;
-  // 发现 (同时触发本地网络权限)
+  // Discovery (also triggers local network permission)
   startDiscovery(): Promise<void>;
   stopDiscovery(): Promise<void>;
-  // 绑定
+  // Binding
   pairDevice(params: {
     deviceId: string;
     host: string;
@@ -26,7 +26,7 @@ export interface Spec extends TurboModule {
     connectionCode: string;
   }): Promise<void>;
   disconnectAndUnbind(): Promise<void>;
-  // 状态查询
+  // Status queries
   getBindingState(): Promise<BindingStateDTO | null>;
   getSyncOverview(): Promise<SyncSummaryDTO>;
   getReadOnlyQueue(): Promise<ReadOnlyQueueItemDTO[]>;
@@ -93,9 +93,9 @@ export interface Spec extends TurboModule {
   pauseAutoUpload(): Promise<void>;
   disableAutoUpload(): Promise<void>;
   resumeAutoUpload(): Promise<void>;
-  // 设置
+  // Settings
   renameBoundDeviceAlias(alias: string): Promise<void>;
-  // 事件 (Codegen EventEmitter)
+  // Events (Codegen EventEmitter)
   readonly onDiscoveredDevicesChanged: (devices: DiscoveredDeviceDTO[]) => void;
   readonly onSyncStateChanged: (summary: SyncSummaryDTO) => void;
   readonly onQueueUpdated: (queue: ReadOnlyQueueItemDTO[]) => void;

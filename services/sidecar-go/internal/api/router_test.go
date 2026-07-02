@@ -3450,7 +3450,7 @@ func TestPersonalAccessCreatesAccessRecordsWhenClientMetadataPresent(t *testing.
 			t.Fatalf("expected %s access record, got %+v", action, records)
 		}
 	}
-	if seen["list"].ResourceName != "个人空间" || seen["list"].ResourceKind != "shared_folder" {
+	if seen["list"].ResourceName != "Personal Space" || seen["list"].ResourceKind != "shared_folder" {
 		t.Fatalf("list record should describe personal folder, got %+v", seen["list"])
 	}
 	if seen["view"].ResourceName != "notes.txt" || seen["view"].ResourceKind != "shared_file" ||

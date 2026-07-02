@@ -131,7 +131,7 @@ async function renderPrefilledPairingFailure(error: unknown) {
 
 describe('CodeVerifyScreen', () => {
   beforeAll(async () => {
-    await i18n.changeLanguage('zh-Hant');
+    await i18n.changeLanguage('en');
   });
 
   beforeEach(() => {
@@ -154,23 +154,25 @@ describe('CodeVerifyScreen', () => {
   it('keeps the original dev pairing-code help card', () => {
     const { getByText } = render(<CodeVerifyScreen />);
 
-    expect(getByText('去哪裡找連接碼？')).toBeTruthy();
+    expect(getByText('Where do I find the pairing code?')).toBeTruthy();
     expect(
       getByText(
-        '請在電腦端 Lynavo Drive 左側導覽列點擊「全域設定」，即可查看 6 位數字連接碼。',
+        'Open Lynavo Drive on your computer, choose Global Settings from the sidebar, and check the 6-digit pairing code.',
       ),
     ).toBeTruthy();
     expect(
-      getByText('連接碼不會自動刷新，需手動點擊「重新產生」才會更新。'),
+      getByText(
+        'The code does not refresh automatically. Use Regenerate to update it manually.',
+      ),
     ).toBeTruthy();
-    expect(getByText('示例')).toBeTruthy();
-    expect(getByText('查看詳細圖文教學 >')).toBeTruthy();
+    expect(getByText('Example')).toBeTruthy();
+    expect(getByText('View detailed tutorial >')).toBeTruthy();
   });
 
   it('opens the detailed connection tutorial from the original dev help card', () => {
     const { getByText } = render(<CodeVerifyScreen />);
 
-    fireEvent.press(getByText('查看詳細圖文教學 >'));
+    fireEvent.press(getByText('View detailed tutorial >'));
 
     expect(mockNavigate).toHaveBeenCalledWith('ConnectionTutorial');
   });
@@ -184,7 +186,9 @@ describe('CodeVerifyScreen', () => {
       }),
     );
 
-    expect(getByText('連接碼錯誤，還可嘗試 2 次')).toBeTruthy();
+    expect(
+      getByText('Incorrect pairing code. You can try 2 more times.'),
+    ).toBeTruthy();
   });
 
   it('keeps legacy PairingError wrong-code handling through the service wrapper', async () => {
@@ -192,7 +196,9 @@ describe('CodeVerifyScreen', () => {
       new PairingError('Pairing rejected', 'wrong_code', 1, false),
     );
 
-    expect(getByText('連接碼錯誤，還可嘗試 1 次')).toBeTruthy();
+    expect(
+      getByText('Incorrect pairing code. You can try 1 more times.'),
+    ).toBeTruthy();
   });
 
   it('shows permanent blocked guidance when pairDevice rejects with PAIRING_CLIENT_BLOCKED', async () => {
@@ -205,7 +211,9 @@ describe('CodeVerifyScreen', () => {
     );
 
     expect(
-      getByText('這台手機已被此電腦封鎖，請在電腦端解除後再試'),
+      getByText(
+        'This phone has been blocked by this computer. Unblock it on the computer, then try again.',
+      ),
     ).toBeTruthy();
   });
 
@@ -217,8 +225,14 @@ describe('CodeVerifyScreen', () => {
       }),
     );
 
-    expect(getByText('連接已失效，請重新輸入電腦端連接碼')).toBeTruthy();
-    expect(queryByText('連接碼錯誤，還可嘗試 2 次')).toBeNull();
+    expect(
+      getByText(
+        'The connection has expired. Enter the computer pairing code again.',
+      ),
+    ).toBeTruthy();
+    expect(
+      queryByText('Incorrect pairing code. You can try 2 more times.'),
+    ).toBeNull();
   });
 
   it('triggers Alert.alert when pairDevice throws APP_VERSION_INCOMPATIBLE', async () => {
@@ -251,9 +265,9 @@ describe('CodeVerifyScreen', () => {
       connectionCode: '123456',
     });
     expect(alertSpy).toHaveBeenCalledWith(
-      '版本不相容',
-      '手機與電腦端的版本不相容，請將電腦端（桌面端）App 更新至最新版本後再試。',
-      [{ text: '好' }],
+      'Version Incompatible',
+      'The app versions on your mobile device and computer are incompatible. Please update the desktop app to the latest version and try again.',
+      [{ text: 'OK' }],
     );
   });
 });

@@ -7,6 +7,7 @@ import { useSettingsStore } from '@renderer/stores/settings-store';
 import { useSidecarRuntimeStore } from '@renderer/stores/sidecar-runtime-store';
 import { mockSettings } from '@renderer/mocks/settings';
 import { installScrollbarActivityTracker } from '@renderer/hooks/scrollbar-activity';
+import i18n from '@renderer/i18n';
 import { INITIAL_SIDECAR_RUNTIME_STATE } from '../../../../shared/sidecar-runtime';
 import { AppShell, getTopActionsRight } from '../AppShell';
 
@@ -120,9 +121,9 @@ function installElectronAPI(
 }
 
 async function completeConnectionCodeSetup() {
-  fireEvent.click(await screen.findByRole('button', { name: '保存并进入Lynavo Drive' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Save and enter Lynavo Drive' }));
   await waitFor(() => {
-    expect(screen.queryByRole('heading', { name: '设置连接码' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Set pairing code' })).not.toBeInTheDocument();
   });
 }
 
@@ -161,9 +162,9 @@ describe('AppShell', () => {
 
     await completeConnectionCodeSetup();
 
-    expect(screen.queryByRole('heading', { name: '登录' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Login' })).not.toBeInTheDocument();
     expect(screen.getByTestId('sidebar')).toBeInTheDocument();
-    expect(screen.getByText('DashboardPage')).toBeInTheDocument();
+    expect(await screen.findByText('DashboardPage')).toBeInTheDocument();
     expect(onSidecarEvent).toHaveBeenCalled();
   });
 
@@ -185,7 +186,7 @@ describe('AppShell', () => {
 
     render(<AppShell />);
 
-    expect(await screen.findByRole('heading', { name: '设置连接码' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Set pairing code' })).toBeInTheDocument();
     expect(window.electronAPI).not.toHaveProperty('auth');
   });
 
@@ -197,7 +198,7 @@ describe('AppShell', () => {
     render(<AppShell />);
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '设置连接码' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Set pairing code' })).toBeInTheDocument();
     });
     expect(onSidecarEvent).toHaveBeenCalled();
   });
@@ -222,11 +223,11 @@ describe('AppShell', () => {
 
     const { container } = render(<AppShell />);
 
-    expect(await screen.findByRole('heading', { name: '设置连接码' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Set pairing code' })).toBeInTheDocument();
     expect(container.firstElementChild).toHaveClass('lynavo-window-drag-region');
-    expect(screen.getByRole('heading', { name: '设置连接码' }).closest('section')).toHaveClass(
-      'lynavo-window-no-drag-region',
-    );
+    expect(
+      screen.getByRole('heading', { name: 'Set pairing code' }).closest('section'),
+    ).toHaveClass('lynavo-window-no-drag-region');
     expect(screen.getByDisplayValue(mockSettings.connectionCode)).toBeInTheDocument();
     expect(screen.queryByTestId('sidebar')).not.toBeInTheDocument();
     expect(screen.queryByText('DashboardPage')).not.toBeInTheDocument();
@@ -237,15 +238,22 @@ describe('AppShell', () => {
 
     render(<AppShell />);
 
-    expect(await screen.findByRole('heading', { name: '设置连接码' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Set pairing code' })).toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole('combobox', { name: '界面语言' }), {
+    fireEvent.change(screen.getByRole('combobox', { name: 'Interface language' }), {
       target: { value: 'zh-Hant' },
     });
 
-    expect(await screen.findByRole('heading', { name: '設定連線碼' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '儲存並進入 Lynavo Drive' })).toBeInTheDocument();
-    expect(screen.getByText('掃碼下載手機端')).toBeInTheDocument();
+    const zhHant = i18n.getFixedT('zh-Hant');
+    expect(
+      await screen.findByRole('heading', { name: zhHant('layout.connectionSetup.title') }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: zhHant('layout.connectionSetup.saveAndEnter') }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(zhHant('layout.connectionSetup.steps.download.title')),
+    ).toBeInTheDocument();
   });
 
   it('saves the connection code setup before entering the dashboard', async () => {
@@ -254,16 +262,16 @@ describe('AppShell', () => {
 
     render(<AppShell />);
 
-    fireEvent.change(await screen.findByLabelText('连接码'), {
+    fireEvent.change(await screen.findByLabelText('Pairing code'), {
       target: { value: '238416' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '保存并进入Lynavo Drive' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save and enter Lynavo Drive' }));
 
     await waitFor(() => {
       expect(window.electronAPI?.sidecar.setConnectionCode).toHaveBeenCalledWith('238416');
     });
     expect(window.confirm).toHaveBeenCalledWith(
-      '修改配对码会中断当前已配对的手机，所有手机需使用新配对码重新配对。要继续吗？',
+      'Changing the pairing code will invalidate all currently paired phones. They will need to pair again with the new code. Continue?',
     );
     expect(await screen.findByTestId('sidebar')).toBeInTheDocument();
     expect(await screen.findByText('DashboardPage')).toBeInTheDocument();
@@ -275,16 +283,16 @@ describe('AppShell', () => {
 
     render(<AppShell />);
 
-    fireEvent.change(await screen.findByLabelText('连接码'), {
+    fireEvent.change(await screen.findByLabelText('Pairing code'), {
       target: { value: '238416' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '保存并进入Lynavo Drive' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save and enter Lynavo Drive' }));
 
     expect(window.confirm).toHaveBeenCalledWith(
-      '修改配对码会中断当前已配对的手机，所有手机需使用新配对码重新配对。要继续吗？',
+      'Changing the pairing code will invalidate all currently paired phones. They will need to pair again with the new code. Continue?',
     );
     expect(window.electronAPI?.sidecar.setConnectionCode).not.toHaveBeenCalled();
-    expect(screen.getByRole('heading', { name: '设置连接码' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Set pairing code' })).toBeInTheDocument();
     expect(screen.queryByTestId('sidebar')).not.toBeInTheDocument();
   });
 
@@ -294,7 +302,7 @@ describe('AppShell', () => {
 
     render(<AppShell />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '保存并进入Lynavo Drive' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Save and enter Lynavo Drive' }));
 
     expect(await screen.findByTestId('sidebar')).toBeInTheDocument();
     expect(await screen.findByText('DashboardPage')).toBeInTheDocument();
@@ -352,7 +360,7 @@ describe('AppShell', () => {
 
     await completeConnectionCodeSetup();
     const helpButton = await screen.findByRole('button', {
-      name: /帮助|幫助|layout\.nav\.help/i,
+      name: /Help|layout\.nav\.help/i,
     });
     helpButton.click();
 
@@ -372,7 +380,7 @@ describe('AppShell', () => {
     await completeConnectionCodeSetup();
     expect(window.electronAPI?.platform.setModalOverlayActive).toHaveBeenLastCalledWith(false);
 
-    fireEvent.click(await screen.findByRole('button', { name: /帮助|幫助|layout\.nav\.help/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Help|layout\.nav\.help/i }));
 
     await waitFor(() => {
       expect(window.electronAPI?.platform.setModalOverlayActive).toHaveBeenLastCalledWith(true);
@@ -385,9 +393,9 @@ describe('AppShell', () => {
     render(<AppShell />);
 
     await completeConnectionCodeSetup();
-    fireEvent.click(await screen.findByRole('button', { name: '下载移动端' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Download mobile app' }));
 
-    expect(screen.getByText('扫码下载移动端')).toBeInTheDocument();
+    expect(screen.getByText('Scan to download mobile app')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'iOS' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Android' })).toBeInTheDocument();
   });
@@ -397,11 +405,11 @@ describe('AppShell', () => {
 
     render(<AppShell />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'iOS 下载二维码' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'iOS download QR code' }));
     expect(openExternal).toHaveBeenLastCalledWith('https://github.com/lynavo/lynavo-drive');
 
     await completeConnectionCodeSetup();
-    fireEvent.click(await screen.findByRole('button', { name: '下载移动端' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Download mobile app' }));
     fireEvent.click(screen.getByRole('button', { name: 'Android' }));
 
     expect(openExternal).toHaveBeenLastCalledWith('https://github.com/lynavo/lynavo-drive');

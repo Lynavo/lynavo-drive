@@ -119,21 +119,21 @@ describe('ReceivedLibraryPage', () => {
 
   it('renders page layout and titles', () => {
     render(<ReceivedLibraryPage />);
-    expect(screen.getByText('同步记录')).toBeInTheDocument();
-    expect(screen.getByText('总接收文件数')).toBeInTheDocument();
-    expect(screen.getByText('占用总空间')).toBeInTheDocument();
-    expect(screen.getByText('磁盘剩余空间')).toBeInTheDocument();
+    expect(screen.getByText('Sync records')).toBeInTheDocument();
+    expect(screen.getByText('Total received files')).toBeInTheDocument();
+    expect(screen.getByText('Total used space')).toBeInTheDocument();
+    expect(screen.getByText('Remaining disk space')).toBeInTheDocument();
   });
 
   it('places the device count below the stats area instead of in the page header', async () => {
     const { container } = render(<ReceivedLibraryPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('0 台设备')).toBeInTheDocument();
+      expect(screen.getByText('0 devices')).toBeInTheDocument();
     });
 
     const header = container.querySelector('header');
-    expect(header).not.toHaveTextContent('0 台设备');
+    expect(header).not.toHaveTextContent('0 devices');
   });
 
   it('keeps the title and summary fixed while device and file lists scroll independently', () => {
@@ -145,9 +145,9 @@ describe('ReceivedLibraryPage', () => {
 
     expect(root).toHaveClass('overflow-hidden');
     expect(scrollRegion).toHaveClass('overflow-auto');
-    expect(fixedSummary).toContainElement(screen.getByText('同步记录'));
-    expect(fixedSummary).toContainElement(screen.getByText('总接收文件数'));
-    expect(scrollRegion).not.toContainElement(screen.getByText('同步记录'));
+    expect(fixedSummary).toContainElement(screen.getByText('Sync records'));
+    expect(fixedSummary).toContainElement(screen.getByText('Total received files'));
+    expect(scrollRegion).not.toContainElement(screen.getByText('Sync records'));
   });
 
   it('loads the next received page when the scroll sentinel becomes visible', async () => {
@@ -223,9 +223,9 @@ describe('ReceivedLibraryPage', () => {
   it('displays the real empty state instead of preview sync records when no real items exist', async () => {
     render(<ReceivedLibraryPage />);
     await waitFor(() => {
-      expect(screen.getByText('尚无同步记录')).toBeInTheDocument();
+      expect(screen.getByText('No sync records yet')).toBeInTheDocument();
     });
-    expect(screen.getByText('0 台设备')).toBeInTheDocument();
+    expect(screen.getByText('0 devices')).toBeInTheDocument();
     expect(screen.queryByText('iPhone 15 Pro')).not.toBeInTheDocument();
     expect(screen.queryByText('Galaxy S24 Ultra')).not.toBeInTheDocument();
     expect(screen.queryByText('IMG_20260610_Office.mov')).not.toBeInTheDocument();
@@ -315,8 +315,8 @@ describe('ReceivedLibraryPage', () => {
     expect(screen.getByText('iOS')).toBeInTheDocument();
 
     // Stats
-    expect(screen.getByText('相册上传 1')).toBeInTheDocument();
-    expect(screen.getByText('文件上传 1')).toBeInTheDocument();
+    expect(screen.getByText('Album uploads 1')).toBeInTheDocument();
+    expect(screen.getByText('File uploads 1')).toBeInTheDocument();
     expect(screen.getAllByText('3.0 MB').length).toBeGreaterThan(0);
   });
 
@@ -353,10 +353,10 @@ describe('ReceivedLibraryPage', () => {
     render(<ReceivedLibraryPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('1 台设备')).toBeInTheDocument();
+      expect(screen.getByText('1 devices')).toBeInTheDocument();
     });
     expect(screen.getAllByText('Alice iPhone').length).toBeGreaterThan(0);
-    expect(screen.queryByText('尚无同步记录')).not.toBeInTheDocument();
+    expect(screen.queryByText('No sync records yet')).not.toBeInTheDocument();
   });
 
   it('does not show a status badge for received files that are not shared', async () => {
@@ -384,7 +384,7 @@ describe('ReceivedLibraryPage', () => {
     await waitFor(() => {
       expect(screen.getAllByText('photo.jpg').length).toBeGreaterThan(0);
     });
-    expect(screen.queryByText('仅电脑端存在')).not.toBeInTheDocument();
+    expect(screen.queryByText('Only exists on desktop')).not.toBeInTheDocument();
   });
 
   it('renders received image thumbnails and falls back when the image fails', async () => {
@@ -596,10 +596,10 @@ describe('ReceivedLibraryPage', () => {
     render(<ReceivedLibraryPage />);
 
     await waitFor(() => {
-      expect(screen.getByTitle('打开目录')).toBeInTheDocument();
+      expect(screen.getByTitle('Open folder')).toBeInTheDocument();
     });
 
-    const openBtn = screen.getByTitle('打开目录');
+    const openBtn = screen.getByTitle('Open folder');
     fireEvent.click(openBtn);
     expect(window.electronAPI?.files.openFolder).toHaveBeenCalledWith(
       '/mock/receive/path/My iPhone',
@@ -678,13 +678,13 @@ describe('ReceivedLibraryPage', () => {
     render(<ReceivedLibraryPage />);
 
     await waitFor(() => {
-      expect(screen.getByTitle('打开目录')).toBeInTheDocument();
+      expect(screen.getByTitle('Open folder')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTitle('打开目录'));
+    fireEvent.click(screen.getByTitle('Open folder'));
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('设备目录不存在或无法打开');
+      expect(toast.error).toHaveBeenCalledWith('Device folder does not exist or cannot be opened');
     });
     expect(openFolder).toHaveBeenCalledTimes(1);
     expect(openFolder).not.toHaveBeenCalledWith('/mock/receive/path');

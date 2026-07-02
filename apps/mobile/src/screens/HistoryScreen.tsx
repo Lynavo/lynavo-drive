@@ -79,7 +79,9 @@ export function HistoryScreen() {
         const { NativeSyncEngine } = NativeModules;
         const binding = await NativeSyncEngine?.getBindingState();
         if (!binding || !binding.host) {
-          Alert.alert(t('sharedFiles.deviceUnavailable.title') || '設備不可用');
+          Alert.alert(
+            t('sharedFiles.deviceUnavailable.title') || 'Device Unavailable',
+          );
           return;
         }
 
@@ -87,18 +89,18 @@ export function HistoryScreen() {
         await downloadResource(desktop, fileKey);
 
         Alert.alert(
-          t('sharedFiles.dialogs.downloadComplete') || '下載完成',
+          t('sharedFiles.dialogs.downloadComplete') || 'Download complete',
           t('sharedFiles.dialogs.downloadSavedToPhotos', {
             name: filename,
-            location: t('sharedFiles.dialogs.savedLocationPhotos') || '相簿',
-          }) || `${filename} 已儲存至相簿`,
+            location: t('sharedFiles.dialogs.savedLocationPhotos') || 'Photos',
+          }) || `${filename} saved to Photos`,
         );
       } catch (err) {
         console.warn('[HistoryScreen] Download failed:', err);
         Alert.alert(
-          t('sharedFiles.dialogs.downloadFailed') || '下載失敗',
+          t('sharedFiles.dialogs.downloadFailed') || 'Download Failed',
           t('sharedFiles.dialogs.downloadFailedMessage') ||
-            '無法下載檔案，請稍後重試',
+            'Could not download the file. Please try again later',
         );
       } finally {
         setDownloadingId(null);
@@ -132,9 +134,9 @@ export function HistoryScreen() {
     const isImage =
       mediaType === 'image' ||
       /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(filename);
-    if (isVideo) return '視頻';
-    if (isImage) return '照片';
-    return '文件';
+    if (isVideo) return 'Video';
+    if (isImage) return 'Photo';
+    return 'File';
   };
 
   const formatItemTime = (isoString?: string) => {
@@ -153,10 +155,10 @@ export function HistoryScreen() {
     });
 
     if (date.toDateString() === today.toDateString()) {
-      return `今天 ${timeString}`;
+      return `Today ${timeString}`;
     }
     if (date.toDateString() === yesterday.toDateString()) {
-      return `昨天 ${timeString}`;
+      return `Yesterday ${timeString}`;
     }
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${timeString}`;
   };
@@ -178,7 +180,7 @@ export function HistoryScreen() {
             {item.filename}
           </Text>
           <Text style={styles.fileMeta}>
-            {`${fileType} · ${formatBytes(item.fileSize)}`}
+            {`${fileType} - ${formatBytes(item.fileSize)}`}
           </Text>
           {formattedTime ? (
             <Text style={styles.fileTime}>{formattedTime}</Text>
@@ -225,7 +227,7 @@ export function HistoryScreen() {
             >
               <Icon name="chevron-back" size={20} color={colors.screenTitle} />
             </TouchableOpacity>
-            <Text style={styles.title}>最近下載</Text>
+            <Text style={styles.title}>Recent Downloads</Text>
           </View>
 
           {/* Content */}
@@ -247,7 +249,7 @@ export function HistoryScreen() {
                     size={48}
                     color="#b0c8da"
                   />
-                  <Text style={styles.emptyText}>暫無下載記錄</Text>
+                  <Text style={styles.emptyText}>No download records yet</Text>
                 </View>
               }
             />

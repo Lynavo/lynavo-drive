@@ -240,10 +240,10 @@ describe('registerIpcHandlers', () => {
     registerIpcHandlers(manager as never);
     const handler = handlers.get(IPC.SUPPORT_EXPORT_DIAGNOSTICS);
 
-    await expect(handler?.(undefined, 'zh-Hans', 'Wi-Fi 断线')).resolves.toBe(
+    await expect(handler?.(undefined, 'zh-Hans', 'Wi-Fi disconnected')).resolves.toBe(
       '/tmp/lynavo-drive-diagnostics.zip',
     );
-    expect(exportDiagnostics).toHaveBeenCalledWith(manager, 'zh-Hans', 'Wi-Fi 断线');
+    expect(exportDiagnostics).toHaveBeenCalledWith(manager, 'zh-Hans', 'Wi-Fi disconnected');
   });
 
   it('does not register stale support network IPC handlers', async () => {

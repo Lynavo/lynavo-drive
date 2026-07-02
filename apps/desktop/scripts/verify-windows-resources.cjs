@@ -25,7 +25,9 @@ const optional = [
 ];
 
 const missing = required.filter(({ file }) => !fs.existsSync(path.join(resourcesDir, file)));
-const missingOptional = optional.filter(({ file }) => !fs.existsSync(path.join(resourcesDir, file)));
+const missingOptional = optional.filter(
+  ({ file }) => !fs.existsSync(path.join(resourcesDir, file)),
+);
 
 if (missing.length === 0) {
   console.log('[verify-windows-resources] all required Windows resources present ✓');
@@ -35,7 +37,9 @@ if (missing.length === 0) {
       console.warn(`  ! apps/desktop/resources/${file}`);
       console.warn(`    → ${hint}`);
     }
-    console.warn('  Continuing; sidecar will use the built-in zeroconf-compatible fallback when needed.');
+    console.warn(
+      '  Continuing; sidecar will use the built-in zeroconf-compatible fallback when needed.',
+    );
   }
   process.exit(0);
 }

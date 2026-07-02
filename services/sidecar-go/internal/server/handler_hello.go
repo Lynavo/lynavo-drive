@@ -88,7 +88,7 @@ func (c *connection) handleHello(body []byte) error {
 		return c.rejectWithError(
 			errorAppVersionIncompatible,
 			fmt.Sprintf(
-				"手機與桌面 App 版本不相容，請同時更新兩端後再連線。手機版本=%s 相容版本=%d，桌面相容版本=%d",
+				"Phone and desktop app versions are incompatible. Please update both apps before reconnecting. phoneVersion=%s compatibilityVersion=%d desktopCompatibilityVersion=%d",
 				req.AppVersion,
 				req.AppCompatibilityVersion,
 				protocol.AppCompatibilityVersion,

@@ -212,14 +212,16 @@ export function LocalComputerScreen() {
         const { NativeSyncEngine } = NativeModules;
         const binding = await NativeSyncEngine?.getBindingState();
         if (!binding || !binding.host) {
-          Alert.alert(t('sharedFiles.deviceUnavailable.title') || '設備不可用');
+          Alert.alert(
+            t('sharedFiles.deviceUnavailable.title') || 'Device Unavailable',
+          );
           return;
         }
 
         const desktop = { host: binding.host, port: 39394 };
         await downloadResource(desktop, resourceId);
 
-        // Keep 「最近下載」 in sync with local-computer downloads.
+        // Keep Recent Downloads in sync with local-computer downloads.
         await recordDownloadedFile({
           resourceId,
           filename,
@@ -237,23 +239,23 @@ export function LocalComputerScreen() {
           isVideoFile(item.mediaType, filename);
 
         Alert.alert(
-          t('sharedFiles.dialogs.downloadComplete') || '下載完成',
+          t('sharedFiles.dialogs.downloadComplete') || 'Download complete',
           isPhotoOrVideo
             ? t('sharedFiles.dialogs.downloadSavedToPhotos', {
                 name: filename,
                 location:
-                  t('sharedFiles.dialogs.savedLocationPhotos') || '相簿',
-              }) || `${filename} 已儲存至相簿`
+                  t('sharedFiles.dialogs.savedLocationPhotos') || 'Photos',
+              }) || `${filename} saved to Photos`
             : t('sharedFiles.dialogs.downloadSavedToFiles', {
                 name: filename,
-              }) || `${filename} 已保存到文件`,
+              }) || `${filename} saved to Files`,
         );
       } catch (err) {
         console.warn('[LocalComputerScreen] Download failed:', err);
         Alert.alert(
-          t('sharedFiles.dialogs.downloadFailed') || '下載失敗',
+          t('sharedFiles.dialogs.downloadFailed') || 'Download Failed',
           t('sharedFiles.dialogs.downloadFailedMessage') ||
-            '無法下載檔案，請稍後重試',
+            'Could not download the file. Please try again later',
         );
       } finally {
         setDownloadingId(null);
@@ -301,9 +303,10 @@ export function LocalComputerScreen() {
     );
     if (selectedFiles.length === 0) {
       Alert.alert(
-        t('sharedFiles.localComputer.shareNoSelectionTitle') || '尚未選擇檔案',
+        t('sharedFiles.localComputer.shareNoSelectionTitle') ||
+          'No Files Selected',
         t('sharedFiles.localComputer.shareNoSelectionMessage') ||
-          '請先選擇要分享的檔案',
+          'Select files to share first',
       );
       return;
     }
@@ -312,7 +315,9 @@ export function LocalComputerScreen() {
     try {
       const desktop = await getBoundDesktop();
       if (!desktop) {
-        Alert.alert(t('sharedFiles.deviceUnavailable.title') || '設備不可用');
+        Alert.alert(
+          t('sharedFiles.deviceUnavailable.title') || 'Device Unavailable',
+        );
         return;
       }
       await shareResources(
@@ -327,9 +332,9 @@ export function LocalComputerScreen() {
     } catch (err) {
       console.warn('[LocalComputerScreen] Share failed:', err);
       Alert.alert(
-        t('sharedFiles.localComputer.shareFailedTitle') || '分享失敗',
+        t('sharedFiles.localComputer.shareFailedTitle') || 'Share Failed',
         t('sharedFiles.localComputer.shareFailedMessage') ||
-          '無法開啟系統分享，請稍後重試',
+          'Could not open the system share sheet. Please try again later',
       );
     } finally {
       setSharing(false);
@@ -343,7 +348,9 @@ export function LocalComputerScreen() {
       try {
         const desktop = await getBoundDesktop();
         if (!desktop) {
-          Alert.alert(t('sharedFiles.deviceUnavailable.title') || '設備不可用');
+          Alert.alert(
+            t('sharedFiles.deviceUnavailable.title') || 'Device Unavailable',
+          );
           return;
         }
 
@@ -370,9 +377,9 @@ export function LocalComputerScreen() {
               err,
             );
             Alert.alert(
-              t('sharedFiles.dialogs.previewFailed') || '預覽失敗',
+              t('sharedFiles.dialogs.previewFailed') || 'Preview Failed',
               t('sharedFiles.dialogs.previewFailedMessage') ||
-                '無法取得檔案預覽',
+                'Could not load file preview',
             );
           }
           return;
@@ -391,8 +398,9 @@ export function LocalComputerScreen() {
       } catch (err) {
         console.warn('[LocalComputerScreen] Preview failed:', err);
         Alert.alert(
-          t('sharedFiles.dialogs.previewFailed') || '預覽失敗',
-          t('sharedFiles.dialogs.previewFailedMessage') || '無法取得檔案預覽',
+          t('sharedFiles.dialogs.previewFailed') || 'Preview Failed',
+          t('sharedFiles.dialogs.previewFailedMessage') ||
+            'Could not load file preview',
         );
       }
     },
@@ -606,7 +614,7 @@ export function LocalComputerScreen() {
           <Text style={styles.headerTitle} numberOfLines={1}>
             {currentFolder
               ? `${currentFolder.displayName}`
-              : t('sharedFiles.localComputer.title') || '電腦檔案'}
+              : t('sharedFiles.localComputer.title') || 'Computer Files'}
           </Text>
           <TouchableOpacity
             style={styles.selectButton}
@@ -615,8 +623,8 @@ export function LocalComputerScreen() {
           >
             <Text style={styles.selectButtonText}>
               {selectionMode
-                ? t('sharedFiles.localComputer.done') || '完成'
-                : t('sharedFiles.localComputer.select') || '選擇'}
+                ? t('sharedFiles.localComputer.done') || 'Done'
+                : t('sharedFiles.localComputer.select') || 'Select'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -657,7 +665,7 @@ export function LocalComputerScreen() {
           <View style={styles.centered}>
             <Icon name="folder-open-outline" size={48} color="#94a3b8" />
             <Text style={styles.emptyText}>
-              {t('sharedFiles.localComputer.empty') || '此資料夾為空'}
+              {t('sharedFiles.localComputer.empty') || 'This folder is empty'}
             </Text>
           </View>
         ) : (
@@ -677,7 +685,7 @@ export function LocalComputerScreen() {
             <Text style={styles.selectionCount}>
               {t('sharedFiles.localComputer.selectedCount', {
                 count: selectedIds.size,
-              }) || `已選擇 ${selectedIds.size} 個`}
+              }) || `Selected ${selectedIds.size} items`}
             </Text>
             <View style={styles.selectionActions}>
               <TouchableOpacity
@@ -696,7 +704,7 @@ export function LocalComputerScreen() {
                   <>
                     <Icon name="download-outline" size={17} color="#2563eb" />
                     <Text style={styles.selectionDownloadButtonText}>
-                      {t('sharedFiles.localComputer.download') || '下載'}
+                      {t('sharedFiles.localComputer.download') || 'Download'}
                     </Text>
                   </>
                 )}
@@ -717,7 +725,7 @@ export function LocalComputerScreen() {
                   <>
                     <Icon name="share-outline" size={17} color="#ffffff" />
                     <Text style={styles.shareButtonText}>
-                      {t('sharedFiles.localComputer.share') || '分享'}
+                      {t('sharedFiles.localComputer.share') || 'Share'}
                     </Text>
                   </>
                 )}

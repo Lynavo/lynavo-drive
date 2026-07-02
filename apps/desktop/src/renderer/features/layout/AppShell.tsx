@@ -64,8 +64,8 @@ const TITLE_BAR_OVERLAY_CONTROLS_FALLBACK_WIDTH = 128;
 const TITLE_BAR_OVERLAY_CONTROLS_GAP = 10;
 const setupLocaleLabels: Record<SupportedLocale, string> = {
   en: 'English',
-  'zh-Hans': '简体中文',
-  'zh-Hant': '繁體中文',
+  'zh-Hans': 'Simplified Chinese',
+  'zh-Hant': 'Traditional Chinese',
 };
 const mobileDownloadLinks = [
   {

@@ -71,7 +71,7 @@ export function GlobalBottomTabBar({
               activeTab === 'home' && styles.activeTabLabel,
             ]}
           >
-            {t('common.tabs.home') || '首页'}
+            {t('common.tabs.home') || 'Home'}
           </Text>
         </TouchableOpacity>
 
@@ -98,7 +98,7 @@ export function GlobalBottomTabBar({
               activeTab === 'files' && styles.activeTabLabel,
             ]}
           >
-            {t('common.tabs.files') || '电脑文件'}
+            {t('common.tabs.files') || 'Computer Files'}
           </Text>
         </TouchableOpacity>
 
@@ -125,7 +125,7 @@ export function GlobalBottomTabBar({
               activeTab === 'settings' && styles.activeTabLabel,
             ]}
           >
-            {t('common.tabs.settings') || '我的'}
+            {t('common.tabs.settings') || 'Me'}
           </Text>
         </TouchableOpacity>
       </View>

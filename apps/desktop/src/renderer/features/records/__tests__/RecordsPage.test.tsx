@@ -64,26 +64,26 @@ describe('RecordsPage', () => {
 
   it('renders filter search and date inputs', () => {
     render(<RecordsPage />);
-    expect(screen.getByPlaceholderText('搜索用户名、设备或 IP')).toBeInTheDocument();
-    const startDateInput = screen.getByLabelText('开始日期') as HTMLInputElement;
-    const endDateInput = screen.getByLabelText('结束日期') as HTMLInputElement;
+    expect(screen.getByPlaceholderText('Search username, device, or IP')).toBeInTheDocument();
+    const startDateInput = screen.getByLabelText('Start date') as HTMLInputElement;
+    const endDateInput = screen.getByLabelText('End date') as HTMLInputElement;
     expect(startDateInput.type).toBe('date');
     expect(endDateInput.type).toBe('date');
     expect(screen.getAllByText('iPhone 15 Pro').length).toBeGreaterThan(0);
-    expect(screen.getByText('产品需求文档v3.pdf')).toBeInTheDocument();
+    expect(screen.getByText('Product requirements v3.pdf')).toBeInTheDocument();
   });
 
   it('shows date clearing and reference pagination for preview access records', () => {
     render(<RecordsPage />);
 
-    fireEvent.change(screen.getByLabelText('开始日期'), {
+    fireEvent.change(screen.getByLabelText('Start date'), {
       target: { value: '2026-06-01' },
     });
-    expect(screen.getByRole('button', { name: '清空' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clear' })).toBeInTheDocument();
 
-    const pagination = screen.getByRole('navigation', { name: '访问记录分页' });
+    const pagination = screen.getByRole('navigation', { name: 'Access records pagination' });
     expect(pagination).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '上一页' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '2' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '3' })).toBeInTheDocument();
 
@@ -122,12 +122,12 @@ describe('RecordsPage', () => {
     expect(screen.getByText('Android')).toBeInTheDocument();
     expect(screen.getByText('clip.mp4')).toBeInTheDocument();
     expect(screen.getByText('photo.jpg')).toBeInTheDocument();
-    expect(screen.getByText('下载')).toBeInTheDocument();
-    expect(screen.getByText('预览')).toBeInTheDocument();
+    expect(screen.getByText('Download')).toBeInTheDocument();
+    expect(screen.getByText('Preview')).toBeInTheDocument();
     expect(screen.getByText('2026-06-15')).toBeInTheDocument();
-    expect(screen.getByText('局域网')).toBeInTheDocument();
+    expect(screen.getByText('LAN')).toBeInTheDocument();
     expect(screen.getByText('192.168.1.112')).toBeInTheDocument();
-    expect(screen.queryByText(/广东省/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Guangdong Province/)).not.toBeInTheDocument();
   });
 
   it('does not invent an IP address when a device has not been matched', () => {
@@ -138,7 +138,7 @@ describe('RecordsPage', () => {
 
     render(<RecordsPage />);
 
-    expect(screen.getByText('IP 未记录')).toBeInTheDocument();
+    expect(screen.getByText('IP not recorded')).toBeInTheDocument();
     expect(screen.queryByText('192.168.1.106')).not.toBeInTheDocument();
   });
 
@@ -153,7 +153,7 @@ describe('RecordsPage', () => {
 
     render(<RecordsPage />);
 
-    const fileButton = screen.getByRole('button', { name: '在文件夹中显示 clip.mp4' });
+    const fileButton = screen.getByRole('button', { name: 'Show clip.mp4 in folder' });
     expect(fileButton).toHaveAttribute(
       'title',
       '/Users/alice/Lynavo Drive/received/Alice iPhone/2026-06-15/clip.mp4',
@@ -193,17 +193,17 @@ describe('RecordsPage', () => {
 
     render(<RecordsPage />);
 
-    const searchInput = screen.getByPlaceholderText('搜索用户名、设备或 IP');
+    const searchInput = screen.getByPlaceholderText('Search username, device, or IP');
     fireEvent.change(searchInput, { target: { value: 'nonexistent' } });
 
     expect(screen.queryByText('Galaxy S24')).not.toBeInTheDocument();
-    expect(screen.getByText('没有匹配的访问记录')).toBeInTheDocument();
+    expect(screen.getByText('No matching access records')).toBeInTheDocument();
   });
 
   it('renders preview access records for an empty real list and still renders error states', () => {
     const { rerender } = render(<RecordsPage />);
     expect(screen.getAllByText('iPhone 15 Pro').length).toBeGreaterThan(0);
-    expect(screen.queryByText('没有匹配的访问记录')).not.toBeInTheDocument();
+    expect(screen.queryByText('No matching access records')).not.toBeInTheDocument();
 
     useManagementStore.setState({ accessRecordsError: 'load failed' });
     rerender(<RecordsPage />);

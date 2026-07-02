@@ -100,7 +100,7 @@ const mockEmitter = {
 
 describe('DeviceDiscoveryScreen — switch mode', () => {
   beforeAll(async () => {
-    await i18n.changeLanguage('zh-Hant');
+    await i18n.changeLanguage('en');
   });
 
   beforeEach(() => {
@@ -128,15 +128,15 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
   it('shows back button and keeps manual pairing options available', async () => {
     const { getByText, queryByText } = render(<DeviceDiscoveryScreen />);
     await waitFor(() => {
-      expect(getByText('手動配對')).toBeTruthy();
+      expect(getByText('Manual Pairing')).toBeTruthy();
       expect(queryByText('chevron-back')).toBeTruthy();
     });
 
-    fireEvent.press(getByText('手動配對'));
+    fireEvent.press(getByText('Manual Pairing'));
 
     await waitFor(() => {
-      expect(getByText('手動輸入 IP')).toBeTruthy();
-      expect(getByText('掃碼配對')).toBeTruthy();
+      expect(getByText('Enter IP Manually')).toBeTruthy();
+      expect(getByText('Scan QR Code')).toBeTruthy();
     });
   });
 
@@ -179,9 +179,9 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
 
     await waitFor(() => {
       expect(getByText('Studio Mac')).toBeTruthy();
-      expect(getByText('已連過')).toBeTruthy();
+      expect(getByText('Previously Connected')).toBeTruthy();
     });
-    expect(queryByText('直接切換')).toBeNull();
+    expect(queryByText('Switch directly')).toBeNull();
 
     fireEvent.press(getByText('Studio Mac'));
 
@@ -200,9 +200,9 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
       port: 39393,
       authorizationStatus: 'authorized',
     });
-    expect(queryByPlaceholderText('輸入連接碼')).toBeNull();
-    expect(queryByText('選擇連接方式')).toBeNull();
-    expect(queryByText('掃碼連接')).toBeNull();
+    expect(queryByPlaceholderText('Enter pairing code')).toBeNull();
+    expect(queryByText('Select Connection Method')).toBeNull();
+    expect(queryByText('Scan QR Code')).toBeNull();
     expect(mockDispatch).toHaveBeenCalledWith({
       type: 'RESET',
       payload: {
@@ -253,13 +253,13 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
 
     await waitFor(() => {
       expect(getByText('Studio Mac')).toBeTruthy();
-      expect(getByText('已連過')).toBeTruthy();
+      expect(getByText('Previously Connected')).toBeTruthy();
     });
-    expect(queryByText('直接切換')).toBeNull();
+    expect(queryByText('Switch directly')).toBeNull();
     fireEvent.press(getByText('Studio Mac'));
 
     await waitFor(() => {
-      expect(getByPlaceholderText('輸入連接碼')).toBeTruthy();
+      expect(getByPlaceholderText('Enter pairing code')).toBeTruthy();
     });
     expect(mockNativeSyncEngine.pairDevice).toHaveBeenCalledWith({
       deviceId: 'server-known',
@@ -267,11 +267,11 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
       port: 39393,
       connectionCode: '',
     });
-    expect(queryByText('選擇連接方式')).toBeNull();
-    expect(queryByText('掃碼連接')).toBeNull();
+    expect(queryByText('Select Connection Method')).toBeNull();
+    expect(queryByText('Scan QR Code')).toBeNull();
 
-    fireEvent.changeText(getByPlaceholderText('輸入連接碼'), '111111');
-    fireEvent.press(getByText('連接'));
+    fireEvent.changeText(getByPlaceholderText('Enter pairing code'), '111111');
+    fireEvent.press(getByText('Connect'));
 
     await waitFor(() => {
       expect(mockNativeSyncEngine.pairDevice).toHaveBeenCalledWith({
@@ -324,13 +324,13 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
     fireEvent.press(getByText('New PC'));
 
     await waitFor(() => {
-      expect(getByPlaceholderText('輸入連接碼')).toBeTruthy();
+      expect(getByPlaceholderText('Enter pairing code')).toBeTruthy();
     });
-    expect(queryByText('選擇連接方式')).toBeNull();
-    expect(queryByText('掃碼連接')).toBeNull();
+    expect(queryByText('Select Connection Method')).toBeNull();
+    expect(queryByText('Scan QR Code')).toBeNull();
 
-    fireEvent.changeText(getByPlaceholderText('輸入連接碼'), '654321');
-    fireEvent.press(getByText('連接'));
+    fireEvent.changeText(getByPlaceholderText('Enter pairing code'), '654321');
+    fireEvent.press(getByText('Connect'));
 
     await waitFor(() => {
       expect(mockNativeSyncEngine.pairDevice).toHaveBeenCalledWith({
@@ -381,9 +381,9 @@ describe('DeviceDiscoveryScreen — switch mode', () => {
 
     expect(mockNativeSyncEngine.pairDevice).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
-    // Alert.alert(title) — title contains the toast text "已是當前連接設備".
+    // Alert.alert(title) - title contains the toast text "Already connected to this device".
     // RN Alert is used here as a cross-platform stand-in for a transient toast;
     // see plan note in Task 5 / Spec → "toast vs Alert" decision.
-    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('當前'));
+    expect(alertSpy).toHaveBeenCalledWith('Already connected to this device');
   });
 });

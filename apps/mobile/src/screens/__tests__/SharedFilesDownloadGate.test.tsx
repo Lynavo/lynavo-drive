@@ -39,122 +39,132 @@ jest.mock('react-i18next', () => {
       return {
         t: (key: string, options?: any) => {
           const map: Record<string, string> = {
-            'sharedFiles.loading': '載入中...',
-            'sharedFiles.deviceUnavailable.title': '設備不可用',
-            'sharedFiles.deviceUnavailable.message': '請先連接設備',
-            'sharedFiles.emptyState.title': '目前沒有內容',
-            'sharedFiles.emptyState.message': '同步完成後，檔案將顯示在這裡',
-            'sharedFiles.dialogs.downloadComplete': '下載完成',
-            'sharedFiles.scopes.team': '檔案共享',
-            'sharedFiles.scopes.shared': '已分享的資源',
-            'sharedFiles.scopes.received': '已接收的檔案',
-            'sharedFiles.networkError.title': '載入失敗',
-            'sharedFiles.networkError.message': '請稍後重試',
-            'sharedFiles.dialogs.downloadFailed': '下載失敗',
+            'sharedFiles.loading': 'Loading...',
+            'sharedFiles.deviceUnavailable.title': 'Device Unavailable',
+            'sharedFiles.deviceUnavailable.message':
+              'Please connect a device first',
+            'sharedFiles.emptyState.title': 'No content yet',
+            'sharedFiles.emptyState.message':
+              'Files will appear here after sync completes',
+            'sharedFiles.dialogs.downloadComplete': 'Download complete',
+            'sharedFiles.scopes.team': 'File sharing',
+            'sharedFiles.scopes.shared': 'Shared resources',
+            'sharedFiles.scopes.received': 'Received files',
+            'sharedFiles.networkError.title': 'Failed to Load',
+            'sharedFiles.networkError.message': 'Please try again later',
+            'sharedFiles.dialogs.downloadFailed': 'Download Failed',
             'sharedFiles.dialogs.downloadFailedMessage':
-              '無法下載檔案，请稍後重試',
-            'sharedFiles.dialogs.savedLocationPhotos': '相簿',
-            'sharedFiles.dialogs.previewFailed': '預覽失敗',
-            'sharedFiles.dialogs.previewFailedMessage': '無法取得檔案預覽',
-            'sharedFiles.dialogs.previewUnsupported': '無法預覽',
+              'Could not download the file. Please try again later',
+            'sharedFiles.dialogs.savedLocationPhotos': 'Photos',
+            'sharedFiles.dialogs.previewFailed': 'Preview Failed',
+            'sharedFiles.dialogs.previewFailedMessage':
+              'Could not load file preview',
+            'sharedFiles.dialogs.previewUnsupported': 'Cannot Preview',
             'sharedFiles.dialogs.previewUnsupportedMessage':
-              '此檔案類型目前無法預覽，請先下載後再用其他 App 開啟',
-            'sharedFiles.dialogs.openWithOtherApp': '用其他 App 開啟',
-            'sharedFiles.dialogs.cancel': '取消',
-            'sharedFiles.title': '文件',
-            'sharedFiles.phoneSyncSpace.title': '手機同步空間',
+              'This file type cannot be previewed yet. Download it first, then open it with another app.',
+            'sharedFiles.dialogs.openWithOtherApp': 'Open with another app',
+            'sharedFiles.dialogs.cancel': 'Cancel',
+            'sharedFiles.title': 'File',
+            'sharedFiles.phoneSyncSpace.title': 'Phone Sync Space',
             'sharedFiles.phoneSyncSpace.desc':
-              '檢視已同步至电脑的檔案與上传来源',
-            'sharedFiles.phoneSyncSpace.badgeSync': '同步后显示',
-            'sharedFiles.phoneSyncSpace.badgeSource': '来源清晰',
-            'sharedFiles.phoneSyncSpace.select': '選擇',
-            'sharedFiles.phoneSyncSpace.empty': '尚無同步檔案',
+              'View files synced to your computer and their upload sources',
+            'sharedFiles.phoneSyncSpace.badgeSync': 'Shown after sync',
+            'sharedFiles.phoneSyncSpace.badgeSource': 'Clear source',
+            'sharedFiles.phoneSyncSpace.select': 'Select',
+            'sharedFiles.phoneSyncSpace.empty': 'No synced files yet',
             'sharedFiles.phoneSyncSpace.emptySubtitle':
-              '开启自动上传后，同步到电脑的素材会出现在这里。',
+              'Once auto upload is enabled, assets synced to the computer will appear here.',
             'sharedFiles.phoneSyncSpace.filesCount': `${
               options?.count ?? 0
-            } 个文件`,
-            'sharedFiles.phoneSyncSpace.loadingTitle': '正在加载',
+            }  files`,
+            'sharedFiles.phoneSyncSpace.loadingTitle': 'Loading',
             'sharedFiles.phoneSyncSpace.loadingSubtitle':
-              '同步空间列表会在这里刷新。',
-            'sharedFiles.phoneSyncSpace.mediaTypes.file': '文件',
-            'sharedFiles.phoneSyncSpace.mediaTypes.photo': '照片',
-            'sharedFiles.phoneSyncSpace.mediaTypes.video': '视频',
-            'sharedFiles.phoneSyncSpace.previewSyncedFile': '预览已同步文件',
-            'sharedFiles.phoneSyncSpace.downloadSyncedFile': '下载已同步文件',
-            'sharedFiles.phoneSyncSpace.desktopDeleted': '電腦已刪除',
+              'The sync space list will refresh here.',
+            'sharedFiles.phoneSyncSpace.mediaTypes.file': 'File',
+            'sharedFiles.phoneSyncSpace.mediaTypes.photo': 'Photo',
+            'sharedFiles.phoneSyncSpace.mediaTypes.video': 'Video',
+            'sharedFiles.phoneSyncSpace.previewSyncedFile':
+              'Preview synced file',
+            'sharedFiles.phoneSyncSpace.downloadSyncedFile':
+              'Download synced file',
+            'sharedFiles.phoneSyncSpace.desktopDeleted': 'Deleted on computer',
             'sharedFiles.phoneSyncSpace.desktopDeletedMessage':
-              '此檔案已從電腦刪除',
+              'This file was deleted from the computer',
             'sharedFiles.phoneSyncSpace.deletedDownloadMessage':
-              '無法下載已刪除的檔案',
-            'sharedFiles.phoneSyncSpace.previewFailedTitle': '无法加载预览',
+              'Deleted files cannot be downloaded',
+            'sharedFiles.phoneSyncSpace.previewFailedTitle':
+              'Cannot load preview',
             'sharedFiles.phoneSyncSpace.previewFailedSubtitle':
-              '请确认电脑在线且文件仍存在。',
-            'sharedFiles.localComputer.title': '電腦檔案',
+              'Please make sure the computer is online and the file still exists.',
+            'sharedFiles.localComputer.title': 'Computer Files',
             'sharedFiles.localComputer.desc':
-              '流覽電腦端共享的目錄結構並下載文件',
+              'Browse your computer shared directory and download files',
             'sharedFiles.localComputer.ossDesc':
-              '通过同一局域网访问已配对电脑文件，不需要付费计划。',
-            'sharedFiles.localComputer.badgeDesktop': '电脑',
-            'sharedFiles.localComputer.badgeView': '浏览',
-            'sharedFiles.localComputer.ossBadge': '局域网',
-            'sharedFiles.localComputer.empty': '此資料夾為空',
-            'sharedFiles.localComputer.rootDirectoryLabel': '用户目录',
-            'sharedFiles.localComputer.fallbackDesktopLabel': '当前电脑',
+              'Access paired computer files on the same local network without a paid plan.',
+            'sharedFiles.localComputer.badgeDesktop': 'Computer',
+            'sharedFiles.localComputer.badgeView': 'Browse',
+            'sharedFiles.localComputer.ossBadge': 'LAN',
+            'sharedFiles.localComputer.empty': 'This folder is empty',
+            'sharedFiles.localComputer.rootDirectoryLabel': 'User Directory',
+            'sharedFiles.localComputer.fallbackDesktopLabel':
+              'Current Computer',
             'sharedFiles.localComputer.unboundLocalComputerSubtitle':
-              '尚未连接电脑',
-            'sharedFiles.localComputer.noFilesTitle': '暂无文件',
+              'Not connected to computer',
+            'sharedFiles.localComputer.noFilesTitle': 'No Files',
             'sharedFiles.localComputer.noFilesSubtitle':
-              '电脑端共享的文件会显示在这里。',
+              'Files shared from the computer will appear here.',
             'sharedFiles.localComputer.localComputerDisabledTitle':
-              '尚未開啟本地共享',
+              'LAN Sharing Unavailable',
             'sharedFiles.localComputer.localComputerDisabledSubtitle':
-              '請到電腦端開啟本地共享後，再回到手機端重新整理。',
-            'sharedFiles.localComputer.recheckPermission': '重新檢查',
-            'sharedFiles.localComputer.loadingTitle': '电脑文件加载中',
+              'Enable local sharing on the computer, then return to the phone and refresh.',
+            'sharedFiles.localComputer.recheckPermission': 'Check Again',
+            'sharedFiles.localComputer.loadingTitle': 'Computer files loading',
             'sharedFiles.localComputer.loadingSubtitle':
-              '正在读取电脑端共享目录。',
-            'sharedFiles.localComputer.networkDisconnectedTitle': '网络断开',
+              'Reading the computer shared directory.',
+            'sharedFiles.localComputer.networkDisconnectedTitle':
+              'Network Disconnected',
             'sharedFiles.localComputer.networkDisconnectedSubtitle':
-              '当前路径会保留，恢复网络或电脑端在线后可以继续访问。',
-            'sharedFiles.localComputer.retryConnection': '重试连接',
-            'sharedFiles.localComputer.listView': '列表视图',
-            'sharedFiles.localComputer.gridView': '网格视图',
-            'sharedFiles.localComputer.searchFilesPlaceholder': '搜索电脑文件',
+              'The current path will be kept. You can continue after the network is restored or the computer is online.',
+            'sharedFiles.localComputer.retryConnection': 'Retry Connection',
+            'sharedFiles.localComputer.listView': 'List View',
+            'sharedFiles.localComputer.gridView': 'Grid View',
+            'sharedFiles.localComputer.searchFilesPlaceholder':
+              'Search computer files',
             'sharedFiles.localComputer.searchFolderPlaceholder':
-              '搜索当前文件夹',
-            'sharedFiles.localComputer.connectionStatePrefix': '电脑连接方式：',
-            'sharedFiles.localComputer.sortTitle': '排序方式',
-            'sharedFiles.localComputer.select': '選擇',
-            'sharedFiles.localComputer.done': '完成',
-            'sharedFiles.localComputer.download': '下載',
-            'sharedFiles.localComputer.share': '分享',
-            'sharedFiles.connectionStatus.lan': '局域网',
-            'sharedFiles.connectionStatus.unavailable': '不可达',
-            'sharedFiles.sortBy.name': '名称',
-            'sharedFiles.sortBy.time': '时间',
-            'sharedFiles.sortBy.size': '文件大小',
-            'common.back': '返回',
-            'common.today': '今天',
-            'common.yesterday': '昨天',
-            'sharedFiles.localComputer.selectedCount': `已選擇 ${
+              'Search current folder',
+            'sharedFiles.localComputer.connectionStatePrefix':
+              'Computer connection method:',
+            'sharedFiles.localComputer.sortTitle': 'Sort By',
+            'sharedFiles.localComputer.select': 'Select',
+            'sharedFiles.localComputer.done': 'Done',
+            'sharedFiles.localComputer.download': 'Download',
+            'sharedFiles.localComputer.share': 'Share',
+            'sharedFiles.connectionStatus.lan': 'LAN',
+            'sharedFiles.connectionStatus.unavailable': 'Unreachable',
+            'sharedFiles.sortBy.name': 'Name',
+            'sharedFiles.sortBy.time': 'Time',
+            'sharedFiles.sortBy.size': 'File Size',
+            'common.back': 'Back',
+            'common.today': 'Today',
+            'common.yesterday': 'Yesterday',
+            'sharedFiles.localComputer.selectedCount': `Selected ${
               options?.count ?? 0
-            } 個`,
+            } items`,
           };
           if (key === 'sharedFiles.phoneSyncSpace.summary') {
-            return `${options?.count ?? 0} 个 · ${options?.size ?? ''}`;
+            return `${options?.count ?? 0} items - ${options?.size ?? ''}`;
           }
           if (
             key === 'sharedFiles.dialogs.downloadSavedToPhotos' &&
             options?.name
           ) {
-            return `${options.name} 已儲存到${options.location ?? ''}`;
+            return `${options.name} saved to ${options.location ?? ''}`;
           }
           if (
             key === 'sharedFiles.dialogs.downloadSavedToFiles' &&
             options?.name
           ) {
-            return `${options.name} 已儲存到檔案`;
+            return `${options.name} saved to Files`;
           }
           return map[key] || key;
         },
@@ -528,8 +538,8 @@ describe('SharedFilesScreen V2 (Landing Menu)', () => {
       </TestErrorBoundary>,
     );
 
-    expect(getByText('手機同步空間')).toBeTruthy();
-    expect(getByText('電腦檔案')).toBeTruthy();
+    expect(getByText('Phone Sync Space')).toBeTruthy();
+    expect(getByText('Computer Files')).toBeTruthy();
   });
 
   it('navigates to PhoneSyncSpace on card press', () => {
@@ -539,7 +549,7 @@ describe('SharedFilesScreen V2 (Landing Menu)', () => {
       </TestErrorBoundary>,
     );
 
-    fireEvent.press(getByText('手機同步空間'));
+    fireEvent.press(getByText('Phone Sync Space'));
     expect(mockNavigate).toHaveBeenCalledWith('PhoneSyncSpace');
     expect(mockRecordDiagnosticsLog).toHaveBeenCalledWith(
       'PhoneSyncSpace',
@@ -555,7 +565,7 @@ describe('SharedFilesScreen V2 (Landing Menu)', () => {
       </TestErrorBoundary>,
     );
 
-    fireEvent.press(getByText('電腦檔案'));
+    fireEvent.press(getByText('Computer Files'));
     expect(mockNavigate).toHaveBeenCalledWith('LocalComputer');
   });
 
@@ -570,7 +580,7 @@ describe('SharedFilesScreen V2 (Landing Menu)', () => {
       </TestErrorBoundary>,
     );
 
-    fireEvent.press(getByText('電腦檔案'));
+    fireEvent.press(getByText('Computer Files'));
 
     expect(mockNavigate).toHaveBeenCalledWith('LocalComputer');
     expect(mockNavigate).not.toHaveBeenCalledWith('Login');
@@ -590,8 +600,8 @@ describe('SharedFilesGlobalScreen', () => {
       <SharedFilesGlobalScreen showBottomTabBar={false} />,
     );
 
-    expect(getByText('同步后显示')).toBeTruthy();
-    expect(queryByText('今日 5 个')).toBeNull();
+    expect(getByText('Shown after sync')).toBeTruthy();
+    expect(queryByText('Today 5 items')).toBeNull();
   });
 
   it('records diagnostics before opening PhoneSyncSpace', () => {
@@ -599,7 +609,7 @@ describe('SharedFilesGlobalScreen', () => {
       <SharedFilesGlobalScreen showBottomTabBar={false} />,
     );
 
-    fireEvent.press(getByText('手機同步空間'));
+    fireEvent.press(getByText('Phone Sync Space'));
     expect(mockNavigate).toHaveBeenCalledWith('PhoneSyncSpace');
     expect(mockRecordDiagnosticsLog).toHaveBeenCalledWith(
       'PhoneSyncSpace',
@@ -613,15 +623,17 @@ describe('SharedFilesGlobalScreen', () => {
       <SharedFilesGlobalScreen showBottomTabBar={false} />,
     );
 
-    expect(getByText('局域网')).toBeTruthy();
+    expect(getByText('LAN')).toBeTruthy();
     expect(
-      getByText('通过同一局域网访问已配对电脑文件，不需要付费计划。'),
+      getByText(
+        'Access paired computer files on the same local network without a paid plan.',
+      ),
     ).toBeTruthy();
-    fireEvent.press(getByText('電腦檔案'));
+    fireEvent.press(getByText('Computer Files'));
 
     expect(mockNavigate).toHaveBeenCalledWith('LocalComputer');
     expect(mockNavigate).not.toHaveBeenCalledWith('OpenSourceInfo');
-    expect(queryByText('网络断开')).toBeNull();
+    expect(queryByText('Network Disconnected')).toBeNull();
   });
 
   it('keeps guest users on local-LAN local computer access instead of login or purchase flow', () => {
@@ -633,7 +645,7 @@ describe('SharedFilesGlobalScreen', () => {
       <SharedFilesGlobalScreen showBottomTabBar={false} />,
     );
 
-    fireEvent.press(getByText('電腦檔案'));
+    fireEvent.press(getByText('Computer Files'));
 
     expect(mockNavigate).toHaveBeenCalledWith('LocalComputer');
     expect(mockNavigate).not.toHaveBeenCalledWith('Login');
@@ -706,8 +718,10 @@ describe('LocalComputerGlobalScreen', () => {
     await waitFor(() => {
       expect(mockListGlobalLocalComputerResources).toHaveBeenCalledWith();
     });
-    expect(queryByText('需要付费计划才能访问电脑文件')).toBeNull();
-    expect(queryByText('网络断开')).toBeNull();
+    expect(
+      queryByText('A paid plan is required to access computer files'),
+    ).toBeNull();
+    expect(queryByText('Network Disconnected')).toBeNull();
   });
 
   it('renders local computer access list items without calling hooks from renderItem helpers', async () => {
@@ -745,10 +759,10 @@ describe('LocalComputerGlobalScreen', () => {
     });
 
     await waitFor(() => {
-      expect(getByText('暂无文件')).toBeTruthy();
+      expect(getByText('No Files')).toBeTruthy();
     });
     expect(getByTestId('local-computer-empty-icon-computer')).toBeTruthy();
-    expect(queryByText('Mac 客户端安装手册-2506.docx')).toBeNull();
+    expect(queryByText('Mac Client Setup Guide-2506.docx')).toBeNull();
     expect(queryByText('document-outline')).toBeNull();
   });
 
@@ -769,9 +783,9 @@ describe('LocalComputerGlobalScreen', () => {
     );
 
     await waitFor(() => {
-      expect(getByText('Edit Bay / 用户目录')).toBeTruthy();
+      expect(getByText('Edit Bay / User Directory')).toBeTruthy();
     });
-    expect(queryByText('MacBook Pro / 用户目录')).toBeNull();
+    expect(queryByText('MacBook Pro / User Directory')).toBeNull();
   });
 
   it('shows the current shared-files route from the binding snapshot', async () => {
@@ -797,7 +811,7 @@ describe('LocalComputerGlobalScreen', () => {
     );
 
     await waitFor(() => {
-      expect(getByText('局域网')).toBeTruthy();
+      expect(getByText('LAN')).toBeTruthy();
     });
   });
 
@@ -824,10 +838,10 @@ describe('LocalComputerGlobalScreen', () => {
     );
 
     await waitFor(() => {
-      expect(getByText('局域网')).toBeTruthy();
+      expect(getByText('LAN')).toBeTruthy();
     });
 
-    let cursor = getByText('局域网').parent;
+    let cursor = getByText('LAN').parent;
     let nestedInHeaderActions = false;
     while (cursor) {
       const ancestorStyle = StyleSheet.flatten(cursor.props.style);
@@ -866,7 +880,7 @@ describe('LocalComputerGlobalScreen', () => {
     );
 
     await waitFor(() => {
-      expect(getByText('局域网')).toBeTruthy();
+      expect(getByText('LAN')).toBeTruthy();
     });
     expect(queryByText('P2P')).toBeNull();
   });
@@ -882,7 +896,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     await waitFor(() => {
       expect(mockListGlobalLocalComputerResources).toHaveBeenCalledWith();
-      expect(getByText('局域网')).toBeTruthy();
+      expect(getByText('LAN')).toBeTruthy();
     });
 
     await act(async () => {
@@ -896,9 +910,9 @@ describe('LocalComputerGlobalScreen', () => {
     });
 
     await waitFor(() => {
-      expect(getByText('局域网')).toBeTruthy();
+      expect(getByText('LAN')).toBeTruthy();
     });
-    expect(queryByText('中继服务器')).toBeNull();
+    expect(queryByText('Relay server')).toBeNull();
   });
 
   it('keeps a successful LAN browse badge when a later native event is still waking', async () => {
@@ -935,7 +949,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     await waitFor(() => {
       expect(getByText('Project Files')).toBeTruthy();
-      expect(getByText('局域网')).toBeTruthy();
+      expect(getByText('LAN')).toBeTruthy();
     });
 
     await act(async () => {
@@ -948,8 +962,8 @@ describe('LocalComputerGlobalScreen', () => {
       });
     });
 
-    expect(getByText('局域网')).toBeTruthy();
-    expect(queryByText('唤醒中')).toBeNull();
+    expect(getByText('LAN')).toBeTruthy();
+    expect(queryByText('Waking')).toBeNull();
   });
 
   it('keeps the LAN badge instead of showing fallback tunnel progress', async () => {
@@ -986,7 +1000,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     await waitFor(() => {
       expect(getByText('Project Files')).toBeTruthy();
-      expect(getByText('局域网')).toBeTruthy();
+      expect(getByText('LAN')).toBeTruthy();
     });
 
     await act(async () => {
@@ -999,9 +1013,9 @@ describe('LocalComputerGlobalScreen', () => {
       });
     });
 
-    expect(getByText('局域网')).toBeTruthy();
-    expect(queryByText('P2P 连接中')).toBeNull();
-    expect(queryByText('唤醒中')).toBeNull();
+    expect(getByText('LAN')).toBeTruthy();
+    expect(queryByText('P2P connecting')).toBeNull();
+    expect(queryByText('Waking')).toBeNull();
   });
 
   it('does not render relay fallback progress as a community route badge', async () => {
@@ -1033,9 +1047,9 @@ describe('LocalComputerGlobalScreen', () => {
       await Promise.resolve();
     });
     expect(mockListGlobalLocalComputerResources).toHaveBeenCalledWith();
-    expect(getByText('电脑文件加载中')).toBeTruthy();
-    expect(queryByText('中继服务器连接中')).toBeNull();
-    expect(queryByText('唤醒中')).toBeNull();
+    expect(getByText('Computer files loading')).toBeTruthy();
+    expect(queryByText('Relay connecting')).toBeNull();
+    expect(queryByText('Waking')).toBeNull();
 
     unmount();
     jest.clearAllTimers();
@@ -1059,7 +1073,7 @@ describe('LocalComputerGlobalScreen', () => {
       await Promise.resolve();
     });
     expect(mockListGlobalLocalComputerResources).toHaveBeenCalledWith();
-    expect(getByText('电脑文件加载中')).toBeTruthy();
+    expect(getByText('Computer files loading')).toBeTruthy();
 
     await act(async () => {
       jest.advanceTimersByTime(35_000);
@@ -1070,8 +1084,8 @@ describe('LocalComputerGlobalScreen', () => {
     await act(async () => {
       await Promise.resolve();
     });
-    expect(getByText('网络断开')).toBeTruthy();
-    expect(queryByText('电脑文件加载中')).toBeNull();
+    expect(getByText('Network Disconnected')).toBeTruthy();
+    expect(queryByText('Computer files loading')).toBeNull();
     expect(warnSpy).toHaveBeenCalledWith(
       '[LocalComputerScreen] Failed to load data:',
       expect.any(Error),
@@ -1095,13 +1109,15 @@ describe('LocalComputerGlobalScreen', () => {
     );
 
     await waitFor(() => {
-      expect(getByText('尚未開啟本地共享')).toBeTruthy();
+      expect(getByText('LAN Sharing Unavailable')).toBeTruthy();
     });
     expect(
-      getByText('請到電腦端開啟本地共享後，再回到手機端重新整理。'),
+      getByText(
+        'Enable local sharing on the computer, then return to the phone and refresh.',
+      ),
     ).toBeTruthy();
-    expect(getByText('重新檢查')).toBeTruthy();
-    expect(queryByText('网络断开')).toBeNull();
+    expect(getByText('Check Again')).toBeTruthy();
+    expect(queryByText('Network Disconnected')).toBeNull();
     expect(warnSpy).toHaveBeenCalledWith(
       '[LocalComputerScreen] Failed to load data:',
       expect.any(Error),
@@ -1121,15 +1137,15 @@ describe('LocalComputerGlobalScreen', () => {
     );
 
     await waitFor(() => {
-      expect(getByText('网络断开')).toBeTruthy();
+      expect(getByText('Network Disconnected')).toBeTruthy();
     });
-    expect(getByText('重试连接')).toBeTruthy();
-    expect(queryByText('電腦端未登入')).toBeNull();
-    expect(queryByText('帳號不一致')).toBeNull();
+    expect(getByText('Retry Connection')).toBeTruthy();
+    expect(queryByText('Desktop not signed in')).toBeNull();
+    expect(queryByText('Account mismatch')).toBeNull();
     expect(
       queryByText('sharedFiles.localComputer.networkDisconnectedTitle'),
     ).toBeNull();
-    expect(queryByText('尚未開啟本地共享')).toBeNull();
+    expect(queryByText('LAN Sharing Unavailable')).toBeNull();
   });
 
   it('shows generic LAN unavailable guidance for legacy identity-mismatch errors', async () => {
@@ -1145,15 +1161,15 @@ describe('LocalComputerGlobalScreen', () => {
     );
 
     await waitFor(() => {
-      expect(getByText('网络断开')).toBeTruthy();
+      expect(getByText('Network Disconnected')).toBeTruthy();
     });
-    expect(getByText('重试连接')).toBeTruthy();
-    expect(queryByText('電腦端未登入')).toBeNull();
-    expect(queryByText('帳號不一致')).toBeNull();
+    expect(getByText('Retry Connection')).toBeTruthy();
+    expect(queryByText('Desktop not signed in')).toBeNull();
+    expect(queryByText('Account mismatch')).toBeNull();
     expect(
       queryByText('sharedFiles.localComputer.networkDisconnectedTitle'),
     ).toBeNull();
-    expect(queryByText('尚未開啟本地共享')).toBeNull();
+    expect(queryByText('LAN Sharing Unavailable')).toBeNull();
   });
 
   it('shows desktop local-computer disabled for generic personal directory HTTP 403', async () => {
@@ -1169,9 +1185,9 @@ describe('LocalComputerGlobalScreen', () => {
     );
 
     await waitFor(() => {
-      expect(getByText('尚未開啟本地共享')).toBeTruthy();
+      expect(getByText('LAN Sharing Unavailable')).toBeTruthy();
     });
-    expect(queryByText('网络断开')).toBeNull();
+    expect(queryByText('Network Disconnected')).toBeNull();
   });
 
   it('shows desktop local-computer disabled when sidecar returns personal directory HTTP 403 with body', async () => {
@@ -1189,9 +1205,9 @@ describe('LocalComputerGlobalScreen', () => {
     );
 
     await waitFor(() => {
-      expect(getByText('尚未開啟本地共享')).toBeTruthy();
+      expect(getByText('LAN Sharing Unavailable')).toBeTruthy();
     });
-    expect(queryByText('网络断开')).toBeNull();
+    expect(queryByText('Network Disconnected')).toBeNull();
   });
 
   it('silently retries the first local computer list while the shared-files route is becoming ready', async () => {
@@ -1221,7 +1237,7 @@ describe('LocalComputerGlobalScreen', () => {
       await Promise.resolve();
     });
     expect(mockListGlobalLocalComputerResources).toHaveBeenCalledTimes(1);
-    expect(queryByText('网络断开')).toBeNull();
+    expect(queryByText('Network Disconnected')).toBeNull();
 
     await act(async () => {
       jest.advanceTimersByTime(1_200);
@@ -1233,7 +1249,7 @@ describe('LocalComputerGlobalScreen', () => {
       expect(getByText('Project Files')).toBeTruthy();
     });
     expect(mockListGlobalLocalComputerResources).toHaveBeenCalledTimes(2);
-    expect(queryByText('网络断开')).toBeNull();
+    expect(queryByText('Network Disconnected')).toBeNull();
   });
 
   it('loads real shared folder contents when a production folder is opened', async () => {
@@ -1630,9 +1646,9 @@ describe('LocalComputerGlobalScreen', () => {
     );
 
     await waitFor(() => {
-      expect(getByText('尚未连接电脑')).toBeTruthy();
+      expect(getByText('Not connected to computer')).toBeTruthy();
     });
-    expect(queryByText('MacBook Pro / 用户目录')).toBeNull();
+    expect(queryByText('MacBook Pro / User Directory')).toBeNull();
   });
 
   it('keeps the demo desktop subtitle behind the explicit shared files preview gate', async () => {
@@ -1646,7 +1662,7 @@ describe('LocalComputerGlobalScreen', () => {
     );
 
     await waitFor(() => {
-      expect(getByText('MacBook Pro / 用户目录')).toBeTruthy();
+      expect(getByText('MacBook Pro / User Directory')).toBeTruthy();
     });
   });
 
@@ -1701,7 +1717,10 @@ describe('LocalComputerGlobalScreen', () => {
       streamUrl: 'http://192.168.1.100:39394/personal/stream/alpha.jpg',
       savedToPhotos: false,
     });
-    expect(alertSpy).toHaveBeenCalledWith('下載完成', 'alpha.jpg 已儲存到檔案');
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Download complete',
+      'alpha.jpg saved to Files',
+    );
 
     alertSpy.mockRestore();
   });
@@ -1837,10 +1856,10 @@ describe('LocalComputerGlobalScreen', () => {
       expect(getByText('beta.mov')).toBeTruthy();
     });
 
-    fireEvent.press(getByText('選擇'));
+    fireEvent.press(getByText('Select'));
     fireEvent.press(getByText('alpha.jpg'));
     fireEvent.press(getByText('beta.mov'));
-    fireEvent.press(getByText(/^(下载|下載)$/));
+    fireEvent.press(getByText(/^(Download|Download)$/));
 
     await waitFor(() => {
       expect(mockDownloadGlobalLocalComputerResource).toHaveBeenCalledTimes(2);
@@ -1882,9 +1901,9 @@ describe('LocalComputerGlobalScreen', () => {
       expect(getByText('alpha.jpg')).toBeTruthy();
     });
 
-    fireEvent.press(getByText('選擇'));
+    fireEvent.press(getByText('Select'));
     fireEvent.press(getByText('alpha.jpg'));
-    fireEvent.press(getByText('分享'));
+    fireEvent.press(getByText('Share'));
 
     await waitFor(() => {
       expect(mockShareGlobalLocalComputerResources).toHaveBeenCalledWith([
@@ -2071,7 +2090,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
     });
 
     await waitFor(() => {
-      expect(getByText('尚無同步檔案')).toBeTruthy();
+      expect(getByText('No synced files yet')).toBeTruthy();
     });
     expect(getByTestId('phone-sync-empty-icon')).toBeTruthy();
     expect(queryByText('IMG_8421.JPG')).toBeNull();
@@ -2141,7 +2160,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
         { page: 1, pageSize: 20 },
       );
       expect(getByText('alpha.jpg')).toBeTruthy();
-      expect(getByText(/41 个/)).toBeTruthy();
+      expect(getByText(/41 items/)).toBeTruthy();
     });
 
     fireEvent(getByTestId('phone-sync-section-list'), 'onEndReached');
@@ -2168,10 +2187,10 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
     );
 
     await waitFor(() => {
-      expect(getByText('載入失敗')).toBeTruthy();
+      expect(getByText('Failed to Load')).toBeTruthy();
     });
-    expect(getByText('請稍後重試')).toBeTruthy();
-    expect(queryByText('尚無同步檔案')).toBeNull();
+    expect(getByText('Please try again later')).toBeTruthy();
+    expect(queryByText('No synced files yet')).toBeNull();
   });
 
   it('renders received image thumbnail and opens the real image preview', async () => {
@@ -2214,12 +2233,12 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
     });
 
     expect(getByTestId('phone-sync-thumbnail-image')).toBeTruthy();
-    expect(queryByLabelText('保存暂不可用')).toBeNull();
+    expect(queryByLabelText('Save Not Available')).toBeNull();
     expect(queryAllByTestId('phone-sync-download-icon').length).toBeGreaterThan(
       0,
     );
 
-    const previewButton = getByLabelText('预览已同步文件');
+    const previewButton = getByLabelText('Preview synced file');
     expect(previewButton.props.accessibilityState?.disabled).not.toBe(true);
 
     fireEvent.press(previewButton);
@@ -2272,7 +2291,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
     expect(queryByTestId('phone-sync-thumbnail-video')).toBeNull();
     expect(queryByTestId('phone-sync-media-icon-video')).toBeNull();
 
-    fireEvent.press(getByLabelText('预览已同步文件'));
+    fireEvent.press(getByLabelText('Preview synced file'));
 
     await waitFor(() => {
       expect(mockGetReceivedLibraryPreviewUrl).toHaveBeenCalledWith(
@@ -2400,11 +2419,11 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
       expect(getByText('deleted.jpg')).toBeTruthy();
     });
 
-    expect(getByText('電腦已刪除')).toBeTruthy();
+    expect(getByText('Deleted on computer')).toBeTruthy();
     expect(queryByTestId('phone-sync-thumbnail-image')).toBeNull();
 
-    const previewButton = getByLabelText('预览已同步文件');
-    const downloadButton = getByLabelText('下载已同步文件');
+    const previewButton = getByLabelText('Preview synced file');
+    const downloadButton = getByLabelText('Download synced file');
     expect(previewButton.props.accessibilityState?.disabled).toBe(true);
     expect(downloadButton.props.accessibilityState?.disabled).toBe(true);
 
@@ -2456,7 +2475,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
       expect(getByText('alpha.jpg')).toBeTruthy();
     });
 
-    fireEvent.press(getByLabelText('下载已同步文件'));
+    fireEvent.press(getByLabelText('Download synced file'));
 
     await waitFor(() => {
       expect(mockDownloadReceivedLibraryItem).toHaveBeenCalledWith(
@@ -2476,7 +2495,10 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
         'http://192.168.1.100:39394/resources/mobile/received/preview?fileKey=received-1',
       savedToPhotos: true,
     });
-    expect(alertSpy).toHaveBeenCalledWith('下載完成', 'alpha.jpg 已儲存到相簿');
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Download complete',
+      'alpha.jpg saved to Photos',
+    );
 
     alertSpy.mockRestore();
   });
@@ -2514,7 +2536,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
       expect(getByText('alpha.jpg')).toBeTruthy();
     });
 
-    fireEvent.press(getByLabelText('下载已同步文件'));
+    fireEvent.press(getByLabelText('Download synced file'));
 
     await waitFor(() => {
       expect(mockDownloadReceivedLibraryItem).toHaveBeenCalledWith(
@@ -2530,7 +2552,10 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
       localPath: 'ph://asset-001',
       savedToPhotos: true,
     });
-    expect(alertSpy).toHaveBeenCalledWith('下載完成', 'alpha.jpg 已儲存到相簿');
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Download complete',
+      'alpha.jpg saved to Photos',
+    );
 
     alertSpy.mockRestore();
   });
@@ -2568,7 +2593,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
       expect(getByText('notes.txt')).toBeTruthy();
     });
 
-    fireEvent.press(getByLabelText('下载已同步文件'));
+    fireEvent.press(getByLabelText('Download synced file'));
 
     await waitFor(() => {
       expect(mockDownloadReceivedLibraryItem).toHaveBeenCalledWith(
@@ -2584,7 +2609,10 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
       localPath: 'content://downloads/my_downloads/42',
       savedToPhotos: false,
     });
-    expect(alertSpy).toHaveBeenCalledWith('下載完成', 'notes.txt 已儲存到檔案');
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Download complete',
+      'notes.txt saved to Files',
+    );
 
     alertSpy.mockRestore();
   });
@@ -2732,9 +2760,9 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
         expect(getByText('notes.pdf')).toBeTruthy();
       });
 
-      fireEvent.press(getByText('时间'));
+      fireEvent.press(getByText('Time'));
 
-      expect(getByText('排序方式')).toBeTruthy();
+      expect(getByText('Sort By')).toBeTruthy();
       expect(getByTestId('phone-sync-sort-sheet-layer')).toBeTruthy();
       expect(UNSAFE_queryAllByProps({ transparent: true })).toHaveLength(0);
     } finally {
@@ -2831,7 +2859,7 @@ describe('LocalComputerScreen', () => {
       </TestErrorBoundary>,
     );
     await waitFor(() => {
-      expect(getByText('此資料夾為空')).toBeTruthy();
+      expect(getByText('This folder is empty')).toBeTruthy();
     });
   });
 
@@ -3007,15 +3035,15 @@ describe('LocalComputerScreen', () => {
 
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalledWith(
-        '下載完成',
-        'photo.jpg 已儲存到相簿',
+        'Download complete',
+        'photo.jpg saved to Photos',
       );
     });
 
     alertSpy.mockRestore();
   });
 
-  it('records folder-entry sub-file downloads into 「最近下载」', async () => {
+  it('records folder-entry sub-file downloads into Recent Downloads', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     mockListSharedResources.mockResolvedValueOnce([
       {
@@ -3113,10 +3141,10 @@ describe('LocalComputerScreen', () => {
       expect(getByText('beta.mov')).toBeTruthy();
     });
 
-    fireEvent.press(getByText('選擇'));
+    fireEvent.press(getByText('Select'));
     fireEvent.press(getByText('alpha.jpg'));
     fireEvent.press(getByText('beta.mov'));
-    fireEvent.press(getByText('下載'));
+    fireEvent.press(getByText('Download'));
 
     await waitFor(() => {
       expect(mockDownloadResource).toHaveBeenCalledTimes(2);
@@ -3154,9 +3182,9 @@ describe('LocalComputerScreen', () => {
       expect(getByText('photo.jpg')).toBeTruthy();
     });
 
-    fireEvent.press(getByText('選擇'));
+    fireEvent.press(getByText('Select'));
     fireEvent.press(getByText('photo.jpg'));
-    fireEvent.press(getByText('分享'));
+    fireEvent.press(getByText('Share'));
 
     await waitFor(() => {
       expect(mockShareResources).toHaveBeenCalledWith(
@@ -3226,12 +3254,12 @@ describe('LocalComputerScreen', () => {
       expect(getByText('contract.pdf')).toBeTruthy();
     });
 
-    fireEvent.press(getByText('選擇'));
+    fireEvent.press(getByText('Select'));
     fireEvent.press(getByText('contract.pdf'));
 
     expect(mockPrepareResourcePreview).not.toHaveBeenCalled();
     expect(mockViewDocument).not.toHaveBeenCalled();
-    expect(getByText('已選擇 1 個')).toBeTruthy();
+    expect(getByText('Selected 1 items')).toBeTruthy();
   });
 
   it('opens a local computer image inside the app preview', async () => {
@@ -3350,7 +3378,10 @@ describe('PhoneSyncSpaceScreen', () => {
         'http://192.168.1.100:39394/resources/mobile/received/preview?fileKey=received-1',
       savedToPhotos: true,
     });
-    expect(alertSpy).toHaveBeenCalledWith('下載完成', 'alpha.jpg 已儲存到相簿');
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Download complete',
+      'alpha.jpg saved to Photos',
+    );
 
     alertSpy.mockRestore();
   });
@@ -3367,10 +3398,10 @@ describe('PhoneSyncSpaceScreen', () => {
     );
 
     await waitFor(() => {
-      expect(getByText('載入失敗')).toBeTruthy();
+      expect(getByText('Failed to Load')).toBeTruthy();
     });
-    expect(getByText('請稍後重試')).toBeTruthy();
-    expect(queryByText('尚無同步檔案')).toBeNull();
+    expect(getByText('Please try again later')).toBeTruthy();
+    expect(queryByText('No synced files yet')).toBeNull();
   });
 
   it('opens a received image inside the app preview when a phone-sync row is pressed', async () => {
@@ -3442,10 +3473,10 @@ describe('PhoneSyncSpaceScreen', () => {
       expect(getByText('deleted.jpg')).toBeTruthy();
     });
 
-    expect(getByText('電腦已刪除')).toBeTruthy();
+    expect(getByText('Deleted on computer')).toBeTruthy();
 
-    const previewButton = getByLabelText('預覽已同步檔案');
-    const downloadButton = getByLabelText('下載已同步檔案');
+    const previewButton = getByLabelText('Preview synced file');
+    const downloadButton = getByLabelText('Download synced file');
     expect(previewButton.props.accessibilityState?.disabled).toBe(true);
     expect(downloadButton.props.accessibilityState?.disabled).toBe(true);
 

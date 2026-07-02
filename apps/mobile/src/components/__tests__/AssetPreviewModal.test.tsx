@@ -25,8 +25,8 @@ jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => {
       if (key === 'albumWorkbench.preview.cloudUnavailable')
-        return 'iCloud 影片未下載，無法預覽';
-      if (key === 'albumWorkbench.preview.notFound') return '素材找不到';
+        return 'iCloud video is not downloaded and cannot be previewed';
+      if (key === 'albumWorkbench.preview.notFound') return 'Asset not found';
       return key;
     },
   }),

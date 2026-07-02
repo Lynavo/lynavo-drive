@@ -14,9 +14,9 @@ mac:
   category: public.app-category.utilities
   icon: resources/icon.icns
   extendInfo:
-    NSDesktopFolderUsageDescription: Lynavo Drive 需要存取桌面資料夾，用於同步、儲存與開啟素材。
-    NSDocumentsFolderUsageDescription: Lynavo Drive 需要存取文件資料夾，用於同步、儲存與開啟素材。
-    NSDownloadsFolderUsageDescription: Lynavo Drive 需要存取下載資料夾，用於同步、儲存與開啟素材。
+    NSDesktopFolderUsageDescription: Lynavo Drive needs access to the Desktop folder to sync, store, and open media.
+    NSDocumentsFolderUsageDescription: Lynavo Drive needs access to the Documents folder to sync, store, and open media.
+    NSDownloadsFolderUsageDescription: Lynavo Drive needs access to the Downloads folder to sync, store, and open media.
   binaries:
     - Contents/Resources/lynavo-drive-sidecar
   extraResources:

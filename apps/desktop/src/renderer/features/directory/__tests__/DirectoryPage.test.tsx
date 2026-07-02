@@ -82,14 +82,14 @@ describe('DirectoryPage', () => {
 
   it('renders page header', () => {
     render(<DirectoryPage />);
-    expect(screen.getByText('目录管理')).toBeInTheDocument();
+    expect(screen.getByText('Folder Management')).toBeInTheDocument();
   });
 
   it('renders local received and shared tabs in the OSS product', () => {
     render(<DirectoryPage />);
-    const receivedMatches = screen.getAllByText(/接收目录/);
+    const receivedMatches = screen.getAllByText(/^Received$/);
     expect(receivedMatches.some((el) => el.closest('button'))).toBe(true);
-    expect(screen.getByRole('button', { name: /团队共享/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Team Shared/ })).toBeInTheDocument();
   });
 
   it('allows switching to the local shared tab', async () => {
@@ -105,7 +105,7 @@ describe('DirectoryPage', () => {
     });
     fetchSharedFiles.mockClear();
 
-    fireEvent.click(screen.getByRole('button', { name: /团队共享/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Team Shared/ }));
 
     expect(useDirectoryStore.getState().activeTab).toBe('shared');
     expect(fetchSharedFiles).toHaveBeenCalledTimes(1);
@@ -114,7 +114,7 @@ describe('DirectoryPage', () => {
   it('keeps the local shared tab visible without reading market env', () => {
     render(<DirectoryPage />);
 
-    expect(screen.getByRole('button', { name: /团队共享/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Team Shared/ })).toBeInTheDocument();
   });
 
   it('polls the active tab while the page stays visible', async () => {
@@ -204,24 +204,24 @@ describe('DirectoryPathCard', () => {
 
   it('renders received directory label', () => {
     render(<DirectoryPathCard />);
-    expect(screen.getByText('接收目录')).toBeInTheDocument();
+    expect(screen.getByText('Received folder')).toBeInTheDocument();
   });
 
   it('renders shared directory label in the OSS product', () => {
     render(<DirectoryPathCard />);
-    expect(screen.getByText('团队共享目录')).toBeInTheDocument();
+    expect(screen.getByText('Team shared folder')).toBeInTheDocument();
   });
 
   it('renders the Lynavo personal directory label', () => {
     render(<DirectoryPathCard />);
-    expect(screen.getByText('我的电脑')).toBeInTheDocument();
+    expect(screen.getByText('My Computer')).toBeInTheDocument();
   });
 
   it('renders personal and team shared directories without reading market env', () => {
     render(<DirectoryPathCard />);
 
-    expect(screen.getByText('我的电脑')).toBeInTheDocument();
-    expect(screen.getByText('团队共享目录')).toBeInTheDocument();
+    expect(screen.getByText('My Computer')).toBeInTheDocument();
+    expect(screen.getByText('Team shared folder')).toBeInTheDocument();
   });
 
   it('renders selected Windows drive root in personal virtual drives mode', () => {
@@ -242,14 +242,14 @@ describe('DirectoryPathCard', () => {
 
     render(<DirectoryPathCard />);
 
-    const personalCard = screen.getByText('我的电脑').closest('.rounded-2xl');
+    const personalCard = screen.getByText('My Computer').closest('.rounded-2xl');
     expect(personalCard).not.toBeNull();
-    expect(within(personalCard as HTMLElement).getByText('本机磁盘（C:\\）')).toBeInTheDocument();
+    expect(within(personalCard as HTMLElement).getByText('Local disks (C:\\)')).toBeInTheDocument();
     expect(
-      within(personalCard as HTMLElement).getByRole('button', { name: '恢复本机磁盘' }),
+      within(personalCard as HTMLElement).getByRole('button', { name: 'Restore local disks' }),
     ).toBeInTheDocument();
     expect(
-      within(personalCard as HTMLElement).getByRole('button', { name: '打开' }),
+      within(personalCard as HTMLElement).getByRole('button', { name: 'Open' }),
     ).toBeDisabled();
   });
 
@@ -264,10 +264,10 @@ describe('DirectoryPathCard', () => {
 
     render(<DirectoryPathCard />);
 
-    const personalCard = screen.getByText('我的电脑').closest('.rounded-2xl');
+    const personalCard = screen.getByText('My Computer').closest('.rounded-2xl');
     expect(personalCard).not.toBeNull();
     expect(
-      within(personalCard as HTMLElement).queryByRole('button', { name: '恢复本机磁盘' }),
+      within(personalCard as HTMLElement).queryByRole('button', { name: 'Restore local disks' }),
     ).not.toBeInTheDocument();
   });
 
@@ -289,17 +289,17 @@ describe('DirectoryPathCard', () => {
 
     render(<DirectoryPathCard />);
 
-    const personalCard = screen.getByText('我的电脑').closest('.rounded-2xl');
+    const personalCard = screen.getByText('My Computer').closest('.rounded-2xl');
     expect(personalCard).not.toBeNull();
-    expect(within(personalCard as HTMLElement).getByText('本机磁盘')).toBeInTheDocument();
+    expect(within(personalCard as HTMLElement).getByText('Local disks')).toBeInTheDocument();
     expect(
       within(personalCard as HTMLElement).queryByText('C:\\Users\\Alice'),
     ).not.toBeInTheDocument();
     expect(
-      within(personalCard as HTMLElement).queryByRole('button', { name: '恢复本机磁盘' }),
+      within(personalCard as HTMLElement).queryByRole('button', { name: 'Restore local disks' }),
     ).not.toBeInTheDocument();
     expect(
-      within(personalCard as HTMLElement).getByRole('button', { name: '打开' }),
+      within(personalCard as HTMLElement).getByRole('button', { name: 'Open' }),
     ).toBeDisabled();
   });
 
@@ -331,10 +331,10 @@ describe('DirectoryPathCard', () => {
 
     render(<DirectoryPathCard />);
 
-    const personalCard = screen.getByText('我的电脑').closest('.rounded-2xl');
+    const personalCard = screen.getByText('My Computer').closest('.rounded-2xl');
     expect(personalCard).not.toBeNull();
     fireEvent.click(
-      within(personalCard as HTMLElement).getByRole('button', { name: '恢复本机磁盘' }),
+      within(personalCard as HTMLElement).getByRole('button', { name: 'Restore local disks' }),
     );
 
     await waitFor(() => {
@@ -347,8 +347,8 @@ describe('DirectoryPathCard', () => {
   it('renders received directory before the Lynavo personal directory', () => {
     render(<DirectoryPathCard />);
 
-    const receivedLabel = screen.getByText('接收目录');
-    const personalLabel = screen.getByText('我的电脑');
+    const receivedLabel = screen.getByText('Received folder');
+    const personalLabel = screen.getByText('My Computer');
 
     expect(
       receivedLabel.compareDocumentPosition(personalLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -358,22 +358,22 @@ describe('DirectoryPathCard', () => {
   it('does not render account login or logout controls in the personal directory card', () => {
     render(<DirectoryPathCard />);
 
-    const personalCard = screen.getByText('我的电脑').closest('.rounded-2xl');
+    const personalCard = screen.getByText('My Computer').closest('.rounded-2xl');
     expect(personalCard).not.toBeNull();
     expect(
-      within(personalCard as HTMLElement).queryByText('远端同步与传输'),
+      within(personalCard as HTMLElement).queryByText('Remote sync and transfer'),
     ).not.toBeInTheDocument();
     expect(
-      within(personalCard as HTMLElement).queryByRole('button', { name: '登入' }),
+      within(personalCard as HTMLElement).queryByRole('button', { name: 'Sign in' }),
     ).not.toBeInTheDocument();
     expect(
-      within(personalCard as HTMLElement).queryByRole('button', { name: '登出' }),
+      within(personalCard as HTMLElement).queryByRole('button', { name: 'Sign out' }),
     ).not.toBeInTheDocument();
   });
 
   it('renders root directory label', () => {
     render(<DirectoryPathCard />);
-    expect(screen.getByText('根目录路径')).toBeInTheDocument();
+    expect(screen.getByText('Root folder path')).toBeInTheDocument();
   });
 
   it('derives root path and keeps the shared path when receivePath ends with lowercase received', () => {
@@ -410,12 +410,14 @@ describe('DirectoryPathCard', () => {
     render(<DirectoryPathCard />);
 
     await waitFor(() => {
-      expect(screen.getByText('正在接收文件，完成后可变更')).toBeInTheDocument();
+      expect(
+        screen.getByText('Files are being received. You can change this after transfer finishes.'),
+      ).toBeInTheDocument();
     });
 
-    const rootCard = screen.getByText('根目录路径').closest('.rounded-2xl');
+    const rootCard = screen.getByText('Root folder path').closest('.rounded-2xl');
     expect(rootCard).not.toBeNull();
-    fireEvent.click(within(rootCard as HTMLElement).getByRole('button', { name: '更改' }));
+    fireEvent.click(within(rootCard as HTMLElement).getByRole('button', { name: 'Change' }));
 
     expect(selectFolder).not.toHaveBeenCalled();
     expect(updateSettings).not.toHaveBeenCalled();
@@ -431,7 +433,7 @@ describe('ReceivedFileList', () => {
 
   it('renders empty state when no files', () => {
     render(<ReceivedFileList />);
-    expect(screen.getByText('暂无接收文件')).toBeInTheDocument();
+    expect(screen.getByText('No received files')).toBeInTheDocument();
   });
 
   it('renders file rows with correct columns', () => {
@@ -458,7 +460,7 @@ describe('ReceivedFileList', () => {
     expect(screen.getByText('vacation.mp4')).toBeInTheDocument();
     expect(screen.getByText('iPhone 15')).toBeInTheDocument();
     // Stats bar should reflect 1 file
-    expect(screen.getByText(/共 1 个文件/)).toBeInTheDocument();
+    expect(screen.getByText(/1 files/)).toBeInTheDocument();
   });
 
   it('renders loading state', () => {
@@ -466,7 +468,7 @@ describe('ReceivedFileList', () => {
 
     render(<ReceivedFileList />);
 
-    expect(screen.getByText('正在加载文件列表...')).toBeInTheDocument();
+    expect(screen.getByText('Loading file list...')).toBeInTheDocument();
   });
 
   it('opens media files via system shell instead of in-app preview', () => {
@@ -504,7 +506,7 @@ describe('ReceivedFileList', () => {
     });
 
     render(<ReceivedFileList />);
-    fireEvent.click(screen.getByRole('button', { name: '打开' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
 
     expect(openFile).toHaveBeenCalledWith(
       '/Users/alice/LynavoDrive/Received/iPhone 15/2026-04-10/vacation clip.mp4',
@@ -521,7 +523,7 @@ describe('SharedFileList', () => {
 
   it('renders empty state when no shared files', () => {
     render(<SharedFileList />);
-    expect(screen.getByText('团队共享目录暂无文件')).toBeInTheDocument();
+    expect(screen.getByText('No files in the team shared folder')).toBeInTheDocument();
   });
 
   it('renders shared file rows when files exist', () => {
@@ -540,12 +542,12 @@ describe('SharedFileList', () => {
     render(<SharedFileList />);
 
     expect(screen.getByText('report.pdf')).toBeInTheDocument();
-    expect(screen.getByText(/共 1 个文件/)).toBeInTheDocument();
+    expect(screen.getByText(/1 files/)).toBeInTheDocument();
   });
 
   it('renders empty state message', () => {
     render(<SharedFileList />);
-    expect(screen.getByText('团队共享目录暂无文件')).toBeInTheDocument();
+    expect(screen.getByText('No files in the team shared folder')).toBeInTheDocument();
   });
 
   it('resolves relative shared paths before opening files', () => {
@@ -577,7 +579,7 @@ describe('SharedFileList', () => {
     });
 
     render(<SharedFileList />);
-    fireEvent.click(screen.getByRole('button', { name: '打开' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
 
     expect(openFile).toHaveBeenCalledWith('/Users/alice/LynavoDrive/shared/nested/report.pdf');
   });

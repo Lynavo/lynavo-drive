@@ -87,8 +87,8 @@ type ModalTone = 'blue' | 'purple' | 'red';
 const NEUTRAL_VALUE = '--';
 
 const LANGUAGE_OPTIONS: Array<{ id: LanguageId; label: string }> = [
-  { id: 'zh-Hans', label: '简体中文' },
-  { id: 'zh-Hant', label: '繁体中文' },
+  { id: 'zh-Hans', label: 'Simplified Chinese' },
+  { id: 'zh-Hant', label: 'Traditional Chinese' },
   { id: 'en', label: 'English' },
 ];
 

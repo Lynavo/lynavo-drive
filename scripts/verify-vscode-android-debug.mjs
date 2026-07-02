@@ -46,10 +46,7 @@ assert.match(
   iosNoMetroConfig.command,
   /corepack pnpm --filter @lynavo-drive\/mobile exec react-native run-ios .*--scheme "LynavoDrive" .*--mode "Debug" .*--no-packager/,
 );
-assert.doesNotMatch(
-  iosNoMetroConfig.command,
-  legacyIosSchemePattern,
-);
+assert.doesNotMatch(iosNoMetroConfig.command, legacyIosSchemePattern);
 
 const iosDeviceConfig = launch.configurations.find(
   (configuration) => configuration.name === 'Mobile: iOS (macOS)',

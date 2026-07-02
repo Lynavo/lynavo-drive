@@ -154,9 +154,13 @@ describe('DownloadRecordsGlobalScreen', () => {
     const { getByText, queryByText } = render(<DownloadRecordsGlobalScreen />);
 
     await waitFor(() => {
-      expect(getByText('最近下载')).toBeTruthy();
-      expect(getByText('暂无最近下载')).toBeTruthy();
-      expect(getByText('从电脑下载到本机的文件会出现在这里。')).toBeTruthy();
+      expect(getByText('Recent Downloads')).toBeTruthy();
+      expect(getByText('No Recent Downloads')).toBeTruthy();
+      expect(
+        getByText(
+          'Files downloaded from your computer to this device will appear here.',
+        ),
+      ).toBeTruthy();
     });
     expect(queryByText('Client-Handoff.mov')).toBeNull();
     expect(queryByText('Campaign-Keyframes.zip')).toBeNull();
@@ -172,7 +176,7 @@ describe('DownloadRecordsGlobalScreen', () => {
       expect(getByText('Client-Handoff.mov')).toBeTruthy();
       expect(getByText('Campaign-Keyframes.zip')).toBeTruthy();
     });
-    expect(queryByText('暂无最近下载')).toBeNull();
+    expect(queryByText('No Recent Downloads')).toBeNull();
   });
 
   it('renders downloaded files using the reference list layout copy', async () => {
@@ -191,7 +195,7 @@ describe('DownloadRecordsGlobalScreen', () => {
 
     await waitFor(() => {
       expect(getByText('Vacation-01.JPG')).toBeTruthy();
-      expect(getByText('照片 · 8.4 MB')).toBeTruthy();
+      expect(getByText('Photo - 8.4 MB')).toBeTruthy();
     });
   });
 
@@ -386,8 +390,8 @@ describe('DownloadRecordsGlobalScreen', () => {
         'application/pdf',
       );
       expect(alertSpy).toHaveBeenCalledWith(
-        '下載完成',
-        'Missing.pdf 已儲存到檔案',
+        'Download complete',
+        'Missing.pdf saved to Files',
       );
     });
   });
@@ -438,8 +442,8 @@ describe('DownloadRecordsGlobalScreen', () => {
       );
       expect(mockedDownloadResourceForGlobal).not.toHaveBeenCalled();
       expect(alertSpy).toHaveBeenCalledWith(
-        '下載完成',
-        'CAP_5FA32EEE-723F-4B25-ABB7-1EF7B23290FA.jpg 已儲存到相簿',
+        'Download complete',
+        'CAP_5FA32EEE-723F-4B25-ABB7-1EF7B23290FA.jpg saved to Photos',
       );
     });
   });

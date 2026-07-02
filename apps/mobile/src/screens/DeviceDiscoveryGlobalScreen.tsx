@@ -338,7 +338,7 @@ export function resolveConnectionGuideCardPosition({
 const VISUAL_QA_LAN_DEVICES: DiscoveredDevice[] = [
   {
     deviceId: 'visual-qa-openimde-mac-mini',
-    name: 'Lynavo Drive 演示 Mac Studio',
+    name: 'Lynavo Drive Demo Mac Studio',
     ip: '192.168.31.21',
     type: 'mac',
     port: 39393,
@@ -347,7 +347,7 @@ const VISUAL_QA_LAN_DEVICES: DiscoveredDevice[] = [
   },
   {
     deviceId: 'visual-qa-macbook-pro',
-    name: 'Lynavo Drive 演示 MacBook Pro',
+    name: 'Lynavo Drive Demo MacBook Pro',
     ip: '192.168.31.36',
     type: 'mac',
     port: 39393,
@@ -356,7 +356,7 @@ const VISUAL_QA_LAN_DEVICES: DiscoveredDevice[] = [
   },
   {
     deviceId: 'visual-qa-windows-workstation',
-    name: 'Lynavo Drive 演示 Windows 工作站',
+    name: 'Lynavo Drive Demo Windows Workstation',
     ip: '192.168.31.52',
     type: 'win',
     port: 39393,

@@ -28,24 +28,22 @@ describe('file-preview', () => {
 
   it('encodes filesystem paths before converting them to file URIs', () => {
     expect(
-      documentPreviewUri('/tmp/lynavo-drive previews/客戶 報告#Q2.pdf'),
-    ).toBe(
-      'file:///tmp/lynavo-drive%20previews/%E5%AE%A2%E6%88%B6%20%E5%A0%B1%E5%91%8A%23Q2.pdf',
-    );
+      documentPreviewUri('/tmp/lynavo-drive previews/Client Report#Q2.pdf'),
+    ).toBe('file:///tmp/lynavo-drive%20previews/Client%20Report%23Q2.pdf');
   });
 
   it('passes a sanitized filename and metadata to the share sheet', async () => {
     await openFileWithOtherApp(
       '/tmp/lynavo-drive_shared_downloads/cache-item',
-      '  客戶/報告:Q2.pdf  ',
+      '  Client/Report:Q2.pdf  ',
     );
 
     expect(shareOpenMock).toHaveBeenCalledWith(
       expect.objectContaining({
         url: 'file:///tmp/lynavo-drive_shared_downloads/cache-item',
-        filename: '客戶_報告_Q2.pdf',
-        title: '客戶_報告_Q2.pdf',
-        subject: '客戶_報告_Q2.pdf',
+        filename: 'Client_Report_Q2.pdf',
+        title: 'Client_Report_Q2.pdf',
+        subject: 'Client_Report_Q2.pdf',
       }),
     );
   });

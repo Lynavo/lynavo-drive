@@ -317,7 +317,7 @@ func (s *Server) trustedPersonalAccessClient(client mobileAccessClient) mobileAc
 func personalAccessResourceName(relPath string) string {
 	trimmed := strings.Trim(strings.TrimSpace(relPath), "/")
 	if trimmed == "" {
-		return "个人空间"
+		return "Personal Space"
 	}
 	name := strings.TrimSpace(path.Base(trimmed))
 	if name == "." || name == "/" || name == "" {

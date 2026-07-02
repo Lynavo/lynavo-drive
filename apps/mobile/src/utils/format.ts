@@ -16,5 +16,5 @@ export function formatDuration(ms: number): string {
 }
 
 export function formatDate(iso: string): string {
-  return iso.slice(5).replace('-', '\u6708') + '\u65e5';
+  return iso.slice(5);
 }

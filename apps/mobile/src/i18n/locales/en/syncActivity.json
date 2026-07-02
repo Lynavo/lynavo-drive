@@ -33,7 +33,7 @@
     "uploadFiles": "Uploaded Files",
     "adjust": "Adjust",
     "waitingForSync": "Waiting for auto sync",
-    "completedSummary": "Synced {{count}} · {{size}}",
+    "completedSummary": "Synced {{count}} - {{size}}",
     "waitingForNewAssets": "Waiting for new assets to auto sync",
     "latestSyncTimeLabel": "Last sync time"
   },
@@ -49,9 +49,9 @@
     "scanningSubtitleProgress": "Scanned {{scanned}} / {{total}}",
     "scanningSubtitleReading": "Reading photo library",
     "preparingSubtitle": "Establishing a secure connection to your computer",
-    "reconnectingTitle": "Network hiccup — reconnecting…",
+    "reconnectingTitle": "Network hiccup — reconnecting...",
     "reconnectingSubtitle": "Upload will resume once the connection is back",
-    "autoPreparingTitle": "Enabling auto-upload…",
+    "autoPreparingTitle": "Enabling auto-upload...",
     "autoPreparingSubtitle": "Preparing to scan for new photos"
   },
   "badges": {
@@ -261,7 +261,7 @@
     "totalSynced": "Total synced: {{size}}",
     "emptyTitle": "No Sync Records Yet",
     "emptyMessage": "After your first auto sync, records will appear here sorted by completion date.",
-    "dayStats": "{{count}} files · {{size}}",
+    "dayStats": "{{count}} files - {{size}}",
     "todayRecord": "Today's sync record",
     "statusCompleted": "Completed",
     "statusSyncing": "Syncing",

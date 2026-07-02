@@ -93,7 +93,7 @@ describe('DevicesPage', () => {
     render(<DevicesPage />);
 
     expect(screen.getByText('iPhone 15 Pro')).toBeInTheDocument();
-    expect(screen.getAllByText('已连接').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Connected').length).toBeGreaterThan(0);
   });
 
   it('displays blocked device with manual unblock action', () => {
@@ -102,15 +102,17 @@ describe('DevicesPage', () => {
     render(<DevicesPage />);
 
     expect(screen.getByText('Galaxy S24')).toBeInTheDocument();
-    expect(screen.getAllByText('已禁用').length).toBeGreaterThan(0);
-    expect(screen.getByText('输错连接码 3 次，已自动禁用')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '取消禁用' })).toBeInTheDocument();
+    expect(screen.getAllByText('Blocked').length).toBeGreaterThan(0);
+    expect(
+      screen.getByText('Pairing code entered incorrectly 3 times. Device blocked automatically.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Unblock' })).toBeInTheDocument();
   });
 
   it('renders the real empty state when the device list is empty in development', () => {
     render(<DevicesPage />);
 
-    expect(screen.getByText('暂无设备')).toBeInTheDocument();
+    expect(screen.getByText('No devices')).toBeInTheDocument();
     expect(screen.queryByText('iPhone 15 Pro')).not.toBeInTheDocument();
     expect(screen.queryByText('Galaxy S24 Ultra')).not.toBeInTheDocument();
   });
@@ -119,14 +121,16 @@ describe('DevicesPage', () => {
     useManagementStore.setState({ devices: [authorizedDevice] });
 
     render(<DevicesPage />);
-    fireEvent.click(screen.getByRole('button', { name: '禁用' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Block' }));
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText('禁用设备')).toBeInTheDocument();
+    expect(screen.getByText('Block device')).toBeInTheDocument();
     expect(
-      screen.getByText('禁用后 iPhone 15 Pro 将断开连接并停止所有传输，确定要禁用该设备吗？'),
+      screen.getByText(
+        'After blocking, iPhone 15 Pro will disconnect and stop all transfers. Block this device?',
+      ),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '确认禁用' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirm block' })).toBeInTheDocument();
   });
 
   it('marks a device as disabled after confirming the disable dialog', async () => {
@@ -145,14 +149,16 @@ describe('DevicesPage', () => {
     useManagementStore.setState({ devices: [authorizedDevice], blockDevice });
 
     render(<DevicesPage />);
-    fireEvent.click(screen.getByRole('button', { name: '禁用' }));
-    fireEvent.click(screen.getByRole('button', { name: '确认禁用' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Block' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm block' }));
 
     await waitFor(() => {
-      expect(screen.getAllByText('已禁用').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Blocked').length).toBeGreaterThan(0);
     });
-    expect(screen.getByText('输错连接码 3 次，已自动禁用')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '取消禁用' })).toBeInTheDocument();
+    expect(
+      screen.getByText('Pairing code entered incorrectly 3 times. Device blocked automatically.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Unblock' })).toBeInTheDocument();
   });
 
   it('clicking unblock calls store action', async () => {
@@ -162,7 +168,7 @@ describe('DevicesPage', () => {
     useManagementStore.setState({ devices: [blockedDevice], unblockDevice });
 
     render(<DevicesPage />);
-    fireEvent.click(screen.getByRole('button', { name: '取消禁用' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Unblock' }));
 
     await waitFor(() => {
       expect(unblockDevice).toHaveBeenCalledWith(blockedDevice.clientId);
@@ -194,9 +200,11 @@ describe('DevicesPage', () => {
 
     expect(screen.getByText('iPhone 15 Pro')).toBeInTheDocument();
     expect(screen.getByText('Galaxy S24')).toBeInTheDocument();
-    expect(screen.getAllByText('已连接').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('已禁用').length).toBeGreaterThan(0);
-    expect(screen.getByText('输错连接码 3 次，已自动禁用')).toBeInTheDocument();
+    expect(screen.getAllByText('Connected').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Blocked').length).toBeGreaterThan(0);
+    expect(
+      screen.getByText('Pairing code entered incorrectly 3 times. Device blocked automatically.'),
+    ).toBeInTheDocument();
   });
 
   it('shows transfer progress for a managed device that is currently uploading', () => {
@@ -227,10 +235,10 @@ describe('DevicesPage', () => {
 
     render(<DevicesPage />);
 
-    expect(screen.getAllByText('传输中').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Transferring').length).toBeGreaterThan(0);
     expect(screen.getByText('IMG_0421.mov')).toBeInTheDocument();
     expect(screen.getByText('42%')).toBeInTheDocument();
-    expect(screen.queryByText('已连接，等待同步')).not.toBeInTheDocument();
+    expect(screen.queryByText('Connected, waiting to sync')).not.toBeInTheDocument();
   });
 
   it('does not hardcode localized Chinese copy in device management source', () => {

@@ -52,7 +52,7 @@
       "copyFailed": "Could not copy the download address. Please try again later.",
       "copyHint": "Open this address in your computer browser to download",
       "start": "I installed it. Connect device",
-      "footerNote": "First-time guide · Available again from Help"
+      "footerNote": "First-time guide - Available again from Help"
     }
   },
   "dialogs": {
@@ -205,7 +205,7 @@
       "syncScope": "Sync Scope",
       "allContentDesc": "Sync all existing photos & videos",
       "uploadedCount": "Uploaded {{uploaded}}/{{total}}",
-      "uploadingProgress": "Uploading · Progress",
+      "uploadingProgress": "Uploading - Progress",
       "speed": "Speed",
       "progress": "Progress",
       "fileSize": "File Size",
@@ -217,7 +217,7 @@
       "demoFileName2": "Launch Video.mov",
       "demoFileName3": "Price List.xlsx",
       "syncRecords": "Sync Records",
-      "todayStat": "Today · 18 files · 18.4 GB",
+      "todayStat": "Today - 18 files - 18.4 GB",
       "completed": "Completed",
       "syncSpaceTitle": "Phone Sync Space",
       "syncSpaceDesc": "View files synced to computer and upload sources",

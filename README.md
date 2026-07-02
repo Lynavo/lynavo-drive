@@ -1,48 +1,59 @@
 # Lynavo Drive
 
-移动端（iOS / Android）→ Desktop（macOS / Windows）局域网素材无感增量同步工具，面向全球用户和短视频团队。当前开源基线只维护单一 OSS 本地构建路径，不包含多市场发行路径。Linux 只保留本地 source-build / package verification 路径，不是当前用户支持范围。
+Lynavo Drive is a local-LAN incremental media sync tool from mobile
+(iOS / Android) to desktop (macOS / Windows), built for global users and video
+teams. The current open-source baseline maintains one OSS local build path only
+and does not include multi-market distribution paths. Linux keeps only local
+source-build / package verification paths and is not a current user support
+surface.
 
-## 当前状态
+## Current Status
 
-- 桌面端、Go sidecar、移动端和 iOS / Android 原生同步能力都已落地
-- iOS 与 Android 移动端都属于当前支持范围
-- 当前工作重点是异常恢复、OSS 边界收口和本地构建 / 打包验证
-- 仓库中目前没有单独维护的产品 spec 文件；开发基线以当前代码、`@lynavo-drive/contracts` 和测试矩阵为准
-- guest/local 用户可使用前景 LAN 自动同步；远程访问和后台静默续传不属于 OSS runtime，缺少官方能力时保持关闭
+- Desktop, Go sidecar, mobile, and native iOS / Android sync are implemented.
+- iOS and Android mobile apps are both in scope.
+- Current work focuses on error recovery, OSS boundary tightening, and local
+  build / package verification.
+- The repository currently has no separately maintained product spec; the
+  baseline is the current code, `@lynavo-drive/contracts`, and the test matrix.
+- Guest/local users can use foreground LAN automatic sync. Remote access and
+  silent background continuation are not part of the OSS runtime and remain off
+  without official capability.
 
-## 前置依赖
+## Prerequisites
 
-- **macOS 或 Windows**（桌面端当前支持 macOS / Windows；Linux 仅本地构建 / 打包验证；iOS 构建仍需 macOS + Xcode）
+- **macOS or Windows** (desktop currently supports macOS / Windows; Linux is
+  only for local build / package verification; iOS builds still require macOS +
+  Xcode)
 - **Node.js** >= 22.12.0
 - **pnpm** >= 10
-- **Go** >= 1.25.6（sidecar 开发和测试）
-- **Xcode + CocoaPods**（iOS 构建和真機偵錯，僅 macOS）
-- **Android Studio + Android SDK / NDK**（Android 构建和调试）
+- **Go** >= 1.25.6 (sidecar development and tests)
+- **Xcode + CocoaPods** (iOS builds and device debugging, macOS only)
+- **Android Studio + Android SDK / NDK** (Android builds and debugging)
 
-## 快速開始
+## Quick Start
 
 ```bash
-# 1. 安裝依賴
+# 1. Install dependencies
 pnpm install
 
-# 2. 建置共享包
+# 2. Build shared packages
 pnpm --filter @lynavo-drive/contracts build
 pnpm --filter @lynavo-drive/design-tokens build
 
-# 3. 啟動 Desktop 開發模式
+# 3. Start desktop development mode
 pnpm dev:desktop
 ```
 
-Electron 窗口會自動打開；桌面端會負責拉起 sidecar。
+The Electron window opens automatically, and the desktop app starts the sidecar.
 
-## 常用命令
+## Common Commands
 
 ```bash
 # Desktop
 pnpm dev:desktop
 pnpm build:desktop
 pnpm package:desktop          # macOS local DMG
-pnpm package:desktop:win      # Windows NSIS + zip（預設 desktop Windows 包，不帶 release profile）
+pnpm package:desktop:win      # Windows NSIS + zip (default desktop Windows package, no release profile)
 
 # Mobile
 pnpm dev:mobile
@@ -55,7 +66,7 @@ pnpm dev:sidecar
 pnpm build:sidecar
 pnpm test:sidecar
 
-# 全倉驗證
+# Full repository validation
 pnpm build
 pnpm test
 pnpm typecheck
@@ -68,23 +79,23 @@ pnpm check
 This OSS repository keeps local source-build and package verification paths.
 
 ```bash
-# 檢查會執行的本地構建 / 打包命令
+# Inspect the local build / package commands that would run
 pnpm release --profile review --targets ios,android,mac,win,linux --dry-run
 
-# 本地 iOS / Android Debug / Desktop 構建驗證
+# Local iOS / Android Debug / Desktop build verification
 pnpm build:mobile
 pnpm build:mobile:ios:release
 pnpm build:mobile:android
 pnpm package:desktop
 
-# Android Release source-build 驗證
+# Android Release source-build verification
 pnpm release --profile review --targets android --dry-run
 pnpm release --profile review --targets android
 
-# Desktop 平台包本地打包
+# Local desktop platform package
 pnpm package:desktop
 
-# Linux package verification（Linux host，一次一個 arch）
+# Linux package verification (Linux host, one arch per run)
 pnpm --filter @lynavo-drive/desktop package:linux -- --arch=x64
 pnpm --filter @lynavo-drive/desktop package:linux -- --arch=arm64
 ```
@@ -94,57 +105,72 @@ configuration, and only select local build/package commands.
 
 ## OSS Boundary
 
-- Community/OSS build 是單一 OSS baseline：不提供多市場分支、專屬支付、專屬 release profile 或雙市場回歸矩陣。
-- guest local LAN mode 必須可用：未登入或無訂閱時，使用者仍可在前景發現 desktop、配對、掃描 pending queue 並自動 LAN 上傳。
-- 不提供手動選檔替代路徑：佇列仍由 mobile 本地掃描和 pending queue 驅動，UI 不允許手動勾選檔案來繞過自動增量同步。
-- foreground LAN fail-open：只要本地權限、配對和 LAN 可達，前景同步不因登入、訂閱或非 OSS 模組缺失而被阻斷。
-- non-OSS remote/background fail-closed：遠端訪問、tunnel credentials、背景靜默續傳等能力缺少官方 capability 或有效 entitlement 時保持關閉。
-- OSS source package 不分發 Apple Bonjour for Windows 二進制；Windows native Bonjour 只能依賴使用者本機安裝或本機允許來源配置，缺失時走 zeroconf-compatible fallback。
-- package scope、mDNS service、舊 data-dir、native package/bundle rename 是後續遷移邊界，本輪文檔不要求執行 rename 或資料遷移。
+- Community/OSS builds are a single OSS baseline. They do not provide
+  multi-market branches, dedicated payment paths, dedicated release profiles, or
+  dual-market regression matrices.
+- Guest local LAN mode must work. Without sign-in or subscription, users can
+  discover the desktop, pair, scan the pending queue, and upload automatically
+  over foreground LAN.
+- No manual file-selection fallback is provided. The queue is driven by mobile
+  local scans and the pending queue; the UI must not allow manual file
+  checkboxes to bypass automatic incremental sync.
+- Foreground LAN sync is fail-open. When local permissions, pairing, and LAN
+  reachability are available, foreground sync is not blocked by sign-in,
+  subscription, or missing non-OSS modules.
+- Non-OSS remote/background capabilities fail closed. Remote access, tunnel
+  credentials, and silent background continuation remain off without official
+  capability or valid entitlement.
+- The OSS source package does not redistribute Apple Bonjour for Windows
+  binaries. Windows native Bonjour can only use the user's local installation or
+  another locally permitted configured source; otherwise it uses the
+  zeroconf-compatible fallback.
+- Package scope, mDNS service, legacy data directory, and native package/bundle
+  renames are future migration boundaries. This documentation pass does not
+  require renames or data migration.
 
-## 專案結構
+## Project Structure
 
 ```text
 lynavo-drive/
 ├── apps/
-│   ├── desktop/              # Electron 桌面應用
+│   ├── desktop/              # Electron desktop app
 │   │   └── src/
-│   │       ├── main/         # 主進程（窗口、IPC、sidecar 生命周期）
-│   │       ├── preload/      # 預先加載橋接
+│   │       ├── main/         # Main process (window, IPC, sidecar lifecycle)
+│   │       ├── preload/      # Preload bridge
 │   │       └── renderer/     # React 18 UI
-│   └── mobile/               # React Native iOS/Android 應用 + 平台原生同步能力
-│       ├── ios/              # Xcode 工程、Swift 原生模組
-│       ├── android/          # Android 工程、Kotlin bridge、原生同步能力
-│       ├── src/              # RN 頁面和 hooks
-│       └── __tests__/        # RN 測試
+│   └── mobile/               # React Native iOS/Android app + native sync
+│       ├── ios/              # Xcode project and Swift native modules
+│       ├── android/          # Android project, Kotlin bridge, native sync
+│       ├── src/              # RN screens and hooks
+│       └── __tests__/        # RN tests
 ├── packages/
-│   ├── contracts/            # 共享 DTO / 常量 / 事件 / 錯誤碼
-│   └── design-tokens/        # 共享設計 token
+│   ├── contracts/            # Shared DTOs / constants / events / error codes
+│   └── design-tokens/        # Shared design tokens
 ├── services/
 │   └── sidecar-go/           # Go sidecar（TCP/HTTP/SQLite/mDNS）
 └── docs/
-    ├── architecture/         # 架構、狀態機、數據模型
-    ├── operations/           # 排障、診斷、sidecar 運行手冊
-    ├── product/              # 產品約束、OSS 邊界與非目標
-    ├── release/              # OSS 構建與打包驗證手冊
-    └── testing/              # OSS 驗證矩陣
+    ├── architecture/         # Architecture, state machine, data model
+    ├── operations/           # Troubleshooting, diagnostics, sidecar runbook
+    ├── product/              # Product constraints, OSS boundaries, non-goals
+    ├── release/              # OSS build and package verification playbook
+    └── testing/              # OSS verification matrix
 ```
 
-## 技術棧
+## Tech Stack
 
-| 層             | 技術                                                       |
+| Layer          | Technology                                                 |
 | -------------- | ---------------------------------------------------------- |
 | Monorepo       | pnpm 10 + turborepo 2.8                                    |
 | Desktop        | Electron 41 + electron-vite 5 + electron-builder 26        |
 | Desktop UI     | React 18.3 + zustand 5 + Tailwind CSS v4                   |
-| Mobile         | React Native 0.84.1 + React 19（iOS / Android）            |
+| Mobile         | React Native 0.84.1 + React 19 (iOS / Android)             |
 | iOS Native     | Swift `SyncEngine` + BGTask + PhotoKit + Network.framework |
 | Android Native | Kotlin bridge + NativeSyncEngine / MediaStore / NsdManager |
 | Sidecar        | Go 1.25.6 + SQLite + WebSocket                             |
 | Shared         | `@lynavo-drive/contracts` + `@lynavo-drive/design-tokens`  |
 | Test           | vitest 4.1 + jest + `go test`                              |
 
-## 架構概覽
+## Architecture Overview
 
 ```text
 Mobile (RN UI on iOS / Android)
@@ -156,38 +182,41 @@ Mobile (RN UI on iOS / Android)
                 │
                 ▼
 Desktop (Electron + Go sidecar, macOS / Windows)
-  ├── Electron: UI 殼、窗口、橋接、sidecar 生命周期管理
+  ├── Electron: UI shell, window, bridge, sidecar lifecycle
   ├── Sidecar HTTP API / WebSocket
-  ├── LMUP 檔案接收
+  ├── LMUP file receiver
   ├── SQLite
-  └── 檔案系統 / 共享目錄偵測
+  └── Filesystem / shared directory detection
 ```
 
-## 開發基線
+## Development Baseline
 
-- 共享型別、常量、事件名、連接埠定義統一來自 `@lynavo-drive/contracts`
-- renderer 不直接存取 sidecar、檔案系統、SQLite；全部透過 preload bridge / main 進程轉發
-- 佇列保持唯讀，不允許在 UI 裡刪除、重排或跳過
-- 同一台手機同一時間只允許序列上傳一個檔案
-- guest/local 前景 LAN 同步 fail-open；遠端訪問和背景續傳 fail-closed
+- Shared types, constants, event names, and port definitions come from
+  `@lynavo-drive/contracts`.
+- The renderer does not access the sidecar, filesystem, or SQLite directly; all
+  access goes through the preload bridge / main process.
+- The queue stays read-only. The UI cannot delete, reorder, or skip items.
+- A given phone uploads only one file at a time.
+- Guest/local foreground LAN sync is fail-open; remote access and background
+  continuation fail closed.
 
-## 檔案
+## Files
 
-- 開發約束與執行準則：[`AGENTS.md`](./AGENTS.md)
-- 系統概覽：[`docs/architecture/system-overview.md`](./docs/architecture/system-overview.md)
-- 同步狀態機：[`docs/architecture/sync-state-machine.md`](./docs/architecture/sync-state-machine.md)
-- 資料模型與統計口徑：[`docs/architecture/data-model.md`](./docs/architecture/data-model.md)
-- 排障手冊：[`docs/operations/troubleshooting.md`](./docs/operations/troubleshooting.md)
-- Mobile 診斷包說明：[`docs/operations/mobile-diagnostics.md`](./docs/operations/mobile-diagnostics.md)
-- Sidecar 運作手冊：[`docs/operations/sidecar-runbook.md`](./docs/operations/sidecar-runbook.md)
-- 產品約束、OSS 邊界與非目標：[`docs/product/constraints.md`](./docs/product/constraints.md)
-- OSS 構建驗證手冊：[`docs/release/release-playbook.md`](./docs/release/release-playbook.md)
-- OSS 驗證矩陣：[`docs/testing/oss-verification-matrix.md`](./docs/testing/oss-verification-matrix.md)
-- 安全政策：[`SECURITY.md`](./SECURITY.md)
-- 隱私說明：[`PRIVACY.md`](./PRIVACY.md)
-- 貢獻指南：[`CONTRIBUTING.md`](./CONTRIBUTING.md)
-- 行為準則：[`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md)
-- 第三方聲明：[`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md)
+- Development constraints and operating rules: [`AGENTS.md`](./AGENTS.md)
+- System overview: [`docs/architecture/system-overview.md`](./docs/architecture/system-overview.md)
+- Sync state machine: [`docs/architecture/sync-state-machine.md`](./docs/architecture/sync-state-machine.md)
+- Data model and statistics semantics: [`docs/architecture/data-model.md`](./docs/architecture/data-model.md)
+- Troubleshooting guide: [`docs/operations/troubleshooting.md`](./docs/operations/troubleshooting.md)
+- Mobile diagnostics package: [`docs/operations/mobile-diagnostics.md`](./docs/operations/mobile-diagnostics.md)
+- Sidecar runbook: [`docs/operations/sidecar-runbook.md`](./docs/operations/sidecar-runbook.md)
+- Product constraints, OSS boundaries, and non-goals: [`docs/product/constraints.md`](./docs/product/constraints.md)
+- OSS build verification playbook: [`docs/release/release-playbook.md`](./docs/release/release-playbook.md)
+- OSS verification matrix: [`docs/testing/oss-verification-matrix.md`](./docs/testing/oss-verification-matrix.md)
+- Security policy: [`SECURITY.md`](./SECURITY.md)
+- Privacy notice: [`PRIVACY.md`](./PRIVACY.md)
+- Contributing guide: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- Code of conduct: [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md)
+- Third-party notices: [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md)
 
 ## License
 

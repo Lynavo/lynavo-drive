@@ -25,7 +25,7 @@ describe('SharedResourcesPage', () => {
 
   it('renders page layout and titles', () => {
     render(<SharedResourcesPage />);
-    expect(screen.getByText('共享管理')).toBeInTheDocument();
+    expect(screen.getByText('Shared Resources')).toBeInTheDocument();
   });
 
   it('displays loading state with skeletons when empty', () => {
@@ -55,12 +55,12 @@ describe('SharedResourcesPage', () => {
       ],
     });
     render(<SharedResourcesPage />);
-    expect(screen.getByText('加载中...')).toBeInTheDocument();
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
   });
 
   it('displays empty state when no resources', () => {
     render(<SharedResourcesPage />);
-    expect(screen.getByText('暂无共享资源')).toBeInTheDocument();
+    expect(screen.getByText('No shared resources')).toBeInTheDocument();
   });
 
   it('displays error state', () => {
@@ -91,8 +91,8 @@ describe('SharedResourcesPage', () => {
 
     render(<SharedResourcesPage />);
     expect(screen.getByText('test-doc.pdf')).toBeInTheDocument();
-    expect(screen.getByText('本地文件')).toBeInTheDocument();
-    expect(screen.getByText('可用')).toBeInTheDocument();
+    expect(screen.getByText('Local File')).toBeInTheDocument();
+    expect(screen.getByText('Available')).toBeInTheDocument();
   });
 
   it('triggers remove action on trash click', () => {
@@ -114,7 +114,7 @@ describe('SharedResourcesPage', () => {
     });
 
     render(<SharedResourcesPage />);
-    const deleteBtn = screen.getByRole('button', { name: '取消共享' });
+    const deleteBtn = screen.getByRole('button', { name: 'Unshare' });
     fireEvent.click(deleteBtn);
     expect(removeSharedResource).toHaveBeenCalledWith('res-1');
   });
@@ -129,10 +129,10 @@ describe('SharedResourcesPage', () => {
     });
 
     render(<SharedResourcesPage />);
-    fireEvent.click(screen.getByRole('button', { name: '共享文件' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Share File' }));
     expect(shareFile).toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: '共享文件夹' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Share Folder' }));
     expect(shareFolder).toHaveBeenCalled();
   });
 });

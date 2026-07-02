@@ -46,20 +46,20 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('react-i18next', () => {
-  const zhHans = {
-    deviceDiscovery: require('../../i18n/locales/zh-Hans/deviceDiscovery.json'),
-    common: require('../../i18n/locales/zh-Hans/common.json'),
-    errors: require('../../i18n/locales/zh-Hans/errors.json'),
+  const en = {
+    deviceDiscovery: require('../../i18n/locales/en/deviceDiscovery.json'),
+    common: require('../../i18n/locales/en/common.json'),
+    errors: require('../../i18n/locales/en/errors.json'),
   };
   return {
     useTranslation: () => ({
       i18n: {
-        language: 'zh-Hans',
-        resolvedLanguage: 'zh-Hans',
+        language: 'en',
+        resolvedLanguage: 'en',
       },
       t: (key: string, options?: any) => {
         const parts = key.split('.');
-        let current: any = zhHans;
+        let current: any = en;
         for (const part of parts) {
           if (current == null) return key;
           current = current[part];
@@ -290,25 +290,25 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('先连接电脑')).toBeTruthy();
+      expect(screen.getByText('Connect Computer First')).toBeTruthy();
     });
 
     expect(screen.getByText('1/6')).toBeTruthy();
-    expect(screen.getByText('继续预览')).toBeTruthy();
+    expect(screen.getByText('Continue Preview')).toBeTruthy();
     expect(screen.getByText('Studio Mac')).toBeTruthy();
-    expect(screen.getByText('已发现 1 台')).toBeTruthy();
-    expect(screen.queryByText('扫描中...')).toBeNull();
-    expect(screen.queryByText('开始使用 Lynavo Drive')).toBeNull();
+    expect(screen.getByText('1 device found')).toBeTruthy();
+    expect(screen.queryByText('Scanning...')).toBeNull();
+    expect(screen.queryByText('Start using Lynavo Drive')).toBeNull();
   });
 
   it('hides the back button in the initial connection flow', async () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('连接你的电脑')).toBeTruthy();
+      expect(screen.getByText('Connect Your PC')).toBeTruthy();
     });
 
-    expect(screen.queryByLabelText('返回')).toBeNull();
+    expect(screen.queryByLabelText('Back')).toBeNull();
     expect(screen.queryByText('chevron-back')).toBeNull();
   });
 
@@ -318,10 +318,10 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('切换电脑')).toBeTruthy();
+      expect(screen.getByText('Switch Computer')).toBeTruthy();
     });
 
-    const backButton = screen.getByLabelText('返回');
+    const backButton = screen.getByLabelText('Back');
     expect(backButton).toBeTruthy();
     fireEvent.press(backButton);
     expect(mockGoBack).toHaveBeenCalledTimes(1);
@@ -334,13 +334,15 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
 
     await waitFor(
       () => {
-        expect(screen.getByText('Lynavo Drive 演示 Mac Studio')).toBeTruthy();
+        expect(screen.getByText('Lynavo Drive Demo Mac Studio')).toBeTruthy();
       },
       { timeout: 2000 },
     );
 
-    expect(screen.getByText('Lynavo Drive 演示 MacBook Pro')).toBeTruthy();
-    expect(screen.getByText('Lynavo Drive 演示 Windows 工作站')).toBeTruthy();
+    expect(screen.getByText('Lynavo Drive Demo MacBook Pro')).toBeTruthy();
+    expect(
+      screen.getByText('Lynavo Drive Demo Windows Workstation'),
+    ).toBeTruthy();
     expect(screen.queryByText('openimdeMac-mini')).toBeNull();
     expect(mockNativeSyncEngine.stopDiscovery).not.toHaveBeenCalled();
     expect(mockNativeSyncEngine.startDiscovery).not.toHaveBeenCalled();
@@ -359,16 +361,16 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('允许查找附近设备')).toBeTruthy();
+      expect(screen.getByText('Find Nearby Devices')).toBeTruthy();
     });
 
-    expect(screen.getByText('等待授权')).toBeTruthy();
+    expect(screen.getByText('Waiting for permission')).toBeTruthy();
     expect(
       mockNativeSyncEngine.getDiscoveryPermissionStatus,
     ).toHaveBeenCalled();
     expect(mockNativeSyncEngine.startDiscovery).not.toHaveBeenCalled();
 
-    fireEvent.press(screen.getByText('开始扫描'));
+    fireEvent.press(screen.getByText('Start Scan'));
 
     await waitFor(() => {
       expect(mockNativeSyncEngine.startDiscovery).toHaveBeenCalledTimes(1);
@@ -379,49 +381,49 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('先连接电脑')).toBeTruthy();
+      expect(screen.getByText('Connect Computer First')).toBeTruthy();
     });
 
     expect(screen.getByText('1/6')).toBeTruthy();
-    expect(screen.getByText('继续预览')).toBeTruthy();
+    expect(screen.getByText('Continue Preview')).toBeTruthy();
 
-    fireEvent.press(screen.getByText('继续预览'));
+    fireEvent.press(screen.getByText('Continue Preview'));
     await waitFor(() => {
-      expect(screen.getByText('开启自动上传')).toBeTruthy();
+      expect(screen.getByText('Enable Auto Upload')).toBeTruthy();
     });
     expect(screen.getByText('2/6')).toBeTruthy();
-    expectPreviewText(screen, '自动上传');
-    expectPreviewText(screen, '当前手机状态');
-    expectPreviewText(screen, '开启');
+    expectPreviewText(screen, 'Auto Upload');
+    expectPreviewText(screen, 'Device Status');
+    expectPreviewText(screen, 'Off');
 
-    fireEvent.press(screen.getByText('下一步'));
-    expect(screen.getByText('同步范围与限制')).toBeTruthy();
+    fireEvent.press(screen.getByText('Next'));
+    expect(screen.getByText('Sync Scope')).toBeTruthy();
     expect(screen.getByText('3/6')).toBeTruthy();
-    expectPreviewText(screen, '同步计划');
-    expectPreviewText(screen, '同步来源');
-    expectPreviewText(screen, '照片和视频');
-    expectPreviewText(screen, '同步范围');
-    expectPreviewText(screen, '全部内容');
+    expectPreviewText(screen, 'Sync Plan');
+    expectPreviewText(screen, 'Sources');
+    expectPreviewText(screen, 'Photos & Videos');
+    expectPreviewText(screen, 'Sync Scope');
+    expectPreviewText(screen, 'All Content');
 
-    fireEvent.press(screen.getByText('下一步'));
-    expect(screen.getByText('查看同步进度')).toBeTruthy();
+    fireEvent.press(screen.getByText('Next'));
+    expect(screen.getByText('Sync Progress')).toBeTruthy();
     expect(screen.getByText('4/6')).toBeTruthy();
-    expectPreviewText(screen, '上传中 · 本次传输进度');
-    expectPreviewText(screen, '已上传96/128');
-    expectPreviewText(screen, '传输速度');
+    expectPreviewText(screen, 'Uploading - Progress');
+    expectPreviewText(screen, 'Uploaded 96/128');
+    expectPreviewText(screen, 'Speed');
     expectPreviewText(screen, '68.5 MB/s');
-    expectPreviewText(screen, '传输进度');
-    expectPreviewText(screen, '文件大小');
-    expectPreviewText(screen, '剩余时间');
-    expectPreviewText(screen, '24 秒');
-    expect(screen.queryAllByText('剪辑工作站-A')).toHaveLength(0);
+    expectPreviewText(screen, 'Progress');
+    expectPreviewText(screen, 'File Size');
+    expectPreviewText(screen, 'Time Left');
+    expectPreviewText(screen, '24s');
+    expect(screen.queryAllByText('Editing Workstation A')).toHaveLength(0);
 
-    fireEvent.press(screen.getByText('下一步'));
-    expect(screen.getByText('查看最近记录')).toBeTruthy();
+    fireEvent.press(screen.getByText('Next'));
+    expect(screen.getByText('Recent Records')).toBeTruthy();
     expect(screen.getByText('5/6')).toBeTruthy();
-    expectPreviewText(screen, '最近下载');
-    expectPreviewText(screen, '查看全部');
-    expectPreviewText(screen, '品牌手册.pdf');
+    expectPreviewText(screen, 'Recent Downloads');
+    expectPreviewText(screen, 'View All');
+    expectPreviewText(screen, 'Brand Guidelines.pdf');
     expectPreviewTestId(screen, 'guide-preview-records-download-icon');
     expectPreviewTestId(screen, 'guide-preview-download-file-icon');
     expectPreviewTestId(screen, 'guide-preview-download-video-icon');
@@ -432,12 +434,12 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     expect(screen.queryByText('document-outline')).toBeNull();
     expect(screen.queryAllByText('arrow-down-circle-outline')).toHaveLength(0);
 
-    fireEvent.press(screen.getByText('下一步'));
-    expect(screen.getByText('电脑文件')).toBeTruthy();
+    fireEvent.press(screen.getByText('Next'));
+    expect(screen.getByText('Local Computer')).toBeTruthy();
     expect(screen.getByText('6/6')).toBeTruthy();
-    expect(screen.getByText('完成')).toBeTruthy();
-    expectPreviewText(screen, '手机同步空间');
-    expectPreviewText(screen, '电脑文件');
+    expect(screen.getByText('Done')).toBeTruthy();
+    expectPreviewText(screen, 'Phone Sync Space');
+    expectPreviewText(screen, 'Local Computer');
     expectPreviewTestId(screen, 'guide-preview-phone-sync-icon');
     expectPreviewTestId(screen, 'guide-preview-local-computer-icon');
 
@@ -445,7 +447,7 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     expect(mockDispatch).not.toHaveBeenCalled();
     expect(mockMarkUnconnectedGuideSeen).not.toHaveBeenCalled();
 
-    fireEvent.press(screen.getByText('完成'));
+    fireEvent.press(screen.getByText('Done'));
 
     await waitFor(() => {
       expect(mockMarkUnconnectedGuideSeen).toHaveBeenCalledTimes(1);
@@ -458,15 +460,15 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('跳过引导')).toBeTruthy();
+      expect(screen.getByText('Skip Guide')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText('跳过引导'));
+    fireEvent.press(screen.getByText('Skip Guide'));
 
     await waitFor(() => {
       expect(mockMarkUnconnectedGuideSeen).toHaveBeenCalledTimes(1);
     });
-    expect(screen.queryByText('先连接电脑')).toBeNull();
+    expect(screen.queryByText('Connect Computer First')).toBeNull();
   });
 
   it('does not show the guide in switch-desktop mode', async () => {
@@ -477,7 +479,7 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     await waitFor(() => {
       expect(mockHasSeenUnconnectedGuide).not.toHaveBeenCalled();
     });
-    expect(screen.queryByText('先连接电脑')).toBeNull();
+    expect(screen.queryByText('Connect Computer First')).toBeNull();
   });
 
   it('shows pairing invalidated notice while keeping pairing choices visible', async () => {
@@ -487,18 +489,20 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('需要重新配对这台电脑')).toBeTruthy();
+      expect(screen.getByText('Pair this desktop again')).toBeTruthy();
     });
 
     expect(
-      screen.getByText('这台电脑已更新连接码。请重新配对后继续同步。'),
+      screen.getByText(
+        'This desktop changed its pairing code. Pair again to continue.',
+      ),
     ).toBeTruthy();
-    expect(screen.getByText('手动配对')).toBeTruthy();
+    expect(screen.getByText('Manual Pairing')).toBeTruthy();
     expect(screen.getByText('Studio Mac')).toBeTruthy();
 
-    fireEvent.press(screen.getByText('手动配对'));
+    fireEvent.press(screen.getByText('Manual Pairing'));
 
-    expect(screen.getByText('扫码配对')).toBeTruthy();
+    expect(screen.getByText('Scan QR Code')).toBeTruthy();
   });
 
   it('marks the current desktop in switch mode and blocks reconnecting it', async () => {
@@ -517,14 +521,14 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('当前')).toBeTruthy();
+      expect(screen.getByText('Current')).toBeTruthy();
     });
 
     fireEvent.press(screen.getByText('Studio Mac'));
 
-    expect(alertSpy).toHaveBeenCalledWith('已是当前连接设备');
+    expect(alertSpy).toHaveBeenCalledWith('Already connected to this device');
     expect(mockPairDevice).not.toHaveBeenCalled();
-    expect(screen.queryByText('选择连接方式')).toBeNull();
+    expect(screen.queryByText('Select Connection Method')).toBeNull();
   });
 
   it('deduplicates a recent desktop that is also discovered on the LAN', async () => {
@@ -547,7 +551,7 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('已发现 1 台')).toBeTruthy();
+      expect(screen.getByText('1 device found')).toBeTruthy();
     });
     expect(screen.getAllByText('Studio Mac')).toHaveLength(1);
   });
@@ -572,7 +576,7 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('已发现 1 台')).toBeTruthy();
+      expect(screen.getByText('1 device found')).toBeTruthy();
     });
     expect(screen.getAllByText('Studio Mac')).toHaveLength(1);
   });
@@ -611,7 +615,7 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('已发现 1 台')).toBeTruthy();
+      expect(screen.getByText('1 device found')).toBeTruthy();
     });
     expect(screen.getAllByText('Mini4')).toHaveLength(1);
     expect(screen.queryByText('172.16.20.108:39393')).toBeNull();
@@ -623,12 +627,12 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('切换电脑')).toBeTruthy();
+      expect(screen.getByText('Switch Computer')).toBeTruthy();
     });
 
     expect(screen.queryByText('Studio Mac')).toBeNull();
     expect(screen.queryByText('192.168.31.8:39393')).toBeNull();
-    expect(screen.queryByText('已发现 1 台')).toBeNull();
+    expect(screen.queryByText('1 device found')).toBeNull();
   });
 
   it('shows recent desktop host without the sync port in initial mode', async () => {
@@ -670,9 +674,9 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('已连过')).toBeTruthy();
+      expect(screen.getByText('Previously Connected')).toBeTruthy();
     });
-    expect(screen.queryByText('直接切换')).toBeNull();
+    expect(screen.queryByText('Switch directly')).toBeNull();
 
     await act(async () => {
       fireEvent.press(screen.getByText('Studio Mac'));
@@ -698,8 +702,8 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
         type: 'RESET',
       }),
     );
-    expect(screen.queryByText('选择连接方式')).toBeNull();
-    expect(screen.queryByPlaceholderText('例如 A8X2K9')).toBeNull();
+    expect(screen.queryByText('Select Connection Method')).toBeNull();
+    expect(screen.queryByPlaceholderText('e.g. A8X2K9')).toBeNull();
   });
 
   it('falls back to code entry when known discovered desktop direct reconnect fails', async () => {
@@ -731,16 +735,16 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('已连过')).toBeTruthy();
+      expect(screen.getByText('Previously Connected')).toBeTruthy();
     });
-    expect(screen.queryByText('直接切换')).toBeNull();
+    expect(screen.queryByText('Switch directly')).toBeNull();
 
     await act(async () => {
       fireEvent.press(screen.getByText('Studio Mac'));
     });
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText('例如 A8X2K9')).toBeTruthy();
+      expect(screen.getByPlaceholderText('e.g. A8X2K9')).toBeTruthy();
     });
     expect(mockPairDevice).toHaveBeenCalledWith({
       deviceId: 'studio-mac',
@@ -749,7 +753,7 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
       connectionCode: '',
     });
     expect(mockAddDesktop).not.toHaveBeenCalled();
-    expect(screen.queryByText('选择连接方式')).toBeNull();
+    expect(screen.queryByText('Select Connection Method')).toBeNull();
     expect(mockDispatch).not.toHaveBeenCalled();
   });
 
@@ -763,28 +767,28 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     fireEvent.press(screen.getByText('Studio Mac'));
 
     expect(mockMarkUnconnectedGuideSeen).not.toHaveBeenCalled();
-    expect(screen.getByText('先连接电脑')).toBeTruthy();
-    expect(screen.queryByText('选择连接方式')).toBeNull();
+    expect(screen.getByText('Connect Computer First')).toBeTruthy();
+    expect(screen.queryByText('Select Connection Method')).toBeNull();
   });
 
   it('opens manual pairing options after the guide is dismissed', async () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('跳过引导')).toBeTruthy();
+      expect(screen.getByText('Skip Guide')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText('跳过引导'));
+    fireEvent.press(screen.getByText('Skip Guide'));
 
     await waitFor(() => {
       expect(mockMarkUnconnectedGuideSeen).toHaveBeenCalledTimes(1);
     });
 
-    fireEvent.press(screen.getByText('手动配对'));
+    fireEvent.press(screen.getByText('Manual Pairing'));
 
-    expect(screen.queryByText('先连接电脑')).toBeNull();
-    expect(screen.getByText('扫码配对')).toBeTruthy();
-    expect(screen.getByText('手动输入 IP')).toBeTruthy();
+    expect(screen.queryByText('Connect Computer First')).toBeNull();
+    expect(screen.getByText('Scan QR Code')).toBeTruthy();
+    expect(screen.getByText('Manual IP')).toBeTruthy();
   });
 
   it('opens camera permission prompt from the manual scan pairing option', async () => {
@@ -793,16 +797,16 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('手动配对')).toBeTruthy();
+      expect(screen.getByText('Manual Pairing')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText('手动配对'));
-    fireEvent.press(screen.getByText('扫码配对'));
+    fireEvent.press(screen.getByText('Manual Pairing'));
+    fireEvent.press(screen.getByText('Scan QR Code'));
 
     await waitFor(() => {
-      expect(screen.getByText('允许相机访问')).toBeTruthy();
+      expect(screen.getByText('Allow Camera Access')).toBeTruthy();
     });
-    expect(screen.getByText('允许')).toBeTruthy();
+    expect(screen.getByText('Allow')).toBeTruthy();
   });
 
   it('navigates directly to QR scanner when camera permission is already granted', async () => {
@@ -812,14 +816,14 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('手动配对')).toBeTruthy();
+      expect(screen.getByText('Manual Pairing')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText('手动配对'));
-    fireEvent.press(screen.getByText('扫码配对'));
+    fireEvent.press(screen.getByText('Manual Pairing'));
+    fireEvent.press(screen.getByText('Scan QR Code'));
 
     expect(mockNavigate).toHaveBeenCalledWith('QRScanner');
-    expect(screen.queryByText('允许相机访问')).toBeNull();
+    expect(screen.queryByText('Allow Camera Access')).toBeNull();
   });
 
   it('opens manual IP input from the manual pairing options', async () => {
@@ -828,11 +832,11 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('手动配对')).toBeTruthy();
+      expect(screen.getByText('Manual Pairing')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText('手动配对'));
-    fireEvent.press(screen.getByText('手动输入 IP'));
+    fireEvent.press(screen.getByText('Manual Pairing'));
+    fireEvent.press(screen.getByText('Manual IP'));
 
     expect(screen.getByPlaceholderText('192.168.31.21')).toBeTruthy();
   });
@@ -866,7 +870,7 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
         }),
       );
     });
-    expect(screen.queryByText('选择连接方式')).toBeNull();
+    expect(screen.queryByText('Select Connection Method')).toBeNull();
   });
 
   it('falls back to pairing options when recent desktop silent reconnect fails', async () => {
@@ -892,9 +896,9 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
       });
     });
     await waitFor(() => {
-      expect(screen.getByPlaceholderText('例如 A8X2K9')).toBeTruthy();
+      expect(screen.getByPlaceholderText('e.g. A8X2K9')).toBeTruthy();
     });
-    expect(screen.queryByText('选择连接方式')).toBeNull();
+    expect(screen.queryByText('Select Connection Method')).toBeNull();
     expect(mockDispatch).not.toHaveBeenCalled();
     expect(console.warn).not.toHaveBeenCalledWith(
       '[DeviceDiscoveryGlobalScreen] recent desktop reconnect failed, requiring pairing',
@@ -908,18 +912,18 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     const screen = render(<DeviceDiscoveryGlobalScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('手动配对')).toBeTruthy();
+      expect(screen.getByText('Manual Pairing')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText('手动配对'));
-    fireEvent.press(screen.getByText('手动输入 IP'));
+    fireEvent.press(screen.getByText('Manual Pairing'));
+    fireEvent.press(screen.getByText('Manual IP'));
     fireEvent.changeText(
       screen.getByPlaceholderText('192.168.31.21'),
       '192.168.31.44',
     );
-    fireEvent.press(screen.getByText('下一步'));
-    fireEvent.changeText(screen.getByPlaceholderText('例如 A8X2K9'), 'a8x2k9');
-    fireEvent.press(screen.getByText('连接'));
+    fireEvent.press(screen.getByText('Next'));
+    fireEvent.changeText(screen.getByPlaceholderText('e.g. A8X2K9'), 'a8x2k9');
+    fireEvent.press(screen.getByText('Connect'));
 
     await waitFor(() => {
       expect(mockPairDevice).toHaveBeenCalledWith({
@@ -945,22 +949,25 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
     {
       label: 'wrong_code',
       error: new PairingError('Wrong code', 'wrong_code', 2),
-      message: '连接码错误，还可以再试 2 次。',
+      message: 'Incorrect connection code. You can try 2 more times.',
     },
     {
       label: 'blocked',
       error: new PairingError('Blocked', 'blocked', undefined, true),
-      message: '这台电脑已阻止此手机配对，请先在电脑端解除阻止后再试。',
+      message:
+        'This computer has blocked this phone from pairing. Please unblock it on the computer first.',
     },
     {
       label: 'version_incompatible',
       error: new PairingError('Version incompatible', 'version_incompatible'),
-      message: '手机和电脑端版本不兼容，请更新两端 Lynavo Drive 后再试。',
+      message:
+        'App versions are incompatible. Please update Lynavo Drive on both devices.',
     },
     {
       label: 'unknown',
       error: new PairingError('Network failed', 'unknown'),
-      message: '连接失败，请确认电脑端在线后重试。',
+      message:
+        'Connection failed. Please check if the computer is online and try again.',
     },
   ])(
     'maps PairingError $label to a global connection state',
@@ -971,21 +978,21 @@ describe('DeviceDiscoveryGlobalScreen onboarding', () => {
       const screen = render(<DeviceDiscoveryGlobalScreen />);
 
       await waitFor(() => {
-        expect(screen.getByText('手动配对')).toBeTruthy();
+        expect(screen.getByText('Manual Pairing')).toBeTruthy();
       });
 
-      fireEvent.press(screen.getByText('手动配对'));
-      fireEvent.press(screen.getByText('手动输入 IP'));
+      fireEvent.press(screen.getByText('Manual Pairing'));
+      fireEvent.press(screen.getByText('Manual IP'));
       fireEvent.changeText(
         screen.getByPlaceholderText('192.168.31.21'),
         '192.168.31.44',
       );
-      fireEvent.press(screen.getByText('下一步'));
+      fireEvent.press(screen.getByText('Next'));
       fireEvent.changeText(
-        screen.getByPlaceholderText('例如 A8X2K9'),
+        screen.getByPlaceholderText('e.g. A8X2K9'),
         'a8x2k9',
       );
-      fireEvent.press(screen.getByText('连接'));
+      fireEvent.press(screen.getByText('Connect'));
 
       await waitFor(() => {
         expect(screen.getByText(message)).toBeTruthy();

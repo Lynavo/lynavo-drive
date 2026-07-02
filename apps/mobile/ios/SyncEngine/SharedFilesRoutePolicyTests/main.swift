@@ -410,7 +410,7 @@ expect(
 )
 
 expect(
-    SharedFilesRoutePolicy.encodedSharedFilePath("相簿 A/IMG #1%.jpg") == "%E7%9B%B8%E7%B0%BF%20A/IMG%20%231%25.jpg",
+    SharedFilesRoutePolicy.encodedSharedFilePath("Album A/IMG #1%.jpg") == "%E7%9B%B8%E7%B0%BF%20A/IMG%20%231%25.jpg",
     "shared-file browse/download paths must be encoded per segment so spaces, hash, percent, and non-ASCII names remain valid URL path components"
 )
 

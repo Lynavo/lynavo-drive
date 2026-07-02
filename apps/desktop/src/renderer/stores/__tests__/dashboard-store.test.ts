@@ -587,7 +587,9 @@ describe('dashboard-store', () => {
 
     await useDashboardStore.getState().fetchDashboard();
 
-    expect(useDashboardStore.getState().error).toBe('接收目录不可用，请重新选择或恢复文件夹');
+    expect(useDashboardStore.getState().error).toBe(
+      'The receive folder is unavailable. Choose another folder or restore it.',
+    );
   });
 
   it('does not preserve a stale 100 percent transfer over an idle snapshot', async () => {

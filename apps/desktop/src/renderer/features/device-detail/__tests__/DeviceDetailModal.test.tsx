@@ -80,6 +80,6 @@ describe('DeviceDetailModal', () => {
     useAppStore.setState({ selectedDevice: mockDevice, isModalOpen: true });
     render(<DeviceDetailModal />);
     expect(screen.getByText('2')).toBeInTheDocument();
-    expect(screen.getByText('个文件')).toBeInTheDocument();
+    expect(screen.getByText('files')).toBeInTheDocument();
   });
 });

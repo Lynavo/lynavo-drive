@@ -31,7 +31,7 @@
   "diagnosticsExport": {
     "button": "Export diagnostics",
     "progress": {
-      "title": "Exporting…"
+      "title": "Exporting..."
     }
   },
   "actions": {
@@ -88,7 +88,7 @@
     "notBound": "No computer bound",
     "currentDesktop": "Current computer",
     "notConnectedAny": "Not connected to any computer",
-    "currentDeviceStatus": "Current device · {{status}}",
+    "currentDeviceStatus": "Current device - {{status}}",
     "followSystem": "Follow System Language",
     "versionEmpty": "Version {{value}}",
     "versionWithBuild": "Version {{version}} ({{build}})",

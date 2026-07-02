@@ -67,16 +67,16 @@ function getDesktopHistoryIdentity(
 }
 
 function getDayLabel(isoString?: string) {
-  if (!isoString) return '未知日期';
+  if (!isoString) return 'Unknown date';
   const date = new Date(isoString);
-  if (Number.isNaN(date.getTime())) return '未知日期';
+  if (Number.isNaN(date.getTime())) return 'Unknown date';
 
   const today = new Date();
   const yesterday = new Date();
   yesterday.setDate(today.getDate() - 1);
 
-  if (date.toDateString() === today.toDateString()) return '今天';
-  if (date.toDateString() === yesterday.toDateString()) return '昨天';
+  if (date.toDateString() === today.toDateString()) return 'Today';
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
     2,
     '0',
@@ -163,18 +163,18 @@ function TransferSummaryCard({ transfer }: { transfer: DailyTransferSummary }) {
 
       <View style={styles.summaryStatsRow}>
         <View style={styles.summaryMainStat}>
-          <Text style={styles.summaryLabel}>同步的媒体文件</Text>
+          <Text style={styles.summaryLabel}>Synced media files</Text>
           <View style={styles.summaryInlineStat}>
             <Text style={styles.summaryFileCount}>{transfer.fileCount}</Text>
-            <Text style={styles.summaryUnit}>个文件</Text>
-            <Text style={styles.summaryDot}>·</Text>
+            <Text style={styles.summaryUnit}> files</Text>
+            <Text style={styles.summaryDot}>-</Text>
             <Text style={styles.summaryTotalSize}>
               {formatBytes(transfer.totalBytes)}
             </Text>
           </View>
         </View>
         <View style={styles.summaryDuration}>
-          <Text style={styles.summaryLabel}>时长</Text>
+          <Text style={styles.summaryLabel}>Duration</Text>
           <Text style={styles.summaryDurationValue}>{transfer.duration}</Text>
         </View>
       </View>
@@ -247,7 +247,7 @@ export function HistoryGlobalScreen() {
       console.warn('[HistoryScreen] Failed to load history:', e);
       setDesktopIdentity(null);
       setHistoryItems([]);
-      setErrorMessage('无法加载同步历史，请稍后重试');
+      setErrorMessage('Unable to load sync history. Please try again later');
     } finally {
       setLoading(false);
     }
@@ -279,7 +279,7 @@ export function HistoryGlobalScreen() {
       return (
         <View style={styles.centerSection}>
           <ActivityIndicator size="large" color="#42A7E2" />
-          <Text style={styles.loadingText}>正在加载同步历史</Text>
+          <Text style={styles.loadingText}>Loading sync history</Text>
         </View>
       );
     }
@@ -289,9 +289,9 @@ export function HistoryGlobalScreen() {
         <View style={styles.centerSection}>
           <StateCard
             icon="alert-circle-outline"
-            title="历史加载失败"
+            title="History load failed"
             message={errorMessage}
-            actionLabel="重试"
+            actionLabel="Retry"
             onAction={handleRetry}
           />
         </View>
@@ -305,10 +305,10 @@ export function HistoryGlobalScreen() {
             icon="cloud-download-outline"
             title={
               emptyTitle === 'history.emptyState.noRecords'
-                ? '暂无同步记录'
+                ? 'No sync history yet'
                 : emptyTitle
             }
-            message="完成第一次自动同步后，记录会按电脑完成日期显示在这里。"
+            message="After the first automatic sync, records will appear here grouped by computer completion date."
           />
         </View>
       );
@@ -346,7 +346,7 @@ export function HistoryGlobalScreen() {
 
         <View style={styles.paginationHint}>
           <Text style={styles.paginationHintText}>
-            已展示最近 {groups.length} 天同步记录
+            Showing recent {groups.length} days of sync records
           </Text>
         </View>
       </ScrollView>
@@ -375,7 +375,7 @@ export function HistoryGlobalScreen() {
           >
             <Icon name="chevron-back" size={20} color="#173B67" />
           </TouchableOpacity>
-          <Text style={styles.title}>{t('history.title') || '历史记录'}</Text>
+          <Text style={styles.title}>{t('history.title') || 'History'}</Text>
         </View>
 
         {renderContent()}

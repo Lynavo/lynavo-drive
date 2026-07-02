@@ -26,42 +26,47 @@ jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, values?: Record<string, unknown>) =>
       ({
-        'common.deviceNames.default': '電腦',
-        'settings.connection.online': '在線',
-        'settings.connection.connecting': '連接中',
-        'settings.connection.offline': '離線',
-        'settings.status.noRecord': '暫無記錄',
-        'syncActivity.title': '同步動態',
-        'syncActivity.badges.auto': '自動',
-        'syncActivity.badges.autoEnabled': '自動上傳已開啟',
-        'syncActivity.notStarted.title': '自動上傳未開啟',
+        'common.deviceNames.default': 'Computer',
+        'settings.connection.online': 'Online',
+        'settings.connection.connecting': 'Connecting',
+        'settings.connection.offline': 'Offline',
+        'settings.status.noRecord': 'No records yet',
+        'syncActivity.title': 'Sync Activity',
+        'syncActivity.badges.auto': 'Auto',
+        'syncActivity.badges.autoEnabled': 'Auto upload enabled',
+        'syncActivity.notStarted.title': 'Auto Upload Is Off',
         'syncActivity.notStarted.subtitle':
-          '開啟自動上傳，拍完就同步；或者也可以選手動傳輸',
-        'syncActivity.notStarted.goToAlbum': '去相簿',
-        'syncActivity.notStarted.enableAuto': '開啟自動上傳',
-        'syncActivity.quickEntry.title': '快捷入口',
-        'syncActivity.quickEntry.albumTitle': '相簿',
-        'syncActivity.quickEntry.albumDesc': '瀏覽相簿素材',
-        'syncActivity.quickEntry.sharedFilesTitle': '共享目錄',
-        'syncActivity.quickEntry.sharedFilesDesc': '瀏覽共享目錄與個人共享目錄',
-        'syncActivity.quickEntry.globalSharedFilesTitle': '我的電腦',
-        'syncActivity.quickEntry.globalSharedFilesDesc': '瀏覽我的電腦中的檔案',
-        'syncActivity.onboarding.skip': '跳過引導',
-        'syncActivity.onboarding.previous': '上一步',
-        'syncActivity.onboarding.next': `下一步 ${values?.step ?? ''}/${values?.total ?? ''}`,
-        'syncActivity.onboarding.startJourney': '開啟旅程',
-        'syncActivity.onboarding.album.title': '相簿素材',
+          'Turn on auto upload to sync after shooting, or choose manual transfer',
+        'syncActivity.notStarted.goToAlbum': 'Go to Album',
+        'syncActivity.notStarted.enableAuto': 'Enable Auto Upload',
+        'syncActivity.quickEntry.title': 'Quick Actions',
+        'syncActivity.quickEntry.albumTitle': 'Photos',
+        'syncActivity.quickEntry.albumDesc': 'BrowseAlbum Library',
+        'syncActivity.quickEntry.sharedFilesTitle': 'Shared Folder',
+        'syncActivity.quickEntry.sharedFilesDesc':
+          'Browse shared folder and personal shared folder',
+        'syncActivity.quickEntry.globalSharedFilesTitle': 'My Computer',
+        'syncActivity.quickEntry.globalSharedFilesDesc':
+          'Browse files from My Computer',
+        'syncActivity.onboarding.skip': 'Skip guide',
+        'syncActivity.onboarding.previous': 'Back',
+        'syncActivity.onboarding.next': `Next ${values?.step ?? ''}/${values?.total ?? ''}`,
+        'syncActivity.onboarding.startJourney': 'Start Journey',
+        'syncActivity.onboarding.album.title': 'Album Library',
         'syncActivity.onboarding.album.body':
-          '從這裡瀏覽照片和影片。新增素材會進入自動同步隊列。',
-        'syncActivity.onboarding.panel.title': '無感備份',
-        'syncActivity.onboarding.panel.body': '這裡即時展示自動上傳進度。',
-        'syncActivity.onboarding.history.title': '傳輸歷史',
-        'syncActivity.onboarding.history.body': '查看所有已完成的傳輸記錄。',
-        'syncActivity.onboarding.settings.title': '全域設定',
+          'Browse photos and videos from here. New media is picked up by the automatic sync queue.',
+        'syncActivity.onboarding.panel.title': 'Hands-free Backup',
+        'syncActivity.onboarding.panel.body':
+          'This panel shows live auto-upload progress.',
+        'syncActivity.onboarding.history.title': 'Transfer History',
+        'syncActivity.onboarding.history.body':
+          'Review all completed transfer records.',
+        'syncActivity.onboarding.settings.title': 'Global Settings',
         'syncActivity.onboarding.settings.body':
-          '查看連接設備，修改手機顯示名稱。',
-        'syncActivity.onboarding.help.title': '幫助中心',
-        'syncActivity.onboarding.help.body': '遇到問題時可查看快速上手指南。',
+          'Check connected devices and edit the phone display name.',
+        'syncActivity.onboarding.help.title': 'Help Center',
+        'syncActivity.onboarding.help.body':
+          'Open the quick start guide when you need help.',
       })[key] ?? key,
   }),
 }));
@@ -119,7 +124,7 @@ jest.mock('../../components/onboarding/SyncActivityTour', () => {
       return ReactInner.createElement(
         View,
         null,
-        ReactInner.createElement(Text, null, '相簿素材'),
+        ReactInner.createElement(Text, null, 'Album Library'),
         ReactInner.createElement(
           TouchableOpacity,
           {
@@ -134,7 +139,7 @@ jest.mock('../../components/onboarding/SyncActivityTour', () => {
           ReactInner.createElement(
             Text,
             null,
-            step >= 5 ? '開啟旅程' : `下一步 ${step}/5`,
+            step >= 5 ? 'Start Journey' : `Next ${step}/5`,
           ),
         ),
       );
@@ -206,21 +211,21 @@ describe('SyncActivityScreen onboarding', () => {
     const screen = render(<SyncActivityScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('相簿素材')).toBeTruthy();
+      expect(screen.getByText('Album Library')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText('下一步 1/5'));
-    fireEvent.press(screen.getByText('下一步 2/5'));
-    fireEvent.press(screen.getByText('下一步 3/5'));
-    fireEvent.press(screen.getByText('下一步 4/5'));
-    fireEvent.press(screen.getByText('開啟旅程'));
+    fireEvent.press(screen.getByText('Next 1/5'));
+    fireEvent.press(screen.getByText('Next 2/5'));
+    fireEvent.press(screen.getByText('Next 3/5'));
+    fireEvent.press(screen.getByText('Next 4/5'));
+    fireEvent.press(screen.getByText('Start Journey'));
 
     await waitFor(() => {
       expect(mockMarkSyncActivityTourSeen).toHaveBeenCalledTimes(1);
     });
 
     await waitFor(() => {
-      expect(screen.queryByText('相簿素材')).toBeNull();
+      expect(screen.queryByText('Album Library')).toBeNull();
     });
   });
 
@@ -232,7 +237,7 @@ describe('SyncActivityScreen onboarding', () => {
     await waitFor(() => {
       expect(mockHasSeenSyncActivityTour).toHaveBeenCalledTimes(1);
     });
-    expect(screen.queryByText('相簿素材')).toBeNull();
+    expect(screen.queryByText('Album Library')).toBeNull();
   });
 
   it('uses My Computer copy for the shared files quick entry', async () => {
@@ -241,10 +246,10 @@ describe('SyncActivityScreen onboarding', () => {
     const screen = render(<SyncActivityScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('我的電腦')).toBeTruthy();
+      expect(screen.getByText('My Computer')).toBeTruthy();
     });
 
-    expect(screen.getByText('瀏覽我的電腦中的檔案')).toBeTruthy();
-    expect(screen.queryByText('共享目錄')).toBeNull();
+    expect(screen.getByText('Browse files from My Computer')).toBeTruthy();
+    expect(screen.queryByText('Shared Folder')).toBeNull();
   });
 });

@@ -30,30 +30,34 @@ jest.mock('react-native-safe-area-context', () => ({
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => {
-      if (key === 'syncActivity.title') return '同步動態';
+      if (key === 'syncActivity.title') return 'Sync Activity';
       if (key === 'syncActivity.header.help') return 'Help';
-      if (key === 'syncActivity.home.recentDownloadsTitle') return '最近下載';
-      if (key === 'syncActivity.home.syncRecordsTitle') return '同步記錄';
-      if (key === 'syncActivity.notStarted.title') return '自動上傳未開啟';
+      if (key === 'syncActivity.home.recentDownloadsTitle')
+        return 'Recent Downloads';
+      if (key === 'syncActivity.home.syncRecordsTitle') return 'Sync Records';
+      if (key === 'syncActivity.notStarted.title') return 'Auto Upload Is Off';
       if (key === 'syncActivity.notStarted.subtitle')
-        return '開啟自動上傳，拍完就同步；或者也可以選手動傳輸';
-      if (key === 'syncActivity.notStarted.goToAlbum') return '去相簿';
-      if (key === 'syncActivity.notStarted.enableAuto') return '開啟自動上傳';
-      if (key === 'syncActivity.badges.auto') return '自動';
-      if (key === 'syncActivity.badges.autoEnabled') return '自動上傳已開啟';
-      if (key === 'syncActivity.running.autoTitle') return '正在自動上傳';
-      if (key === 'syncActivity.running.queueInfo') return '排隊中 3項';
-      if (key === 'syncActivity.stats.speed') return '速度';
-      if (key === 'syncActivity.stats.progress') return '進度';
-      if (key === 'syncActivity.stats.transferred') return '已傳輸';
-      if (key === 'syncActivity.quickEntry.title') return '快捷入口';
-      if (key === 'syncActivity.quickEntry.albumTitle') return '相簿';
+        return 'Turn on auto upload to sync after shooting, or choose manual transfer';
+      if (key === 'syncActivity.notStarted.goToAlbum') return 'Go to Album';
+      if (key === 'syncActivity.notStarted.enableAuto')
+        return 'Enable Auto Upload';
+      if (key === 'syncActivity.badges.auto') return 'Auto';
+      if (key === 'syncActivity.badges.autoEnabled')
+        return 'Auto upload enabled';
+      if (key === 'syncActivity.running.autoTitle') return 'Auto Uploading';
+      if (key === 'syncActivity.running.queueInfo') return '3 queued';
+      if (key === 'syncActivity.stats.speed') return 'Speed';
+      if (key === 'syncActivity.stats.progress') return 'Progress';
+      if (key === 'syncActivity.stats.transferred') return 'Transferred';
+      if (key === 'syncActivity.quickEntry.title') return 'Quick Actions';
+      if (key === 'syncActivity.quickEntry.albumTitle') return 'Photos';
       if (key === 'syncActivity.quickEntry.albumDesc')
-        return '瀏覽相簿素材';
-      if (key === 'syncActivity.quickEntry.sharedFilesTitle') return '共享目錄';
+        return 'BrowseAlbum Library';
+      if (key === 'syncActivity.quickEntry.sharedFilesTitle')
+        return 'Shared Folder';
       if (key === 'syncActivity.quickEntry.sharedFilesDesc')
-        return '瀏覽共享目錄與個人共享目錄';
-      if (key === 'settings.connection.online') return '線上';
+        return 'Browse shared folder and personal shared folder';
+      if (key === 'settings.connection.online') return 'Online';
       return key;
     },
   }),
@@ -151,17 +155,17 @@ describe('SyncActivityScreen header', () => {
     const screen = render(<SyncActivityScreen />);
 
     await waitFor(() => {
-      expect(screen.getAllByText('同步動態').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Sync Activity').length).toBeGreaterThan(0);
       expect(screen.getByTestId('sync-activity-device-row')).toBeTruthy();
       expect(screen.getAllByText('Mini4').length).toBeGreaterThan(0);
-      expect(screen.getByText('線上')).toBeTruthy();
-      expect(screen.getByText('自動上傳未開啟')).toBeTruthy();
-      expect(screen.getByText('開啟自動上傳')).toBeTruthy();
-      expect(screen.getByText('快捷入口')).toBeTruthy();
-      expect(screen.queryByText('當前手機狀態')).toBeNull();
+      expect(screen.getByText('Online')).toBeTruthy();
+      expect(screen.getByText('Auto Upload Is Off')).toBeTruthy();
+      expect(screen.getByText('Enable Auto Upload')).toBeTruthy();
+      expect(screen.getByText('Quick Actions')).toBeTruthy();
+      expect(screen.queryByText('Current Phone Status')).toBeNull();
     });
 
-    fireEvent.press(screen.getByText('開啟自動上傳'));
+    fireEvent.press(screen.getByText('Enable Auto Upload'));
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('AutoUploadSettings');
@@ -191,16 +195,16 @@ describe('SyncActivityScreen header', () => {
     const screen = render(<SyncActivityScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('自動')).toBeTruthy();
-      expect(screen.getByText('自動上傳已開啟')).toBeTruthy();
-      expect(screen.getByText('正在自動上傳')).toBeTruthy();
+      expect(screen.getByText('Auto')).toBeTruthy();
+      expect(screen.getByText('Auto upload enabled')).toBeTruthy();
+      expect(screen.getByText('Auto Uploading')).toBeTruthy();
       expect(screen.getByText('25%')).toBeTruthy();
       expect(screen.getByText('IMG_0002.HEIC')).toBeTruthy();
-      expect(screen.getByText('速度')).toBeTruthy();
-      expect(screen.getByText('進度')).toBeTruthy();
-      expect(screen.getByText('已傳輸')).toBeTruthy();
-      expect(screen.getByText('排隊中 3項')).toBeTruthy();
-      expect(screen.queryByText('當前傳輸進度')).toBeNull();
+      expect(screen.getByText('Speed')).toBeTruthy();
+      expect(screen.getByText('Progress')).toBeTruthy();
+      expect(screen.getByText('Transferred')).toBeTruthy();
+      expect(screen.getByText('3 queued')).toBeTruthy();
+      expect(screen.queryByText('Current Transfer Progress')).toBeNull();
     });
   });
 

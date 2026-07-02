@@ -454,7 +454,7 @@ object AndroidSyncPrimitives {
 
   fun requireCompatibleDesktopAppVersion(serverCompatibilityVersion: Int) {
     require(serverCompatibilityVersion == APP_COMPATIBILITY_VERSION) {
-      "手機與桌面 App 版本不相容，請同時更新兩端後再連線。"
+      "Phone and desktop app versions are incompatible. Please update both apps before reconnecting."
     }
   }
 

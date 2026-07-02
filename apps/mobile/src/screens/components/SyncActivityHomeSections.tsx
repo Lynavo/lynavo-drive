@@ -56,7 +56,7 @@ export function RecentDownloadsSection({
         </View>
         <TouchableOpacity onPress={onPressViewAll} activeOpacity={0.7}>
           <Text style={styles.recentDownloadViewAll}>
-            {t('syncActivity.recentDownload.viewAll') || '查看全部'}
+            {t('syncActivity.recentDownload.viewAll') || 'View All'}
           </Text>
         </TouchableOpacity>
       </View>

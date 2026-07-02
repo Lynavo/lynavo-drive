@@ -1,7 +1,7 @@
 {
   "title": "All Devices",
   "lastSuccess": {
-    "withDevice": "Last successful sync: {{time}} · {{device}}",
+    "withDevice": "Last successful sync: {{time}} \u00b7 {{device}}",
     "none": "Last successful sync: No records"
   },
   "stats": {

@@ -595,9 +595,8 @@ export async function pairDevice(params: {
     } else if (
       rawCode === 'APP_VERSION_INCOMPATIBLE' ||
       rawCode === 'version_incompatible' ||
-      errMsg.includes('版本不相容') ||
       errMsg.includes('APP_VERSION_INCOMPATIBLE') ||
-      errMsg.includes('版本不兼容')
+      errMsg.toLowerCase().includes('version incompatible')
     ) {
       code = 'version_incompatible';
     }

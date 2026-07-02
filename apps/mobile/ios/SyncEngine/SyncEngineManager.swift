@@ -508,7 +508,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         runtimeThermalReason = nextReason
         runtimeIsThermalLimited = nextReason != nil
         runtimePerformanceHint = nextReason == nil ? "none" : "thermal_limited"
-        runtimePerformanceMessage = nextReason == nil ? nil : "设备温度较高，已降低传输强度"
+        runtimePerformanceMessage = nextReason == nil ? nil : "Device is running hot; transfer intensity has been reduced"
 
         if previousProfile != profileLabel || previousReason != nextReason || previousThermalState != nextThermalState {
             slog(
@@ -2357,13 +2357,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private func defaultPairingErrorMessage(code: String) -> String {
         switch code {
         case "PAIRING_CODE_INVALID":
-            return "連接碼錯誤，請重新輸入"
+            return "Pairing code is incorrect. Please enter it again."
         case "PAIRING_CLIENT_BLOCKED":
-            return "這支手機已被此電腦封鎖，請在桌面端設定解除封鎖後再試。"
+            return "This phone is blocked by this computer. Unblock it in desktop settings and try again."
         case "PAIR_TOKEN_INVALID":
-            return "連線授權已失效，請重新輸入桌面端連接碼。"
+            return "Connection authorization expired. Enter the desktop pairing code again."
         case "APP_VERSION_INCOMPATIBLE":
-            return "手機與桌面 App 版本不相容，請同時更新兩端後再連線。"
+            return "Phone and desktop app versions are incompatible. Please update both apps before reconnecting."
         default:
             return "Pairing rejected"
         }
@@ -2410,7 +2410,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         guard serverCompatibilityVersion == lynavoAppCompatibilityVersion else {
             throw structuredPairingError(
                 code: "APP_VERSION_INCOMPATIBLE",
-                rawMessage: "手機與桌面 App 版本不相容，請同時更新兩端後再連線。",
+                rawMessage: "Phone and desktop app versions are incompatible. Please update both apps before reconnecting.",
                 meta: nil
             )
         }
@@ -3483,7 +3483,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
                     syncDiagnosticsLog("SyncPipeline", "idle — auto interrupted (auto pending: \(autoPendingCount))")
                     sessionService.transitionTo(.interruptedAutoUpload)
                 } else if configState == "disabled" {
-                    // Disabled: emit idle, NOT completed — page should show "自动上传未开启"
+                    // Disabled: emit idle, NOT completed - page should show "Auto upload is off"
                     let payload = runtimeSyncOverviewPayload(uploadState: "idle")
                     logSyncOverviewEmission("empty_queue_disabled", payload: payload)
                     NativeSyncEngineModule.shared?.emitSyncStateChanged(
@@ -5460,7 +5460,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         else { pairOk = (pairType == .pairRes) }
 
         guard pairOk else {
-            let errMsg = pairRes["error"] as? String ?? "连接码错误或已过期"
+            let errMsg = pairRes["error"] as? String ?? "Pairing code is incorrect or expired"
             if let code = structuredPairingErrorCode(pairRes["errorCode"]) {
                 throw structuredPairingError(
                     code: code,

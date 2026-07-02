@@ -44,8 +44,8 @@ const installedVersionFallback = '0.1.0';
 
 const localeLabels: Record<SupportedLocale, { label: string; caption: string }> = {
   en: { label: 'English', caption: 'English UI' },
-  'zh-Hans': { label: '简体中文', caption: '简体中文界面' },
-  'zh-Hant': { label: '繁體中文', caption: '繁體中文介面' },
+  'zh-Hans': { label: 'Simplified Chinese', caption: 'Simplified Chinese UI' },
+  'zh-Hant': { label: 'Traditional Chinese', caption: 'Traditional Chinese UI' },
 };
 
 const languageOptions = SUPPORTED_LOCALES.map((locale) => ({

@@ -225,7 +225,7 @@ export function RecentDownloadsSection({
         <TouchableOpacity onPress={onPressViewAll} activeOpacity={0.7}>
           <Text style={styles.recentDownloadViewAll}>
             {viewAllLabel ??
-              (t('syncActivity.recentDownload.viewAll') || '查看全部')}
+              (t('syncActivity.recentDownload.viewAll') || 'View All')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -845,7 +845,7 @@ function getRecentDownloadThumbnailSource(
     return undefined;
   }
 
-  // 1. 对于图片，如果已经成功下载到本地（有 localPath），优先使用本地物理文件
+  // 1. For images, prefer the local physical file when it has already downloaded locally and has localPath
   if (previewType === 'photo') {
     const localUri = readLocalPathUri(record.localPath);
     if (localUri) {
@@ -853,7 +853,7 @@ function getRecentDownloadThumbnailSource(
     }
   }
 
-  // 2. 其次使用电脑端缩略图，视频和图片皆是如此
+  // 2. Next use the desktop thumbnail for both videos and images
   const thumbnailUrl = readNonEmptyUri(record.thumbnailUrl);
   if (thumbnailUrl) {
     return { uri: thumbnailUrl, renderer: 'image' };
@@ -863,7 +863,7 @@ function getRecentDownloadThumbnailSource(
     return undefined;
   }
 
-  // 3. 对于图片类型，如果在本地没有文件，可以使用远端的 previewUrl 或 streamUrl
+  // 3. For image types without a local file, use the remote previewUrl or streamUrl
   const mediaUri =
     readNonEmptyUri(record.previewUrl) ?? readNonEmptyUri(record.streamUrl);
   if (!mediaUri) {

@@ -59,7 +59,7 @@ import { Camera, useCodeScanner } from 'react-native-vision-camera';
 
 describe('QRScannerScreen', () => {
   beforeAll(async () => {
-    await i18n.changeLanguage('zh-Hant');
+    await i18n.changeLanguage('en');
   });
 
   beforeEach(() => {
@@ -82,7 +82,7 @@ describe('QRScannerScreen', () => {
     const { getByText } = render(<QRScannerScreen />);
 
     await waitFor(() => {
-      expect(getByText('如何取得二維碼？')).toBeTruthy();
+      expect(getByText('How do I get the QR code?')).toBeTruthy();
     });
 
     expect(Camera.getCameraPermissionStatus).toHaveBeenCalledTimes(1);
@@ -93,10 +93,10 @@ describe('QRScannerScreen', () => {
     const { getByText } = render(<QRScannerScreen />);
 
     await waitFor(() => {
-      expect(getByText('如何取得二維碼？')).toBeTruthy();
+      expect(getByText('How do I get the QR code?')).toBeTruthy();
       expect(
         getByText(
-          '打開電腦端 Lynavo Drive，在「全域設定」中找到連接碼，用攝像頭對準二維碼即可自動連接。',
+          'Open Lynavo Drive on your computer, find the pairing code in Global Settings, then aim the camera at the QR code to connect automatically.',
         ),
       ).toBeTruthy();
     });
@@ -111,16 +111,18 @@ describe('QRScannerScreen', () => {
     const { getByText } = render(<QRScannerScreen />);
 
     await waitFor(() => {
-      expect(getByText('如何取得二維碼？')).toBeTruthy();
+      expect(getByText('How do I get the QR code?')).toBeTruthy();
     });
   });
 
   it('opens the full tutorial flow from the QR guide card', async () => {
     const { getByText } = render(<QRScannerScreen />);
 
-    await waitFor(() => expect(getByText('查看詳細圖文教程 >')).toBeTruthy());
+    await waitFor(() =>
+      expect(getByText('View full illustrated tutorial >')).toBeTruthy(),
+    );
 
-    fireEvent.press(getByText('查看詳細圖文教程 >'));
+    fireEvent.press(getByText('View full illustrated tutorial >'));
 
     expect(mockNavigate).toHaveBeenCalledWith('ConnectionTutorial');
   });
@@ -139,12 +141,16 @@ describe('QRScannerScreen', () => {
 
     const { queryByText, getByText } = render(<QRScannerScreen />);
 
-    expect(queryByText('需要相機權限來掃描二維碼')).toBeNull();
+    expect(
+      queryByText('Camera access is required to scan the QR code.'),
+    ).toBeNull();
 
     resolvePermission('denied');
 
     await waitFor(() => {
-      expect(getByText('需要相機權限來掃描二維碼')).toBeTruthy();
+      expect(
+        getByText('Camera access is required to scan the QR code.'),
+      ).toBeTruthy();
     });
   });
 
@@ -157,9 +163,11 @@ describe('QRScannerScreen', () => {
     const { getByText, queryByText } = render(<QRScannerScreen />);
 
     await waitFor(() => {
-      expect(getByText('如何取得二維碼？')).toBeTruthy();
+      expect(getByText('How do I get the QR code?')).toBeTruthy();
     });
-    expect(queryByText('需要相機權限來掃描二維碼')).toBeNull();
+    expect(
+      queryByText('Camera access is required to scan the QR code.'),
+    ).toBeNull();
   });
 
   it('opens system settings when camera permission has been denied', async () => {
@@ -168,10 +176,12 @@ describe('QRScannerScreen', () => {
     const { getByText } = render(<QRScannerScreen />);
 
     await waitFor(() => {
-      expect(getByText('需要相機權限來掃描二維碼')).toBeTruthy();
+      expect(
+        getByText('Camera access is required to scan the QR code.'),
+      ).toBeTruthy();
     });
 
-    fireEvent.press(getByText('開啟設定'));
+    fireEvent.press(getByText('Open Settings'));
 
     expect(Linking.openSettings).toHaveBeenCalledTimes(1);
   });
@@ -191,7 +201,9 @@ describe('QRScannerScreen', () => {
     const { getByText, queryByText } = render(<QRScannerScreen />);
 
     await waitFor(() => {
-      expect(getByText('需要相機權限來掃描二維碼')).toBeTruthy();
+      expect(
+        getByText('Camera access is required to scan the QR code.'),
+      ).toBeTruthy();
     });
 
     act(() => {
@@ -199,9 +211,11 @@ describe('QRScannerScreen', () => {
     });
 
     await waitFor(() => {
-      expect(getByText('如何取得二維碼？')).toBeTruthy();
+      expect(getByText('How do I get the QR code?')).toBeTruthy();
     });
-    expect(queryByText('需要相機權限來掃描二維碼')).toBeNull();
+    expect(
+      queryByText('Camera access is required to scan the QR code.'),
+    ).toBeNull();
   });
 
   it('navigates to code verification after scanning a desktop connection QR', async () => {

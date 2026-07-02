@@ -22,17 +22,19 @@ describe('DiskWarningBanner', () => {
 
   it('renders localized warning copy and dismiss label', () => {
     render(<DiskWarningBanner />);
+    const zhHant = i18n.getFixedT('zh-Hant');
 
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      '接收磁碟剩餘空間小於 500MB，已暫停新的接收任務',
-    );
-    expect(screen.getByRole('button', { name: '關閉磁碟空間提醒' })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(zhHant('dashboard.diskWarning'));
+    expect(
+      screen.getByRole('button', { name: zhHant('dashboard.dismissDiskWarning') }),
+    ).toBeInTheDocument();
   });
 
   it('dismisses the warning through the dashboard store', () => {
     render(<DiskWarningBanner />);
+    const zhHant = i18n.getFixedT('zh-Hant');
 
-    fireEvent.click(screen.getByRole('button', { name: '關閉磁碟空間提醒' }));
+    fireEvent.click(screen.getByRole('button', { name: zhHant('dashboard.dismissDiskWarning') }));
 
     expect(useDashboardStore.getState().diskWarningDismissed).toBe(true);
   });

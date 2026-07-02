@@ -37,20 +37,20 @@ jest.mock('@react-navigation/native', () => ({
 }));
 
 jest.mock('react-i18next', () => {
-  const zhHans = {
-    settings: require('../../i18n/locales/zh-Hans/settings.json'),
-    deviceDiscovery: require('../../i18n/locales/zh-Hans/deviceDiscovery.json'),
-    common: require('../../i18n/locales/zh-Hans/common.json'),
+  const en = {
+    settings: require('../../i18n/locales/en/settings.json'),
+    deviceDiscovery: require('../../i18n/locales/en/deviceDiscovery.json'),
+    common: require('../../i18n/locales/en/common.json'),
   };
   return {
     useTranslation: () => ({
       i18n: {
-        language: 'zh-Hans',
-        resolvedLanguage: 'zh-Hans',
+        language: 'en',
+        resolvedLanguage: 'en',
       },
       t: (key: string, options?: any) => {
         const parts = key.split('.');
-        let current: any = zhHans;
+        let current: any = en;
         for (const part of parts) {
           if (current == null) return key;
           current = current[part];
@@ -207,17 +207,17 @@ describe('SettingsGlobalScreen', () => {
 
     await waitFor(() => expect(getByText('Field iPhone')).toBeTruthy());
     expect(getByText('Edit Bay')).toBeTruthy();
-    expect(getByText('当前设备 · 已连接')).toBeTruthy();
-    expect(getByText('版本 3.4.5 (67)')).toBeTruthy();
+    expect(getByText('Current device - Connected')).toBeTruthy();
+    expect(getByText('Version 3.4.5 (67)')).toBeTruthy();
 
     expect(queryByText('creator@example.com')).toBeNull();
-    expect(queryByText('会员状态')).toBeNull();
-    expect(queryByText('退出登录')).toBeNull();
-    expect(queryByText('注销账号')).toBeNull();
+    expect(queryByText('Membership status')).toBeNull();
+    expect(queryByText('Sign out')).toBeNull();
+    expect(queryByText('Delete account')).toBeNull();
     expect(queryByText('+1 206 **** 1234')).toBeNull();
-    expect(queryByText('Pro Annual · 剩余 28 天')).toBeNull();
+    expect(queryByText('Pro Annual - remaining 28 days')).toBeNull();
     expect(queryByText('MacBook Pro')).toBeNull();
-    expect(queryByText('版本 2.1.0')).toBeNull();
+    expect(queryByText('Version 2.1.0')).toBeNull();
   });
 
   test('uses lucide icons instead of legacy ionicon glyph names on the global settings page', async () => {
@@ -248,9 +248,9 @@ describe('SettingsGlobalScreen', () => {
 
     const { getByText } = await renderSettingsGlobalScreen();
 
-    await waitFor(() => expect(getByText('未绑定电脑')).toBeTruthy());
-    expect(getByText('尚未连接任何电脑')).toBeTruthy();
-    expect(getByText('版本 --')).toBeTruthy();
+    await waitFor(() => expect(getByText('No computer bound')).toBeTruthy());
+    expect(getByText('Not connected to any computer')).toBeTruthy();
+    expect(getByText('Version --')).toBeTruthy();
   });
 
   test('keeps content bottom spacing aligned with the reference page padding', async () => {
@@ -268,18 +268,18 @@ describe('SettingsGlobalScreen', () => {
       await renderSettingsGlobalScreen();
 
     expect(mockNavigate).not.toHaveBeenCalledWith('OpenSourceInfo');
-    expect(queryByText('会员状态')).toBeNull();
+    expect(queryByText('Membership status')).toBeNull();
     expect(queryByTestId('global-settings-logout')).toBeNull();
     expect(queryByTestId('global-settings-delete-account')).toBeNull();
     expect(queryByTestId('global-settings-restore-purchase')).toBeNull();
-    expect(queryByText('恢复购买')).toBeNull();
+    expect(queryByText('Restore purchases')).toBeNull();
 
-    fireEvent.press(getByText('切换设备'));
+    fireEvent.press(getByText('Switch Device'));
     expect(mockNavigate).toHaveBeenCalledWith('DeviceDiscovery', {
       mode: 'switch',
     });
 
-    fireEvent.press(getByText('常见问题'));
+    fireEvent.press(getByText('FAQ'));
     expect(mockNavigate).toHaveBeenCalledWith('Help');
   });
 
@@ -287,7 +287,7 @@ describe('SettingsGlobalScreen', () => {
     const { getByText } = await renderSettingsGlobalScreen();
 
     await act(async () => {
-      fireEvent.press(getByText('导出诊断包'));
+      fireEvent.press(getByText('Export Diagnostics'));
     });
 
     expect(mockedShareDiagnosticsArchive).toHaveBeenCalledTimes(1);
@@ -299,19 +299,19 @@ describe('SettingsGlobalScreen', () => {
 
     fireEvent.press(getByTestId('global-settings-edit-device-name'));
 
-    expect(getByText('编辑设备名称')).toBeTruthy();
+    expect(getByText('Edit Device Name')).toBeTruthy();
     fireEvent.changeText(
       getByDisplayValue('Field iPhone'),
       '  Studio iPhone  ',
     );
 
     await act(async () => {
-      fireEvent.press(getByText('保存'));
+      fireEvent.press(getByText('Save'));
     });
 
     expect(mockedSetClientDisplayName).toHaveBeenCalledWith('Studio iPhone');
     expect(getByText('Studio iPhone')).toBeTruthy();
-    expect(queryByText('编辑设备名称')).toBeNull();
+    expect(queryByText('Edit Device Name')).toBeNull();
   });
 
   test('keeps the edit device modal open when saving the native display name fails', async () => {
@@ -323,11 +323,11 @@ describe('SettingsGlobalScreen', () => {
     fireEvent.changeText(getByDisplayValue('Field iPhone'), 'Studio iPhone');
 
     await act(async () => {
-      fireEvent.press(getByText('保存'));
+      fireEvent.press(getByText('Save'));
     });
 
-    expect(getByText('编辑设备名称')).toBeTruthy();
-    expect(getByText('保存失败，请稍后重试')).toBeTruthy();
+    expect(getByText('Edit Device Name')).toBeTruthy();
+    expect(getByText('Failed to save, please try again later')).toBeTruthy();
     expect(getByText('Field iPhone')).toBeTruthy();
   });
 
@@ -337,14 +337,14 @@ describe('SettingsGlobalScreen', () => {
 
     fireEvent.press(getByTestId('global-settings-language'));
 
-    expect(getByText('跟随系统语言')).toBeTruthy();
-    expect(getByText('手动选择语言')).toBeTruthy();
-    fireEvent.press(getByText('手动选择语言'));
+    expect(getByText('Follow System Language')).toBeTruthy();
+    expect(getByText('Select Language Manually')).toBeTruthy();
+    fireEvent.press(getByText('Select Language Manually'));
 
-    expect(getByText('简体中文')).toBeTruthy();
-    expect(getByText('繁体中文')).toBeTruthy();
+    expect(getByText('Simplified Chinese')).toBeTruthy();
+    expect(getByText('Traditional Chinese')).toBeTruthy();
     expect(getByText('English')).toBeTruthy();
-    expect(queryByText('日本語')).toBeNull();
+    expect(queryByText('Japanese')).toBeNull();
     expect(queryByText('한국어')).toBeNull();
     expect(queryByText('Français')).toBeNull();
     expect(queryByText('Español')).toBeNull();

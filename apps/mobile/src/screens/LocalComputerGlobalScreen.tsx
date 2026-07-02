@@ -106,18 +106,18 @@ type RouteStatusViewModel = {
 type LocalComputerDisabledReason = 'desktop';
 
 const SORT_OPTIONS: Array<{ id: SortKey; label: string }> = [
-  { id: 'name', label: '名称' },
-  { id: 'time', label: '时间' },
-  { id: 'size', label: '文件大小' },
+  { id: 'name', label: 'Name' },
+  { id: 'time', label: 'Time' },
+  { id: 'size', label: 'File Size' },
 ];
 
 const PREVIEW_DESKTOP_NAME = 'MacBook Pro';
-const ROOT_DIRECTORY_LABEL = '用户目录';
-const UNBOUND_LOCAL_COMPUTER_SUBTITLE = '尚未连接电脑';
-const FALLBACK_DESKTOP_LABEL = '当前电脑';
-const LOCAL_SAVE_UNSUPPORTED_TITLE = '暂不支持保存';
+const ROOT_DIRECTORY_LABEL = 'User Directory';
+const UNBOUND_LOCAL_COMPUTER_SUBTITLE = 'Not connected to computer';
+const FALLBACK_DESKTOP_LABEL = 'Current Computer';
+const LOCAL_SAVE_UNSUPPORTED_TITLE = 'Save Not Supported Yet';
 const LOCAL_SAVE_UNSUPPORTED_MESSAGE =
-  '当前版本还没有接入客户端本地保存能力，请等待后续版本。';
+  'Local client saving is not integrated in the current version. Please wait for a future release.';
 const LOCAL_COMPUTER_REQUEST_TIMEOUT_MS = 30_000;
 const LOCAL_COMPUTER_TIMEOUT_ERROR_MESSAGE = 'Local computer request timed out';
 const LOCAL_COMPUTER_READY_RETRY_ATTEMPTS = 2;
@@ -177,16 +177,16 @@ const MOCK_ROOT_ITEMS: LocalComputerResourceItem[] = [
     resourceId: 'codex',
     kind: 'shared_folder',
     displayName: 'Codex',
-    countLabel: '文件夹',
+    countLabel: 'Folder',
     addedOffsetHours: 14,
   }),
   resource({
     resourceId: 'mac-manual',
     kind: 'shared_file',
-    displayName: 'Mac 客户端安装手册-2506.docx',
+    displayName: 'Mac Client Setup Guide-2506.docx',
     fileSize: 1992294,
     mediaType: 'document',
-    modifiedLabel: '上次修改时间 1天前',
+    modifiedLabel: 'Modified 1 day ago',
     preview: 'settings',
     addedOffsetHours: 24,
     downloadCount: 2,
@@ -197,7 +197,7 @@ const MOCK_ROOT_ITEMS: LocalComputerResourceItem[] = [
     displayName: 'REPLY_TEMPLATE_API.md',
     fileSize: 5120,
     mediaType: 'document',
-    modifiedLabel: '上次修改时间 2天前',
+    modifiedLabel: 'Modified 2 days ago',
     preview: 'settings',
     addedOffsetHours: 48,
   }),
@@ -207,7 +207,7 @@ const MOCK_ROOT_ITEMS: LocalComputerResourceItem[] = [
     displayName: 'abc.txt',
     fileSize: 13,
     mediaType: 'document',
-    modifiedLabel: '上次修改时间 3天前',
+    modifiedLabel: 'Modified 3 days ago',
     preview: 'blue',
     addedOffsetHours: 72,
   }),
@@ -217,7 +217,7 @@ const MOCK_ROOT_ITEMS: LocalComputerResourceItem[] = [
     displayName: 'imsdk.har',
     fileSize: 15728640,
     mediaType: 'document',
-    modifiedLabel: '上次修改时间 1天前',
+    modifiedLabel: 'Modified 1 day ago',
     preview: 'settings',
     addedOffsetHours: 25,
   }),
@@ -225,28 +225,28 @@ const MOCK_ROOT_ITEMS: LocalComputerResourceItem[] = [
     resourceId: 'community-docs',
     kind: 'shared_folder',
     displayName: 'community-docs',
-    countLabel: '文件夹',
+    countLabel: 'Folder',
     addedOffsetHours: 30,
   }),
   resource({
     resourceId: 'promo-video',
     kind: 'shared_folder',
     displayName: 'Lynavo Drive demo video',
-    countLabel: '文件夹',
+    countLabel: 'Folder',
     addedOffsetHours: 38,
   }),
   resource({
     resourceId: 'ui-design',
     kind: 'shared_folder',
-    displayName: '海外版 UI 设计',
-    countLabel: '文件夹',
+    displayName: 'Global UI Design',
+    countLabel: 'Folder',
     addedOffsetHours: 42,
   }),
   resource({
     resourceId: 'empty-folder',
     kind: 'shared_folder',
-    displayName: '待整理',
-    countLabel: '空文件夹',
+    displayName: 'To Organize',
+    countLabel: 'Empty Folder',
     addedOffsetHours: 96,
   }),
 ];
@@ -259,7 +259,7 @@ const MOCK_FOLDER_CONTENTS: Record<string, LocalComputerResourceItem[]> = {
       displayName: 'README.md',
       fileSize: 12288,
       mediaType: 'document',
-      modifiedLabel: '上次修改时间 1天前',
+      modifiedLabel: 'Modified 1 day ago',
       preview: 'settings',
       addedOffsetHours: 28,
     }),
@@ -269,7 +269,7 @@ const MOCK_FOLDER_CONTENTS: Record<string, LocalComputerResourceItem[]> = {
       displayName: 'project-plan.pdf',
       fileSize: 700416,
       mediaType: 'document',
-      modifiedLabel: '上次修改时间 2天前',
+      modifiedLabel: 'Modified 2 days ago',
       preview: 'blue',
       addedOffsetHours: 49,
     }),
@@ -279,7 +279,7 @@ const MOCK_FOLDER_CONTENTS: Record<string, LocalComputerResourceItem[]> = {
       displayName: 'screen-recording.mov',
       fileSize: 1932735283,
       mediaType: 'video',
-      modifiedLabel: '上次修改时间 1天前',
+      modifiedLabel: 'Modified 1 day ago',
       preview: 'dark',
       addedOffsetHours: 21,
       downloadCount: 1,
@@ -288,7 +288,7 @@ const MOCK_FOLDER_CONTENTS: Record<string, LocalComputerResourceItem[]> = {
       resourceId: 'codex-archive',
       kind: 'shared_folder',
       displayName: 'Archive',
-      countLabel: '文件夹',
+      countLabel: 'Folder',
       addedOffsetHours: 120,
     }),
   ],
@@ -299,7 +299,7 @@ const MOCK_FOLDER_CONTENTS: Record<string, LocalComputerResourceItem[]> = {
       displayName: 'old-backup.tar.gz',
       fileSize: 104857600,
       mediaType: 'document',
-      modifiedLabel: '上次修改时间 5天前',
+      modifiedLabel: 'Modified 5 days ago',
       preview: 'settings',
       addedOffsetHours: 122,
     }),
@@ -311,7 +311,7 @@ const MOCK_FOLDER_CONTENTS: Record<string, LocalComputerResourceItem[]> = {
       displayName: 'brand-guide.pdf',
       fileSize: 6710886,
       mediaType: 'document',
-      modifiedLabel: '上次修改时间 3天前',
+      modifiedLabel: 'Modified 3 days ago',
       preview: 'blue',
       addedOffsetHours: 72,
     }),
@@ -321,7 +321,7 @@ const MOCK_FOLDER_CONTENTS: Record<string, LocalComputerResourceItem[]> = {
       displayName: 'release-note.docx',
       fileSize: 1258291,
       mediaType: 'document',
-      modifiedLabel: '上次修改时间 1天前',
+      modifiedLabel: 'Modified 1 day ago',
       preview: 'settings',
       addedOffsetHours: 24,
     }),
@@ -333,7 +333,7 @@ const MOCK_FOLDER_CONTENTS: Record<string, LocalComputerResourceItem[]> = {
       displayName: 'launch-trailer.mp4',
       fileSize: 897581056,
       mediaType: 'video',
-      modifiedLabel: '上次修改时间 2天前',
+      modifiedLabel: 'Modified 2 days ago',
       preview: 'dark',
       addedOffsetHours: 51,
       downloadCount: 4,
@@ -344,7 +344,7 @@ const MOCK_FOLDER_CONTENTS: Record<string, LocalComputerResourceItem[]> = {
       displayName: 'behind-scenes.mov',
       fileSize: 1181116006,
       mediaType: 'video',
-      modifiedLabel: '上次修改时间 4天前',
+      modifiedLabel: 'Modified 4 days ago',
       preview: 'settings',
       addedOffsetHours: 99,
     }),
@@ -356,7 +356,7 @@ const MOCK_FOLDER_CONTENTS: Record<string, LocalComputerResourceItem[]> = {
       displayName: 'home-screen.fig',
       fileSize: 29360128,
       mediaType: 'image',
-      modifiedLabel: '上次修改时间 2天前',
+      modifiedLabel: 'Modified 2 days ago',
       preview: 'blue',
       addedOffsetHours: 50,
     }),
@@ -366,7 +366,7 @@ const MOCK_FOLDER_CONTENTS: Record<string, LocalComputerResourceItem[]> = {
       displayName: 'history-screen.png',
       fileSize: 201728,
       mediaType: 'image',
-      modifiedLabel: '上次修改时间 1天前',
+      modifiedLabel: 'Modified 1 day ago',
       preview: 'settings',
       addedOffsetHours: 23,
     }),
@@ -376,7 +376,7 @@ const MOCK_FOLDER_CONTENTS: Record<string, LocalComputerResourceItem[]> = {
       displayName: 'settings-screen.png',
       fileSize: 139264,
       mediaType: 'image',
-      modifiedLabel: '上次修改时间 1天前',
+      modifiedLabel: 'Modified 1 day ago',
       preview: 'blue',
       addedOffsetHours: 22,
     }),
@@ -534,19 +534,19 @@ function getItemTime(item: LocalComputerResourceItem) {
 
 function getItemMeta(item: LocalComputerResourceItem, t: any) {
   if (isFolder(item)) {
-    if (item.countLabel === '空文件夹') {
-      return t('sharedFiles.files.emptyFolder') || '空文件夹';
+    if (item.countLabel === 'Empty Folder') {
+      return t('sharedFiles.files.emptyFolder') || 'Empty Folder';
     }
-    return t('sharedFiles.files.folder') || '文件夹';
+    return t('sharedFiles.files.folder') || 'Folder';
   }
   const size = formatBytes(item.fileSize ?? 0);
-  let modified = t('sharedFiles.files.justNow') || '刚刚';
+  let modified = t('sharedFiles.files.justNow') || 'Just now';
   if (item.modifiedLabel) {
     if (
-      item.modifiedLabel.includes('今天') ||
+      item.modifiedLabel.includes('Today') ||
       item.modifiedLabel.includes('Today')
     ) {
-      modified = t('sharedFiles.files.modifiedToday') || '今天';
+      modified = t('sharedFiles.files.modifiedToday') || 'Today';
     } else {
       const match = item.modifiedLabel.match(/(\d+)/);
       if (match) {
@@ -554,7 +554,7 @@ function getItemMeta(item: LocalComputerResourceItem, t: any) {
         modified =
           t('sharedFiles.files.modifiedDaysAgo', {
             count: parseInt(days, 10),
-          }) || `${days}天前`;
+          }) || `${days} days ago`;
       }
     }
   } else if (item.addedAt) {
@@ -563,16 +563,16 @@ function getItemMeta(item: LocalComputerResourceItem, t: any) {
       const diffMs = Math.max(0, Date.now() - timestamp);
       const dayMs = 24 * 60 * 60 * 1000;
       if (diffMs < dayMs) {
-        modified = t('sharedFiles.files.modifiedToday') || '今天';
+        modified = t('sharedFiles.files.modifiedToday') || 'Today';
       } else {
         const days = Math.floor(diffMs / dayMs);
         modified =
           t('sharedFiles.files.modifiedDaysAgo', { count: days }) ||
-          `${days}天前`;
+          `${days} days ago`;
       }
     }
   }
-  return `${size} · ${modified}`;
+  return `${size} - ${modified}`;
 }
 
 function firstNonEmptyString(...values: Array<string | null | undefined>) {
@@ -722,7 +722,7 @@ function getRouteStatusViewModel(
   if (reachability.state === 'available') {
     if (reachability.route === 'lan') {
       return {
-        label: t('sharedFiles.connectionStatus.lan') || '局域网',
+        label: t('sharedFiles.connectionStatus.lan') || 'LAN',
         tone: 'online',
       };
     }
@@ -734,7 +734,7 @@ function getRouteStatusViewModel(
     reachability.state === 'wake_unavailable'
   ) {
     return {
-      label: t('sharedFiles.connectionStatus.unavailable') || '不可达',
+      label: t('sharedFiles.connectionStatus.unavailable') || 'Unreachable',
       tone: 'offline',
     };
   }
@@ -773,8 +773,8 @@ function getModifiedLabel(modifiedAt: string) {
   if (Number.isNaN(timestamp)) return undefined;
   const diffMs = Math.max(0, Date.now() - timestamp);
   const dayMs = 24 * 60 * 60 * 1000;
-  if (diffMs < dayMs) return '上次修改时间 今天';
-  return `上次修改时间 ${Math.floor(diffMs / dayMs)}天前`;
+  if (diffMs < dayMs) return 'Modified Today';
+  return `Modified ${Math.floor(diffMs / dayMs)} days ago`;
 }
 
 function personalDirectoryResourceId(path: string) {
@@ -815,7 +815,7 @@ function directoryFileToResourceItem({
     status: 'available',
     addedAt: file.modifiedAt,
     downloadCount: 0,
-    countLabel: file.isDirectory ? '文件夹' : undefined,
+    countLabel: file.isDirectory ? 'Folder' : undefined,
     modifiedLabel: getModifiedLabel(file.modifiedAt),
     sharedRootResourceId: file.isDirectory ? resourceId : undefined,
     relativePath: '',
@@ -1090,7 +1090,9 @@ export function LocalComputerGlobalScreen() {
         const { NativeSyncEngine } = NativeModules;
         const binding = await NativeSyncEngine?.getBindingState();
         if (!binding || !binding.host) {
-          Alert.alert(t('sharedFiles.deviceUnavailable.title') || '設備不可用');
+          Alert.alert(
+            t('sharedFiles.deviceUnavailable.title') || 'Device Unavailable',
+          );
           return;
         }
 
@@ -1130,23 +1132,23 @@ export function LocalComputerGlobalScreen() {
         });
 
         Alert.alert(
-          t('sharedFiles.dialogs.downloadComplete') || '下載完成',
+          t('sharedFiles.dialogs.downloadComplete') || 'Download complete',
           result.savedToPhotos
             ? t('sharedFiles.dialogs.downloadSavedToPhotos', {
                 name: item.displayName,
                 location:
-                  t('sharedFiles.dialogs.savedLocationPhotos') || '相簿',
-              }) || `${item.displayName} 已儲存至相簿`
+                  t('sharedFiles.dialogs.savedLocationPhotos') || 'Photos',
+              }) || `${item.displayName} saved to Photos`
             : t('sharedFiles.dialogs.downloadSavedToFiles', {
                 name: item.displayName,
-              }) || `${item.displayName} 已保存到文件`,
+              }) || `${item.displayName} saved to Files`,
         );
       } catch (err) {
         console.warn('[LocalComputerScreen] Download failed:', err);
         Alert.alert(
-          t('sharedFiles.dialogs.downloadFailed') || '下載失敗',
+          t('sharedFiles.dialogs.downloadFailed') || 'Download Failed',
           t('sharedFiles.dialogs.downloadFailedMessage') ||
-            '無法下載檔案，請稍後重試',
+            'Could not download the file. Please try again later',
         );
       } finally {
         setDownloadingId(null);
@@ -1221,7 +1223,9 @@ export function LocalComputerGlobalScreen() {
       try {
         const bound = await isDesktopBound();
         if (!bound) {
-          Alert.alert(t('sharedFiles.deviceUnavailable.title') || '設備不可用');
+          Alert.alert(
+            t('sharedFiles.deviceUnavailable.title') || 'Device Unavailable',
+          );
           return;
         }
 
@@ -1247,9 +1251,9 @@ export function LocalComputerGlobalScreen() {
               err,
             );
             Alert.alert(
-              t('sharedFiles.dialogs.previewFailed') || '預覽失敗',
+              t('sharedFiles.dialogs.previewFailed') || 'Preview Failed',
               t('sharedFiles.dialogs.previewFailedMessage') ||
-                '無法取得檔案預覽',
+                'Could not load file preview',
             );
           }
           return;
@@ -1267,8 +1271,9 @@ export function LocalComputerGlobalScreen() {
       } catch (err) {
         console.warn('[LocalComputerScreen] Preview failed:', err);
         Alert.alert(
-          t('sharedFiles.dialogs.previewFailed') || '預覽失敗',
-          t('sharedFiles.dialogs.previewFailedMessage') || '無法取得檔案預覽',
+          t('sharedFiles.dialogs.previewFailed') || 'Preview Failed',
+          t('sharedFiles.dialogs.previewFailedMessage') ||
+            'Could not load file preview',
         );
       }
     },
@@ -1323,7 +1328,9 @@ export function LocalComputerGlobalScreen() {
       const { NativeSyncEngine } = NativeModules;
       const binding = await NativeSyncEngine?.getBindingState();
       if (!binding || !binding.host) {
-        Alert.alert(t('sharedFiles.deviceUnavailable.title') || '設備不可用');
+        Alert.alert(
+          t('sharedFiles.deviceUnavailable.title') || 'Device Unavailable',
+        );
         return;
       }
 
@@ -1337,9 +1344,9 @@ export function LocalComputerGlobalScreen() {
     } catch (err) {
       console.warn('[LocalComputerScreen] Share failed:', err);
       Alert.alert(
-        t('sharedFiles.localComputer.shareFailedTitle') || '分享失敗',
+        t('sharedFiles.localComputer.shareFailedTitle') || 'Share Failed',
         t('sharedFiles.localComputer.shareFailedMessage') ||
-          '無法開啟系統分享，請稍後重試',
+          'Could not open the system share sheet. Please try again later',
       );
     } finally {
       setSharing(false);
@@ -1359,22 +1366,22 @@ export function LocalComputerGlobalScreen() {
 
   const localizedSortOptions = useMemo(
     () => [
-      { id: 'name' as SortKey, label: t('sharedFiles.sortBy.name') || '名称' },
-      { id: 'time' as SortKey, label: t('sharedFiles.sortBy.time') || '时间' },
+      { id: 'name' as SortKey, label: t('sharedFiles.sortBy.name') || 'Name' },
+      { id: 'time' as SortKey, label: t('sharedFiles.sortBy.time') || 'Time' },
       {
         id: 'size' as SortKey,
-        label: t('sharedFiles.sortBy.size') || '文件大小',
+        label: t('sharedFiles.sortBy.size') || 'File Size',
       },
     ],
     [t],
   );
 
   const sortLabel =
-    localizedSortOptions.find(option => option.id === sortBy)?.label ?? '名称';
+    localizedSortOptions.find(option => option.id === sortBy)?.label ?? 'Name';
   const queryActive = searchQuery.trim().length > 0;
   const title = currentFolder
     ? currentFolder.name
-    : t('sharedFiles.localComputer.title') || '電腦檔案';
+    : t('sharedFiles.localComputer.title') || 'Computer Files';
   const subtitle = getLocalComputerSubtitle({
     currentFolder,
     desktopDisplayName,
@@ -1417,7 +1424,7 @@ export function LocalComputerGlobalScreen() {
           <TouchableOpacity
             style={styles.backButton}
             accessibilityRole="button"
-            accessibilityLabel={t('common.back') || '返回'}
+            accessibilityLabel={t('common.back') || 'Back'}
             onPress={goBack}
             activeOpacity={0.7}
           >
@@ -1455,8 +1462,8 @@ export function LocalComputerGlobalScreen() {
                 ]}
               >
                 {selectionMode
-                  ? t('sharedFiles.localComputer.done') || '完成'
-                  : t('sharedFiles.localComputer.select') || '選擇'}
+                  ? t('sharedFiles.localComputer.done') || 'Done'
+                  : t('sharedFiles.localComputer.select') || 'Select'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -1471,9 +1478,9 @@ export function LocalComputerGlobalScreen() {
             placeholder={
               currentFolder
                 ? t('sharedFiles.localComputer.searchFolderPlaceholder') ||
-                  '搜索当前文件夹'
+                  'Search current folder'
                 : t('sharedFiles.localComputer.searchFilesPlaceholder') ||
-                  '搜索电脑文件'
+                  'Search computer files'
             }
             placeholderTextColor="#9AA3AE"
             autoCapitalize="none"
@@ -1518,7 +1525,7 @@ export function LocalComputerGlobalScreen() {
                       : null,
                   ]}
                 >
-                  {t('sharedFiles.localComputer.download') || '下载'}
+                  {t('sharedFiles.localComputer.download') || 'Download'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -1543,7 +1550,7 @@ export function LocalComputerGlobalScreen() {
                         : null,
                     ]}
                   >
-                    {t('sharedFiles.localComputer.share') || '分享'}
+                    {t('sharedFiles.localComputer.share') || 'Share'}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -1556,7 +1563,7 @@ export function LocalComputerGlobalScreen() {
                   layoutMode === 'list' ? styles.layoutButtonActive : null,
                 ]}
                 accessibilityLabel={
-                  t('sharedFiles.localComputer.listView') || '列表视图'
+                  t('sharedFiles.localComputer.listView') || 'List View'
                 }
                 activeOpacity={0.7}
                 onPress={() => setLayoutMode('list')}
@@ -1574,7 +1581,7 @@ export function LocalComputerGlobalScreen() {
                   layoutMode === 'grid' ? styles.layoutButtonActive : null,
                 ]}
                 accessibilityLabel={
-                  t('sharedFiles.localComputer.gridView') || '网格视图'
+                  t('sharedFiles.localComputer.gridView') || 'Grid View'
                 }
                 activeOpacity={0.7}
                 onPress={() => setLayoutMode('grid')}
@@ -1594,11 +1601,12 @@ export function LocalComputerGlobalScreen() {
           <View style={styles.centeredCard}>
             <ActivityIndicator size="small" color={colors.primary} />
             <Text style={styles.centeredTitle}>
-              {t('sharedFiles.localComputer.loadingTitle') || '电脑文件加载中'}
+              {t('sharedFiles.localComputer.loadingTitle') ||
+                'Computer files loading'}
             </Text>
             <Text style={styles.centeredSubtitle}>
               {t('sharedFiles.localComputer.loadingSubtitle') ||
-                '正在读取电脑端共享目录。'}
+                'Reading the computer shared directory.'}
             </Text>
           </View>
         ) : localComputerDisabledReason ? (
@@ -1613,11 +1621,11 @@ export function LocalComputerGlobalScreen() {
             <ActivityIndicator size="small" color={colors.primary} />
             <Text style={styles.centeredTitle}>
               {t('sharedFiles.localComputer.folderLoadingTitle') ||
-                '文件夹加载中'}
+                'Folder loading'}
             </Text>
             <Text style={styles.centeredSubtitle}>
               {t('sharedFiles.localComputer.folderLoadingSubtitle') ||
-                '正在读取电脑端目录内容。'}
+                'Reading computer directory contents.'}
             </Text>
           </View>
         ) : folderLoadError ? (
@@ -1680,7 +1688,7 @@ function LocalComputerRouteBadge({
   const inline = variant === 'inline';
   return (
     <View
-      accessibilityLabel={`${t('sharedFiles.localComputer.connectionStatePrefix') || '电脑连接方式：'}${status.label}`}
+      accessibilityLabel={`${t('sharedFiles.localComputer.connectionStatePrefix') || 'Computer connection method:'}${status.label}`}
       style={[
         styles.routeBadge,
         status.tone === 'pending' ? styles.routeBadgePending : null,
@@ -1719,11 +1727,12 @@ function NetworkDisconnectedState({ onRetry }: { onRetry: () => void }) {
         <Icon name="cloud-offline-outline" size={28} color="#DC2626" />
       </View>
       <Text style={styles.centeredTitle}>
-        {t('sharedFiles.localComputer.networkDisconnectedTitle') || '网络断开'}
+        {t('sharedFiles.localComputer.networkDisconnectedTitle') ||
+          'Network Disconnected'}
       </Text>
       <Text style={styles.centeredSubtitle}>
         {t('sharedFiles.localComputer.networkDisconnectedSubtitle') ||
-          '当前路径会保留，恢复网络或电脑端在线后可以继续访问。'}
+          'The current path will be kept. You can continue after the network is restored or the computer is online.'}
       </Text>
       <TouchableOpacity
         style={styles.retryButton}
@@ -1732,7 +1741,7 @@ function NetworkDisconnectedState({ onRetry }: { onRetry: () => void }) {
         onPress={onRetry}
       >
         <Text style={styles.retryButtonText}>
-          {t('sharedFiles.localComputer.retryConnection') || '重试连接'}
+          {t('sharedFiles.localComputer.retryConnection') || 'Retry Connection'}
         </Text>
       </TouchableOpacity>
     </View>
@@ -1757,14 +1766,14 @@ function LocalComputerDisabledState({
         {translateOrFallback(
           translate,
           'sharedFiles.localComputer.localComputerDisabledTitle',
-          '尚未開啟本地共享',
+          'LAN Sharing Unavailable',
         )}
       </Text>
       <Text style={styles.centeredSubtitle}>
         {translateOrFallback(
           translate,
           'sharedFiles.localComputer.localComputerDisabledSubtitle',
-          '請到電腦端開啟本地共享後，再回到手機端重新整理。',
+          'Enable local sharing on the computer, then return to the phone and refresh.',
         )}
       </Text>
       <TouchableOpacity
@@ -1777,7 +1786,7 @@ function LocalComputerDisabledState({
           {translateOrFallback(
             translate,
             'sharedFiles.localComputer.recheckPermission',
-            '重新檢查',
+            'Check Again',
           )}
         </Text>
       </TouchableOpacity>
@@ -1793,11 +1802,12 @@ function FolderLoadErrorState({ onRetry }: { onRetry: () => void }) {
         <Icon name="alert-circle-outline" size={28} color="#DC2626" />
       </View>
       <Text style={styles.centeredTitle}>
-        {t('sharedFiles.localComputer.folderLoadErrorTitle') || '目录加载失败'}
+        {t('sharedFiles.localComputer.folderLoadErrorTitle') ||
+          'Folder Load Failed'}
       </Text>
       <Text style={styles.centeredSubtitle}>
         {t('sharedFiles.localComputer.folderLoadErrorSubtitle') ||
-          '无法读取这个共享文件夹，请确认电脑端文件仍然存在。'}
+          'Unable to read this shared folder. Make sure the files still exist on the computer.'}
       </Text>
       <TouchableOpacity
         style={styles.retryButton}
@@ -1806,7 +1816,7 @@ function FolderLoadErrorState({ onRetry }: { onRetry: () => void }) {
         onPress={onRetry}
       >
         <Text style={styles.retryButtonText}>
-          {t('sharedFiles.localComputer.reload') || '重新加载'}
+          {t('sharedFiles.localComputer.reload') || 'Reload'}
         </Text>
       </TouchableOpacity>
     </View>
@@ -2163,7 +2173,7 @@ function LocalComputerResourcePreviewModal({
             style={styles.mediaPreviewCloseButton}
             accessibilityRole="button"
             accessibilityLabel={
-              t('sharedFiles.localComputer.closePreview') || '关闭预览'
+              t('sharedFiles.localComputer.closePreview') || 'Close Preview'
             }
             activeOpacity={0.7}
             onPress={onClose}
@@ -2233,11 +2243,11 @@ function EmptyState({
       <View style={styles.centeredCard}>
         <LocalComputerEmptyArtwork variant="search" />
         <Text style={styles.centeredTitle}>
-          {t('sharedFiles.localComputer.noMatchTitle') || '没有匹配结果'}
+          {t('sharedFiles.localComputer.noMatchTitle') || 'No Matching Results'}
         </Text>
         <Text style={styles.centeredSubtitle}>
           {t('sharedFiles.localComputer.noMatchSubtitle') ||
-            '换个关键词再试一次'}
+            'Try another keyword'}
         </Text>
       </View>
     );
@@ -2248,11 +2258,11 @@ function EmptyState({
       <View style={styles.centeredCard}>
         <LocalComputerEmptyArtwork variant="folder" />
         <Text style={styles.centeredTitle}>
-          {t('sharedFiles.localComputer.emptyFolderTitle') || '空文件夹'}
+          {t('sharedFiles.localComputer.emptyFolderTitle') || 'Empty Folder'}
         </Text>
         <Text style={styles.centeredSubtitle}>
           {t('sharedFiles.localComputer.emptyFolderSubtitle') ||
-            '这个目录暂时没有可下载或分享的文件。'}
+            'This directory has no files available for download or sharing.'}
         </Text>
       </View>
     );
@@ -2262,11 +2272,11 @@ function EmptyState({
     <View style={styles.centeredCard}>
       <LocalComputerEmptyArtwork variant="computer" />
       <Text style={styles.centeredTitle}>
-        {t('sharedFiles.localComputer.noFilesTitle') || '暂无文件'}
+        {t('sharedFiles.localComputer.noFilesTitle') || 'No Files'}
       </Text>
       <Text style={styles.centeredSubtitle}>
         {t('sharedFiles.localComputer.noFilesSubtitle') ||
-          '电脑端还没有开放可访问的文件目录。'}
+          'The computer has not opened any accessible file directories yet.'}
       </Text>
     </View>
   );
@@ -2369,7 +2379,7 @@ function SortSheet({
         </Pressable>
         <View style={styles.sheetCard}>
           <Text style={styles.sheetTitle}>
-            {t('sharedFiles.localComputer.sortTitle') || '排序方式'}
+            {t('sharedFiles.localComputer.sortTitle') || 'Sort By'}
           </Text>
           {options.map(option => {
             const active = option.id === value;
@@ -2421,12 +2431,13 @@ function ShareSheet({
         </Pressable>
         <View style={styles.shareCard}>
           <Text style={styles.shareTitle}>
-            {t('sharedFiles.localComputer.shareTitle') || '分享所选文件'}
+            {t('sharedFiles.localComputer.shareTitle') ||
+              'Share Selected Files'}
           </Text>
           <Text style={styles.shareSubtitle}>
             {t('sharedFiles.localComputer.shareSubtitle', {
               count: selectedCount,
-            }) || `已选择 ${selectedCount} 个文件`}
+            }) || `Selected ${selectedCount}  files`}
           </Text>
           <View style={styles.shareTargets}>
             {targets.map(target => (

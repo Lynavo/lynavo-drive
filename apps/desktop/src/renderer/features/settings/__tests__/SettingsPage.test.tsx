@@ -86,29 +86,35 @@ describe('SettingsPage', () => {
     });
   });
 
-  it('renders the page title "我的"', () => {
+  it('renders the page title "Me"', () => {
     render(<SettingsPage />);
-    expect(screen.getByText('我的')).toBeInTheDocument();
+    expect(screen.getByText('Me')).toBeInTheDocument();
   });
 
   it('renders the community local LAN section without account or membership CTAs', () => {
     render(<SettingsPage />);
 
-    expect(screen.getByText('开源本地同步')).toBeInTheDocument();
-    expect(screen.getByText('同一局域网内可直接配对、发现并自动同步。')).toBeInTheDocument();
-    expect(screen.queryByText('我的账户')).not.toBeInTheDocument();
+    expect(screen.getByText('Open-source local sync')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Pair, discover, and sync automatically on the same LAN. No Lynavo cloud login is required.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('My account')).not.toBeInTheDocument();
     expect(screen.queryByText('test@old-product.example')).not.toBeInTheDocument();
-    expect(screen.queryByText('会员状态')).not.toBeInTheDocument();
+    expect(screen.queryByText('Membership status')).not.toBeInTheDocument();
     expect(screen.queryByText('Pro')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '登入' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
   });
 
   it('renders the prevent sleep standby option', async () => {
     render(<SettingsPage />);
-    expect(screen.getByText('防止待机')).toBeInTheDocument();
-    expect(screen.getByText('传输任务运行时保持电脑唤醒')).toBeInTheDocument();
+    expect(screen.getByText('Prevent sleep')).toBeInTheDocument();
+    expect(
+      screen.getByText('Keep the computer awake while transfer jobs are running'),
+    ).toBeInTheDocument();
 
-    const switchBtn = screen.getByRole('button', { name: '防止待机' });
+    const switchBtn = screen.getByRole('button', { name: 'Prevent sleep' });
     expect(switchBtn).toBeInTheDocument();
   });
 
@@ -123,7 +129,7 @@ describe('SettingsPage', () => {
 
     fireEvent.click(
       screen.getByRole('switch', {
-        name: '允许已配对手机浏览所有已接收文件',
+        name: 'Allow paired phones to browse all received files',
       }),
     );
 
@@ -142,19 +148,19 @@ describe('SettingsPage', () => {
 
     fireEvent.click(
       screen.getByRole('switch', {
-        name: '允许已配对手机浏览所有已接收文件',
+        name: 'Allow paired phones to browse all received files',
       }),
     );
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('修改已接收文件浏览权限失败');
+      expect(toast.error).toHaveBeenCalledWith('Failed to update received file browsing access');
     });
   });
 
   it('does not render the connection devices section in settings', async () => {
     render(<SettingsPage />);
 
-    expect(screen.queryByText('连接设备')).not.toBeInTheDocument();
+    expect(screen.queryByText('Connected devices')).not.toBeInTheDocument();
     expect(screen.queryByTestId('connection-devices-section')).not.toBeInTheDocument();
   });
 
@@ -167,19 +173,19 @@ describe('SettingsPage', () => {
   it('opens a searchable language picker', () => {
     render(<SettingsPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: /界面语言/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Interface language/ }));
 
-    const search = screen.getByRole('searchbox', { name: '搜索语言' });
+    const search = screen.getByRole('searchbox', { name: 'Search languages' });
     expect(search).toBeInTheDocument();
 
     fireEvent.change(search, { target: { value: 'English' } });
-    expect(screen.getByRole('button', { name: /English/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /繁體中文/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /English/ }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: /Traditional Chinese/ })).not.toBeInTheDocument();
   });
 
   it('renders the local IP', () => {
     render(<SettingsPage />);
-    expect(screen.getByText('本机 IP')).toBeInTheDocument();
+    expect(screen.getByText('Local IP')).toBeInTheDocument();
     expect(screen.getByText('192.168.0.227')).toBeInTheDocument();
   });
 
@@ -188,9 +194,11 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    expect(screen.queryByText('局域网共享地址')).not.toBeInTheDocument();
-    expect(screen.queryByText('Linux 文件共享')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /打开团队共享目录/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('LAN share address')).not.toBeInTheDocument();
+    expect(screen.queryByText('Linux File Sharing')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Open team shared folder/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('keeps Linux sharing guidance hidden in the Lynavo global product', () => {
@@ -208,23 +216,27 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    expect(screen.queryByText('请在系统中手动配置文件共享后重新检测。')).not.toBeInTheDocument();
-    expect(screen.queryByText('Linux 文件共享')).not.toBeInTheDocument();
-    expect(screen.queryByText('Windows 快速配置')).not.toBeInTheDocument();
-    expect(screen.queryByText('Windows 文件共享')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Configure file sharing in Linux system settings, then check again.'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Linux File Sharing')).not.toBeInTheDocument();
+    expect(screen.queryByText('Windows quick setup')).not.toBeInTheDocument();
+    expect(screen.queryByText('Windows File Sharing')).not.toBeInTheDocument();
   });
 
   it('does not render desktop version polling controls', async () => {
     render(<SettingsPage />);
 
-    expect(screen.queryByRole('button', { name: '检查更新' })).not.toBeInTheDocument();
-    expect(screen.queryByText('已是最新版本')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Check for updates' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Already on the latest version')).not.toBeInTheDocument();
   });
 
   it('renders the installed desktop version from app info', async () => {
     render(<SettingsPage />);
 
-    expect(await screen.findByText('v1.0.1 (56) · 当前版本已安装')).toBeInTheDocument();
+    expect(
+      await screen.findByText('v1.0.1 (56) \u00b7 Current version installed'),
+    ).toBeInTheDocument();
   });
 
   it('renders the product helper name in the version card', async () => {
@@ -236,14 +248,14 @@ describe('SettingsPage', () => {
 
   it('renders support section and exports diagnostics locally', async () => {
     render(<SettingsPage />);
-    const exportBtn = screen.getByRole('button', { name: '导出' });
+    const exportBtn = screen.getByRole('button', { name: 'Export' });
     expect(exportBtn).toBeInTheDocument();
 
     fireEvent.click(exportBtn);
 
     // Dialog should be open, find the description textarea
     const textarea = screen.getByPlaceholderText(
-      '请描述出现问题的步骤、手机型号、网络环境或错误现象（选填）',
+      'Describe the steps, phone model, network environment, or error symptoms (optional)',
     );
     expect(textarea).toBeInTheDocument();
 
@@ -259,7 +271,7 @@ describe('SettingsPage', () => {
       'Test log description',
     );
     await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith('诊断包已导出', {
+      expect(toast.success).toHaveBeenCalledWith('Diagnostics bundle exported', {
         description: '/tmp/lynavo-drive-diagnostics.zip',
       });
     });
@@ -267,24 +279,23 @@ describe('SettingsPage', () => {
 
   it('opens feedback panel and sends a composed GitHub issue link', async () => {
     render(<SettingsPage />);
-    await screen.findByText('v1.0.1 (56) · 当前版本已安装');
+    await screen.findByText('v1.0.1 (56) \u00b7 Current version installed');
 
-    fireEvent.click(screen.getByRole('button', { name: /问题反馈/ }));
-    fireEvent.change(screen.getByPlaceholderText('请描述问题、发生步骤或希望改进的地方'), {
-      target: { value: '手机无法连接电脑' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(screen.getByRole('button', { name: /Feedback/ }));
+    fireEvent.change(
+      screen.getByPlaceholderText('Describe the issue, steps, or improvements you want'),
+      {
+        target: { value: 'Phone cannot connect to the computer' },
+      },
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
 
     const issueUrl = new URL(
       vi.mocked(window.electronAPI?.files.openExternal).mock.calls[0]?.[0] ?? '',
     );
-    expect(issueUrl.href).toContain(
-      'https://github.com/lynavo/lynavo-drive/issues/new',
-    );
-    expect(issueUrl.searchParams.get('title')).toBe(
-      'Lynavo Drive Desktop 问题反馈 v1.0.1 (56)',
-    );
-    expect(issueUrl.searchParams.get('body')).toContain('手机无法连接电脑');
-    expect(issueUrl.searchParams.get('body')).toContain('当前版本：v1.0.1 (56)');
+    expect(issueUrl.href).toContain('https://github.com/lynavo/lynavo-drive/issues/new');
+    expect(issueUrl.searchParams.get('title')).toBe('Lynavo Drive Desktop feedback v1.0.1 (56)');
+    expect(issueUrl.searchParams.get('body')).toContain('Phone cannot connect to the computer');
+    expect(issueUrl.searchParams.get('body')).toContain('Current version: v1.0.1 (56)');
   });
 });

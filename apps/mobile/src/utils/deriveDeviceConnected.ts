@@ -11,7 +11,7 @@
  *   - offline: presence confirmed unreachable
  *
  * `connecting` is sticky with respect to the previous value: flipping to
- * "offline" during this transient would flash the "設備已斷開" badge every
+ * "offline" during this transient would flash the "device disconnected" badge every
  * time sync kicks off (e.g. `connected -> connecting (connect_and_upload_started)`
  * -> connected). Preserving the previous value avoids that flash while still
  * treating a real `connected -> offline` transition as an immediate disconnect.
