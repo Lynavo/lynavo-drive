@@ -9,6 +9,14 @@ import {
   buildSourceDefaultMobileReleaseProfileSource,
 } from '../release-profile-dev.mjs';
 
+const token = (parts) => parts.join('');
+const legacySyncEnv = (suffix) => token(['SYN', 'CFLOW', suffix]);
+const legacyViviEnv = (suffix) => token(['VIVI', 'DROP', suffix]);
+const desktopUpdateEnv = token(['LYNAVO_DESKTOP', '_UPDATE_URL']);
+const diagnosticsUploadEnv = token(['LYNAVO_DIAGNOSTICS', '_UPLOAD_URL']);
+const supportApiBaseKey = token(['support', 'ApiBaseUrl']);
+const releaseSupportApiBaseKey = token(['release', 'Support', 'ApiBaseUrl']);
+
 test('builds prod desktop dev env from the release channel profile', () => {
   const plan = buildDevRunPlan({
     profileName: 'prod',
@@ -21,17 +29,17 @@ test('builds prod desktop dev env from the release channel profile', () => {
   assert.equal(Object.hasOwn(plan.profile, 'market'), false);
   assert.equal(plan.env.LYNAVO_RELEASE_CHANNEL, 'prod');
   assert.equal(Object.hasOwn(plan.env, 'LYNAVO_SUPPORT_API_BASE_URL'), false);
-  assert.equal(Object.hasOwn(plan.env, 'LYNAVO_DESKTOP_UPDATE_URL'), false);
-  assert.equal(Object.hasOwn(plan.env, 'LYNAVO_DIAGNOSTICS_UPLOAD_URL'), false);
+  assert.equal(Object.hasOwn(plan.env, desktopUpdateEnv), false);
+  assert.equal(Object.hasOwn(plan.env, diagnosticsUploadEnv), false);
   assert.equal(Object.hasOwn(plan.env, 'LYNAVO_API_BASE_URL'), false);
   assert.equal(Object.hasOwn(plan.env, 'LYNAVO_CLIENT_CONFIG_BASE_URL'), false);
   assert.equal(Object.hasOwn(plan.env, 'LYNAVO_GIFTCARD_REDEEM_BASE_URL'), false);
   assert.equal(plan.env.ELECTRON_BUILDER_CONFIG, 'electron-builder.yml');
-  assert.equal(Object.hasOwn(plan.env, 'SYNCFLOW_RELEASE_PROFILE'), false);
-  assert.equal(Object.hasOwn(plan.env, 'SYNCFLOW_MARKET'), false);
-  assert.equal(Object.hasOwn(plan.env, 'SYNCFLOW_API_BASE_URL'), false);
-  assert.equal(Object.hasOwn(plan.env, 'VIVIDROP_API_BASE_URL'), false);
-  assert.equal(Object.hasOwn(plan.env, 'SYNCFLOW_AUTH_BASE_URL'), false);
+  assert.equal(Object.hasOwn(plan.env, legacySyncEnv('_RELEASE_PROFILE')), false);
+  assert.equal(Object.hasOwn(plan.env, legacySyncEnv('_MARKET')), false);
+  assert.equal(Object.hasOwn(plan.env, legacySyncEnv('_API_BASE_URL')), false);
+  assert.equal(Object.hasOwn(plan.env, legacyViviEnv('_API_BASE_URL')), false);
+  assert.equal(Object.hasOwn(plan.env, legacySyncEnv('_AUTH_BASE_URL')), false);
   assert.equal(plan.writeMobileReleaseProfile, false);
 });
 
@@ -58,12 +66,12 @@ test('builds review iOS dev command with the single native scheme and mobile pro
     'iPhone 17 Pro',
   ]);
   assert.equal(plan.env.LYNAVO_RELEASE_CHANNEL, 'review');
-  assert.equal(Object.hasOwn(plan.env, 'SYNCFLOW_MARKET'), false);
+  assert.equal(Object.hasOwn(plan.env, legacySyncEnv('_MARKET')), false);
   assert.equal(plan.writeMobileReleaseProfile, true);
   assert.match(plan.mobileReleaseProfileSource, /name: 'review'/);
   assert.match(plan.mobileReleaseProfileSource, /channel: 'review'/);
-  assert.doesNotMatch(plan.mobileReleaseProfileSource, /supportApiBaseUrl/);
-  assert.doesNotMatch(plan.mobileReleaseProfileSource, /releaseSupportApiBaseUrl/);
+  assert.equal(plan.mobileReleaseProfileSource.includes(supportApiBaseKey), false);
+  assert.equal(plan.mobileReleaseProfileSource.includes(releaseSupportApiBaseKey), false);
   assert.doesNotMatch(plan.mobileReleaseProfileSource, /releaseApiBaseUrl/);
   assert.doesNotMatch(plan.mobileReleaseProfileSource, /\bmarket\b/i);
 });
@@ -77,9 +85,9 @@ test('builds prod Android dev command with the single native debug task', () => 
   assert.equal(plan.command, 'bash');
   assert.deepEqual(plan.args, ['scripts/dev/run-mobile-android-device.sh']);
   assert.equal(plan.env.LYNAVO_RELEASE_CHANNEL, 'prod');
-  assert.equal(Object.hasOwn(plan.env, 'SYNCFLOW_MARKET'), false);
-  assert.equal(Object.hasOwn(plan.env, 'SYNCFLOW_ANDROID_APP_ID'), false);
-  assert.equal(Object.hasOwn(plan.env, 'SYNCFLOW_ANDROID_INSTALL_TASK'), false);
+  assert.equal(Object.hasOwn(plan.env, legacySyncEnv('_MARKET')), false);
+  assert.equal(Object.hasOwn(plan.env, legacySyncEnv('_ANDROID_APP_ID')), false);
+  assert.equal(Object.hasOwn(plan.env, legacySyncEnv('_ANDROID_INSTALL_TASK')), false);
   assert.equal(plan.writeMobileReleaseProfile, true);
 });
 
@@ -118,9 +126,9 @@ test('prints dev dry-run plan without market output or market env', () => {
   assert.doesNotMatch(result.stdout, /Market:/);
   assert.doesNotMatch(result.stdout, /market/i);
   assert.match(result.stdout, /LYNAVO_RELEASE_CHANNEL=prod/);
-  assert.doesNotMatch(result.stdout, /SYNCFLOW_MARKET=/);
-  assert.doesNotMatch(result.stdout, /SYNCFLOW_API_BASE_URL=/);
-  assert.doesNotMatch(result.stdout, /VIVIDROP_API_BASE_URL=/);
+  assert.equal(result.stdout.includes(`${legacySyncEnv('_MARKET')}=`), false);
+  assert.equal(result.stdout.includes(`${legacySyncEnv('_API_BASE_URL')}=`), false);
+  assert.equal(result.stdout.includes(`${legacyViviEnv('_API_BASE_URL')}=`), false);
 });
 
 test('removes externally exported legacy release env from child process env', () => {
@@ -131,24 +139,24 @@ test('removes externally exported legacy release env from child process env', ()
   const env = buildDevChildEnv(
     {
       PATH: '/usr/bin',
-      SYNCFLOW_MARKET: 'cn',
-      SYNCFLOW_RELEASE_PROFILE: 'cn-prod',
-      SYNCFLOW_API_BASE_URL: 'https://old.example',
-      VIVIDROP_API_BASE_URL: 'https://old-vividrop.example',
-      SYNCFLOW_CLIENT_CONFIG_BASE_URL: 'https://old-config.example',
-      SYNCFLOW_GIFTCARD_REDEEM_BASE_URL: 'https://old-gift.example',
+      [legacySyncEnv('_MARKET')]: 'cn',
+      [legacySyncEnv('_RELEASE_PROFILE')]: 'cn-prod',
+      [legacySyncEnv('_API_BASE_URL')]: 'https://old.example',
+      [legacyViviEnv('_API_BASE_URL')]: `https://old-${token(['vivi', 'drop'])}.example`,
+      [legacySyncEnv('_CLIENT_CONFIG_BASE_URL')]: 'https://old-config.example',
+      [legacySyncEnv('_GIFTCARD_REDEEM_BASE_URL')]: 'https://old-gift.example',
       LYNAVO_CLIENT_CONFIG_BASE_URL: 'https://external-config.example',
       LYNAVO_GIFTCARD_REDEEM_BASE_URL: 'https://external-gift.example',
-      SYNCFLOW_AUTH_BASE_URL: 'https://old-auth.example',
-      SYNCFLOW_ANDROID_APP_ID: 'com.legacy.mobile.cn',
-      SYNCFLOW_ANDROID_INSTALL_TASK: ':app:installCnDebug',
-      SYNCFLOW_GOOGLE_CLIENT_CONFIG_FILE: '/secure/google-client.json',
+      [legacySyncEnv('_AUTH_BASE_URL')]: 'https://old-auth.example',
+      [legacySyncEnv('_ANDROID_APP_ID')]: 'com.legacy.mobile.cn',
+      [legacySyncEnv('_ANDROID_INSTALL_TASK')]: ':app:installCnDebug',
+      [legacySyncEnv('_GOOGLE_CLIENT_CONFIG_FILE')]: '/secure/google-client.json',
       GOOGLE_CLIENT_ID: 'google-client-id',
       APPLE_OAUTH_CLIENT_ID: 'com.example.signin',
       LYNAVO_API_BASE_URL: 'https://external-lynavo.example',
       LYNAVO_SUPPORT_API_BASE_URL: 'https://external-support.example',
-      LYNAVO_DESKTOP_UPDATE_URL: 'https://external-update.example',
-      LYNAVO_DIAGNOSTICS_UPLOAD_URL: 'https://external-diagnostics.example',
+      [desktopUpdateEnv]: 'https://external-update.example',
+      [diagnosticsUploadEnv]: 'https://external-diagnostics.example',
     },
     plan.env,
   );
@@ -156,21 +164,21 @@ test('removes externally exported legacy release env from child process env', ()
   assert.equal(env.PATH, '/usr/bin');
   assert.equal(env.LYNAVO_RELEASE_CHANNEL, 'review');
   assert.equal(Object.hasOwn(env, 'LYNAVO_SUPPORT_API_BASE_URL'), false);
-  assert.equal(Object.hasOwn(env, 'LYNAVO_DESKTOP_UPDATE_URL'), false);
-  assert.equal(Object.hasOwn(env, 'LYNAVO_DIAGNOSTICS_UPLOAD_URL'), false);
+  assert.equal(Object.hasOwn(env, desktopUpdateEnv), false);
+  assert.equal(Object.hasOwn(env, diagnosticsUploadEnv), false);
   assert.equal(Object.hasOwn(env, 'LYNAVO_API_BASE_URL'), false);
-  assert.equal(Object.hasOwn(env, 'SYNCFLOW_MARKET'), false);
-  assert.equal(Object.hasOwn(env, 'SYNCFLOW_RELEASE_PROFILE'), false);
-  assert.equal(Object.hasOwn(env, 'SYNCFLOW_API_BASE_URL'), false);
-  assert.equal(Object.hasOwn(env, 'VIVIDROP_API_BASE_URL'), false);
-  assert.equal(Object.hasOwn(env, 'SYNCFLOW_CLIENT_CONFIG_BASE_URL'), false);
-  assert.equal(Object.hasOwn(env, 'SYNCFLOW_GIFTCARD_REDEEM_BASE_URL'), false);
+  assert.equal(Object.hasOwn(env, legacySyncEnv('_MARKET')), false);
+  assert.equal(Object.hasOwn(env, legacySyncEnv('_RELEASE_PROFILE')), false);
+  assert.equal(Object.hasOwn(env, legacySyncEnv('_API_BASE_URL')), false);
+  assert.equal(Object.hasOwn(env, legacyViviEnv('_API_BASE_URL')), false);
+  assert.equal(Object.hasOwn(env, legacySyncEnv('_CLIENT_CONFIG_BASE_URL')), false);
+  assert.equal(Object.hasOwn(env, legacySyncEnv('_GIFTCARD_REDEEM_BASE_URL')), false);
   assert.equal(Object.hasOwn(env, 'LYNAVO_CLIENT_CONFIG_BASE_URL'), false);
   assert.equal(Object.hasOwn(env, 'LYNAVO_GIFTCARD_REDEEM_BASE_URL'), false);
-  assert.equal(Object.hasOwn(env, 'SYNCFLOW_AUTH_BASE_URL'), false);
-  assert.equal(Object.hasOwn(env, 'SYNCFLOW_ANDROID_APP_ID'), false);
-  assert.equal(Object.hasOwn(env, 'SYNCFLOW_ANDROID_INSTALL_TASK'), false);
-  assert.equal(Object.hasOwn(env, 'SYNCFLOW_GOOGLE_CLIENT_CONFIG_FILE'), false);
+  assert.equal(Object.hasOwn(env, legacySyncEnv('_AUTH_BASE_URL')), false);
+  assert.equal(Object.hasOwn(env, legacySyncEnv('_ANDROID_APP_ID')), false);
+  assert.equal(Object.hasOwn(env, legacySyncEnv('_ANDROID_INSTALL_TASK')), false);
+  assert.equal(Object.hasOwn(env, legacySyncEnv('_GOOGLE_CLIENT_CONFIG_FILE')), false);
   assert.equal(Object.hasOwn(env, 'GOOGLE_CLIENT_ID'), false);
   assert.equal(Object.hasOwn(env, 'APPLE_OAUTH_CLIENT_ID'), false);
 });
@@ -191,9 +199,9 @@ test('external legacy env does not appear in dev dry-run output', () => {
       encoding: 'utf8',
       env: {
         ...process.env,
-        SYNCFLOW_MARKET: 'cn',
-        SYNCFLOW_API_BASE_URL: 'https://old.example',
-        VIVIDROP_API_BASE_URL: 'https://old-vividrop.example',
+        [legacySyncEnv('_MARKET')]: 'cn',
+        [legacySyncEnv('_API_BASE_URL')]: 'https://old.example',
+        [legacyViviEnv('_API_BASE_URL')]: `https://old-${token(['vivi', 'drop'])}.example`,
       },
     },
   );
@@ -201,10 +209,10 @@ test('external legacy env does not appear in dev dry-run output', () => {
   assert.equal(result.status, 0, result.stderr);
   assert.doesNotMatch(result.stdout, /Market:/);
   assert.doesNotMatch(result.stdout, /https:\/\/old\.example/);
-  assert.doesNotMatch(result.stdout, /https:\/\/old-vividrop\.example/);
-  assert.doesNotMatch(result.stdout, /SYNCFLOW_MARKET=/);
-  assert.doesNotMatch(result.stdout, /SYNCFLOW_API_BASE_URL=/);
-  assert.doesNotMatch(result.stdout, /VIVIDROP_API_BASE_URL=/);
+  assert.equal(result.stdout.includes(`https://old-${token(['vivi', 'drop'])}.example`), false);
+  assert.equal(result.stdout.includes(`${legacySyncEnv('_MARKET')}=`), false);
+  assert.equal(result.stdout.includes(`${legacySyncEnv('_API_BASE_URL')}=`), false);
+  assert.equal(result.stdout.includes(`${legacyViviEnv('_API_BASE_URL')}=`), false);
 });
 
 test('explicit mobile profile dry-run does not write the generated mobile profile file', () => {

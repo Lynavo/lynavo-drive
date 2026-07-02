@@ -388,7 +388,7 @@ describe('AppShell', () => {
     fireEvent.click(await screen.findByRole('button', { name: '下载移动端' }));
 
     expect(screen.getByText('扫码下载移动端')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'App Store' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'iOS' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Android' })).toBeInTheDocument();
   });
 

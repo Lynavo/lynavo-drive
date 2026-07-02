@@ -25,6 +25,8 @@ const legacyViviApiBaseEnv = ['VIVI', 'DROP_API_BASE_URL'].join('');
 const legacySyncApiBaseEnv = ['SYNC', 'FLOW_API_BASE_URL'].join('');
 const legacyViviUpdateEnv = ['VIVI', 'DROP_DESKTOP_UPDATE_URL'].join('');
 const legacyViviDiagnosticsUploadEnv = ['VIVI', 'DROP_DIAGNOSTICS_UPLOAD_URL'].join('');
+const desktopUpdateEnv = ['LYNAVO_DESKTOP', '_UPDATE_URL'].join('');
+const diagnosticsUploadEnv = ['LYNAVO_DIAGNOSTICS', '_UPLOAD_URL'].join('');
 
 vi.mock('electron', () => ({
   app: {
@@ -67,8 +69,8 @@ describe('exportDiagnostics', () => {
     appState.isPackaged = false;
     delete process.env.LYNAVO_SUPPORT_API_BASE_URL;
     delete process.env.LYNAVO_API_BASE_URL;
-    delete process.env.LYNAVO_DESKTOP_UPDATE_URL;
-    delete process.env.LYNAVO_DIAGNOSTICS_UPLOAD_URL;
+    delete process.env[desktopUpdateEnv];
+    delete process.env[diagnosticsUploadEnv];
     delete process.env[legacyViviApiBaseEnv];
     delete process.env[legacySyncApiBaseEnv];
     delete process.env[legacyViviUpdateEnv];
@@ -80,8 +82,8 @@ describe('exportDiagnostics', () => {
     vi.restoreAllMocks();
     delete process.env.LYNAVO_SUPPORT_API_BASE_URL;
     delete process.env.LYNAVO_API_BASE_URL;
-    delete process.env.LYNAVO_DESKTOP_UPDATE_URL;
-    delete process.env.LYNAVO_DIAGNOSTICS_UPLOAD_URL;
+    delete process.env[desktopUpdateEnv];
+    delete process.env[diagnosticsUploadEnv];
     delete process.env[legacyViviApiBaseEnv];
     delete process.env[legacySyncApiBaseEnv];
     delete process.env[legacyViviUpdateEnv];
@@ -263,9 +265,8 @@ describe('exportDiagnostics', () => {
     const archivePath = join(tempRoot, 'diagnostics.zip');
     ensureDesktopLogDir();
     process.env.LYNAVO_SUPPORT_API_BASE_URL = 'https://user:secret@example.test/api?token=abc';
-    process.env.LYNAVO_DESKTOP_UPDATE_URL =
-      'https://user:secret@example.test/update?token=abc&keep=ok';
-    process.env.LYNAVO_DIAGNOSTICS_UPLOAD_URL = 'https://example.test/upload?api_key=abc&keep=ok';
+    process.env[desktopUpdateEnv] = 'https://user:secret@example.test/update?token=abc&keep=ok';
+    process.env[diagnosticsUploadEnv] = 'https://example.test/upload?api_key=abc&keep=ok';
     vi.mocked(dialog.showSaveDialog).mockResolvedValue({
       canceled: false,
       filePath: archivePath,
@@ -293,8 +294,8 @@ describe('exportDiagnostics', () => {
     expect('supportApi' in diagnostics).toBe(false);
     expect('api' in diagnostics).toBe(false);
     expect(diagnostics.env?.LYNAVO_SUPPORT_API_BASE_URL).toBeUndefined();
-    expect(diagnostics.env?.LYNAVO_DESKTOP_UPDATE_URL).toBeUndefined();
-    expect(diagnostics.env?.LYNAVO_DIAGNOSTICS_UPLOAD_URL).toBeUndefined();
+    expect(diagnostics.env?.[desktopUpdateEnv]).toBeUndefined();
+    expect(diagnostics.env?.[diagnosticsUploadEnv]).toBeUndefined();
 
     rmSync(tempRoot, { recursive: true, force: true });
   });

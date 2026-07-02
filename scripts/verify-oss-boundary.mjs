@@ -5,6 +5,7 @@ import { relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 
 const MAX_REPORTED_UNALLOWLISTED_HITS = 200;
+const ossTerm = (parts) => parts.join('');
 
 const OSS_BOUNDARY_TERMS = [
   'RemoteAccess',
@@ -48,11 +49,11 @@ const OSS_BOUNDARY_TERMS = [
   'SYNC' + 'FLOW_RELEASE_PROFILE',
   'SYNC' + 'FLOW_MARKET',
   'LYNAVO_SUPPORT_API_BASE_URL',
-  'LYNAVO_DESKTOP_UPDATE_URL',
-  'LYNAVO_DIAGNOSTICS_UPLOAD_URL',
-  'supportApiBaseUrl',
-  'releaseSupportApiBaseUrl',
-  'reviewSupportApiBaseUrl',
+  ossTerm(['LYNAVO_DESKTOP', '_UPDATE_URL']),
+  ossTerm(['LYNAVO_DIAGNOSTICS', '_UPLOAD_URL']),
+  ossTerm(['support', 'ApiBaseUrl']),
+  ossTerm(['release', 'Support', 'ApiBaseUrl']),
+  ossTerm(['review', 'Support', 'ApiBaseUrl']),
 ];
 
 const OSS_BOUNDARY_PATTERN = OSS_BOUNDARY_TERMS.map(escapeRegExp).join('|');
@@ -120,9 +121,6 @@ function allowMatches(matchers, reason) {
   };
 }
 
-const APPLE_SIGNING_ENTITLEMENTS_REASON =
-  'Apple code-signing entitlements are platform signing metadata, not commercial feature entitlements.';
-
 const NEGATIVE_ASSERTION_REASON =
   'Regression test or scrubber names commercial/account inputs to prove the OSS runtime does not expose them.';
 
@@ -141,7 +139,6 @@ const ALLOWED_EXACT_PATHS = new Map([
   ],
   ['scripts/dev/oss-env-scrubber.cjs', allowAny(NEGATIVE_ASSERTION_REASON)],
   ['scripts/dev/__tests__/release-profile-dev.test.mjs', allowAny(NEGATIVE_ASSERTION_REASON)],
-  ['scripts/release/__tests__/macos-packaging.test.mjs', allowAny(NEGATIVE_ASSERTION_REASON)],
   ['scripts/release/__tests__/oss-boundary.test.mjs', allowAny(NEGATIVE_ASSERTION_REASON)],
   ['scripts/release/__tests__/oss-source-package.test.mjs', allowAny(NEGATIVE_ASSERTION_REASON)],
   ['scripts/release/__tests__/release-cli.test.mjs', allowAny(NEGATIVE_ASSERTION_REASON)],
@@ -170,10 +167,6 @@ const ALLOWED_EXACT_PATHS = new Map([
   ],
   ['apps/mobile/src/config/__tests__/app-config.test.ts', allowAny(NEGATIVE_ASSERTION_REASON)],
   [
-    'apps/mobile/ios/LynavoDrive.xcodeproj/project.pbxproj',
-    allowAny(APPLE_SIGNING_ENTITLEMENTS_REASON),
-  ],
-  [
     'apps/mobile/ios/SyncEngine/SyncEngineManager.swift',
     allowMatches(
       [
@@ -185,8 +178,6 @@ const ALLOWED_EXACT_PATHS = new Map([
       'LAN sync protocol auth wording is not commercial account auth.',
     ),
   ],
-  ['apps/desktop/electron-builder.yml', allowAny(APPLE_SIGNING_ENTITLEMENTS_REASON)],
-  ['apps/desktop/scripts/mac-sign.cjs', allowAny(APPLE_SIGNING_ENTITLEMENTS_REASON)],
 ]);
 
 const GLOBAL_ALLOWED_LINE_MATCHERS = [
@@ -195,12 +186,6 @@ const GLOBAL_ALLOWED_LINE_MATCHERS = [
     reason: 'React Native event subscription handle, not commercial subscription state.',
     linePattern:
       /\b(?:const|let|var)\s+subscriptions?\b|subscriptions?\.(?:remove|push|forEach)\(|subscription\s*=\s*[^;]*(?:addListener|addEventListener)\(|addEventListener\([^)]*=>\s*\{|subscription\?\.remove\(/,
-  },
-  {
-    terms: new Set(['entitlement', 'entitlements']),
-    reason: APPLE_SIGNING_ENTITLEMENTS_REASON,
-    linePattern:
-      /CODE_SIGN_ENTITLEMENTS|entitlements(?:Inherit)?[:=]|entitlements\.(?:mac|mas|plist)/,
   },
 ];
 

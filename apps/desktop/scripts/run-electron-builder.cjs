@@ -4,10 +4,6 @@ const path = require('node:path');
 const projectRoot = path.resolve(__dirname, '..');
 const binName = process.platform === 'win32' ? 'electron-builder.cmd' : 'electron-builder';
 const binPath = path.join(projectRoot, 'node_modules', '.bin', binName);
-const env = {
-  ...process.env,
-  CSC_IDENTITY_AUTO_DISCOVERY: 'false',
-};
 const spawnCommand = process.platform === 'win32' ? 'cmd.exe' : binPath;
 const spawnArgs =
   process.platform === 'win32'
@@ -16,7 +12,7 @@ const spawnArgs =
 
 const child = spawn(spawnCommand, spawnArgs, {
   cwd: projectRoot,
-  env,
+  env: process.env,
   stdio: 'inherit',
 });
 

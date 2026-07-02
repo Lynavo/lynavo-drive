@@ -3,17 +3,12 @@ productName: Lynavo Drive
 buildVersion: '62'
 mac:
   artifactName: LynavoDrive-${version}-${arch}.${ext}
+  identity: null
   target:
     - dmg
     - zip
-    - mas
   category: public.app-category.utilities
   icon: resources/icon.icns
-  sign: ./scripts/mac-sign.cjs
-  hardenedRuntime: true
-  gatekeeperAssess: false
-  entitlements: resources/entitlements.mac.plist
-  entitlementsInherit: resources/entitlements.mac.inherit.plist
   extendInfo:
     NSDesktopFolderUsageDescription: Lynavo Drive 需要存取桌面資料夾，用於同步、儲存與開啟素材。
     NSDocumentsFolderUsageDescription: Lynavo Drive 需要存取文件資料夾，用於同步、儲存與開啟素材。
@@ -37,15 +32,6 @@ dmg:
       y: 210
       type: link
       path: /Applications
-mas:
-  extendInfo:
-    ITSAppUsesNonExemptEncryption: false
-    NSDesktopFolderUsageDescription: Lynavo Drive 需要存取桌面資料夾，用於同步、儲存與開啟素材。
-    NSDocumentsFolderUsageDescription: Lynavo Drive 需要存取文件資料夾，用於同步、儲存與開啟素材。
-    NSDownloadsFolderUsageDescription: Lynavo Drive 需要存取下載資料夾，用於同步、儲存與開啟素材。
-  entitlements: resources/entitlements.mas.plist
-  entitlementsInherit: resources/entitlements.mas.inherit.plist
-  notarize: null
 win:
   artifactName: LynavoDrive-${version}-${arch}.${ext}
   target:

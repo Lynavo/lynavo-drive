@@ -84,8 +84,8 @@ function buildTargetStep(profile, target) {
   if (target === 'ios') {
     return {
       target,
-      command: 'bash',
-      args: ['apps/mobile/ios/scripts/testflight-release.sh', 'archive-upload'],
+      command: 'pnpm',
+      args: ['--filter', '@lynavo-drive/mobile', 'build:ios:release'],
     };
   }
   if (target === 'android') {
@@ -102,7 +102,7 @@ function buildTargetStep(profile, target) {
     return {
       target,
       command: 'pnpm',
-      args: ['package:desktop:signed'],
+      args: ['package:desktop'],
     };
   }
   if (target === 'linux') {

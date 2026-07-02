@@ -274,5 +274,5 @@ desktop 诊断包足够回答这些问题：
 1. 本机没有残留源码 sidecar
 2. 只测试本轮目标平台的最新安装包（macOS DMG / Windows NSIS）
 3. 端口监听、Bonjour、HTTP API 都正常
-4. macOS：`spctl` 和 notarization 都已通过
+4. macOS：DMG 可挂载，内嵌 `lynavo-drive-sidecar` 可执行
 5. Windows：安装器已写入防火墙规则，Bonjour 运行时路径或 fallback 模式都已验证

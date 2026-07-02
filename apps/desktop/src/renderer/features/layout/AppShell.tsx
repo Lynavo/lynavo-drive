@@ -70,7 +70,7 @@ const setupLocaleLabels: Record<SupportedLocale, string> = {
 const mobileDownloadLinks = [
   {
     platform: 'iOS',
-    label: 'App Store',
+    label: 'iOS',
     url: new URL('/download/ios', LYNAVO_WEB_BASE_URL).toString(),
   },
   {
@@ -497,7 +497,7 @@ export function AppShell() {
                     }
                     className="inline-flex min-h-7 w-full items-center justify-center rounded-md bg-white/70 px-2 text-[11px] font-semibold text-[#59616d] transition hover:bg-white/90 hover:text-[#17191c]"
                   >
-                    App Store
+                    {mobileDownloadLinks[0].label}
                   </button>
                 </div>
                 <div className="flex flex-col items-center gap-2 rounded-md border border-white/80 bg-white/60 p-2.5">

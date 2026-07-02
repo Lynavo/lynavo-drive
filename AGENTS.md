@@ -32,8 +32,8 @@ Lynavo Drive：移动端（iOS / Android）→ Desktop（macOS / Windows / Linux
 - sidecar 运维：[docs/operations/sidecar-runbook.md](./docs/operations/sidecar-runbook.md)
 - 环境和密钥：[docs/operations/environment-and-secrets.md](./docs/operations/environment-and-secrets.md)
 - 产品边界：[docs/product/constraints.md](./docs/product/constraints.md)
-- iOS TF：[docs/release/ios-testflight.md](./docs/release/ios-testflight.md)
-- macOS 签名：[docs/release/macos-desktop-signing.md](./docs/release/macos-desktop-signing.md)
+- iOS 构建验证：[docs/release/ios-build.md](./docs/release/ios-build.md)
+- macOS 桌面构建验证：[docs/release/macos-desktop-build.md](./docs/release/macos-desktop-build.md)
 
 ## 多 Agent 派发优先规则
 
@@ -45,7 +45,7 @@ Lynavo Drive：移动端（iOS / Android）→ Desktop（macOS / Windows / Linux
 
 ## 关键架构约束
 
-- **Desktop 当前覆盖 macOS / Windows**；平台差异（如共享检测、签名/打包）按当前代码和对应文档处理
+- **Desktop 当前覆盖 macOS / Windows**；平台差异（如共享检测、打包）按当前代码和对应文档处理；开源仓库不提供官方签名 / 上传路径
 - **队列绝对只读**：不允许用户在 UI 删除、调序、跳过队列项
 - **全自动增量同步**：不允许手动勾选文件
 - **无手动文件选择替代路径**：不得新增手动挑选文件来绕过 mobile 本地扫描和 pending 队列
@@ -145,11 +145,11 @@ pnpm format:check      # 格式检查
 ## 当前状态
 
 - **Monorepo / Desktop / Sidecar / Mobile SyncEngine**：都已落地，不再是 greenfield 阶段
-- **当前重点**：异常恢复、后台上传、连接状态提示、beta 收口和发布验证
-- **回归基线**：以 `go test ./...`、`pnpm --filter @lynavo-drive/mobile exec tsc --noEmit`、iOS 构建、Android Debug 构建和 `docs/testing/beta-test-matrix.md` 为准
+- **当前重点**：异常恢复、连接状态提示、OSS 边界收口和本地构建 / 打包验证
+- **回归基线**：以 `go test ./...`、`pnpm --filter @lynavo-drive/mobile exec tsc --noEmit`、iOS 构建、Android Debug/Release 构建和 `docs/testing/beta-test-matrix.md` 为准
 - **交接基线**：新同事优先依赖 `docs/architecture/*`、`docs/operations/*`、`docs/release/release-playbook.md`
 
-## 排障与发布入口
+## 排障与构建验证入口
 
 排障优先看：
 
@@ -157,32 +157,23 @@ pnpm format:check      # 格式检查
 2. [docs/operations/mobile-diagnostics.md](./docs/operations/mobile-diagnostics.md)
 3. [docs/operations/sidecar-runbook.md](./docs/operations/sidecar-runbook.md)
 
-发布优先看：
+构建 / 打包验证优先看：
 
 1. [docs/release/release-playbook.md](./docs/release/release-playbook.md)
-2. [docs/release/ios-testflight.md](./docs/release/ios-testflight.md)
-3. [docs/release/macos-desktop-signing.md](./docs/release/macos-desktop-signing.md)
+2. [docs/release/ios-build.md](./docs/release/ios-build.md)
+3. [docs/release/macos-desktop-build.md](./docs/release/macos-desktop-build.md)
 
 Windows 桌面包当前跟随 `docs/release/release-playbook.md` 中的 Windows 小节，以及根目录脚本 `pnpm package:desktop:win`。
 
-## Release profile 打包规则
+## Release profile 构建规则
 
-AI 或人工执行 iOS TestFlight、Android APK/AAB、macOS DMG、Windows EXE/ZIP 正式打包时，必须优先使用根目录单一入口：
+AI 或人工执行 OSS 构建验证时，优先使用根目录单一入口查看或执行本机构建路径：
 
 ```bash
 pnpm release --profile <review|prod> --targets ios,android,mac,win,linux
 ```
 
-禁止用手动拼接历史 market 或 API base URL 环境变量来替代 release profile。未来 agent 不应使用旧的 CN / Global profile 名称；`prod` 不允许使用 review API，`review` 必须使用 review API。如果只是确认将执行什么，使用 `--dry-run`。
-
-## TestFlight 打包上传后的跨仓库 tag 规则
-
-如果本仓库被要求打包并上传 Lynavo Drive iOS TestFlight，完成上传后必须给以下两个仓库都打上对应的 beta 测试 tag：
-
-1. `/Volumes/T7/Dev/Web/SyncFlow`
-2. `/Volumes/T7/Dev/Web/vivi-drop-server`
-
-tag 名称必须与 Lynavo Drive TestFlight build 对齐，格式沿用 `beta/v<MARKETING_VERSION>-b<CURRENT_PROJECT_VERSION>`，例如 `beta/v1.0.0-b37`。两个仓库必须使用同一个 tag 名称；若要推送远端 tag，也必须两边都推送。不要只给其中一个仓库打 tag。
+禁止用手动拼接历史 market 或 API base URL 环境变量来替代 release profile。OSS 仓库只维护本机构建和打包验证路径。如果只是确认将执行什么，使用 `--dry-run`。
 
 ## Sidecar HTTP API 端口
 

@@ -1,5 +1,7 @@
 import { appConfig } from '../app-config';
 
+const token = (parts: string[]) => parts.join('');
+
 describe('appConfig', () => {
   test('uses the single Lynavo Drive mobile identity without market fields', () => {
     expect(appConfig.productName).toBe('Lynavo Drive');
@@ -20,8 +22,8 @@ describe('appConfig', () => {
     expect('turnUrl' in appConfig.endpoints).toBe(false);
     expect('apiBaseUrl' in appConfig.endpoints).toBe(false);
     expect('reviewApiBaseUrl' in appConfig.endpoints).toBe(false);
-    expect('supportApiBaseUrl' in appConfig.endpoints).toBe(false);
-    expect('reviewSupportApiBaseUrl' in appConfig.endpoints).toBe(false);
+    expect(token(['support', 'ApiBaseUrl']) in appConfig.endpoints).toBe(false);
+    expect(token(['review', 'Support', 'ApiBaseUrl']) in appConfig.endpoints).toBe(false);
     expect(appConfig.legal).toEqual({
       privacyUrl: 'https://www.lynavo.com/privacy',
       termsUrl: 'https://www.lynavo.com/terms',

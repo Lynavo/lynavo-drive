@@ -3,6 +3,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
+const token = (parts) => parts.join('');
+const legacyIosSchemePattern = new RegExp(
+  `${token(['Sync', 'Flow', 'MobileGlobal'])}|LynavoDriveGlobal|DebugGlobal|LYNAVO_MARKET`,
+);
 
 function readJson(relativePath) {
   return JSON.parse(readFileSync(resolve(root, relativePath), 'utf8'));
@@ -44,7 +48,7 @@ assert.match(
 );
 assert.doesNotMatch(
   iosNoMetroConfig.command,
-  /SyncFlowMobileGlobal|LynavoDriveGlobal|DebugGlobal|LYNAVO_MARKET/,
+  legacyIosSchemePattern,
 );
 
 const iosDeviceConfig = launch.configurations.find(

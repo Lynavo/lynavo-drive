@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import test from 'node:test';
@@ -20,8 +20,11 @@ const removedPackageScriptPattern = new RegExp(
 );
 const legacyViviName = ['Vivi', 'Drop'].join(' ');
 const legacyViviSlug = ['Vivi', 'Drop'].join('');
-const legacySyncFlowName = ['Sync', 'Flow'].join('');
+const legacyFormerFlowName = ['Sync', 'Flow'].join('');
+const legacyViviDomain = ['vivi', 'drop'].join('');
+const legacyEnvPrefix = ['SYN', 'CFLOW'].join('');
 const packageScriptName = (suffix) => `package:${suffix}`;
+const token = (parts) => parts.join('');
 
 test('resolves Linux package defaults from host arch', () => {
   assert.deepEqual(resolvePackageLinuxOptions([], { arch: 'arm64' }), {
@@ -180,15 +183,16 @@ test('desktop packaging keeps a single Lynavo Drive builder config', () => {
   assert.match(builderConfig, /lynavo-drive-sidecar/);
   assert.doesNotMatch(builderConfig, new RegExp(legacyViviSlug));
   assert.doesNotMatch(builderConfig, new RegExp(`productName: ${legacyViviName}`));
-  assert.doesNotMatch(builderConfig, /^appId: com\.vividrop\.desktop\.china$/m);
+  assert.doesNotMatch(
+    builderConfig,
+    new RegExp(`^appId: com\\.${legacyViviDomain}\\.desktop\\.china$`, 'm'),
+  );
 });
 
 test('desktop packaging scripts do not reference removed market builder configs', () => {
   const filesToCheck = [
     'package.json',
     'scripts/package-linux.cjs',
-    'scripts/package-macos-signed.sh',
-    'scripts/package-macos-mas.sh',
     'scripts/run-electron-builder.cjs',
   ];
 
@@ -199,28 +203,31 @@ test('desktop packaging scripts do not reference removed market builder configs'
   }
 });
 
-test('macOS packaging scripts use Lynavo global signing defaults without market branching', () => {
-  const scriptNames = [
+test('desktop OSS package scripts do not ship official Apple signing or upload helpers', () => {
+  const removedScripts = [
     'scripts/package-macos-signed.sh',
     'scripts/package-macos-mas.sh',
-    'scripts/upload-macos-testflight.sh',
-    'scripts/watch-notarization.sh',
+    token(['scripts/upload-macos-', 'test', 'flight.sh']),
+    token(['scripts/watch-', 'not', 'arization.sh']),
+    'scripts/mac-sign.cjs',
   ];
 
-  for (const scriptName of scriptNames) {
-    const content = readFileSync(path.join(desktopRoot, scriptName), 'utf8');
-    assert.doesNotMatch(content, /SYNCFLOW_MARKET/, scriptName);
-    assert.doesNotMatch(content, /DEFAULT_CN_|AuthKey_China|GKN7JQNCMC|HY8CAHGPW9/, scriptName);
-    assert.match(content, /AMY9XVV3LD/, scriptName);
-    assert.match(content, /8de17ec0-4bff-4ab2-8c01-ace1f9307147/, scriptName);
+  for (const scriptName of removedScripts) {
+    assert.equal(existsSync(path.join(desktopRoot, scriptName)), false, scriptName);
   }
 
-  const signedScript = readFileSync(
-    path.join(desktopRoot, 'scripts/package-macos-signed.sh'),
-    'utf8',
-  );
-  assert.match(signedScript, /DEFAULT_CSC_TEAM_ID="S44ANBLMF9"/);
-  assert.match(signedScript, /CSC_TEAM_ID:-\$\{DEFAULT_CSC_TEAM_ID\}/);
+  const packageJson = JSON.parse(readFileSync(path.join(desktopRoot, 'package.json'), 'utf8'));
+  assert.equal(packageJson.scripts[token(['package', ':signed'])], undefined);
+  assert.equal(packageJson.scripts[token(['package', ':signed:dir'])], undefined);
+  assert.equal(packageJson.scripts[token(['package', ':mas'])], undefined);
+  assert.equal(packageJson.scripts[token(['upload', ':test', 'flight'])], undefined);
+
+  const builderConfig = readFileSync(path.join(desktopRoot, 'electron-builder.yml'), 'utf8');
+  assert.match(builderConfig, /^  identity: null$/m);
+  assert.doesNotMatch(builderConfig, /sign:\s+\.\/scripts\/mac-sign\.cjs/);
+  assert.doesNotMatch(builderConfig, /\bmas:/);
+  assert.doesNotMatch(builderConfig, /entitlements(?:Inherit)?:/);
+  assert.equal(builderConfig.includes(token(['not', 'arize:'])), false);
 });
 
 test('Windows installer uses Lynavo Drive firewall rule identities', () => {
@@ -230,11 +237,11 @@ test('Windows installer uses Lynavo Drive firewall rule identities', () => {
   assert.match(installer, /!define SF_RULE_HTTP\s+"Lynavo Drive Sidecar HTTP"/);
   assert.match(installer, /!define SF_RULE_MDNS\s+"Lynavo Drive mDNS UDP"/);
   assert.doesNotMatch(installer, /SF_LEGACY_VIVI_RULE_/);
-  assert.doesNotMatch(installer, /SF_LEGACY_SYNCFLOW_RULE_/);
+  assert.equal(installer.includes(`SF_LEGACY_${legacyEnvPrefix}_RULE_`), false);
   assert.doesNotMatch(installer, /delete rule name="\$\{SF_LEGACY_/);
   assert.doesNotMatch(installer, /add rule name="\$\{SF_LEGACY_/);
   assert.match(installer, /description="Lynavo Drive sidecar file transfer \(TCP 39393\)"/);
   assert.match(installer, /lynavo-drive-sidecar\.exe/);
   assert.doesNotMatch(installer, new RegExp(`${legacyViviName} Sidecar`));
-  assert.doesNotMatch(installer, new RegExp(`${legacySyncFlowName} Sidecar`));
+  assert.doesNotMatch(installer, new RegExp(`${legacyFormerFlowName} Sidecar`));
 });

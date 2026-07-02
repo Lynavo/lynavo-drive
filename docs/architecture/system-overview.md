@@ -164,7 +164,7 @@ packages/contracts 共享 DTO、常量、連接埠、事件名
 packages/design-tokens 共享設計 token
 services/sidecar-go Go sidecar
 scripts/ios       真機上傳回歸指令碼
-scripts/release   beta tag 等發佈指令碼
+scripts/release   OSS build profile / release gate 指令碼
 ```
 
 ## 6. 接手建議

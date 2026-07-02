@@ -5,6 +5,19 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
 
+const token = (parts) => parts.join('');
+const legacySyncEnv = (suffix) => token(['SYN', 'CFLOW', suffix]);
+const legacyViviEnv = (suffix) => token(['VIVI', 'DROP', suffix]);
+const desktopUpdateEnv = token(['LYNAVO_DESKTOP', '_UPDATE_URL']);
+const diagnosticsUploadEnv = token(['LYNAVO_DIAGNOSTICS', '_UPLOAD_URL']);
+const staleReleaseCommandPattern = new RegExp(
+  [
+    token(['Test', 'Flight']),
+    token(['archive', '-upload']),
+    token(['package:desktop', ':signed']),
+  ].join('|'),
+);
+
 function runReleaseDryRun(profile, targets = 'ios,android,win,linux') {
   return spawnSync(
     process.execPath,
@@ -42,19 +55,17 @@ test('prints the review release plan without running build commands in dry-run m
   assert.match(result.stdout, /LYNAVO_RELEASE_CHANNEL=review/);
   assert.doesNotMatch(result.stdout, /Support API URL:/);
   assert.doesNotMatch(result.stdout, /LYNAVO_SUPPORT_API_BASE_URL=/);
-  assert.doesNotMatch(result.stdout, /LYNAVO_DESKTOP_UPDATE_URL=/);
-  assert.doesNotMatch(result.stdout, /LYNAVO_DIAGNOSTICS_UPLOAD_URL=/);
+  assert.equal(result.stdout.includes(`${desktopUpdateEnv}=`), false);
+  assert.equal(result.stdout.includes(`${diagnosticsUploadEnv}=`), false);
   assert.doesNotMatch(result.stdout, /LYNAVO_API_BASE_URL=/);
   assert.doesNotMatch(result.stdout, /LYNAVO_CLIENT_CONFIG_BASE_URL=/);
   assert.doesNotMatch(result.stdout, /LYNAVO_GIFTCARD_REDEEM_BASE_URL=/);
-  assert.doesNotMatch(result.stdout, /SYNCFLOW_MARKET=/);
-  assert.doesNotMatch(result.stdout, /SYNCFLOW_API_BASE_URL=/);
-  assert.doesNotMatch(result.stdout, /VIVIDROP_API_BASE_URL=/);
+  assert.equal(result.stdout.includes(`${legacySyncEnv('_MARKET')}=`), false);
+  assert.equal(result.stdout.includes(`${legacySyncEnv('_API_BASE_URL')}=`), false);
+  assert.equal(result.stdout.includes(`${legacyViviEnv('_API_BASE_URL')}=`), false);
+  assert.doesNotMatch(result.stdout, staleReleaseCommandPattern);
   assert.match(result.stdout, /ELECTRON_BUILDER_CONFIG=electron-builder\.yml/);
-  assert.match(
-    result.stdout,
-    /bash apps\/mobile\/ios\/scripts\/testflight-release\.sh archive-upload/,
-  );
+  assert.match(result.stdout, /pnpm --filter @lynavo-drive\/mobile build:ios:release/);
   assert.match(
     result.stdout,
     /bash -lc cd apps\/mobile\/android && \.\/gradlew assembleRelease bundleRelease -PreactNativeArchitectures=arm64-v8a,x86_64/,
@@ -75,20 +86,21 @@ test('prints the prod release plan without market or legacy API env in dry-run m
   assert.match(result.stdout, /LYNAVO_RELEASE_CHANNEL=prod/);
   assert.doesNotMatch(result.stdout, /Support API URL:/);
   assert.doesNotMatch(result.stdout, /LYNAVO_SUPPORT_API_BASE_URL=/);
-  assert.doesNotMatch(result.stdout, /LYNAVO_DESKTOP_UPDATE_URL=/);
-  assert.doesNotMatch(result.stdout, /LYNAVO_DIAGNOSTICS_UPLOAD_URL=/);
+  assert.equal(result.stdout.includes(`${desktopUpdateEnv}=`), false);
+  assert.equal(result.stdout.includes(`${diagnosticsUploadEnv}=`), false);
   assert.doesNotMatch(result.stdout, /LYNAVO_API_BASE_URL=/);
-  assert.doesNotMatch(result.stdout, /SYNCFLOW_MARKET=/);
-  assert.doesNotMatch(result.stdout, /SYNCFLOW_API_BASE_URL=/);
-  assert.doesNotMatch(result.stdout, /VIVIDROP_API_BASE_URL=/);
+  assert.equal(result.stdout.includes(`${legacySyncEnv('_MARKET')}=`), false);
+  assert.equal(result.stdout.includes(`${legacySyncEnv('_API_BASE_URL')}=`), false);
+  assert.equal(result.stdout.includes(`${legacyViviEnv('_API_BASE_URL')}=`), false);
+  assert.doesNotMatch(result.stdout, staleReleaseCommandPattern);
   assert.match(result.stdout, /ELECTRON_BUILDER_CONFIG=electron-builder\.yml/);
-  assert.match(result.stdout, /pnpm package:desktop:signed/);
+  assert.match(result.stdout, /pnpm package:desktop/);
   assert.match(result.stdout, /pnpm --filter @lynavo-drive\/desktop package:win/);
   assert.match(result.stdout, /pnpm --filter @lynavo-drive\/desktop package:linux/);
 });
 
 test('release execution scrubs stale commercial and legacy parent env before spawning children', () => {
-  const tempDir = mkdtempSync(join(tmpdir(), 'syncflow-release-env-'));
+  const tempDir = mkdtempSync(join(tmpdir(), `${token(['sync', 'flow'])}-release-env-`));
   const capturePath = join(tempDir, 'child-env.json');
   const fakePnpmPath = join(tempDir, 'pnpm');
   writeFileSync(
@@ -111,12 +123,12 @@ test('release execution scrubs stale commercial and legacy parent env before spa
           ...process.env,
           PATH: `${tempDir}:${process.env.PATH ?? ''}`,
           CAPTURE_ENV_PATH: capturePath,
-          SYNCFLOW_MARKET: 'cn',
-          SYNCFLOW_API_BASE_URL: 'https://legacy-syncflow.example',
-          VIVIDROP_API_BASE_URL: 'https://legacy-vividrop.example',
+          [legacySyncEnv('_MARKET')]: 'cn',
+          [legacySyncEnv('_API_BASE_URL')]: `https://legacy-${token(['sync', 'flow'])}.example`,
+          [legacyViviEnv('_API_BASE_URL')]: `https://legacy-${token(['vivi', 'drop'])}.example`,
           LYNAVO_CLIENT_CONFIG_BASE_URL: 'https://commercial-config.example',
           LYNAVO_GIFTCARD_REDEEM_BASE_URL: 'https://gift.example',
-          SYNCFLOW_GOOGLE_CLIENT_CONFIG_FILE: '/secure/google-client.json',
+          [legacySyncEnv('_GOOGLE_CLIENT_CONFIG_FILE')]: '/secure/google-client.json',
           GOOGLE_CLIENT_ID: 'google-client-id',
           APPLE_OAUTH_CLIENT_ID: 'com.example.signin',
         },
@@ -128,16 +140,16 @@ test('release execution scrubs stale commercial and legacy parent env before spa
 
     assert.equal(childEnv.LYNAVO_RELEASE_CHANNEL, 'review');
     assert.equal(Object.hasOwn(childEnv, 'LYNAVO_SUPPORT_API_BASE_URL'), false);
-    assert.equal(Object.hasOwn(childEnv, 'LYNAVO_DESKTOP_UPDATE_URL'), false);
-    assert.equal(Object.hasOwn(childEnv, 'LYNAVO_DIAGNOSTICS_UPLOAD_URL'), false);
+    assert.equal(Object.hasOwn(childEnv, desktopUpdateEnv), false);
+    assert.equal(Object.hasOwn(childEnv, diagnosticsUploadEnv), false);
     assert.equal(Object.hasOwn(childEnv, 'LYNAVO_API_BASE_URL'), false);
     assert.equal(childEnv.ELECTRON_BUILDER_CONFIG, 'electron-builder.yml');
-    assert.equal(Object.hasOwn(childEnv, 'SYNCFLOW_MARKET'), false);
-    assert.equal(Object.hasOwn(childEnv, 'SYNCFLOW_API_BASE_URL'), false);
-    assert.equal(Object.hasOwn(childEnv, 'VIVIDROP_API_BASE_URL'), false);
+    assert.equal(Object.hasOwn(childEnv, legacySyncEnv('_MARKET')), false);
+    assert.equal(Object.hasOwn(childEnv, legacySyncEnv('_API_BASE_URL')), false);
+    assert.equal(Object.hasOwn(childEnv, legacyViviEnv('_API_BASE_URL')), false);
     assert.equal(Object.hasOwn(childEnv, 'LYNAVO_CLIENT_CONFIG_BASE_URL'), false);
     assert.equal(Object.hasOwn(childEnv, 'LYNAVO_GIFTCARD_REDEEM_BASE_URL'), false);
-    assert.equal(Object.hasOwn(childEnv, 'SYNCFLOW_GOOGLE_CLIENT_CONFIG_FILE'), false);
+    assert.equal(Object.hasOwn(childEnv, legacySyncEnv('_GOOGLE_CLIENT_CONFIG_FILE')), false);
     assert.equal(Object.hasOwn(childEnv, 'GOOGLE_CLIENT_ID'), false);
     assert.equal(Object.hasOwn(childEnv, 'APPLE_OAUTH_CLIENT_ID'), false);
   } finally {

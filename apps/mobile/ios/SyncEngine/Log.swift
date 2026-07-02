@@ -22,11 +22,10 @@ enum Log {
 
 /// Drop-in replacement for `NSLog` that prepends a timestamp to every line.
 ///
-/// Xcode 16's Debug console hides NSLog's default timestamp column, and the
-/// TestFlight `log stream` view also trims it, so we bake the timestamp into
-/// the message body. Underlying sink is still `NSLog` so lines continue to
-/// flow through Apple Unified Logging (visible in Console.app and
-/// `sysdiagnose`).
+/// Xcode 16's Debug console hides NSLog's default timestamp column, and some
+/// device log viewers also trim it, so we bake the timestamp into the message
+/// body. Underlying sink is still `NSLog` so lines continue to flow through
+/// Apple Unified Logging (visible in Console.app and `sysdiagnose`).
 ///
 /// Usage is identical to NSLog:
 /// ```

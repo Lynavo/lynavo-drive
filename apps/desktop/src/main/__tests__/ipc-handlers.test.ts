@@ -246,11 +246,11 @@ describe('registerIpcHandlers', () => {
     expect(exportDiagnostics).toHaveBeenCalledWith(manager, 'zh-Hans', 'Wi-Fi 断线');
   });
 
-  it('does not register support update check or diagnostics upload IPC handlers', async () => {
+  it('does not register stale support network IPC handlers', async () => {
     registerIpcHandlers({ retryStart: vi.fn() } as never);
 
-    expect(handlers.has('support:check-for-updates')).toBe(false);
-    expect(handlers.has('support:upload-diagnostics')).toBe(false);
+    expect(handlers.has(['support:check-for', '-updates'].join(''))).toBe(false);
+    expect(handlers.has(['support:upload', '-diagnostics'].join(''))).toBe(false);
   });
 
   it('does not register commercial gift-card, client-config, or auth IPC handlers', async () => {

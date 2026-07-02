@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
 const repoRoot = new URL('../../..', import.meta.url);
+const token = (parts) => parts.join('');
 
 function runVerifier(args) {
   return spawnSync(process.execPath, ['scripts/verify-oss-boundary.mjs', ...args], {
@@ -87,6 +88,7 @@ test('scans release scripts while excluding generated release artifacts', () => 
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'oss-boundary-'));
   try {
     const staleMarketKey = ['SYNC', 'FLOW_MARKET'].join('');
+    const staleUpdateUrlKey = token(['LYNAVO_DESKTOP', '_UPDATE_URL']);
     const releaseScriptDir = join(fixtureRoot, 'scripts', 'release');
     const generatedReleaseDir = join(fixtureRoot, 'apps', 'desktop', 'release', 'win-unpacked');
     mkdirSync(releaseScriptDir, { recursive: true });
@@ -95,7 +97,7 @@ test('scans release scripts while excluding generated release artifacts', () => 
       join(releaseScriptDir, 'bad.mjs'),
       [
         `const staleMarket = "${staleMarketKey}";`,
-        'const staleUpdateUrl = "LYNAVO_DESKTOP_UPDATE_URL";',
+        `const staleUpdateUrl = "${staleUpdateUrlKey}";`,
       ].join('\n'),
     );
     writeFileSync(join(generatedReleaseDir, 'bundle.js'), 'const oldScreen = "RemoteAccess";\n');
@@ -105,8 +107,35 @@ test('scans release scripts while excluding generated release artifacts', () => 
     assert.equal(result.status, 1, result.stderr);
     assert.match(result.stdout, /Unallowlisted OSS boundary hits: 2/);
     assert.match(result.stdout, new RegExp(`scripts/release/bad\\.mjs:1 ${staleMarketKey}`));
-    assert.match(result.stdout, /scripts\/release\/bad\.mjs:2 LYNAVO_DESKTOP_UPDATE_URL/);
+    assert.match(result.stdout, new RegExp(`scripts/release/bad\\.mjs:2 ${staleUpdateUrlKey}`));
     assert.doesNotMatch(result.stdout, /apps\/desktop\/release/);
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test('blocks Apple signing metadata in active desktop and iOS build files', () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'oss-boundary-'));
+  try {
+    const desktopDir = join(fixtureRoot, 'apps', 'desktop');
+    const iosProjectDir = join(fixtureRoot, 'apps', 'mobile', 'ios', 'LynavoDrive.xcodeproj');
+    mkdirSync(desktopDir, { recursive: true });
+    mkdirSync(iosProjectDir, { recursive: true });
+    writeFileSync(
+      join(desktopDir, 'electron-builder.yml'),
+      ['mac:', '  entitlements: resources/entitlements.mac.plist'].join('\n'),
+    );
+    writeFileSync(
+      join(iosProjectDir, 'project.pbxproj'),
+      'CODE_SIGN_ENTITLEMENTS = LynavoDrive/LynavoDrive.entitlements;\n',
+    );
+
+    const result = runVerifier(['--root', fixtureRoot]);
+
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stdout, /Unallowlisted OSS boundary hits: [1-9]\d*/);
+    assert.match(result.stdout, /apps\/desktop\/electron-builder\.yml:2 entitlement/);
+    assert.match(result.stdout, /apps\/mobile\/ios\/LynavoDrive\.xcodeproj\/project\.pbxproj:1 entitlement/);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }

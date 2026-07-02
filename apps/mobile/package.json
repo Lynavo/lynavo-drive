@@ -11,10 +11,8 @@
     "test": "jest",
     "import:i18n": "python3 ./scripts/import_i18n_workbook.py",
     "build": "cd ios && xcodebuild -workspace LynavoDrive.xcworkspace -scheme LynavoDrive -destination 'generic/platform=iOS' -configuration Debug CODE_SIGNING_ALLOWED=NO build",
+    "build:ios:release": "cd ios && xcodebuild -workspace LynavoDrive.xcworkspace -scheme LynavoDrive -destination 'generic/platform=iOS' -configuration Release CODE_SIGNING_ALLOWED=NO build",
     "build:android": "cd android && ./gradlew assembleDebug",
-    "archive:testflight": "bash ./ios/scripts/testflight-release.sh archive",
-    "upload:testflight": "bash ./ios/scripts/testflight-release.sh upload",
-    "release:testflight": "bash ./ios/scripts/testflight-release.sh archive-upload",
     "bundle": "react-native bundle --platform ios --dev true --entry-file index.js --bundle-output ios/main.jsbundle --assets-dest ios"
   },
   "dependencies": {

@@ -9,7 +9,7 @@
 1. 基础可用：配对、发现、上传、完成
 2. 异常恢复：断线、重连、断点续传
 3. 能力边界：guest/local 前景 LAN 同步 fail-open，remote/background 付费能力 fail-closed
-4. 发布可交付：Debug/Release 构建可过，关键自动化测试全绿
+4. 构建可交付：Debug/Release 构建可过，关键自动化测试全绿
 
 ## 2. 自动化测试
 

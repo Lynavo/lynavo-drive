@@ -214,7 +214,7 @@ describe('SettingsPage', () => {
     expect(screen.queryByText('Windows 文件共享')).not.toBeInTheDocument();
   });
 
-  it('does not render desktop update checks', async () => {
+  it('does not render desktop version polling controls', async () => {
     render(<SettingsPage />);
 
     expect(screen.queryByRole('button', { name: '检查更新' })).not.toBeInTheDocument();

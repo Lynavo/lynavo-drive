@@ -41,7 +41,7 @@ Electron 窗口會自動打開；桌面端會負責拉起 sidecar。
 # Desktop
 pnpm dev:desktop
 pnpm build:desktop
-pnpm package:desktop:signed   # macOS signed DMG
+pnpm package:desktop          # macOS unsigned DMG
 pnpm package:desktop:win      # Windows NSIS + zip（預設 desktop Windows 包，不帶 release profile）
 
 # Mobile
@@ -63,26 +63,27 @@ pnpm format:check
 pnpm check
 ```
 
-## 發佈與 Review 打包
+## OSS Build And Package Verification
 
-正式發佈、Review 包、TestFlight 上傳、Android APK/AAB、Desktop DMG / EXE / DEB 都應先選 release profile，避免手動拼接 API base URL：
+This OSS repository keeps local source-build and package verification paths.
 
 ```bash
-# 檢查 review 後端、base URL 與會執行的命令
-pnpm release --profile review --targets win --dry-run
+# 檢查會執行的本地構建 / 打包命令
+pnpm release --profile review --targets ios,android,mac,win,linux --dry-run
 
-# 打 review Windows EXE / zip
-pnpm release --profile review --targets win
+# 本地 iOS / Android / Desktop 構建驗證
+pnpm build:mobile
+pnpm build:mobile:ios:release
+pnpm build:mobile:android
+pnpm package:desktop
 
-# 打 prod Windows EXE / zip
-pnpm release --profile prod --targets win
-
-# 打完整 Review / Prod 版本（iOS TestFlight + Android + Desktop）
-pnpm release --profile review --targets ios,android,mac,win,linux
-pnpm release --profile prod --targets ios,android,mac,win,linux
+# Desktop 平台包 dry-run / 本地打包
+pnpm release --profile prod --targets win,mac --dry-run
+pnpm package:desktop
 ```
 
-`package:desktop:*` 類腳本只做本地封裝或單平台驗證；正式 / Review 發佈都應走 `release` 指令，讓 profile 統一注入 `LYNAVO_RELEASE_CHANNEL` 與 Lynavo API base URL。`review` 必須指向 review API，`prod` 不得使用 review API。
+`release` profiles only inject `LYNAVO_RELEASE_CHANNEL` and local build
+configuration, and only select local build/package commands.
 
 ## Open Source / Commercial Boundary
 
@@ -119,7 +120,7 @@ lynavo-drive/
 │   ├── open-source/          # Community/OSS build 規則
 │   ├── commercial/           # 官方商業能力邊界
 │   ├── product/              # 產品約束與非目標
-│   ├── release/              # TestFlight / 簽名 / 發版手冊
+│   ├── release/              # OSS 構建與打包驗證手冊
 │   └── testing/              # 測試矩陣和 beta 驗證說明
 └── tmp/
     └── ui-demo/              # 視覺參考，僅供比對，不直接複用程式碼
@@ -178,7 +179,7 @@ Desktop (Electron + Go sidecar, macOS / Windows)
 - Sidecar 運作手冊：[`docs/operations/sidecar-runbook.md`](./docs/operations/sidecar-runbook.md)
 - 環境與秘密金鑰說明：[`docs/operations/environment-and-secrets.md`](./docs/operations/environment-and-secrets.md)
 - 產品約束與非目標：[`docs/product/constraints.md`](./docs/product/constraints.md)
-- Beta 發佈手冊：[`docs/release/release-playbook.md`](./docs/release/release-playbook.md)
+- OSS 構建驗證手冊：[`docs/release/release-playbook.md`](./docs/release/release-playbook.md)
 - beta 測試矩陣：[`docs/testing/beta-test-matrix.md`](./docs/testing/beta-test-matrix.md)
 - Community build：[`docs/open-source/community-build.md`](./docs/open-source/community-build.md)
 - Commercial feature boundary：[`docs/commercial/feature-boundary.md`](./docs/commercial/feature-boundary.md)

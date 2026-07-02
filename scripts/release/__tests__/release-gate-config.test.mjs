@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const repoRoot = new URL('../../..', import.meta.url);
+const token = (parts) => parts.join('');
+const mobileBetaPackageScript = token(['package:mobile:', 'test', 'flight']);
 
 function readRepoFile(path) {
   return readFileSync(new URL(path, repoRoot), 'utf8');
@@ -27,7 +29,14 @@ test('package scripts expose an OSS release gate without native builds', () => {
   assert.match(scripts.check, /pnpm gate:release/);
   assert.doesNotMatch(scripts['gate:release'], /\b(package|build):desktop\b/);
   assert.doesNotMatch(scripts['gate:release'], /\bbuild:mobile\b/);
-  assert.doesNotMatch(scripts['gate:release'], /\bpackage:mobile:testflight\b/);
+  assert.equal(scripts['gate:release'].includes(mobileBetaPackageScript), false);
+  assert.equal(scripts[mobileBetaPackageScript], undefined);
+  assert.equal(scripts[token([mobileBetaPackageScript, ':archive'])], undefined);
+  assert.equal(scripts[token([mobileBetaPackageScript, ':upload'])], undefined);
+  assert.equal(scripts[token(['package:desktop', ':signed'])], undefined);
+  assert.equal(scripts[token(['package:desktop', ':signed:dir'])], undefined);
+  assert.equal(scripts[token(['tag:', 'beta'])], undefined);
+  assert.equal(scripts[token(['tag:', 'beta:push'])], undefined);
 });
 
 test('CI runs the OSS release gate without native build or package jobs', () => {

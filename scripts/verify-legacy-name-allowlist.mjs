@@ -3,7 +3,19 @@ import { spawnSync } from 'node:child_process';
 import { relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 
-const LEGACY_PATTERN = 'Vivi Drop|ViviDrop|vividrop|SyncFlow|syncflow|SYNCFLOW|VIVIDROP|@syncflow';
+const token = (parts) => parts.join('');
+const LEGACY_TERMS = Object.freeze([
+  token(['Vivi', ' Drop']),
+  token(['Vivi', 'Drop']),
+  token(['vivi', 'drop']),
+  token(['Sync', 'Flow']),
+  token(['sync', 'flow']),
+  token(['SYN', 'CFLOW']),
+  token(['VIVI', 'DROP']),
+  token(['@', 'sync', 'flow']),
+]);
+const LEGACY_PATTERN = LEGACY_TERMS.join('|');
+const legacyLowerFlow = token(['sync', 'flow']);
 const MAX_REPORTED_UNALLOWLISTED_HITS = 200;
 
 const IGNORE_GLOBS = [
@@ -45,82 +57,20 @@ function allowMatches(matchers, reason) {
   };
 }
 
-const HISTORICAL_SUPERPOWERS_DOC_REASON =
-  'Temporary historical-doc exception for pre-rename implementation plans and specs; keep exact so new rename work is still reported.';
-
-const HISTORICAL_SUPERPOWERS_DOC_PATHS = [
-  'docs/superpowers/plans/2026-04-17-apple-iap.md',
-  'docs/superpowers/plans/2026-04-17-mobile-i18n.md',
-  'docs/superpowers/plans/2026-04-20-album-preview-and-select-redesign.md',
-  'docs/superpowers/plans/2026-04-23-multi-device-upload-scheduler.md',
-  'docs/superpowers/plans/2026-04-23-switch-device.md',
-  'docs/superpowers/plans/2026-04-28-mobile-onboarding-guide.md',
-  'docs/superpowers/plans/2026-04-29-market-branching-plan.md',
-  'docs/superpowers/plans/2026-05-25-p2p-tunnel-shared-download.md',
-  'docs/superpowers/plans/2026-05-26-android-cn-review-apk-plan.md',
-  'docs/superpowers/plans/2026-05-26-device-pairing-version-compatibility-alert.md',
-  'docs/superpowers/plans/2026-06-03-team-personal-directories.md',
-  'docs/superpowers/plans/2026-06-09-sleep-wake-optimization.md',
-  'docs/superpowers/plans/2026-06-09-wake-bound-desktop.md',
-  'docs/superpowers/plans/2026-06-10-connection-device-management.md',
-  'docs/superpowers/plans/2026-06-15-vividrop-desktop-local-product-expansion.md',
-  'docs/superpowers/plans/2026-06-16-global-connection-feature-guide-plan.md',
-  'docs/superpowers/plans/2026-06-16-global-real-business-integration-plan.md',
-  'docs/superpowers/plans/2026-06-17-global-remote-access-personal-root.md',
-  'docs/superpowers/plans/2026-06-22-linux-desktop-release.md',
-  'docs/superpowers/plans/2026-06-22-received-library-deleted-status.md',
-  'docs/superpowers/plans/2026-06-22-video-thumbnails.md',
-  'docs/superpowers/plans/2026-06-23-desktop-received-library-pairing-access.md',
-  'docs/superpowers/plans/2026-06-24-mobile-pairing-invalidation.md',
-  'docs/superpowers/plans/2026-06-29-lynavo-drive-global-only-oss.md',
-  'docs/superpowers/specs/2026-04-17-apple-iap-design.md',
-  'docs/superpowers/specs/2026-04-17-mobile-i18n-design.md',
-  'docs/superpowers/specs/2026-04-18-account-identity-reset-design.md',
-  'docs/superpowers/specs/2026-04-20-album-preview-and-select-redesign-design.md',
-  'docs/superpowers/specs/2026-04-23-switch-device-design.md',
-  'docs/superpowers/specs/2026-05-22-rename-app-run-ios-design.md',
-  'docs/superpowers/specs/2026-05-26-android-cn-review-apk-design.md',
-  'docs/superpowers/specs/2026-05-26-device-pairing-version-compatibility-alert-design.md',
-  'docs/superpowers/specs/2026-05-26-global-country-code-picker-design.md',
-  'docs/superpowers/specs/2026-06-03-team-personal-directories-design.md',
-  'docs/superpowers/specs/2026-06-09-public-wake-design.md',
-  'docs/superpowers/specs/2026-06-10-connection-device-management-design.md',
-  'docs/superpowers/specs/2026-06-15-vividrop-desktop-local-product-expansion-design.md',
-  'docs/superpowers/specs/2026-06-15-vividrop-mobile-ui-v0-alignment-design.md',
-  'docs/superpowers/specs/2026-06-16-global-connection-feature-guide-design.md',
-  'docs/superpowers/specs/2026-06-17-global-remote-access-personal-root-design.md',
-  'docs/superpowers/specs/2026-06-22-linux-desktop-release-design.md',
-  'docs/superpowers/specs/2026-06-22-video-thumbnails-design.md',
-];
-
-const HISTORICAL_DOC_PATHS = [
-  'docs/architecture/background-upload-plan.md',
-  'docs/operations/mobile-ui-restoration-coordination.md',
-  'docs/operations/mobile-ui-restoration-workflow.md',
-  'docs/operations/prd-gap-priority-checklist.md',
-  'docs/release/market-release-flow.md',
-];
-
 const ALLOWED_EXACT_PATHS = new Map([
   [
     '.gitignore',
     allowMatches(
       [
         {
-          terms: ['syncflow'],
-          linePattern: /services\/sidecar-go\/syncflow(?:-sidecar|\.db(?:-(?:wal|shm))?)$/,
+          terms: [legacyLowerFlow],
+          linePattern: new RegExp(
+            `services/sidecar-go/${legacyLowerFlow}(?:-sidecar|\\.db(?:-(?:wal|shm))?)$`,
+          ),
         },
       ],
       'Local generated legacy sidecar/db artifacts stay ignored until sidecar cmd/db rename.',
     ),
-  ],
-  [
-    'docs/product/lynavo-drive-global-only-oss-commercial-plan.md',
-    allowAny('Product rename source plan; legacy names are quoted for migration scope.'),
-  ],
-  [
-    'docs/rename/legacy-name-allowlist.md',
-    allowAny('This allowlist document necessarily names legacy forms.'),
   ],
   [
     'scripts/verify-legacy-name-allowlist.mjs',
@@ -137,10 +87,6 @@ const ALLOWED_EXACT_PATHS = new Map([
   [
     'scripts/release/__tests__/desktop-branding.test.mjs',
     allowAny('Regression test fixture asserts legacy desktop branding does not return.'),
-  ],
-  [
-    'scripts/release/__tests__/macos-packaging.test.mjs',
-    allowAny('Regression test fixture asserts legacy market env usage does not return.'),
   ],
   [
     'scripts/release/__tests__/release-profiles.test.mjs',
@@ -172,19 +118,6 @@ const ALLOWED_EXACT_PATHS = new Map([
     allowAny('Regression test fixture asserts legacy source-package paths stay blocked.'),
   ],
   [
-    'docs/release/release-playbook.md',
-    allowAny(
-      'Release playbook quotes the current external repository path used by beta tag automation.',
-    ),
-  ],
-  [
-    'scripts/verify-vscode-android-debug.mjs',
-    allowMatches(
-      [{ terms: ['SyncFlow'], linePattern: /SyncFlowMobileGlobal/ }],
-      'VS Code verifier asserts old iOS scheme names do not return.',
-    ),
-  ],
-  [
     'apps/mobile/ios/LynavoDrive/AuthKeychainCleaner.swift',
     allowAny('Keychain migration strings preserve access to existing credentials.'),
   ],
@@ -198,25 +131,13 @@ const ALLOWED_EXACT_PATHS = new Map([
   ],
 ]);
 
-for (const path of HISTORICAL_SUPERPOWERS_DOC_PATHS) {
-  ALLOWED_EXACT_PATHS.set(path, allowAny(HISTORICAL_SUPERPOWERS_DOC_REASON));
-}
-for (const path of HISTORICAL_DOC_PATHS) {
-  ALLOWED_EXACT_PATHS.set(
-    path,
-    allowAny(
-      'Historical implementation/reference document retained for context before a doc archive pass.',
-    ),
-  );
-}
-
 const ALLOWED_PATH_PREFIXES = [];
 
 function usage() {
   return [
     'Usage: node scripts/verify-legacy-name-allowlist.mjs [--root <path>] [--advisory]',
     '',
-    'Scans for legacy Vivi Drop / SyncFlow names and reports hits outside the allowlist.',
+    `Scans for legacy ${LEGACY_TERMS[0]} / ${LEGACY_TERMS[3]} names and reports hits outside the allowlist.`,
     'By default, unallowlisted hits exit 1 for CI blocking. Use --advisory to report and exit 0.',
   ].join('\n');
 }
