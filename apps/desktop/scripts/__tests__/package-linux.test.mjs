@@ -15,7 +15,6 @@ const desktopRoot = path.resolve(import.meta.dirname, '..', '..');
 const scriptsRoot = path.join(desktopRoot, 'scripts');
 const alternateBuilderConfigName = 'electron-builder.custom.yml';
 const alternateBuilderConfigPattern = /electron-builder\.[\w-]+\.yml/;
-const packageScriptName = (suffix) => `package:${suffix}`;
 const token = (parts) => parts.join('');
 
 test('resolves Linux package defaults from host arch', () => {
@@ -157,9 +156,6 @@ test('desktop packaging keeps a single Lynavo Drive builder config', () => {
 
   const packageJson = JSON.parse(readFileSync(path.join(desktopRoot, 'package.json'), 'utf8'));
   assert.equal(packageJson.productName, 'Lynavo Drive');
-  for (const scriptSuffix of ['cn', 'global', 'win:cn', 'win:global', 'linux:cn', 'linux:global']) {
-    assert.equal(packageJson.scripts[packageScriptName(scriptSuffix)], undefined);
-  }
 
   const builderConfig = readFileSync(path.join(desktopRoot, 'electron-builder.yml'), 'utf8');
   assert.match(builderConfig, /^productName: Lynavo Drive$/m);

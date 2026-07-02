@@ -91,7 +91,7 @@ describe('resolveLocale', () => {
   });
 });
 
-describe('OSS commercial-removal locale guards', () => {
+describe('public locale surface guards', () => {
   const supportedLocales = ['en', 'zh-Hans', 'zh-Hant'] as const;
 
   it('does not ship unused remote-wake settings copy', () => {

@@ -1,5 +1,5 @@
 {
-  "copyright": "© Kaiyun Info. All Rights Reserved.",
+  "copyright": "© Lynavo Drive contributors.",
   "title": "Settings",
   "versionLabel": "v{{version}} ({{build}})",
   "sections": {
@@ -9,7 +9,7 @@
   },
   "android": {
     "title": "Android Capability Notes",
-    "body": "This build ships the Android shell, LAN auto-discovery, basic pairing, and diagnostics export. QR pairing, the real upload queue, foreground reconnection, and incremental sync have not yet been ported to the Android native engine."
+    "body": "This Android build supports local LAN discovery, pairing, the foreground sync queue, reconnection, incremental upload, and diagnostics export. Remote and background services are not included in this OSS build."
   },
   "connection": {
     "online": "Online",

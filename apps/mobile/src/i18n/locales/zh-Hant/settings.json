@@ -1,5 +1,5 @@
 {
-  "copyright": "© 開雲信息 版權所有",
+  "copyright": "© Lynavo Drive 貢獻者",
   "title": "設定",
   "versionLabel": "v{{version}} ({{build}})",
   "sections": {
@@ -9,7 +9,7 @@
   },
   "android": {
     "title": "Android 端能力說明",
-    "body": "目前版本已提供 Android 殼層、區域網路自動發現、基礎配對與診斷匯出入口；掃碼配對、真實上傳隊列、前台重連和增量同步仍未移植到 Android 原生引擎。"
+    "body": "Android 版本支援本地區域網路探索、配對、前台同步佇列、重新連線、增量上傳和診斷匯出。此 OSS 版本不包含遠端和背景服務。"
   },
   "connection": {
     "online": "在線",

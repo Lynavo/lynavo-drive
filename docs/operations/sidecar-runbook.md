@@ -38,13 +38,13 @@ Desktop main manages the sidecar lifecycle.
 
 Desktop packages include one sidecar binary:
 
-- macOS：`Lynavo Drive.app/Contents/Resources/lynavo-drive-sidecar`
-- Windows：`<InstallDir>\\resources\\lynavo-drive-sidecar.exe`
+- macOS: `Lynavo Drive.app/Contents/Resources/lynavo-drive-sidecar`
+- Windows: `<InstallDir>\\resources\\lynavo-drive-sidecar.exe`
 
 ## 2. Standard Ports
 
-- TCP：`39393`
-- HTTP：`39394`
+- TCP: `39393`
+- HTTP: `39394`
 
 If these two ports are not listening, most sync issues do not need higher-layer
 analysis yet.
@@ -60,14 +60,14 @@ The Windows installer should currently write these inbound firewall rules:
 
 ### 3.1 Port Listening
 
-macOS：
+macOS:
 
 ```bash
 lsof -nP -iTCP:39393 -sTCP:LISTEN
 lsof -nP -iTCP:39394 -sTCP:LISTEN
 ```
 
-Windows（PowerShell）：
+Windows (PowerShell):
 
 ```powershell
 Get-NetTCPConnection -State Listen -LocalPort 39393,39394 |
@@ -76,13 +76,13 @@ Get-NetTCPConnection -State Listen -LocalPort 39393,39394 |
 
 ### 3.2 Process Source
 
-macOS：
+macOS:
 
 ```bash
 pgrep -af 'lynavo-drive-sidecar|lynavo-drive-sidecar'
 ```
 
-Windows（PowerShell）：
+Windows (PowerShell):
 
 ```powershell
 Get-CimInstance Win32_Process |
@@ -98,7 +98,7 @@ How to interpret:
 
 ### 3.3 Bonjour Broadcast
 
-macOS：
+macOS:
 
 ```bash
 dns-sd -B _lynavodrive._tcp local.
@@ -106,7 +106,7 @@ dns-sd -B _lynavodrive._tcp local.
 
 You should see the `_lynavodrive._tcp` broadcast.
 
-Windows（PowerShell）：
+Windows (PowerShell):
 
 ```powershell
 Get-Service -Name "Bonjour Service"
@@ -133,13 +133,13 @@ Cause:
 
 Fix:
 
-macOS：
+macOS:
 
 ```bash
 pkill -f 'lynavo-drive-sidecar|lynavo-drive-sidecar'
 ```
 
-Windows（PowerShell）：
+Windows (PowerShell):
 
 ```powershell
 Get-Process lynavo-drive-sidecar,lynavo-drive-sidecar -ErrorAction SilentlyContinue | Stop-Process -Force
@@ -158,13 +158,13 @@ Cause:
 
 Check:
 
-macOS：
+macOS:
 
 ```bash
 pgrep -af 'dns-sd.*_lynavodrive._tcp'
 ```
 
-Windows（PowerShell）：
+Windows (PowerShell):
 
 ```powershell
 Get-CimInstance Win32_Process -Filter "Name='dns-sd.exe'" |
@@ -174,13 +174,13 @@ Get-CimInstance Win32_Process -Filter "Name='dns-sd.exe'" |
 
 Fix:
 
-macOS：
+macOS:
 
 ```bash
 pkill -f 'dns-sd.*_lynavodrive._tcp'
 ```
 
-Windows（PowerShell）：
+Windows (PowerShell):
 
 ```powershell
 Get-CimInstance Win32_Process -Filter "Name='dns-sd.exe'" |
@@ -231,7 +231,7 @@ Fix principles:
 
 After debugging, run:
 
-macOS：
+macOS:
 
 ```bash
 pkill -f 'lynavo-drive-sidecar|lynavo-drive-sidecar' || true
@@ -240,14 +240,14 @@ pkill -f 'dns-sd.*_lynavodrive._tcp' || true
 
 Then confirm:
 
-macOS：
+macOS:
 
 ```bash
 lsof -nP -iTCP:39393 -sTCP:LISTEN
 lsof -nP -iTCP:39394 -sTCP:LISTEN
 ```
 
-Windows（PowerShell）：
+Windows (PowerShell):
 
 ```powershell
 Get-Process lynavo-drive-sidecar,lynavo-drive-sidecar -ErrorAction SilentlyContinue | Stop-Process -Force

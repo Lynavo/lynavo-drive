@@ -147,7 +147,7 @@ lynavo-drive/
 │   ├── contracts/            # Shared DTOs / constants / events / error codes
 │   └── design-tokens/        # Shared design tokens
 ├── services/
-│   └── sidecar-go/           # Go sidecar（TCP/HTTP/SQLite/mDNS）
+│   └── sidecar-go/           # Go sidecar (TCP/HTTP/SQLite/mDNS)
 └── docs/
     ├── architecture/         # Architecture, state machine, data model
     ├── operations/           # Troubleshooting, diagnostics, sidecar runbook
