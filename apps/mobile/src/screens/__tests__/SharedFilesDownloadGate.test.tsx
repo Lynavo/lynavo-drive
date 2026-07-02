@@ -3440,7 +3440,7 @@ describe('PhoneSyncSpaceScreen', () => {
         { host: '192.168.1.100', port: 39394 },
         expect.objectContaining({ fileKey: 'received/alpha.jpg' }),
       );
-      expect(getByTestId('phone-sync-cn-preview-image')).toBeTruthy();
+      expect(getByTestId('phone-sync-preview-image')).toBeTruthy();
     });
     expect(mockViewDocument).not.toHaveBeenCalled();
   });

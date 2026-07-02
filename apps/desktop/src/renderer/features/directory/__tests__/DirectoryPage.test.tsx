@@ -111,7 +111,7 @@ describe('DirectoryPage', () => {
     expect(fetchSharedFiles).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the local shared tab visible without reading market env', () => {
+  it('keeps the local shared tab visible without reading external env', () => {
     render(<DirectoryPage />);
 
     expect(screen.getByRole('button', { name: /Team Shared/ })).toBeInTheDocument();
@@ -217,7 +217,7 @@ describe('DirectoryPathCard', () => {
     expect(screen.getByText('My Computer')).toBeInTheDocument();
   });
 
-  it('renders personal and team shared directories without reading market env', () => {
+  it('renders personal and team shared directories without reading external env', () => {
     render(<DirectoryPathCard />);
 
     expect(screen.getByText('My Computer')).toBeInTheDocument();

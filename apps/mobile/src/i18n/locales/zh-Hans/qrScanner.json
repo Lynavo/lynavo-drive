@@ -14,10 +14,5 @@
     "text": "需要相机权限来扫描二维码",
     "openSettings": "打开设置"
   },
-  "noCameraDevice": "未找到相机设备",
-  "android": {
-    "title": "Android 暂未提供扫码配对",
-    "body": "当前 Android 基线版本先开放基础桥接与手动配对入口。请返回上一页，使用「手动配对」输入桌面端 IPv4 地址继续。",
-    "backToManual": "返回手动配对"
-  }
+  "noCameraDevice": "未找到相机设备"
 }

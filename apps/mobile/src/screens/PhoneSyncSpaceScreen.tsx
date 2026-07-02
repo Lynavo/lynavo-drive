@@ -496,7 +496,7 @@ function PhoneSyncPreviewModal({
         <View style={styles.previewBody}>
           {video ? (
             <Video
-              testID="phone-sync-cn-preview-video"
+              testID="phone-sync-preview-video"
               source={{ uri: preview.url }}
               style={styles.previewMedia}
               resizeMode="contain"
@@ -506,7 +506,7 @@ function PhoneSyncPreviewModal({
             />
           ) : (
             <Image
-              testID="phone-sync-cn-preview-image"
+              testID="phone-sync-preview-image"
               source={{ uri: preview.url }}
               style={styles.previewMedia}
               resizeMode="contain"

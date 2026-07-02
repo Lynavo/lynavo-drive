@@ -994,7 +994,7 @@ export async function downloadResource(
 ): Promise<ResourceDownloadResult> {
   await requestResourceDownload(desktop, resourceId);
 
-  // CN legacy screens only await completion and do not inspect this result.
+  // Current callers only await completion and do not inspect this result.
   // Keep the HTTP request behavior, but do not manufacture a local file path.
   return {
     savedToPhotos: false,

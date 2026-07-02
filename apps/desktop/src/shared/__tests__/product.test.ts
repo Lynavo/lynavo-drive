@@ -24,15 +24,15 @@ describe('desktop product helper', () => {
     expect(APP_STORAGE_IDENTITY_NAME).toBe(getProductName());
   });
 
-  it('does not let unrelated market env affect product identity', () => {
-    vi.stubEnv('OTHER_PRODUCT_MARKET', 'cn');
+  it('does not let unrelated env affect product identity', () => {
+    vi.stubEnv('OTHER_PRODUCT_VARIANT', 'regional');
 
     expect(getProductName()).toBe('Lynavo Drive');
     expect(isLynavoGlobalProduct()).toBe(true);
   });
 
   it('resolves release channel from Lynavo env only', () => {
-    vi.stubEnv('OTHER_PRODUCT_MARKET', 'global');
+    vi.stubEnv('OTHER_RELEASE_PROFILE', 'external');
     vi.stubEnv('LYNAVO_RELEASE_CHANNEL', 'review');
 
     expect(getProductReleaseChannel()).toBe('review');

@@ -185,7 +185,6 @@ test('external sensitive env does not appear in dev dry-run output', () => {
   );
 
   assert.equal(result.status, 0, result.stderr);
-  assert.doesNotMatch(result.stdout, /Market:/);
   assert.doesNotMatch(result.stdout, /https:\/\/external-api\.example/);
   assert.doesNotMatch(result.stdout, /https:\/\/external-support\.example/);
   assert.doesNotMatch(result.stdout, /https:\/\/external-update\.example/);

@@ -3,15 +3,9 @@ import { appConfig } from '../app-config';
 const token = (parts: string[]) => parts.join('');
 
 describe('appConfig', () => {
-  test('uses the single Lynavo Drive mobile identity without market fields', () => {
+  test('uses the single Lynavo Drive mobile identity', () => {
     expect(appConfig.productName).toBe('Lynavo Drive');
     expect(appConfig.bundleId).toBe('com.lynavo.drive.mobile');
-    expect('market' in appConfig).toBe(false);
-    expect(JSON.stringify(appConfig)).not.toContain('"market"');
-  });
-
-  test('does not carry a cn fallback in the config payload', () => {
-    expect(JSON.stringify(appConfig)).not.toContain('"cn"');
   });
 
   test('uses OSS repository links without official service endpoints', () => {

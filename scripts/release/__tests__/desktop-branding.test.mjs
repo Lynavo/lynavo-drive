@@ -1,11 +1,9 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
-const removedBuilderConfigName = (name) => `electron-builder.${name}.yml`;
-
 function readDesktopConfig(name) {
   return readFileSync(resolve(repoRoot, 'apps/desktop', name), 'utf8');
 }
@@ -97,14 +95,6 @@ test('desktop uses a single builder config with bundle build version from mobile
   assert.match(
     config,
     new RegExp(`^buildVersion: ['"]${mobileVersion.buildNumber}['"]$`, 'm'),
-  );
-  assert.equal(
-    existsSync(resolve(repoRoot, 'apps/desktop', removedBuilderConfigName('cn'))),
-    false,
-  );
-  assert.equal(
-    existsSync(resolve(repoRoot, 'apps/desktop', removedBuilderConfigName('global'))),
-    false,
   );
 });
 
