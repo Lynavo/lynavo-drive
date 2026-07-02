@@ -2553,7 +2553,6 @@ class NativeSyncEngineModule(
         activeTuningProfile = "standard",
         currentTaskSource = item.source.takeIf { it == "auto" },
         autoUploadState = autoConfig.state,
-        manualPending = 0,
         autoPending = AndroidSyncPrimitives.pendingCount(pendingItems, "auto"),
       ),
     ).toWritableMap()
@@ -4130,7 +4129,6 @@ class NativeSyncEngineModule(
         lastErrorCode = lastErrorCode,
         lastErrorMessage = lastErrorMessage,
         autoUploadState = autoConfig.state,
-        manualPending = 0,
         autoPending = autoPending,
       ),
     ).toWritableMap()
@@ -4150,7 +4148,6 @@ class NativeSyncEngineModule(
         totalCount = pendingItems.size,
         totalBytes = pendingBytes,
         autoUploadState = autoConfig.state,
-        manualPending = 0,
         autoPending = AndroidSyncPrimitives.pendingCount(pendingItems, "auto"),
       ),
     ).toJson()
@@ -4176,7 +4173,6 @@ class NativeSyncEngineModule(
           activeTuningProfile = "standard",
           currentTaskSource = pending.firstOrNull()?.source?.takeIf { it == "auto" },
           autoUploadState = autoConfig.state,
-          manualPending = 0,
           autoPending = AndroidSyncPrimitives.pendingCount(pending, "auto"),
         ),
       ).toWritableMap(),
@@ -4208,7 +4204,6 @@ class NativeSyncEngineModule(
           totalBytes = totalBytes,
           lastCompletedTaskSource = lastCompletedTaskSource,
           autoUploadState = autoConfig.state,
-          manualPending = 0,
           autoPending = AndroidSyncPrimitives.pendingCount(pendingItems, "auto"),
         ),
       ).toWritableMap(),
@@ -5095,7 +5090,6 @@ class NativeSyncEngineModule(
         putString("lastCompletedTaskSource", lastCompletedTaskSource)
       }
       putString("autoUploadState", autoUploadState)
-      putDouble("manualPending", manualPending)
       putDouble("autoPending", autoPending)
     }
   }
@@ -5132,7 +5126,6 @@ class NativeSyncEngineModule(
       put("currentTaskSource", currentTaskSource ?: JSONObject.NULL)
       put("lastCompletedTaskSource", lastCompletedTaskSource ?: JSONObject.NULL)
       put("autoUploadState", autoUploadState)
-      put("manualPending", manualPending)
       put("autoPending", autoPending)
     }
 

@@ -16,7 +16,7 @@
         "1": "在電腦打開 Lynavo Drive 客戶端並保持執行",
         "2": "手機端進入搜尋設備，稍等片刻即可發現電腦"
       },
-      "warning": "還沒有電腦端？請在電腦瀏覽器訪問 www.lynavo.com 下載安裝。"
+      "warning": "還沒有電腦端？請在電腦瀏覽器訪問 {{host}}，按 OSS 桌面端建置或發布說明安裝。"
     },
     "qr": {
       "title": "掃碼配對",
@@ -56,7 +56,7 @@
       "2": "仍然無法連接時，改用「手動輸入 IP」或「輸入連接碼」完成配對。"
     },
     "supportTitle": "仍然無法解決？",
-    "supportBody": "請匯出診斷包或聯絡客服，我們會協助排查。",
-    "supportEmail": "support@lynavo.com"
+    "supportBody": "需要時請本機匯出診斷包，並透過 GitHub issue 提交可重現步驟。",
+    "supportIssue": "GitHub Issues"
   }
 }

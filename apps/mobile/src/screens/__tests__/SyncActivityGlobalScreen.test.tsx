@@ -363,7 +363,6 @@ describe('SyncActivityGlobalScreen', () => {
       totalCount: 7,
       completedBytes: 13 * 1024 * 1024,
       autoUploadState: 'active',
-      manualPending: 0,
       autoPending: 0,
       lastCompletedAt: '2026-06-17T02:10:27.000Z',
     });

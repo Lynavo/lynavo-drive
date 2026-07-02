@@ -58,8 +58,8 @@ export function HelpGlobalScreen() {
     },
   ];
 
-  const handleOpenSupportEmail = useCallback(() => {
-    void Linking.openURL(`mailto:${appConfig.endpoints.supportEmail}`);
+  const handleOpenSupportIssue = useCallback(() => {
+    void Linking.openURL(appConfig.endpoints.supportUrl);
   }, []);
 
   const handleExportDiagnostics = useCallback(async () => {
@@ -129,17 +129,17 @@ export function HelpGlobalScreen() {
               <TouchableOpacity
                 style={styles.actionRow}
                 activeOpacity={0.7}
-                onPress={handleOpenSupportEmail}
+                onPress={handleOpenSupportIssue}
               >
                 <View style={[styles.actionIconBox, styles.mailIconBox]}>
                   <Icon name="mail-outline" size={18} color="#1677D2" />
                 </View>
                 <View style={styles.actionContent}>
                   <Text style={styles.actionTitle}>
-                    {t('help.contact.supportEmail')}
+                    {t('help.contact.supportIssue')}
                   </Text>
                   <Text style={styles.actionDesc}>
-                    {appConfig.endpoints.supportEmail}
+                    {t('help.contact.supportIssueDesc')}
                   </Text>
                 </View>
               </TouchableOpacity>

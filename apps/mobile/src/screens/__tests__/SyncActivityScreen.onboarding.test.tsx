@@ -185,7 +185,6 @@ describe('SyncActivityScreen onboarding', () => {
         currentFileConfirmedBytes: 0,
         currentFileTotalBytes: 0,
         autoUploadState: 'disabled',
-        manualPending: 0,
         autoPending: 0,
       }),
       startDiscovery: jest.fn().mockResolvedValue(undefined),

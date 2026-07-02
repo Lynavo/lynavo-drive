@@ -88,7 +88,7 @@ describe('HelpGlobalScreen OSS copy', () => {
     ).toBeTruthy();
     expect(
       getByText(
-        'No. The OSS edition keeps local LAN pairing, foreground sync, and shared-folder browsing available without an official account.',
+        'No. The OSS edition keeps local LAN pairing, foreground sync, and shared-folder browsing available through local desktop pairing.',
       ),
     ).toBeTruthy();
     expect(queryByText(/trial/i)).toBeNull();

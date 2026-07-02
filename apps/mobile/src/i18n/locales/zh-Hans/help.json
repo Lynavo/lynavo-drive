@@ -9,7 +9,7 @@
     },
     "item1": {
       "title": "自动上传为什么会暂停？",
-      "answer": "自动上传在切换 Wi-Fi 或电脑睡眠后会暂停。电脑唤醒且网络恢复后，Lynavo Drive 会保留已完成文件并自动继续未完成队列。后台权限受限时也会暂停，请在手机系统设置中确认 Lynavo Drive 有后台刷新权限。"
+      "answer": "自动上传在切换 Wi-Fi、电脑睡眠或手机应用不在前台时会暂停。应用回到前台且局域网恢复后，Lynavo Drive 会保留已完成文件并自动继续未完成队列。"
     },
     "item2": {
       "title": "上传失败怎么处理？",
@@ -21,7 +21,7 @@
     },
     "item4": {
       "title": "开源版需要付费计划吗？",
-      "answer": "不需要。OSS 版本保留本地局域网配对、前台同步和共享目录浏览能力，无需登录官方账号。"
+      "answer": "不需要。OSS 版本通过本地桌面配对保留局域网配对、前台同步和共享目录浏览能力。"
     },
     "item5": {
       "title": "共享目录显示为空怎么办？",
@@ -29,9 +29,10 @@
     }
   },
   "contact": {
-    "supportEmail": "客服邮箱",
+    "supportIssue": "GitHub Issues",
+    "supportIssueDesc": "通过公开 issue 提交可复现 bug 或功能建议。",
     "exportDiagnostics": "导出诊断包",
     "exportingDiagnostics": "正在导出…",
-    "exportHint": "需要时可通过系统分享或邮件发送给维护者/支持方"
+    "exportHint": "诊断包只会保存到本地。仅在你确认可以公开分享时附加到 issue。"
   }
 }

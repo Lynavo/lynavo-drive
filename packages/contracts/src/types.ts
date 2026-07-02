@@ -370,14 +370,12 @@ export interface SyncSummaryDTO {
   thermalState?: 'nominal' | 'fair' | 'serious' | 'critical' | 'unknown';
   activeTuningProfile?: string | null;
   isThermalLimited?: boolean;
-  /** Source of the currently uploading task (auto or manual) */
+  /** Source of the currently uploading task */
   currentTaskSource?: UploadTaskSource | null;
   /** Source of the most recently completed upload task */
   lastCompletedTaskSource?: UploadTaskSource | null;
   /** Current state of the auto-upload feature */
   autoUploadState?: AutoUploadState;
-  /** Number of pending items in the manual upload queue */
-  manualPending?: number;
   /** Number of pending auto-upload items */
   autoPending?: number;
 }
@@ -390,9 +388,8 @@ export interface ReadOnlyQueueItemDTO {
   /** Simplified status for RN display; failed/skipped items are excluded from the read-only queue */
   status: 'uploading' | 'waiting' | 'completed' | 'cancelled';
   progress?: number;
-  /** Upload source: auto-scanned or manually selected */
+  /** Upload source */
   source?: UploadTaskSource;
-  /** Manual batch group identifier */
   batchId?: string;
 }
 

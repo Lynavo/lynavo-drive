@@ -12,7 +12,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 1,
       totalCount: 3,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
@@ -29,7 +28,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 1,
       totalCount: 3,
       autoPending: 1,
-      manualPending: 0,
       currentTaskSource: 'auto' as const,
       currentFileConfirmedBytes: 50,
       currentFileTotalBytes: 200,
@@ -45,7 +43,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 3,
       totalCount: 3,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
@@ -63,7 +60,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 0,
       totalCount: 0,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
@@ -73,15 +69,14 @@ describe('syncActivityTransferState', () => {
     expect(getSyncActivityMainCardState(snapshot, false)).toBe('standby');
   });
 
-  it('ignores stale manual queue fields when auto upload has no work', () => {
+  it('ignores stale non-auto queue fields when auto upload has no work', () => {
     const snapshot = {
       uploadState: 'idle',
       autoUploadState: 'active' as const,
       completedCount: 0,
       totalCount: 0,
       autoPending: 0,
-      manualPending: 2,
-      currentTaskSource: 'manual' as const,
+      currentTaskSource: 'legacy' as never,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
     };
@@ -97,7 +92,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 1,
       totalCount: 3,
       autoPending: 2,
-      manualPending: 0,
       currentTaskSource: undefined,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
@@ -117,7 +111,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 0,
       totalCount: 0,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
@@ -134,7 +127,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 2,
       totalCount: 2,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
       lastCompletedTaskSource: 'auto' as const,
       currentFileConfirmedBytes: 0,
@@ -152,7 +144,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 0,
       totalCount: 0,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
@@ -172,7 +163,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 0,
       totalCount: 0,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
@@ -188,7 +178,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 0,
       totalCount: 237,
       autoPending: 237,
-      manualPending: 0,
       currentTaskSource: undefined,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
@@ -206,7 +195,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 0,
       totalCount: 0,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
@@ -223,7 +211,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 0,
       totalCount: 0,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
@@ -240,7 +227,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 1,
       totalCount: 3,
       autoPending: 1,
-      manualPending: 0,
       currentTaskSource: 'auto' as const,
       currentFileConfirmedBytes: 50,
       currentFileTotalBytes: 200,
@@ -257,7 +243,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 1,
       totalCount: 3,
       autoPending: 2,
-      manualPending: 0,
       currentTaskSource: 'auto' as const,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
@@ -275,7 +260,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 12,
       totalCount: 12,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
       lastCompletedTaskSource: 'auto' as const,
       currentFileConfirmedBytes: 0,
@@ -288,16 +272,15 @@ describe('syncActivityTransferState', () => {
     );
   });
 
-  it('does not show a completion card for stale manual source snapshots', () => {
+  it('does not show a completion card for stale non-auto source snapshots', () => {
     const snapshot = {
       uploadState: 'completed',
       autoUploadState: 'disabled' as const,
       completedCount: 12,
       totalCount: 12,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
-      lastCompletedTaskSource: 'manual' as const,
+      lastCompletedTaskSource: 'legacy' as never,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
     };
@@ -313,7 +296,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 0,
       totalCount: 0,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
       lastCompletedTaskSource: undefined,
       currentFileConfirmedBytes: 0,
@@ -324,16 +306,15 @@ describe('syncActivityTransferState', () => {
     expect(getSyncActivityMainCardState(snapshot, false)).toBe('standby');
   });
 
-  it('ignores stale manual completion after native settles back to idle', () => {
+  it('ignores stale non-auto completion after native settles back to idle', () => {
     const snapshot = {
       uploadState: 'idle',
       autoUploadState: 'disabled' as const,
       completedCount: 1,
       totalCount: 1,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
-      lastCompletedTaskSource: 'manual' as const,
+      lastCompletedTaskSource: 'legacy' as never,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
     };
@@ -349,7 +330,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 1,
       totalCount: 1,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
@@ -366,7 +346,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 12,
       totalCount: 12,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
@@ -376,16 +355,15 @@ describe('syncActivityTransferState', () => {
     expect(getSyncActivityMainCardState(snapshot, false)).toBe('standby');
   });
 
-  it('does not preserve stale manual completion after auto upload is closed', () => {
+  it('does not preserve stale non-auto completion after auto upload is closed', () => {
     const snapshot = {
       uploadState: 'paused_auto_upload',
       autoUploadState: 'interrupted' as const,
       completedCount: 12,
       totalCount: 12,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
-      lastCompletedTaskSource: 'manual' as const,
+      lastCompletedTaskSource: 'legacy' as never,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
     };
@@ -394,17 +372,15 @@ describe('syncActivityTransferState', () => {
     expect(getSyncActivityMainCardState(snapshot, false)).toBe('not_started');
   });
 
-  it('ignores stale manual cancellation fields and follows auto interrupted state', () => {
+  it('ignores stale non-auto cancellation fields and follows auto interrupted state', () => {
     const snapshot = {
       uploadState: 'idle',
       autoUploadState: 'interrupted' as const,
       completedCount: 7,
       totalCount: 7,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
-      lastCompletedTaskSource: 'manual' as const,
-      manualUploadCancelled: true,
+      lastCompletedTaskSource: 'legacy' as never,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
     };
@@ -414,17 +390,15 @@ describe('syncActivityTransferState', () => {
     );
   });
 
-  it('keeps offline state ahead of a stale manual source snapshot', () => {
+  it('keeps offline state ahead of a stale non-auto source snapshot', () => {
     const snapshot = {
       uploadState: 'idle',
       autoUploadState: 'disabled' as const,
       completedCount: 7,
       totalCount: 7,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
-      lastCompletedTaskSource: 'manual' as const,
-      manualUploadCancelled: true,
+      lastCompletedTaskSource: 'legacy' as never,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
     };
@@ -432,14 +406,13 @@ describe('syncActivityTransferState', () => {
     expect(getSyncActivityMainCardState(snapshot, true)).toBe('offline');
   });
 
-  it('does not infer manual completion from a final upload pulse without auto context', () => {
+  it('does not infer non-auto completion from a final upload pulse without auto context', () => {
     const snapshot = {
       uploadState: 'uploading',
       autoUploadState: 'interrupted' as const,
       completedCount: 22,
       totalCount: 22,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
       lastCompletedTaskSource: undefined,
       currentFileConfirmedBytes: 546828,
@@ -459,7 +432,6 @@ describe('syncActivityTransferState', () => {
       completedCount: 5,
       totalCount: 5,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
       lastCompletedTaskSource: 'auto' as const,
       currentFileConfirmedBytes: 42_943_681,
@@ -472,16 +444,15 @@ describe('syncActivityTransferState', () => {
     );
   });
 
-  it('ignores stale manual completion when native emits a scanning pulse', () => {
+  it('ignores stale non-auto completion when native emits a scanning pulse', () => {
     const snapshot = {
       uploadState: 'scanning',
       autoUploadState: 'disabled' as const,
       completedCount: 12,
       totalCount: 12,
       autoPending: 0,
-      manualPending: 0,
       currentTaskSource: undefined,
-      lastCompletedTaskSource: 'manual' as const,
+      lastCompletedTaskSource: 'legacy' as never,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
     };
@@ -489,16 +460,15 @@ describe('syncActivityTransferState', () => {
     expect(getSyncActivityMainCardState(snapshot, false)).toBe('not_started');
   });
 
-  it('does not prioritize stale manual queue fields over auto interruption', () => {
+  it('does not prioritize stale non-auto queue fields over auto interruption', () => {
     const snapshot = {
       uploadState: 'scanning',
       autoUploadState: 'interrupted' as const,
       completedCount: 12,
       totalCount: 12,
       autoPending: 0,
-      manualPending: 2,
       currentTaskSource: undefined,
-      lastCompletedTaskSource: 'manual' as const,
+      lastCompletedTaskSource: 'legacy' as never,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
     };
@@ -508,15 +478,14 @@ describe('syncActivityTransferState', () => {
     );
   });
 
-  it('does not keep running state for stale manual work during reconnecting', () => {
+  it('does not keep running state for stale non-auto work during reconnecting', () => {
     const snapshot = {
       uploadState: 'reconnecting',
       autoUploadState: 'interrupted' as const,
       completedCount: 0,
       totalCount: 1,
       autoPending: 0,
-      manualPending: 1,
-      currentTaskSource: 'manual' as const,
+      currentTaskSource: 'legacy' as never,
       lastCompletedTaskSource: undefined,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
@@ -528,16 +497,15 @@ describe('syncActivityTransferState', () => {
     expect(getSyncActivityMainCardState(snapshot, true)).toBe('offline');
   });
 
-  it('does not keep running state during stale manual reconnecting snapshots', () => {
+  it('does not keep running state during stale non-auto reconnecting snapshots', () => {
     const snapshot = {
       uploadState: 'reconnecting',
       autoUploadState: 'interrupted' as const,
       completedCount: 3,
       totalCount: 6,
       autoPending: 0,
-      manualPending: 3,
-      currentTaskSource: 'manual' as const,
-      lastCompletedTaskSource: 'manual' as const,
+      currentTaskSource: 'legacy' as never,
+      lastCompletedTaskSource: 'legacy' as never,
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
     };

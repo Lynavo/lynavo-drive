@@ -56,7 +56,6 @@ describe('buildOverview', () => {
       currentFileTotalBytes: 1024,
       currentTaskSource: null,
       autoUploadState: 'active' as const,
-      manualPending: 0,
       autoPending: 0,
     };
 
@@ -95,7 +94,6 @@ describe('buildOverview', () => {
       currentFileTotalBytes: 1000,
       currentTaskSource: 'auto' as const,
       autoUploadState: 'active' as const,
-      manualPending: 0,
       autoPending: 1,
     };
 
@@ -112,7 +110,7 @@ describe('buildOverview', () => {
     expect(next.currentFileTotalBytes).toBe(1000);
   });
 
-  it('ignores stale manual task source when a completion payload clears source', () => {
+  it('ignores stale non-auto task source when a completion payload clears source', () => {
     const prev = {
       progressPercent: 92,
       currentSpeedMbps: 8.2,
@@ -125,10 +123,9 @@ describe('buildOverview', () => {
       currentFilename: 'clip-2.mov',
       currentFileConfirmedBytes: 950,
       currentFileTotalBytes: 1000,
-      currentTaskSource: 'manual' as const,
+      currentTaskSource: 'legacy' as never,
       lastCompletedTaskSource: null,
       autoUploadState: 'disabled' as const,
-      manualPending: 0,
       autoPending: 0,
     };
 
@@ -148,7 +145,7 @@ describe('buildOverview', () => {
     expect(next.lastCompletedTaskSource).toBeUndefined();
   });
 
-  it('uses native last completed source when an auto round completes after stale manual state', () => {
+  it('uses native last completed source when an auto round completes after stale non-auto state', () => {
     const prev = {
       progressPercent: 100,
       currentSpeedMbps: 0,
@@ -162,9 +159,8 @@ describe('buildOverview', () => {
       currentFileConfirmedBytes: 621067508,
       currentFileTotalBytes: 621067508,
       currentTaskSource: undefined,
-      lastCompletedTaskSource: 'manual' as const,
+      lastCompletedTaskSource: 'legacy' as never,
       autoUploadState: 'active' as const,
-      manualPending: 0,
       autoPending: 0,
     };
 
@@ -178,7 +174,6 @@ describe('buildOverview', () => {
         totalBytes: 1629535908,
         currentTaskSource: null,
         lastCompletedTaskSource: 'auto',
-        manualPending: 0,
         autoPending: 0,
         autoUploadState: 'active',
       },
@@ -194,7 +189,6 @@ describe('buildOverview', () => {
         totalBytes: 1629535908,
         currentTaskSource: null,
         lastCompletedTaskSource: 'auto',
-        manualPending: 0,
         autoPending: 0,
         autoUploadState: 'active',
       },
@@ -206,7 +200,7 @@ describe('buildOverview', () => {
     expect(getSyncActivityMainCardState(settled, false)).toBe('auto_completed');
   });
 
-  it('infers active auto completion ahead of stale manual context when native omits last source', () => {
+  it('infers active auto completion ahead of stale non-auto context when native omits last source', () => {
     const prev = {
       progressPercent: 100,
       currentSpeedMbps: 0,
@@ -220,9 +214,8 @@ describe('buildOverview', () => {
       currentFileConfirmedBytes: 621067508,
       currentFileTotalBytes: 621067508,
       currentTaskSource: undefined,
-      lastCompletedTaskSource: 'manual' as const,
+      lastCompletedTaskSource: 'legacy' as never,
       autoUploadState: 'active' as const,
-      manualPending: 0,
       autoPending: 0,
     };
 
@@ -235,7 +228,6 @@ describe('buildOverview', () => {
         completedBytes: 1629535908,
         totalBytes: 1629535908,
         currentTaskSource: null,
-        manualPending: 0,
         autoPending: 0,
         autoUploadState: 'active',
       },
@@ -262,7 +254,6 @@ describe('buildOverview', () => {
       currentTaskSource: undefined,
       lastCompletedTaskSource: 'auto' as const,
       autoUploadState: 'active' as const,
-      manualPending: 0,
       autoPending: 0,
     };
 
@@ -275,7 +266,6 @@ describe('buildOverview', () => {
         completedBytes: 1293262,
         totalBytes: 1293262,
         currentTaskSource: null,
-        manualPending: 0,
         autoPending: 0,
         autoUploadState: 'interrupted',
       },
@@ -302,7 +292,6 @@ describe('buildOverview', () => {
       currentTaskSource: undefined,
       lastCompletedTaskSource: 'auto' as const,
       autoUploadState: 'active' as const,
-      manualPending: 0,
       autoPending: 0,
     };
 
@@ -316,7 +305,6 @@ describe('buildOverview', () => {
         totalBytes: 1293262,
         currentTaskSource: null,
         lastCompletedTaskSource: null,
-        manualPending: 0,
         autoPending: 0,
         autoUploadState: 'disabled',
       },
@@ -330,7 +318,7 @@ describe('buildOverview', () => {
     expect(getSyncActivityMainCardState(next, false)).toBe('not_started');
   });
 
-  it('clears stale manual completion when enabling auto upload finds no new work', () => {
+  it('clears stale non-auto completion when enabling auto upload finds no new work', () => {
     const prev = {
       progressPercent: 100,
       currentSpeedMbps: 0,
@@ -344,9 +332,8 @@ describe('buildOverview', () => {
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
       currentTaskSource: undefined,
-      lastCompletedTaskSource: 'manual' as const,
+      lastCompletedTaskSource: 'legacy' as never,
       autoUploadState: 'disabled' as const,
-      manualPending: 0,
       autoPending: 0,
     };
 
@@ -360,7 +347,6 @@ describe('buildOverview', () => {
         totalBytes: 0,
         currentTaskSource: null,
         lastCompletedTaskSource: null,
-        manualPending: 0,
         autoPending: 0,
         autoUploadState: 'active',
       },
@@ -373,7 +359,7 @@ describe('buildOverview', () => {
     expect(getSyncActivityMainCardState(next, false)).toBe('standby');
   });
 
-  it('does not derive manual completion when native jumps straight from uploading to idle', () => {
+  it('does not derive non-auto completion when native jumps straight from uploading to idle', () => {
     const prev = {
       progressPercent: 100,
       currentSpeedMbps: 0,
@@ -386,10 +372,9 @@ describe('buildOverview', () => {
       currentFilename: 'clip-3.mov',
       currentFileConfirmedBytes: 8192,
       currentFileTotalBytes: 8192,
-      currentTaskSource: 'manual' as const,
+      currentTaskSource: 'legacy' as never,
       lastCompletedTaskSource: null,
       autoUploadState: 'disabled' as const,
-      manualPending: 0,
       autoPending: 0,
     };
 
@@ -400,7 +385,6 @@ describe('buildOverview', () => {
         totalCount: 1,
         completedBytes: 8192,
         currentTaskSource: null,
-        manualPending: 0,
         autoPending: 0,
       },
       prev,
@@ -411,7 +395,7 @@ describe('buildOverview', () => {
     expect(next.lastCompletedTaskSource).toBeUndefined();
   });
 
-  it('does not derive manual completion when native settles into paused_auto_upload', () => {
+  it('does not derive non-auto completion when native settles into paused_auto_upload', () => {
     const prev = {
       progressPercent: 100,
       currentSpeedMbps: 0,
@@ -424,10 +408,9 @@ describe('buildOverview', () => {
       currentFilename: 'clip-4.mov',
       currentFileConfirmedBytes: 43892627,
       currentFileTotalBytes: 43892627,
-      currentTaskSource: 'manual' as const,
+      currentTaskSource: 'legacy' as never,
       lastCompletedTaskSource: null,
       autoUploadState: 'interrupted' as const,
-      manualPending: 0,
       autoPending: 0,
     };
 
@@ -438,7 +421,6 @@ describe('buildOverview', () => {
         totalCount: 12,
         completedBytes: 2071538583,
         currentTaskSource: null,
-        manualPending: 0,
         autoPending: 0,
         autoUploadState: 'interrupted',
       },
@@ -450,7 +432,7 @@ describe('buildOverview', () => {
     expect(next.lastCompletedTaskSource).toBeUndefined();
   });
 
-  it('does not derive manual completion when native scans immediately after stale manual source', () => {
+  it('does not derive non-auto completion when native scans immediately after stale non-auto source', () => {
     const prev = {
       progressPercent: 100,
       currentSpeedMbps: 0,
@@ -463,10 +445,9 @@ describe('buildOverview', () => {
       currentFilename: 'IMG_8971.JPG',
       currentFileConfirmedBytes: 187645,
       currentFileTotalBytes: 187645,
-      currentTaskSource: 'manual' as const,
+      currentTaskSource: 'legacy' as never,
       lastCompletedTaskSource: null,
       autoUploadState: 'interrupted' as const,
-      manualPending: 0,
       autoPending: 0,
     };
 
@@ -477,7 +458,6 @@ describe('buildOverview', () => {
         totalCount: 12,
         completedBytes: 4314899286,
         currentTaskSource: null,
-        manualPending: 0,
         autoPending: 0,
         autoUploadState: 'interrupted',
       },
@@ -489,7 +469,7 @@ describe('buildOverview', () => {
     expect(next.lastCompletedTaskSource).toBeUndefined();
   });
 
-  it('does not keep stale manual completion context through an idle disabled payload', () => {
+  it('does not keep stale non-auto completion context through an idle disabled payload', () => {
     const prev = {
       progressPercent: 100,
       currentSpeedMbps: 0,
@@ -502,10 +482,9 @@ describe('buildOverview', () => {
       currentFilename: 'clip-6.mov',
       currentFileConfirmedBytes: 8192,
       currentFileTotalBytes: 8192,
-      currentTaskSource: 'manual' as const,
+      currentTaskSource: 'legacy' as never,
       lastCompletedTaskSource: null,
       autoUploadState: 'disabled' as const,
-      manualPending: 1,
       autoPending: 0,
     };
 
@@ -517,7 +496,6 @@ describe('buildOverview', () => {
         completedBytes: 0,
         totalBytes: 0,
         currentTaskSource: null,
-        manualPending: 0,
         autoPending: 0,
         autoUploadState: 'disabled',
       },
@@ -532,7 +510,7 @@ describe('buildOverview', () => {
     expect(getSyncActivityMainCardState(next, false)).toBe('not_started');
   });
 
-  it('ignores stale manual cancel payload when auto upload is disabled', () => {
+  it('ignores stale non-auto cancel payload when auto upload is disabled', () => {
     const prev = {
       progressPercent: 31,
       currentSpeedMbps: 8.5,
@@ -545,10 +523,9 @@ describe('buildOverview', () => {
       currentFilename: 'clip-cancelled.mov',
       currentFileConfirmedBytes: 117_440_512,
       currentFileTotalBytes: 374_027_575,
-      currentTaskSource: 'manual' as const,
+      currentTaskSource: 'legacy' as never,
       lastCompletedTaskSource: null,
       autoUploadState: 'disabled' as const,
-      manualPending: 0,
       autoPending: 0,
     };
 
@@ -560,7 +537,6 @@ describe('buildOverview', () => {
         completedBytes: 0,
         totalBytes: 0,
         currentTaskSource: null,
-        manualPending: 0,
         autoPending: 0,
         autoUploadState: 'disabled',
       },
@@ -576,7 +552,7 @@ describe('buildOverview', () => {
     expect(getSyncActivityMainCardState(next, false)).toBe('not_started');
   });
 
-  it('ignores stale manual cancel payload and follows auto interrupted state', () => {
+  it('ignores stale non-auto cancel payload and follows auto interrupted state', () => {
     const prev = {
       progressPercent: 45,
       currentSpeedMbps: 6.5,
@@ -589,10 +565,9 @@ describe('buildOverview', () => {
       currentFilename: 'clip-cancelled.mov',
       currentFileConfirmedBytes: 512_000,
       currentFileTotalBytes: 1_024_000,
-      currentTaskSource: 'manual' as const,
+      currentTaskSource: 'legacy' as never,
       lastCompletedTaskSource: null,
       autoUploadState: 'interrupted' as const,
-      manualPending: 0,
       autoPending: 0,
     };
 
@@ -605,7 +580,6 @@ describe('buildOverview', () => {
         completedBytes: 4_912_657,
         totalBytes: 4_912_657,
         currentTaskSource: null,
-        manualPending: 0,
         autoPending: 0,
         autoUploadState: 'interrupted',
       },
@@ -621,7 +595,7 @@ describe('buildOverview', () => {
     expect(getSyncActivityMainCardState(next, false)).toBe('auto_interrupted');
   });
 
-  it('does not persist stale manual cancellation across idle overview refreshes', () => {
+  it('does not persist stale non-auto cancellation across idle overview refreshes', () => {
     const cancelled = buildOverview(
       {
         uploadState: 'idle',
@@ -630,7 +604,6 @@ describe('buildOverview', () => {
         completedBytes: 4_912_657,
         totalBytes: 4_912_657,
         currentTaskSource: null,
-        manualPending: 0,
         autoPending: 0,
         autoUploadState: 'interrupted',
       },
@@ -646,10 +619,9 @@ describe('buildOverview', () => {
         currentFilename: 'clip-cancelled.mov',
         currentFileConfirmedBytes: 512_000,
         currentFileTotalBytes: 1_024_000,
-        currentTaskSource: 'manual' as const,
+        currentTaskSource: 'legacy' as never,
         lastCompletedTaskSource: null,
         autoUploadState: 'interrupted' as const,
-        manualPending: 0,
         autoPending: 0,
       },
     );
@@ -663,7 +635,6 @@ describe('buildOverview', () => {
         completedBytes: 4_912_657,
         totalBytes: 4_912_657,
         currentTaskSource: null,
-        manualPending: 0,
         autoPending: 0,
         autoUploadState: 'interrupted',
       },
@@ -678,7 +649,7 @@ describe('buildOverview', () => {
     );
   });
 
-  it('closes auto upload from stale manual source without showing manual state', () => {
+  it('closes auto upload from stale non-auto source without showing manual state', () => {
     const prev = {
       progressPercent: 31,
       currentSpeedMbps: 8.5,
@@ -691,10 +662,9 @@ describe('buildOverview', () => {
       currentFilename: 'clip-cancelled.mov',
       currentFileConfirmedBytes: 117_440_512,
       currentFileTotalBytes: 374_027_575,
-      currentTaskSource: 'manual' as const,
+      currentTaskSource: 'legacy' as never,
       lastCompletedTaskSource: null,
       autoUploadState: 'interrupted' as const,
-      manualPending: 0,
       autoPending: 0,
     };
 
@@ -706,7 +676,6 @@ describe('buildOverview', () => {
         completedBytes: 0,
         totalBytes: 0,
         currentTaskSource: null,
-        manualPending: 0,
         autoPending: 0,
         autoUploadState: 'interrupted',
       },
@@ -720,7 +689,7 @@ describe('buildOverview', () => {
     expect(getSyncActivityMainCardState(next, false)).toBe('not_started');
   });
 
-  it('does not infer manual completion after the final upload pulse clears source', () => {
+  it('does not infer non-auto completion after the final upload pulse clears source', () => {
     const prev = {
       progressPercent: 100,
       currentSpeedMbps: 0,
@@ -736,7 +705,6 @@ describe('buildOverview', () => {
       currentTaskSource: undefined,
       lastCompletedTaskSource: null,
       autoUploadState: 'interrupted' as const,
-      manualPending: 0,
       autoPending: 0,
     };
 
@@ -748,7 +716,6 @@ describe('buildOverview', () => {
         completedBytes: 0,
         totalBytes: 0,
         currentTaskSource: null,
-        manualPending: 0,
         autoPending: 0,
         autoUploadState: 'interrupted',
       },
@@ -763,7 +730,7 @@ describe('buildOverview', () => {
     expect(getSyncActivityMainCardState(next, false)).toBe('auto_interrupted');
   });
 
-  it('does not convert a manual auto-upload interruption into auto completion', () => {
+  it('does not convert a non-auto auto-upload interruption into auto completion', () => {
     const prev = {
       progressPercent: 42,
       currentSpeedMbps: 12.4,
@@ -777,9 +744,8 @@ describe('buildOverview', () => {
       currentFileConfirmedBytes: 80_000_000,
       currentFileTotalBytes: 571_265_496,
       currentTaskSource: 'auto' as const,
-      lastCompletedTaskSource: 'manual' as const,
+      lastCompletedTaskSource: 'legacy' as never,
       autoUploadState: 'active' as const,
-      manualPending: 0,
       autoPending: 198,
     };
 
@@ -791,7 +757,6 @@ describe('buildOverview', () => {
         completedBytes: 0,
         totalBytes: 0,
         currentTaskSource: 'auto',
-        manualPending: 0,
         autoPending: 0,
         autoUploadState: 'interrupted',
       },
@@ -818,9 +783,8 @@ describe('buildOverview', () => {
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
       currentTaskSource: 'auto' as const,
-      lastCompletedTaskSource: 'manual' as const,
+      lastCompletedTaskSource: 'legacy' as never,
       autoUploadState: 'interrupted' as const,
-      manualPending: 0,
       autoPending: 0,
     };
 
@@ -832,7 +796,6 @@ describe('buildOverview', () => {
         completedBytes: 0,
         totalBytes: 0,
         currentTaskSource: null,
-        manualPending: 0,
         autoPending: 0,
         autoUploadState: 'interrupted',
       },
@@ -861,7 +824,6 @@ describe('buildOverview', () => {
       currentTaskSource: undefined,
       lastCompletedTaskSource: undefined,
       autoUploadState: 'active' as const,
-      manualPending: 0,
       autoPending: 6042,
       lastErrorCode: 'RECONNECT_EXHAUSTED',
     };
@@ -880,7 +842,6 @@ describe('buildOverview', () => {
         currentFileTotalBytes: 0,
         currentTaskSource: null,
         lastErrorCode: null,
-        manualPending: 0,
         autoPending: 0,
         autoUploadState: 'active',
       },
@@ -913,7 +874,7 @@ describe('shouldBypassOfflineDisplayDelay', () => {
 });
 
 describe('shouldRenderSyncActivityProgress', () => {
-  it('does not render upload progress while a manual batch is only preparing to connect', () => {
+  it('does not render upload progress while a non-auto batch is only preparing to connect', () => {
     expect(shouldRenderSyncActivityProgress('preparing', false, false)).toBe(
       false,
     );
@@ -950,7 +911,7 @@ describe('isPreparationPhase', () => {
   // Regression: native emits uploadState='reconnecting' on every retryable
   // upload failure (SyncEngineManager.swift). Without this membership the
   // running card's preparation guard evaluates false and the fallback
-  // else-branch renders the auto-running title over a manual batch — the
+  // else-branch renders the auto-running title over a non-auto batch — the
   // Frankenstein UI bug reproduced by flipping desktop Wi-Fi mid-upload.
   it.each([
     'discovering',
@@ -987,10 +948,9 @@ describe('getSyncActivityDisplayProgressPercent', () => {
           currentFilename: 'clip-4.mov',
           currentFileConfirmedBytes: 180,
           currentFileTotalBytes: 1_000,
-          currentTaskSource: 'manual',
+          currentTaskSource: 'legacy' as never,
           lastCompletedTaskSource: null,
           autoUploadState: 'disabled',
-          manualPending: 2,
           autoPending: 0,
         },
         false,
@@ -1016,7 +976,6 @@ describe('getSyncActivityDisplayProgressPercent', () => {
           currentTaskSource: 'auto',
           lastCompletedTaskSource: null,
           autoUploadState: 'disabled',
-          manualPending: 0,
           autoPending: 2,
         },
         true,
@@ -1035,7 +994,7 @@ describe('getSyncActivityAutoRoundDisplayMetrics', () => {
           totalCount: 6046,
           completedBytes: 1024,
           currentTaskSource: undefined,
-          lastCompletedTaskSource: 'manual',
+          lastCompletedTaskSource: 'legacy' as never,
           autoUploadState: 'active',
           autoPending: 6042,
         },
@@ -1063,7 +1022,7 @@ describe('getSyncActivityAutoRoundDisplayMetrics', () => {
           totalCount: 6046,
           completedBytes: 4096,
           currentTaskSource: 'auto',
-          lastCompletedTaskSource: 'manual',
+          lastCompletedTaskSource: 'legacy' as never,
           autoUploadState: 'active',
           autoPending: 6039,
         },
@@ -1094,7 +1053,7 @@ describe('getSyncActivityAutoRoundDisplayMetrics', () => {
           totalCount: 6046,
           completedBytes: 4096,
           currentTaskSource: 'auto',
-          lastCompletedTaskSource: 'manual',
+          lastCompletedTaskSource: 'legacy' as never,
           autoUploadState: 'active',
           autoPending: 6039,
         },

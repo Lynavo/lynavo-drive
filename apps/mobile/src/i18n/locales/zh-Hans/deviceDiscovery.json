@@ -25,10 +25,10 @@
   "troubleshooting": {
     "title": "找不到设备或不知道怎么连？",
     "sameWifi": "确保手机与电脑连接在同一个 Wi-Fi（局域网）下。",
-    "desktopApp": "请在电脑端浏览器访问 www.lynavo.com 下载并打开 PC 端。",
+    "desktopApp": "请在电脑端浏览器访问 {{host}}，按 OSS 桌面端构建或发布说明安装并打开客户端。",
     "cta": "查看详细图文教程 >",
     "notReadyTitle": "电脑端还没有准备好？",
-    "notReadyDesc": "请先在官网 www.lynavo.com 下载并打开客户端，然后返回此页面扫码或输入连接码进行连接。"
+    "notReadyDesc": "请先从 OSS 仓库构建或安装 Lynavo Drive 桌面端，然后返回此页面扫码或输入连接码进行连接。"
   },
   "onboarding": {
     "unconnected": {

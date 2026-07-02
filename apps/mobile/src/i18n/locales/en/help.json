@@ -9,7 +9,7 @@
     },
     "item1": {
       "title": "Why does auto upload pause?",
-      "answer": "Auto upload pauses after Wi-Fi changes or when the computer sleeps. After the computer wakes and the network returns, Lynavo Drive keeps completed files and resumes unfinished queued tasks automatically. It can also pause when background permissions are limited; check that Lynavo Drive has background refresh permission in system settings."
+      "answer": "Auto upload pauses after Wi-Fi changes, when the computer sleeps, or when the mobile app is no longer foregrounded. After the app is foregrounded again and the local network returns, Lynavo Drive keeps completed files and resumes unfinished queued tasks automatically."
     },
     "item2": {
       "title": "What should I do if an upload fails?",
@@ -21,7 +21,7 @@
     },
     "item4": {
       "title": "Does the open-source edition require a paid plan?",
-      "answer": "No. The OSS edition keeps local LAN pairing, foreground sync, and shared-folder browsing available without an official account."
+      "answer": "No. The OSS edition keeps local LAN pairing, foreground sync, and shared-folder browsing available through local desktop pairing."
     },
     "item5": {
       "title": "What if the shared folder is empty?",
@@ -29,9 +29,10 @@
     }
   },
   "contact": {
-    "supportEmail": "Support Email",
+    "supportIssue": "GitHub Issues",
+    "supportIssueDesc": "Open a public issue for reproducible bugs or feature requests.",
     "exportDiagnostics": "Export Diagnostics",
     "exportingDiagnostics": "Exporting...",
-    "exportHint": "Share the local diagnostics bundle with a maintainer or support contact when needed."
+    "exportHint": "Save diagnostics locally. Share them only if you are comfortable attaching them to a public issue."
   }
 }

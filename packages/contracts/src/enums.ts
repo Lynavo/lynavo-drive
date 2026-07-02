@@ -68,7 +68,7 @@ export type MobileUploadItemStatus =
 
 // ── Lynavo Drive: Upload source & auto-upload config ──
 
-export type UploadTaskSource = 'auto' | 'manual';
+export type UploadTaskSource = 'auto';
 
 export type AutoUploadTimeRangeMode = 'from_now' | 'from_today' | 'all' | 'custom';
 

@@ -160,10 +160,9 @@ export function ConnectionTutorialScreen() {
           t('connectionTutorial.cards.lan.steps.1'),
           t('connectionTutorial.cards.lan.steps.2'),
         ],
-        warning: t('connectionTutorial.cards.lan.warning').replace(
-          'www.lynavo.com',
-          desktopDownloadHost,
-        ),
+        warning: t('connectionTutorial.cards.lan.warning', {
+          host: desktopDownloadHost,
+        }),
       },
       qr: {
         visual: <QrVisual />,
@@ -383,8 +382,8 @@ export function ConnectionTutorialScreen() {
             <Text style={styles.supportBody}>
               {t('connectionTutorial.troubleshoot.supportBody')}
             </Text>
-            <Text style={styles.supportEmail}>
-              {appConfig.endpoints.supportEmail}
+            <Text style={styles.supportLink}>
+              {appConfig.endpoints.supportUrl}
             </Text>
           </Pressable>
         </Pressable>
@@ -885,7 +884,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
-  supportEmail: {
+  supportLink: {
     marginTop: 5,
     color: '#2563eb',
     fontSize: 13,

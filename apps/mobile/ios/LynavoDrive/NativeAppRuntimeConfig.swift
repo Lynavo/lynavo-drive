@@ -13,12 +13,9 @@ class NativeAppRuntimeConfig: NSObject {
     let environment = ProcessInfo.processInfo.environment
     [
       "LYNAVO_VISUAL_QA",
-      "LYNAVO_VISUAL_QA_EMAIL",
       "LYNAVO_VISUAL_QA_HOME_EMPTY",
       "LYNAVO_VISUAL_QA_ROUTE",
       "LYNAVO_VISUAL_QA_SHARED_FILES_PREVIEW",
-      "LYNAVO_DEV_SKIP_AUTH",
-      "LYNAVO_DEV_SKIP_AUTH_EMAIL",
     ].forEach { key in
       if let value = environment[key] {
         constants[key] = value

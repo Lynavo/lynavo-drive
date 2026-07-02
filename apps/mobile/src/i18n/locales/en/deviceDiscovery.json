@@ -25,10 +25,10 @@
   "troubleshooting": {
     "title": "Can't find a device or not sure how to connect?",
     "sameWifi": "Make sure your phone and computer are connected to the same Wi-Fi or local network.",
-    "desktopApp": "Open www.lynavo.com in your computer browser, download the desktop app, and keep it open.",
+    "desktopApp": "Open {{host}} in your computer browser, follow the OSS desktop build or release instructions, and keep the desktop app open.",
     "cta": "View full illustrated tutorial >",
     "notReadyTitle": "Computer app not ready yet?",
-    "notReadyDesc": "Download and open Lynavo Drive on your computer from lynavo.com first, then return to scan QR or enter code."
+    "notReadyDesc": "Build or install Lynavo Drive desktop from the OSS repository first, then return to scan QR or enter code."
   },
   "onboarding": {
     "unconnected": {
@@ -118,7 +118,7 @@
       "step1Desc": "Select a computer to connect. The guide only previews features without creating real data.",
       "step1Action": "Continue Preview",
       "step2Title": "Enable Auto Upload",
-      "step2Desc": "Once connected, auto upload syncs new photos, videos, and files silently.",
+      "step2Desc": "Once connected, foreground auto upload syncs new photos and videos over the local LAN.",
       "step2Action": "Next",
       "step3Title": "Sync Scope",
       "step3Desc": "Choose albums, files, and scope to control what gets synced.",

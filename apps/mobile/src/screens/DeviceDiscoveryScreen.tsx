@@ -710,10 +710,9 @@ export function DeviceDiscoveryScreen() {
         <View style={styles.troubleshootingItem}>
           <View style={styles.troubleshootingBullet} />
           <Text style={styles.troubleshootingText}>
-            {t('deviceDiscovery.troubleshooting.desktopApp').replace(
-              'www.lynavo.com',
-              desktopDownloadHost,
-            )}
+            {t('deviceDiscovery.troubleshooting.desktopApp', {
+              host: desktopDownloadHost,
+            })}
           </Text>
         </View>
       </View>

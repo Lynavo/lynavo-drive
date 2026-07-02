@@ -14,19 +14,21 @@ describe('appConfig', () => {
     expect(JSON.stringify(appConfig)).not.toContain('"cn"');
   });
 
-  test('uses Lynavo global web endpoint and support contact only', () => {
+  test('uses OSS repository links without official service endpoints', () => {
     expect(appConfig.endpoints).toEqual({
-      webBaseUrl: 'https://www.lynavo.com',
-      supportEmail: 'support@lynavo.com',
+      webBaseUrl: 'https://github.com/lynavo/lynavo-drive',
+      supportUrl: 'https://github.com/lynavo/lynavo-drive/issues',
+      securityAdvisoryUrl: 'https://github.com/lynavo/lynavo-drive/security/advisories/new',
     });
     expect('turnUrl' in appConfig.endpoints).toBe(false);
     expect('apiBaseUrl' in appConfig.endpoints).toBe(false);
     expect('reviewApiBaseUrl' in appConfig.endpoints).toBe(false);
+    expect('supportEmail' in appConfig.endpoints).toBe(false);
     expect(token(['support', 'ApiBaseUrl']) in appConfig.endpoints).toBe(false);
     expect(token(['review', 'Support', 'ApiBaseUrl']) in appConfig.endpoints).toBe(false);
     expect(appConfig.legal).toEqual({
-      privacyUrl: 'https://www.lynavo.com/privacy',
-      termsUrl: 'https://www.lynavo.com/terms',
+      privacyUrl: 'https://github.com/lynavo/lynavo-drive/blob/main/PRIVACY.md',
+      termsUrl: 'https://github.com/lynavo/lynavo-drive/blob/main/LICENSE',
     });
   });
 

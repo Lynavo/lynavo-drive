@@ -16,7 +16,7 @@
         "1": "Open Lynavo Drive on your computer and keep it running.",
         "2": "Open device search on your phone and wait for the computer to appear."
       },
-      "warning": "Need the desktop app? Open www.lynavo.com in your computer browser to download it."
+      "warning": "Need the desktop app? Open {{host}} in your computer browser and follow the OSS desktop build or release instructions."
     },
     "qr": {
       "title": "Scan QR Code",
@@ -56,7 +56,7 @@
       "2": "If it still cannot connect, use Enter IP Manually or the pairing code flow."
     },
     "supportTitle": "Still stuck?",
-    "supportBody": "Export diagnostics or contact support so we can help investigate.",
-    "supportEmail": "support@lynavo.com"
+    "supportBody": "Export diagnostics locally and open a GitHub issue with reproducible steps when needed.",
+    "supportIssue": "GitHub Issues"
   }
 }

@@ -141,7 +141,7 @@ describe('desktop-local-service', () => {
     globalThis.fetch = fetchMock;
   });
 
-  it('keeps the legacy CN downloadResource request without manufacturing a local path', async () => {
+  it('uses direct LAN downloadResource requests without manufacturing a local path', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       statusText: 'OK',
@@ -557,7 +557,7 @@ describe('desktop-local-service', () => {
     );
   });
 
-  it('keeps the legacy received library request unscoped for CN screens', async () => {
+  it('uses the current-client LAN received library request for local screens', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       statusText: 'OK',

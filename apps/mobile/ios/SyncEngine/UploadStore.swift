@@ -621,15 +621,14 @@ class UploadStore {
     }
 
     /// Count pending auto-upload items.
-    func getPendingCountsBySource() -> (auto: Int, manual: Int) {
+    func getPendingUploadItemCount() -> Int {
         return queue.sync {
             let sql = """
             SELECT COUNT(*) as cnt FROM upload_items
             WHERE status IN ('queued', 'discovered', 'preparing', 'ready', 'cloud_downloading')
             """
             let row = queryInternal(sql, bind: []).first
-            let autoCount = (row?["cnt"] as? Int64).map(Int.init) ?? 0
-            return (auto: autoCount, manual: 0)
+            return (row?["cnt"] as? Int64).map(Int.init) ?? 0
         }
     }
 

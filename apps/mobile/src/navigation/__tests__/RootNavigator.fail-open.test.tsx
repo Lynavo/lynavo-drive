@@ -329,7 +329,17 @@ import i18n from '../../i18n';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function mockAuthedLocalSession() {
+function mockGuestLocalSession() {
+  (useAuth as jest.Mock).mockReturnValue({
+    isLoggedIn: false,
+    isLoading: false,
+    signedOutTransition: null,
+    clearAuth: jest.fn(),
+    setSignedOutTransition: jest.fn(),
+  });
+}
+
+function mockLegacyAuthenticatedSession() {
   (useAuth as jest.Mock).mockReturnValue({
     isLoggedIn: true,
     isLoading: false,
@@ -339,8 +349,8 @@ function mockAuthedLocalSession() {
   });
 }
 
-function renderWithAuthedLocalSession() {
-  mockAuthedLocalSession();
+function renderWithGuestLocalSession() {
+  mockGuestLocalSession();
   return render(
     <NavigationContainer>
       <RootNavigator />
@@ -385,7 +395,12 @@ afterAll(() => {
 
 describe('RootNavigator - OSS fail-open routing', () => {
   test('routes stale authenticated sessions to foreground LAN discovery, not OpenSourceInfoScreen', async () => {
-    renderWithAuthedLocalSession();
+    mockLegacyAuthenticatedSession();
+    render(
+      <NavigationContainer>
+        <RootNavigator />
+      </NavigationContainer>,
+    );
     await waitFor(() =>
       expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
     );
@@ -393,7 +408,7 @@ describe('RootNavigator - OSS fail-open routing', () => {
   });
 
   test('does not require account state before entering foreground LAN discovery', async () => {
-    renderWithAuthedLocalSession();
+    renderWithGuestLocalSession();
     await waitFor(() =>
       expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
     );
@@ -401,7 +416,7 @@ describe('RootNavigator - OSS fail-open routing', () => {
   });
 
   test('routes hydrated local sessions to main app without a paid gate', async () => {
-    renderWithAuthedLocalSession();
+    renderWithGuestLocalSession();
     await waitFor(() =>
       expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
     );
@@ -409,7 +424,7 @@ describe('RootNavigator - OSS fail-open routing', () => {
   });
 
   test('keeps local sessions off paid gate routes', async () => {
-    renderWithAuthedLocalSession();
+    renderWithGuestLocalSession();
     await waitFor(() =>
       expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
     );
@@ -425,7 +440,7 @@ describe('RootNavigator - OSS fail-open routing', () => {
       host: '192.168.1.10',
     });
 
-    renderWithAuthedLocalSession();
+    renderWithGuestLocalSession();
 
     await waitFor(() =>
       expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy(),
@@ -434,7 +449,7 @@ describe('RootNavigator - OSS fail-open routing', () => {
   });
 
   test('stale legacy account snapshots are no longer required for LAN discovery', async () => {
-    renderWithAuthedLocalSession();
+    renderWithGuestLocalSession();
     await waitFor(() =>
       expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
     );
@@ -442,12 +457,12 @@ describe('RootNavigator - OSS fail-open routing', () => {
   });
 
   test('does not reset foreground LAN route to OpenSourceInfoScreen after entering the app', async () => {
-    const view = renderWithAuthedLocalSession();
+    const view = renderWithGuestLocalSession();
     await waitFor(() =>
       expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
     );
 
-    mockAuthedLocalSession();
+    mockGuestLocalSession();
     view.rerender(
       <NavigationContainer>
         <RootNavigator />
@@ -460,11 +475,11 @@ describe('RootNavigator - OSS fail-open routing', () => {
     expect(screen.queryByTestId('open-source-info-screen')).toBeNull();
   });
 
-  test('uses visual QA whitelisted authed route as initial route', async () => {
+  test('uses visual QA whitelisted local route as initial route', async () => {
     process.env.LYNAVO_VISUAL_QA = '1';
     process.env.LYNAVO_VISUAL_QA_ROUTE = 'History';
 
-    renderWithAuthedLocalSession();
+    renderWithGuestLocalSession();
 
     await waitFor(() =>
       expect(screen.getByTestId('history-screen')).toBeTruthy(),
@@ -479,7 +494,7 @@ describe('RootNavigator - OSS fail-open routing', () => {
       removeListeners: jest.fn(),
     };
 
-    renderWithAuthedLocalSession();
+    renderWithGuestLocalSession();
 
     await waitFor(() =>
       expect(

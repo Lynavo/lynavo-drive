@@ -181,16 +181,28 @@ describe('@lynavo-drive/contracts exports', () => {
     expect(legacyEndpoints in contracts).toBe(false);
   });
 
-  it('exports Lynavo Drive web and support contact without official API endpoints', () => {
-    expect(contracts.LYNAVO_ROOT_DOMAIN).toBe('lynavo.com');
-    expect(contracts.LYNAVO_WEB_BASE_URL).toBe('https://www.lynavo.com');
-    expect(contracts.LYNAVO_SUPPORT_EMAIL).toBe('support@lynavo.com');
+  it('exports OSS repository support links without official API endpoints', () => {
+    expect(contracts.LYNAVO_REPOSITORY_URL).toBe('https://github.com/lynavo/lynavo-drive');
+    expect(contracts.LYNAVO_WEB_BASE_URL).toBe('https://github.com/lynavo/lynavo-drive');
+    expect(contracts.LYNAVO_SUPPORT_URL).toBe(
+      'https://github.com/lynavo/lynavo-drive/issues',
+    );
+    expect(contracts.LYNAVO_SECURITY_ADVISORY_URL).toBe(
+      'https://github.com/lynavo/lynavo-drive/security/advisories/new',
+    );
+    expect(contracts.LYNAVO_PRIVACY_URL).toBe(
+      'https://github.com/lynavo/lynavo-drive/blob/main/PRIVACY.md',
+    );
+    expect(contracts.LYNAVO_LICENSE_URL).toBe(
+      'https://github.com/lynavo/lynavo-drive/blob/main/LICENSE',
+    );
     expect('LYNAVO_API_BASE_URL' in contracts).toBe(false);
     expect('LYNAVO_REVIEW_API_BASE_URL' in contracts).toBe(false);
     expect('LYNAVO_SUPPORT_API_BASE_URL' in contracts).toBe(false);
     expect('LYNAVO_REVIEW_SUPPORT_API_BASE_URL' in contracts).toBe(false);
     expect('LYNAVO_SERVICE_ENDPOINTS' in contracts).toBe(false);
     expect('LYNAVO_SUPPORT_ENDPOINTS' in contracts).toBe(false);
+    expect('LYNAVO_SUPPORT_EMAIL' in contracts).toBe(false);
     expect('LYNAVO_REVIEW_EMAIL' in contracts).toBe(false);
     const iosRedirectKey = ['LYNAVO', 'APPLE_REDIRECT_URI'].join('_');
     expect(iosRedirectKey in contracts).toBe(false);

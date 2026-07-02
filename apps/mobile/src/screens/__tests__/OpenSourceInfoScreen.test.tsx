@@ -27,7 +27,7 @@ jest.mock('react-i18next', () => ({
       const map: Record<string, string> = {
         'oss.title': 'Lynavo Drive Community',
         'oss.body':
-          'The open-source edition syncs over your local LAN without an official account.',
+          'The open-source edition syncs over your local LAN with local desktop pairing.',
         'oss.pointLan':
           'Pair with a desktop on the same network for automatic incremental sync.',
         'oss.pointNoStore':
@@ -73,7 +73,7 @@ describe('OpenSourceInfoScreen OSS information route', () => {
     expect(getByText('Lynavo Drive Community')).toBeTruthy();
     expect(
       getByText(
-        'The open-source edition syncs over your local LAN without an official account.',
+        'The open-source edition syncs over your local LAN with local desktop pairing.',
       ),
     ).toBeTruthy();
     expect(

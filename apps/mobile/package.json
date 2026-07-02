@@ -2,6 +2,7 @@
   "name": "@lynavo-drive/mobile",
   "version": "1.0.1",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "android": "react-native run-android",
     "ios": "react-native run-ios",
@@ -64,6 +65,6 @@
     "typescript": "^5.8.3"
   },
   "engines": {
-    "node": ">= 22.11.0"
+    "node": ">= 22.12.0"
   }
 }

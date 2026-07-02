@@ -58,7 +58,6 @@ data class AndroidSyncOverviewInput(
   val currentTaskSource: String? = null,
   val lastCompletedTaskSource: String? = null,
   val autoUploadState: String = "disabled",
-  val manualPending: Int = 0,
   val autoPending: Int = 0,
   val roundBaselineCompletedCount: Int = 0,
   val roundBaselineCompletedBytes: Long = 0,
@@ -95,7 +94,6 @@ data class AndroidSyncOverviewFields(
   val currentTaskSource: String?,
   val lastCompletedTaskSource: String?,
   val autoUploadState: String,
-  val manualPending: Double,
   val autoPending: Double,
 )
 
@@ -1018,7 +1016,6 @@ object AndroidSyncPrimitives {
       currentTaskSource = if (clearsActiveFile) null else input.currentTaskSource,
       lastCompletedTaskSource = input.lastCompletedTaskSource,
       autoUploadState = input.autoUploadState,
-      manualPending = input.manualPending.toDouble(),
       autoPending = input.autoPending.toDouble(),
     )
   }

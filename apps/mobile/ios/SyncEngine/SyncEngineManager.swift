@@ -620,7 +620,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     ) -> [String: Any] {
         runtimeUploadState = uploadState
         let currentBinding = uploadStore?.getBinding()
-        let pendingCounts = uploadStore?.getPendingCountsBySource() ?? (auto: 0, manual: 0)
+        let autoPendingCount = uploadStore?.getPendingUploadItemCount() ?? 0
         let currentSource = uploadStore?.getCurrentUploadingSource()
         let currentTaskSource: Any = currentSource == "auto" ? "auto" : NSNull()
         let persistedQueueStats = uploadStore?.getQueueStats() ?? (totalCount: 0, totalBytes: 0, completedCount: 0, completedBytes: 0)
@@ -633,7 +633,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let shouldFallbackToPersistedQueueStats =
             includePersistedIdleStats &&
             !hasRuntimeRoundProgress &&
-            pendingCounts.auto == 0 &&
+            autoPendingCount == 0 &&
             currentBinding != nil &&
             uploadState == "idle" &&
             persistedQueueStats.totalCount > 0
@@ -697,8 +697,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             "currentTaskSource": currentTaskSource,
             "lastCompletedTaskSource": runtimeLastCompletedTaskSource ?? NSNull(),
             "autoUploadState": autoUploadState,
-            "manualPending": 0,
-            "autoPending": pendingCounts.auto,
+            "autoPending": autoPendingCount,
         ]
         return payload
     }
@@ -1325,7 +1324,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     private var isPairing = false
 
 
-    private static let bindingInvalidationReasonKey = "vivi_binding_invalidation_reason"
+    private static let bindingInvalidationReasonKey = "lynavo_binding_invalidation_reason"
 
     private func withBindingMutationLock<T>(_ body: () throws -> T) rethrows -> T {
         bindingMutationLock.lock()
@@ -2114,13 +2113,13 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
     private func resumeSyncAfterConnectionRecovery(reason: String) {
         let configState = autoUploadConfigStore?.getConfig().state ?? "disabled"
-        let pendingCounts = uploadStore?.getPendingCountsBySource() ?? (auto: 0, manual: 0)
+        let autoPendingCount = uploadStore?.getPendingUploadItemCount() ?? 0
         let shouldResume = configState == "active"
 
         guard shouldResume else {
             syncDiagnosticsLog(
                 "SyncEngine",
-                "connection recovery did not resume sync (\(reason)) auto=\(configState) pending(auto=\(pendingCounts.auto))"
+                "connection recovery did not resume sync (\(reason)) auto=\(configState) pending(auto=\(autoPendingCount))"
             )
             return
         }
@@ -2133,10 +2132,10 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
             isSyncing = false
         }
 
-        syncDiagnosticsLog(
-            "SyncEngine",
-            "connection recovery resuming sync (\(reason)) auto=\(configState) pending(auto=\(pendingCounts.auto)) isSyncing=\(isSyncing) session=\(sessionService.state.rawValue)"
-        )
+            syncDiagnosticsLog(
+                "SyncEngine",
+                "connection recovery resuming sync (\(reason)) auto=\(configState) pending(auto=\(autoPendingCount)) isSyncing=\(isSyncing) session=\(sessionService.state.rawValue)"
+            )
         startSync()
     }
 
@@ -3072,17 +3071,19 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     }
 
     private func runStartLynavoDriveFlow() async {
-        let shouldBeginBackgroundTransition = await MainActor.run {
+        let startsInBackground = await MainActor.run {
             UIApplication.shared.applicationState == .background
         }
 
-        if shouldBeginBackgroundTransition {
-            await MainActor.run {
-                beginBackgroundTransitionIfNeeded(reason: "startSyncWhileBackgrounded")
-            }
-        }
-
         do {
+            if startsInBackground {
+                slog("[SyncEngine] refusing to start foreground LAN sync while app is backgrounded")
+                syncDiagnosticsLog(
+                    "SyncEngine",
+                    "refusing to start foreground LAN sync while app is backgrounded"
+                )
+                throw SyncEngineError.backgroundRuntimePaused
+            }
             try await runSyncPipeline()
         } catch is CancellationError {
             protocolSession?.disconnect()
@@ -3472,7 +3473,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
 
                 if configState == "interrupted" || isAutoUploadInterrupted {
                     // Interrupted: report interrupted state regardless of pending count
-                    let autoPendingCount = uploadStore?.getPendingCountsBySource().auto ?? 0
+                    let autoPendingCount = uploadStore?.getPendingUploadItemCount() ?? 0
                     let payload = runtimeSyncOverviewPayload(uploadState: "paused_auto_upload")
                     logSyncOverviewEmission("empty_queue_interrupted", payload: payload)
                     NativeSyncEngineModule.shared?.emitSyncStateChanged(
@@ -7776,18 +7777,16 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         try persistBinding(binding)
     }
 
-    // MARK: - Account Identity Reset (Phase 1 / 2 / 3)
+    // MARK: - Sync Identity Reset (Phase 1 / 2 / 3)
 
     /// UserDefaults key used as a 2-phase sentinel around a wipe. While set,
     /// the next cold start treats the wipe as interrupted and re-runs it. See
     /// AppDelegate for the launch-time self-heal branch.
-    private static let wipeInProgressKey = "vivi_wipe_in_progress"
+    private static let wipeInProgressKey = "lynavo_wipe_in_progress"
 
-    /// Prefixes of Keychain accounts that represent per-device pairing tokens.
-    /// The current build writes `lynavo_pairing_token_<serverId>`; historical
-    /// builds used `pairing_token_<serverId>` — we sweep both so an upgraded
-    /// user never carries a dangling legacy entry past logout.
-    private static let pairingTokenKeyPrefixes = ["lynavo_pairing_token_", "pairing_token_"]
+    /// Prefixes of Keychain entries that represent per-device pairing tokens.
+    /// The current build writes `lynavo_pairing_token_<serverId>`.
+    private static let pairingTokenKeyPrefixes = ["lynavo_pairing_token_"]
 
     /// Single orchestrator for all sync-identity cleanup. Safe to call multiple
     /// times (idempotent — each step re-checks state). Individual step failures
@@ -7798,7 +7797,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     /// upload queue + sessions + daily ledger, auto-upload config, runtime
     /// pipeline state.
     ///
-    /// Preserves: clientDisplayName (device preference, not account data)
+    /// Preserves: clientDisplayName (device preference, not session data)
     /// plus every UserDefaults key not explicitly touched below — including
     /// language/theme/permission state and diagnostic flags outside our
     /// scope. (Note: the `@lynavo-drive/debug/*` namespace lives in AsyncStorage

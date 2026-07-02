@@ -10,7 +10,7 @@ from zipfile import ZipFile
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 LOCALES_ROOT = PROJECT_ROOT / 'apps/mobile/src/i18n/locales'
-WORKBOOK_PATH = PROJECT_ROOT / 'docs/localization/mobile-i18n.xlsx'
+WORKBOOK_PATH = PROJECT_ROOT / 'apps/mobile/scripts/resources/mobile-i18n.xlsx'
 LOCALES = ('en', 'zh-Hans', 'zh-Hant')
 REQUIRED_HEADERS = ('section', 'full_key', 'relative_key', 'en', 'zh-Hans', 'zh-Hant')
 XML_NS = {

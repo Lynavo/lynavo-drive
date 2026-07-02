@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 MODE="batch"
 ROUNDS=5
 FILE_KEY=""
@@ -22,7 +25,7 @@ RESULTS=""
 THRESHOLD_BYTES=$((512 * 1024 * 1024))
 ROUND_TIMEOUT_SEC=600
 COMPLETE_TIMEOUT_SEC=900
-SIDECAR_DIR="/Volumes/workspace/work/sync-flow/services/sidecar-go"
+SIDECAR_DIR="$REPO_ROOT/services/sidecar-go"
 PAUSE_SEC=15
 
 usage() {

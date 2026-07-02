@@ -1579,7 +1579,6 @@ class AndroidSyncPrimitivesTest {
         currentFileConfirmedBytes = 1_000,
         currentFileTotalBytes = 1_000,
         autoUploadState = "active",
-        manualPending = 0,
         autoPending = 0,
         lastCompletedTaskSource = "auto",
       ),

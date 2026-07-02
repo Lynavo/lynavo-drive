@@ -1,8 +1,8 @@
 import { NativeModules } from 'react-native';
+import * as visualQa from '../visualQa';
 import {
   applyVisualQaSharedFilesPreviewFlag,
-  getDevSkipAuthMockTokens,
-  getVisualQaMockTokens,
+  isVisualQaEnabled,
   isVisualQaHomeEmptyStateEnabled,
   resolveVisualQaInitialRoute,
 } from '../visualQa';
@@ -26,7 +26,6 @@ describe('visual QA dev bootstrap', () => {
     delete testGlobal.__LYNAVO_SHARED_FILES_PREVIEW__;
     process.env = { ...originalEnv };
     delete process.env.LYNAVO_VISUAL_QA;
-    delete process.env.LYNAVO_VISUAL_QA_EMAIL;
     delete process.env.LYNAVO_VISUAL_QA_ROUTE;
     delete process.env.LYNAVO_VISUAL_QA_SHARED_FILES_PREVIEW;
     delete process.env.LYNAVO_VISUAL_QA_HOME_EMPTY;
@@ -43,11 +42,10 @@ describe('visual QA dev bootstrap', () => {
   test('stays disabled outside dev even when env is present', () => {
     testGlobal.__DEV__ = false;
     process.env.LYNAVO_VISUAL_QA = '1';
-    process.env.LYNAVO_VISUAL_QA_EMAIL = 'person@example.com';
     process.env.LYNAVO_VISUAL_QA_ROUTE = 'History';
     process.env.LYNAVO_VISUAL_QA_SHARED_FILES_PREVIEW = '1';
 
-    expect(getVisualQaMockTokens()).toBeNull();
+    expect(isVisualQaEnabled()).toBe(false);
     expect(resolveVisualQaInitialRoute()).toBeNull();
     applyVisualQaSharedFilesPreviewFlag();
     expect(testGlobal.__LYNAVO_SHARED_FILES_PREVIEW__).toBeUndefined();
@@ -61,44 +59,35 @@ describe('visual QA dev bootstrap', () => {
       LYNAVO_VISUAL_QA_SHARED_FILES_PREVIEW: '1',
     };
 
-    expect(getVisualQaMockTokens()).toEqual({
-      accessToken: 'mock-sandbox-access-token:qa@example.com',
-      refreshToken: 'mock-sandbox-refresh-token',
-    });
+    expect(isVisualQaEnabled()).toBe(true);
     expect(resolveVisualQaInitialRoute()).toBe('History');
     applyVisualQaSharedFilesPreviewFlag();
     expect(testGlobal.__LYNAVO_SHARED_FILES_PREVIEW__).toBe(true);
   });
 
   test('stays disabled in dev when enable env is missing', () => {
-    expect(getVisualQaMockTokens()).toBeNull();
+    expect(isVisualQaEnabled()).toBe(false);
     expect(resolveVisualQaInitialRoute()).toBeNull();
   });
 
-  test('builds mock tokens from enabled env and default email', () => {
+  test('enables local visual QA flags without shipping mock auth helpers', () => {
     process.env.LYNAVO_VISUAL_QA = '1';
 
-    expect(getVisualQaMockTokens()).toEqual({
-      accessToken: 'mock-sandbox-access-token:qa@example.com',
-      refreshToken: 'mock-sandbox-refresh-token',
-    });
+    expect(isVisualQaEnabled()).toBe(true);
+    expect(visualQa).not.toHaveProperty('getVisualQaMockTokens');
+    expect(visualQa).not.toHaveProperty('getDevSkipAuthMockTokens');
   });
 
   test('prefers native runtime visual QA constants over process env fallback', () => {
     NativeModules.NativeAppRuntimeConfig = {
       LYNAVO_VISUAL_QA: '1',
-      LYNAVO_VISUAL_QA_EMAIL: 'native@example.com',
       LYNAVO_VISUAL_QA_ROUTE: 'History',
       LYNAVO_VISUAL_QA_SHARED_FILES_PREVIEW: '1',
     };
     process.env.LYNAVO_VISUAL_QA = '0';
-    process.env.LYNAVO_VISUAL_QA_EMAIL = 'process@example.com';
     process.env.LYNAVO_VISUAL_QA_ROUTE = 'Settings';
 
-    expect(getVisualQaMockTokens()).toEqual({
-      accessToken: 'mock-sandbox-access-token:native@example.com',
-      refreshToken: 'mock-sandbox-refresh-token',
-    });
+    expect(isVisualQaEnabled()).toBe(true);
     expect(resolveVisualQaInitialRoute()).toBe('History');
     applyVisualQaSharedFilesPreviewFlag();
     expect(testGlobal.__LYNAVO_SHARED_FILES_PREVIEW__).toBe(true);
@@ -112,14 +101,11 @@ describe('visual QA dev bootstrap', () => {
       }),
     };
 
-    expect(getVisualQaMockTokens()).toEqual({
-      accessToken: 'mock-sandbox-access-token:qa@example.com',
-      refreshToken: 'mock-sandbox-refresh-token',
-    });
+    expect(isVisualQaEnabled()).toBe(true);
     expect(resolveVisualQaInitialRoute()).toBe('History');
   });
 
-  test('reads native dev skip-auth constants without enabling visual QA mocks', () => {
+  test('ignores legacy dev skip-auth constants for local visual QA routing', () => {
     NativeModules.NativeAppRuntimeConfig = {
       LYNAVO_DEV_SKIP_AUTH: '1',
       LYNAVO_DEV_SKIP_AUTH_EMAIL: 'functional@example.com',
@@ -127,24 +113,11 @@ describe('visual QA dev bootstrap', () => {
       LYNAVO_VISUAL_QA_ROUTE: 'DeviceDiscovery',
     };
 
-    expect(getDevSkipAuthMockTokens()).toEqual({
-      accessToken: 'mock-sandbox-access-token:functional@example.com',
-      refreshToken: 'mock-sandbox-refresh-token',
-    });
-    expect(getVisualQaMockTokens()).toBeNull();
+    expect(isVisualQaEnabled()).toBe(false);
     expect(resolveVisualQaInitialRoute()).toBeNull();
   });
 
-  test('uses requested visual QA email for mock access token', () => {
-    process.env.LYNAVO_VISUAL_QA = '1';
-    process.env.LYNAVO_VISUAL_QA_EMAIL = 'designer@example.com';
-
-    expect(getVisualQaMockTokens()?.accessToken).toBe(
-      'mock-sandbox-access-token:designer@example.com',
-    );
-  });
-
-  test('accepts only whitelisted authed initial routes', () => {
+  test('accepts only whitelisted local LAN initial routes', () => {
     process.env.LYNAVO_VISUAL_QA = '1';
 
     process.env.LYNAVO_VISUAL_QA_ROUTE = 'History';

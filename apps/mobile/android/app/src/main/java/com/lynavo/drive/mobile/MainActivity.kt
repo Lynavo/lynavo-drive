@@ -42,12 +42,9 @@ class MainActivity : ReactActivity() {
     private val VISUAL_QA_KEYS =
         listOf(
             "LYNAVO_VISUAL_QA",
-            "LYNAVO_VISUAL_QA_EMAIL",
             "LYNAVO_VISUAL_QA_HOME_EMPTY",
             "LYNAVO_VISUAL_QA_ROUTE",
             "LYNAVO_VISUAL_QA_SHARED_FILES_PREVIEW",
-            "LYNAVO_DEV_SKIP_AUTH",
-            "LYNAVO_DEV_SKIP_AUTH_EMAIL",
         )
 
     @Volatile private var visualQaLaunchExtras: Map<String, String> = emptyMap()

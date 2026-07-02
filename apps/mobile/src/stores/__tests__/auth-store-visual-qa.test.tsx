@@ -24,7 +24,7 @@ function AuthProbe() {
   );
 }
 
-describe('AuthProvider visual QA bootstrap', () => {
+describe('AuthProvider local visual QA bootstrap', () => {
   const originalDev = testGlobal.__DEV__;
   const originalEnv = { ...process.env };
 
@@ -33,7 +33,6 @@ describe('AuthProvider visual QA bootstrap', () => {
     testGlobal.__DEV__ = true;
     process.env = { ...originalEnv };
     delete process.env.LYNAVO_VISUAL_QA;
-    delete process.env.LYNAVO_VISUAL_QA_EMAIL;
     delete process.env.LYNAVO_DEV_SKIP_AUTH;
     delete process.env.LYNAVO_DEV_SKIP_AUTH_EMAIL;
   });
@@ -43,9 +42,8 @@ describe('AuthProvider visual QA bootstrap', () => {
     process.env = originalEnv;
   });
 
-  test('enables local dev session when visual QA is enabled', async () => {
+  test('keeps guest local LAN session when visual QA is enabled', async () => {
     process.env.LYNAVO_VISUAL_QA = '1';
-    process.env.LYNAVO_VISUAL_QA_EMAIL = 'designer@example.com';
 
     render(
       <AuthProvider>
@@ -61,12 +59,12 @@ describe('AuthProvider visual QA bootstrap', () => {
       };
 
       expect(state).toEqual({
-        isLoggedIn: true,
+        isLoggedIn: false,
       });
     });
   });
 
-  test('enables dev skip-auth session without enabling visual QA route mocks', async () => {
+  test('ignores legacy dev skip-auth env for OSS local LAN session', async () => {
     process.env.LYNAVO_DEV_SKIP_AUTH = '1';
     process.env.LYNAVO_DEV_SKIP_AUTH_EMAIL = 'functional@example.com';
     process.env.LYNAVO_VISUAL_QA_ROUTE = 'DeviceDiscovery';
@@ -85,7 +83,7 @@ describe('AuthProvider visual QA bootstrap', () => {
       };
 
       expect(state).toEqual({
-        isLoggedIn: true,
+        isLoggedIn: false,
       });
     });
   });

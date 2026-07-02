@@ -124,7 +124,6 @@ beforeEach(() => {
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
       autoUploadState: 'disabled',
-      manualPending: 0,
       autoPending: 0,
     }),
     startDiscovery: jest.fn().mockResolvedValue(undefined),
@@ -186,7 +185,6 @@ describe('SyncActivityScreen header', () => {
       currentFileTotalBytes: 4096,
       currentTaskSource: 'auto',
       autoUploadState: 'active',
-      manualPending: 0,
       autoPending: 3,
     });
 
@@ -238,7 +236,6 @@ describe('SyncActivityScreen header', () => {
       currentFileConfirmedBytes: 0,
       currentFileTotalBytes: 0,
       autoUploadState: 'disabled',
-      manualPending: 0,
       autoPending: 0,
       lastErrorCode: 'RECONNECT_EXHAUSTED',
     });

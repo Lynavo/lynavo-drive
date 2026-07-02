@@ -80,7 +80,6 @@ const EMPTY_SYNC_OVERVIEW: GlobalSyncOverview = {
   completedCount: 0,
   totalCount: 0,
   autoUploadState: 'disabled',
-  manualPending: 0,
   autoPending: 0,
 };
 
@@ -667,7 +666,6 @@ function normalizeSyncOverview(
     autoUploadState: isAutoUploadState(autoUploadStateValue)
       ? autoUploadStateValue
       : prev.autoUploadState,
-    manualPending: 0,
     autoPending: readNumberField(payload, 'autoPending') ?? prev.autoPending,
   };
 }

@@ -115,9 +115,9 @@
     },
     "allDuplicate": {
       "title": "All Duplicates",
-      "body": "All {{count}} selected items are already in the upload queue.",
+      "body": "All {{count}} items are already in the upload queue.",
       "body_one": "The selected item is already in the upload queue.",
-      "body_other": "All {{count}} selected items are already in the upload queue."
+      "body_other": "All {{count}} items are already in the upload queue."
     },
     "submitFailed": {
       "title": "Submission Failed",

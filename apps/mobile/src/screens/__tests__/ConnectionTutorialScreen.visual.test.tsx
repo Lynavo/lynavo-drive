@@ -33,7 +33,7 @@ jest.mock('react-i18next', () => ({
         'connectionTutorial.cards.lan.steps.2':
           '手機端進入搜尋設備，稍等片刻即可發現電腦',
         'connectionTutorial.cards.lan.warning':
-          '還沒有電腦端？請在電腦瀏覽器訪問 www.lynavo.com 下載安裝。',
+          '還沒有電腦端？請在電腦瀏覽器訪問 {{host}} 安裝。',
         'connectionTutorial.cards.qr.steps.0':
           '在電腦端 Lynavo Drive「全域設定」中顯示二維碼',
         'connectionTutorial.cards.qr.steps.1':
@@ -63,8 +63,8 @@ jest.mock('react-i18next', () => ({
           '仍然無法連接時，改用手動方式完成配對。',
         'connectionTutorial.troubleshoot.supportTitle': '仍然無法解決？',
         'connectionTutorial.troubleshoot.supportBody':
-          '請匯出診斷包或聯絡客服。',
-        'connectionTutorial.troubleshoot.supportEmail': 'support@lynavo.com',
+          '請匯出診斷包並開 GitHub issue。',
+        'connectionTutorial.troubleshoot.supportIssue': 'GitHub Issues',
       })[key] ?? key,
   }),
 }));

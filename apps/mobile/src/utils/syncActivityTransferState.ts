@@ -10,7 +10,6 @@ export interface SyncActivityTransferSnapshot {
   currentFileTotalBytes?: number | null;
   currentTaskSource?: UploadTaskSource | null;
   lastCompletedTaskSource?: UploadTaskSource | null;
-  manualPending?: number | null;
   autoPending?: number | null;
   completedCount?: number | null;
   totalCount?: number | null;

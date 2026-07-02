@@ -27,19 +27,13 @@ type SharedFilesPreviewGlobal = typeof globalThis & {
 };
 
 type VisualQaNativeConstants = {
-  LYNAVO_DEV_SKIP_AUTH?: unknown;
-  LYNAVO_DEV_SKIP_AUTH_EMAIL?: unknown;
   LYNAVO_VISUAL_QA?: unknown;
-  LYNAVO_VISUAL_QA_EMAIL?: unknown;
   LYNAVO_VISUAL_QA_HOME_EMPTY?: unknown;
   LYNAVO_VISUAL_QA_ROUTE?: unknown;
   LYNAVO_VISUAL_QA_SHARED_FILES_PREVIEW?: unknown;
   getConstants?: () => VisualQaNativeConstants;
 };
 
-const DEFAULT_VISUAL_QA_EMAIL = 'qa@example.com';
-const DEFAULT_DEV_SKIP_AUTH_EMAIL = 'qa@example.com';
-const VISUAL_QA_REFRESH_TOKEN = 'mock-sandbox-refresh-token';
 const VISUAL_QA_ROUTE_WHITELIST: ReadonlySet<string> = new Set<VisualQaRoute>([
   'DeviceDiscovery',
   'QRScanner',
@@ -90,38 +84,6 @@ export function isVisualQaEnabled(): boolean {
     return nativeValue === '1';
   }
   return isDevRuntime() ? getEnv('LYNAVO_VISUAL_QA') === '1' : false;
-}
-
-export function getVisualQaMockTokens(): {
-  accessToken: string;
-  refreshToken: string;
-} | null {
-  if (!isVisualQaEnabled()) return null;
-  const email =
-    getVisualQaValue('LYNAVO_VISUAL_QA_EMAIL') || DEFAULT_VISUAL_QA_EMAIL;
-  return {
-    accessToken: `mock-sandbox-access-token:${email}`,
-    refreshToken: VISUAL_QA_REFRESH_TOKEN,
-  };
-}
-
-export function isDevSkipAuthEnabled(): boolean {
-  if (!isDevRuntime()) return false;
-  return getVisualQaValue('LYNAVO_DEV_SKIP_AUTH') === '1';
-}
-
-export function getDevSkipAuthMockTokens(): {
-  accessToken: string;
-  refreshToken: string;
-} | null {
-  if (!isDevSkipAuthEnabled()) return null;
-  const email =
-    getVisualQaValue('LYNAVO_DEV_SKIP_AUTH_EMAIL') ||
-    DEFAULT_DEV_SKIP_AUTH_EMAIL;
-  return {
-    accessToken: `mock-sandbox-access-token:${email}`,
-    refreshToken: VISUAL_QA_REFRESH_TOKEN,
-  };
 }
 
 export function resolveVisualQaInitialRoute(): VisualQaRoute | null {

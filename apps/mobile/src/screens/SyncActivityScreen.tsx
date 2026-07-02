@@ -93,7 +93,6 @@ interface SyncOverview {
   currentTaskSource?: UploadTaskSource | null;
   lastCompletedTaskSource?: UploadTaskSource | null;
   autoUploadState?: AutoUploadState;
-  manualPending?: number;
   autoPending?: number;
   lastErrorCode?: string;
   /** Seconds elapsed during Bonjour device discovery */
@@ -210,7 +209,6 @@ const EMPTY_OVERVIEW: SyncOverview = {
   currentTaskSource: null,
   lastCompletedTaskSource: null,
   autoUploadState: 'disabled',
-  manualPending: 0,
   autoPending: 0,
 };
 
@@ -2004,7 +2002,6 @@ export function buildOverview(
     (payload.totalCount as number | undefined) ??
     (payload.queueTotalCount as number | undefined) ??
     prev.totalCount;
-  const nextManualPending = 0;
   const nextAutoPending =
     (payload.autoPending as number | undefined) ?? prev.autoPending;
   const nextAutoUploadState =
@@ -2098,7 +2095,6 @@ export function buildOverview(
     currentTaskSource: nextCurrentTaskSource,
     lastCompletedTaskSource: derivedLastCompletedTaskSource,
     autoUploadState: nextAutoUploadState,
-    manualPending: nextManualPending,
     autoPending: nextAutoPending,
     lastErrorCode: hasLastErrorCode ? payloadLastErrorCode : prev.lastErrorCode,
     discoveryElapsedSec:

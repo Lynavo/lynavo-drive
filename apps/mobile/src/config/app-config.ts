@@ -1,11 +1,15 @@
 import {
-  LYNAVO_SUPPORT_EMAIL,
+  LYNAVO_LICENSE_URL,
+  LYNAVO_PRIVACY_URL,
+  LYNAVO_SECURITY_ADVISORY_URL,
+  LYNAVO_SUPPORT_URL,
   LYNAVO_WEB_BASE_URL,
 } from '@lynavo-drive/contracts';
 
 interface AppConfigEndpoints {
   readonly webBaseUrl: string;
-  readonly supportEmail: string;
+  readonly supportUrl: string;
+  readonly securityAdvisoryUrl: string;
 }
 
 interface AppConfigLegal {
@@ -22,7 +26,8 @@ export interface AppConfig {
 
 const LYNAVO_ENDPOINTS: AppConfigEndpoints = {
   webBaseUrl: LYNAVO_WEB_BASE_URL,
-  supportEmail: LYNAVO_SUPPORT_EMAIL,
+  supportUrl: LYNAVO_SUPPORT_URL,
+  securityAdvisoryUrl: LYNAVO_SECURITY_ADVISORY_URL,
 };
 
 export const appConfig: AppConfig = Object.freeze({
@@ -30,7 +35,7 @@ export const appConfig: AppConfig = Object.freeze({
   bundleId: 'com.lynavo.drive.mobile',
   endpoints: LYNAVO_ENDPOINTS,
   legal: {
-    privacyUrl: `${LYNAVO_ENDPOINTS.webBaseUrl}/privacy`,
-    termsUrl: `${LYNAVO_ENDPOINTS.webBaseUrl}/terms`,
+    privacyUrl: LYNAVO_PRIVACY_URL,
+    termsUrl: LYNAVO_LICENSE_URL,
   },
 });

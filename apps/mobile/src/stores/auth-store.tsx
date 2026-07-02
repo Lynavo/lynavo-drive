@@ -5,11 +5,7 @@ import React, {
   useEffect,
   useReducer,
 } from 'react';
-import {
-  applyVisualQaSharedFilesPreviewFlag,
-  getDevSkipAuthMockTokens,
-  getVisualQaMockTokens,
-} from '../dev/visualQa';
+import { applyVisualQaSharedFilesPreviewFlag } from '../dev/visualQa';
 
 applyVisualQaSharedFilesPreviewFlag();
 
@@ -93,18 +89,15 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // Only explicit visual QA/dev skip-auth flags may enter the authenticated
-  // route shape. Normal OSS startup enters guest LAN sync.
+  // OSS startup always enters the guest LAN session shape. Visual QA may pick
+  // a local route, but it must not mint a signed-in session.
   useEffect(() => {
     let cancelled = false;
     Promise.resolve().then(() => {
       if (cancelled) {
         return;
       }
-      const hasDevSession = Boolean(
-        getDevSkipAuthMockTokens() ?? getVisualQaMockTokens(),
-      );
-      dispatch({ type: 'HYDRATE', isLoggedIn: hasDevSession });
+      dispatch({ type: 'HYDRATE', isLoggedIn: false });
     });
     return () => {
       cancelled = true;

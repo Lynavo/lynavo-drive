@@ -38,7 +38,7 @@ describe('AuthProvider API session clear bridge', () => {
   beforeEach(() => {
     mockRegisteredClearAuth = null;
     testGlobal.__DEV__ = true;
-    process.env = { ...originalEnv, LYNAVO_DEV_SKIP_AUTH: '1' };
+    process.env = { ...originalEnv };
   });
 
   afterAll(() => {
@@ -46,7 +46,7 @@ describe('AuthProvider API session clear bridge', () => {
     process.env = originalEnv;
   });
 
-  test('clears local dev session after registered API clear', async () => {
+  test('records session-replaced transition after registered local session clear', async () => {
     render(
       <AuthProvider>
         <AuthProbe />
@@ -63,7 +63,7 @@ describe('AuthProvider API session clear bridge', () => {
         isLoggedIn: boolean;
       };
 
-      expect(state.isLoggedIn).toBe(true);
+      expect(state.isLoggedIn).toBe(false);
     });
     await act(async () => {
       mockRegisteredClearAuth?.('session_replaced');
