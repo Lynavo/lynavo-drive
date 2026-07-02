@@ -6,9 +6,6 @@ import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
 const repoRoot = new URL('../../..', import.meta.url);
-const token = (parts) => parts.join('');
-const legacyFormerFlow = token(['Sync', 'Flow']);
-const legacyLowerVivi = token(['vivi', 'drop']);
 
 function runVerifier(args) {
   return spawnSync(process.execPath, ['scripts/verify-oss-source-package.mjs', ...args], {
@@ -156,10 +153,10 @@ test('audits deleted tracked source-package files when untracked worktree files 
 
 test('ignores tracked files deleted from the working tree before staging', () => {
   const fixtureRoot = createTrackedFixture({
-    [`docs/${legacyFormerFlow}-plan.md`]: 'legacy\n',
+    'docs/source-plan.md': 'plan\n',
   });
   try {
-    rmSync(join(fixtureRoot, 'docs', `${legacyFormerFlow}-plan.md`), { force: true });
+    rmSync(join(fixtureRoot, 'docs', 'source-plan.md'), { force: true });
 
     const result = runVerifier(['--root', fixtureRoot]);
 
@@ -173,7 +170,7 @@ test('ignores tracked files deleted from the working tree before staging', () =>
 
 test('audits a committed git tree when a git ref is requested', () => {
   const fixtureRoot = createTrackedFixture({
-    [`docs/${legacyFormerFlow}-plan.md`]: 'legacy\n',
+    'apps/desktop/release/LynavoDrive.dmg': 'binary\n',
   });
   try {
     git(fixtureRoot, [
@@ -185,14 +182,16 @@ test('audits a committed git tree when a git ref is requested', () => {
       '-qm',
       'fixture',
     ]);
-    rmSync(join(fixtureRoot, 'docs', `${legacyFormerFlow}-plan.md`), { force: true });
+    rmSync(join(fixtureRoot, 'apps', 'desktop', 'release', 'LynavoDrive.dmg'), {
+      force: true,
+    });
 
     const result = runVerifier(['--root', fixtureRoot, '--git-ref', 'HEAD']);
 
     assert.equal(result.status, 1, result.stderr);
     assert.match(result.stdout, /OSS source package input: git tree HEAD/);
     assert.match(result.stdout, /Audited OSS source package files: 1/);
-    assert.match(result.stdout, new RegExp(`docs/${legacyFormerFlow}-plan\\.md`));
+    assert.match(result.stdout, /apps\/desktop\/release\/LynavoDrive\.dmg/);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }
@@ -303,12 +302,12 @@ test('falls back to filesystem walk for git-ref audits in extracted source archi
   }
 });
 
-test('blocks private tooling directories and legacy source-package paths', () => {
+test('blocks private tooling directories and local runtime artifacts', () => {
   const fixtureRoot = createTrackedFixture({
     '.vscode/launch.json': '{}\n',
-    '.superpowers/plans/old.md': 'plan\n',
-    [`docs/${legacyFormerFlow}-plan.md`]: 'legacy\n',
-    [`apps/mobile/src/assets/icons/${legacyLowerVivi}-logo.png`]: 'png\n',
+    '.superpowers/plans/build.md': 'plan\n',
+    'services/sidecar-go/sidecar.db': 'sqlite\n',
+    'services/sidecar-go/sidecar.log': 'log\n',
   });
   try {
     const result = runVerifier(['--root', fixtureRoot]);
@@ -320,10 +319,10 @@ test('blocks private tooling directories and legacy source-package paths', () =>
       new RegExp(
         [
           'Disallowed files:',
-          '- \\.superpowers/plans/old\\.md .*private tooling directory.*',
+          '- \\.superpowers/plans/build\\.md .*private tooling directory.*',
           '- \\.vscode/launch\\.json .*private tooling directory.*',
-          `- apps/mobile/src/assets/icons/${legacyLowerVivi}-logo\\.png .*legacy product name in path`,
-          `- docs/${legacyFormerFlow}-plan\\.md .*legacy product name in path`,
+          '- services/sidecar-go/sidecar\\.db .*generated data or log artifact.*',
+          '- services/sidecar-go/sidecar\\.log .*generated data or log artifact.*',
         ].join('\\n'),
       ),
     );

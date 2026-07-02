@@ -52,7 +52,7 @@ vi.mock('@renderer/features/library/ReceivedLibraryPage', () => ({
 }));
 
 vi.mock('@renderer/features/directory/DirectoryPage', () => ({
-  DirectoryPage: () => <main data-testid="legacy-directory-page">DirectoryPage</main>,
+  DirectoryPage: () => <main data-testid="directory-page">DirectoryPage</main>,
 }));
 
 vi.mock('@renderer/hooks/scrollbar-activity', () => ({
@@ -326,7 +326,7 @@ describe('AppShell', () => {
     expect(await screen.findByText(pageText)).toBeInTheDocument();
   });
 
-  it('does not refresh the legacy directory store when shared.directory.changed arrives', async () => {
+  it('does not refresh the directory store when shared.directory.changed arrives', async () => {
     const fetchSharedFiles = vi
       .spyOn(useDirectoryStore.getState(), 'fetchSharedFiles')
       .mockResolvedValue();
@@ -342,14 +342,14 @@ describe('AppShell', () => {
     expect(fetchSharedFiles).not.toHaveBeenCalled();
   });
 
-  it('does not load the legacy directory page for desktop-local management views', async () => {
+  it('does not load the directory page for desktop-local management views', async () => {
     installElectronAPI();
     useAppStore.setState({ currentView: 'devices' });
 
     render(<AppShell />);
 
     await completeConnectionCodeSetup();
-    expect(screen.queryByTestId('legacy-directory-page')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('directory-page')).not.toBeInTheDocument();
   });
 
   it('opens help dialog when clicking help button', async () => {
@@ -413,7 +413,7 @@ describe('AppShell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Android' }));
 
     expect(openExternal).toHaveBeenLastCalledWith('https://github.com/lynavo/lynavo-drive');
-    expect(openExternal).not.toHaveBeenCalledWith(expect.stringContaining('old-product.example'));
+    expect(openExternal).not.toHaveBeenCalledWith(expect.stringContaining('unexpected.example'));
   });
 
   it('keeps top actions clear of non-macOS native caption buttons', async () => {

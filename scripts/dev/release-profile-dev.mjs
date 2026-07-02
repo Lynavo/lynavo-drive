@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import { buildReleasePlan } from '../release/release-profiles.mjs';
 
 const require = createRequire(import.meta.url);
-const { buildOssChildEnv } = require('./oss-env-scrubber.cjs');
+const { buildReleaseChildEnv } = require('./release-child-env.cjs');
 
 const DEV_TARGETS = new Set([
   'desktop',
@@ -54,7 +54,7 @@ export function buildSourceDefaultMobileReleaseProfileSource() {
 }
 
 export function buildDevChildEnv(parentEnv, profileEnv) {
-  return buildOssChildEnv(parentEnv, profileEnv);
+  return buildReleaseChildEnv(parentEnv, profileEnv);
 }
 
 function buildTargetCommand(target) {

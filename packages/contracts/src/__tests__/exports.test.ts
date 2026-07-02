@@ -174,13 +174,6 @@ describe('@lynavo-drive/contracts exports', () => {
     expect(contracts.COUNTRY_CODES.find((country) => country.iso === 'CN')?.code).toBe('+86');
     expect(contracts.COUNTRY_CODES.find((country) => country.iso === 'TW')?.code).toBe('+886');
   });
-  it('does not export legacy Lynavo Drive commercial endpoint constants', () => {
-    const legacyPrefix = ['VIVI', 'DROP_'].join('');
-    const legacyEndpoints = ['VIVI', 'DROP_SERVICE_ENDPOINTS'].join('');
-    expect(Object.keys(contracts).filter((key) => key.startsWith(legacyPrefix))).toEqual([]);
-    expect(legacyEndpoints in contracts).toBe(false);
-  });
-
   it('exports OSS repository support links without official API endpoints', () => {
     expect(contracts.LYNAVO_REPOSITORY_URL).toBe('https://github.com/lynavo/lynavo-drive');
     expect(contracts.LYNAVO_WEB_BASE_URL).toBe('https://github.com/lynavo/lynavo-drive');

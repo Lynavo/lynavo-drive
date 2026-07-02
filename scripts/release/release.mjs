@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { buildReleasePlan, listReleaseProfileNames, parseTargets } from './release-profiles.mjs';
 
 const require = createRequire(import.meta.url);
-const { buildOssChildEnv } = require('../dev/oss-env-scrubber.cjs');
+const { buildReleaseChildEnv } = require('../dev/release-child-env.cjs');
 const repoRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const mobileReleaseProfilePath = resolve(repoRoot, 'apps/mobile/src/release-profile.ts');
 
@@ -123,7 +123,7 @@ function runStep(step, profileEnv) {
 
   const result = spawnSync(step.command, step.args, {
     cwd: repoRoot,
-    env: buildOssChildEnv(process.env, profileEnv),
+    env: buildReleaseChildEnv(process.env, profileEnv),
     stdio: 'inherit',
   });
 

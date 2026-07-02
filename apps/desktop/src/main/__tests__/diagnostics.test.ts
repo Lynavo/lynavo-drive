@@ -21,10 +21,6 @@ const diagnosticsPaths = vi.hoisted(() => {
     rendererLog: `${root}/desktop/renderer.log`,
   };
 });
-const legacyViviApiBaseEnv = ['VIVI', 'DROP_API_BASE_URL'].join('');
-const legacySyncApiBaseEnv = ['SYNC', 'FLOW_API_BASE_URL'].join('');
-const legacyViviUpdateEnv = ['VIVI', 'DROP_DESKTOP_UPDATE_URL'].join('');
-const legacyViviDiagnosticsUploadEnv = ['VIVI', 'DROP_DIAGNOSTICS_UPLOAD_URL'].join('');
 const desktopUpdateEnv = ['LYNAVO_DESKTOP', '_UPDATE_URL'].join('');
 const diagnosticsUploadEnv = ['LYNAVO_DIAGNOSTICS', '_UPLOAD_URL'].join('');
 
@@ -71,10 +67,6 @@ describe('exportDiagnostics', () => {
     delete process.env.LYNAVO_API_BASE_URL;
     delete process.env[desktopUpdateEnv];
     delete process.env[diagnosticsUploadEnv];
-    delete process.env[legacyViviApiBaseEnv];
-    delete process.env[legacySyncApiBaseEnv];
-    delete process.env[legacyViviUpdateEnv];
-    delete process.env[legacyViviDiagnosticsUploadEnv];
     resetDiagnosticsFs();
   });
 
@@ -84,10 +76,6 @@ describe('exportDiagnostics', () => {
     delete process.env.LYNAVO_API_BASE_URL;
     delete process.env[desktopUpdateEnv];
     delete process.env[diagnosticsUploadEnv];
-    delete process.env[legacyViviApiBaseEnv];
-    delete process.env[legacySyncApiBaseEnv];
-    delete process.env[legacyViviUpdateEnv];
-    delete process.env[legacyViviDiagnosticsUploadEnv];
     resetDiagnosticsFs();
   });
 

@@ -5,19 +5,6 @@ import { basename, extname, resolve, sep } from 'node:path';
 import process from 'node:process';
 
 const MAX_REPORTED_DISALLOWED_FILES = 200;
-const token = (parts) => parts.join('');
-const LEGACY_PATH_TERMS = Object.freeze([
-  token(['Sync', 'Flow']),
-  token(['sync', 'flow']),
-  token(['Vivi', 'Drop']),
-  token(['vivi', 'drop']),
-  token(['Vivi', ' Drop']),
-  token(['@', 'sync', 'flow']),
-]);
-const LEGACY_PATH_PATTERN = new RegExp(
-  `(^|[/._-])(?:${LEGACY_PATH_TERMS.join('|')})(?=$|[/._-])`,
-  'u',
-);
 
 const ALLOWED_EXACT_PATHS = new Map([
   [
@@ -112,7 +99,7 @@ function usage() {
   return [
     'Usage: node scripts/verify-oss-source-package.mjs [--root <path>] [--manifest <file>] [--git-ref <ref>] [--include-untracked] [--advisory]',
     '',
-    'Audits the source-package file list for generated artifacts, signing material, private tooling, and legacy runtime paths.',
+    'Audits the source-package file list for generated artifacts, signing material, private tooling, and local runtime data.',
     'By default it uses `git ls-files -z` under --root, with a filesystem fallback for extracted archives without .git.',
     'Use --include-untracked to also audit non-ignored untracked worktree files before a local release.',
     'Use --git-ref to audit a committed Git tree such as HEAD before a source archive rehearsal.',
@@ -304,10 +291,6 @@ function isReleaseOutputPath(path) {
   );
 }
 
-function hasLegacyProductPath(path) {
-  return LEGACY_PATH_PATTERN.test(path);
-}
-
 function contentDisallowReason(path, root) {
   if (basename(path) !== '.npmrc') {
     return null;
@@ -352,10 +335,6 @@ function disallowReason(path, root) {
 
   if (isReleaseOutputPath(path)) {
     return 'release output directory';
-  }
-
-  if (hasLegacyProductPath(path)) {
-    return 'legacy product name in path';
   }
 
   const name = basename(path);

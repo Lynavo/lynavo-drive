@@ -101,7 +101,7 @@ describe('SettingsPage', () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText('My account')).not.toBeInTheDocument();
-    expect(screen.queryByText('test@old-product.example')).not.toBeInTheDocument();
+    expect(screen.queryByText('test@unexpected.example')).not.toBeInTheDocument();
     expect(screen.queryByText('Membership status')).not.toBeInTheDocument();
     expect(screen.queryByText('Pro')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();

@@ -12,15 +12,15 @@ describe('requestMacFilesAndFoldersPermissionsOnStartup', () => {
 
     await requestMacFilesAndFoldersPermissionsOnStartup({
       platform: 'darwin',
-      homeDirectory: '/Users/vivi',
+      homeDirectory: '/Users/ada',
       readdir,
       logger,
     });
 
     expect(readdir).toHaveBeenCalledTimes(3);
-    expect(readdir).toHaveBeenCalledWith('/Users/vivi/Desktop', { withFileTypes: true });
-    expect(readdir).toHaveBeenCalledWith('/Users/vivi/Documents', { withFileTypes: true });
-    expect(readdir).toHaveBeenCalledWith('/Users/vivi/Downloads', { withFileTypes: true });
+    expect(readdir).toHaveBeenCalledWith('/Users/ada/Desktop', { withFileTypes: true });
+    expect(readdir).toHaveBeenCalledWith('/Users/ada/Documents', { withFileTypes: true });
+    expect(readdir).toHaveBeenCalledWith('/Users/ada/Downloads', { withFileTypes: true });
     expect(logger.info).toHaveBeenCalledWith(
       '[Permissions] requested macOS Files and Folders access for Desktop, Documents, Downloads',
     );
@@ -31,7 +31,7 @@ describe('requestMacFilesAndFoldersPermissionsOnStartup', () => {
 
     await requestMacFilesAndFoldersPermissionsOnStartup({
       platform: 'win32',
-      homeDirectory: '/Users/vivi',
+      homeDirectory: '/Users/ada',
       readdir,
       logger: { info: vi.fn(), warn: vi.fn() },
     });

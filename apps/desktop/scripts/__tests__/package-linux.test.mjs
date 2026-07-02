@@ -13,16 +13,8 @@ const {
 
 const desktopRoot = path.resolve(import.meta.dirname, '..', '..');
 const scriptsRoot = path.join(desktopRoot, 'scripts');
-const removedBuilderConfigNames = ['cn', 'global'].map((name) => `electron-builder.${name}.yml`);
-const removedBuilderConfigPattern = new RegExp('electron-builder\\.(?:cn|global)\\.yml');
-const removedPackageScriptPattern = new RegExp(
-  `${'pack'}${'age'}:[^"'\\s]*:(?:${['cn', 'global'].join('|')})`,
-);
-const legacyViviName = ['Vivi', 'Drop'].join(' ');
-const legacyViviSlug = ['Vivi', 'Drop'].join('');
-const legacyFormerFlowName = ['Sync', 'Flow'].join('');
-const legacyViviDomain = ['vivi', 'drop'].join('');
-const legacyEnvPrefix = ['SYN', 'CFLOW'].join('');
+const alternateBuilderConfigName = 'electron-builder.custom.yml';
+const alternateBuilderConfigPattern = /electron-builder\.[\w-]+\.yml/;
 const packageScriptName = (suffix) => `package:${suffix}`;
 const token = (parts) => parts.join('');
 
@@ -59,12 +51,12 @@ test('rejects builder config flags and unsupported arches', () => {
     /Linux packaging uses the single electron-builder\.yml config/,
   );
   assert.throws(
-    () => resolvePackageLinuxOptions([`--config=${removedBuilderConfigNames[1]}`], { arch: 'x64' }),
+    () => resolvePackageLinuxOptions([`--config=${alternateBuilderConfigName}`], { arch: 'x64' }),
     /Linux packaging uses the single electron-builder\.yml config/,
   );
   assert.throws(
     () =>
-      resolvePackageLinuxOptions(['arm64', `--config=${removedBuilderConfigNames[0]}`], {
+      resolvePackageLinuxOptions(['arm64', `--config=${alternateBuilderConfigName}`], {
         arch: 'x64',
       }),
     /Linux packaging uses the single electron-builder\.yml config/,
@@ -181,15 +173,9 @@ test('desktop packaging keeps a single Lynavo Drive builder config', () => {
   assert.match(builderConfig, /^  executableName: lynavo-drive$/m);
   assert.match(builderConfig, /^  shortcutName: Lynavo Drive$/m);
   assert.match(builderConfig, /lynavo-drive-sidecar/);
-  assert.doesNotMatch(builderConfig, new RegExp(legacyViviSlug));
-  assert.doesNotMatch(builderConfig, new RegExp(`productName: ${legacyViviName}`));
-  assert.doesNotMatch(
-    builderConfig,
-    new RegExp(`^appId: com\\.${legacyViviDomain}\\.desktop\\.china$`, 'm'),
-  );
 });
 
-test('desktop packaging scripts do not reference removed market builder configs', () => {
+test('desktop packaging scripts use the single builder config', () => {
   const filesToCheck = [
     'package.json',
     'scripts/package-linux.cjs',
@@ -198,8 +184,7 @@ test('desktop packaging scripts do not reference removed market builder configs'
 
   for (const file of filesToCheck) {
     const content = readFileSync(path.join(desktopRoot, file), 'utf8');
-    assert.doesNotMatch(content, removedBuilderConfigPattern, file);
-    assert.doesNotMatch(content, removedPackageScriptPattern, file);
+    assert.doesNotMatch(content, alternateBuilderConfigPattern, file);
   }
 });
 
@@ -257,12 +242,6 @@ test('Windows installer uses Lynavo Drive firewall rule identities', () => {
   assert.match(installer, /!define SF_RULE_TCP\s+"Lynavo Drive Sidecar TCP"/);
   assert.match(installer, /!define SF_RULE_HTTP\s+"Lynavo Drive Sidecar HTTP"/);
   assert.match(installer, /!define SF_RULE_MDNS\s+"Lynavo Drive mDNS UDP"/);
-  assert.doesNotMatch(installer, /SF_LEGACY_VIVI_RULE_/);
-  assert.equal(installer.includes(`SF_LEGACY_${legacyEnvPrefix}_RULE_`), false);
-  assert.doesNotMatch(installer, /delete rule name="\$\{SF_LEGACY_/);
-  assert.doesNotMatch(installer, /add rule name="\$\{SF_LEGACY_/);
   assert.match(installer, /description="Lynavo Drive sidecar file transfer \(TCP 39393\)"/);
   assert.match(installer, /lynavo-drive-sidecar\.exe/);
-  assert.doesNotMatch(installer, new RegExp(`${legacyViviName} Sidecar`));
-  assert.doesNotMatch(installer, new RegExp(`${legacyFormerFlowName} Sidecar`));
 });

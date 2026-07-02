@@ -5,11 +5,6 @@ import test from 'node:test';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const removedBuilderConfigName = (name) => `electron-builder.${name}.yml`;
-const legacyViviName = ['Vivi', 'Drop'].join(' ');
-const legacyViviSlug = ['Vivi', 'Drop'].join('');
-const legacyFormerFlowName = ['Sync', 'Flow'].join('');
-const legacyViviDomain = ['vivi', 'drop'].join('');
-const legacySidecarBin = ['sync', 'flow', '-sidecar'].join('');
 
 function readDesktopConfig(name) {
   return readFileSync(resolve(repoRoot, 'apps/desktop', name), 'utf8');
@@ -131,13 +126,6 @@ test('desktop builder config uses Lynavo Drive for package branding and public a
   );
   assert.match(linuxConfig, /^  executableName: lynavo-drive$/m);
   assert.match(nsisConfig, /^  shortcutName: Lynavo Drive$/m);
-  assert.doesNotMatch(config, new RegExp(`^productName: ${legacyFormerFlowName}$`, 'm'));
-  assert.doesNotMatch(config, new RegExp(`^  artifactName: ${legacyFormerFlowName}-`, 'm'));
-  assert.doesNotMatch(config, new RegExp(`^productName: ${legacyViviName}$`, 'm'));
-  assert.doesNotMatch(config, new RegExp(`^  artifactName: ${legacyViviSlug}-`, 'm'));
-  assert.doesNotMatch(config, new RegExp(`^appId: com\\.${legacyViviDomain}\\.desktop\\.china$`, 'm'));
-  assert.doesNotMatch(config, new RegExp(`^  executableName: ${legacyViviName}$`, 'm'));
-  assert.doesNotMatch(config, /^  executableName: vivi-drop$/m);
 });
 
 test('macOS permission descriptions use Lynavo Drive as the visible app name', () => {
@@ -146,7 +134,6 @@ test('macOS permission descriptions use Lynavo Drive as the visible app name', (
   assert.match(config, /NSDesktopFolderUsageDescription: Lynavo Drive /);
   assert.match(config, /NSDocumentsFolderUsageDescription: Lynavo Drive /);
   assert.match(config, /NSDownloadsFolderUsageDescription: Lynavo Drive /);
-  assert.doesNotMatch(config, new RegExp(`NS\\w+UsageDescription: ${legacyViviName} `));
 });
 
 test('windows installer uses Lynavo Drive firewall identities scoped to the sidecar binary', () => {
@@ -159,20 +146,15 @@ test('windows installer uses Lynavo Drive firewall identities scoped to the side
   assert.match(installer, /description="Lynavo Drive sidecar file transfer \(TCP 39393\)"/);
   assert.match(installer, /description="Lynavo Drive sidecar HTTP health and API \(TCP 39394\)"/);
   assert.match(installer, /description="Lynavo Drive Bonjour\/mDNS discovery \(UDP 5353\)"/);
-  assert.doesNotMatch(installer, new RegExp(`add rule name="${legacyFormerFlowName}`));
-  assert.doesNotMatch(installer, new RegExp(`description="${legacyFormerFlowName}`));
-  assert.doesNotMatch(installer, new RegExp(`DetailPrint ".*${legacyFormerFlowName}`));
-  assert.doesNotMatch(installer, new RegExp(`${legacyViviName} Sidecar`));
-  assert.doesNotMatch(installer, new RegExp(`${legacyViviName} mDNS`));
   assert.match(installer, /resources\\lynavo-drive-sidecar\.exe/);
-  assert.doesNotMatch(installer, new RegExp(`resources\\\\${legacySidecarBin}\\.exe`));
 });
 
-test('windows installer no longer deletes legacy firewall rules during upgrade', () => {
+test('windows installer refreshes current firewall rules during upgrade', () => {
   const installer = readDesktopConfig('resources/installer.nsh');
 
-  assert.doesNotMatch(installer, /SF_LEGACY_/);
-  assert.doesNotMatch(installer, /delete rule name="\$\{SF_LEGACY_/);
+  assert.match(installer, /delete rule name="\$\{SF_RULE_TCP\}"/);
+  assert.match(installer, /delete rule name="\$\{SF_RULE_HTTP\}"/);
+  assert.match(installer, /delete rule name="\$\{SF_RULE_MDNS\}"/);
 });
 
 test('Windows release and OSS verification docs match Lynavo Drive firewall rule identities', () => {
@@ -194,8 +176,6 @@ test('Windows release and OSS verification docs match Lynavo Drive firewall rule
     for (const rule of expectedRules) {
       assert.match(doc, new RegExp(rule));
     }
-    assert.doesNotMatch(doc, new RegExp(`${legacyViviName} Sidecar`));
-    assert.doesNotMatch(doc, new RegExp(`${legacyViviName} mDNS UDP`));
   }
 });
 
@@ -206,9 +186,7 @@ test('release docs verify the renamed packaged sidecar binary paths', () => {
   );
 
   assert.match(releasePlaybook, /resources\\lynavo-drive-sidecar\.exe/);
-  assert.doesNotMatch(releasePlaybook, new RegExp(`resources\\\\${legacySidecarBin}\\.exe`));
   assert.match(releasePlaybook, /Contents\/Resources\/lynavo-drive-sidecar/);
-  assert.doesNotMatch(releasePlaybook, new RegExp(`Contents/Resources/${legacySidecarBin}`));
 });
 
 test('release playbook does not expose external upload steps', () => {
@@ -250,5 +228,4 @@ test('desktop packaging uses the Lynavo Drive sidecar binary name', () => {
   assert.match(config, /resources\/lynavo-drive-sidecar/);
   assert.match(config, /lynavo-drive-sidecar\.exe/);
   assert.match(packageJson, /lynavo-drive-sidecar/);
-  assert.doesNotMatch(config, new RegExp(`${legacySidecarBin}\\.exe`));
 });

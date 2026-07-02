@@ -1,6 +1,6 @@
 const { spawn, spawnSync } = require('node:child_process');
 const path = require('node:path');
-const { buildOssChildEnv } = require('../../../scripts/dev/oss-env-scrubber.cjs');
+const { buildReleaseChildEnv } = require('../../../scripts/dev/release-child-env.cjs');
 
 function main() {
   const command = process.argv[2];
@@ -60,7 +60,7 @@ function main() {
 }
 
 function buildElectronViteEnv({ command, parentEnv }) {
-  const env = buildOssChildEnv(parentEnv);
+  const env = buildReleaseChildEnv(parentEnv);
 
   if (command === 'dev') {
     bridgeLynavoDevEnv(env);

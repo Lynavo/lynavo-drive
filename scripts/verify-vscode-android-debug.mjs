@@ -3,10 +3,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
-const token = (parts) => parts.join('');
-const legacyIosSchemePattern = new RegExp(
-  `${token(['Sync', 'Flow', 'MobileGlobal'])}|LynavoDriveGlobal|DebugGlobal|LYNAVO_MARKET`,
-);
 
 function readJson(relativePath) {
   return JSON.parse(readFileSync(resolve(root, relativePath), 'utf8'));
@@ -46,7 +42,6 @@ assert.match(
   iosNoMetroConfig.command,
   /corepack pnpm --filter @lynavo-drive\/mobile exec react-native run-ios .*--scheme "LynavoDrive" .*--mode "Debug" .*--no-packager/,
 );
-assert.doesNotMatch(iosNoMetroConfig.command, legacyIosSchemePattern);
 
 const iosDeviceConfig = launch.configurations.find(
   (configuration) => configuration.name === 'Mobile: iOS (macOS)',

@@ -38,7 +38,7 @@ class MainApplication : Application(), ReactApplication {
     // deletion on some launcher implementations / backup restore flows. The
     // install marker lives in the same prefs file and is deleted with it —
     // so "marker absent" uniquely identifies a fresh / reinstalled app and
-    // lets us purge any surviving identity before React starts.
+    // lets us clear any surviving identity before React starts.
     //
     // Also handles the 2-phase self-heal: if a prior wipe was killed after
     // setting `lynavo_wipe_in_progress` but before clearing it, retry now.

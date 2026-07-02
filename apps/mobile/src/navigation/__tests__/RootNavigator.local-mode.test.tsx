@@ -343,7 +343,7 @@ describe('RootNavigator — guest local LAN mode', () => {
     expect(wipeSyncIdentity).not.toHaveBeenCalled();
   });
 
-  test('profile load errors from stale commercial sessions do not block LAN screens', async () => {
+  test('profile load errors from stale local sessions do not block LAN screens', async () => {
     (useAuth as jest.Mock).mockReturnValue({
       isLoggedIn: true,
       isLoading: false,
