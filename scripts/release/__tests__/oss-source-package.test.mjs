@@ -280,6 +280,29 @@ test('falls back to filesystem walk for extracted source archives without git me
   }
 });
 
+test('falls back to filesystem walk for git-ref audits in extracted source archives', () => {
+  const fixtureRoot = createFilesystemFixture({
+    'package.json': '{}\n',
+    'apps/mobile/src/App.tsx': 'export const App = () => null;\n',
+    'apps/mobile/android/gradle/wrapper/gradle-wrapper.jar': 'jar\n',
+    'apps/desktop/release/LynavoDrive.dmg': 'binary\n',
+    'node_modules/pkg/private.key': 'ignored dependency fixture\n',
+  });
+  try {
+    const result = runVerifier(['--root', fixtureRoot, '--git-ref', 'HEAD']);
+
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stdout, /OSS source package input: filesystem walk \(no git metadata for HEAD\)/);
+    assert.match(result.stdout, /Audited OSS source package files: 4/);
+    assert.match(result.stdout, /Allowed OSS source package exceptions: 1/);
+    assert.match(result.stdout, /Disallowed OSS source package files: 1/);
+    assert.match(result.stdout, /apps\/desktop\/release\/LynavoDrive\.dmg/);
+    assert.doesNotMatch(result.stdout, /node_modules/);
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
 test('blocks private tooling directories and legacy source-package paths', () => {
   const fixtureRoot = createTrackedFixture({
     '.vscode/launch.json': '{}\n',

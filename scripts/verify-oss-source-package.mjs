@@ -237,6 +237,15 @@ function collectGitRefFiles(root, gitRef) {
     .filter(Boolean);
 }
 
+function isGitWorktree(root) {
+  const result = spawnSync('git', ['rev-parse', '--is-inside-work-tree'], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+
+  return result.status === 0 && result.stdout.trim() === 'true';
+}
+
 function collectFilesystemFiles(root) {
   const files = [];
 
@@ -408,6 +417,13 @@ function collectInputFiles(options) {
   }
 
   if (options.gitRef) {
+    if (!isGitWorktree(options.root)) {
+      return {
+        inputKind: `filesystem walk (no git metadata for ${options.gitRef})`,
+        paths: collectFilesystemFiles(options.root),
+      };
+    }
+
     return {
       inputKind: `git tree ${options.gitRef}`,
       paths: collectGitRefFiles(options.root, options.gitRef),
