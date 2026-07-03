@@ -56,6 +56,7 @@ win:
         - lynavo-drive-sidecar.exe
 linux:
   artifactName: LynavoDrive-${version}-linux-${arch}.${ext}
+  maintainer: Lynavo Drive Maintainers <maintainers@lynavo.invalid>
   target:
     - target: deb
       arch:
