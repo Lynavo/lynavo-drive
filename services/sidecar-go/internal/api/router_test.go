@@ -930,9 +930,9 @@ func TestOSSSettingsDoNotExposeLegacyCommercialToggle(t *testing.T) {
 	if err := json.NewDecoder(settingsResp.Body).Decode(&settings); err != nil {
 		t.Fatalf("decode settings: %v", err)
 	}
-	legacyCommercialKey := "remote" + "AccessEnabled"
-	if _, ok := settings[legacyCommercialKey]; ok {
-		t.Fatal("settings must not expose legacy commercial toggles in OSS runtime")
+	legacyNonOSSKey := "remote" + "AccessEnabled"
+	if _, ok := settings[legacyNonOSSKey]; ok {
+		t.Fatal("settings must not expose legacy non-OSS toggles in OSS runtime")
 	}
 
 	presenceResp, err := http.Post(srv.URL+"/presence/phone-local", "application/json", strings.NewReader("{}"))

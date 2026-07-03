@@ -253,7 +253,7 @@ describe('registerIpcHandlers', () => {
     expect(handlers.has(['support:upload', '-diagnostics'].join(''))).toBe(false);
   });
 
-  it('does not register commercial gift-card, client-config, or auth IPC handlers', async () => {
+  it('does not register non-OSS gift-card, client-config, or auth IPC handlers', async () => {
     registerIpcHandlers({ retryStart: vi.fn() } as never);
 
     expect(handlers.has('sidecar:redeem-gift-card')).toBe(false);

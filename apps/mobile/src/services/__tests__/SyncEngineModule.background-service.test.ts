@@ -1,4 +1,4 @@
-describe('SyncEngineModule commercial background bridge', () => {
+describe('SyncEngineModule non-OSS background bridge', () => {
   const driveCapabilitySetter = ['setDrive', 'Entitlements'].join('');
   const loadModule = (
     platform: 'android' | 'ios',
@@ -67,7 +67,7 @@ describe('SyncEngineModule commercial background bridge', () => {
     ).not.toHaveBeenCalled();
   });
 
-  it('does not export commercial capability or tunnel bridge wrappers in OSS', () => {
+  it('does not export non-OSS capability or tunnel bridge wrappers in OSS', () => {
     const { syncEngine } = loadModule('android');
 
     expect(syncEngine).not.toHaveProperty(driveCapabilitySetter);

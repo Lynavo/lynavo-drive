@@ -68,7 +68,7 @@ describe('preload electronAPI', () => {
     platformCapabilities.usesTitleBarOverlayControls.mockReturnValue(false);
   });
 
-  it('does not expose commercial gift-card, client-config, or auth bridges', async () => {
+  it('does not expose non-OSS gift-card, client-config, or auth bridges', async () => {
     exposed.invoke.mockResolvedValue({ ok: true });
 
     await import('../index');

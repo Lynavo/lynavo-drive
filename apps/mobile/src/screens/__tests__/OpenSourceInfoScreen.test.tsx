@@ -33,7 +33,7 @@ jest.mock('react-i18next', () => ({
         'oss.pointNoStore':
           'App-store purchases and redemption flows are not included in this runtime.',
         'oss.pointServices':
-          'Off-LAN and background commercial services stay disabled in this community runtime.',
+          'Off-LAN and background non-OSS services stay disabled in this community runtime.',
         'oss.primary': 'Pair a computer',
         'oss.secondary': 'Back to sync',
         'common.back': 'Back',
@@ -88,7 +88,7 @@ describe('OpenSourceInfoScreen OSS information route', () => {
     ).toBeTruthy();
     expect(
       getByText(
-        'Off-LAN and background commercial services stay disabled in this community runtime.',
+        'Off-LAN and background non-OSS services stay disabled in this community runtime.',
       ),
     ).toBeTruthy();
     expect(queryByText('Subscribe Now')).toBeNull();

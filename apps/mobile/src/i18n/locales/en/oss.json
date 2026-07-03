@@ -3,7 +3,7 @@
   "body": "The open-source edition syncs over your local LAN with local desktop pairing.",
   "pointLan": "Pair with a desktop on the same network for automatic incremental sync.",
   "pointNoStore": "App-store purchases and redemption flows are not included in this runtime.",
-  "pointServices": "Off-LAN and background commercial services stay disabled in this community runtime.",
+  "pointServices": "Off-LAN and background non-OSS services stay disabled in this community runtime.",
   "primary": "Pair a computer",
   "secondary": "Back to sync"
 }
