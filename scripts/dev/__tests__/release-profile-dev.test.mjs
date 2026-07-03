@@ -133,6 +133,9 @@ test('removes externally exported sensitive release env from child process env',
       APPLE_TEAM_ID: 'TEAMID1234',
       CSC_LINK: '/secure/cert.p12',
       CSC_KEY_PASSWORD: 'cert-password',
+      ELECTRON_BUILDER_PUBLISH: 'always',
+      GH_TOKEN: 'github-token',
+      GITHUB_TOKEN: 'github-token',
       WIN_CSC_LINK: '/secure/win-cert.p12',
       LYNAVO_SUPPORT_API_BASE_URL: 'https://external-support.example',
       [desktopUpdateEnv]: 'https://external-update.example',
@@ -158,6 +161,9 @@ test('removes externally exported sensitive release env from child process env',
   assert.equal(Object.hasOwn(env, 'APPLE_TEAM_ID'), false);
   assert.equal(Object.hasOwn(env, 'CSC_LINK'), false);
   assert.equal(Object.hasOwn(env, 'CSC_KEY_PASSWORD'), false);
+  assert.equal(Object.hasOwn(env, 'ELECTRON_BUILDER_PUBLISH'), false);
+  assert.equal(Object.hasOwn(env, 'GH_TOKEN'), false);
+  assert.equal(Object.hasOwn(env, 'GITHUB_TOKEN'), false);
   assert.equal(Object.hasOwn(env, 'WIN_CSC_LINK'), false);
 });
 

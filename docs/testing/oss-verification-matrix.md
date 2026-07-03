@@ -47,7 +47,7 @@ Commands:
 pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 
 cd apps/mobile/ios
-xcodebuild -workspace LynavoDrive.xcworkspace -scheme LynavoDrive -configuration Debug -destination 'generic/platform=iOS' build
+xcodebuild -workspace LynavoDrive.xcworkspace -scheme LynavoDrive -configuration Debug -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
 xcodebuild -workspace LynavoDrive.xcworkspace -scheme LynavoDrive -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
 
 cd ../android

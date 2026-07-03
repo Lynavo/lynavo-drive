@@ -123,6 +123,9 @@ test('release execution removes external sensitive env before spawning children'
           APPLE_TEAM_ID: 'TEAMID1234',
           CSC_LINK: '/secure/cert.p12',
           CSC_KEY_PASSWORD: 'cert-password',
+          ELECTRON_BUILDER_PUBLISH: 'always',
+          GH_TOKEN: 'github-token',
+          GITHUB_TOKEN: 'github-token',
           WIN_CSC_LINK: '/secure/win-cert.p12',
         },
       },
@@ -148,6 +151,9 @@ test('release execution removes external sensitive env before spawning children'
     assert.equal(Object.hasOwn(childEnv, 'APPLE_TEAM_ID'), false);
     assert.equal(Object.hasOwn(childEnv, 'CSC_LINK'), false);
     assert.equal(Object.hasOwn(childEnv, 'CSC_KEY_PASSWORD'), false);
+    assert.equal(Object.hasOwn(childEnv, 'ELECTRON_BUILDER_PUBLISH'), false);
+    assert.equal(Object.hasOwn(childEnv, 'GH_TOKEN'), false);
+    assert.equal(Object.hasOwn(childEnv, 'GITHUB_TOKEN'), false);
     assert.equal(Object.hasOwn(childEnv, 'WIN_CSC_LINK'), false);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });

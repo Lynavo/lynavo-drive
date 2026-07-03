@@ -1241,9 +1241,9 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         )
     }
 
-    private func clearDisabledCommercialRuntimeState(reason: String) {
+    private func clearDisabledNonOSSRuntimeState(reason: String) {
         stopDisabledBackgroundRuntime(reason: reason)
-        syncDiagnosticsLog("CommercialRuntime", "disabled commercial runtime state cleared reason=\(reason)")
+        syncDiagnosticsLog("NonOSSRuntime", "disabled non-OSS runtime state cleared reason=\(reason)")
     }
 
     @objc private func appDidEnterBackground() {
@@ -5551,7 +5551,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         slog("[SyncEngine] disconnectAndUnbind")
         interruptActiveSyncForBindingChange(reason: "disconnect_and_unbind")
         clearBindingInvalidation()
-        clearDisabledCommercialRuntimeState(reason: "disconnectAndUnbind")
+        clearDisabledNonOSSRuntimeState(reason: "disconnectAndUnbind")
         // Clear the token stored under the binding's per-device key (and the legacy
         // global key for bindings created before per-device storage was introduced).
         if let binding = uploadStore?.getBinding() {
@@ -7822,7 +7822,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         slog("[SyncEngine] wipeSyncIdentity: begin (sentinel set)")
         syncDiagnosticsLog("SyncEngine", "wipeSyncIdentity: begin")
         clearBindingInvalidation()
-        clearDisabledCommercialRuntimeState(reason: "wipeSyncIdentity")
+        clearDisabledNonOSSRuntimeState(reason: "wipeSyncIdentity")
 
         // 1. Tear down any live networking / timers so we don't race the wipe.
         stopPresenceHeartbeatTimer()

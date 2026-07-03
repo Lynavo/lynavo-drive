@@ -75,7 +75,7 @@
           },
           {
             "title": "What if upload fails?",
-            "body": "Check that the network connection is stable and the desktop app is still running. You can retry failed tasks on the transfer page, or export a diagnostics package from Settings for support."
+            "body": "Check that the network connection is stable and the desktop app is still running. Lynavo Drive will automatically retry resumable work when the LAN connection recovers. Export a diagnostics package from Settings if you need to attach details to a GitHub issue."
           },
           {
             "title": "What if the shared folder is empty?",
@@ -204,7 +204,7 @@
         "title": "Personal shared folder (personal)",
         "points": [
           "Can point to any permitted local folder or disk root, such as the whole Macintosh HD, C drive, or D drive",
-          "Visible only to phones and desktops signed in to the same account",
+          "Visible to phones paired with this desktop on the local LAN",
           "Not affected by the root folder path; use it for content that should not be visible to other LAN users"
         ]
       },
@@ -230,7 +230,7 @@
         "title": "My Computer (personal)",
         "points": [
           "Can point to any permitted local folder or disk root, such as the whole Macintosh HD, C drive, or D drive",
-          "Visible only to phones and desktops signed in to the same account",
+          "Visible to phones paired with this desktop on the local LAN",
           "Not affected by the root folder path; use it to browse local desktop files from the phone"
         ]
       }
@@ -347,8 +347,8 @@
         "answer": "Check these in order: 1) computer and phone are on the same Wi-Fi; 2) macOS users have granted Local Network permission to Lynavo Drive; 3) Windows users have a Private network with Network discovery enabled; 4) firewall is not blocking incoming connections; 5) close and reopen Lynavo Drive."
       },
       {
-        "question": "Why do I need to manually resume sync after reconnecting?",
-        "answer": "When automatic upload is turned off, it does not resume automatically. Re-enable it on the phone album page. This avoids using the transfer channel without your knowledge."
+        "question": "What happens after reconnecting?",
+        "answer": "When automatic upload is on, resumable work continues after foreground LAN connectivity returns. If automatic upload was turned off, re-enable it on the phone album page."
       },
       {
         "question": "Why is upload speed unstable?",

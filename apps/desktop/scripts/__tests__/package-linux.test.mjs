@@ -222,7 +222,7 @@ test('desktop OSS package scripts do not ship official Apple signing or upload h
   assert.equal(builderConfig.includes(token(['not', 'arize:'])), false);
 });
 
-test('desktop electron-builder wrapper disables local signing auto discovery', () => {
+test('desktop electron-builder wrapper disables signing discovery and publishing', () => {
   const wrapper = readFileSync(
     path.join(desktopRoot, 'scripts', 'run-electron-builder.cjs'),
     'utf8',
@@ -230,6 +230,9 @@ test('desktop electron-builder wrapper disables local signing auto discovery', (
 
   assert.match(wrapper, /CSC_IDENTITY_AUTO_DISCOVERY:\s+'false'/);
   assert.match(wrapper, /ELECTRON_BUILDER_DISABLE_BUILD_CACHE:\s+'true'/);
+  assert.match(wrapper, /ELECTRON_BUILDER_PUBLISH:\s+'never'/);
+  assert.match(wrapper, /'--publish', 'never'/);
+  assert.match(wrapper, /does not support Electron Builder publishing/);
 });
 
 test('Windows installer uses Lynavo Drive firewall rule identities', () => {

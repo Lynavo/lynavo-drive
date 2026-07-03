@@ -26,6 +26,9 @@ const SENSITIVE_EXTERNAL_ENV_PATTERNS = Object.freeze([
   /^APPLE_/,
   /^ASC_/,
   /^CSC_/,
+  /^ELECTRON_BUILDER_PUBLISH$/,
+  /^GH_TOKEN$/,
+  /^GITHUB_TOKEN$/,
   /^WIN_CSC_/,
   /^GOOGLE_(?:API|CLIENT|OAUTH|SERVICE|SIGN_IN)/,
 ]);

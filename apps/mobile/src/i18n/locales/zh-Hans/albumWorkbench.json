@@ -43,13 +43,6 @@
   "dates": {
     "full": "{{year}}年{{month}}月{{day}}日 {{hour}}:{{minute}}"
   },
-  "selectedCount": "已选 {{count}} 个素材",
-  "selectedCount_one": "已选 {{count}} 个素材",
-  "selectedCount_other": "已选 {{count}} 个素材",
-  "selectionHint": {
-    "none": "未选择素材",
-    "autoActiveLock": "自动上传中"
-  },
   "deviceDisconnected": "设备已断开",
   "mediaTypes": {
     "video": "视频",
@@ -60,7 +53,6 @@
     "transferred": "已传"
   },
   "actions": {
-    "startUpload": "开始上传",
     "pickTime": "点击设置时间"
   },
   "config": {
@@ -81,7 +73,6 @@
   },
   "stats": {
     "total": "总数",
-    "selected": "已选",
     "transferred": "已传",
     "new": "新增"
   },
@@ -94,35 +85,11 @@
     "title": "选择相册",
     "allPhotos": "全部照片"
   },
-  "selectAll": "全选",
-  "deselectAll": "取消全选",
   "preview": {
     "cloudUnavailable": "iCloud 视频未下载，无法预览",
     "notFound": "素材找不到"
   },
   "dialogs": {
-    "cannotUpload": {
-      "title": "无法上传",
-      "autoActive": "请先关闭自动上传",
-      "notConnected": "请先连接设备"
-    },
-    "submitted": {
-      "title": "已提交",
-      "queuedOnly_one": "已入队 {{count}} 个文件",
-      "queuedOnly": "已入队 {{count}} 个文件",
-      "queuedOnly_other": "已入队 {{count}} 个文件",
-      "queuedWithSkipped": "已入队 {{queued}} 个文件，{{skipped}} 个重复素材已自动跳过"
-    },
-    "allDuplicate": {
-      "title": "全部重复",
-      "body_one": "所选 {{count}} 个素材已存在于上传队列中，无需重复提交",
-      "body": "所选 {{count}} 个素材已存在于上传队列中，无需重复提交",
-      "body_other": "所选 {{count}} 个素材已存在于上传队列中，无需重复提交"
-    },
-    "submitFailed": {
-      "title": "提交失败",
-      "body": "无法提交上传任务，请稍后重试"
-    },
     "closeAuto": {
       "title": "关闭自动上传",
       "body": "确认关闭自动上传？关闭后新素材将不再自动传输到 PC 端。",

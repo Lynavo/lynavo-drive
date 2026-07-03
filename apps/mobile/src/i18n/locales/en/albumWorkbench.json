@@ -43,13 +43,6 @@
   "dates": {
     "full": "{{month}}/{{day}}/{{year}} {{hour}}:{{minute}}"
   },
-  "selectedCount": "{{count}} items selected",
-  "selectedCount_one": "{{count}} item selected",
-  "selectedCount_other": "{{count}} items selected",
-  "selectionHint": {
-    "none": "No items selected",
-    "autoActiveLock": "Auto upload is on"
-  },
   "deviceDisconnected": "Device offline",
   "mediaTypes": {
     "video": "Video",
@@ -60,7 +53,6 @@
     "transferred": "Uploaded"
   },
   "actions": {
-    "startUpload": "Start Upload",
     "pickTime": "Tap to Set a Time"
   },
   "config": {
@@ -81,7 +73,6 @@
   },
   "stats": {
     "total": "Total",
-    "selected": "Selected",
     "transferred": "Uploaded",
     "new": "New"
   },
@@ -94,35 +85,11 @@
     "title": "Choose Album",
     "allPhotos": "All Photos"
   },
-  "selectAll": "Select all",
-  "deselectAll": "Deselect all",
   "preview": {
     "cloudUnavailable": "iCloud video not downloaded, cannot preview",
     "notFound": "Asset not found"
   },
   "dialogs": {
-    "cannotUpload": {
-      "title": "Cannot Upload",
-      "autoActive": "Turn off auto upload first.",
-      "notConnected": "Please connect to a device first."
-    },
-    "submitted": {
-      "title": "Submitted",
-      "queuedOnly": "Queued {{count}} files",
-      "queuedOnly_one": "Queued {{count}} file",
-      "queuedOnly_other": "Queued {{count}} files",
-      "queuedWithSkipped": "Queued {{queued}} files; {{skipped}} duplicate(s) skipped"
-    },
-    "allDuplicate": {
-      "title": "All Duplicates",
-      "body": "All {{count}} items are already in the upload queue.",
-      "body_one": "The selected item is already in the upload queue.",
-      "body_other": "All {{count}} items are already in the upload queue."
-    },
-    "submitFailed": {
-      "title": "Submission Failed",
-      "body": "Could not submit the upload. Please try again later."
-    },
     "closeAuto": {
       "title": "Turn Off Auto Upload",
       "body": "Turn off auto upload? New photos will stop transferring to your PC automatically.",
