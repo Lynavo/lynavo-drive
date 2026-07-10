@@ -100,7 +100,7 @@ jest.mock('react-i18next', () => {
             'sharedFiles.localComputer.desc':
               'Browse your computer shared directory and download files',
             'sharedFiles.localComputer.ossDesc':
-              'Access paired computer files on the same local network without a paid plan.',
+              'Browse paired desktop files over your local LAN.',
             'sharedFiles.localComputer.badgeDesktop': 'Computer',
             'sharedFiles.localComputer.badgeView': 'Browse',
             'sharedFiles.localComputer.ossBadge': 'LAN',
@@ -569,7 +569,7 @@ describe('SharedFilesScreen V2 (Landing Menu)', () => {
     expect(mockNavigate).toHaveBeenCalledWith('LocalComputer');
   });
 
-  it('keeps guest users on local-LAN local computer access instead of login or purchase flow', () => {
+  it('keeps guest users on local-LAN local computer access instead of login or account flow', () => {
     mockAuthState = {
       isLoggedIn: false,
     };
@@ -584,7 +584,6 @@ describe('SharedFilesScreen V2 (Landing Menu)', () => {
 
     expect(mockNavigate).toHaveBeenCalledWith('LocalComputer');
     expect(mockNavigate).not.toHaveBeenCalledWith('Login');
-    expect(mockNavigate).not.toHaveBeenCalledWith('OpenSourceInfo', undefined);
   });
 });
 
@@ -618,25 +617,22 @@ describe('SharedFilesGlobalScreen', () => {
     );
   });
 
-  it('keeps global local computer local-LAN without a paid service gate', () => {
+  it('keeps global local computer local-LAN without an account service gate', () => {
     const { getByText, queryByText } = render(
       <SharedFilesGlobalScreen showBottomTabBar={false} />,
     );
 
     expect(getByText('LAN')).toBeTruthy();
     expect(
-      getByText(
-        'Access paired computer files on the same local network without a paid plan.',
-      ),
+      getByText('Browse paired desktop files over your local LAN.'),
     ).toBeTruthy();
     fireEvent.press(getByText('Computer Files'));
 
     expect(mockNavigate).toHaveBeenCalledWith('LocalComputer');
-    expect(mockNavigate).not.toHaveBeenCalledWith('OpenSourceInfo');
     expect(queryByText('Network Disconnected')).toBeNull();
   });
 
-  it('keeps guest users on local-LAN local computer access instead of login or purchase flow', () => {
+  it('keeps guest users on local-LAN local computer access instead of login or account flow', () => {
     mockAuthState = {
       isLoggedIn: false,
     };
@@ -649,7 +645,6 @@ describe('SharedFilesGlobalScreen', () => {
 
     expect(mockNavigate).toHaveBeenCalledWith('LocalComputer');
     expect(mockNavigate).not.toHaveBeenCalledWith('Login');
-    expect(mockNavigate).not.toHaveBeenCalledWith('OpenSourceInfo');
   });
 });
 
@@ -706,7 +701,7 @@ describe('LocalComputerGlobalScreen', () => {
     });
   });
 
-  it('lists shared files without a paid off-LAN gate', async () => {
+  it('lists shared files without an off-LAN service gate', async () => {
     mockListGlobalLocalComputerResources.mockResolvedValueOnce([]);
 
     const { queryByText } = render(
@@ -718,9 +713,7 @@ describe('LocalComputerGlobalScreen', () => {
     await waitFor(() => {
       expect(mockListGlobalLocalComputerResources).toHaveBeenCalledWith();
     });
-    expect(
-      queryByText('A paid plan is required to access computer files'),
-    ).toBeNull();
+    expect(queryByText('Cloud account required')).toBeNull();
     expect(queryByText('Network Disconnected')).toBeNull();
   });
 

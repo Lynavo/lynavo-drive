@@ -278,18 +278,6 @@ jest.mock('../../screens/SettingsGlobalScreen', () => ({
   },
 }));
 
-jest.mock('../../screens/OpenSourceInfoScreen', () => ({
-  OpenSourceInfoScreen: () => {
-    const R = require('react');
-    const { Text } = require('react-native');
-    return R.createElement(
-      Text,
-      { testID: 'open-source-info-screen' },
-      'OpenSourceInfo',
-    );
-  },
-}));
-
 jest.mock('../../screens/HelpScreen', () => ({
   HelpScreen: () => {
     const R = require('react');
@@ -394,7 +382,7 @@ afterAll(() => {
 // ---------------------------------------------------------------------------
 
 describe('RootNavigator - OSS fail-open routing', () => {
-  test('routes stale authenticated sessions to foreground LAN discovery, not OpenSourceInfoScreen', async () => {
+  test('routes stale authenticated sessions to foreground LAN discovery', async () => {
     mockLegacyAuthenticatedSession();
     render(
       <NavigationContainer>
@@ -404,7 +392,6 @@ describe('RootNavigator - OSS fail-open routing', () => {
     await waitFor(() =>
       expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
     );
-    expect(screen.queryByTestId('open-source-info-screen')).toBeNull();
   });
 
   test('does not require account state before entering foreground LAN discovery', async () => {
@@ -412,23 +399,20 @@ describe('RootNavigator - OSS fail-open routing', () => {
     await waitFor(() =>
       expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
     );
-    expect(screen.queryByTestId('open-source-info-screen')).toBeNull();
   });
 
-  test('routes hydrated local sessions to main app without a paid gate', async () => {
+  test('routes hydrated local sessions to main app without an account gate', async () => {
     renderWithGuestLocalSession();
     await waitFor(() =>
       expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
     );
-    expect(screen.queryByTestId('open-source-info-screen')).toBeNull();
   });
 
-  test('keeps local sessions off paid gate routes', async () => {
+  test('keeps local sessions off account-gated routes', async () => {
     renderWithGuestLocalSession();
     await waitFor(() =>
       expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
     );
-    expect(screen.queryByTestId('open-source-info-screen')).toBeNull();
   });
 
   test('expired status with an existing binding still routes to SyncActivity', async () => {
@@ -445,7 +429,6 @@ describe('RootNavigator - OSS fail-open routing', () => {
     await waitFor(() =>
       expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy(),
     );
-    expect(screen.queryByTestId('open-source-info-screen')).toBeNull();
   });
 
   test('stale legacy account snapshots are no longer required for LAN discovery', async () => {
@@ -453,10 +436,9 @@ describe('RootNavigator - OSS fail-open routing', () => {
     await waitFor(() =>
       expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
     );
-    expect(screen.queryByTestId('open-source-info-screen')).toBeNull();
   });
 
-  test('does not reset foreground LAN route to OpenSourceInfoScreen after entering the app', async () => {
+  test('does not reset foreground LAN route after entering the app', async () => {
     const view = renderWithGuestLocalSession();
     await waitFor(() =>
       expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),

@@ -1,5 +1,5 @@
 describe('SyncEngineModule non-OSS background bridge', () => {
-  const driveCapabilitySetter = ['setDrive', 'Entitlements'].join('');
+  const driveCapabilitySetter = ['setDrive', 'Capabilities'].join('');
   const loadModule = (
     platform: 'android' | 'ios',
     options: { includeCapabilityBridge?: boolean } = {
@@ -42,7 +42,7 @@ describe('SyncEngineModule non-OSS background bridge', () => {
     jest.clearAllMocks();
   });
 
-  it('does not export Android paid background service wrappers in OSS', () => {
+  it('does not export Android non-OSS background service wrappers in OSS', () => {
     const { nativeSyncEngine, syncEngine } = loadModule('android');
 
     expect(syncEngine).not.toHaveProperty('startBackgroundSyncService');

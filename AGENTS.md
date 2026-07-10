@@ -9,7 +9,7 @@ Android sync capabilities.
 
 This repository is the global-only OSS baseline. It maintains one public local
 source-build and package-verification path only. It does not include
-multi-market, official signing, upload, auto-update, commercial distribution,
+multi-market, official signing, upload, auto-update, non-OSS distribution,
 or other non-OSS product paths. Linux is kept only for local source-build /
 package verification; it is not a current user support surface.
 
@@ -75,8 +75,8 @@ machine, persistence, or sync semantics.
   relevant docs. The OSS repository provides local source-build and package
   verification only.
 - **No official non-OSS release path is available here**. Do not add or assume
-  official signing, notarization, upload, auto-update, commercial market,
-  entitlement, support, or hosted release infrastructure in this public
+  official signing, notarization, upload, auto-update, non-OSS market,
+  server-side capability, support, or hosted release infrastructure in this public
   baseline.
 - **Linux is verification-only**. Keep Linux local source-build and package
   verification paths working where documented, but do not treat Linux as a
@@ -91,11 +91,12 @@ machine, persistence, or sync semantics.
 - **No manual file-selection fallback**. Do not add manual picking to bypass the
   mobile local scan and pending queue.
 - **Single-file serial upload**. A given phone uploads only one file at a time.
-- **Guest local LAN mode**. Users who are not signed in or subscribed can still
-  discover, pair, and automatically sync in foreground LAN scenarios.
+- **Guest local LAN mode**. Users without sign-in or account-service state can
+  still discover, pair, and automatically sync in foreground LAN scenarios.
 - **Non-OSS remote / background capabilities fail closed**. Silent background
   resume, remote access, and tunnel credentials require official capability and
-  valid entitlement. If missing, expired, or unconfirmed, keep them disabled.
+  valid server-side capability. If missing, expired, or unconfirmed, keep them
+  disabled.
 - **Import all DTO types from `@lynavo-drive/contracts`**. Do not redefine them
   in desktop or mobile packages.
 - **Renderer must not access sidecar, filesystem, or SQLite directly**. Route
@@ -114,9 +115,9 @@ Additional clarifications:
 - iCloud assets enter the queue during scanning; cloud download happens during
   export.
 - Foreground LAN sync is fail-open and must not be blocked by login state,
-  subscription state, or missing non-OSS modules.
-- Remote / background capabilities fail closed. Do not turn paid capabilities on
-  through local defaults.
+  account-service state, or missing non-OSS modules.
+- Remote / background capabilities fail closed. Do not turn non-OSS
+  capabilities on through local defaults.
 - mDNS service names, legacy data directories, native package / bundle IDs, and
   package scope rename are migration boundaries for later work. Do not perform
   migrations in documentation-only tasks unless explicitly requested.
@@ -144,8 +145,8 @@ items in the final response:
    behavior, and possibly affected platforms.
 2. **Contamination check**: confirm whether adjacent logic, shared state,
    DTO/protocol, persistence, queue semantics, sync state machine,
-   permission/subscription gates, history statistics, or other non-target paths
-   were changed.
+   permission/account-service gates, history statistics, or other non-target
+   paths were changed.
 3. **Validation results**: list tests, type checks, builds, or explain why they
    could not be run.
 

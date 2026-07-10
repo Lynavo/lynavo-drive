@@ -911,7 +911,7 @@ func TestSidecarDesktopOnlyRoutesRejectLANAccess(t *testing.T) {
 	}
 }
 
-func TestOSSSettingsDoNotExposeLegacyCommercialToggle(t *testing.T) {
+func TestOSSSettingsDoNotExposeLegacyRemoteToggle(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 
 	_, handler := api.NewServer(st, cfg, hub, nil)

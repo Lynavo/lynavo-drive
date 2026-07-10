@@ -106,20 +106,20 @@ configuration, and only select local build/package commands.
 ## OSS Boundary
 
 - Community/OSS builds are a single OSS baseline. They do not provide
-  multi-market branches, dedicated payment paths, dedicated release profiles, or
-  dual-market regression matrices.
-- Guest local LAN mode must work. Without sign-in or subscription, users can
-  discover the desktop, pair, scan the pending queue, and upload automatically
-  over foreground LAN.
+  multi-market branches, dedicated account-service paths, dedicated release
+  profiles, or dual-market regression matrices.
+- Guest local LAN mode must work. Without sign-in or account-service state,
+  users can discover the desktop, pair, scan the pending queue, and upload
+  automatically over foreground LAN.
 - No manual file-selection fallback is provided. The queue is driven by mobile
   local scans and the pending queue; the UI must not allow manual file
   checkboxes to bypass automatic incremental sync.
 - Foreground LAN sync is fail-open. When local permissions, pairing, and LAN
   reachability are available, foreground sync is not blocked by sign-in,
-  subscription, or missing non-OSS modules.
+  account-service state, or missing non-OSS modules.
 - Non-OSS remote/background capabilities fail closed. Remote access, tunnel
   credentials, and silent background continuation remain off without official
-  capability or valid entitlement.
+  capability.
 - The OSS source package does not redistribute Apple Bonjour for Windows
   binaries. Windows native Bonjour can only use the user's local installation or
   another locally permitted configured source; otherwise it uses the

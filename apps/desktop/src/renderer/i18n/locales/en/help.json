@@ -91,7 +91,7 @@
           },
           {
             "title": "Does the OSS edition include official internet relay?",
-            "body": "No. Official TURN, signaling, purchase, and account services are not part of the OSS runtime. Keep the phone and computer on the same LAN for sync and browsing."
+            "body": "No. Official TURN, signaling, and account services are not part of the OSS runtime. Keep the phone and computer on the same LAN for sync and browsing."
           }
         ]
       },

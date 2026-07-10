@@ -86,8 +86,8 @@ Release profiles are build-channel selectors for local verification only:
 
 1. `review` sets `LYNAVO_RELEASE_CHANNEL=review`.
 2. Other configured local profiles follow the same source-build-only rules.
-3. Profiles do not inject support, update, diagnostics, auth, entitlement,
-   signing, upload, or external service environment variables.
+3. Profiles do not inject support, update, diagnostics, auth, server-side
+   capability, signing, upload, or external service environment variables.
 4. Profiles resolve to local build/package commands only.
 
 Target commands:

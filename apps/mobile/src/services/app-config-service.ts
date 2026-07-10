@@ -39,5 +39,5 @@ export async function getAppConfig(): Promise<AppConfig> {
 }
 
 export async function refreshNativeAppFeatureSettings(): Promise<void> {
-  // OSS builds do not expose native paid-background feature toggles.
+  // OSS builds do not expose native non-OSS background feature toggles.
 }

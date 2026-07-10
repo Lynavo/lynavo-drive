@@ -24,5 +24,5 @@ history.
 ## Network Behavior
 
 The app uses local discovery, pairing, and file transfer on the LAN. Remote
-access, tunnel credentials, entitlement services, and cloud-assisted routing are
-outside the OSS runtime.
+access, tunnel credentials, server-side capability services, and cloud-assisted
+routing are outside the OSS runtime.

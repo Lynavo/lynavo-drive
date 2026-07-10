@@ -15,6 +15,13 @@ type IpcHandler = (...args: unknown[]) => unknown;
 
 const handlers = new Map<string, IpcHandler>();
 
+const registeredIpcChannelsWithoutPowerSave = Object.values(IPC)
+  .filter(
+    (channel) =>
+      channel !== IPC.POWER_SAVE_GET_STATE && channel !== IPC.POWER_SAVE_SET_PREVENT_SLEEP,
+  )
+  .sort();
+
 const platformCapabilitiesMock = vi.hoisted(() => ({
   usesTitleBarOverlayControls: vi.fn(() => true),
 }));
@@ -253,18 +260,10 @@ describe('registerIpcHandlers', () => {
     expect(handlers.has(['support:upload', '-diagnostics'].join(''))).toBe(false);
   });
 
-  it('does not register non-OSS gift-card, client-config, or auth IPC handlers', async () => {
+  it('registers only the public OSS IPC surface', async () => {
     registerIpcHandlers({ retryStart: vi.fn() } as never);
 
-    expect(handlers.has('sidecar:redeem-gift-card')).toBe(false);
-    expect(handlers.has('sidecar:client-config')).toBe(false);
-    expect(handlers.has('auth:send-sms-code')).toBe(false);
-    expect(handlers.has('auth:login-with-sms-code')).toBe(false);
-    expect(handlers.has('auth:send-email-code')).toBe(false);
-    expect(handlers.has('auth:login-with-email-code')).toBe(false);
-    expect(handlers.has('auth:get-session')).toBe(false);
-    expect(handlers.has('auth:logout')).toBe(false);
-    expect(handlers.has('auth:login-with-oauth')).toBe(false);
+    expect([...handlers.keys()].sort()).toEqual(registeredIpcChannelsWithoutPowerSave);
   });
 
   it('updates the native title bar overlay while renderer modals are open', async () => {

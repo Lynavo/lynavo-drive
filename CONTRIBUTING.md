@@ -4,7 +4,7 @@
 
 Read `AGENTS.md` before changing code. The short version:
 
-- keep foreground LAN sync usable without account or subscription services
+- keep foreground LAN sync usable without account services
 - keep non-OSS remote/background capabilities fail-closed
 - do not add manual file picking as an upload path
 - do not commit signing material, API keys, generated packages, local databases,

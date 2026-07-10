@@ -33,7 +33,7 @@
   "localComputer": {
     "title": "電腦檔案",
     "desc": "瀏覽電腦端共享的目錄結構並下載檔案",
-    "ossDesc": "透過本地局域網瀏覽已配對電腦的檔案，無需付費方案。",
+    "ossDesc": "透過本地局域網瀏覽已配對電腦的檔案。",
     "ossBadge": "局域網",
     "badgeDesktop": "桌面目錄",
     "badgeView": "列表/網格",

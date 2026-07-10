@@ -169,7 +169,8 @@ should continue through the pending queue.
 
 ### 4.5 Guest Local LAN Mode
 
-1. Mobile is not signed in, has no subscription, and has no server entitlement.
+1. Mobile is not signed in, has no account-service state, and has no
+   server-side capability.
 2. Desktop and mobile are on the same LAN.
 3. Mobile can discover desktop, complete pairing, and trigger foreground
    automatic sync.

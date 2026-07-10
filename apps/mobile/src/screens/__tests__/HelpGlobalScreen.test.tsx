@@ -80,11 +80,11 @@ describe('HelpGlobalScreen OSS copy', () => {
     );
   });
 
-  it('describes local LAN operation instead of trial or purchase flows', () => {
+  it('describes local LAN operation instead of account-gated flows', () => {
     const { getByText, queryByText } = render(<HelpGlobalScreen />);
 
     expect(
-      getByText('Does the open-source edition require a paid plan?'),
+      getByText('Does the open-source edition require a cloud login?'),
     ).toBeTruthy();
     expect(
       getByText(
@@ -92,7 +92,7 @@ describe('HelpGlobalScreen OSS copy', () => {
       ),
     ).toBeTruthy();
     expect(queryByText(/trial/i)).toBeNull();
-    expect(queryByText(/purchase/i)).toBeNull();
+    expect(queryByText('Cloud login required')).toBeNull();
   });
 
   it('shares a local diagnostics archive from the support section', async () => {

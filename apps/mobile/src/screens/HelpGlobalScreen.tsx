@@ -313,9 +313,6 @@ const styles = StyleSheet.create({
   diagnosticsIconBox: {
     backgroundColor: 'rgba(116,106,168,0.12)',
   },
-  giftIconBox: {
-    backgroundColor: 'rgba(255,204,0,0.15)',
-  },
   actionContent: {
     flex: 1,
     minWidth: 0,

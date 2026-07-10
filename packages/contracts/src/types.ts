@@ -11,7 +11,7 @@ import type {
   UploadTaskSource,
 } from './enums';
 
-// ── Product / Entitlements ──
+// ── Product / Release ──
 
 export type ReleaseChannel = 'dev' | 'review' | 'prod';
 

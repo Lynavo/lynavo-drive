@@ -35,8 +35,8 @@ runtime.
 
 The OSS version must keep:
 
-1. Guest local LAN mode: users without sign-in or subscription can still
-   discover the desktop, pair, and sync automatically in foreground LAN
+1. Guest local LAN mode: users without sign-in or account-service state can
+   still discover the desktop, pair, and sync automatically in foreground LAN
    scenarios.
 2. Foreground LAN automatic sync: the upload set comes from the mobile local
    pending queue.
@@ -49,7 +49,7 @@ The OSS version does not provide:
 
 1. Market branches, market switching, dedicated release profiles, or dual-market
    regression matrices.
-2. Official accounts, subscriptions, server entitlement, paid-state recovery, or
+2. Official accounts, server-side capability, server-side account recovery, or
    social-login runtime.
 3. Remote access outside local LAN, relay, tunnel credentials, or
    cloud-assisted routes.
@@ -64,14 +64,14 @@ The OSS version does not provide:
 
 Failure strategy:
 
-1. Foreground LAN fail-open: sign-in state, subscription state, missing server
-   entitlement, or missing non-OSS modules must not block foreground LAN
-   automatic sync.
+1. Foreground LAN fail-open: sign-in state, account-service state, missing
+   server-side capability, or missing non-OSS modules must not block foreground
+   LAN automatic sync.
 2. Remote/background fail-closed: remote access, tunnel, relay, and silent
    background continuation must be disabled without official capability and
-   valid entitlement.
-3. Missing, expired, unconfirmed, or malformed entitlement is treated as
-   unavailable.
+   valid server-side capability.
+3. Missing, expired, unconfirmed, or malformed server-side capability is treated
+   as unavailable.
 4. Remote/background check failure must not clear LAN pairing, sync identity, or
    pending queue.
 

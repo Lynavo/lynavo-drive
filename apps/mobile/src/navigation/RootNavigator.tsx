@@ -29,7 +29,6 @@ import { HistoryGlobalScreen } from '../screens/HistoryGlobalScreen';
 import { SettingsGlobalScreen } from '../screens/SettingsGlobalScreen';
 import { HelpGlobalScreen } from '../screens/HelpGlobalScreen';
 import { QRScannerScreen } from '../screens/QRScannerScreen';
-import { OpenSourceInfoScreen } from '../screens/OpenSourceInfoScreen';
 import { AutoUploadSettingsGlobalScreen } from '../screens/AutoUploadSettingsGlobalScreen';
 import { GlobalBottomTabBar } from '../components/GlobalBottomTabBar';
 import {
@@ -76,7 +75,6 @@ export type RootStackParamList = {
   History: undefined;
   Settings: undefined;
   Help: undefined;
-  OpenSourceInfo: { isNewUser?: boolean } | undefined;
   AutoUploadSettings: undefined;
 };
 
@@ -278,7 +276,6 @@ function LanSyncStack() {
         <Stack.Screen name="History" component={HistoryGlobalScreen} />
         <Stack.Screen name="Settings" component={GlobalMainTabsScreen} />
         <Stack.Screen name="Help" component={HelpGlobalScreen} />
-        <Stack.Screen name="OpenSourceInfo" component={OpenSourceInfoScreen} />
         <Stack.Screen
           name="AutoUploadSettings"
           component={AutoUploadSettingsGlobalScreen}

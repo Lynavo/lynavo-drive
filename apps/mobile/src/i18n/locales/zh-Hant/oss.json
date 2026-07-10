@@ -1,9 +1,0 @@
-{
-  "title": "Lynavo Drive Community",
-  "body": "開源版透過本地桌面配對在區域網路內同步。",
-  "pointLan": "與同一網路內的桌面端配對後，可自動增量同步素材。",
-  "pointNoStore": "開源執行環境不包含應用商店購買或兌換流程。",
-  "pointServices": "非區域網路與背景非開源版服務在社群版中保持關閉。",
-  "primary": "配對電腦",
-  "secondary": "返回同步"
-}

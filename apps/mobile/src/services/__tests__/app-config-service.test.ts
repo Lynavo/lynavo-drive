@@ -9,7 +9,7 @@ describe('app-config-service', () => {
     jest.clearAllMocks();
   });
 
-  it('returns OSS local defaults without commercial feature switches', async () => {
+  it('returns OSS local defaults without non-OSS feature switches', async () => {
     await expect(getAppConfig()).resolves.toEqual({
       backgroundSilentAudio: { enabled: false },
       network: { callerPublicIp: null },
@@ -31,7 +31,7 @@ describe('app-config-service', () => {
     expect(normalizePublicIPv4('bad')).toBeNull();
   });
 
-  it('does not call native paid-background feature toggles in the OSS runtime', async () => {
+  it('does not call native non-OSS background feature toggles in the OSS runtime', async () => {
     await expect(refreshNativeAppFeatureSettings()).resolves.toBeUndefined();
   });
 });

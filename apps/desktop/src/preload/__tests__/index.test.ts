@@ -40,6 +40,38 @@ const platformCapabilities = vi.hoisted(() => ({
   usesTitleBarOverlayControls: vi.fn((): boolean => false),
 }));
 
+const allowedElectronApiKeys = ['events', 'files', 'platform', 'power', 'sidecar', 'support'];
+
+const allowedSidecarApiKeys = [
+  'addSharedResource',
+  'blockDevice',
+  'clearBlockedClient',
+  'getAccessRecords',
+  'getConnectionDevices',
+  'getDashboardDevices',
+  'getDashboardSummary',
+  'getDeviceDates',
+  'getDeviceFiles',
+  'getHealth',
+  'getManagedDevices',
+  'getReceivedLibrary',
+  'getRuntimeState',
+  'getSettings',
+  'getShareStatus',
+  'getSharedList',
+  'getSharedResources',
+  'getSyncRecords',
+  'getTransferActive',
+  'regenerateConnectionCode',
+  'removeSharedResource',
+  'retryStart',
+  'revokeConnectionDevice',
+  'setConnectionCode',
+  'unblockDevice',
+  'updateSettings',
+  'validateShare',
+];
+
 vi.mock('electron', () => ({
   contextBridge: {
     exposeInMainWorld: vi.fn((_key: string, value: unknown) => {
@@ -68,14 +100,13 @@ describe('preload electronAPI', () => {
     platformCapabilities.usesTitleBarOverlayControls.mockReturnValue(false);
   });
 
-  it('does not expose non-OSS gift-card, client-config, or auth bridges', async () => {
+  it('exposes only the public OSS preload surface', async () => {
     exposed.invoke.mockResolvedValue({ ok: true });
 
     await import('../index');
 
-    expect(exposed.api?.sidecar).not.toHaveProperty('redeemGiftCard');
-    expect(exposed.api?.sidecar).not.toHaveProperty('getClientConfig');
-    expect(exposed.api).not.toHaveProperty('auth');
+    expect(Object.keys(exposed.api ?? {}).sort()).toEqual(allowedElectronApiKeys);
+    expect(Object.keys(exposed.api?.sidecar ?? {}).sort()).toEqual(allowedSidecarApiKeys);
   });
 
   it('maps desktop-local sidecar calls to IPC channels', async () => {

@@ -18,7 +18,6 @@ type VisualQaRoute = Extract<
   | 'History'
   | 'Settings'
   | 'Help'
-  | 'OpenSourceInfo'
   | 'AutoUploadSettings'
 >;
 
@@ -47,7 +46,6 @@ const VISUAL_QA_ROUTE_WHITELIST: ReadonlySet<string> = new Set<VisualQaRoute>([
   'History',
   'Settings',
   'Help',
-  'OpenSourceInfo',
   'AutoUploadSettings',
 ]);
 

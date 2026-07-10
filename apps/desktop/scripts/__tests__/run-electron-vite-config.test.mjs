@@ -28,7 +28,6 @@ test('desktop dev bootstrap references only local release env', () => {
   assert.equal(script.includes(diagnosticsUploadEnv), false);
   assert.doesNotMatch(script, /LYNAVO_API_BASE_URL/);
   assert.match(script, /LYNAVO_RELEASE_CHANNEL/);
-  assert.doesNotMatch(script, /LYNAVO_GIFTCARD_REDEEM_BASE_URL/);
   assert.doesNotMatch(viteConfig, /LYNAVO_API_BASE_URL/);
   assert.doesNotMatch(viteConfig, /LYNAVO_SUPPORT_API_BASE_URL/);
 });
@@ -77,7 +76,6 @@ test('desktop dev bootstrap bridges only release channel over external API env',
       [desktopUpdateEnv]: 'https://updates.lynavo.example/app',
       [diagnosticsUploadEnv]: 'https://diagnostics.lynavo.example/upload',
       LYNAVO_CLIENT_CONFIG_BASE_URL: 'https://config.lynavo.test',
-      LYNAVO_GIFTCARD_REDEEM_BASE_URL: 'https://gift.lynavo.test',
     },
     existsSyncFn: () => false,
     projectRoot,
@@ -89,7 +87,6 @@ test('desktop dev bootstrap bridges only release channel over external API env',
   assert.equal(Object.hasOwn(env, diagnosticsUploadEnv), false);
   assert.equal(Object.hasOwn(env, 'LYNAVO_API_BASE_URL'), false);
   assert.equal(Object.hasOwn(env, 'LYNAVO_CLIENT_CONFIG_BASE_URL'), false);
-  assert.equal(Object.hasOwn(env, 'LYNAVO_GIFTCARD_REDEEM_BASE_URL'), false);
 });
 
 test('desktop dev bootstrap removes explicit auth endpoints from the local runtime', () => {

@@ -215,7 +215,6 @@ describe('SettingsGlobalScreen', () => {
     expect(queryByText('Sign out')).toBeNull();
     expect(queryByText('Delete account')).toBeNull();
     expect(queryByText('+1 206 **** 1234')).toBeNull();
-    expect(queryByText('Pro Annual - remaining 28 days')).toBeNull();
     expect(queryByText('MacBook Pro')).toBeNull();
     expect(queryByText('Version 2.1.0')).toBeNull();
   });
@@ -263,16 +262,13 @@ describe('SettingsGlobalScreen', () => {
     expect(contentStyle.paddingBottom).toBe(24);
   });
 
-  test('keeps settings OSS-only without purchase, membership, logout, or delete-account actions', async () => {
+  test('keeps settings OSS-only without account membership, logout, or delete-account actions', async () => {
     const { getByText, queryByTestId, queryByText } =
       await renderSettingsGlobalScreen();
 
-    expect(mockNavigate).not.toHaveBeenCalledWith('OpenSourceInfo');
     expect(queryByText('Membership status')).toBeNull();
     expect(queryByTestId('global-settings-logout')).toBeNull();
     expect(queryByTestId('global-settings-delete-account')).toBeNull();
-    expect(queryByTestId('global-settings-restore-purchase')).toBeNull();
-    expect(queryByText('Restore purchases')).toBeNull();
 
     fireEvent.press(getByText('Switch Device'));
     expect(mockNavigate).toHaveBeenCalledWith('DeviceDiscovery', {

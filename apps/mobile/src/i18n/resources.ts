@@ -9,7 +9,6 @@ import deviceDiscovery_en from './locales/en/deviceDiscovery.json';
 import help_en from './locales/en/help.json';
 import sharedFiles_en from './locales/en/sharedFiles.json';
 import syncStatus_en from './locales/en/syncStatus.json';
-import oss_en from './locales/en/oss.json';
 import history_en from './locales/en/history.json';
 import albumWorkbench_en from './locales/en/albumWorkbench.json';
 import common_zh_Hans from './locales/zh-Hans/common.json';
@@ -23,7 +22,6 @@ import deviceDiscovery_zh_Hans from './locales/zh-Hans/deviceDiscovery.json';
 import help_zh_Hans from './locales/zh-Hans/help.json';
 import sharedFiles_zh_Hans from './locales/zh-Hans/sharedFiles.json';
 import syncStatus_zh_Hans from './locales/zh-Hans/syncStatus.json';
-import oss_zh_Hans from './locales/zh-Hans/oss.json';
 import history_zh_Hans from './locales/zh-Hans/history.json';
 import albumWorkbench_zh_Hans from './locales/zh-Hans/albumWorkbench.json';
 import common_zh_Hant from './locales/zh-Hant/common.json';
@@ -37,7 +35,6 @@ import deviceDiscovery_zh_Hant from './locales/zh-Hant/deviceDiscovery.json';
 import help_zh_Hant from './locales/zh-Hant/help.json';
 import sharedFiles_zh_Hant from './locales/zh-Hant/sharedFiles.json';
 import syncStatus_zh_Hant from './locales/zh-Hant/syncStatus.json';
-import oss_zh_Hant from './locales/zh-Hant/oss.json';
 import history_zh_Hant from './locales/zh-Hant/history.json';
 import albumWorkbench_zh_Hant from './locales/zh-Hant/albumWorkbench.json';
 
@@ -53,7 +50,6 @@ export const LOCALE_SECTIONS = [
   'help',
   'sharedFiles',
   'syncStatus',
-  'oss',
   'history',
   'albumWorkbench',
 ] as const;
@@ -70,7 +66,6 @@ export const translationSchema = {
   help: help_zh_Hant,
   sharedFiles: sharedFiles_zh_Hant,
   syncStatus: syncStatus_zh_Hant,
-  oss: oss_zh_Hant,
   history: history_zh_Hant,
   albumWorkbench: albumWorkbench_zh_Hant,
 } as const;
@@ -89,7 +84,6 @@ export const resources = {
       help: help_en,
       sharedFiles: sharedFiles_en,
       syncStatus: syncStatus_en,
-      oss: oss_en,
       history: history_en,
       albumWorkbench: albumWorkbench_en,
     },
@@ -107,7 +101,6 @@ export const resources = {
       help: help_zh_Hans,
       sharedFiles: sharedFiles_zh_Hans,
       syncStatus: syncStatus_zh_Hans,
-      oss: oss_zh_Hans,
       history: history_zh_Hans,
       albumWorkbench: albumWorkbench_zh_Hans,
     },
@@ -125,7 +118,6 @@ export const resources = {
       help: help_zh_Hant,
       sharedFiles: sharedFiles_zh_Hant,
       syncStatus: syncStatus_zh_Hant,
-      oss: oss_zh_Hant,
       history: history_zh_Hant,
       albumWorkbench: albumWorkbench_zh_Hant,
     },

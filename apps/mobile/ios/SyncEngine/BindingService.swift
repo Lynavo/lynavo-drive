@@ -9,6 +9,10 @@ class BindingService {
     private static let pairingTokenKey = "lynavo_pairing_token"
     private static let clientDisplayNameKey = "lynavo_client_display_name"
     private static let keychainMigrationDoneKey = "lynavo_keychain_initialized_v1"
+    private static let keychainFallbackPrefix = "lynavo_keychain_fallback_v1"
+
+    private let keychainAvailabilityLock = NSLock()
+    private var unavailableKeychainServices = Set<String>()
 
     weak var uploadStore: UploadStore?
 
@@ -29,21 +33,14 @@ class BindingService {
 
     /// Read a value from a specific keychain service (for migration).
     private func readKeychainFromService(_ service: String, key: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess, let data = result as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
+        return readKeychain(service: service, key: key)
     }
 
     /// List all keychain account keys under a given service.
     private func listKeychainKeys(service: String) -> [String] {
+        if isKeychainUnavailable(service: service) {
+            return listFallbackKeys(service: service)
+        }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -52,8 +49,18 @@ class BindingService {
         ]
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess, let items = result as? [[String: Any]] else { return [] }
-        return items.compactMap { $0[kSecAttrAccount as String] as? String }
+        var keys = Set(listFallbackKeys(service: service))
+        if status == errSecItemNotFound {
+            return Array(keys).sorted()
+        }
+        if status != errSecSuccess {
+            markKeychainUnavailable(service: service, operation: "list", status: status)
+            return Array(keys).sorted()
+        }
+        if let items = result as? [[String: Any]] {
+            keys.formUnion(items.compactMap { $0[kSecAttrAccount as String] as? String })
+        }
+        return Array(keys).sorted()
     }
 
     // MARK: - Client ID (generated once, persisted in Keychain)
@@ -168,6 +175,11 @@ class BindingService {
     }
 
     private func writeKeychain(service: String, key: String, value: String, accessible: CFString) {
+        if isKeychainUnavailable(service: service) {
+            writeFallbackValue(service: service, key: key, value: value)
+            return
+        }
+
         let data = Data(value.utf8)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -182,14 +194,29 @@ class BindingService {
         addQuery[kSecAttrAccessible as String] = accessible
         let status = SecItemAdd(addQuery as CFDictionary, nil)
         if status != errSecSuccess {
-            slog("[BindingService] Keychain write failed for %@: OSStatus=%d", key, status)
+            markKeychainUnavailable(service: service, operation: "write", status: status)
+            writeFallbackValue(service: service, key: key, value: value)
+            return
         }
+        deleteFallbackValue(service: service, key: key)
     }
 
     private func readKeychain(key: String) -> String? {
+        return readKeychain(service: Self.keychainServiceName, key: key)
+    }
+
+    private func readKeychain(service: String, key: String) -> String? {
+        if let fallbackValue = readFallbackValue(service: service, key: key) {
+            return fallbackValue
+        }
+
+        if isKeychainUnavailable(service: service) {
+            return nil
+        }
+
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: Self.keychainServiceName,
+            kSecAttrService as String: service,
             kSecAttrAccount as String: key,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
@@ -197,25 +224,85 @@ class BindingService {
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         if status == errSecItemNotFound {
-            return nil
+            return readFallbackValue(service: service, key: key)
         }
         if status != errSecSuccess {
-            slog("[BindingService] Keychain read failed for %@: OSStatus=%d", key, status)
-            return nil
+            markKeychainUnavailable(service: service, operation: "read", status: status)
+            return readFallbackValue(service: service, key: key)
         }
         guard let data = result as? Data else {
             slog("[BindingService] Keychain read for %@: status OK but data cast failed", key)
-            return nil
+            return readFallbackValue(service: service, key: key)
         }
         return String(data: data, encoding: .utf8)
     }
 
     private func deleteKeychain(key: String) {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: Self.keychainServiceName,
-            kSecAttrAccount as String: key,
-        ]
-        SecItemDelete(query as CFDictionary)
+        deleteKeychain(service: Self.keychainServiceName, key: key)
+    }
+
+    private func deleteKeychain(service: String, key: String) {
+        if !isKeychainUnavailable(service: service) {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: key,
+            ]
+            let status = SecItemDelete(query as CFDictionary)
+            if status != errSecSuccess && status != errSecItemNotFound {
+                markKeychainUnavailable(service: service, operation: "delete", status: status)
+            }
+        }
+        deleteFallbackValue(service: service, key: key)
+    }
+
+    private func isKeychainUnavailable(service: String) -> Bool {
+        keychainAvailabilityLock.lock()
+        defer { keychainAvailabilityLock.unlock() }
+        return unavailableKeychainServices.contains(service)
+    }
+
+    private func markKeychainUnavailable(service: String, operation: String, status: OSStatus) {
+        keychainAvailabilityLock.lock()
+        let inserted = unavailableKeychainServices.insert(service).inserted
+        keychainAvailabilityLock.unlock()
+        if inserted {
+            slog(
+                "[BindingService] Keychain %@ failed for service %@: OSStatus=%d; using local fallback for this run",
+                operation,
+                service,
+                status
+            )
+        }
+    }
+
+    private func fallbackDefaultsKey(service: String, key: String) -> String {
+        return "\(Self.keychainFallbackPrefix).\(service).\(key)"
+    }
+
+    private func fallbackDefaultsPrefix(service: String) -> String {
+        return "\(Self.keychainFallbackPrefix).\(service)."
+    }
+
+    private func readFallbackValue(service: String, key: String) -> String? {
+        return UserDefaults.standard.string(forKey: fallbackDefaultsKey(service: service, key: key))
+    }
+
+    private func writeFallbackValue(service: String, key: String, value: String) {
+        UserDefaults.standard.set(value, forKey: fallbackDefaultsKey(service: service, key: key))
+        UserDefaults.standard.synchronize()
+    }
+
+    private func deleteFallbackValue(service: String, key: String) {
+        UserDefaults.standard.removeObject(forKey: fallbackDefaultsKey(service: service, key: key))
+        UserDefaults.standard.synchronize()
+    }
+
+    private func listFallbackKeys(service: String) -> [String] {
+        let prefix = fallbackDefaultsPrefix(service: service)
+        return UserDefaults.standard.dictionaryRepresentation().keys.compactMap { rawKey in
+            guard rawKey.hasPrefix(prefix) else { return nil }
+            return String(rawKey.dropFirst(prefix.count))
+        }
     }
 }

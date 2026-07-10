@@ -26,8 +26,8 @@ Include:
 ## Security Scope
 
 Lynavo Drive OSS is a local LAN sync tool. Official account services, remote
-relay, entitlement checks, update services, and diagnostic upload services are
-not part of this repository.
+relay, server-side capability checks, update services, and diagnostic upload
+services are not part of this repository.
 
 Do not submit secrets, signing material, local databases, diagnostic archives,
 or generated packages to public issues or pull requests.
