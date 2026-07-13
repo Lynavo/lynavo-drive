@@ -10,6 +10,7 @@
 To optimize the reader journey and establish clear project boundaries for the open-source community, we will adjust the section order of `README.md`.
 
 Our objectives are:
+
 - Prioritize high-level project specs: Bring **OSS Boundaries**, **Tech Stack**, and **Architecture Overview** closer to the top.
 - Postpone configuration details: Move **Prerequisites**, **Common Commands**, **Build & Package Verification**, and **Project Structure** lower down, keeping developer-heavy parts folded.
 - Keep onboarding smooth: Keep **Quick Start** and **FAQs & Troubleshooting** closely connected in the middle.
@@ -19,6 +20,7 @@ Our objectives are:
 ## 2. Updated Section Hierarchy
 
 The revised order of `README.md` sections will be:
+
 1. **Hero Header & Title Banner**
 2. **Current Status**
 3. **📸 Screenshots Preview**
