@@ -37,3 +37,20 @@ Before opening a pull request:
 2. Run `pnpm gate:release`.
 3. Update documentation when behavior, build paths, or OSS boundaries change.
 4. Keep unrelated formatting and generated artifacts out of the diff.
+
+## Repository Checks
+
+The intended required checks are:
+
+- `OSS Release Gate`
+- `TS Quality`
+- `Go Tests`
+- `Native Builds` (added by the native verification workflow)
+
+Repository rules are configured in GitHub after each check has appeared at
+least once. Keep the display names stable when changing workflows so existing
+rules do not silently stop applying.
+
+Dependabot opens reviewed monthly updates for pnpm dependencies and pinned
+GitHub Actions. Each ecosystem is limited to five open pull requests; updates
+must pass the same checks and are not merged automatically.

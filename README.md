@@ -17,6 +17,8 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/gpt-open/vividrop-client/actions/workflows/oss-release-gate.yml"><img src="https://github.com/gpt-open/vividrop-client/actions/workflows/oss-release-gate.yml/badge.svg" alt="OSS Release Gate"></a>
+  <a href="https://github.com/gpt-open/vividrop-client/actions/workflows/ci.yml"><img src="https://github.com/gpt-open/vividrop-client/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/Node.js-%3E%3D%2022.12.0-blue?style=flat-square&logo=node.js" alt="Node Version">
   <img src="https://img.shields.io/badge/Go-%3E%3D%201.25.6-00ADD8?style=flat-square&logo=go" alt="Go Version">
   <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="Desktop Platform">

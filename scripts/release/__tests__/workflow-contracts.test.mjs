@@ -115,3 +115,20 @@ test('repository CI workflow runs TypeScript quality and Go tests', () => {
   assert.equal(goTest.run, 'go test ./...');
   assert.equal(goTest['working-directory'], 'services/sidecar-go');
 });
+
+test('Dependabot proposes reviewed monthly dependency updates', () => {
+  const config = workflow('.github/dependabot.yml');
+  const updates = config.updates ?? [];
+  const pnpm = updates.find(update => update['package-ecosystem'] === 'npm');
+  const actions = updates.find(
+    update => update['package-ecosystem'] === 'github-actions',
+  );
+
+  assert.equal(config.version, 2);
+  for (const update of [pnpm, actions]) {
+    assert.ok(update);
+    assert.equal(update.directory, '/');
+    assert.equal(update.schedule?.interval, 'monthly');
+    assert.equal(update['open-pull-requests-limit'], 5);
+  }
+});
