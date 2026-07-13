@@ -38,6 +38,11 @@ describe('renderer i18n initialization', () => {
     const { default: i18n } = await importFreshI18n();
 
     expect(i18n.language).toBe('zh-Hant');
+    expect(document.documentElement.lang).toBe('zh-Hant');
+
+    await i18n.changeLanguage('zh-Hans');
+
+    expect(document.documentElement.lang).toBe('zh-Hans');
   });
 
   it('falls back to English when no supported system language is present', async () => {

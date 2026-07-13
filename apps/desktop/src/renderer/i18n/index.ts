@@ -21,6 +21,13 @@ export function resolveInitialLocale(): SupportedLocale {
 
 const lng = resolveInitialLocale();
 
+function syncDocumentLanguage(locale: string): void {
+  document.documentElement.lang = isSupportedLocale(locale) ? locale : resolveLocale([locale]);
+}
+
+syncDocumentLanguage(lng);
+i18next.on('languageChanged', syncDocumentLanguage);
+
 void i18next.use(initReactI18next).init({
   resources,
   lng,
