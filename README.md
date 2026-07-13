@@ -42,6 +42,43 @@
   silent background continuation are not part of the OSS runtime and remain off
   without official capability.
 
+## 📸 Screenshots Preview
+
+<table width="100%">
+  <tr>
+    <td width="33%" align="center">
+      <strong>1. Device Discovery</strong><br>
+      <img src="./screenshots/screenshot_1.png" alt="Device Discovery" width="100%"><br>
+      <sub>Local LAN pairing via mDNS</sub>
+    </td>
+    <td width="33%" align="center">
+      <strong>2. Mobile Media Scan</strong><br>
+      <img src="./screenshots/screenshot_2.png" alt="Mobile Media Scan" width="100%"><br>
+      <sub>Incremental scanner for photo libraries</sub>
+    </td>
+    <td width="33%" align="center">
+      <strong>3. Active Sync Queue</strong><br>
+      <img src="./screenshots/screenshot_3.png" alt="Sync Queue" width="100%"><br>
+      <sub>Serial file upload tracking</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" align="center">
+      <strong>4. Sync History</strong><br>
+      <img src="./screenshots/screenshot_4.png" alt="Sync History" width="100%"><br>
+      <sub>Transfer logs and daily completion stats</sub>
+    </td>
+    <td width="33%" align="center">
+      <strong>5. Desktop Settings</strong><br>
+      <img src="./screenshots/screenshot_5.png" alt="Desktop Settings" width="100%"><br>
+      <sub>Shared target directory configurations</sub>
+    </td>
+    <td width="33%" align="center">
+      <!-- Empty cell for grid layout balance -->
+    </td>
+  </tr>
+</table>
+
 ## Prerequisites
 
 - **macOS or Windows** (desktop currently supports macOS / Windows; Linux is
