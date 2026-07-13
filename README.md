@@ -79,22 +79,30 @@
   </tr>
 </table>
 
-## ⚙️ Prerequisites
+## 🛡️ OSS Boundaries
 
-- **macOS or Windows** (desktop currently supports macOS / Windows; Linux is
-  only for local build / package verification; iOS builds still require macOS +
-  Xcode)
-- **Node.js** >= 22.12.0
-- **pnpm** >= 10
-- **Go** >= 1.25.6 (sidecar development and tests)
+<a id="-key-features"></a>
+<a id="-oss-boundaries"></a>
 
-<details>
-<summary>📱 View Mobile & Platform-Specific SDK Requirements</summary>
+> [!IMPORTANT]
+> **Open-Source Core & Sync Limitations**
+>
+> - **Guest Local LAN Mode**: Foreground automatic sync works out of the box without login or account-service state. Devices discover, pair, scan the pending queue, and upload over local LAN.
+> - **Strictly Read-Only Queue**: Users cannot delete, reorder, or skip queue items in the UI.
+> - **Automatic Incremental Sync Only**: No manual file-selection fallback or checkbox picking is provided. Sync is driven solely by local scans and the pending queue.
+> - **Fail-Open LAN Sync**: Foreground LAN sync is never blocked by login, account-service state, or missing non-OSS modules.
+> - **Single-Device Serial Upload**: A given mobile client uploads only one file at a time to the desktop.
 
-- **Xcode + CocoaPods** (iOS builds and device debugging, macOS only)
-- **Android Studio + Android SDK / NDK** (Android builds and debugging)
+> [!WARNING]
+> **Closed-by-Default Capabilities & Licensing**
+>
+> - **Non-OSS Capabilities Fail Closed**: Silent background resume, remote access, and tunnel credentials require official capabilities and will fail closed (remain disabled) by default.
+> - **No Redistribution of Apple Bonjour**: The OSS build does not redistribute Apple Bonjour for Windows binaries. Windows users must use their local Bonjour installation or default to the zeroconf-compatible fallback.
+> - **Single Baseline**: No multi-market branches, dedicated account paths, or dual-market regression matrices are provided in this baseline.
 
-</details>
+> [!NOTE]
+> **Future Migration Boundaries**
+> Package scope, mDNS service names, legacy data directories, and native package/bundle ID renames are migration boundaries and do not require renames in this documentation pass.
 
 ## 🚀 Quick Start
 
@@ -136,6 +144,56 @@ The Electron window opens automatically, and the desktop app starts the sidecar.
 
 - LAN transfers will interrupt. Once the desktop wakes and network connectivity is restored, the mobile app will automatically resume the unfinished queue without losing progress.
 - Enable _"Prevent computer from sleeping while syncing"_ in the desktop app settings for uninterrupted transfers.
+
+</details>
+
+## 🛠️ Tech Stack
+
+| Layer          | Technology                                                 |
+| -------------- | ---------------------------------------------------------- |
+| Monorepo       | pnpm 10 + turborepo 2.8                                    |
+| Desktop        | Electron 41 + electron-vite 5 + electron-builder 26        |
+| Desktop UI     | React 18.3 + zustand 5 + Tailwind CSS v4                   |
+| Mobile         | React Native 0.84.1 + React 19 (iOS / Android)             |
+| iOS Native     | Swift `SyncEngine` + BGTask + PhotoKit + Network.framework |
+| Android Native | Kotlin bridge + NativeSyncEngine / MediaStore / NsdManager |
+| Sidecar        | Go 1.25.6 + SQLite + WebSocket                             |
+| Shared         | `@lynavo-drive/contracts` + `@lynavo-drive/design-tokens`  |
+| Test           | vitest 4.1 + jest + `go test`                              |
+
+## 🏗️ Architecture Overview
+
+```text
+Mobile (RN UI on iOS / Android)
+  ├── iOS: Swift SyncEngine
+  └── Android: Kotlin NativeSyncEngine
+  ├── Bonjour/mDNS discover
+  ├── LMUP/TCP :39393
+  └── Presence/HTTP :39394
+                │
+                ▼
+Desktop (Electron + Go sidecar, macOS / Windows)
+  ├── Electron: UI shell, window, bridge, sidecar lifecycle
+  ├── Sidecar HTTP API / WebSocket
+  ├── LMUP file receiver
+  ├── SQLite
+  └── Filesystem / shared directory detection
+```
+
+## ⚙️ Prerequisites
+
+- **macOS or Windows** (desktop currently supports macOS / Windows; Linux is
+  only for local build / package verification; iOS builds still require macOS +
+  Xcode)
+- **Node.js** >= 22.12.0
+- **pnpm** >= 10
+- **Go** >= 1.25.6 (sidecar development and tests)
+
+<details>
+<summary>📱 View Mobile & Platform-Specific SDK Requirements</summary>
+
+- **Xcode + CocoaPods** (iOS builds and device debugging, macOS only)
+- **Android Studio + Android SDK / NDK** (Android builds and debugging)
 
 </details>
 
@@ -206,31 +264,6 @@ pnpm --filter @lynavo-drive/desktop package:linux -- --arch=arm64
 `release` profiles only inject `LYNAVO_RELEASE_CHANNEL` and local build
 configuration, and only select local build/package commands.
 
-## 🛡️ Key Features & OSS Boundaries
-
-<a id="-key-features"></a>
-<a id="-oss-boundaries"></a>
-
-> [!IMPORTANT]
-> **Open-Source Core & Sync Limitations**
->
-> - **Guest Local LAN Mode**: Foreground automatic sync works out of the box without login or account-service state. Devices discover, pair, scan the pending queue, and upload over local LAN.
-> - **Strictly Read-Only Queue**: Users cannot delete, reorder, or skip queue items in the UI.
-> - **Automatic Incremental Sync Only**: No manual file-selection fallback or checkbox picking is provided. Sync is driven solely by local scans and the pending queue.
-> - **Fail-Open LAN Sync**: Foreground LAN sync is never blocked by login, account-service state, or missing non-OSS modules.
-> - **Single-Device Serial Upload**: A given mobile client uploads only one file at a time to the desktop.
-
-> [!WARNING]
-> **Closed-by-Default Capabilities & Licensing**
->
-> - **Non-OSS Capabilities Fail Closed**: Silent background resume, remote access, and tunnel credentials require official capabilities and will fail closed (remain disabled) by default.
-> - **No Redistribution of Apple Bonjour**: The OSS build does not redistribute Apple Bonjour for Windows binaries. Windows users must use their local Bonjour installation or default to the zeroconf-compatible fallback.
-> - **Single Baseline**: No multi-market branches, dedicated account paths, or dual-market regression matrices are provided in this baseline.
-
-> [!NOTE]
-> **Future Migration Boundaries**
-> Package scope, mDNS service names, legacy data directories, and native package/bundle ID renames are migration boundaries and do not require renames in this documentation pass.
-
 ## 📁 Project Structure
 
 <details>
@@ -263,39 +296,6 @@ lynavo-drive/
 ```
 
 </details>
-
-## 🛠️ Tech Stack
-
-| Layer          | Technology                                                 |
-| -------------- | ---------------------------------------------------------- |
-| Monorepo       | pnpm 10 + turborepo 2.8                                    |
-| Desktop        | Electron 41 + electron-vite 5 + electron-builder 26        |
-| Desktop UI     | React 18.3 + zustand 5 + Tailwind CSS v4                   |
-| Mobile         | React Native 0.84.1 + React 19 (iOS / Android)             |
-| iOS Native     | Swift `SyncEngine` + BGTask + PhotoKit + Network.framework |
-| Android Native | Kotlin bridge + NativeSyncEngine / MediaStore / NsdManager |
-| Sidecar        | Go 1.25.6 + SQLite + WebSocket                             |
-| Shared         | `@lynavo-drive/contracts` + `@lynavo-drive/design-tokens`  |
-| Test           | vitest 4.1 + jest + `go test`                              |
-
-## 🏗️ Architecture Overview
-
-```text
-Mobile (RN UI on iOS / Android)
-  ├── iOS: Swift SyncEngine
-  └── Android: Kotlin NativeSyncEngine
-  ├── Bonjour/mDNS discover
-  ├── LMUP/TCP :39393
-  └── Presence/HTTP :39394
-                │
-                ▼
-Desktop (Electron + Go sidecar, macOS / Windows)
-  ├── Electron: UI shell, window, bridge, sidecar lifecycle
-  ├── Sidecar HTTP API / WebSocket
-  ├── LMUP file receiver
-  ├── SQLite
-  └── Filesystem / shared directory detection
-```
 
 ## 🎯 Development Baseline
 
