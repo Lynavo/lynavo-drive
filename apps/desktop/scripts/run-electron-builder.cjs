@@ -24,9 +24,7 @@ if (publishArgIndex >= 0) {
 
 const builderArgs = publishArgIndex >= 0 ? requestedArgs : [...requestedArgs, '--publish', 'never'];
 const spawnArgs =
-  process.platform === 'win32'
-    ? ['/d', '/c', binPath, ...builderArgs]
-    : builderArgs;
+  process.platform === 'win32' ? ['/d', '/c', binPath, ...builderArgs] : builderArgs;
 
 const child = spawn(spawnCommand, spawnArgs, {
   cwd: projectRoot,
