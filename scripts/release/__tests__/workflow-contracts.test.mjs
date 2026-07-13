@@ -71,3 +71,47 @@ test('OSS Release Gate workflow is stable, read-only, and toolchain-pinned', () 
   assert.doesNotMatch(commands, /\bxcodebuild\b/);
   assert.doesNotMatch(commands, /\bgradlew\b/);
 });
+
+test('repository CI workflow runs TypeScript quality and Go tests', () => {
+  const config = workflow('.github/workflows/ci.yml');
+  const mobilePackage = JSON.parse(readRepoFile('apps/mobile/package.json'));
+  const tsJob = config.jobs?.['ts-quality'];
+  const goJob = config.jobs?.['go-tests'];
+
+  assert.equal(config.name, 'CI');
+  assert.equal(mobilePackage.scripts?.test, 'jest --no-watchman');
+  assertCommonTriggers(config);
+  assertReadOnlyWorkflow(config);
+
+  assert.equal(tsJob?.name, 'TS Quality');
+  assert.equal(tsJob?.['runs-on'], 'ubuntu-24.04');
+  assert.equal(tsJob?.['timeout-minutes'], 45);
+  assertActionsPinned(tsJob?.steps ?? []);
+  assert.equal(findStep(tsJob.steps, 'Setup pnpm').with?.version, '10.32.1');
+  const node = findStep(tsJob.steps, 'Setup Node.js');
+  assert.equal(node.with?.['node-version'], '22.12.0');
+  assert.equal(node.with?.cache, 'pnpm');
+
+  const tsCommands = tsJob.steps.map(step => step.run).filter(Boolean);
+  assert.deepEqual(tsCommands, [
+    'pnpm install --frozen-lockfile',
+    'pnpm build --filter=!@lynavo-drive/mobile',
+    'pnpm format:check',
+    'pnpm lint',
+    'pnpm typecheck',
+    'pnpm --filter @lynavo-drive/mobile exec tsc --noEmit',
+    'pnpm test',
+  ]);
+
+  assert.equal(goJob?.name, 'Go Tests');
+  assert.equal(goJob?.['runs-on'], 'ubuntu-24.04');
+  assert.equal(goJob?.['timeout-minutes'], 20);
+  assertActionsPinned(goJob?.steps ?? []);
+  const go = findStep(goJob.steps, 'Setup Go');
+  assert.equal(go.with?.['go-version'], '1.25.6');
+  assert.equal(go.with?.cache, true);
+  assert.equal(go.with?.['cache-dependency-path'], 'services/sidecar-go/go.sum');
+  const goTest = findStep(goJob.steps, 'Run Go tests');
+  assert.equal(goTest.run, 'go test ./...');
+  assert.equal(goTest['working-directory'], 'services/sidecar-go');
+});

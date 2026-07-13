@@ -9,7 +9,7 @@
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint .",
     "start": "react-native start",
     "start:reset": "react-native start --reset-cache",
-    "test": "jest",
+    "test": "jest --no-watchman",
     "import:i18n": "python3 ./scripts/import_i18n_workbook.py",
     "build": "cd ios && xcodebuild -workspace LynavoDrive.xcworkspace -scheme LynavoDrive -destination 'generic/platform=iOS' -configuration Debug CODE_SIGNING_ALLOWED=NO build",
     "build:ios:release": "cd ios && xcodebuild -workspace LynavoDrive.xcworkspace -scheme LynavoDrive -destination 'generic/platform=iOS' -configuration Release CODE_SIGNING_ALLOWED=NO build",
