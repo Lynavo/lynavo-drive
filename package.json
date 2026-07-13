@@ -33,6 +33,7 @@
     "test:sidecar": "cd services/sidecar-go && make test",
     "test:release": "node --test scripts/release/__tests__/*.mjs scripts/dev/__tests__/*.mjs",
     "gate:release": "pnpm sync:versions:check && pnpm verify:oss-source-package:worktree && pnpm verify:oss-source-package:head && pnpm test:release && pnpm release --profile review --targets ios,android,mac,win,linux --dry-run && pnpm release --profile prod --targets ios,android,mac,win,linux --dry-run",
+    "verify:release-tag": "node scripts/release/verify-release-tag.mjs",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
