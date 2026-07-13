@@ -179,7 +179,10 @@ pnpm --filter @lynavo-drive/desktop package:linux -- --arch=arm64
 `release` profiles only inject `LYNAVO_RELEASE_CHANNEL` and local build
 configuration, and only select local build/package commands.
 
-## 🛡️ OSS Boundaries
+## 🛡️ Key Features & OSS Boundaries
+
+<a id="-key-features"></a>
+<a id="-oss-boundaries"></a>
 
 > [!IMPORTANT]
 > **Open-Source Core & Sync Limitations**
