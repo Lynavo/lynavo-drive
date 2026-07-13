@@ -1,4 +1,8 @@
 <p align="center">
+  <strong>English</strong> | <a href="./README.zh-Hant.md">繁體中文</a>
+</p>
+
+<p align="center">
   <img src="./screenshots/banner.png" alt="Lynavo Drive Banner" width="100%">
 </p>
 
