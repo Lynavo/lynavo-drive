@@ -115,8 +115,8 @@ jest.mock('../../services/SyncEngineModule', () => ({
   getAlbumCollections: jest.fn().mockResolvedValue([]),
 }));
 
-jest.mock('../../screens/DeviceDiscoveryGlobalScreen', () => ({
-  DeviceDiscoveryGlobalScreen: ({
+jest.mock('../../screens/DeviceDiscoveryScreen', () => ({
+  DeviceDiscoveryScreen: ({
     route,
   }: {
     route?: { params?: { reason?: string } };
@@ -125,50 +125,50 @@ jest.mock('../../screens/DeviceDiscoveryGlobalScreen', () => ({
     const { Text } = require('react-native');
     return R.createElement(
       Text,
-      { testID: 'global-device-discovery-screen' },
-      `GlobalDeviceDiscovery reason=${String(route?.params?.reason)}`,
+      { testID: 'device-discovery-screen' },
+      `DeviceDiscovery reason=${String(route?.params?.reason)}`,
     );
   },
 }));
 
-jest.mock('../../screens/SyncActivityGlobalScreen', () => ({
-  SyncActivityGlobalScreen: () => {
+jest.mock('../../screens/SyncActivityScreen', () => ({
+  SyncActivityScreen: () => {
     const R = require('react');
     const { Text } = require('react-native');
     return R.createElement(
       Text,
-      { testID: 'global-sync-activity-screen' },
-      'GlobalSyncActivity',
+      { testID: 'sync-activity-screen' },
+      'SyncActivity',
     );
   },
 }));
 
-jest.mock('../../screens/SharedFilesGlobalScreen', () => ({
-  SharedFilesGlobalScreen: () => null,
+jest.mock('../../screens/SharedFilesScreen', () => ({
+  SharedFilesScreen: () => null,
 }));
-jest.mock('../../screens/PhoneSyncSpaceGlobalScreen', () => ({
-  PhoneSyncSpaceGlobalScreen: () => null,
+jest.mock('../../screens/PhoneSyncSpaceScreen', () => ({
+  PhoneSyncSpaceScreen: () => null,
 }));
-jest.mock('../../screens/LocalComputerGlobalScreen', () => ({
-  LocalComputerGlobalScreen: () => null,
+jest.mock('../../screens/LocalComputerScreen', () => ({
+  LocalComputerScreen: () => null,
 }));
-jest.mock('../../screens/DownloadRecordsGlobalScreen', () => ({
-  DownloadRecordsGlobalScreen: () => null,
+jest.mock('../../screens/DownloadRecordsScreen', () => ({
+  DownloadRecordsScreen: () => null,
 }));
-jest.mock('../../screens/HistoryGlobalScreen', () => ({
-  HistoryGlobalScreen: () => null,
+jest.mock('../../screens/HistoryScreen', () => ({
+  HistoryScreen: () => null,
 }));
-jest.mock('../../screens/SettingsGlobalScreen', () => ({
-  SettingsGlobalScreen: () => null,
+jest.mock('../../screens/SettingsScreen', () => ({
+  SettingsScreen: () => null,
 }));
-jest.mock('../../screens/HelpGlobalScreen', () => ({
-  HelpGlobalScreen: () => null,
+jest.mock('../../screens/HelpScreen', () => ({
+  HelpScreen: () => null,
 }));
-jest.mock('../../screens/AutoUploadSettingsGlobalScreen', () => ({
-  AutoUploadSettingsGlobalScreen: () => null,
+jest.mock('../../screens/AutoUploadSettingsScreen', () => ({
+  AutoUploadSettingsScreen: () => null,
 }));
-jest.mock('../../components/GlobalBottomTabBar', () => ({
-  GlobalBottomTabBar: () => null,
+jest.mock('../../components/BottomTabBar', () => ({
+  BottomTabBar: () => null,
 }));
 
 jest.mock('../../screens/DeviceDiscoveryScreen', () => ({
@@ -268,9 +268,9 @@ describe('RootNavigator — guest local LAN mode', () => {
     renderRootNavigator();
 
     await waitFor(() =>
-      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+      expect(screen.getByTestId('device-discovery-screen')).toBeTruthy(),
     );
-    expect(screen.queryByTestId('global-login-screen')).toBeNull();
+    expect(screen.queryByTestId('login-screen')).toBeNull();
     expect(NativeModules.NativeSyncEngine.getBindingState).toHaveBeenCalled();
     expect(wipeSyncIdentity).not.toHaveBeenCalled();
   });
@@ -287,9 +287,9 @@ describe('RootNavigator — guest local LAN mode', () => {
     renderRootNavigator();
 
     await waitFor(() =>
-      expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy(),
+      expect(screen.getByTestId('sync-activity-screen')).toBeTruthy(),
     );
-    expect(screen.queryByTestId('global-login-screen')).toBeNull();
+    expect(screen.queryByTestId('login-screen')).toBeNull();
     expect(wipeSyncIdentity).not.toHaveBeenCalled();
   });
 
@@ -305,7 +305,7 @@ describe('RootNavigator — guest local LAN mode', () => {
     renderRootNavigator();
 
     await waitFor(() =>
-      expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy(),
+      expect(screen.getByTestId('sync-activity-screen')).toBeTruthy(),
     );
     expect(nativeListeners.onPairingInvalidated).toBeDefined();
 
@@ -316,7 +316,7 @@ describe('RootNavigator — guest local LAN mode', () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+      expect(screen.getByTestId('device-discovery-screen')).toBeTruthy(),
     );
     expect(screen.getByText(/reason=pairing_invalidated/)).toBeTruthy();
   });
@@ -335,7 +335,7 @@ describe('RootNavigator — guest local LAN mode', () => {
     renderRootNavigator();
 
     await waitFor(() =>
-      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+      expect(screen.getByTestId('device-discovery-screen')).toBeTruthy(),
     );
     expect(wipeSyncIdentity).not.toHaveBeenCalled();
   });
@@ -354,7 +354,7 @@ describe('RootNavigator — guest local LAN mode', () => {
     renderRootNavigator();
 
     await waitFor(() =>
-      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+      expect(screen.getByTestId('device-discovery-screen')).toBeTruthy(),
     );
     expect(screen.queryByText('profile server unavailable')).toBeNull();
     expect(wipeSyncIdentity).not.toHaveBeenCalled();

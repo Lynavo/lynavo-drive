@@ -115,8 +115,8 @@ jest.mock('../../services/SyncEngineModule', () => {
 // ---------------------------------------------------------------------------
 // Screen stubs — route params are surfaced as text for assertions.
 // ---------------------------------------------------------------------------
-jest.mock('../../screens/DeviceDiscoveryGlobalScreen', () => ({
-  DeviceDiscoveryGlobalScreen: ({
+jest.mock('../../screens/DeviceDiscoveryScreen', () => ({
+  DeviceDiscoveryScreen: ({
     route,
   }: {
     route?: { params?: { mode?: string; reason?: string } };
@@ -125,49 +125,49 @@ jest.mock('../../screens/DeviceDiscoveryGlobalScreen', () => ({
     const { Text } = require('react-native');
     return R.createElement(
       Text,
-      { testID: 'global-device-discovery-screen' },
-      `GlobalDeviceDiscovery reason=${String(
+      { testID: 'device-discovery-screen' },
+      `DeviceDiscovery reason=${String(
         route?.params?.reason,
       )} mode=${String(route?.params?.mode)}`,
     );
   },
 }));
 
-jest.mock('../../screens/SyncActivityGlobalScreen', () => ({
-  SyncActivityGlobalScreen: () => {
+jest.mock('../../screens/SyncActivityScreen', () => ({
+  SyncActivityScreen: () => {
     const R = require('react');
     const { Text } = require('react-native');
     return R.createElement(
       Text,
-      { testID: 'global-sync-activity-screen' },
-      'GlobalSyncActivity',
+      { testID: 'sync-activity-screen' },
+      'SyncActivity',
     );
   },
 }));
 
-jest.mock('../../screens/SharedFilesGlobalScreen', () => ({
-  SharedFilesGlobalScreen: () => null,
+jest.mock('../../screens/SharedFilesScreen', () => ({
+  SharedFilesScreen: () => null,
 }));
-jest.mock('../../screens/PhoneSyncSpaceGlobalScreen', () => ({
-  PhoneSyncSpaceGlobalScreen: () => null,
+jest.mock('../../screens/PhoneSyncSpaceScreen', () => ({
+  PhoneSyncSpaceScreen: () => null,
 }));
-jest.mock('../../screens/LocalComputerGlobalScreen', () => ({
-  LocalComputerGlobalScreen: () => null,
+jest.mock('../../screens/LocalComputerScreen', () => ({
+  LocalComputerScreen: () => null,
 }));
-jest.mock('../../screens/DownloadRecordsGlobalScreen', () => ({
-  DownloadRecordsGlobalScreen: () => null,
+jest.mock('../../screens/DownloadRecordsScreen', () => ({
+  DownloadRecordsScreen: () => null,
 }));
-jest.mock('../../screens/HistoryGlobalScreen', () => ({
-  HistoryGlobalScreen: () => null,
+jest.mock('../../screens/HistoryScreen', () => ({
+  HistoryScreen: () => null,
 }));
-jest.mock('../../screens/SettingsGlobalScreen', () => ({
-  SettingsGlobalScreen: () => null,
+jest.mock('../../screens/SettingsScreen', () => ({
+  SettingsScreen: () => null,
 }));
-jest.mock('../../screens/HelpGlobalScreen', () => ({
-  HelpGlobalScreen: () => null,
+jest.mock('../../screens/HelpScreen', () => ({
+  HelpScreen: () => null,
 }));
-jest.mock('../../screens/AutoUploadSettingsGlobalScreen', () => ({
-  AutoUploadSettingsGlobalScreen: () => null,
+jest.mock('../../screens/AutoUploadSettingsScreen', () => ({
+  AutoUploadSettingsScreen: () => null,
 }));
 
 jest.mock('../../screens/DeviceDiscoveryScreen', () => ({
@@ -206,8 +206,8 @@ jest.mock('../../screens/AutoUploadSettingsScreen', () => ({
   AutoUploadSettingsScreen: () => null,
 }));
 
-jest.mock('../../components/GlobalBottomTabBar', () => ({
-  GlobalBottomTabBar: () => null,
+jest.mock('../../components/BottomTabBar', () => ({
+  BottomTabBar: () => null,
 }));
 
 jest.mock('../../stores/auth-store', () => {
@@ -294,7 +294,7 @@ describe('RootNavigator — pairing invalidation', () => {
     renderRootNavigator();
 
     await waitFor(() =>
-      expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy(),
+      expect(screen.getByTestId('sync-activity-screen')).toBeTruthy(),
     );
 
     await act(async () => {
@@ -302,17 +302,17 @@ describe('RootNavigator — pairing invalidation', () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+      expect(screen.getByTestId('device-discovery-screen')).toBeTruthy(),
     );
     expect(screen.getByText(/reason=pairing_invalidated/)).toBeTruthy();
-    expect(screen.queryByTestId('global-sync-activity-screen')).toBeNull();
+    expect(screen.queryByTestId('sync-activity-screen')).toBeNull();
   });
 
   test('watcher suppresses immediate duplicate invalidation events but handles a later event', async () => {
     renderRootNavigator();
 
     await waitFor(() =>
-      expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy(),
+      expect(screen.getByTestId('sync-activity-screen')).toBeTruthy(),
     );
 
     jest.useFakeTimers();
@@ -346,7 +346,7 @@ describe('RootNavigator — pairing invalidation', () => {
     renderRootNavigator();
 
     await waitFor(() =>
-      expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy(),
+      expect(screen.getByTestId('sync-activity-screen')).toBeTruthy(),
     );
 
     const resetSpy = jest.spyOn(CommonActions, 'reset');
@@ -376,7 +376,7 @@ describe('RootNavigator — pairing invalidation', () => {
     renderRootNavigator();
 
     await waitFor(() =>
-      expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy(),
+      expect(screen.getByTestId('sync-activity-screen')).toBeTruthy(),
     );
 
     await act(async () => {
@@ -386,8 +386,8 @@ describe('RootNavigator — pairing invalidation', () => {
       });
     });
 
-    expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy();
-    expect(screen.queryByTestId('global-device-discovery-screen')).toBeNull();
+    expect(screen.getByTestId('sync-activity-screen')).toBeTruthy();
+    expect(screen.queryByTestId('device-discovery-screen')).toBeNull();
   });
 
   test('cold-start native persisted invalidation routes to DeviceDiscovery with reason pairing_invalidated', async () => {
@@ -398,10 +398,10 @@ describe('RootNavigator — pairing invalidation', () => {
     renderRootNavigator();
 
     await waitFor(() =>
-      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+      expect(screen.getByTestId('device-discovery-screen')).toBeTruthy(),
     );
     expect(screen.getByText(/reason=pairing_invalidated/)).toBeTruthy();
-    expect(screen.queryByTestId('global-sync-activity-screen')).toBeNull();
+    expect(screen.queryByTestId('sync-activity-screen')).toBeNull();
   });
 
   test.each([
@@ -418,9 +418,9 @@ describe('RootNavigator — pairing invalidation', () => {
       renderRootNavigator();
 
       await waitFor(() =>
-        expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy(),
+        expect(screen.getByTestId('sync-activity-screen')).toBeTruthy(),
       );
-      expect(screen.queryByTestId('global-device-discovery-screen')).toBeNull();
+      expect(screen.queryByTestId('device-discovery-screen')).toBeNull();
     },
   );
 });

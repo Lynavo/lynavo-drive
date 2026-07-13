@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
-import { GlobalBottomTabBar } from '../GlobalBottomTabBar';
+import { BottomTabBar } from '../BottomTabBar';
 
 const mockDispatch = jest.fn();
 const mockReset = jest.fn((payload: unknown) => ({
@@ -44,20 +44,20 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => mockInsets,
 }));
 
-describe('GlobalBottomTabBar', () => {
+describe('BottomTabBar', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockInsets = { top: 0, bottom: 34, left: 0, right: 0 };
   });
 
   test('uses the reference in-flow bottom spacing without a filled strip', () => {
-    const { getByTestId } = render(<GlobalBottomTabBar activeTab="home" />);
+    const { getByTestId } = render(<BottomTabBar activeTab="home" />);
 
     const outerStyle = StyleSheet.flatten(
-      getByTestId('global-bottom-tab-bar-outer').props.style,
+      getByTestId('bottom-tab-bar-outer').props.style,
     );
     const containerStyle = StyleSheet.flatten(
-      getByTestId('global-bottom-tab-bar-container').props.style,
+      getByTestId('bottom-tab-bar-container').props.style,
     );
 
     expect(outerStyle.position).toBeUndefined();
@@ -76,13 +76,13 @@ describe('GlobalBottomTabBar', () => {
   });
 
   test('matches the reference active pill styling', () => {
-    const { getByTestId } = render(<GlobalBottomTabBar activeTab="home" />);
+    const { getByTestId } = render(<BottomTabBar activeTab="home" />);
 
     const activeTabStyle = StyleSheet.flatten(
-      getByTestId('global-bottom-tab-home').props.style,
+      getByTestId('bottom-tab-home').props.style,
     );
     const inactiveTabStyle = StyleSheet.flatten(
-      getByTestId('global-bottom-tab-files').props.style,
+      getByTestId('bottom-tab-files').props.style,
     );
 
     expect(activeTabStyle.minHeight).toBe(54);
@@ -93,26 +93,22 @@ describe('GlobalBottomTabBar', () => {
   });
 
   test('uses lucide icons that match the global reference tabbar', () => {
-    const { getByTestId } = render(<GlobalBottomTabBar activeTab="home" />);
+    const { getByTestId } = render(<BottomTabBar activeTab="home" />);
 
-    expect(getByTestId('global-bottom-tab-home-icon')).toBeTruthy();
-    expect(getByTestId('global-bottom-tab-files-icon')).toBeTruthy();
-    expect(getByTestId('global-bottom-tab-settings-icon')).toBeTruthy();
-    expect(getByTestId('global-bottom-tab-home-icon').props.strokeWidth).toBe(
-      2.2,
-    );
-    expect(getByTestId('global-bottom-tab-files-icon').props.strokeWidth).toBe(
-      1.9,
-    );
+    expect(getByTestId('bottom-tab-home-icon')).toBeTruthy();
+    expect(getByTestId('bottom-tab-files-icon')).toBeTruthy();
+    expect(getByTestId('bottom-tab-settings-icon')).toBeTruthy();
+    expect(getByTestId('bottom-tab-home-icon').props.strokeWidth).toBe(2.2);
+    expect(getByTestId('bottom-tab-files-icon').props.strokeWidth).toBe(1.9);
   });
 
   test('switches tabs inside the global shell without resetting navigation', () => {
     const onTabPress = jest.fn();
     const { getByTestId } = render(
-      <GlobalBottomTabBar activeTab="home" onTabPress={onTabPress} />,
+      <BottomTabBar activeTab="home" onTabPress={onTabPress} />,
     );
 
-    fireEvent.press(getByTestId('global-bottom-tab-files'));
+    fireEvent.press(getByTestId('bottom-tab-files'));
 
     expect(onTabPress).toHaveBeenCalledWith('files');
     expect(mockDispatch).not.toHaveBeenCalled();

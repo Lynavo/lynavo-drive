@@ -1,34 +1,59 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  Image,
-  Modal,
-  TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Image,
+  Modal,
   NativeModules,
+  Platform,
+  Pressable,
+  SectionList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { viewDocument } from '@react-native-documents/viewer';
-import Video from 'react-native-video';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useTranslation } from 'react-i18next';
-import type { RootStackParamList } from '../navigation/RootNavigator';
-import { colors } from '../theme/colors';
-import { formatBytes } from '../utils/format';
-import { Icon } from '../components/Icon';
-import { GradientBackground } from '../components/GradientBackground';
-import { BottomTabBar } from '../components/BottomTabBar';
+import Video from 'react-native-video';
 import {
+  Check,
+  ChevronLeft,
+  CloudUpload,
+  Download,
+  Eye,
+  FileImage,
+  FileText,
+  Play,
+  Rows3,
+  X,
+} from 'lucide-react-native';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import {
+  SIDECAR_HTTP_PORT,
+  type BindingStateDTO,
+} from '@lynavo-drive/contracts';
+
+import type { RootStackParamList } from '../navigation/RootNavigator';
+import { colors } from '../theme/globalColors';
+import { androidBoxShadow } from '../utils/androidShadow';
+import { formatBytes } from '../utils/format';
+import { GradientBackground } from '../components/GradientBackground';
+import { ModalBlurBackdrop } from '../components/shared/ModalBlurBackdrop';
+import { recordDiagnosticsLog } from '../services/diagnostics-log-service';
+import {
+  type DesktopInfo,
   downloadReceivedLibraryItem,
   getReceivedLibraryPreviewUrl,
+  isDownloadSavedLocally,
   isDownloadSavedToPhotos,
-  listCurrentClientReceivedLibrary,
+  listGlobalReceivedLibraryPage,
   prepareReceivedLibraryPreview,
+  type ReceivedLibraryMediaPage,
+  type ReceivedLibraryMediaItem,
 } from '../services/desktop-local-service';
 import { recordDownloadedFile } from '../services/download-records-service';
 import {
@@ -39,140 +64,521 @@ import {
   isVideoFile,
   openFileWithOtherApp,
 } from '../utils/file-preview';
-import {
-  SIDECAR_HTTP_PORT,
-  type BindingStateDTO,
-  type ReceivedLibraryItemDTO,
-} from '@lynavo-drive/contracts';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'PhoneSyncSpace'>;
-type PhoneSyncPreviewState = {
-  item: ReceivedLibraryItemDTO;
+type ReceivedSection = {
+  title: string;
+  key: string;
+  data: ReceivedLibraryMediaItem[];
+};
+type SortKey = 'time' | 'name' | 'size';
+type MediaTypeIconKind = 'photo' | 'video' | 'file';
+type MediaTypeGradientStop = {
+  offset: string;
+  color: string;
+};
+type ReceivedPreviewState = {
+  item: ReceivedLibraryMediaItem;
   url: string;
 };
 
-function isReceivedFileDeleted(item: ReceivedLibraryItemDTO) {
+function isReceivedFileDeleted(item: ReceivedLibraryMediaItem) {
   return item.fileStatus === 'deleted';
+}
+type IdleCallbackHandle = number;
+type IdleCallbackOptions = {
+  timeout?: number;
+};
+type IdleDeadlineLike = {
+  didTimeout: boolean;
+  timeRemaining: () => number;
+};
+type IdleCallbacks = typeof globalThis & {
+  requestIdleCallback?: (
+    callback: (deadline: IdleDeadlineLike) => void,
+    options?: IdleCallbackOptions,
+  ) => IdleCallbackHandle;
+  cancelIdleCallback?: (handle: IdleCallbackHandle) => void;
+};
+
+const SORT_OPTIONS: Array<{ id: SortKey; label: string }> = [
+  { id: 'time', label: 'Time' },
+  { id: 'name', label: 'Name' },
+  { id: 'size', label: 'File Size' },
+];
+const RECEIVED_LIBRARY_PAGE_SIZE = 20;
+const MEDIA_TYPE_ICON_GRADIENTS: Record<
+  MediaTypeIconKind,
+  MediaTypeGradientStop[]
+> = {
+  photo: [
+    { offset: '0%', color: '#F7FCFF' },
+    { offset: '54%', color: '#D8F0FF' },
+    { offset: '100%', color: '#9FD6FF' },
+  ],
+  video: [
+    { offset: '0%', color: '#F8F6FF' },
+    { offset: '48%', color: '#E3E6FF' },
+    { offset: '100%', color: '#9AAEFF' },
+  ],
+  file: [
+    { offset: '0%', color: '#FFFFFF' },
+    { offset: '56%', color: '#EFF5FB' },
+    { offset: '100%', color: '#D7E2F0' },
+  ],
+};
+
+const now = Date.now();
+const MOCK_RECEIVED_ITEMS: ReceivedLibraryMediaItem[] = [
+  {
+    resourceId: 'mock-received-1',
+    desktopDeviceId: 'Editing Workstation A',
+    clientId: 'iphone-15-pro',
+    displayName: 'IMG_8421.JPG',
+    fileKey: 'mock/IMG_8421.JPG',
+    filename: 'IMG_8421.JPG',
+    mediaType: 'image',
+    fileSize: 9017753,
+    completedAt: new Date(now - 9 * 60 * 1000).toISOString(),
+    shareStatus: 'shared',
+  },
+  {
+    resourceId: 'mock-received-2',
+    desktopDeviceId: 'Editing Workstation A',
+    clientId: 'iphone-15-pro',
+    displayName: 'IMG_8420.JPG',
+    fileKey: 'mock/IMG_8420.JPG',
+    filename: 'IMG_8420.JPG',
+    mediaType: 'image',
+    fileSize: 8283750,
+    completedAt: new Date(now - 14 * 60 * 1000).toISOString(),
+    shareStatus: 'shared',
+  },
+  {
+    resourceId: 'mock-received-3',
+    desktopDeviceId: 'Editing Workstation A',
+    clientId: 'iphone-15-pro',
+    displayName: 'VID_3018.MP4',
+    fileKey: 'mock/VID_3018.MP4',
+    filename: 'VID_3018.MP4',
+    mediaType: 'video',
+    fileSize: 1717986918,
+    completedAt: new Date(now - 18 * 60 * 1000).toISOString(),
+    shareStatus: 'missing',
+  },
+  {
+    resourceId: 'mock-received-4',
+    desktopDeviceId: 'MacBook Pro',
+    clientId: 'iphone-15-pro',
+    displayName: 'ScreenRecording_0615.mov',
+    fileKey: 'mock/ScreenRecording_0615.mov',
+    filename: 'ScreenRecording_0615.mov',
+    mediaType: 'video',
+    fileSize: 3006477107,
+    completedAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+    shareStatus: 'missing',
+  },
+  {
+    resourceId: 'mock-received-5',
+    desktopDeviceId: 'MacBook Pro',
+    clientId: 'iphone-15-pro',
+    displayName: 'Contract-Final.pdf',
+    fileKey: 'mock/Contract-Final.pdf',
+    filename: 'Contract-Final.pdf',
+    mediaType: 'document',
+    fileSize: 6501171,
+    completedAt: new Date(now - 5 * 60 * 60 * 1000).toISOString(),
+    shareStatus: 'shared',
+  },
+  {
+    resourceId: 'mock-received-6',
+    desktopDeviceId: 'Editing Workstation A',
+    clientId: 'iphone-15-pro',
+    displayName: 'IMG_8393.PNG',
+    fileKey: 'mock/IMG_8393.PNG',
+    filename: 'IMG_8393.PNG',
+    mediaType: 'image',
+    fileSize: 4299161,
+    completedAt: new Date(now - 25 * 60 * 60 * 1000).toISOString(),
+    shareStatus: 'shared',
+  },
+  {
+    resourceId: 'mock-received-7',
+    desktopDeviceId: 'Editing Workstation A',
+    clientId: 'iphone-15-pro',
+    displayName: 'ProjectAssets.zip',
+    fileKey: 'mock/ProjectAssets.zip',
+    filename: 'ProjectAssets.zip',
+    mediaType: 'document',
+    fileSize: 3650722202,
+    completedAt: new Date(now - 26 * 60 * 60 * 1000).toISOString(),
+    shareStatus: 'missing',
+  },
+  {
+    resourceId: 'mock-received-8',
+    desktopDeviceId: 'Editing Workstation A',
+    clientId: 'iphone-15-pro',
+    displayName: 'VID_2981.MP4',
+    fileKey: 'mock/VID_2981.MP4',
+    filename: 'VID_2981.MP4',
+    mediaType: 'video',
+    fileSize: 1033895936,
+    completedAt: new Date(now - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    shareStatus: 'shared',
+  },
+  {
+    resourceId: 'mock-received-9',
+    desktopDeviceId: 'Windows Workstation',
+    clientId: 'iphone-15-pro',
+    displayName: 'B-roll_Studio_A.heic',
+    fileKey: 'mock/B-roll_Studio_A.heic',
+    filename: 'B-roll_Studio_A.heic',
+    mediaType: 'image',
+    fileSize: 11240735,
+    completedAt: new Date(
+      now - 3 * 24 * 60 * 60 * 1000 - 90 * 60 * 1000,
+    ).toISOString(),
+    shareStatus: 'shared',
+  },
+];
+
+type SharedFilesPreviewGlobal = typeof globalThis & {
+  __LYNAVO_SHARED_FILES_PREVIEW__?: boolean;
+};
+
+function isSharedFilesPreviewMode() {
+  return (
+    (globalThis as SharedFilesPreviewGlobal).__LYNAVO_SHARED_FILES_PREVIEW__ ===
+    true
+  );
+}
+
+function getPreviewReceivedItems() {
+  return isSharedFilesPreviewMode() ? MOCK_RECEIVED_ITEMS : [];
+}
+
+function getSectionTitle(isoString: string, t: any) {
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime()))
+    return t('common.unknownTime') || 'Unknown time';
+
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString())
+    return t('common.today') || 'Today';
+  if (date.toDateString() === yesterday.toDateString())
+    return t('common.yesterday') || 'Yesterday';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+    2,
+    '0',
+  )}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function getItemTimestamp(item: ReceivedLibraryMediaItem) {
+  const timestamp = new Date(item.completedAt).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function isVideo(mediaType: string, filename: string) {
+  return mediaType === 'video' || /\.(mp4|mov|avi|mkv|webm)$/i.test(filename);
+}
+
+function isImage(mediaType: string, filename: string) {
+  return (
+    mediaType === 'image' || /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(filename)
+  );
+}
+
+function getFileTypeText(mediaType: string, filename: string, t: any) {
+  if (isVideo(mediaType, filename))
+    return t('sharedFiles.phoneSyncSpace.mediaTypes.video') || 'Video';
+  if (isImage(mediaType, filename))
+    return t('sharedFiles.phoneSyncSpace.mediaTypes.photo') || 'Photo';
+  return t('sharedFiles.phoneSyncSpace.mediaTypes.file') || 'File';
+}
+
+function getFileIconType(
+  mediaType: string,
+  filename: string,
+): MediaTypeIconKind {
+  if (isVideo(mediaType, filename)) return 'video';
+  if (isImage(mediaType, filename)) return 'photo';
+  return 'file';
+}
+
+function getReceivedFileTitle(item: ReceivedLibraryMediaItem, t?: any) {
+  return (
+    item.filename ||
+    item.displayName ||
+    item.fileKey ||
+    (t ? t('sharedFiles.phoneSyncSpace.unnamedFile') : 'Unnamed File')
+  );
+}
+
+function getReceivedItemKey(item: ReceivedLibraryMediaItem, index: number) {
+  return (
+    item.fileKey ||
+    item.resourceId ||
+    `${item.filename || 'unnamed'}-${item.completedAt}-${index}`
+  );
+}
+
+function formatClock(isoString: string) {
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+function hasNextReceivedLibraryPage(page: ReceivedLibraryMediaPage) {
+  if (page.totalItems <= 0) return false;
+  return page.page * page.pageSize < page.totalItems;
+}
+
+function mergeReceivedLibraryItems(
+  current: ReceivedLibraryMediaItem[],
+  next: ReceivedLibraryMediaItem[],
+) {
+  const seen = new Set(
+    current.map((item, index) => getReceivedItemKey(item, index)),
+  );
+  const merged = [...current];
+  for (const item of next) {
+    const key = getReceivedItemKey(item, merged.length);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    merged.push(item);
+  }
+  return merged;
 }
 
 export function PhoneSyncSpaceScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const [items, setItems] = useState<ReceivedLibraryItemDTO[]>([]);
-  const [sortDesc, setSortDesc] = useState(true);
+  const [items, setItems] = useState<ReceivedLibraryMediaItem[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMorePages, setHasMorePages] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [libraryTotalItems, setLibraryTotalItems] = useState(0);
+  const [libraryTotalBytes, setLibraryTotalBytes] = useState(0);
+  const [sortBy, setSortBy] = useState<SortKey>('time');
+  const [showSortSheet, setShowSortSheet] = useState(false);
+  const [preview, setPreview] = useState<ReceivedPreviewState | null>(null);
   const [binding, setBinding] = useState<BindingStateDTO | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [preview, setPreview] = useState<PhoneSyncPreviewState | null>(null);
+  const [remoteThumbnailsEnabled, setRemoteThumbnailsEnabled] = useState(
+    Platform.OS !== 'android',
+  );
+  const hasDeferredAndroidThumbnails = useRef(Platform.OS !== 'android');
 
   const loadData = useCallback(async () => {
     setLoadError(false);
+    setLoadingMore(false);
+    recordDiagnosticsLog('PhoneSyncSpace', 'global screen load start');
     try {
       const { NativeSyncEngine } = NativeModules;
       if (!NativeSyncEngine) {
-        setItems([]);
+        const previewItems = getPreviewReceivedItems();
+        recordDiagnosticsLog('PhoneSyncSpace', 'global screen native missing', {
+          previewItems: previewItems.length,
+        });
+        setItems(previewItems);
+        setCurrentPage(1);
+        setHasMorePages(false);
+        setLibraryTotalItems(previewItems.length);
+        setLibraryTotalBytes(
+          previewItems.reduce((total, item) => total + item.fileSize, 0),
+        );
+        setLoadError(false);
         setLoading(false);
         return;
       }
 
       const bindingState = await NativeSyncEngine.getBindingState();
       setBinding(bindingState);
+      recordDiagnosticsLog('PhoneSyncSpace', 'global screen binding loaded', {
+        hasBinding: Boolean(bindingState),
+        hasHost: Boolean(bindingState?.host),
+        connectionState: bindingState?.connectionState ?? 'unknown',
+      });
       if (!bindingState || !bindingState.host) {
-        setItems([]);
+        const previewItems = getPreviewReceivedItems();
+        recordDiagnosticsLog('PhoneSyncSpace', 'global screen no host', {
+          previewItems: previewItems.length,
+        });
+        setItems(previewItems);
+        setCurrentPage(1);
+        setHasMorePages(false);
+        setLibraryTotalItems(previewItems.length);
+        setLibraryTotalBytes(
+          previewItems.reduce((total, item) => total + item.fileSize, 0),
+        );
+        setLoadError(false);
         setLoading(false);
         return;
       }
 
       const desktop = { host: bindingState.host, port: SIDECAR_HTTP_PORT };
-      const result = await listCurrentClientReceivedLibrary(desktop);
-      setItems(result || []);
+      recordDiagnosticsLog('PhoneSyncSpace', 'global screen list request', {
+        host: desktop.host,
+        page: 1,
+        pageSize: RECEIVED_LIBRARY_PAGE_SIZE,
+      });
+      const result = await listGlobalReceivedLibraryPage(desktop, {
+        page: 1,
+        pageSize: RECEIVED_LIBRARY_PAGE_SIZE,
+      });
+      const receivedItems = result.items ?? [];
+      const previewItems = getPreviewReceivedItems();
+      const nextItems = receivedItems.length > 0 ? receivedItems : previewItems;
+      recordDiagnosticsLog('PhoneSyncSpace', 'global screen list result', {
+        itemCount: receivedItems.length,
+        totalItems: result.totalItems,
+        totalBytes: result.totalBytes,
+        previewFallback: receivedItems.length === 0 && previewItems.length > 0,
+      });
+      setItems(nextItems);
+      setCurrentPage(result.page);
+      setHasMorePages(
+        receivedItems.length > 0 ? hasNextReceivedLibraryPage(result) : false,
+      );
+      setLibraryTotalItems(
+        receivedItems.length > 0 ? result.totalItems : previewItems.length,
+      );
+      setLibraryTotalBytes(
+        receivedItems.length > 0
+          ? result.totalBytes
+          : previewItems.reduce((total, item) => total + item.fileSize, 0),
+      );
+      setLoadError(false);
     } catch (e) {
       console.warn('[PhoneSyncSpaceScreen] Failed to load data:', e);
-      setItems([]);
-      setLoadError(true);
+      const previewItems = getPreviewReceivedItems();
+      recordDiagnosticsLog('PhoneSyncSpace', 'global screen load failed', {
+        error: e instanceof Error ? e.message : String(e),
+        previewItems: previewItems.length,
+      });
+      setItems(previewItems);
+      setCurrentPage(1);
+      setHasMorePages(false);
+      setLibraryTotalItems(previewItems.length);
+      setLibraryTotalBytes(
+        previewItems.reduce((total, item) => total + item.fileSize, 0),
+      );
+      setLoadError(previewItems.length === 0);
     } finally {
       setLoading(false);
+      setHasLoadedOnce(true);
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
+      let idleTask: IdleCallbackHandle | null = null;
+      let fallbackTask: ReturnType<typeof setTimeout> | null = null;
+      const idleCallbacks = globalThis as IdleCallbacks;
+      if (Platform.OS === 'android' && !hasDeferredAndroidThumbnails.current) {
+        setRemoteThumbnailsEnabled(false);
+        const enableThumbnails = () => {
+          hasDeferredAndroidThumbnails.current = true;
+          setRemoteThumbnailsEnabled(true);
+        };
+        if (typeof idleCallbacks.requestIdleCallback === 'function') {
+          idleTask = idleCallbacks.requestIdleCallback(enableThumbnails, {
+            timeout: 600,
+          });
+        } else {
+          fallbackTask = setTimeout(enableThumbnails, 240);
+        }
+      } else {
+        setRemoteThumbnailsEnabled(true);
+      }
+
       setLoading(true);
       setLoadError(false);
       loadData();
+
+      return () => {
+        if (
+          idleTask !== null &&
+          typeof idleCallbacks.cancelIdleCallback === 'function'
+        ) {
+          idleCallbacks.cancelIdleCallback(idleTask);
+        }
+        if (fallbackTask !== null) {
+          clearTimeout(fallbackTask);
+        }
+      };
     }, [loadData]),
   );
 
-  const getFileIcon = (mediaType: string, filename: string) => {
-    const isVideo =
-      mediaType === 'video' || /\.(mp4|mov|avi|mkv|webm)$/i.test(filename);
-    const isImage =
-      mediaType === 'image' ||
-      /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(filename);
-    if (isVideo) {
-      return { name: 'play', color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)' };
+  const loadNextPage = useCallback(async () => {
+    if (loading || loadingMore || !hasMorePages || !binding?.host) {
+      return;
     }
-    if (isImage) {
-      return { name: 'image', color: '#3b82f6', bg: 'rgba(59,130,246,0.08)' };
+    setLoadingMore(true);
+    try {
+      const desktop = { host: binding.host, port: SIDECAR_HTTP_PORT };
+      recordDiagnosticsLog(
+        'PhoneSyncSpace',
+        'global screen next page request',
+        {
+          host: desktop.host,
+          page: currentPage + 1,
+          pageSize: RECEIVED_LIBRARY_PAGE_SIZE,
+        },
+      );
+      const result = await listGlobalReceivedLibraryPage(desktop, {
+        page: currentPage + 1,
+        pageSize: RECEIVED_LIBRARY_PAGE_SIZE,
+      });
+      recordDiagnosticsLog('PhoneSyncSpace', 'global screen next page result', {
+        itemCount: result.items?.length ?? 0,
+        totalItems: result.totalItems,
+        page: result.page,
+      });
+      setItems(currentItems =>
+        mergeReceivedLibraryItems(currentItems, result.items ?? []),
+      );
+      setCurrentPage(result.page);
+      setHasMorePages(hasNextReceivedLibraryPage(result));
+      setLibraryTotalItems(result.totalItems);
+      setLibraryTotalBytes(result.totalBytes);
+      setLoadError(false);
+    } catch (e) {
+      console.warn('[PhoneSyncSpaceScreen] Failed to load next page:', e);
+      recordDiagnosticsLog('PhoneSyncSpace', 'global screen next page failed', {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setLoadingMore(false);
     }
-    return {
-      name: 'document-text',
-      color: '#10b981',
-      bg: 'rgba(16,185,129,0.08)',
-    };
-  };
+  }, [binding?.host, currentPage, hasMorePages, loading, loadingMore]);
 
-  const getFileTypeText = (mediaType: string, filename: string) => {
-    const isVideo =
-      mediaType === 'video' || /\.(mp4|mov|avi|mkv|webm)$/i.test(filename);
-    const isImage =
-      mediaType === 'image' ||
-      /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(filename);
-    if (isVideo) return 'Video';
-    if (isImage) return 'Photo';
-    return 'File';
-  };
-
-  const formatItemTime = (isoString?: string) => {
-    if (!isoString) return '';
-    const date = new Date(isoString);
-    if (Number.isNaN(date.getTime())) return '';
-
-    const today = new Date();
-    const yesterday = new Date();
-    yesterday.setDate(today.getDate() - 1);
-
-    const timeString = date.toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-
-    if (date.toDateString() === today.toDateString()) {
-      return `Today ${timeString}`;
+  const goBack = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
     }
-    if (date.toDateString() === yesterday.toDateString()) {
-      return `Yesterday ${timeString}`;
-    }
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${timeString}`;
-  };
-
-  const handleSelect = () => {
-    Alert.alert(
-      t('sharedFiles.phoneSyncSpace.select') || 'SelectFile',
-      t('sharedFiles.phoneSyncSpace.selectFeature') ||
-        'This feature is under development',
-    );
-  };
+    navigation.reset({ index: 0, routes: [{ name: 'SharedFiles' }] });
+  }, [navigation]);
 
   const handleDownload = useCallback(
-    async (item: ReceivedLibraryItemDTO) => {
+    async (item: ReceivedLibraryMediaItem) => {
       if (downloadingId !== null) return;
       if (isReceivedFileDeleted(item)) return;
       const itemKey = item.fileKey || item.resourceId;
       setDownloadingId(itemKey);
-
       try {
         const { NativeSyncEngine } = NativeModules;
         const bindingState = await NativeSyncEngine?.getBindingState();
@@ -182,14 +588,24 @@ export function PhoneSyncSpaceScreen() {
           );
           return;
         }
-
-        const filename = item.filename || item.displayName;
-        const desktop = { host: bindingState.host, port: SIDECAR_HTTP_PORT };
+        const desktop: DesktopInfo = {
+          host: bindingState.host,
+          port: SIDECAR_HTTP_PORT,
+        };
         const result = await downloadReceivedLibraryItem(desktop, item);
+        if (!isDownloadSavedLocally(result)) {
+          Alert.alert(
+            t('sharedFiles.localSaveUnsupported.title') ||
+              'Save Not Supported Yet',
+            t('sharedFiles.localSaveUnsupported.message') ||
+              'Local client saving is not integrated in the current version. Please wait for a future release.',
+          );
+          return;
+        }
         const savedToPhotos = isDownloadSavedToPhotos(result);
         await recordDownloadedFile({
           resourceId: itemKey,
-          filename,
+          filename: item.filename || item.displayName,
           fileSize: item.fileSize,
           mediaType: item.mediaType,
           localPath: result.localPath,
@@ -198,18 +614,17 @@ export function PhoneSyncSpaceScreen() {
           streamUrl: item.streamUrl,
           savedToPhotos,
         });
-
         Alert.alert(
           t('sharedFiles.dialogs.downloadComplete') || 'Download complete',
           savedToPhotos
             ? t('sharedFiles.dialogs.downloadSavedToPhotos', {
-                name: filename,
+                name: item.filename || item.displayName,
                 location:
                   t('sharedFiles.dialogs.savedLocationPhotos') || 'Photos',
-              }) || `${filename} saved to Photos`
+              }) || `${item.filename || item.displayName} saved to Photos`
             : t('sharedFiles.dialogs.downloadSavedToFiles', {
-                name: filename,
-              }) || `${filename} saved to Files`,
+                name: item.filename || item.displayName,
+              }) || `${item.filename || item.displayName} saved to Files`,
         );
       } catch (err) {
         console.warn('[PhoneSyncSpaceScreen] Download failed:', err);
@@ -225,9 +640,13 @@ export function PhoneSyncSpaceScreen() {
     [downloadingId, t],
   );
 
-  const handleOpenItem = useCallback(
-    async (item: ReceivedLibraryItemDTO) => {
+  const handleOpenReceivedItem = useCallback(
+    async (item: ReceivedLibraryMediaItem) => {
       if (isReceivedFileDeleted(item)) return;
+      const filename = getReceivedFileTitle(item);
+      const image = isImageFile(item.mediaType, filename);
+      const video = isVideoFile(item.mediaType, filename);
+
       try {
         const { NativeSyncEngine } = NativeModules;
         const bindingState = await NativeSyncEngine?.getBindingState();
@@ -238,12 +657,12 @@ export function PhoneSyncSpaceScreen() {
           return;
         }
 
-        const filename = item.filename || item.displayName;
-        const desktop = { host: bindingState.host, port: SIDECAR_HTTP_PORT };
-        if (
-          isImageFile(item.mediaType, filename) ||
-          isVideoFile(item.mediaType, filename)
-        ) {
+        const desktop: DesktopInfo = {
+          host: bindingState.host,
+          port: SIDECAR_HTTP_PORT,
+        };
+
+        if (image || video) {
           const url = await getReceivedLibraryPreviewUrl(desktop, item);
           setPreview({ item, url });
           return;
@@ -288,93 +707,119 @@ export function PhoneSyncSpaceScreen() {
     [t],
   );
 
-  const sortedItems = [...items].sort((a, b) => {
-    const timeA = new Date(a.completedAt).getTime();
-    const timeB = new Date(b.completedAt).getTime();
-    return sortDesc ? timeB - timeA : timeA - timeB;
-  });
+  const sortedItems = useMemo(() => {
+    return [...items].sort((a, b) => {
+      if (sortBy === 'name') {
+        return getReceivedFileTitle(a).localeCompare(
+          getReceivedFileTitle(b),
+          'zh-CN',
+        );
+      }
+      if (sortBy === 'size') return b.fileSize - a.fileSize;
+      return getItemTimestamp(b) - getItemTimestamp(a);
+    });
+  }, [items, sortBy]);
 
-  const renderItem = ({ item }: { item: ReceivedLibraryItemDTO }) => {
-    const iconConfig = getFileIcon(item.mediaType, item.filename);
-    const fileType = getFileTypeText(item.mediaType, item.filename);
-    const formattedTime = formatItemTime(item.completedAt);
-    const displayName = item.filename || item.displayName;
+  const sections = useMemo(
+    () =>
+      sortedItems.reduce<ReceivedSection[]>((acc, item) => {
+        const title = getSectionTitle(item.completedAt, t);
+        const section = acc.find(group => group.title === title);
+        if (section) {
+          section.data.push(item);
+        } else {
+          acc.push({ title, key: title, data: [item] });
+        }
+        return acc;
+      }, []),
+    [sortedItems],
+  );
+
+  const totalSizeLabel = formatBytes(libraryTotalBytes);
+  const totalItemCount = libraryTotalItems;
+  const sortLabel = t(`sharedFiles.sortBy.${sortBy}`) || 'Time';
+  const showBlockingLoading = loading && !hasLoadedOnce;
+  const showBlockingError = loadError && sortedItems.length === 0;
+  const listFooter = loadingMore ? (
+    <View style={styles.listFooter}>
+      <ActivityIndicator size="small" color={colors.primary} />
+    </View>
+  ) : null;
+
+  const renderItem = ({ item }: { item: ReceivedLibraryMediaItem }) => {
+    const iconType = getFileIconType(item.mediaType, item.filename);
+    const displayName = getReceivedFileTitle(item, t);
+    const fileType = getFileTypeText(item.mediaType, item.filename, t);
+    const clock = formatClock(item.completedAt);
     const isDownloading = downloadingId === (item.fileKey || item.resourceId);
     const isDeleted = isReceivedFileDeleted(item);
-
-    const desktopName = binding
-      ? item.desktopDeviceId === binding.deviceId ||
-        (item.desktopDeviceId &&
-          (item.desktopDeviceId.includes('-') ||
-            item.desktopDeviceId.length > 12))
-        ? binding.deviceAlias || binding.deviceName || 'Synced computer'
-        : item.desktopDeviceId
-      : item.desktopDeviceId || 'Unknown device';
 
     return (
       <TouchableOpacity
         style={[styles.card, isDeleted && styles.cardDisabled]}
         activeOpacity={0.75}
-        onPress={() => handleOpenItem(item)}
+        onPress={() => handleOpenReceivedItem(item)}
         disabled={isDeleted}
         accessibilityRole="button"
-        accessibilityLabel="Preview synced file"
+        accessibilityLabel={
+          t('sharedFiles.phoneSyncSpace.previewSyncedFile') ||
+          'Preview synced file'
+        }
         accessibilityState={{ disabled: isDeleted }}
       >
-        <View style={[styles.iconWrapper, { backgroundColor: iconConfig.bg }]}>
-          <Icon name={iconConfig.name} size={24} color={iconConfig.color} />
-        </View>
+        <ReceivedMediaThumbnail
+          item={item}
+          iconType={iconType}
+          loadRemoteThumbnail={remoteThumbnailsEnabled && !isDeleted}
+        />
         <View style={styles.infoWrapper}>
           <Text style={styles.filename} numberOfLines={1}>
             {displayName}
           </Text>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaText}>
-              {`${fileType} - ${formatBytes(item.fileSize)}`}
-            </Text>
-            <Text style={styles.timeText}>{formattedTime}</Text>
-          </View>
-        </View>
-        <View style={styles.rightWrapper}>
-          {item.shareStatus === 'missing' && (
-            <View style={styles.missingBadge}>
-              <Text style={styles.missingText}>Only exists on computer</Text>
-            </View>
-          )}
-          {isDeleted && (
-            <View style={styles.missingBadge}>
-              <Text style={styles.missingText}>
+          <Text style={styles.metaText} numberOfLines={1}>
+            {`${fileType} - ${formatBytes(item.fileSize)}${
+              clock ? ` - ${clock}` : ''
+            }`}
+          </Text>
+          {isDeleted ? (
+            <View style={styles.deletedBadge}>
+              <Text style={styles.deletedBadgeText}>
                 {t('sharedFiles.phoneSyncSpace.desktopDeleted') ||
                   'Deleted on computer'}
               </Text>
             </View>
-          )}
-          <Text style={styles.deviceText} numberOfLines={1}>
-            {desktopName}
-          </Text>
-          <TouchableOpacity
-            style={[
-              styles.downloadButton,
-              (isDownloading || isDeleted) && styles.downloadButtonDisabled,
-            ]}
-            onPress={() => handleDownload(item)}
-            activeOpacity={0.7}
-            disabled={isDeleted || isDownloading || downloadingId !== null}
-            accessibilityRole="button"
-            accessibilityLabel="Download synced file"
-            accessibilityState={{ disabled: isDeleted || isDownloading }}
-          >
-            {isDownloading ? (
-              <ActivityIndicator size="small" color="#3b82f6" />
-            ) : (
-              <Icon
-                name="download-outline"
-                size={18}
-                color={isDeleted ? '#94a3b8' : '#3b82f6'}
-              />
-            )}
-          </TouchableOpacity>
+          ) : null}
         </View>
+        <TouchableOpacity
+          style={[
+            styles.downloadButton,
+            (isDownloading || isDeleted) && styles.downloadButtonDisabled,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={
+            t('sharedFiles.phoneSyncSpace.downloadSyncedFile') ||
+            'Download synced file'
+          }
+          accessibilityState={{ disabled: isDeleted || isDownloading }}
+          disabled={isDeleted || isDownloading || downloadingId !== null}
+          onPress={() => handleDownload(item)}
+          activeOpacity={0.72}
+        >
+          {isDownloading ? (
+            <ActivityIndicator
+              testID="phone-sync-download-icon"
+              size="small"
+              color={colors.primary}
+            />
+          ) : (
+            <Download
+              testID="phone-sync-download-icon"
+              size={16}
+              color={isDeleted ? '#9AA3AE' : colors.primary}
+              strokeWidth={2}
+            />
+          )}
+        </TouchableOpacity>
       </TouchableOpacity>
     );
   };
@@ -382,324 +827,909 @@ export function PhoneSyncSpaceScreen() {
   return (
     <GradientBackground>
       <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
-        {/* Top bar */}
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.back') || 'Back'}
+            onPress={goBack}
             activeOpacity={0.7}
           >
-            <Icon name="arrow-back" size={24} color="#1e293b" />
+            <ChevronLeft
+              testID="phone-sync-back-icon"
+              size={20}
+              color="#59616D"
+              strokeWidth={2}
+            />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>
-            {t('sharedFiles.phoneSyncSpace.title') || 'Phone Sync Space'}
-          </Text>
-          <TouchableOpacity
-            style={styles.selectButton}
-            onPress={handleSelect}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.selectButtonText}>
-              {t('sharedFiles.phoneSyncSpace.select') || 'Select'}
+          <View style={styles.headerText}>
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {t('sharedFiles.phoneSyncSpace.title') || 'Phone Sync Space'}
             </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Sort Filter Button */}
-        <View style={styles.filterBar}>
-          <TouchableOpacity
-            style={styles.filterButton}
-            activeOpacity={0.7}
-            onPress={() => setSortDesc(!sortDesc)}
-          >
-            <Text style={styles.filterButtonText}>
-              {sortDesc ? 'Time ⬇' : 'Time ⬆'}
+            <Text style={styles.headerSubtitle} numberOfLines={1}>
+              {t('sharedFiles.phoneSyncSpace.desc') ||
+                'Phone media synced to the computer'}
             </Text>
-          </TouchableOpacity>
-        </View>
-
-        {loading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color="#3b82f6" />
           </View>
-        ) : loadError ? (
-          <View style={styles.centered}>
-            <Icon name="alert-circle-outline" size={48} color="#ef4444" />
-            <Text style={styles.emptyText}>
+        </View>
+
+        <View style={styles.toolbarCard}>
+          <TouchableOpacity
+            style={styles.sortButton}
+            activeOpacity={0.7}
+            onPress={() => setShowSortSheet(true)}
+          >
+            <Rows3
+              testID="phone-sync-sort-icon"
+              size={16}
+              color={colors.primary}
+              strokeWidth={2}
+            />
+            <Text style={styles.sortButtonText}>{sortLabel}</Text>
+          </TouchableOpacity>
+          <View style={styles.summaryBadge}>
+            {loading && hasLoadedOnce ? (
+              <ActivityIndicator
+                size="small"
+                color="#7B8490"
+                style={styles.summarySpinner}
+              />
+            ) : null}
+            <Text style={styles.summaryText}>
+              {t('sharedFiles.phoneSyncSpace.summary', {
+                count: totalItemCount,
+                size: totalSizeLabel,
+              }) || `${totalItemCount} items - ${totalSizeLabel}`}
+            </Text>
+          </View>
+        </View>
+
+        {showBlockingLoading ? (
+          <View style={styles.centeredCard}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={styles.centeredTitle}>
+              {t('sharedFiles.phoneSyncSpace.loadingTitle') || 'Loading'}
+            </Text>
+            <Text style={styles.centeredSubtitle}>
+              {t('sharedFiles.phoneSyncSpace.loadingSubtitle') ||
+                'The sync space list will refresh here.'}
+            </Text>
+          </View>
+        ) : showBlockingError ? (
+          <View style={styles.centeredCard}>
+            <Text style={styles.centeredTitle}>
               {t('sharedFiles.networkError.title') || 'Failed to Load'}
             </Text>
-            <Text style={styles.errorSubtitle}>
+            <Text style={styles.centeredSubtitle}>
               {t('sharedFiles.networkError.message') ||
                 'Please try again later'}
             </Text>
           </View>
         ) : sortedItems.length === 0 ? (
-          <View style={styles.centered}>
-            <Icon name="folder-open-outline" size={48} color="#94a3b8" />
-            <Text style={styles.emptyText}>
+          <View style={styles.centeredCard}>
+            <PhoneSyncEmptyArtwork />
+            <Text style={styles.centeredTitle}>
               {t('sharedFiles.phoneSyncSpace.empty') || 'No synced files yet'}
+            </Text>
+            <Text style={styles.centeredSubtitle}>
+              {t('sharedFiles.phoneSyncSpace.emptySubtitle') ||
+                'Once auto upload is enabled, assets synced to the computer will appear here.'}
             </Text>
           </View>
         ) : (
-          <FlatList
-            data={sortedItems}
-            keyExtractor={item => item.fileKey || item.resourceId}
+          <SectionList
+            testID="phone-sync-section-list"
+            sections={sections}
+            keyExtractor={(item, index) => getReceivedItemKey(item, index)}
             renderItem={renderItem}
+            renderSectionHeader={({ section }) => (
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>{section.title}</Text>
+                <Text style={styles.sectionCount}>
+                  {t('sharedFiles.phoneSyncSpace.filesCount', {
+                    count: section.data.length,
+                  }) || `${section.data.length}  files`}
+                </Text>
+              </View>
+            )}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            stickySectionHeadersEnabled={false}
+            ListFooterComponent={listFooter}
+            onEndReached={loadNextPage}
+            onEndReachedThreshold={0.45}
           />
         )}
       </SafeAreaView>
-      <PhoneSyncPreviewModal
+
+      <SortSheet
+        visible={showSortSheet}
+        value={sortBy}
+        options={SORT_OPTIONS}
+        onClose={() => setShowSortSheet(false)}
+        onSelect={value => {
+          setSortBy(value);
+          setShowSortSheet(false);
+        }}
+      />
+      <ReceivedMediaPreviewModal
         preview={preview}
         onClose={() => setPreview(null)}
       />
-      <BottomTabBar activeTab="files" />
     </GradientBackground>
   );
 }
 
-function PhoneSyncPreviewModal({
+function PhoneSyncEmptyArtwork() {
+  return (
+    <View testID="phone-sync-empty-icon" style={styles.emptyArtwork}>
+      <View style={[styles.emptyArtworkSheet, styles.emptyArtworkSheetBack]} />
+      <View style={[styles.emptyArtworkSheet, styles.emptyArtworkSheetFront]}>
+        <Svg
+          pointerEvents="none"
+          style={StyleSheet.absoluteFillObject}
+          width="100%"
+          height="100%"
+          viewBox="0 0 72 72"
+        >
+          <Defs>
+            <LinearGradient
+              id="phoneSyncEmptyGradient"
+              x1="0%"
+              y1="0%"
+              x2="100%"
+              y2="100%"
+            >
+              <Stop offset="0%" stopColor="#F8FCFF" />
+              <Stop offset="54%" stopColor="#DFF3FF" />
+              <Stop offset="100%" stopColor="#B6E3FF" />
+            </LinearGradient>
+          </Defs>
+          <Rect
+            x="0"
+            y="0"
+            width="72"
+            height="72"
+            rx="22"
+            fill="url(#phoneSyncEmptyGradient)"
+          />
+        </Svg>
+        <View style={styles.emptyArtworkCorner} />
+        <View style={styles.emptyArtworkPulse} />
+        <CloudUpload size={30} color="#1677D2" strokeWidth={1.9} />
+      </View>
+    </View>
+  );
+}
+
+function MediaTypeIcon({ type }: { type: MediaTypeIconKind }) {
+  const gradientId = `phoneSync${type}Gradient`;
+
+  return (
+    <View testID={`phone-sync-media-icon-${type}`} style={styles.mediaTypeIcon}>
+      <Svg
+        style={StyleSheet.absoluteFillObject}
+        width="100%"
+        height="100%"
+        viewBox="0 0 46 46"
+      >
+        <Defs>
+          <LinearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+            {MEDIA_TYPE_ICON_GRADIENTS[type].map(stop => (
+              <Stop
+                key={stop.offset}
+                offset={stop.offset}
+                stopColor={stop.color}
+              />
+            ))}
+          </LinearGradient>
+        </Defs>
+        <Rect width="46" height="46" rx="14" fill={`url(#${gradientId})`} />
+      </Svg>
+      <MediaTypeGlyph type={type} />
+    </View>
+  );
+}
+
+function ReceivedMediaThumbnail({
+  item,
+  iconType,
+  loadRemoteThumbnail,
+}: {
+  item: ReceivedLibraryMediaItem;
+  iconType: MediaTypeIconKind;
+  loadRemoteThumbnail: boolean;
+}) {
+  const { t } = useTranslation();
+  const [imageFailed, setImageFailed] = useState(false);
+  const displayName = getReceivedFileTitle(item, t);
+
+  if (
+    loadRemoteThumbnail &&
+    (iconType === 'photo' || iconType === 'video') &&
+    item.thumbnailUrl &&
+    !imageFailed
+  ) {
+    return (
+      <View style={styles.mediaPreviewThumb}>
+        <Image
+          testID="phone-sync-thumbnail-image"
+          source={{ uri: item.thumbnailUrl }}
+          style={styles.mediaPreviewImage}
+          resizeMode="cover"
+          fadeDuration={Platform.OS === 'android' ? 0 : undefined}
+          accessibilityLabel={`${displayName} ${t('common.thumbnail') || 'thumbnail'}`}
+          onError={() => setImageFailed(true)}
+        />
+      </View>
+    );
+  }
+
+  return <MediaTypeIcon type={iconType} />;
+}
+
+function MediaTypeGlyph({ type }: { type: MediaTypeIconKind }) {
+  if (type === 'photo') {
+    return (
+      <>
+        <View style={styles.photoIconDot} />
+        <View style={styles.photoIconHillLight} />
+        <View style={styles.photoIconHillBlue} />
+        <View style={styles.mediaTypeGlyphCenter}>
+          <FileImage size={20} color="#1677D2" strokeWidth={1.8} />
+        </View>
+      </>
+    );
+  }
+
+  if (type === 'video') {
+    return (
+      <>
+        <View style={styles.videoDotRowTop}>
+          {[0, 1, 2].map(item => (
+            <View key={item} style={styles.videoDotTop} />
+          ))}
+        </View>
+        <View style={styles.videoDotRowBottom}>
+          {[0, 1, 2].map(item => (
+            <View key={item} style={styles.videoDotBottom} />
+          ))}
+        </View>
+        <View style={styles.videoPlayCircle}>
+          <Play
+            size={14}
+            color="#746AA8"
+            fill="#746AA8"
+            strokeWidth={1.8}
+            style={styles.videoPlayIcon}
+          />
+        </View>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <View style={styles.fileIconCorner} />
+      <View style={styles.mediaTypeGlyphCenter}>
+        <FileText size={20} color="#59616D" strokeWidth={1.8} />
+      </View>
+    </>
+  );
+}
+
+function SortSheet({
+  visible,
+  value,
+  options,
+  onClose,
+  onSelect,
+}: {
+  visible: boolean;
+  value: SortKey;
+  options: Array<{ id: SortKey; label: string }>;
+  onClose: () => void;
+  onSelect: (value: SortKey) => void;
+}) {
+  const { t } = useTranslation();
+  if (!visible) return null;
+
+  const content = (
+    <View
+      testID="phone-sync-sort-sheet-layer"
+      pointerEvents="box-none"
+      style={styles.sheetLayer}
+    >
+      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
+        <ModalBlurBackdrop overlayColor="rgba(23,25,28,0.18)" />
+      </Pressable>
+      <View style={styles.sheetCard}>
+        <Text style={styles.sheetTitle}>
+          {t('sharedFiles.localComputer.sortTitle') || 'Sort By'}
+        </Text>
+        {options.map(option => {
+          const active = option.id === value;
+          return (
+            <TouchableOpacity
+              key={option.id}
+              style={styles.sheetOption}
+              activeOpacity={0.7}
+              onPress={() => onSelect(option.id)}
+            >
+              <Text style={styles.sheetOptionText}>
+                {t(`sharedFiles.sortBy.${option.id}`) || option.label}
+              </Text>
+              {active ? (
+                <Check
+                  testID="phone-sync-sort-check-icon"
+                  size={20}
+                  color={colors.primary}
+                  strokeWidth={2.4}
+                />
+              ) : null}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+
+  if (Platform.OS === 'android') {
+    return content;
+  }
+
+  return (
+    <Modal
+      animationType="fade"
+      transparent
+      statusBarTranslucent
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      {content}
+    </Modal>
+  );
+}
+
+function ReceivedMediaPreviewModal({
   preview,
   onClose,
 }: {
-  preview: PhoneSyncPreviewState | null;
+  preview: ReceivedPreviewState | null;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   if (!preview) return null;
 
-  const filename = preview.item.filename || preview.item.displayName;
-  const video = isVideoFile(preview.item.mediaType, filename);
+  const { item } = preview;
+  const displayName = getReceivedFileTitle(item, t);
+  const imagePreview = isImage(item.mediaType, item.filename);
+  const videoPreview = isVideo(item.mediaType, item.filename);
 
   return (
     <Modal
       animationType="fade"
       presentationStyle="fullScreen"
+      statusBarTranslucent
       visible={preview != null}
       onRequestClose={onClose}
     >
-      <View style={styles.previewModalRoot}>
-        <View style={styles.previewHeader}>
-          <Text style={styles.previewTitle} numberOfLines={1}>
-            {filename}
+      <View style={styles.mediaPreviewModalRoot}>
+        <View style={styles.mediaPreviewHeader}>
+          <Text style={styles.mediaPreviewTitle} numberOfLines={1}>
+            {displayName}
           </Text>
           <TouchableOpacity
-            style={styles.previewCloseButton}
+            style={styles.mediaPreviewCloseButton}
             accessibilityRole="button"
-            accessibilityLabel="Close Preview"
+            accessibilityLabel={
+              t('sharedFiles.localComputer.closePreview') || 'Close Preview'
+            }
             activeOpacity={0.7}
             onPress={onClose}
           >
-            <Icon name="close" size={18} color="#ffffff" />
+            <X size={18} color="#FFFFFF" strokeWidth={2.2} />
           </TouchableOpacity>
         </View>
-        <View style={styles.previewBody}>
-          {video ? (
+
+        <View style={styles.mediaPreviewBody}>
+          {imagePreview ? (
+            <Image
+              testID="phone-sync-preview-image"
+              source={{ uri: preview.url }}
+              style={styles.mediaPreviewFullMedia}
+              resizeMode="contain"
+            />
+          ) : null}
+          {videoPreview ? (
             <Video
               testID="phone-sync-preview-video"
               source={{ uri: preview.url }}
-              style={styles.previewMedia}
+              style={styles.mediaPreviewFullMedia}
               resizeMode="contain"
               controls
               paused={false}
               muted={false}
+              playInBackground
+              playWhenInactive
+              ignoreSilentSwitch="ignore"
             />
-          ) : (
-            <Image
-              testID="phone-sync-preview-image"
-              source={{ uri: preview.url }}
-              style={styles.previewMedia}
-              resizeMode="contain"
-            />
-          )}
+          ) : null}
+          {!imagePreview && !videoPreview ? (
+            <View style={styles.mediaPreviewErrorBox}>
+              <Text style={styles.mediaPreviewErrorText}>
+                {`${t('sharedFiles.phoneSyncSpace.previewFailedTitle') || 'Cannot load preview'},${t('sharedFiles.phoneSyncSpace.previewFailedSubtitle') || 'Please make sure the computer is online and the file still exists.'}`}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
     </Modal>
   );
 }
 
+const glassShadow = {
+  shadowColor: '#46608A',
+  shadowOffset: { width: 0, height: 12 },
+  shadowOpacity: 0.08,
+  shadowRadius: 34,
+  elevation: 3,
+  ...androidBoxShadow({
+    offsetY: 12,
+    blurRadius: 34,
+    color: 'rgba(70, 96, 138, 0.08)',
+  }),
+};
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    paddingHorizontal: 20,
   },
   header: {
-    height: 56,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginTop: 12,
+    gap: 14,
+    marginTop: 18,
+    marginBottom: 20,
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: 'rgba(255,255,255,0.62)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.70)',
+    ...glassShadow,
+  },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.foreground,
   },
-  selectButton: {
+  headerSubtitle: {
+    marginTop: 2,
+    fontSize: 11,
+    color: '#59616D',
+  },
+  toolbarCard: {
+    minHeight: 48,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.70)',
+    backgroundColor: 'rgba(255,255,255,0.50)',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: 'rgba(59, 130, 246, 0.08)',
-  },
-  selectButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#3b82f6',
-  },
-  filterBar: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    alignItems: 'flex-start',
-  },
-  filterButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  filterButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
+    marginBottom: 16,
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingBottom: 80,
+    justifyContent: 'space-between',
+    ...glassShadow,
   },
-  emptyText: {
-    marginTop: 12,
-    fontSize: 15,
-    color: '#64748b',
+  sortButton: {
+    minHeight: 36,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  errorSubtitle: {
-    marginTop: 6,
-    fontSize: 13,
-    color: '#94a3b8',
+  sortButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.foreground,
+  },
+  summaryBadge: {
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.62)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  summarySpinner: {
+    transform: [{ scale: 0.72 }],
+  },
+  summaryText: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#7B8490',
   },
   listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 100,
+    paddingBottom: 34,
+  },
+  listFooter: {
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#59616D',
+  },
+  sectionCount: {
+    fontSize: 10,
+    color: '#9AA3AE',
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 1.5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.70)',
+    backgroundColor: 'rgba(255,255,255,0.50)',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 10,
+    ...glassShadow,
   },
   cardDisabled: {
     opacity: 0.72,
   },
-  iconWrapper: {
-    width: 48,
-    height: 48,
+  mediaTypeIcon: {
+    width: 46,
+    height: 46,
     borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.75)',
+    shadowColor: '#46608A',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.1,
+    shadowRadius: 28,
+    elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 12,
+      blurRadius: 28,
+      color: 'rgba(70, 96, 138, 0.10)',
+    }),
+  },
+  mediaPreviewThumb: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.78)',
+    backgroundColor: 'rgba(255,255,255,0.54)',
+    shadowColor: '#46608A',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.1,
+    shadowRadius: 28,
+    elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 12,
+      blurRadius: 28,
+      color: 'rgba(70, 96, 138, 0.10)',
+    }),
+  },
+  mediaPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  mediaTypeGlyphCenter: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  photoIconDot: {
+    position: 'absolute',
+    left: 8,
+    top: 8,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(255,255,255,0.86)',
+  },
+  photoIconHillLight: {
+    position: 'absolute',
+    left: 4,
+    bottom: -4,
+    width: 32,
+    height: 20,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.62)',
+    transform: [{ rotate: '-8deg' }],
+  },
+  photoIconHillBlue: {
+    position: 'absolute',
+    right: 0,
+    bottom: -4,
+    width: 36,
+    height: 24,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    backgroundColor: 'rgba(191,227,255,0.78)',
+    transform: [{ rotate: '10deg' }],
+  },
+  videoDotRowTop: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    top: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  videoDotRowBottom: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    bottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  videoDotTop: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+  },
+  videoDotBottom: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.54)',
+  },
+  videoPlayCircle: {
+    position: 'absolute',
+    left: 9,
+    top: 9,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.74)',
+    shadowColor: '#46608A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+    ...androidBoxShadow({
+      offsetY: 1,
+      blurRadius: 2,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
+  },
+  videoPlayIcon: {
+    marginLeft: 2,
+  },
+  fileIconCorner: {
+    position: 'absolute',
+    right: 8,
+    top: 8,
+    width: 12,
+    height: 12,
+    borderBottomLeftRadius: 8,
+    borderLeftWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#C6D2DF',
+    backgroundColor: 'rgba(255,255,255,0.76)',
+  },
   infoWrapper: {
     flex: 1,
+    minWidth: 0,
     marginLeft: 12,
     marginRight: 8,
   },
   filename: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.foreground,
   },
   metaText: {
-    fontSize: 12,
-    color: '#64748b',
-    marginRight: 8,
+    marginTop: 5,
+    fontSize: 11,
+    lineHeight: 16,
+    color: '#59616D',
   },
-  timeText: {
-    fontSize: 12,
-    color: '#94a3b8',
-  },
-  rightWrapper: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  },
-  deviceText: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '500',
-    marginTop: 4,
-    maxWidth: 90,
-  },
-  downloadButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(59, 130, 246, 0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  downloadButtonDisabled: {
-    backgroundColor: 'rgba(148, 163, 184, 0.08)',
-  },
-  missingBadge: {
+  deletedBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
     backgroundColor: 'rgba(239, 68, 68, 0.08)',
   },
-  missingText: {
+  deletedBadgeText: {
     fontSize: 10,
     fontWeight: '600',
     color: '#ef4444',
   },
-  previewModalRoot: {
+  rightWrapper: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  deviceText: {
+    fontSize: 11,
+    color: '#1677D2',
+    fontWeight: '600',
+  },
+  missingText: {
+    marginTop: 4,
+    fontSize: 10,
+    color: '#9AA3AE',
+  },
+  previewButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.64)',
+    marginRight: 6,
+  },
+  downloadButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.64)',
+  },
+  downloadButtonDisabled: {
+    opacity: 0.5,
+  },
+  centeredCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.70)',
+    backgroundColor: 'rgba(255,255,255,0.50)',
+    paddingHorizontal: 24,
+    paddingVertical: 34,
+    alignItems: 'center',
+    ...glassShadow,
+  },
+  emptyArtwork: {
+    width: 84,
+    height: 78,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyArtworkSheet: {
+    position: 'absolute',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.82)',
+    shadowColor: '#46608A',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.12,
+    shadowRadius: 30,
+    elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 16,
+      blurRadius: 30,
+      color: 'rgba(70, 96, 138, 0.12)',
+    }),
+  },
+  emptyArtworkSheetBack: {
+    width: 58,
+    height: 58,
+    left: 8,
+    top: 11,
+    backgroundColor: 'rgba(255,255,255,0.50)',
+    transform: [{ rotate: '-8deg' }],
+  },
+  emptyArtworkSheetFront: {
+    width: 72,
+    height: 72,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyArtworkCorner: {
+    position: 'absolute',
+    right: 13,
+    top: 13,
+    width: 14,
+    height: 14,
+    borderLeftWidth: 1,
+    borderBottomWidth: 1,
+    borderBottomLeftRadius: 9,
+    borderColor: 'rgba(22,119,210,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.68)',
+  },
+  emptyArtworkPulse: {
+    position: 'absolute',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.58)',
+  },
+  centeredTitle: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.foreground,
+  },
+  centeredSubtitle: {
+    marginTop: 6,
+    fontSize: 11,
+    lineHeight: 18,
+    textAlign: 'center',
+    color: '#59616D',
+  },
+  sheetLayer: {
+    ...StyleSheet.absoluteFillObject,
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    zIndex: 30,
+    elevation: 30,
+  },
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  sheetCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.70)',
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+    ...glassShadow,
+  },
+  sheetTitle: {
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.foreground,
+  },
+  mediaPreviewModalRoot: {
     flex: 1,
     backgroundColor: '#000000',
   },
-  previewHeader: {
-    minHeight: 84,
+  mediaPreviewHeader: {
+    minHeight: 86,
     paddingHorizontal: 16,
-    paddingTop: 46,
+    paddingTop: 48,
     paddingBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
   },
-  previewTitle: {
-    flex: 1,
-    minWidth: 0,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  previewCloseButton: {
+  mediaPreviewCloseButton: {
     width: 34,
     height: 34,
     borderRadius: 17,
@@ -707,13 +1737,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.14)',
   },
-  previewBody: {
+  mediaPreviewTitle: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  mediaPreviewBody: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  previewMedia: {
+  mediaPreviewFullMedia: {
     width: '100%',
     height: '100%',
+  },
+  mediaPreviewErrorBox: {
+    paddingHorizontal: 26,
+  },
+  mediaPreviewErrorText: {
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+    color: 'rgba(255,255,255,0.78)',
+  },
+  sheetOption: {
+    minHeight: 48,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sheetOptionText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: colors.foreground,
   },
 });

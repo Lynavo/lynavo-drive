@@ -30,8 +30,8 @@ jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-jest.mock('../../components/GlobalGradientBackground', () => ({
-  GlobalGradientBackground: ({ children }: { children: React.ReactNode }) => (
+jest.mock('../../components/GradientBackground', () => ({
+  GradientBackground: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
   ),
 }));
@@ -119,12 +119,12 @@ jest.mock('react-i18next', () => ({
   }),
 }));
 
-import { AutoUploadSettingsGlobalScreen } from '../AutoUploadSettingsGlobalScreen';
+import { AutoUploadSettingsScreen } from '../AutoUploadSettingsScreen';
 
 async function renderScreen() {
   let tree: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
-    tree = ReactTestRenderer.create(<AutoUploadSettingsGlobalScreen />);
+    tree = ReactTestRenderer.create(<AutoUploadSettingsScreen />);
     await Promise.resolve();
   });
   return tree!;
@@ -149,7 +149,7 @@ const mockedGetAutoUploadConfig = getAutoUploadConfig as jest.Mock;
 const mockedPrepareAutoUploadEnable = prepareAutoUploadEnable as jest.Mock;
 const mockedSaveAutoUploadConfig = saveAutoUploadConfig as jest.Mock;
 
-describe('AutoUploadSettingsGlobalScreen', () => {
+describe('AutoUploadSettingsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(true);

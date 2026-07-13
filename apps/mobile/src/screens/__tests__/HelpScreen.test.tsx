@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { HelpGlobalScreen } from '../HelpGlobalScreen';
+import { HelpScreen } from '../HelpScreen';
 import { shareDiagnosticsArchive } from '../../utils/shareDiagnosticsArchive';
 
 const mockGoBack = jest.fn();
@@ -72,7 +72,7 @@ const mockedShareDiagnosticsArchive =
     typeof shareDiagnosticsArchive
   >;
 
-describe('HelpGlobalScreen OSS copy', () => {
+describe('HelpScreen OSS copy', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedShareDiagnosticsArchive.mockResolvedValue(
@@ -81,7 +81,7 @@ describe('HelpGlobalScreen OSS copy', () => {
   });
 
   it('describes local LAN operation instead of account-gated flows', () => {
-    const { getByText, queryByText } = render(<HelpGlobalScreen />);
+    const { getByText, queryByText } = render(<HelpScreen />);
 
     expect(
       getByText('Does the open-source edition require a cloud login?'),
@@ -96,7 +96,7 @@ describe('HelpGlobalScreen OSS copy', () => {
   });
 
   it('shares a local diagnostics archive from the support section', async () => {
-    const { getByText } = render(<HelpGlobalScreen />);
+    const { getByText } = render(<HelpScreen />);
 
     expect(getByText('share-outline')).toBeTruthy();
 

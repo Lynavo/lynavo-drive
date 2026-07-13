@@ -1,232 +1,534 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  Animated,
-  Easing,
-  NativeModules,
-  NativeEventEmitter,
-  ListRenderItemInfo,
-  Alert,
-  TextInput,
-  Keyboard,
-  LayoutChangeEvent,
-  Platform,
-  Modal,
-  Pressable,
-  KeyboardAvoidingView,
-  ActivityIndicator,
-} from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+  Alert,
+  ActivityIndicator,
+  Animated,
+  Easing,
+  KeyboardAvoidingView,
+  Modal,
+  NativeEventEmitter,
+  NativeModules,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import {
   CommonActions,
-  useFocusEffect,
   useNavigation,
   useRoute,
 } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
-import type { DiscoveredDeviceDTO } from '@lynavo-drive/contracts';
-import type { RootStackParamList } from '../navigation/RootNavigator';
-import { colors } from '../theme/colors';
+import type {
+  DiscoveredDeviceDTO,
+  RecentDesktopDTO,
+} from '@lynavo-drive/contracts';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import Svg, { Defs, Mask, Rect } from 'react-native-svg';
+import {
+  Check,
+  ChevronRight,
+  CloudDownload,
+  Download,
+  FileText,
+  FileVideo,
+  Monitor,
+  Smartphone,
+} from 'lucide-react-native';
+import { Camera } from 'react-native-vision-camera';
+
 import { Icon } from '../components/Icon';
 import { GradientBackground } from '../components/GradientBackground';
-import {
-  isDiagnosticsExportUnavailable,
-  shareDiagnosticsArchive,
-} from '../utils/shareDiagnosticsArchive';
-import { UnconnectedGuide } from '../components/onboarding/UnconnectedGuide';
+import { ModalBlurBackdrop } from '../components/shared/ModalBlurBackdrop';
+import { NativeModalBlurView } from '../components/shared/NativeModalBlurView';
+import type { RootStackParamList } from '../navigation/RootNavigator';
+import { useRecentDesktops } from '../stores/recent-desktops-store';
+import { androidBoxShadow } from '../utils/androidShadow';
 import {
   hasSeenUnconnectedGuide,
   markUnconnectedGuideSeen,
 } from '../utils/onboardingStorage';
+import { isVisualQaEnabled } from '../dev/visualQa';
+import { pairDevice, PairingError } from '../services/SyncEngineModule';
 import { buildManualPairDevice } from './deviceDiscoveryManualPairing';
 import {
   normalizeDiscoveredDevices,
   recentDesktopMatchesDiscoveredDevice,
 } from './deviceDiscoveryDevices';
 import { shouldKeepCachedDevicesVisible } from './deviceDiscoveryRefresh';
-import { appConfig } from '../config/app-config';
-import { useRecentDesktops } from '../stores/recent-desktops-store';
-import type { RecentDesktopDTO } from '@lynavo-drive/contracts';
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type DiscoveredDevice = Pick<
-  DiscoveredDeviceDTO,
-  'deviceId' | 'name' | 'ip' | 'type' | 'port'
->;
-
-const desktopDownloadHost = appConfig.endpoints.webBaseUrl
-  .replace(/^https?:\/\//, '')
-  .replace(/\/$/, '');
-
-function deviceDiscoveryDebugSummary(devices: DiscoveredDevice[]): string {
-  if (devices.length === 0) {
-    return 'none';
-  }
-
-  return devices
-    .map(
-      device =>
-        `${device.name}/${device.ip || 'no-ip'}/${device.deviceId}/${
-          device.type
-        }`,
-    )
-    .join(', ');
-}
-
-// ---------------------------------------------------------------------------
-// Pulse ring animation component
-// ---------------------------------------------------------------------------
-
-function PulseRings() {
-  const rings = [
-    useRef(new Animated.Value(0)).current,
-    useRef(new Animated.Value(0)).current,
-    useRef(new Animated.Value(0)).current,
-  ];
-
-  useEffect(() => {
-    const animations = rings.map((anim, i) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(i * 400),
-          Animated.timing(anim, {
-            toValue: 1,
-            duration: 1800,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ]),
-      ),
-    );
-    animations.forEach(a => a.start());
-    return () => animations.forEach(a => a.stop());
-  }, []);
-
-  return (
-    <View style={styles.pulseContainer}>
-      {rings.map((anim, i) => {
-        const size = 60 + i * 36;
-        return (
-          <Animated.View
-            key={i}
-            style={[
-              styles.pulseRing,
-              {
-                width: size,
-                height: size,
-                borderRadius: size / 2,
-                borderColor: `rgba(59,159,216,${0.35 - i * 0.1})`,
-                opacity: anim.interpolate({
-                  inputRange: [0, 0.7, 1],
-                  outputRange: [0.8, 0, 0],
-                }),
-                transform: [
-                  {
-                    scale: anim.interpolate({
-                      inputRange: [0, 0.7, 1],
-                      outputRange: [0.85, 1.2, 1.2],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          />
-        );
-      })}
-      {/* Center circle */}
-      <View style={styles.pulseCenter}>
-        <Icon name="radio-outline" size={22} color="#3b9fd8" />
-      </View>
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// DeviceDiscoveryScreen
-// ---------------------------------------------------------------------------
 
 type NavigationProp = StackNavigationProp<
   RootStackParamList,
   'DeviceDiscovery'
 >;
 
+type DiscoveredDevice = Pick<
+  DiscoveredDeviceDTO,
+  'deviceId' | 'name' | 'ip' | 'type' | 'port'
+> & {
+  availability?: DeviceAvailability;
+  deviceKind?: 'desktop' | 'laptop';
+};
+
+type DeviceAvailability = 'available' | 'busy';
+type ConnectionFlowStatus =
+  | 'scanning'
+  | 'ready'
+  | 'empty'
+  | 'failed'
+  | 'timeout'
+  | 'permissionRequired'
+  | 'cameraDenied';
+type ConnectionFailureCode =
+  | 'wrong_code'
+  | 'blocked'
+  | 'version_incompatible'
+  | 'unknown';
+type ConnectionFailure = {
+  code: ConnectionFailureCode;
+  remainingAttempts?: number;
+};
+type ConnectionModalStep =
+  | 'method'
+  | 'manualPair'
+  | 'cameraPermission'
+  | 'code';
+type FlowStateTone = 'neutral' | 'danger' | 'warning';
+type NativeDiscoveryModule = {
+  addListener: (eventName: string) => void;
+  removeListeners: (count: number) => void;
+  startDiscovery?: () => Promise<void>;
+  stopDiscovery?: () => Promise<void>;
+  getDiscoveryPermissionStatus?: () => Promise<unknown>;
+};
+type DiscoveryPermissionStatus = 'granted' | 'required' | 'unavailable';
+type ConnectionGuidePreviewKind =
+  | 'connect'
+  | 'autoUpload'
+  | 'uploadScope'
+  | 'syncProgress'
+  | 'records'
+  | 'sharedFilesHub';
+type ConnectionGuideStep = {
+  title: string;
+  description: string;
+  actionLabel: string;
+  previewKind: ConnectionGuidePreviewKind;
+};
+type FlowStateContent = {
+  title: string;
+  description: string;
+  actionLabel?: string;
+  icon: string;
+  tone: FlowStateTone;
+  onAction?: () => void;
+};
+
+type SpotlightLayout = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+type ConnectionGuideCardPosition = {
+  position: 'absolute';
+  left: number;
+  right: number;
+  top?: number;
+  bottom?: number;
+};
+type GuidePreviewIconComponent = React.ComponentType<{
+  color?: string;
+  size?: number;
+  strokeWidth?: number;
+  testID?: string;
+}>;
+
+const GUIDE_CARD_EDGE_MARGIN = 16;
+const GUIDE_CARD_VERTICAL_GAP = 14;
+const GUIDE_CARD_TOP_MARGIN = 20;
+const GUIDE_CARD_ESTIMATED_HEIGHT = 236;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function describeLogError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  return 'unknown';
+}
+
+function isConnectionFailureCode(
+  value: unknown,
+): value is ConnectionFailureCode {
+  return (
+    value === 'wrong_code' ||
+    value === 'blocked' ||
+    value === 'version_incompatible' ||
+    value === 'unknown'
+  );
+}
+
+function normalizeConnectionFailure(error: unknown): ConnectionFailure {
+  if (error instanceof PairingError) {
+    return {
+      code: error.blocked ? 'blocked' : error.code,
+      remainingAttempts: error.remainingAttempts,
+    };
+  }
+
+  if (isRecord(error)) {
+    const code = isConnectionFailureCode(error.code) ? error.code : 'unknown';
+    return {
+      code,
+      remainingAttempts:
+        typeof error.remainingAttempts === 'number'
+          ? error.remainingAttempts
+          : undefined,
+    };
+  }
+
+  return { code: 'unknown' };
+}
+
+function getConnectionCodeErrorMessage(
+  failure: ConnectionFailure,
+  t: any,
+): string {
+  if (
+    failure.code === 'wrong_code' &&
+    failure.remainingAttempts !== undefined &&
+    failure.remainingAttempts > 0
+  ) {
+    return t('deviceDiscovery.global.connectionCodeWrongWithAttempts', {
+      remainingAttempts: failure.remainingAttempts,
+    });
+  }
+  return t('deviceDiscovery.global.connectionCodeWrong');
+}
+
+function displayHostWithoutPort(host: string): string {
+  const trimmed = host.trim();
+  const ipv4WithPort = /^(\d{1,3}(?:\.\d{1,3}){3}):\d{1,5}$/.exec(trimmed);
+  return ipv4WithPort ? ipv4WithPort[1] : trimmed;
+}
+
+function getConnectionFailureCopy(
+  failure: ConnectionFailure | null,
+  t: any,
+): {
+  title: string;
+  description: string;
+  actionLabel: string;
+  icon: string;
+  tone: FlowStateTone;
+} {
+  if (failure?.code === 'blocked') {
+    return {
+      title: t('deviceDiscovery.global.pairingBlockedTitle'),
+      description: t('deviceDiscovery.global.pairingBlockedDesc'),
+      actionLabel: t('deviceDiscovery.global.reenter'),
+      icon: 'alert-circle-outline',
+      tone: 'danger',
+    };
+  }
+
+  if (failure?.code === 'version_incompatible') {
+    return {
+      title: t('deviceDiscovery.global.versionIncompatibleTitle'),
+      description: t('deviceDiscovery.global.versionIncompatibleDesc'),
+      actionLabel: t('deviceDiscovery.global.rescan'),
+      icon: 'alert-circle-outline',
+      tone: 'warning',
+    };
+  }
+
+  if (failure?.code === 'wrong_code') {
+    return {
+      title: t('deviceDiscovery.global.connectionCodeError'),
+      description: getConnectionCodeErrorMessage(failure, t),
+      actionLabel: t('deviceDiscovery.global.reenter'),
+      icon: 'alert-circle-outline',
+      tone: 'danger',
+    };
+  }
+
+  return {
+    title: t('deviceDiscovery.global.connectionFailed'),
+    description: t('deviceDiscovery.global.connectionFailedDesc'),
+    actionLabel: t('deviceDiscovery.global.reenter'),
+    icon: 'alert-circle-outline',
+    tone: 'danger',
+  };
+}
+
+async function getAndroidDiscoveryPermissionStatus(
+  nativeSyncEngine: NativeDiscoveryModule | undefined,
+): Promise<DiscoveryPermissionStatus> {
+  if (Platform.OS !== 'android') {
+    return 'granted';
+  }
+
+  const status = await (
+    nativeSyncEngine?.getDiscoveryPermissionStatus?.() ??
+    Promise.resolve('granted')
+  ).catch(() => 'granted');
+
+  if (status === 'required' || status === 'unavailable') {
+    return status;
+  }
+
+  return 'granted';
+}
+
+export function resolveConnectionGuideCardPosition({
+  hole,
+  viewportHeight,
+  bottomInset,
+}: {
+  hole: SpotlightLayout | null;
+  viewportHeight: number;
+  bottomInset: number;
+}): ConnectionGuideCardPosition {
+  if (!hole) {
+    return {
+      position: 'absolute',
+      left: GUIDE_CARD_EDGE_MARGIN,
+      right: GUIDE_CARD_EDGE_MARGIN,
+      bottom: Math.max(bottomInset, 8),
+    };
+  }
+
+  const bottomMargin = Math.max(bottomInset, 8);
+  const preferredCardTop = hole.y + hole.height + GUIDE_CARD_VERTICAL_GAP;
+  const maxCardTop = Math.max(
+    GUIDE_CARD_TOP_MARGIN,
+    viewportHeight - bottomMargin - GUIDE_CARD_ESTIMATED_HEIGHT,
+  );
+  const shouldPlaceAbove = preferredCardTop > maxCardTop;
+  const preferredAboveTop =
+    hole.y - GUIDE_CARD_ESTIMATED_HEIGHT - GUIDE_CARD_VERTICAL_GAP;
+
+  return {
+    position: 'absolute',
+    left: GUIDE_CARD_EDGE_MARGIN,
+    right: GUIDE_CARD_EDGE_MARGIN,
+    top: shouldPlaceAbove
+      ? Math.max(GUIDE_CARD_TOP_MARGIN, Math.min(preferredAboveTop, maxCardTop))
+      : preferredCardTop,
+  };
+}
+
+const VISUAL_QA_LAN_DEVICES: DiscoveredDevice[] = [
+  {
+    deviceId: 'visual-qa-openimde-mac-mini',
+    name: 'Lynavo Drive Demo Mac Studio',
+    ip: '192.168.31.21',
+    type: 'mac',
+    port: 39393,
+    availability: 'available',
+    deviceKind: 'desktop',
+  },
+  {
+    deviceId: 'visual-qa-macbook-pro',
+    name: 'Lynavo Drive Demo MacBook Pro',
+    ip: '192.168.31.36',
+    type: 'mac',
+    port: 39393,
+    availability: 'available',
+    deviceKind: 'laptop',
+  },
+  {
+    deviceId: 'visual-qa-windows-workstation',
+    name: 'Lynavo Drive Demo Windows Workstation',
+    ip: '192.168.31.52',
+    type: 'win',
+    port: 39393,
+    availability: 'busy',
+    deviceKind: 'desktop',
+  },
+];
+
+function PulseDot() {
+  const opacity = useRef(new Animated.Value(0.45)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 720,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.45,
+          duration: 720,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+
+  return <Animated.View style={[styles.scanDot, { opacity }]} />;
+}
+
 export function DeviceDiscoveryScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp>();
-  const insets = useSafeAreaInsets();
-  const { t, i18n } = useTranslation();
-  const isAndroid = Platform.OS === 'android';
-  const language = i18n.resolvedLanguage ?? i18n.language;
-  const popoverMenuWidth = language.startsWith('zh') ? 176 : 200;
   const route = useRoute<RouteProp<RootStackParamList, 'DeviceDiscovery'>>();
+  const insets = useSafeAreaInsets();
   const mode = route.params?.mode ?? 'initial';
+  const showPairingInvalidatedNotice =
+    route.params?.reason === 'pairing_invalidated';
+  const { recentDesktops, addDesktop } = useRecentDesktops();
+
+  const getVisualQaDevices = useCallback(() => {
+    return VISUAL_QA_LAN_DEVICES.map(device => {
+      if (device.deviceId === 'visual-qa-openimde-mac-mini') {
+        return { ...device, name: t('deviceDiscovery.global.demoMacStudio') };
+      }
+      if (device.deviceId === 'visual-qa-macbook-pro') {
+        return { ...device, name: t('deviceDiscovery.global.demoMacBook') };
+      }
+      if (device.deviceId === 'visual-qa-windows-workstation') {
+        return { ...device, name: t('deviceDiscovery.global.demoWindows') };
+      }
+      return device;
+    });
+  }, [t]);
+
+  const connectionFeatureGuideSteps = React.useMemo<ConnectionGuideStep[]>(
+    () => [
+      {
+        title: t('deviceDiscovery.global.onboarding.step1Title'),
+        description: t('deviceDiscovery.global.onboarding.step1Desc'),
+        actionLabel: t('deviceDiscovery.global.onboarding.step1Action'),
+        previewKind: 'connect',
+      },
+      {
+        title: t('deviceDiscovery.global.onboarding.step2Title'),
+        description: t('deviceDiscovery.global.onboarding.step2Desc'),
+        actionLabel: t('deviceDiscovery.global.onboarding.step2Action'),
+        previewKind: 'autoUpload',
+      },
+      {
+        title: t('deviceDiscovery.global.onboarding.step3Title'),
+        description: t('deviceDiscovery.global.onboarding.step3Desc'),
+        actionLabel: t('deviceDiscovery.global.onboarding.step3Action'),
+        previewKind: 'uploadScope',
+      },
+      {
+        title: t('deviceDiscovery.global.onboarding.step4Title'),
+        description: t('deviceDiscovery.global.onboarding.step4Desc'),
+        actionLabel: t('deviceDiscovery.global.onboarding.step4Action'),
+        previewKind: 'syncProgress',
+      },
+      {
+        title: t('deviceDiscovery.global.onboarding.step5Title'),
+        description: t('deviceDiscovery.global.onboarding.step5Desc'),
+        actionLabel: t('deviceDiscovery.global.onboarding.step5Action'),
+        previewKind: 'records',
+      },
+      {
+        title: t('deviceDiscovery.global.onboarding.step6Title'),
+        description: t('deviceDiscovery.global.onboarding.step6Desc'),
+        actionLabel: t('deviceDiscovery.global.onboarding.step6Action'),
+        previewKind: 'sharedFilesHub',
+      },
+    ],
+    [t],
+  );
+
   const [knownDeviceIds, setKnownDeviceIds] = useState<Set<string>>(new Set());
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
-  const [scanning, setScanning] = useState(true);
   const [devices, setDevices] = useState<DiscoveredDevice[]>([]);
-  const { recentDesktops, addDesktop } = useRecentDesktops();
+  const [scanning, setScanning] = useState(true);
   const [manualHost, setManualHost] = useState('');
-  const [manualHostError, setManualHostError] = useState<string | null>(null);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [manualSectionHeight, setManualSectionHeight] = useState(0);
-  const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false);
-  const [showUnconnectedGuide, setShowUnconnectedGuide] = useState(false);
-
-  // Popover & Modal state
-  const [showPairingMenu, setShowPairingMenu] = useState(false);
-  const [showManualModal, setShowManualModal] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<DiscoveredDevice | null>(
     null,
   );
-  const [showMethodModal, setShowMethodModal] = useState(false);
-  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [connectionStatus, setConnectionStatus] =
+    useState<ConnectionFlowStatus>('scanning');
+  const [connectionFailure, setConnectionFailure] =
+    useState<ConnectionFailure | null>(null);
+  const [connectionModalStep, setConnectionModalStep] =
+    useState<ConnectionModalStep | null>(null);
   const [connectionCode, setConnectionCode] = useState('');
-  const [verifyingCode, setVerifyingCode] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
+  const [guideStepIndex, setGuideStepIndex] = useState(0);
+  const [spotlightLayout, setSpotlightLayout] =
+    useState<SpotlightLayout | null>(null);
+  const containerRef = useRef<React.ElementRef<typeof View>>(null);
+  const devicesCardRef = useRef<React.ElementRef<typeof View>>(null);
   const devicesRef = useRef<DiscoveredDevice[]>([]);
   const preserveCachedDevicesRef = useRef(false);
 
   useEffect(() => {
-    if (mode !== 'switch') return;
+    devicesRef.current = devices;
+  }, [devices]);
+
+  useEffect(() => {
+    if (mode !== 'switch') {
+      setKnownDeviceIds(new Set());
+      setCurrentDeviceId(null);
+      return undefined;
+    }
+
     let cancelled = false;
-    const { NativeSyncEngine: NSE } = NativeModules;
+    const { NativeSyncEngine } = NativeModules;
+
     Promise.all([
-      (NSE?.getKnownDeviceIds?.() ?? Promise.resolve([])).catch(
-        (err: unknown) => {
+      (NativeSyncEngine?.getKnownDeviceIds?.() ?? Promise.resolve([])).catch(
+        (error: unknown) => {
           console.warn(
-            '[DiscoveryScreen] switch bootstrap: getKnownDeviceIds failed',
-            err,
+            '[DeviceDiscoveryScreen] switch bootstrap getKnownDeviceIds failed',
+            error,
           );
           return [] as string[];
         },
       ),
-      (NSE?.getBindingState?.() ?? Promise.resolve(null)).catch(
-        (err: unknown) => {
+      (NativeSyncEngine?.getBindingState?.() ?? Promise.resolve(null)).catch(
+        (error: unknown) => {
           console.warn(
-            '[DiscoveryScreen] switch bootstrap: getBindingState failed',
-            err,
+            '[DeviceDiscoveryScreen] switch bootstrap getBindingState failed',
+            error,
           );
           return null;
         },
       ),
     ]).then(([ids, binding]) => {
       if (cancelled) return;
-      setKnownDeviceIds(new Set(ids as string[]));
+      setKnownDeviceIds(new Set(ids));
       setCurrentDeviceId(
-        (binding as { deviceId?: string } | null)?.deviceId ?? null,
+        ((binding as { deviceId?: string } | null)?.deviceId as
+          | string
+          | undefined) ?? null,
       );
     });
+
     return () => {
       cancelled = true;
     };
@@ -234,14 +536,15 @@ export function DeviceDiscoveryScreen() {
 
   useEffect(() => {
     if (mode === 'switch') {
-      setShowUnconnectedGuide(false);
+      setShowGuide(false);
       return;
     }
 
     let cancelled = false;
     void hasSeenUnconnectedGuide().then(seen => {
       if (!cancelled) {
-        setShowUnconnectedGuide(!seen);
+        setGuideStepIndex(0);
+        setShowGuide(!seen);
       }
     });
     return () => {
@@ -250,212 +553,236 @@ export function DeviceDiscoveryScreen() {
   }, [mode]);
 
   useEffect(() => {
-    devicesRef.current = devices;
-  }, [devices]);
+    preserveCachedDevicesRef.current = devicesRef.current.length > 0;
+    setScanning(devicesRef.current.length === 0);
+    setConnectionStatus(devicesRef.current.length === 0 ? 'scanning' : 'ready');
 
-  // ---------------------------------------------------------------------------
-  // Native module discovery
-  // ---------------------------------------------------------------------------
+    let subscription: { remove: () => void } | undefined;
+    let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
+    let visualQaTimer: ReturnType<typeof setTimeout> | undefined;
+    let active = true;
 
-  useFocusEffect(
-    useCallback(() => {
-      console.log('[DiscoveryScreen] focused, starting discovery session');
-      preserveCachedDevicesRef.current = devicesRef.current.length > 0;
-      setScanning(devicesRef.current.length === 0);
-
-      let subscription: { remove: () => void } | undefined;
-      let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
-      let active = true;
-
-      try {
-        const { NativeSyncEngine } = NativeModules;
-        if (NativeSyncEngine) {
-          console.log(
-            '[DiscoveryScreen] NativeSyncEngine available, subscribing to discovery events',
-          );
-          const emitter = new NativeEventEmitter(NativeSyncEngine);
-          subscription = emitter.addListener(
-            'onDiscoveredDevicesChanged',
-            (discoveredDevices: DiscoveredDevice[]) => {
-              const normalizedDevices =
-                normalizeDiscoveredDevices(discoveredDevices);
-              console.log(
-                '[DiscoveryScreen] onDiscoveredDevicesChanged',
-                normalizedDevices.length,
-                deviceDiscoveryDebugSummary(normalizedDevices),
-              );
-
-              if (
-                shouldKeepCachedDevicesVisible({
-                  currentDeviceCount: devicesRef.current.length,
-                  nextDeviceCount: normalizedDevices.length,
-                  preserveCachedDevices: preserveCachedDevicesRef.current,
-                })
-              ) {
-                console.log(
-                  '[DiscoveryScreen] keeping cached devices visible during discovery refresh',
-                );
-                return;
-              }
-
-              preserveCachedDevicesRef.current = false;
-              setDevices(normalizedDevices);
-              if (normalizedDevices.length > 0) {
-                setScanning(false);
-                if (timeoutTimer) {
-                  clearTimeout(timeoutTimer);
-                  timeoutTimer = undefined;
-                }
-              }
-            },
-          );
-          console.log('[DiscoveryScreen] restarting discovery');
-          NativeSyncEngine.stopDiscovery()
-            .catch((e: Error) =>
-              console.warn(
-                '[DiscoveryScreen] stopDiscovery before start failed:',
-                e,
-              ),
-            )
-            .then(() => {
-              if (!active) return undefined;
-              return NativeSyncEngine.startDiscovery();
-            })
-            .then(() =>
-              console.log('[DiscoveryScreen] startDiscovery resolved'),
-            )
-            .catch((e: Error) =>
-              console.warn('[DiscoveryScreen] startDiscovery failed:', e),
-            );
-          // Timeout fallback: if no devices found after 8s, stop scanning animation
-          timeoutTimer = setTimeout(() => {
-            console.log(
-              '[DiscoveryScreen] discovery timeout reached with no devices',
-            );
-            preserveCachedDevicesRef.current = false;
-            setScanning(false);
-          }, 8000);
-        } else {
-          console.log('[DiscoveryScreen] NativeSyncEngine unavailable');
-          setScanning(false);
-        }
-      } catch (e) {
-        console.warn('[DiscoveryScreen] setup error:', e);
+    if (isVisualQaEnabled()) {
+      visualQaTimer = setTimeout(() => {
+        if (!active || devicesRef.current.length > 0) return;
+        preserveCachedDevicesRef.current = false;
+        setDevices(getVisualQaDevices());
         setScanning(false);
-      }
-
+        setConnectionStatus('ready');
+        if (timeoutTimer) {
+          clearTimeout(timeoutTimer);
+          timeoutTimer = undefined;
+        }
+      }, 900);
       return () => {
         active = false;
-        console.log(
-          '[DiscoveryScreen] blurred, cleaning up discovery listeners',
-        );
-        subscription?.remove();
-        if (timeoutTimer) clearTimeout(timeoutTimer);
+        if (visualQaTimer) clearTimeout(visualQaTimer);
         preserveCachedDevicesRef.current = false;
-        try {
-          console.log('[DiscoveryScreen] calling stopDiscovery during cleanup');
-          NativeModules.NativeSyncEngine?.stopDiscovery();
-        } catch {
-          // ignore cleanup errors
-        }
       };
-    }, []),
-  );
+    }
 
-  useEffect(() => {
-    console.log('[DiscoveryScreen] mounted');
-    return () => {
-      console.log('[DiscoveryScreen] unmounted');
+    const scheduleDiscoveryTimeout = () => {
+      timeoutTimer = setTimeout(() => {
+        preserveCachedDevicesRef.current = false;
+        setScanning(false);
+        if (devicesRef.current.length === 0) {
+          setConnectionStatus('empty');
+        }
+      }, 8000);
     };
-  }, []);
-
-  useEffect(() => {
-    const showEvent =
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent =
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSubscription = Keyboard.addListener(showEvent, event => {
-      setKeyboardHeight(event.endCoordinates.height);
-    });
-    const hideSubscription = Keyboard.addListener(hideEvent, () => {
-      setKeyboardHeight(0);
-    });
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, []);
-
-  // ---------------------------------------------------------------------------
-  // Rescan
-  // ---------------------------------------------------------------------------
-
-  const handleRescan = useCallback(() => {
-    console.log('[DiscoveryScreen] handleRescan invoked');
-    setScanning(true);
-    setDevices([]);
 
     try {
-      const { NativeSyncEngine } = NativeModules;
-      if (NativeSyncEngine) {
-        console.log('[DiscoveryScreen] handleRescan restarting discovery');
-        NativeSyncEngine.stopDiscovery()
-          .catch((e: Error) =>
-            console.warn(
-              '[DiscoveryScreen] handleRescan stopDiscovery failed:',
-              e,
-            ),
-          )
-          .then(() => NativeSyncEngine.startDiscovery())
-          .catch((e: Error) => {
-            console.warn(
-              '[DiscoveryScreen] handleRescan startDiscovery failed:',
-              e,
-            );
-            setScanning(false);
-          });
-        return;
+      const { NativeSyncEngine } = NativeModules as {
+        NativeSyncEngine?: NativeDiscoveryModule;
+      };
+      if (!NativeSyncEngine) {
+        scheduleDiscoveryTimeout();
+        return () => {
+          if (visualQaTimer) clearTimeout(visualQaTimer);
+          if (timeoutTimer) clearTimeout(timeoutTimer);
+        };
       }
-    } catch {
-      // fallback
-    }
-    setScanning(false);
-  }, []);
 
-  const handleDevicePress = useCallback(
-    async (device: DiscoveredDevice) => {
-      console.log(
-        '[DiscoveryScreen] handleDevicePress',
-        `${device.name}/${device.ip || 'no-ip'}/${device.deviceId}/${
-          device.type
-        }`,
+      const emitter = new NativeEventEmitter(NativeSyncEngine);
+      subscription = emitter.addListener(
+        'onDiscoveredDevicesChanged',
+        (nextDevices: DiscoveredDevice[]) => {
+          const normalizedDevices = normalizeDiscoveredDevices(nextDevices);
+          if (
+            shouldKeepCachedDevicesVisible({
+              currentDeviceCount: devicesRef.current.length,
+              nextDeviceCount: normalizedDevices.length,
+              preserveCachedDevices: preserveCachedDevicesRef.current,
+            })
+          ) {
+            return;
+          }
+
+          preserveCachedDevicesRef.current = false;
+          setDevices(normalizedDevices);
+          if (normalizedDevices.length > 0) {
+            setScanning(false);
+            setConnectionStatus('ready');
+            if (timeoutTimer) {
+              clearTimeout(timeoutTimer);
+              timeoutTimer = undefined;
+            }
+          }
+        },
       );
 
-      if (device.deviceId === currentDeviceId) {
+      void (async () => {
+        await (NativeSyncEngine.stopDiscovery?.() ?? Promise.resolve()).catch(
+          () => undefined,
+        );
+        if (!active) return;
+
+        const permissionStatus =
+          await getAndroidDiscoveryPermissionStatus(NativeSyncEngine);
+        if (!active) return;
+        if (permissionStatus === 'required') {
+          preserveCachedDevicesRef.current = false;
+          setScanning(false);
+          setConnectionStatus('permissionRequired');
+          return;
+        }
+
+        await (NativeSyncEngine.startDiscovery?.() ?? Promise.resolve()).catch(
+          () => undefined,
+        );
+        if (!active) return;
+        scheduleDiscoveryTimeout();
+      })().catch(() => {
+        if (!active) return;
+        scheduleDiscoveryTimeout();
+      });
+    } catch {
+      scheduleDiscoveryTimeout();
+    }
+
+    return () => {
+      active = false;
+      subscription?.remove();
+      if (visualQaTimer) clearTimeout(visualQaTimer);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      preserveCachedDevicesRef.current = false;
+      try {
+        NativeModules.NativeSyncEngine?.stopDiscovery?.();
+      } catch {
+        // ignore cleanup errors
+      }
+    };
+  }, []);
+
+  const displayedRecentDesktops =
+    mode === 'switch'
+      ? recentDesktops.filter(
+          recent =>
+            recent.desktopDeviceId === currentDeviceId &&
+            !devices.some(device => device.deviceId === recent.desktopDeviceId),
+        )
+      : recentDesktops.filter(
+          recent =>
+            !devices.some(device =>
+              recentDesktopMatchesDiscoveredDevice(recent, device),
+            ),
+        );
+  const discoveredCount = devices.length + displayedRecentDesktops.length;
+  const isShowingSkeleton = scanning && discoveredCount === 0;
+  const statusLabel = isShowingSkeleton
+    ? t('deviceDiscovery.global.connectionStatus.scanning')
+    : connectionStatus === 'permissionRequired'
+      ? t('deviceDiscovery.global.connectionStatus.permissionRequired')
+      : t('deviceDiscovery.devices.foundCount', { count: discoveredCount });
+
+  const measureGuideTarget = useCallback(() => {
+    const containerNode = containerRef.current;
+    const devicesCardNode = devicesCardRef.current;
+    if (
+      !containerNode ||
+      !devicesCardNode ||
+      typeof containerNode.measureInWindow !== 'function' ||
+      typeof devicesCardNode.measureInWindow !== 'function'
+    ) {
+      return;
+    }
+
+    containerNode.measureInWindow((containerX, containerY) => {
+      devicesCardNode.measureInWindow((cardX, cardY, width, height) => {
+        if (width <= 0 || height <= 0) return;
+        const nextLayout = {
+          x: cardX - containerX,
+          y: cardY - containerY,
+          width,
+          height,
+        };
+        setSpotlightLayout(previous => {
+          if (
+            previous &&
+            Math.abs(previous.x - nextLayout.x) < 1 &&
+            Math.abs(previous.y - nextLayout.y) < 1 &&
+            Math.abs(previous.width - nextLayout.width) < 1 &&
+            Math.abs(previous.height - nextLayout.height) < 1
+          ) {
+            return previous;
+          }
+          return nextLayout;
+        });
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!showGuide) {
+      return undefined;
+    }
+
+    const frame = requestAnimationFrame(measureGuideTarget);
+    return () => cancelAnimationFrame(frame);
+  }, [
+    showGuide,
+    isShowingSkeleton,
+    devices.length,
+    recentDesktops.length,
+    connectionStatus,
+    measureGuideTarget,
+  ]);
+
+  const goBack = useCallback(() => {
+    if (mode === 'switch' || navigation.canGoBack()) {
+      navigation.goBack();
+    }
+  }, [mode, navigation]);
+
+  const openDeviceCodeModal = useCallback(
+    async (device: DiscoveredDevice) => {
+      if (showGuide) {
+        return;
+      }
+      if (mode === 'switch' && device.deviceId === currentDeviceId) {
         Alert.alert(t('deviceDiscovery.switch.toast.alreadyCurrent'));
         return;
       }
-
       setSelectedDevice(device);
       setConnectionCode('');
       setCodeError(null);
+      setConnectionFailure(null);
+      if (device.availability === 'busy') {
+        setConnectionStatus('timeout');
+        return;
+      }
 
+      setConnectionStatus('ready');
       if (mode === 'switch' && knownDeviceIds.has(device.deviceId)) {
-        try {
-          const { NativeSyncEngine } = NativeModules;
-          if (!NativeSyncEngine) {
-            throw new Error('NativeSyncEngine unavailable');
-          }
+        setVerifying(true);
 
-          await NativeSyncEngine.pairDevice({
+        try {
+          await pairDevice({
             deviceId: device.deviceId,
             host: device.ip,
             port: device.port || 39393,
             connectionCode: '',
           });
-
           await addDesktop({
             desktopDeviceId: device.deviceId,
             desktopName: device.name,
@@ -463,7 +790,8 @@ export function DeviceDiscoveryScreen() {
             port: device.port || 39393,
             authorizationStatus: 'authorized',
           });
-
+          setVerifying(false);
+          setConnectionModalStep(null);
           navigation.dispatch(
             CommonActions.reset({
               index: 0,
@@ -472,53 +800,159 @@ export function DeviceDiscoveryScreen() {
           );
           return;
         } catch (error) {
-          console.warn(
-            '[DiscoveryScreen] known discovered device direct reconnect failed, requiring code verification',
-            error,
-          );
+          if (error instanceof PairingError) {
+            console.info(
+              '[DeviceDiscoveryScreen] known discovered desktop reconnect requires pairing',
+              {
+                code: error.code,
+                nativeCode: error.nativeCode,
+                message: describeLogError(error),
+              },
+            );
+          } else {
+            console.warn(
+              '[DeviceDiscoveryScreen] known discovered desktop reconnect failed, requiring pairing',
+              error,
+            );
+          }
+          setVerifying(false);
         }
       }
 
-      setShowCodeModal(true);
+      setConnectionModalStep('code');
     },
-    [addDesktop, currentDeviceId, knownDeviceIds, mode, navigation, t],
+    [
+      addDesktop,
+      currentDeviceId,
+      knownDeviceIds,
+      mode,
+      navigation,
+      showGuide,
+      t,
+    ],
   );
 
-  const handleRecentDevicePress = useCallback(
+  const openRecentDesktop = useCallback(
     async (recent: RecentDesktopDTO) => {
-      const discovered = devices.find(
-        d => d.deviceId === recent.desktopDeviceId,
-      );
-      const host = discovered ? discovered.ip : recent.host;
-      const port = discovered ? discovered.port : recent.port;
-      const deviceId = recent.desktopDeviceId;
-      const deviceName = recent.desktopName;
+      if (showGuide) {
+        return;
+      }
 
-      if (mode === 'switch' && deviceId === currentDeviceId) {
+      const discoveredDevice = devices.find(
+        device => device.deviceId === recent.desktopDeviceId,
+      );
+      const device: DiscoveredDevice = {
+        deviceId: recent.desktopDeviceId,
+        name: discoveredDevice?.name ?? recent.desktopName,
+        ip: discoveredDevice?.ip ?? recent.host,
+        port: discoveredDevice?.port ?? recent.port,
+        type: discoveredDevice?.type ?? 'mac',
+        availability: discoveredDevice?.availability,
+        deviceKind: discoveredDevice?.deviceKind,
+      };
+
+      if (mode === 'switch' && device.deviceId === currentDeviceId) {
         Alert.alert(t('deviceDiscovery.switch.toast.alreadyCurrent'));
         return;
       }
 
+      if (device.availability === 'busy') {
+        setConnectionStatus('timeout');
+        return;
+      }
+
+      setSelectedDevice(device);
+      setConnectionCode('');
+      setCodeError(null);
+      setConnectionFailure(null);
+      setConnectionStatus('ready');
+      setVerifying(true);
+
       try {
-        const { NativeSyncEngine } = NativeModules;
-        if (!NativeSyncEngine) {
-          throw new Error('NativeSyncEngine unavailable');
-        }
-        await NativeSyncEngine.pairDevice({
-          deviceId,
-          host,
-          port,
+        await pairDevice({
+          deviceId: device.deviceId,
+          host: device.ip,
+          port: device.port || 39393,
           connectionCode: '',
         });
-
         await addDesktop({
-          desktopDeviceId: deviceId,
-          desktopName: deviceName,
-          host,
-          port,
+          desktopDeviceId: device.deviceId,
+          desktopName: device.name,
+          host: device.ip,
+          port: device.port || 39393,
           authorizationStatus: 'authorized',
         });
+        setVerifying(false);
+        setConnectionModalStep(null);
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'SyncActivity' }],
+          }),
+        );
+      } catch (error) {
+        if (error instanceof PairingError) {
+          console.info(
+            '[DeviceDiscoveryScreen] recent desktop reconnect requires pairing',
+            {
+              code: error.code,
+              nativeCode: error.nativeCode,
+              message: describeLogError(error),
+            },
+          );
+        } else {
+          console.warn(
+            '[DeviceDiscoveryScreen] recent desktop reconnect failed, requiring pairing',
+            error,
+          );
+        }
+        setVerifying(false);
+        setConnectionModalStep('code');
+      }
+    },
+    [addDesktop, currentDeviceId, devices, mode, navigation, showGuide],
+  );
 
+  const handleManualPair = useCallback(() => {
+    const manualDevice = buildManualPairDevice(manualHost);
+    if (!manualDevice) {
+      setManualError(t('deviceDiscovery.global.manualIPErr'));
+      return;
+    }
+    setManualError(null);
+    setSelectedDevice(manualDevice);
+    setConnectionCode('');
+    setCodeError(null);
+    setConnectionFailure(null);
+    setConnectionStatus('ready');
+    setConnectionModalStep('code');
+  }, [manualHost]);
+
+  const handleVerifyCode = useCallback(async () => {
+    if (!selectedDevice || !connectionCode.trim()) return;
+
+    const normalizedCode = connectionCode.trim().toUpperCase();
+    setVerifying(true);
+    setCodeError(null);
+    try {
+      if (isVisualQaEnabled()) {
+        if (normalizedCode !== 'A8X2K9') {
+          setVerifying(false);
+          setConnectionModalStep(null);
+          setConnectionFailure({ code: 'wrong_code' });
+          setConnectionStatus('failed');
+          return;
+        }
+
+        await addDesktop({
+          desktopDeviceId: selectedDevice.deviceId,
+          desktopName: selectedDevice.name,
+          host: selectedDevice.ip,
+          port: selectedDevice.port || 39393,
+          authorizationStatus: 'authorized',
+        });
+        setVerifying(false);
+        setConnectionModalStep(null);
         navigation.dispatch(
           CommonActions.reset({
             index: 0,
@@ -526,41 +960,14 @@ export function DeviceDiscoveryScreen() {
           }),
         );
         return;
-      } catch (error) {
-        console.warn(
-          '[DiscoveryScreen] recent device direct reconnect failed, requiring code verification',
-          error,
-        );
       }
 
-      navigation.navigate('CodeVerify', {
-        deviceId,
-        host,
-        port,
-        deviceName,
-      });
-    },
-    [devices, mode, currentDeviceId, addDesktop, navigation, t],
-  );
-
-  const handleVerifyCode = useCallback(async () => {
-    if (!selectedDevice || !connectionCode.trim()) return;
-    setVerifyingCode(true);
-    setCodeError(null);
-
-    try {
-      const { NativeSyncEngine } = NativeModules;
-      if (!NativeSyncEngine) {
-        throw new Error('NativeSyncEngine unavailable');
-      }
-
-      await NativeSyncEngine.pairDevice({
+      await pairDevice({
         deviceId: selectedDevice.deviceId,
         host: selectedDevice.ip,
         port: selectedDevice.port || 39393,
-        connectionCode: connectionCode,
+        connectionCode: normalizedCode,
       });
-
       await addDesktop({
         desktopDeviceId: selectedDevice.deviceId,
         desktopName: selectedDevice.name,
@@ -569,775 +976,1377 @@ export function DeviceDiscoveryScreen() {
         authorizationStatus: 'authorized',
       });
 
-      setVerifyingCode(false);
-      setShowCodeModal(false);
-
+      setVerifying(false);
+      setConnectionModalStep(null);
       navigation.dispatch(
         CommonActions.reset({
           index: 0,
           routes: [{ name: 'SyncActivity' }],
         }),
       );
-    } catch (err: any) {
-      console.warn('[DiscoveryScreen] pairing failed:', err);
-      setVerifyingCode(false);
-      setCodeError(
-        err?.message ||
-          t('errors.pairingConnectFailed') ||
-          'Pairing failed. Please try again later.',
-      );
+    } catch (error: unknown) {
+      const failure = normalizeConnectionFailure(error);
+      setVerifying(false);
+      setConnectionFailure(failure);
+      if (failure.code === 'wrong_code') {
+        setCodeError(getConnectionCodeErrorMessage(failure, t));
+        return;
+      }
+      setConnectionModalStep(null);
+      setConnectionStatus('failed');
     }
-  }, [selectedDevice, connectionCode, addDesktop, navigation, t]);
+  }, [addDesktop, connectionCode, navigation, selectedDevice]);
 
-  const handleManualPair = useCallback(() => {
-    console.log('[DiscoveryScreen] handleManualPair submitted', manualHost);
-    const manualDevice = buildManualPairDevice(manualHost);
+  const handleRescan = useCallback(() => {
+    setDevices([]);
+    setScanning(true);
+    setConnectionStatus('scanning');
+    setConnectionFailure(null);
+    if (isVisualQaEnabled()) {
+      setTimeout(() => {
+        setDevices(getVisualQaDevices());
+        setScanning(false);
+        setConnectionStatus('ready');
+      }, 900);
+      return;
+    }
+    try {
+      const { NativeSyncEngine } = NativeModules;
+      if (!NativeSyncEngine) {
+        setTimeout(() => {
+          setScanning(false);
+          setConnectionStatus('empty');
+        }, 8000);
+        return;
+      }
+      NativeSyncEngine.stopDiscovery()
+        .catch(() => undefined)
+        .then(() => NativeSyncEngine.startDiscovery())
+        .catch(() => undefined);
+      setTimeout(() => {
+        setScanning(false);
+        if (devicesRef.current.length === 0) {
+          setConnectionStatus('empty');
+        }
+      }, 8000);
+    } catch {
+      setScanning(false);
+      setConnectionStatus('empty');
+    }
+  }, [getVisualQaDevices]);
 
-    if (!manualDevice) {
-      console.log('[DiscoveryScreen] handleManualPair rejected invalid host');
-      setManualHostError(t('deviceDiscovery.dialogs.manualInput.ipError'));
+  const connectionStateContent: FlowStateContent | null =
+    !isShowingSkeleton && connectionStatus === 'empty'
+      ? {
+          title: t('deviceDiscovery.global.noDeviceTitle'),
+          description: t('deviceDiscovery.global.noDeviceDesc'),
+          actionLabel: t('deviceDiscovery.global.manualPairing'),
+          icon: 'desktop-outline',
+          tone: 'neutral',
+          onAction: () => {
+            setManualHost('');
+            setManualError(null);
+            setSelectedDevice(null);
+            setConnectionModalStep('method');
+          },
+        }
+      : !isShowingSkeleton && connectionStatus === 'permissionRequired'
+        ? {
+            title: t('deviceDiscovery.global.nearbyPermissionTitle'),
+            description: t('deviceDiscovery.global.nearbyPermissionDesc'),
+            actionLabel: t('deviceDiscovery.global.startScan'),
+            icon: 'radio-outline',
+            tone: 'neutral',
+            onAction: handleRescan,
+          }
+        : !isShowingSkeleton && connectionStatus === 'failed'
+          ? {
+              ...getConnectionFailureCopy(connectionFailure, t),
+              onAction: () => {
+                if (connectionFailure?.code === 'version_incompatible') {
+                  handleRescan();
+                  return;
+                }
+                setConnectionCode('');
+                setCodeError(null);
+                setConnectionFailure(null);
+                setConnectionStatus('ready');
+                setConnectionModalStep('code');
+              },
+            }
+          : !isShowingSkeleton && connectionStatus === 'timeout'
+            ? {
+                title: t('deviceDiscovery.global.connectTimeoutTitle'),
+                description: t('deviceDiscovery.global.connectTimeoutDesc'),
+                actionLabel: t('deviceDiscovery.global.rescan'),
+                icon: 'time-outline',
+                tone: 'warning',
+                onAction: handleRescan,
+              }
+            : !isShowingSkeleton && connectionStatus === 'cameraDenied'
+              ? {
+                  title: t('deviceDiscovery.global.cameraDeniedTitle'),
+                  description: t('deviceDiscovery.global.cameraDeniedDesc'),
+                  actionLabel: t('deviceDiscovery.global.inputCode'),
+                  icon: 'camera-outline',
+                  tone: 'warning',
+                  onAction: () => {
+                    setConnectionCode('');
+                    setCodeError(null);
+                    setConnectionModalStep(selectedDevice ? 'code' : 'method');
+                  },
+                }
+              : null;
+
+  const activeConnectionModalStep =
+    connectionModalStep === 'manualPair' ||
+    connectionModalStep === 'method' ||
+    connectionModalStep === 'cameraPermission' ||
+    selectedDevice !== null
+      ? connectionModalStep
+      : null;
+
+  const closeConnectionModal = useCallback(() => {
+    if (verifying) return;
+    setConnectionModalStep(null);
+  }, [verifying]);
+
+  const openScannerOrPermissionPrompt = useCallback(() => {
+    if (Camera.getCameraPermissionStatus() === 'granted') {
+      setConnectionModalStep(null);
+      navigation.navigate('QRScanner');
       return;
     }
 
-    console.log(
-      '[DiscoveryScreen] handleManualPair accepted',
-      `${manualDevice.name}/${manualDevice.ip}/${manualDevice.deviceId}/${manualDevice.type}`,
-    );
-    setManualHostError(null);
-    setShowManualModal(false);
-    handleDevicePress(manualDevice);
-  }, [handleDevicePress, manualHost, t]);
+    setConnectionModalStep('cameraPermission');
+  }, [navigation]);
 
-  const handleExportDiagnostics = useCallback(async () => {
-    setShowPairingMenu(false);
-    if (isExportingDiagnostics) return;
-    try {
-      setIsExportingDiagnostics(true);
-      await shareDiagnosticsArchive();
-    } catch (error) {
-      if (isDiagnosticsExportUnavailable(error)) {
-        Alert.alert(
-          t('settings.dialogs.exportUnavailable.title'),
-          t('settings.dialogs.exportUnavailable.body'),
-        );
-      } else {
-        Alert.alert(
-          t('settings.dialogs.exportFailed.title'),
-          t('settings.dialogs.exportFailed.body'),
-        );
-      }
-    } finally {
-      setIsExportingDiagnostics(false);
-    }
-  }, [isExportingDiagnostics, t]);
-
-  const handleDismissUnconnectedGuide = useCallback(async () => {
+  const dismissGuide = useCallback(async () => {
     await markUnconnectedGuideSeen();
-    setShowUnconnectedGuide(false);
+    setShowGuide(false);
+    setGuideStepIndex(0);
   }, []);
 
-  const renderDevice = useCallback(
-    ({ item }: ListRenderItemInfo<DiscoveredDevice>) => {
-      const isCurrentDevice =
-        mode === 'switch' && item.deviceId === currentDeviceId;
-      const isKnownDevice =
-        mode === 'switch' &&
-        !isCurrentDevice &&
-        knownDeviceIds.has(item.deviceId);
-
-      return (
-        <TouchableOpacity
-          style={styles.deviceCard}
-          activeOpacity={0.7}
-          onPress={() => handleDevicePress(item)}
-        >
-          <View style={styles.deviceIconWrapper}>
-            <Icon name="desktop-outline" size={20} color="#fff" />
-          </View>
-          <View style={styles.deviceInfo}>
-            <Text style={styles.deviceName}>{item.name}</Text>
-            <Text style={styles.deviceMeta}>
-              {item.type === 'win' ? 'Windows' : 'macOS'} {'-'} {item.ip}
-            </Text>
-          </View>
-          {isCurrentDevice && (
-            <View style={styles.badgeCurrent}>
-              <Text style={styles.badgeCurrentText}>
-                {t('deviceDiscovery.switch.badge.current')}
-              </Text>
-            </View>
-          )}
-          {isKnownDevice && (
-            <View style={styles.badgeKnown}>
-              <Text style={styles.badgeKnownText}>
-                {t('deviceDiscovery.switch.badge.known')}
-              </Text>
-            </View>
-          )}
-          {!isCurrentDevice && !isKnownDevice && (
-            <Icon name="chevron-forward" size={20} color="#b0c8da" />
-          )}
-        </TouchableOpacity>
+  const continuePreview = useCallback(() => {
+    if (guideStepIndex < connectionFeatureGuideSteps.length - 1) {
+      setGuideStepIndex(index =>
+        Math.min(index + 1, connectionFeatureGuideSteps.length - 1),
       );
-    },
-    [handleDevicePress, mode, currentDeviceId, knownDeviceIds, t],
-  );
-
-  const keyExtractor = useCallback(
-    (item: DiscoveredDevice) => item.deviceId,
-    [],
-  );
-
-  const handleManualSectionLayout = useCallback((event: LayoutChangeEvent) => {
-    const nextHeight = Math.ceil(event.nativeEvent.layout.height);
-    setManualSectionHeight(currentHeight =>
-      currentHeight === nextHeight ? currentHeight : nextHeight,
-    );
-  }, []);
-
-  const troubleshootingCard = (
-    <View style={styles.troubleshootingCard}>
-      <Text style={styles.troubleshootingTitle}>
-        {t('deviceDiscovery.troubleshooting.title')}
-      </Text>
-      <View style={styles.troubleshootingList}>
-        <View style={styles.troubleshootingItem}>
-          <View style={styles.troubleshootingBullet} />
-          <Text style={styles.troubleshootingText}>
-            {t('deviceDiscovery.troubleshooting.sameWifi')}
-          </Text>
-        </View>
-        <View style={styles.troubleshootingItem}>
-          <View style={styles.troubleshootingBullet} />
-          <Text style={styles.troubleshootingText}>
-            {t('deviceDiscovery.troubleshooting.desktopApp', {
-              host: desktopDownloadHost,
-            })}
-          </Text>
-        </View>
-      </View>
-      <TouchableOpacity
-        style={styles.troubleshootingLink}
-        activeOpacity={0.72}
-        onPress={() => navigation.navigate('ConnectionTutorial')}
-      >
-        <Text style={styles.troubleshootingLinkText}>
-          {t('deviceDiscovery.troubleshooting.cta')}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  type ListEntry =
-    | { type: 'header'; key: string; title: string }
-    | { type: 'discovered'; key: string; device: DiscoveredDevice }
-    | { type: 'recent'; key: string; desktop: RecentDesktopDTO };
-
-  const listData: ListEntry[] = [];
-  if (devices.length > 0) {
-    listData.push({
-      type: 'header',
-      key: 'header-discovered',
-      title: t('deviceDiscovery.sections.discovered'),
-    });
-    for (const dev of devices) {
-      listData.push({
-        type: 'discovered',
-        key: `dev-${dev.deviceId}`,
-        device: dev,
-      });
+      return;
     }
-  }
-  const displayedRecentDesktops = recentDesktops.filter(
-    recent =>
-      !devices.some(device =>
-        mode === 'switch'
-          ? device.deviceId === recent.desktopDeviceId
-          : recentDesktopMatchesDiscoveredDevice(recent, device),
-      ),
-  );
-  if (displayedRecentDesktops.length > 0) {
-    listData.push({
-      type: 'header',
-      key: 'header-recent',
-      title: t('deviceDiscovery.sections.recent'),
-    });
-    for (const recent of displayedRecentDesktops) {
-      listData.push({
-        type: 'recent',
-        key: `recent-${recent.desktopDeviceId}`,
-        desktop: recent,
-      });
-    }
-  }
-
-  const renderListEntry = useCallback(
-    ({ item }: ListRenderItemInfo<ListEntry>) => {
-      if (item.type === 'header') {
-        return <Text style={styles.sectionHeader}>{item.title}</Text>;
-      }
-      if (item.type === 'discovered') {
-        return renderDevice({ item: item.device } as any);
-      }
-      const recent = item.desktop;
-      const isCurrentDevice =
-        mode === 'switch' && recent.desktopDeviceId === currentDeviceId;
-      const isKnownDevice =
-        mode === 'switch' &&
-        !isCurrentDevice &&
-        knownDeviceIds.has(recent.desktopDeviceId);
-      return (
-        <TouchableOpacity
-          style={styles.deviceCard}
-          activeOpacity={0.7}
-          onPress={() => handleRecentDevicePress(recent)}
-        >
-          <View style={styles.deviceIconWrapper}>
-            <Icon name="desktop-outline" size={20} color="#fff" />
-          </View>
-          <View style={styles.deviceInfo}>
-            <Text style={styles.deviceName}>{recent.desktopName}</Text>
-            <Text style={styles.deviceMeta}>
-              {recent.host}:{recent.port}
-            </Text>
-          </View>
-          {isCurrentDevice && (
-            <View style={styles.badgeCurrent}>
-              <Text style={styles.badgeCurrentText}>
-                {t('deviceDiscovery.switch.badge.current')}
-              </Text>
-            </View>
-          )}
-          {isKnownDevice && (
-            <View style={styles.badgeKnown}>
-              <Text style={styles.badgeKnownText}>
-                {t('deviceDiscovery.switch.badge.known')}
-              </Text>
-            </View>
-          )}
-          {!isCurrentDevice && !isKnownDevice && (
-            <Icon name="chevron-forward" size={20} color="#b0c8da" />
-          )}
-        </TouchableOpacity>
-      );
-    },
-    [
-      renderDevice,
-      handleRecentDevicePress,
-      mode,
-      currentDeviceId,
-      knownDeviceIds,
-      t,
-    ],
-  );
-
-  const entryKeyExtractor = useCallback((item: ListEntry) => item.key, []);
-
-  const manualDockBottom =
-    keyboardHeight > 0 ? Math.max(12, keyboardHeight - insets.bottom) : 0;
-  const listBottomInset =
-    manualSectionHeight > 0 ? manualSectionHeight + 16 : 220;
+    void dismissGuide();
+  }, [dismissGuide, guideStepIndex, connectionFeatureGuideSteps]);
 
   return (
     <GradientBackground>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerTopRow}>
-              {mode === 'switch' ? (
-                <TouchableOpacity
-                  style={styles.backButton}
-                  activeOpacity={0.7}
-                  onPress={() => navigation.goBack()}
-                >
-                  <Icon name="chevron-back" size={20} color="#3b9fd8" />
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.wifiIconBox}>
-                  <Icon name="wifi" size={24} color="#3b9fd8" />
-                </View>
-              )}
+        <View ref={containerRef} style={styles.container}>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {mode === 'switch' ? (
               <TouchableOpacity
-                style={styles.scanButton}
-                activeOpacity={0.8}
-                onPress={() => setShowPairingMenu(true)}
+                activeOpacity={0.76}
+                accessibilityRole="button"
+                accessibilityLabel={t('deviceDiscovery.global.back')}
+                onPress={goBack}
+                style={styles.backButton}
               >
-                <Icon name="settings-outline" size={16} color="#3b9fd8" />
-                <Text style={styles.scanButtonText}>
-                  {t('deviceDiscovery.actions.manualPair')}
-                </Text>
+                <Icon name="chevron-back" size={22} color="#42566E" />
               </TouchableOpacity>
-            </View>
-            <Text style={styles.title}>
-              {mode === 'switch'
-                ? t('deviceDiscovery.switch.title')
-                : t('deviceDiscovery.title')}
-            </Text>
-            <Text style={styles.subtitle}>
-              {isAndroid
-                ? t('deviceDiscovery.subtitle.android')
-                : t('deviceDiscovery.subtitle.ios')}
-            </Text>
-          </View>
+            ) : null}
 
-          {/* Scanning animation */}
-          {scanning && devices.length === 0 && recentDesktops.length === 0 && (
-            <View style={styles.scanningSection}>
-              <PulseRings />
-              <Text style={styles.scanningText}>
-                {t('deviceDiscovery.scanning.text')}
+            <View style={styles.header}>
+              <Text style={styles.title}>
+                {mode === 'switch'
+                  ? t('deviceDiscovery.global.switchComputer')
+                  : t('deviceDiscovery.global.connectYourPC')}
+              </Text>
+              <Text style={styles.subtitle}>
+                {t('deviceDiscovery.global.scanFirstText')}
               </Text>
             </View>
-          )}
 
-          {/* Device list */}
-          {(devices.length > 0 || recentDesktops.length > 0 || !scanning) && (
+            {showPairingInvalidatedNotice ? (
+              <FlowStateCard
+                state={{
+                  title: t('deviceDiscovery.global.pairingInvalidatedTitle'),
+                  description: t(
+                    'deviceDiscovery.global.pairingInvalidatedDesc',
+                  ),
+                  icon: 'key-outline',
+                  tone: 'warning',
+                }}
+              />
+            ) : null}
+
             <View
-              style={[styles.listSection, { paddingBottom: listBottomInset }]}
+              ref={devicesCardRef}
+              style={styles.devicesCard}
+              onLayout={measureGuideTarget}
             >
-              {devices.length === 0 && recentDesktops.length === 0 ? (
-                <View style={styles.emptySection}>
-                  <Text style={styles.emptyText}>
-                    {isAndroid
-                      ? t('deviceDiscovery.emptyState.android')
-                      : t('deviceDiscovery.emptyState.default')}
-                  </Text>
+              <View style={styles.devicesHeader}>
+                <Text style={styles.devicesTitle}>
+                  {t('deviceDiscovery.global.lanDeviceTitle')}
+                </Text>
+                <View style={styles.statusPill}>
+                  {scanning ? <PulseDot /> : null}
+                  <Text style={styles.statusText}>{statusLabel}</Text>
+                </View>
+              </View>
+
+              {isShowingSkeleton ? (
+                <View style={styles.skeletonStack}>
+                  {[0, 1, 2].map(item => (
+                    <View key={item} style={styles.skeletonRow} />
+                  ))}
                 </View>
               ) : (
-                <FlatList
-                  data={listData}
-                  renderItem={renderListEntry}
-                  keyExtractor={entryKeyExtractor}
-                  contentContainerStyle={styles.listContent}
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                />
+                <View style={styles.deviceStack}>
+                  {connectionStateContent ? (
+                    <FlowStateCard state={connectionStateContent} />
+                  ) : null}
+                  {!connectionStateContent
+                    ? devices.map(device => {
+                        const isCurrentDevice =
+                          mode === 'switch' &&
+                          device.deviceId === currentDeviceId;
+                        const isKnownDevice =
+                          mode === 'switch' &&
+                          !isCurrentDevice &&
+                          knownDeviceIds.has(device.deviceId);
+                        return (
+                          <DeviceRow
+                            key={device.deviceId}
+                            title={device.name}
+                            subtitle={device.ip}
+                            status={
+                              isCurrentDevice
+                                ? t('deviceDiscovery.switch.badge.current')
+                                : isKnownDevice
+                                  ? t('deviceDiscovery.switch.badge.known')
+                                  : device.availability === 'busy'
+                                    ? t(
+                                        'deviceDiscovery.global.connectionStatus.busy',
+                                      )
+                                    : t(
+                                        'deviceDiscovery.global.connectionStatus.available',
+                                      )
+                            }
+                            iconName={
+                              device.deviceKind === 'laptop'
+                                ? 'laptop-outline'
+                                : 'desktop-outline'
+                            }
+                            availability={device.availability ?? 'available'}
+                            onPress={() => openDeviceCodeModal(device)}
+                          />
+                        );
+                      })
+                    : null}
+                  {!connectionStateContent
+                    ? displayedRecentDesktops.map(recent => {
+                        const isCurrentDevice =
+                          mode === 'switch' &&
+                          recent.desktopDeviceId === currentDeviceId;
+                        const isKnownDevice =
+                          mode === 'switch' &&
+                          !isCurrentDevice &&
+                          knownDeviceIds.has(recent.desktopDeviceId);
+                        return (
+                          <DeviceRow
+                            key={recent.desktopDeviceId}
+                            title={recent.desktopName}
+                            subtitle={displayHostWithoutPort(recent.host)}
+                            status={
+                              isCurrentDevice
+                                ? t('deviceDiscovery.switch.badge.current')
+                                : isKnownDevice
+                                  ? t('deviceDiscovery.switch.badge.known')
+                                  : t(
+                                      'deviceDiscovery.global.connectionStatus.available',
+                                    )
+                            }
+                            iconName="desktop-outline"
+                            availability="available"
+                            onPress={() => openRecentDesktop(recent)}
+                          />
+                        );
+                      })
+                    : null}
+                  <TouchableOpacity
+                    activeOpacity={0.76}
+                    style={styles.manualPairRow}
+                    onPress={() => {
+                      setSelectedDevice(null);
+                      setManualHost('');
+                      setManualError(null);
+                      setConnectionFailure(null);
+                      setConnectionModalStep('method');
+                    }}
+                  >
+                    <View style={styles.rowIcon}>
+                      <Icon name="link-outline" size={22} color="#1677D2" />
+                    </View>
+                    <View style={styles.rowCopy}>
+                      <Text style={styles.rowTitle}>
+                        {t('deviceDiscovery.actions.manualPair')}
+                      </Text>
+                      <Text style={styles.rowSubtitle}>
+                        {t('deviceDiscovery.global.enterIPAndCode')}
+                      </Text>
+                    </View>
+                    <Icon name="chevron-forward" size={18} color="#A1B6CF" />
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
-          )}
 
-          <View
-            style={[
-              styles.manualDock,
-              {
-                bottom: manualDockBottom,
-                paddingBottom: Math.max(insets.bottom, 24),
-              },
-            ]}
-            onLayout={handleManualSectionLayout}
-          >
-            {/* Fixed Rescan button */}
-            {!scanning && (
-              <View style={styles.manualSection}>
-                <TouchableOpacity
-                  style={styles.rescanButton}
-                  activeOpacity={0.7}
-                  onPress={handleRescan}
-                >
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
-                    }}
-                  >
-                    <Icon name="refresh" size={16} color="#5a9abf" />
-                    <Text style={styles.rescanText}>
-                      {t('deviceDiscovery.actions.rescan')}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-                {mode === 'switch' ? null : troubleshootingCard}
-              </View>
-            )}
-          </View>
+            {!scanning ? (
+              <TouchableOpacity
+                activeOpacity={0.76}
+                style={styles.rescanButton}
+                onPress={handleRescan}
+              >
+                <View style={styles.rescanButtonContent}>
+                  <Icon name="refresh" size={16} color="#5A9ABF" />
+                  <Text style={styles.rescanText}>
+                    {t('deviceDiscovery.actions.rescan')}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ) : null}
 
-          {showUnconnectedGuide && (
-            <UnconnectedGuide
-              onSkip={() => void handleDismissUnconnectedGuide()}
-              onStart={() => void handleDismissUnconnectedGuide()}
+            <View style={styles.helpPanel}>
+              <Text style={styles.helpTitle}>
+                {t('deviceDiscovery.troubleshooting.notReadyTitle')}
+              </Text>
+              <Text style={styles.helpBody}>
+                {t('deviceDiscovery.troubleshooting.notReadyDesc')}
+              </Text>
+            </View>
+          </ScrollView>
+
+          {showGuide ? (
+            <ConnectionGuideOverlay
+              step={connectionFeatureGuideSteps[guideStepIndex]}
+              stepIndex={guideStepIndex}
+              totalSteps={connectionFeatureGuideSteps.length}
+              targetLayout={guideStepIndex === 0 ? spotlightLayout : null}
+              bottomInset={insets.bottom}
+              onSkip={() => void dismissGuide()}
+              onNext={continuePreview}
             />
-          )}
+          ) : null}
 
-          {/* Pairing Menu Popover */}
-          <Modal
-            visible={showPairingMenu}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setShowPairingMenu(false)}
-          >
-            <Pressable
-              style={styles.popoverOverlay}
-              onPress={() => setShowPairingMenu(false)}
-            >
-              <View
-                style={[
-                  styles.popoverMenu,
-                  { top: insets.top + 60, width: popoverMenuWidth },
-                ]}
-              >
-                <TouchableOpacity
-                  style={styles.popoverItem}
-                  onPress={() => {
-                    setShowPairingMenu(false);
-                    setShowManualModal(true);
-                  }}
-                >
-                  <Icon name="create-outline" size={20} color="#3b9fd8" />
-                  <Text style={styles.popoverText}>
-                    {t('deviceDiscovery.actions.manualInputIp')}
-                  </Text>
-                </TouchableOpacity>
-                <View style={styles.popoverDivider} />
-                <TouchableOpacity
-                  style={styles.popoverItem}
-                  onPress={() => {
-                    setShowPairingMenu(false);
-                    navigation.navigate('QRScanner');
-                  }}
-                >
-                  <Icon name="scan-outline" size={20} color="#3b9fd8" />
-                  <Text style={styles.popoverText}>
-                    {t('deviceDiscovery.actions.qrPair')}
-                  </Text>
-                </TouchableOpacity>
-                <View style={styles.popoverDivider} />
-                <TouchableOpacity
-                  style={styles.popoverItem}
-                  disabled={isExportingDiagnostics}
-                  onPress={() => {
-                    void handleExportDiagnostics();
-                  }}
-                >
-                  <Icon name="share-outline" size={20} color="#3b9fd8" />
-                  <Text style={styles.popoverText}>
-                    {isExportingDiagnostics
-                      ? t('settings.diagnosticsExport.progress.title')
-                      : t('settings.diagnosticsExport.button')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </Pressable>
-          </Modal>
-
-          {/* Manual Input Modal */}
-          <Modal
-            visible={showManualModal}
-            transparent
-            animationType="slide"
-            onRequestClose={() => setShowManualModal(false)}
-          >
-            <Pressable
-              style={styles.modalOverlay}
-              onPress={() => setShowManualModal(false)}
-            >
-              <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.modalContent}
-              >
-                <Pressable onPress={() => {}}>
-                  <View style={styles.manualCard}>
-                    <View style={styles.manualHandle} />
-                    <View style={styles.modalHeader}>
-                      <Text style={styles.manualTitle}>
-                        {t('deviceDiscovery.dialogs.manualInput.title')}
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => setShowManualModal(false)}
-                      >
-                        <Icon name="close" size={22} color="#8aa9bc" />
-                      </TouchableOpacity>
-                    </View>
-                    <Text style={styles.manualDescription}>
-                      {t('deviceDiscovery.dialogs.manualInput.description')}
-                    </Text>
-                    <View style={styles.manualCallout}>
-                      <View style={styles.manualCalloutIcon}>
-                        <Icon
-                          name="desktop-outline"
-                          size={22}
-                          color="#3b82f6"
-                        />
-                      </View>
-                      <View style={styles.manualCalloutCopy}>
-                        <Text style={styles.manualCalloutTitle}>
-                          {t('deviceDiscovery.dialogs.manualInput.guideTitle')}
-                        </Text>
-                        <Text style={styles.manualCalloutBody}>
-                          {t('deviceDiscovery.dialogs.manualInput.guideBody')}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text style={styles.manualLabel}>
-                      {t('deviceDiscovery.dialogs.manualInput.hostLabel')}
-                    </Text>
-                    <View style={styles.manualInputRow}>
-                      <TextInput
-                        style={[
-                          styles.manualInput,
-                          manualHostError && styles.manualInputError,
-                        ]}
-                        value={manualHost}
-                        onChangeText={value => {
-                          setManualHost(value);
-                          if (manualHostError) {
-                            setManualHostError(null);
-                          }
-                        }}
-                        placeholder="192.168.0.1"
-                        placeholderTextColor="#8aa9bc"
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        keyboardType="decimal-pad"
-                        returnKeyType="done"
-                        autoFocus
-                        onSubmitEditing={handleManualPair}
-                      />
-                      <TouchableOpacity
-                        style={styles.manualButton}
-                        activeOpacity={0.8}
-                        onPress={handleManualPair}
-                      >
-                        <Text style={styles.manualButtonText}>
-                          {t('deviceDiscovery.dialogs.manualInput.confirm')}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                    {manualHostError ? (
-                      <Text style={styles.manualErrorText}>
-                        {manualHostError}
-                      </Text>
-                    ) : (
-                      <Text style={styles.manualHint}>
-                        {t('deviceDiscovery.dialogs.manualInput.hint')}
-                      </Text>
-                    )}
-                  </View>
-                </Pressable>
-              </KeyboardAvoidingView>
-            </Pressable>
-          </Modal>
-
-          {/* ── Method Selection Modal ── */}
-          <Modal
-            visible={showMethodModal && selectedDevice !== null}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setShowMethodModal(false)}
-          >
-            <Pressable
-              style={styles.pairModalOverlay}
-              onPress={() => setShowMethodModal(false)}
-            >
-              <View
-                style={styles.pairModalCard}
-                onStartShouldSetResponder={() => true}
-              >
-                <View style={styles.pairModalHeader}>
-                  <Text style={styles.pairModalTitle}>
-                    {t('deviceDiscovery.connectionMethod.title') ||
-                      'Select Connection Method'}
-                  </Text>
-                  <Text style={styles.pairModalSubtitle}>
-                    {t('deviceDiscovery.connectionMethod.selected', {
-                      name: selectedDevice?.name,
-                    }) || `Selected ${selectedDevice?.name}`}
-                  </Text>
-                </View>
-
-                <View style={styles.pairModalBody}>
-                  <TouchableOpacity
-                    style={styles.methodButton}
-                    activeOpacity={0.8}
-                    onPress={() => {
-                      setShowMethodModal(false);
-                      navigation.navigate('QRScanner');
-                    }}
-                  >
-                    <View
-                      style={[
-                        styles.methodIconBox,
-                        { backgroundColor: 'rgba(59,130,246,0.08)' },
-                      ]}
-                    >
-                      <Icon name="scan-outline" size={20} color="#3b82f6" />
-                    </View>
-                    <View style={styles.methodInfo}>
-                      <Text style={styles.methodTitle}>
-                        {t('deviceDiscovery.connectionMethod.qrTitle') ||
-                          'Scan QR Code'}
-                      </Text>
-                      <Text style={styles.methodDesc} numberOfLines={1}>
-                        {t('deviceDiscovery.connectionMethod.qrDesc', {
-                          name: selectedDevice?.name,
-                        }) ||
-                          `Scan the QR code shown on ${selectedDevice?.name}`}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.methodButton}
-                    activeOpacity={0.8}
-                    onPress={() => {
-                      setShowMethodModal(false);
-                      setShowCodeModal(true);
-                    }}
-                  >
-                    <View
-                      style={[
-                        styles.methodIconBox,
-                        { backgroundColor: 'rgba(139,92,246,0.08)' },
-                      ]}
-                    >
-                      <Icon name="link-outline" size={20} color="#8b5cf6" />
-                    </View>
-                    <View style={styles.methodInfo}>
-                      <Text style={styles.methodTitle}>
-                        {t('deviceDiscovery.connectionMethod.codeTitle') ||
-                          'Enter pairing code'}
-                      </Text>
-                      <Text style={styles.methodDesc} numberOfLines={1}>
-                        {t('deviceDiscovery.connectionMethod.codeDesc', {
-                          name: selectedDevice?.name,
-                        }) ||
-                          `Enter the pairing code shown on ${selectedDevice?.name}`}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.pairModalCancelButton}
-                  activeOpacity={0.8}
-                  onPress={() => setShowMethodModal(false)}
-                >
-                  <Text style={styles.pairModalCancelText}>
-                    {t('deviceDiscovery.connectionMethod.cancel') || 'Cancel'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </Pressable>
-          </Modal>
-
-          {/* ── Code Entry Modal ── */}
-          <Modal
-            visible={showCodeModal && selectedDevice !== null}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setShowCodeModal(false)}
-          >
-            <Pressable
-              style={styles.pairModalOverlay}
-              onPress={() => !verifyingCode && setShowCodeModal(false)}
-            >
-              <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                style={styles.pairModalOverlay}
-              >
-                <View
-                  style={styles.pairModalCard}
-                  onStartShouldSetResponder={() => true}
-                >
-                  <View style={styles.pairModalHeader}>
-                    <Text style={styles.pairModalTitle}>
-                      {t('deviceDiscovery.connectionMethod.connectCodeTitle') ||
-                        'Enter pairing code'}
-                    </Text>
-                    <Text style={styles.pairModalSubtitle}>
-                      {t('deviceDiscovery.connectionMethod.connectCodeDesc', {
-                        name: selectedDevice?.name,
-                      }) ||
-                        `Enter the pairing code shown on ${selectedDevice?.name} to complete connection.`}
-                    </Text>
-                  </View>
-
-                  <View style={styles.pairModalBody}>
-                    <TextInput
-                      style={styles.codeInput}
-                      value={connectionCode}
-                      onChangeText={text =>
-                        setConnectionCode(text.toUpperCase())
-                      }
-                      placeholder={
-                        t(
-                          'deviceDiscovery.connectionMethod.inputPlaceholder',
-                        ) || 'Enter pairing code'
-                      }
-                      placeholderTextColor="#a0aec0"
-                      autoFocus
-                      maxLength={6}
-                      keyboardType="default"
-                      autoCapitalize="characters"
-                      autoCorrect={false}
-                      editable={!verifyingCode}
-                    />
-
-                    {verifyingCode && (
-                      <View style={styles.verifyingRow}>
-                        <ActivityIndicator size="small" color="#3b82f6" />
-                        <Text style={styles.verifyingText}>
-                          {t('deviceDiscovery.connectionMethod.verifying') ||
-                            'Verifying code...'}
-                        </Text>
-                      </View>
-                    )}
-
-                    {codeError && (
-                      <Text style={styles.codeErrorText}>{codeError}</Text>
-                    )}
-                  </View>
-
-                  <View style={styles.pairModalFooterButtons}>
-                    <TouchableOpacity
-                      style={[
-                        styles.pairModalFooterButton,
-                        styles.pairModalFooterButtonLeft,
-                      ]}
-                      activeOpacity={0.8}
-                      disabled={verifyingCode}
-                      onPress={() => setShowCodeModal(false)}
-                    >
-                      <Text style={styles.pairModalFooterButtonText}>
-                        {t('deviceDiscovery.connectionMethod.cancel') ||
-                          'Cancel'}
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.pairModalFooterButton,
-                        styles.pairModalFooterButtonRight,
-                      ]}
-                      activeOpacity={0.8}
-                      disabled={verifyingCode || !connectionCode.trim()}
-                      onPress={handleVerifyCode}
-                    >
-                      <Text
-                        style={[
-                          styles.pairModalFooterButtonText,
-                          styles.pairModalFooterButtonTextBold,
-                        ]}
-                      >
-                        {t('deviceDiscovery.connectionMethod.connect') ||
-                          'Connect'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </KeyboardAvoidingView>
-            </Pressable>
-          </Modal>
+          <ConnectionFlowModal
+            step={activeConnectionModalStep}
+            deviceName={selectedDevice?.name ?? ''}
+            manualHost={manualHost}
+            manualError={manualError}
+            connectionCode={connectionCode}
+            verifying={verifying}
+            codeError={codeError}
+            onClose={closeConnectionModal}
+            onScan={openScannerOrPermissionPrompt}
+            onCode={() => {
+              setCodeError(null);
+              setConnectionFailure(null);
+              setConnectionModalStep('code');
+            }}
+            onManual={() => {
+              setManualHost('');
+              setManualError(null);
+              setConnectionFailure(null);
+              setConnectionModalStep('manualPair');
+            }}
+            onManualHostChange={value => {
+              setManualHost(value);
+              if (manualError) setManualError(null);
+            }}
+            onManualSubmit={handleManualPair}
+            onDeny={() => {
+              setConnectionModalStep(null);
+              setConnectionStatus('cameraDenied');
+            }}
+            onAllow={() => {
+              setConnectionModalStep(null);
+              navigation.navigate('QRScanner');
+            }}
+            onChange={value => {
+              setConnectionCode(value.toUpperCase());
+              if (codeError) setCodeError(null);
+            }}
+            onSubmit={handleVerifyCode}
+          />
         </View>
       </SafeAreaView>
     </GradientBackground>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
+function DeviceRow({
+  title,
+  subtitle,
+  status,
+  iconName,
+  availability,
+  onPress,
+}: {
+  title: string;
+  subtitle: string;
+  status: string;
+  iconName: string;
+  availability: DeviceAvailability;
+  onPress: () => void;
+}) {
+  const isBusy = availability === 'busy';
+  return (
+    <TouchableOpacity
+      activeOpacity={0.76}
+      style={styles.deviceRow}
+      onPress={onPress}
+    >
+      <View style={styles.rowIcon}>
+        <Icon name={iconName} size={22} color="#1677D2" />
+      </View>
+      <View style={styles.rowCopy}>
+        <Text style={styles.rowTitle} numberOfLines={1}>
+          {title}
+        </Text>
+        <Text style={styles.rowSubtitle} numberOfLines={1}>
+          {subtitle}
+        </Text>
+      </View>
+      <View style={[styles.deviceStatus, isBusy && styles.deviceStatusBusy]}>
+        <Text
+          style={[
+            styles.deviceStatusText,
+            isBusy && styles.deviceStatusTextBusy,
+          ]}
+        >
+          {status}
+        </Text>
+      </View>
+      <Icon name="chevron-forward" size={18} color="#9AA3AE" />
+    </TouchableOpacity>
+  );
+}
+
+function FlowStateCard({ state }: { state: FlowStateContent }) {
+  const toneStyle =
+    state.tone === 'danger'
+      ? {
+          icon: styles.flowIconDanger,
+          iconColor: '#D94F4F',
+          action: styles.flowActionDanger,
+          actionText: styles.flowActionTextDanger,
+        }
+      : state.tone === 'warning'
+        ? {
+            icon: styles.flowIconWarning,
+            iconColor: '#AD761D',
+            action: styles.flowActionWarning,
+            actionText: styles.flowActionTextWarning,
+          }
+        : {
+            icon: styles.flowIconNeutral,
+            iconColor: '#7B8490',
+            action: styles.flowActionNeutral,
+            actionText: styles.flowActionTextNeutral,
+          };
+
+  return (
+    <View style={styles.flowStateCard}>
+      <View style={[styles.flowStateIcon, toneStyle.icon]}>
+        <Icon name={state.icon} size={20} color={toneStyle.iconColor} />
+      </View>
+      <View style={styles.flowStateCopy}>
+        <View style={styles.flowStateTopRow}>
+          <Text style={styles.flowStateTitle}>{state.title}</Text>
+          {state.actionLabel && state.onAction ? (
+            <TouchableOpacity
+              activeOpacity={0.76}
+              style={[styles.flowAction, toneStyle.action]}
+              onPress={state.onAction}
+            >
+              <Text style={[styles.flowActionText, toneStyle.actionText]}>
+                {state.actionLabel}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <Text style={styles.flowStateDescription}>{state.description}</Text>
+      </View>
+    </View>
+  );
+}
+
+function ConnectionGuideOverlay({
+  step,
+  stepIndex,
+  totalSteps,
+  targetLayout,
+  bottomInset,
+  onSkip,
+  onNext,
+}: {
+  step: ConnectionGuideStep;
+  stepIndex: number;
+  totalSteps: number;
+  targetLayout: SpotlightLayout | null;
+  bottomInset: number;
+  onSkip: () => void;
+  onNext: () => void;
+}) {
+  const { t } = useTranslation();
+  const { height: viewportHeight } = useWindowDimensions();
+  const isSpotlightStep = step.previewKind === 'connect';
+  const spotlightPadding = 10;
+  const hole =
+    isSpotlightStep && targetLayout
+      ? {
+          x: Math.max(8, targetLayout.x - spotlightPadding),
+          y: Math.max(8, targetLayout.y - spotlightPadding),
+          width: Math.max(0, targetLayout.width + spotlightPadding * 2),
+          height: targetLayout.height + spotlightPadding * 2,
+        }
+      : null;
+  const guideCardPosition = resolveConnectionGuideCardPosition({
+    hole,
+    viewportHeight,
+    bottomInset,
+  });
+
+  return (
+    <View pointerEvents="auto" style={styles.guideOverlay}>
+      {hole ? (
+        <Svg pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+          <Defs>
+            <Mask id="connection-guide-spotlight">
+              <Rect width="100%" height="100%" fill="white" />
+              <Rect
+                x={hole.x}
+                y={hole.y}
+                width={hole.width}
+                height={hole.height}
+                rx={18}
+                ry={18}
+                fill="black"
+              />
+            </Mask>
+          </Defs>
+          <Rect
+            width="100%"
+            height="100%"
+            fill="rgba(14,31,52,0.36)"
+            mask="url(#connection-guide-spotlight)"
+          />
+          <Rect
+            x={hole.x - 2}
+            y={hole.y - 2}
+            width={hole.width + 4}
+            height={hole.height + 4}
+            rx={20}
+            ry={20}
+            fill="none"
+            stroke="rgba(255,255,255,0.48)"
+            strokeWidth={1.5}
+          />
+        </Svg>
+      ) : (
+        <View pointerEvents="none" style={styles.guideDimFill} />
+      )}
+      <View style={[styles.guideCard, guideCardPosition]}>
+        <View pointerEvents="none" style={styles.guideCardSurface}>
+          <NativeModalBlurView
+            blurStyle="systemThinMaterialLight"
+            fallbackColor="rgba(255,255,255,0.78)"
+            intensity={0.42}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <View pointerEvents="none" style={styles.guideCardTint} />
+        </View>
+        <View style={styles.guideCardContent}>
+          <View style={styles.guideProgressRow}>
+            <View style={styles.guideDots}>
+              {Array.from({ length: totalSteps }).map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.guideDot,
+                    index === stepIndex && styles.guideDotActive,
+                  ]}
+                />
+              ))}
+            </View>
+            <Text style={styles.guideStep}>
+              {stepIndex + 1}/{totalSteps}
+            </Text>
+          </View>
+          {isSpotlightStep ? null : (
+            <ConnectionFeaturePreviewCard kind={step.previewKind} />
+          )}
+          <Text style={styles.guideTitle}>{step.title}</Text>
+          <Text style={styles.guideBody}>{step.description}</Text>
+          <View style={styles.guideActions}>
+            <TouchableOpacity
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={t('deviceDiscovery.global.preview.skipGuide')}
+              activeOpacity={0.76}
+              style={styles.guideSkipButton}
+              onPress={onSkip}
+            >
+              <Text style={styles.guideSkip}>
+                {t('deviceDiscovery.global.preview.skipGuide')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={step.actionLabel}
+              activeOpacity={0.82}
+              style={styles.guideNext}
+              onPress={onNext}
+            >
+              <Text style={styles.guideNextText}>{step.actionLabel}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function ConnectionFeaturePreviewCard({
+  kind,
+}: {
+  kind: ConnectionGuidePreviewKind;
+}) {
+  const { t } = useTranslation();
+  if (kind === 'autoUpload') {
+    return (
+      <GuidePreviewShell>
+        <View style={styles.guidePreviewHeader}>
+          <View style={styles.guidePreviewTitleRow}>
+            <View
+              testID="guide-preview-auto-upload-icon"
+              style={[styles.guidePreviewMiniIcon, styles.guidePreviewIconBlue]}
+            >
+              <Monitor size={16} color="#1677D2" strokeWidth={2} />
+            </View>
+            <View>
+              <Text style={styles.guidePreviewStrong}>
+                {t('deviceDiscovery.global.preview.autoUpload')}
+              </Text>
+              <Text style={styles.guidePreviewSubtle}>
+                {t('deviceDiscovery.global.preview.disabled')}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.guidePreviewPrimaryPill}>
+            <Text style={styles.guidePreviewPrimaryPillText}>
+              {t('deviceDiscovery.global.preview.enableAction')}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.guidePreviewPanel}>
+          <Text style={styles.guidePreviewPanelTitle}>
+            {t('deviceDiscovery.global.preview.deviceStatus')}
+          </Text>
+          <Text style={styles.guidePreviewPanelValue}>
+            {t('deviceDiscovery.global.preview.autoUploadDisabled')}
+          </Text>
+          <Text style={styles.guidePreviewPanelMeta}>
+            {t('deviceDiscovery.global.preview.lastSyncNone')}
+          </Text>
+        </View>
+      </GuidePreviewShell>
+    );
+  }
+
+  if (kind === 'uploadScope') {
+    return (
+      <GuidePreviewShell>
+        <View style={styles.guidePreviewPlanRow}>
+          <View
+            testID="guide-preview-sync-plan-icon"
+            style={[styles.guidePreviewMiniIcon, styles.guidePreviewIconBlue]}
+          >
+            <CloudDownload size={16} color="#1677D2" strokeWidth={2} />
+          </View>
+          <View style={styles.guidePreviewFlex}>
+            <Text style={styles.guidePreviewStrong}>
+              {t('deviceDiscovery.global.preview.syncPlan')}
+            </Text>
+            <Text style={styles.guidePreviewSubtle} numberOfLines={1}>
+              {t('deviceDiscovery.global.preview.syncPlanDesc')}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.guidePreviewStatsRow}>
+          <GuidePreviewStat
+            label={t('deviceDiscovery.global.preview.statSource')}
+            value="2"
+          />
+          <GuidePreviewStat
+            label={t('deviceDiscovery.global.preview.statFiles')}
+            value="3"
+          />
+          <GuidePreviewStat
+            label={t('deviceDiscovery.global.preview.statScope')}
+            value={t('deviceDiscovery.global.preview.statScopeAll')}
+          />
+        </View>
+        <Text style={styles.guidePreviewSectionLabel}>
+          {t('deviceDiscovery.global.preview.syncSource')}
+        </Text>
+        <GuidePreviewOption
+          iconName="auto-upload-image"
+          title={t('deviceDiscovery.global.preview.photosAndVideos')}
+          description={t('deviceDiscovery.global.preview.photosAndVideosDesc')}
+          active
+        />
+        <Text style={styles.guidePreviewSectionLabel}>
+          {t('deviceDiscovery.global.preview.syncScope')}
+        </Text>
+        <GuidePreviewOption
+          iconName="auto-upload-folder"
+          title={t('deviceDiscovery.global.preview.statScopeAll')}
+          description={t('deviceDiscovery.global.preview.allContentDesc')}
+          active
+        />
+      </GuidePreviewShell>
+    );
+  }
+
+  if (kind === 'syncProgress') {
+    return (
+      <GuidePreviewShell>
+        <View style={styles.guidePreviewHeader}>
+          <View style={styles.guidePreviewTitleRow}>
+            <View
+              testID="guide-preview-sync-progress-icon"
+              style={[styles.guidePreviewMiniIcon, styles.guidePreviewIconBlue]}
+            >
+              <Monitor size={16} color="#1677D2" strokeWidth={2} />
+            </View>
+            <View>
+              <Text style={styles.guidePreviewStrong}>
+                {t('deviceDiscovery.global.preview.autoUpload')}
+              </Text>
+              <Text style={styles.guidePreviewSubtle}>
+                {t('deviceDiscovery.global.preview.enabled')}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.guidePreviewPrimaryPill}>
+            <Text style={styles.guidePreviewPrimaryPillText}>
+              {t('deviceDiscovery.global.preview.adjustAction')}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.guidePreviewPanel}>
+          <Text style={styles.guidePreviewPanelTitle}>
+            {t('deviceDiscovery.global.preview.deviceStatus')}
+          </Text>
+          <Text style={styles.guidePreviewPanelValue}>
+            {t('deviceDiscovery.global.preview.uploadedCount', {
+              uploaded: 96,
+              total: 128,
+            })}
+          </Text>
+          <View style={styles.guidePreviewUploadCard}>
+            <View style={styles.guidePreviewUploadHeader}>
+              <Text style={styles.guidePreviewUploadTitle}>
+                {t('deviceDiscovery.global.preview.uploadingProgress')}
+              </Text>
+              <Text style={styles.guidePreviewUploadPercent}>75%</Text>
+            </View>
+            <View style={styles.guidePreviewUploadTrack}>
+              <View style={styles.guidePreviewUploadFill} />
+            </View>
+            <View style={styles.guidePreviewUploadGrid}>
+              <GuidePreviewProgressStat
+                label={t('deviceDiscovery.global.preview.speed')}
+                value="68.5 MB/s"
+              />
+              <GuidePreviewProgressStat
+                label={t('deviceDiscovery.global.preview.progress')}
+                value="96 / 128"
+                alignRight
+              />
+              <GuidePreviewProgressStat
+                label={t('deviceDiscovery.global.preview.fileSize')}
+                value="2.4 GB / 3.6 GB"
+              />
+              <GuidePreviewProgressStat
+                label={t('deviceDiscovery.global.preview.remainingTime')}
+                value={t('deviceDiscovery.global.preview.secondsVal', {
+                  seconds: 24,
+                })}
+                alignRight
+              />
+            </View>
+          </View>
+          <Text style={styles.guidePreviewPanelMeta}>
+            {t('deviceDiscovery.global.preview.lastSyncNone')}
+          </Text>
+        </View>
+      </GuidePreviewShell>
+    );
+  }
+
+  if (kind === 'records') {
+    return (
+      <GuidePreviewShell>
+        <View style={styles.guidePreviewHeader}>
+          <View style={styles.guidePreviewTitleRow}>
+            <View
+              testID="guide-preview-records-download-icon"
+              style={[styles.guidePreviewMiniIcon, styles.guidePreviewIconBlue]}
+            >
+              <Download size={16} color="#1677D2" strokeWidth={2} />
+            </View>
+            <Text style={styles.guidePreviewStrong}>
+              {t('deviceDiscovery.global.preview.recentDownload')}
+            </Text>
+          </View>
+          <Text style={styles.guidePreviewLink}>
+            {t('deviceDiscovery.global.preview.viewAll')}
+          </Text>
+        </View>
+        <View style={styles.guidePreviewDownloadRow}>
+          {[
+            {
+              icon: FileText,
+              label: t('deviceDiscovery.global.preview.demoFileName1'),
+              testID: 'file',
+            },
+            {
+              icon: FileVideo,
+              label: t('deviceDiscovery.global.preview.demoFileName2'),
+              testID: 'video',
+            },
+            {
+              icon: FileText,
+              label: t('deviceDiscovery.global.preview.demoFileName3'),
+              testID: 'document',
+            },
+          ].map(({ icon: PreviewIcon, label, testID }) => (
+            <View key={label} style={styles.guidePreviewDownloadItem}>
+              <View testID={`guide-preview-download-${testID}-icon`}>
+                <PreviewIcon size={15} color="#315E8C" strokeWidth={2} />
+              </View>
+              <Text style={styles.guidePreviewDownloadLabel} numberOfLines={1}>
+                {label}
+              </Text>
+            </View>
+          ))}
+        </View>
+        <View style={styles.guidePreviewCompactRecord}>
+          <View>
+            <Text style={styles.guidePreviewStrong}>
+              {t('deviceDiscovery.global.preview.syncRecords')}
+            </Text>
+            <Text style={styles.guidePreviewSubtle}>
+              {t('deviceDiscovery.global.preview.todayStat')}
+            </Text>
+          </View>
+          <View style={styles.guidePreviewCompletedPill}>
+            <Text style={styles.guidePreviewCompletedText}>
+              {t('deviceDiscovery.global.preview.completed')}
+            </Text>
+          </View>
+        </View>
+      </GuidePreviewShell>
+    );
+  }
+
+  if (kind === 'sharedFilesHub') {
+    return (
+      <GuidePreviewShell>
+        <GuidePreviewResourceEntry
+          icon={Smartphone}
+          iconStyle={styles.guidePreviewIconBlue}
+          iconColor="#3B82F6"
+          testID="guide-preview-phone-sync-icon"
+          title={t('deviceDiscovery.global.preview.syncSpaceTitle')}
+          description={t('deviceDiscovery.global.preview.syncSpaceDesc')}
+          badges={[
+            t('deviceDiscovery.global.preview.syncSpaceBadge1'),
+            t('deviceDiscovery.global.preview.syncSpaceBadge2'),
+          ]}
+        />
+        <GuidePreviewResourceEntry
+          icon={Monitor}
+          iconStyle={styles.guidePreviewIconPurple}
+          iconColor="#8B5CF6"
+          testID="guide-preview-local-computer-icon"
+          title={t('deviceDiscovery.global.preview.localComputerTitle')}
+          description={t('deviceDiscovery.global.preview.localComputerDesc')}
+          badges={[
+            t('deviceDiscovery.global.preview.localComputerBadge1'),
+            t('deviceDiscovery.global.preview.localComputerBadge2'),
+          ]}
+        />
+      </GuidePreviewShell>
+    );
+  }
+
+  return null;
+}
+
+function GuidePreviewShell({ children }: { children: React.ReactNode }) {
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      pointerEvents="none"
+      style={styles.guidePreviewCard}
+    >
+      {children}
+    </View>
+  );
+}
+
+function GuidePreviewStat({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.guidePreviewStat}>
+      <Text style={styles.guidePreviewStatLabel}>{label}</Text>
+      <Text style={styles.guidePreviewStatValue} numberOfLines={1}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function GuidePreviewProgressStat({
+  label,
+  value,
+  alignRight,
+}: {
+  label: string;
+  value: string;
+  alignRight?: boolean;
+}) {
+  return (
+    <View
+      style={[
+        styles.guidePreviewProgressStat,
+        alignRight && styles.guidePreviewProgressStatRight,
+      ]}
+    >
+      <Text style={styles.guidePreviewProgressLabel}>{label}</Text>
+      <Text style={styles.guidePreviewProgressValue}>{value}</Text>
+    </View>
+  );
+}
+
+function GuidePreviewOption({
+  iconName,
+  title,
+  description,
+  active,
+}: {
+  iconName: string;
+  title: string;
+  description: string;
+  active?: boolean;
+}) {
+  return (
+    <View
+      style={[
+        styles.guidePreviewOption,
+        active && styles.guidePreviewOptionActive,
+      ]}
+    >
+      <View
+        style={[
+          styles.guidePreviewMiniIcon,
+          active
+            ? styles.guidePreviewIconBlueSolid
+            : styles.guidePreviewIconMuted,
+        ]}
+      >
+        <Icon
+          name={iconName}
+          size={15}
+          color={active ? '#FFFFFF' : '#8AABBD'}
+        />
+      </View>
+      <View style={styles.guidePreviewFlex}>
+        <Text style={styles.guidePreviewOptionTitle}>{title}</Text>
+        <Text style={styles.guidePreviewSubtle} numberOfLines={1}>
+          {description}
+        </Text>
+      </View>
+      {active ? (
+        <View style={styles.guidePreviewCheck}>
+          <Check
+            testID="guide-preview-option-check-icon"
+            size={9}
+            color="#FFFFFF"
+            strokeWidth={2.8}
+          />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function GuidePreviewResourceEntry({
+  icon: ResourceIcon,
+  iconStyle,
+  iconColor,
+  testID,
+  title,
+  description,
+  badges,
+}: {
+  icon: GuidePreviewIconComponent;
+  iconStyle: object;
+  iconColor: string;
+  testID: string;
+  title: string;
+  description: string;
+  badges: string[];
+}) {
+  return (
+    <View style={styles.guidePreviewResourceEntry}>
+      <View
+        testID={testID}
+        style={[styles.guidePreviewResourceIcon, iconStyle]}
+      >
+        <ResourceIcon size={17} color={iconColor} strokeWidth={2} />
+      </View>
+      <View style={styles.guidePreviewFlex}>
+        <Text style={styles.guidePreviewOptionTitle}>{title}</Text>
+        <Text style={styles.guidePreviewSubtle} numberOfLines={1}>
+          {description}
+        </Text>
+        <View style={styles.guidePreviewBadgeRow}>
+          {badges.map(badge => (
+            <View key={badge} style={styles.guidePreviewBadge}>
+              <Text style={styles.guidePreviewBadgeText}>{badge}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+      <ChevronRight
+        testID="guide-preview-resource-chevron-icon"
+        size={14}
+        color="#C7C7CC"
+        strokeWidth={2}
+      />
+    </View>
+  );
+}
+
+function ConnectionFlowModal({
+  step,
+  deviceName,
+  manualHost,
+  manualError,
+  connectionCode,
+  verifying,
+  codeError,
+  onClose,
+  onScan,
+  onCode,
+  onManual,
+  onManualHostChange,
+  onManualSubmit,
+  onDeny,
+  onAllow,
+  onChange,
+  onSubmit,
+}: {
+  step: ConnectionModalStep | null;
+  deviceName: string;
+  manualHost: string;
+  manualError: string | null;
+  connectionCode: string;
+  verifying: boolean;
+  codeError: string | null;
+  onClose: () => void;
+  onScan: () => void;
+  onCode: () => void;
+  onManual: () => void;
+  onManualHostChange: (value: string) => void;
+  onManualSubmit: () => void;
+  onDeny: () => void;
+  onAllow: () => void;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  const { t } = useTranslation();
+  if (!step) return null;
+
+  const keyboardEnabled = step === 'manualPair' || step === 'code';
+  let content: React.ReactNode;
+
+  if (step === 'method') {
+    const isManualPairing = !deviceName;
+    content = (
+      <>
+        <View style={styles.modalHeader}>
+          <View style={styles.modalIconBlue}>
+            <Icon name="desktop-outline" size={22} color="#1677D2" />
+          </View>
+          <View style={styles.modalTitleStack}>
+            <Text style={styles.modalTitle}>
+              {isManualPairing
+                ? t('deviceDiscovery.global.manualPairing')
+                : t('deviceDiscovery.global.selectMethod')}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              {isManualPairing
+                ? t('deviceDiscovery.global.manualPairingDesc')
+                : t('deviceDiscovery.connectionMethod.selected', {
+                    name: deviceName,
+                  })}
+            </Text>
+          </View>
+        </View>
+        <TouchableOpacity
+          activeOpacity={0.78}
+          style={styles.optionRow}
+          onPress={onScan}
+        >
+          <View style={styles.optionIconBlue}>
+            <Icon name="scan-outline" size={20} color="#1677D2" />
+          </View>
+          <View style={styles.optionCopy}>
+            <Text style={styles.optionTitle}>
+              {t('deviceDiscovery.actions.qrPair')}
+            </Text>
+            <Text style={styles.optionBody}>
+              {t('deviceDiscovery.connectionMethod.qrDesc', {
+                name: deviceName || t('deviceDiscovery.global.findPC'),
+              })}
+            </Text>
+          </View>
+          <Icon name="chevron-forward" size={18} color="#9AA3AE" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          activeOpacity={0.78}
+          style={styles.optionRow}
+          onPress={isManualPairing ? onManual : onCode}
+        >
+          <View style={styles.optionIconPurple}>
+            <Icon
+              name={isManualPairing ? 'create-outline' : 'link-outline'}
+              size={20}
+              color="#746AA8"
+            />
+          </View>
+          <View style={styles.optionCopy}>
+            <Text style={styles.optionTitle}>
+              {isManualPairing
+                ? t('deviceDiscovery.global.manualIP')
+                : t('deviceDiscovery.connectionMethod.codeTitle')}
+            </Text>
+            <Text style={styles.optionBody}>
+              {isManualPairing
+                ? t('deviceDiscovery.global.enterIPAndCode')
+                : t('deviceDiscovery.connectionMethod.codeDesc', {
+                    name: deviceName,
+                  })}
+            </Text>
+          </View>
+          <Icon name="chevron-forward" size={18} color="#9AA3AE" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          activeOpacity={0.76}
+          style={styles.modalCancel}
+          onPress={onClose}
+        >
+          <Text style={styles.modalCancelText}>
+            {t('deviceDiscovery.global.cancel')}
+          </Text>
+        </TouchableOpacity>
+      </>
+    );
+  } else if (step === 'manualPair') {
+    content = (
+      <>
+        <View style={styles.modalHeader}>
+          <View style={styles.modalIconPurple}>
+            <Icon name="link-outline" size={22} color="#746AA8" />
+          </View>
+          <View style={styles.modalTitleStack}>
+            <Text style={styles.modalTitle}>
+              {t('deviceDiscovery.global.manualPairing')}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              {t('deviceDiscovery.global.manualIPHint')}
+            </Text>
+          </View>
+        </View>
+        <TextInput
+          value={manualHost}
+          onChangeText={onManualHostChange}
+          placeholder="192.168.31.21"
+          placeholderTextColor="#A8B6C6"
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="decimal-pad"
+          style={[styles.textInput, manualError && styles.textInputError]}
+          onSubmitEditing={onManualSubmit}
+        />
+        <Text style={manualError ? styles.errorText : styles.inputHint}>
+          {manualError || t('deviceDiscovery.global.viewSettingsHint')}
+        </Text>
+        <View style={styles.modalActions}>
+          <TouchableOpacity
+            activeOpacity={0.76}
+            style={styles.secondaryAction}
+            onPress={onClose}
+          >
+            <Text style={styles.secondaryActionText}>
+              {t('deviceDiscovery.global.cancel')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.82}
+            style={styles.primaryAction}
+            onPress={onManualSubmit}
+          >
+            <Text style={styles.primaryActionText}>
+              {t('deviceDiscovery.global.onboarding.step2Action')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </>
+    );
+  } else if (step === 'cameraPermission') {
+    content = (
+      <>
+        <View style={styles.modalHeader}>
+          <View style={styles.modalIconBlue}>
+            <Icon name="scan-outline" size={22} color="#1677D2" />
+          </View>
+          <View style={styles.modalTitleStack}>
+            <Text style={styles.modalTitle}>
+              {t('deviceDiscovery.global.cameraAccessTitle')}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              {t('deviceDiscovery.global.cameraAccessDesc')}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.modalActions}>
+          <TouchableOpacity
+            activeOpacity={0.76}
+            style={styles.secondaryAction}
+            onPress={onDeny}
+          >
+            <Text style={styles.secondaryActionText}>
+              {t('deviceDiscovery.global.deny')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.82}
+            style={styles.primaryAction}
+            onPress={onAllow}
+          >
+            <Text style={styles.primaryActionText}>
+              {t('deviceDiscovery.global.allow')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </>
+    );
+  } else {
+    content = (
+      <>
+        <View style={styles.modalHeader}>
+          <View style={styles.modalIconPurple}>
+            <Icon name="link-outline" size={22} color="#746AA8" />
+          </View>
+          <View style={styles.modalTitleStack}>
+            <Text style={styles.modalTitle}>
+              {t('deviceDiscovery.global.enterCodeTitle')}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              {t('deviceDiscovery.global.enterCodeDesc', {
+                deviceName:
+                  deviceName || t('deviceDiscovery.global.lanDeviceTitle'),
+              })}
+            </Text>
+          </View>
+        </View>
+        <TextInput
+          value={connectionCode}
+          onChangeText={onChange}
+          placeholder={t('deviceDiscovery.global.pairingCodePlaceholder')}
+          placeholderTextColor="#A8B6C6"
+          autoCapitalize="characters"
+          autoCorrect={false}
+          maxLength={6}
+          editable={!verifying}
+          style={styles.codeInput}
+          onSubmitEditing={onSubmit}
+        />
+        {verifying ? (
+          <View style={styles.verifyingRow}>
+            <ActivityIndicator size="small" color="#1677D2" />
+            <Text style={styles.verifyingText}>
+              {t('deviceDiscovery.global.verifyingCode')}
+            </Text>
+          </View>
+        ) : null}
+        {codeError ? <Text style={styles.errorText}>{codeError}</Text> : null}
+        <View style={styles.modalActions}>
+          <TouchableOpacity
+            activeOpacity={0.76}
+            style={styles.secondaryAction}
+            onPress={onClose}
+          >
+            <Text style={styles.secondaryActionText}>
+              {t('deviceDiscovery.global.cancel')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.82}
+            disabled={verifying || !connectionCode.trim()}
+            style={[
+              styles.primaryAction,
+              (verifying || !connectionCode.trim()) && styles.disabledAction,
+            ]}
+            onPress={onSubmit}
+          >
+            <Text style={styles.primaryActionText}>
+              {t('deviceDiscovery.global.connect')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </>
+    );
+  }
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <ModalBlurBackdrop />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          enabled={keyboardEnabled}
+          style={styles.keyboardModal}
+        >
+          <Pressable style={styles.modalCard} onPress={() => undefined}>
+            {content}
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Pressable>
+    </Modal>
+  );
+}
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -1346,597 +2355,1002 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: undefined,
+  },
+  scroll: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 32,
+    paddingBottom: 42,
+  },
+  backButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.42)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.62)',
+    shadowColor: '#46608A',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 12,
+      blurRadius: 24,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
   },
   header: {
-    paddingTop: 24,
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  headerTopRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  wifiIconBox: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: 'rgba(59,159,216,0.12)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
+    marginTop: 24,
   },
   title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: colors.screenTitle,
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: '700',
+    color: '#17191C',
   },
   subtitle: {
-    fontSize: 14,
-    color: '#6a96b8',
-    marginTop: 4,
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 24,
+    color: '#59616D',
   },
-  scanButton: {
-    minHeight: 40,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(255,255,255,0.62)',
+  devicesCard: {
+    marginTop: 24,
+    borderRadius: 28,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    backgroundColor: 'rgba(255,255,255,0.82)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.82)',
+    borderColor: 'rgba(255,255,255,0.72)',
+    shadowColor: '#46608A',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.12,
+    shadowRadius: 42,
+    elevation: 5,
+    ...androidBoxShadow({
+      offsetY: 18,
+      blurRadius: 42,
+      color: 'rgba(70, 96, 138, 0.12)',
+    }),
+  },
+  devicesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  devicesTitle: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+    color: '#17191C',
+  },
+  statusPill: {
+    minHeight: 30,
+    borderRadius: 999,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    shadowColor: 'rgba(80,160,210,0.25)',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  scanButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#3b9fd8',
-  },
-
-  // Scanning
-  scanningSection: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    gap: 20,
-  },
-  pulseContainer: {
-    width: 140,
-    height: 140,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pulseRing: {
-    position: 'absolute',
-    borderWidth: 2,
-  },
-  pulseCenter: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(59,159,216,0.15)',
-    borderWidth: 2,
-    borderColor: 'rgba(59,159,216,0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scanningText: {
-    fontSize: 14,
-    color: '#6a96b8',
-  },
-
-  // Device list
-  listSection: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  deviceCount: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#6a96b8',
-    marginBottom: 8,
-    paddingHorizontal: 4,
-  },
-  sectionHeader: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#5a7a96',
-    marginTop: 18,
-    marginBottom: 6,
-    paddingHorizontal: 4,
-  },
-  listContent: {
-    gap: 8,
-  },
-  deviceCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.75)',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.9)',
-    shadowColor: 'rgba(80,160,210,0.3)',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 2,
-    gap: 12,
+    borderColor: 'rgba(255,255,255,0.72)',
+    backgroundColor: 'rgba(255,255,255,0.58)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  deviceIconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#3ba4dc',
-    shadowColor: 'rgba(59,159,216,0.5)',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  deviceInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
-  deviceName: {
-    fontSize: 14,
+  statusText: {
+    fontSize: 10,
+    lineHeight: 14,
     fontWeight: '600',
-    color: colors.screenTitle,
+    color: '#59616D',
   },
-  deviceMeta: {
-    fontSize: 12,
-    color: '#8aabbd',
-    marginTop: 2,
-  },
-  badgeCurrent: {
-    backgroundColor: 'rgba(59,159,216,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(59,159,216,0.4)',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  badgeCurrentText: {
-    color: '#3b9fd8',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  badgeKnown: {
-    backgroundColor: 'rgba(63,207,127,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(63,207,127,0.4)',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  badgeKnownText: {
-    color: '#3fcf7f',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: 'rgba(59,159,216,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // Empty state
-  emptySection: {
-    alignItems: 'stretch',
-    paddingVertical: 48,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#8aabbd',
-    textAlign: 'center',
-    marginBottom: 18,
-  },
-  troubleshootingCard: {
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: 'rgba(219,234,254,0.45)',
-  },
-  troubleshootingTitle: {
-    color: '#1e40af',
-    fontSize: 13,
-    fontWeight: '800',
-    marginBottom: 10,
-  },
-  troubleshootingList: {
-    gap: 8,
-  },
-  troubleshootingItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  troubleshootingBullet: {
+  scanDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#3b82f6',
-    marginTop: 6,
+    backgroundColor: '#1677D2',
   },
-  troubleshootingText: {
-    flex: 1,
-    color: '#3b5a8a',
-    fontSize: 12,
-    lineHeight: 18,
+  skeletonStack: {
+    marginTop: 16,
+    gap: 12,
   },
-  troubleshootingLink: {
-    alignSelf: 'flex-start',
-    marginTop: 12,
+  skeletonRow: {
+    height: 66,
+    borderRadius: 18,
+    backgroundColor: '#EDF4FB',
   },
-  troubleshootingLinkText: {
-    color: '#2563eb',
-    fontSize: 12,
-    fontWeight: '700',
+  deviceStack: {
+    marginTop: 16,
+    gap: 12,
   },
-
-  // Rescan
-  rescanButton: {
-    marginBottom: 12,
-    backgroundColor: 'rgba(255,255,255,0.55)',
-    borderRadius: 16,
-    paddingVertical: 14,
+  deviceRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.7)',
-  },
-  rescanText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#5a9abf',
-  },
-
-  // Popover Styles
-  popoverOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-  },
-  popoverMenu: {
-    position: 'absolute',
-    right: 16,
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    paddingVertical: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-  },
-  popoverItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  popoverText: {
-    flex: 1,
-    flexShrink: 1,
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '500',
-    color: colors.screenTitle,
-  },
-  popoverDivider: {
-    height: 1,
-    backgroundColor: 'rgba(0,0,0,0.05)',
-    marginHorizontal: 8,
-  },
-
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(13,27,39,0.42)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    width: '100%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  manualCard: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 28,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    backgroundColor: 'rgba(236,247,253,0.98)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.68)',
-    shadowColor: '#173d58',
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    elevation: 10,
-  },
-  manualHandle: {
-    alignSelf: 'center',
-    width: 42,
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: 'rgba(90,122,150,0.28)',
-    marginBottom: 18,
-  },
-  manualSection: {
-    paddingHorizontal: 20,
-  },
-  manualDock: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-  },
-  manualTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.screenTitle,
-  },
-  manualDescription: {
-    marginTop: 6,
-    fontSize: 13,
-    lineHeight: 19,
-    color: '#6a96b8',
-  },
-  manualCallout: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    marginTop: 16,
+    backgroundColor: 'rgba(255,255,255,0.6)',
     paddingHorizontal: 14,
     paddingVertical: 14,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.72)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.62)',
-    shadowColor: 'rgba(59,130,210,0.3)',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 14,
+    shadowColor: '#46608A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
     elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 10,
+      blurRadius: 24,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
   },
-  manualCalloutIcon: {
-    width: 42,
-    height: 42,
+  manualPairRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     borderRadius: 14,
-    backgroundColor: 'rgba(59,130,246,0.09)',
     borderWidth: 1,
-    borderColor: 'rgba(59,130,246,0.16)',
+    borderStyle: 'dashed',
+    borderColor: '#B8DFFF',
+    backgroundColor: 'rgba(247,251,255,0.72)',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  rowIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    backgroundColor: '#E4F5FF',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  manualCalloutCopy: {
+  rowCopy: {
     flex: 1,
     minWidth: 0,
   },
-  manualCalloutTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1a3a5c',
-  },
-  manualCalloutBody: {
-    marginTop: 6,
-    fontSize: 12,
+  rowTitle: {
+    fontSize: 14,
     lineHeight: 18,
-    color: '#5a7a96',
-  },
-  manualLabel: {
-    marginTop: 18,
-    marginBottom: 8,
-    fontSize: 12,
     fontWeight: '700',
-    color: '#5a7a96',
+    color: '#17191C',
   },
-  manualInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+  rowSubtitle: {
+    marginTop: 4,
+    fontSize: 10,
+    lineHeight: 18,
+    color: '#59616D',
   },
-  manualInput: {
-    flex: 1,
-    minHeight: 52,
-    paddingHorizontal: 16,
+  deviceStatus: {
+    borderRadius: 999,
+    backgroundColor: '#E8F7ED',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  deviceStatusBusy: {
+    backgroundColor: '#FFF3E8',
+  },
+  deviceStatusText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#21A453',
+  },
+  deviceStatusTextBusy: {
+    color: '#D7832F',
+  },
+  rescanButton: {
+    marginTop: 14,
     borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: 'rgba(59,130,246,0.18)',
-    backgroundColor: 'rgba(255,255,255,0.82)',
-    color: colors.screenTitle,
-    fontSize: 16,
-  },
-  manualInputError: {
-    borderColor: '#db6b6b',
-  },
-  manualButton: {
-    minHeight: 52,
-    paddingHorizontal: 20,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#3b82f6',
-    shadowColor: 'rgba(59,130,246,0.5)',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.22,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  manualButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  manualHint: {
-    marginTop: 12,
-    fontSize: 12,
-    lineHeight: 18,
-    color: '#8aabbd',
-  },
-  manualErrorText: {
-    marginTop: 12,
-    fontSize: 12,
-    lineHeight: 18,
-    color: '#db6b6b',
-  },
-
-  // Modal styles
-  pairModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  pairModalCard: {
-    width: '100%',
-    maxWidth: 300,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 10,
-  },
-  pairModalHeader: {
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-  },
-  pairModalTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#20344F',
-    textAlign: 'center',
-  },
-  pairModalSubtitle: {
-    fontSize: 13,
-    color: '#7D97B5',
-    marginTop: 6,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  pairModalBody: {
-    padding: 20,
-    gap: 12,
-  },
-  methodButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
     borderWidth: 1,
-    borderColor: '#edf2f7',
-    backgroundColor: '#f7fafc',
-    borderRadius: 16,
-    padding: 14,
+    borderColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: 'rgba(255,255,255,0.55)',
+    paddingVertical: 14,
+    alignItems: 'center',
   },
-  methodIconBox: {
+  rescanButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  rescanText: {
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '500',
+    color: '#1677D2',
+  },
+  helpPanel: {
+    marginTop: 20,
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(255,255,255,0.54)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.68)',
+  },
+  helpTitle: {
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '700',
+    color: '#17191C',
+  },
+  helpBody: {
+    marginTop: 8,
+    fontSize: 10,
+    lineHeight: 20,
+    color: '#59616D',
+  },
+  flowStateCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.7)',
+    shadowColor: '#46608A',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.08,
+    shadowRadius: 34,
+    elevation: 2,
+    ...androidBoxShadow({
+      offsetY: 12,
+      blurRadius: 34,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
+  },
+  flowStateIcon: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  methodInfo: {
+  flowIconNeutral: {
+    backgroundColor: 'rgba(255,255,255,0.72)',
+  },
+  flowIconDanger: {
+    backgroundColor: '#FFF0F0',
+  },
+  flowIconWarning: {
+    backgroundColor: '#FFF6D8',
+  },
+  flowStateCopy: {
     flex: 1,
+    minWidth: 0,
   },
-  methodTitle: {
+  flowStateTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  flowStateTitle: {
+    flex: 1,
     fontSize: 13,
-    fontWeight: '600',
-    color: '#1a202c',
+    lineHeight: 18,
+    fontWeight: '700',
+    color: '#17191C',
   },
-  methodDesc: {
+  flowStateDescription: {
+    marginTop: 6,
     fontSize: 11,
-    color: '#718096',
-    marginTop: 2,
+    lineHeight: 20,
+    color: '#59616D',
   },
-  pairModalCancelButton: {
-    borderTopWidth: 1,
-    borderTopColor: '#edf2f7',
-    paddingVertical: 14,
+  flowAction: {
+    flexShrink: 0,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  flowActionNeutral: {
+    backgroundColor: 'rgba(255,255,255,0.64)',
+  },
+  flowActionDanger: {
+    backgroundColor: '#FFF0F0',
+  },
+  flowActionWarning: {
+    backgroundColor: '#FFF5E0',
+  },
+  flowActionText: {
+    fontSize: 9,
+    lineHeight: 13,
+    fontWeight: '700',
+  },
+  flowActionTextNeutral: {
+    color: '#7B8490',
+  },
+  flowActionTextDanger: {
+    color: '#D94F4F',
+  },
+  flowActionTextWarning: {
+    color: '#B7791F',
+  },
+  guideOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 80,
+    overflow: 'hidden',
+  },
+  guideDimFill: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(14,31,52,0.36)',
+  },
+  guideCard: {
+    borderRadius: 18,
+    shadowColor: '#46608A',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.18,
+    shadowRadius: 50,
+    elevation: 8,
+    ...androidBoxShadow({
+      offsetY: 18,
+      blurRadius: 50,
+      color: 'rgba(70, 96, 138, 0.18)',
+    }),
+  },
+  guideCardSurface: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: 'rgba(255,255,255,0.7)',
+  },
+  guideCardTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.58)',
+  },
+  guideCardContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  guideProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  guideDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  guideDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#C9DAEE',
+  },
+  guideDotActive: {
+    width: 20,
+    backgroundColor: '#357CFF',
+  },
+  guideStep: {
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '500',
+    color: '#7D97B5',
+  },
+  guideTitle: {
+    marginTop: 12,
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: '600',
+    color: '#1C365A',
+  },
+  guideBody: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 24,
+    color: '#6E8CAD',
+  },
+  guidePreviewCard: {
+    marginTop: 12,
+    marginBottom: 2,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.72)',
+    backgroundColor: 'rgba(247,251,255,0.72)',
+    padding: 12,
+    gap: 9,
+    shadowColor: '#46608A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 3,
+    ...androidBoxShadow({
+      offsetY: 10,
+      blurRadius: 24,
+      color: 'rgba(70, 96, 138, 0.08)',
+    }),
+  },
+  guidePreviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  guidePreviewTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  guidePreviewFlex: {
+    flex: 1,
+    minWidth: 0,
+  },
+  guidePreviewMiniIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pairModalCancelText: {
-    fontSize: 15,
-    color: '#3b82f6',
-    fontWeight: '500',
+  guidePreviewIconBlue: {
+    backgroundColor: '#E8F4FF',
   },
-  // Code entry modal specific
-  codeInput: {
-    width: '100%',
+  guidePreviewIconBlueSolid: {
+    backgroundColor: '#3B9FD8',
+  },
+  guidePreviewIconMuted: {
+    backgroundColor: '#EEF3FA',
+  },
+  guidePreviewIconPurple: {
+    backgroundColor: '#F0EDFF',
+  },
+  guidePreviewStrong: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: '#203D63',
+  },
+  guidePreviewSubtle: {
+    marginTop: 2,
+    fontSize: 9,
+    lineHeight: 13,
+    color: '#6E8CAD',
+  },
+  guidePreviewPrimaryPill: {
+    borderRadius: 999,
+    backgroundColor: '#DBEAFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  guidePreviewPrimaryPillText: {
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '700',
+    color: '#357CFF',
+  },
+  guidePreviewPanel: {
+    borderRadius: 13,
+    backgroundColor: 'rgba(232,244,255,0.74)',
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+  },
+  guidePreviewPanelTitle: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '700',
+    color: '#203D63',
+  },
+  guidePreviewPanelValue: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: '#1677D2',
+  },
+  guidePreviewPanelMeta: {
+    marginTop: 2,
+    fontSize: 9,
+    lineHeight: 13,
+    color: '#7D97B5',
+  },
+  guidePreviewUploadCard: {
+    marginTop: 9,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#DCE7F6',
-    backgroundColor: '#F7FAFE',
+    borderColor: 'rgba(255,255,255,0.72)',
+    backgroundColor: 'rgba(255,255,255,0.54)',
+    paddingHorizontal: 9,
+    paddingVertical: 9,
+  },
+  guidePreviewUploadHeader: {
+    marginBottom: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  guidePreviewUploadTitle: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 8,
+    lineHeight: 11,
+    fontWeight: '600',
+    color: '#59616D',
+  },
+  guidePreviewUploadPercent: {
+    fontSize: 8,
+    lineHeight: 11,
+    fontWeight: '700',
+    color: '#59616D',
+  },
+  guidePreviewUploadTrack: {
+    height: 6,
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: '#DCE9F5',
+  },
+  guidePreviewUploadFill: {
+    width: '75%',
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: '#1677D2',
+  },
+  guidePreviewUploadGrid: {
+    marginTop: 10,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: 9,
+  },
+  guidePreviewProgressStat: {
+    width: '50%',
+    minWidth: 0,
+  },
+  guidePreviewProgressStatRight: {
+    alignItems: 'flex-end',
+  },
+  guidePreviewProgressLabel: {
+    fontSize: 8,
+    lineHeight: 11,
+    color: '#9AB0C6',
+  },
+  guidePreviewProgressValue: {
+    marginTop: 3,
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '700',
+    color: '#17191C',
+  },
+  guidePreviewPlanRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  guidePreviewStatsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  guidePreviewStat: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+  },
+  guidePreviewStatLabel: {
+    fontSize: 8,
+    lineHeight: 11,
+    color: '#7D97B5',
+  },
+  guidePreviewStatValue: {
+    marginTop: 2,
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '700',
+    color: '#203D63',
+  },
+  guidePreviewSectionLabel: {
+    marginTop: 1,
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '700',
+    color: '#203D63',
+  },
+  guidePreviewOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.64)',
+    paddingHorizontal: 9,
+    paddingVertical: 8,
+  },
+  guidePreviewOptionActive: {
+    backgroundColor: 'rgba(232,244,255,0.8)',
+  },
+  guidePreviewOptionTitle: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '700',
+    color: '#203D63',
+  },
+  guidePreviewCheck: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#3B9FD8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guidePreviewDayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  guidePreviewDay: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '700',
+    color: '#3E6F9E',
+  },
+  guidePreviewDayStats: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '700',
+    color: '#9CB6D2',
+  },
+  guidePreviewRecordCard: {
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.82)',
+    padding: 10,
+  },
+  guidePreviewRecordHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  guidePreviewRecordTitle: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: '#203D63',
+  },
+  guidePreviewSyncingPill: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    backgroundColor: '#DBEAFF',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  guidePreviewSyncingText: {
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '700',
+    color: '#357CFF',
+  },
+  guidePreviewCompletedPill: {
+    alignSelf: 'center',
+    borderRadius: 999,
+    backgroundColor: '#E8F7ED',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  guidePreviewCompletedText: {
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '700',
+    color: '#21A453',
+  },
+  guidePreviewLink: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '700',
+    color: '#357CFF',
+  },
+  guidePreviewDownloadRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  guidePreviewDownloadItem: {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  guidePreviewDownloadLabel: {
+    marginTop: 5,
+    fontSize: 8,
+    lineHeight: 11,
+    fontWeight: '700',
+    color: '#315E8C',
+    textAlign: 'center',
+  },
+  guidePreviewCompactRecord: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  guidePreviewResourceEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  guidePreviewResourceIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guidePreviewBadgeRow: {
+    marginTop: 5,
+    flexDirection: 'row',
+    gap: 5,
+  },
+  guidePreviewBadge: {
+    borderRadius: 999,
+    backgroundColor: '#EEF3FA',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  guidePreviewBadgeText: {
+    fontSize: 8,
+    lineHeight: 10,
+    fontWeight: '700',
+    color: '#6E8CAD',
+  },
+  guideActions: {
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  guideSkipButton: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  guideSkip: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#8DA5BF',
+  },
+  guideNext: {
+    minHeight: 36,
+    borderRadius: 8,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: '#20344F',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1677D2',
+    shadowColor: '#1677D2',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.18,
+    shadowRadius: 28,
+    elevation: 6,
+  },
+  guideNextText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  keyboardModal: {
+    width: '100%',
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 336,
+    alignSelf: 'center',
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.68)',
+    shadowColor: '#173D58',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 28,
+    elevation: 10,
+    ...androidBoxShadow({
+      offsetY: 12,
+      blurRadius: 28,
+      color: 'rgba(23, 61, 88, 0.18)',
+    }),
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 16,
+  },
+  modalIconBlue: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E4F5FF',
+  },
+  modalIconPurple: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EEEAFB',
+  },
+  modalTitleStack: {
+    flex: 1,
+    minWidth: 0,
+  },
+  modalTitle: {
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: '700',
+    color: '#17191C',
+  },
+  modalSubtitle: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#59616D',
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: 'rgba(255,255,255,0.56)',
+    padding: 14,
+    marginBottom: 12,
+  },
+  optionIconBlue: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E4F5FF',
+  },
+  optionIconPurple: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EEEAFB',
+  },
+  optionCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  optionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#17191C',
+  },
+  optionBody: {
+    marginTop: 4,
+    fontSize: 11,
+    lineHeight: 18,
+    color: '#59616D',
+  },
+  modalCancel: {
+    marginTop: 2,
+    minHeight: 46,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EEF5FC',
+    borderWidth: 1,
+    borderColor: '#DDE8F4',
+  },
+  modalCancelText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1677D2',
+  },
+  textInput: {
+    minHeight: 52,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#DDE8F4',
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    paddingHorizontal: 16,
+    color: '#17191C',
+    fontSize: 16,
+  },
+  codeInput: {
+    minHeight: 52,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#DDE8F4',
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    paddingHorizontal: 16,
+    color: '#17191C',
+    fontSize: 18,
+    fontWeight: '700',
     textAlign: 'center',
     letterSpacing: 2,
-    fontWeight: '600',
+  },
+  textInputError: {
+    borderColor: '#DB6B6B',
+  },
+  inputHint: {
+    marginTop: 10,
+    fontSize: 11,
+    lineHeight: 18,
+    color: '#59616D',
+  },
+  errorText: {
+    marginTop: 10,
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#D14C4C',
+  },
+  modalActions: {
+    marginTop: 18,
+    flexDirection: 'row',
+    gap: 12,
+  },
+  secondaryAction: {
+    flex: 0.78,
+    minHeight: 52,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EEF5FC',
+    borderWidth: 1,
+    borderColor: '#DDE8F4',
+  },
+  secondaryActionText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1677D2',
+  },
+  primaryAction: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1677D2',
+  },
+  disabledAction: {
+    backgroundColor: '#A8B6CC',
+  },
+  primaryActionText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   verifyingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
     marginTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
   },
   verifyingText: {
-    fontSize: 13,
-    color: '#3b82f6',
-  },
-  codeErrorText: {
     fontSize: 12,
-    color: '#db6b6b',
-    textAlign: 'center',
-    marginTop: 12,
-  },
-  pairModalFooterButtons: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#edf2f7',
-  },
-  pairModalFooterButton: {
-    flex: 1,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pairModalFooterButtonLeft: {
-    borderRightWidth: 1,
-    borderRightColor: '#edf2f7',
-  },
-  pairModalFooterButtonRight: {},
-  pairModalFooterButtonText: {
-    fontSize: 15,
-    color: '#3b82f6',
-    fontWeight: '500',
-  },
-  pairModalFooterButtonTextBold: {
-    fontWeight: '700',
+    color: '#59616D',
   },
 });

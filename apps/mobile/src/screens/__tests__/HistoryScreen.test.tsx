@@ -49,8 +49,8 @@ jest.mock('../../components/Icon', () => ({
   },
 }));
 
-jest.mock('../../components/GlobalGradientBackground', () => ({
-  GlobalGradientBackground: ({ children }: { children: React.ReactNode }) => (
+jest.mock('../../components/GradientBackground', () => ({
+  GradientBackground: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
   ),
 }));
@@ -65,7 +65,7 @@ jest.mock('../../services/SyncEngineModule', () => ({
 
 import { listHistory } from '../../services/desktop-local-service';
 import { getBindingState } from '../../services/SyncEngineModule';
-import { HistoryGlobalScreen } from '../HistoryGlobalScreen';
+import { HistoryScreen } from '../HistoryScreen';
 import type { DesktopSyncRecordDTO } from '@lynavo-drive/contracts';
 
 const mockedListHistory = listHistory as jest.MockedFunction<
@@ -75,7 +75,7 @@ const mockedGetBindingState = getBindingState as jest.MockedFunction<
   typeof getBindingState
 >;
 
-describe('HistoryGlobalScreen', () => {
+describe('HistoryScreen', () => {
   let warnSpy: jest.SpyInstance<void, Parameters<typeof console.warn>>;
 
   beforeEach(() => {
@@ -93,7 +93,7 @@ describe('HistoryGlobalScreen', () => {
   it('keeps a real empty history response empty instead of using preview records', async () => {
     mockedListHistory.mockResolvedValueOnce([]);
 
-    const { getByText, queryByText } = render(<HistoryGlobalScreen />);
+    const { getByText, queryByText } = render(<HistoryScreen />);
 
     await waitFor(() => {
       expect(mockedListHistory).toHaveBeenCalledWith({
@@ -111,7 +111,7 @@ describe('HistoryGlobalScreen', () => {
   it('top-aligns the empty history prompt below the header', async () => {
     mockedListHistory.mockResolvedValueOnce([]);
 
-    const { getByTestId } = render(<HistoryGlobalScreen />);
+    const { getByTestId } = render(<HistoryScreen />);
 
     await waitFor(() => {
       expect(mockedListHistory).toHaveBeenCalled();
@@ -127,7 +127,7 @@ describe('HistoryGlobalScreen', () => {
   it('shows an error state when the real history request fails', async () => {
     mockedListHistory.mockRejectedValueOnce(new Error('offline'));
 
-    const { getByText, queryByText } = render(<HistoryGlobalScreen />);
+    const { getByText, queryByText } = render(<HistoryScreen />);
 
     await waitFor(() => {
       expect(mockedListHistory).toHaveBeenCalled();
@@ -145,7 +145,7 @@ describe('HistoryGlobalScreen', () => {
   it('shows the empty state when the binding wrapper returns no binding', async () => {
     mockedGetBindingState.mockResolvedValueOnce(null);
 
-    const { getByText, queryByText } = render(<HistoryGlobalScreen />);
+    const { getByText, queryByText } = render(<HistoryScreen />);
 
     await waitFor(() => {
       expect(getByText('No sync history yet')).toBeTruthy();
@@ -175,7 +175,7 @@ describe('HistoryGlobalScreen', () => {
       },
     ]);
 
-    const { getByText, queryByText } = render(<HistoryGlobalScreen />);
+    const { getByText, queryByText } = render(<HistoryScreen />);
 
     await waitFor(() => {
       expect(getByText('--')).toBeTruthy();
@@ -242,9 +242,7 @@ describe('HistoryGlobalScreen', () => {
     ];
     mockedListHistory.mockResolvedValueOnce(realHistory);
 
-    const { getAllByText, getByText, queryByText } = render(
-      <HistoryGlobalScreen />,
-    );
+    const { getAllByText, getByText, queryByText } = render(<HistoryScreen />);
 
     await waitFor(() => {
       expect(mockedListHistory).toHaveBeenCalledWith({

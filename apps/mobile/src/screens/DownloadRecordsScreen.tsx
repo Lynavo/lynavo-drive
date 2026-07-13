@@ -21,7 +21,7 @@ import {
   type ReceivedLibraryItemDTO,
 } from '@lynavo-drive/contracts';
 
-import { GlobalGradientBackground } from '../components/GlobalGradientBackground';
+import { GradientBackground } from '../components/GradientBackground';
 import { Icon } from '../components/Icon';
 import { isVisualQaEnabled } from '../dev/visualQa';
 import { getVisualQaDownloadRecords } from '../dev/visualQaMockData';
@@ -54,7 +54,7 @@ import {
   openFileWithOtherApp,
 } from '../utils/file-preview';
 import { formatBytes } from '../utils/format';
-import { GlobalMediaPreviewIcon } from './components/GlobalSyncActivityHomeSections';
+import { MediaPreviewIcon } from './components/SyncActivityHomeSections';
 
 type NavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -68,7 +68,7 @@ type DownloadPreviewState = {
 
 const BLUE = colors.accent;
 
-export function DownloadRecordsGlobalScreen() {
+export function DownloadRecordsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState<DownloadRecord[]>([]);
@@ -116,7 +116,7 @@ export function DownloadRecordsGlobalScreen() {
           );
         } catch (err) {
           console.warn(
-            '[DownloadRecordsGlobalScreen] Failed to fetch personal-dir preview URL',
+            '[DownloadRecordsScreen] Failed to fetch personal-dir preview URL',
             err,
           );
         }
@@ -149,7 +149,7 @@ export function DownloadRecordsGlobalScreen() {
         mimeType: documentMimeType(record.filename),
       });
     } catch (err) {
-      console.warn('[DownloadRecordsGlobalScreen] Preview failed:', err);
+      console.warn('[DownloadRecordsScreen] Preview failed:', err);
       Alert.alert('Preview Failed', 'Could not load file preview.');
     }
   }, []);
@@ -179,7 +179,7 @@ export function DownloadRecordsGlobalScreen() {
           : `${record.filename} saved to Files`,
       );
     } catch (err) {
-      console.warn('[DownloadRecordsGlobalScreen] Re-download failed:', err);
+      console.warn('[DownloadRecordsScreen] Re-download failed:', err);
       Alert.alert(
         'Download Failed',
         'Could not download the file. Please try again later.',
@@ -188,7 +188,7 @@ export function DownloadRecordsGlobalScreen() {
   }, []);
 
   return (
-    <GlobalGradientBackground>
+    <GradientBackground>
       <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
         <View style={styles.header}>
           <TouchableOpacity
@@ -271,7 +271,7 @@ export function DownloadRecordsGlobalScreen() {
         preview={preview}
         onClose={() => setPreview(null)}
       />
-    </GlobalGradientBackground>
+    </GradientBackground>
   );
 }
 
@@ -525,7 +525,7 @@ function DownloadRecordPreviewThumbnail({
     );
   }
 
-  return <GlobalMediaPreviewIcon type={kind} />;
+  return <MediaPreviewIcon type={kind} />;
 }
 
 function DownloadRecordMediaPreviewModal({

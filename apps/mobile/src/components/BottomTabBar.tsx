@@ -1,25 +1,29 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Platform,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
-import { Icon } from './Icon';
+import { FolderOpen, Home, User } from 'lucide-react-native';
+import { colors } from '../theme/globalColors';
+import { androidBoxShadow } from '../utils/androidShadow';
+
+const SIDE_INSET = 16;
+const BOTTOM_GAP = 16;
 
 interface BottomTabBarProps {
   activeTab: 'home' | 'files' | 'settings';
+  onTabPress?: (tab: 'home' | 'files' | 'settings') => void;
 }
 
-export function BottomTabBar({ activeTab }: BottomTabBarProps) {
+export function BottomTabBar({ activeTab, onTabPress }: BottomTabBarProps) {
   const navigation = useNavigation();
   const { t } = useTranslation();
 
   const handleTabPress = (tab: 'home' | 'files' | 'settings') => {
     if (activeTab === tab) return;
+    if (onTabPress) {
+      onTabPress(tab);
+      return;
+    }
 
     let targetRoute = '';
     if (tab === 'home') targetRoute = 'SyncActivity';
@@ -35,95 +39,154 @@ export function BottomTabBar({ activeTab }: BottomTabBarProps) {
   };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.tabButton}
-        onPress={() => handleTabPress('home')}
-        activeOpacity={0.7}
-      >
-        <Icon
-          name="home-outline"
-          size={22}
-          color={activeTab === 'home' ? '#1A3A5C' : '#5A7A96'}
-        />
-        <Text
+    <View
+      pointerEvents="box-none"
+      testID="bottom-tab-bar-outer"
+      style={styles.outer}
+    >
+      <View testID="bottom-tab-bar-container" style={styles.container}>
+        <TouchableOpacity
+          testID="bottom-tab-home"
           style={[
-            styles.tabLabel,
-            activeTab === 'home' && styles.activeTabLabel,
+            styles.tabButton,
+            activeTab === 'home' && styles.activeTabButton,
           ]}
+          onPress={() => handleTabPress('home')}
+          activeOpacity={0.7}
         >
-          {t('common.tabs.home') || 'Home'}
-        </Text>
-      </TouchableOpacity>
+          <Home
+            testID="bottom-tab-home-icon"
+            size={22}
+            color={
+              activeTab === 'home' ? colors.primary : colors.mutedForeground
+            }
+            strokeWidth={activeTab === 'home' ? 2.2 : 1.9}
+          />
+          <Text
+            style={[
+              styles.tabLabel,
+              activeTab === 'home' && styles.activeTabLabel,
+            ]}
+          >
+            {t('common.tabs.home') || 'Home'}
+          </Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.tabButton}
-        onPress={() => handleTabPress('files')}
-        activeOpacity={0.7}
-      >
-        <Icon
-          name="desktop-outline"
-          size={22}
-          color={activeTab === 'files' ? '#1A3A5C' : '#5A7A96'}
-        />
-        <Text
+        <TouchableOpacity
+          testID="bottom-tab-files"
           style={[
-            styles.tabLabel,
-            activeTab === 'files' && styles.activeTabLabel,
+            styles.tabButton,
+            activeTab === 'files' && styles.activeTabButton,
           ]}
+          onPress={() => handleTabPress('files')}
+          activeOpacity={0.7}
         >
-          {t('common.tabs.files') || 'Computer Files'}
-        </Text>
-      </TouchableOpacity>
+          <FolderOpen
+            testID="bottom-tab-files-icon"
+            size={22}
+            color={
+              activeTab === 'files' ? colors.primary : colors.mutedForeground
+            }
+            strokeWidth={activeTab === 'files' ? 2.2 : 1.9}
+          />
+          <Text
+            style={[
+              styles.tabLabel,
+              activeTab === 'files' && styles.activeTabLabel,
+            ]}
+          >
+            {t('common.tabs.files') || 'Computer Files'}
+          </Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.tabButton}
-        onPress={() => handleTabPress('settings')}
-        activeOpacity={0.7}
-      >
-        <Icon
-          name="person-outline"
-          size={22}
-          color={activeTab === 'settings' ? '#1A3A5C' : '#5A7A96'}
-        />
-        <Text
+        <TouchableOpacity
+          testID="bottom-tab-settings"
           style={[
-            styles.tabLabel,
-            activeTab === 'settings' && styles.activeTabLabel,
+            styles.tabButton,
+            activeTab === 'settings' && styles.activeTabButton,
           ]}
+          onPress={() => handleTabPress('settings')}
+          activeOpacity={0.7}
         >
-          {t('common.tabs.settings') || 'Me'}
-        </Text>
-      </TouchableOpacity>
+          <User
+            testID="bottom-tab-settings-icon"
+            size={22}
+            color={
+              activeTab === 'settings' ? colors.primary : colors.mutedForeground
+            }
+            strokeWidth={activeTab === 'settings' ? 2.2 : 1.9}
+          />
+          <Text
+            style={[
+              styles.tabLabel,
+              activeTab === 'settings' && styles.activeTabLabel,
+            ]}
+          >
+            {t('common.tabs.settings') || 'Me'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  outer: {
+    flexShrink: 0,
+    marginHorizontal: SIDE_INSET,
+    marginBottom: BOTTOM_GAP,
+    zIndex: 40,
+    backgroundColor: 'transparent',
+  },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(56, 92, 128, 0.12)',
-    backgroundColor: '#DCEEFE',
-    paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 14,
-    paddingHorizontal: 16,
+    gap: 4,
+    backgroundColor: '#F7FBFF',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    padding: 6,
+    shadowColor: '#46608A',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.14,
+    shadowRadius: 48,
+    elevation: 8,
+    ...androidBoxShadow({
+      offsetY: 20,
+      blurRadius: 48,
+      color: 'rgba(70, 96, 138, 0.14)',
+    }),
   },
   tabButton: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
+    minHeight: 54,
+    borderRadius: 17,
+  },
+  activeTabButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    shadowColor: '#46608A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    elevation: 3,
+    ...androidBoxShadow({
+      offsetY: 10,
+      blurRadius: 24,
+      color: 'rgba(70, 96, 138, 0.10)',
+    }),
   },
   tabLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#5A7A96',
-    marginTop: 4,
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.mutedForeground,
+    marginTop: 2,
   },
   activeTabLabel: {
-    color: '#1A3A5C',
-    fontWeight: '600',
+    color: colors.foreground,
   },
 });

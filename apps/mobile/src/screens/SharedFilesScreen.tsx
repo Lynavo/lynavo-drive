@@ -9,12 +9,21 @@ import { GradientBackground } from '../components/GradientBackground';
 import { BottomTabBar } from '../components/BottomTabBar';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { recordDiagnosticsLog } from '../services/diagnostics-log-service';
+import { colors } from '../theme/globalColors';
+import { androidBoxShadow } from '../utils/androidShadow';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'SharedFiles'>;
 
-export function SharedFilesScreen() {
+interface SharedFilesScreenProps {
+  showBottomTabBar?: boolean;
+}
+
+export function SharedFilesScreen({
+  showBottomTabBar = true,
+}: SharedFilesScreenProps) {
   const navigation = useNavigation<NavigationProp>();
   const { t } = useTranslation();
+  const translate = t as (key: string) => string;
 
   const openPhoneSyncSpace = () => {
     recordDiagnosticsLog('PhoneSyncSpace', 'entry pressed', {
@@ -29,6 +38,16 @@ export function SharedFilesScreen() {
     });
     navigation.navigate('LocalComputer');
   };
+  const localComputerDescription = translateOrFallback(
+    translate,
+    'sharedFiles.localComputer.ossDesc',
+    'Access paired computer files on the same local network.',
+  );
+  const localComputerBadge = translateOrFallback(
+    translate,
+    'sharedFiles.localComputer.ossBadge',
+    'LAN',
+  );
 
   return (
     <GradientBackground>
@@ -36,6 +55,9 @@ export function SharedFilesScreen() {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>
             {t('sharedFiles.title') || 'File'}
+          </Text>
+          <Text style={styles.headerSubtitle}>
+            {t('sharedFiles.headerSubtitle')}
           </Text>
         </View>
 
@@ -48,10 +70,10 @@ export function SharedFilesScreen() {
             <View
               style={[
                 styles.iconWrapper,
-                { backgroundColor: 'rgba(59, 130, 246, 0.08)' },
+                { backgroundColor: 'rgba(59, 130, 246, 0.10)' },
               ]}
             >
-              <Icon name="phone-portrait-outline" size={36} color="#3b82f6" />
+              <Icon name="phone-portrait-outline" size={24} color="#3B82F6" />
             </View>
             <View style={styles.cardInfo}>
               <Text style={styles.cardTitle}>
@@ -61,8 +83,20 @@ export function SharedFilesScreen() {
                 {t('sharedFiles.phoneSyncSpace.desc') ||
                   'View files synced to your computer and their upload sources'}
               </Text>
+              <View style={styles.badgeRow}>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {t('sharedFiles.phoneSyncSpace.badgeSync')}
+                  </Text>
+                </View>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {t('sharedFiles.phoneSyncSpace.badgeSource')}
+                  </Text>
+                </View>
+              </View>
             </View>
-            <Icon name="chevron-forward" size={24} color="#94a3b8" />
+            <Icon name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -73,27 +107,47 @@ export function SharedFilesScreen() {
             <View
               style={[
                 styles.iconWrapper,
-                { backgroundColor: 'rgba(139, 92, 246, 0.08)' },
+                { backgroundColor: 'rgba(139, 92, 246, 0.10)' },
               ]}
             >
-              <Icon name="desktop-outline" size={36} color="#8b5cf6" />
+              <Icon name="desktop-outline" size={24} color="#8B5CF6" />
             </View>
             <View style={styles.cardInfo}>
               <Text style={styles.cardTitle}>
                 {t('sharedFiles.localComputer.title') || 'Computer Files'}
               </Text>
               <Text style={styles.cardDescription}>
-                {t('sharedFiles.localComputer.desc') ||
-                  'Browse your computer shared directory and download files'}
+                {localComputerDescription}
               </Text>
+              <View style={styles.badgeRow}>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {t('sharedFiles.localComputer.badgeDesktop')}
+                  </Text>
+                </View>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{localComputerBadge}</Text>
+                </View>
+              </View>
             </View>
-            <Icon name="chevron-forward" size={24} color="#94a3b8" />
+            <Icon name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
         </View>
       </SafeAreaView>
-      <BottomTabBar activeTab="files" />
+      {showBottomTabBar ? <BottomTabBar activeTab="files" /> : null}
     </GradientBackground>
   );
+}
+
+function translateOrFallback(
+  t: (key: string) => string,
+  key: string,
+  fallback: string,
+) {
+  const value = t(key);
+  return typeof value === 'string' && value.trim().length > 0 && value !== key
+    ? value
+    : fallback;
 }
 
 const styles = StyleSheet.create({
@@ -101,38 +155,52 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    height: 56,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    marginTop: 12,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 14,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.foreground,
+    letterSpacing: 0,
+  },
+  headerSubtitle: {
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 20,
+    color: '#59616D',
   },
   cardContainer: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    gap: 16,
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    gap: 12,
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 20,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 3,
+    backgroundColor: 'rgba(255,255,255,0.58)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.70)',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    shadowColor: '#46608A',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.12,
+    shadowRadius: 52,
+    elevation: 6,
+    ...androidBoxShadow({
+      offsetY: 18,
+      blurRadius: 52,
+      color: 'rgba(70, 96, 138, 0.12)',
+    }),
   },
   iconWrapper: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
+    width: 52,
+    height: 52,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -142,15 +210,32 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.foreground,
     marginBottom: 4,
   },
   cardDescription: {
-    fontSize: 13,
-    color: '#64748b',
-    lineHeight: 18,
+    fontSize: 12,
+    color: '#59616D',
+    lineHeight: 20,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  badge: {
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.62)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#7B8490',
   },
 });
 

@@ -4,11 +4,11 @@ import { Image, Text } from 'react-native';
 import type { TFunction } from 'i18next';
 
 import {
-  GlobalSyncRecordTimelineSection,
+  SyncRecordTimelineSection,
   RecentDownloadsSection,
   SyncRecordSummarySection,
   type RecentDownloadPlaceholder,
-} from '../GlobalSyncActivityHomeSections';
+} from '../SyncActivityHomeSections';
 
 jest.mock('react-native-video', () => 'Video');
 
@@ -96,7 +96,7 @@ describe('RecentDownloadsSection', () => {
       tree!.root.findByProps({ testID: 'recent-download-empty-state' }),
     ).toBeTruthy();
     expect(
-      tree!.root.findByProps({ testID: 'global-recent-download-title-icon' }),
+      tree!.root.findByProps({ testID: 'recent-download-title-icon' }),
     ).toBeTruthy();
   });
 
@@ -238,7 +238,7 @@ describe('RecentDownloadsSection', () => {
     let tree: ReactTestRenderer.ReactTestRenderer;
     ReactTestRenderer.act(() => {
       tree = ReactTestRenderer.create(
-        <GlobalSyncRecordTimelineSection days={[]} totalSyncedSize="0 B" />,
+        <SyncRecordTimelineSection days={[]} totalSyncedSize="0 B" />,
       );
     });
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { act, render, waitFor } from '@testing-library/react-native';
 import { NativeEventEmitter, NativeModules, StyleSheet } from 'react-native';
 
-import { SyncActivityGlobalScreen } from '../SyncActivityGlobalScreen';
+import { SyncActivityScreen } from '../SyncActivityScreen';
 import { listDownloadRecords } from '../../services/download-records-service';
 import {
   getBindingState,
@@ -49,24 +49,24 @@ jest.mock('react-native-safe-area-context', () => ({
       const { View } = require('react-native');
       return ReactInner.createElement(
         View,
-        { testID: 'sync-activity-global-safe-area', edges },
+        { testID: 'sync-activity-safe-area', edges },
         children,
       );
     })(),
 }));
 
-jest.mock('../../components/GlobalGradientBackground', () => ({
-  GlobalGradientBackground: ({ children }: { children: React.ReactNode }) => (
+jest.mock('../../components/GradientBackground', () => ({
+  GradientBackground: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
   ),
 }));
 
-jest.mock('../../components/GlobalBottomTabBar', () => ({
-  GlobalBottomTabBar: () => {
+jest.mock('../../components/BottomTabBar', () => ({
+  BottomTabBar: () => {
     const ReactInner = require('react');
     const { View } = require('react-native');
     return ReactInner.createElement(View, {
-      testID: 'global-bottom-tab-bar',
+      testID: 'bottom-tab-bar',
     });
   },
 }));
@@ -79,7 +79,7 @@ jest.mock('../../components/Icon', () => ({
   },
 }));
 
-jest.mock('../components/GlobalSyncActivityHomeSections', () => ({
+jest.mock('../components/SyncActivityHomeSections', () => ({
   RecentDownloadsSection: (props: { records: Array<{ filename: string }> }) => {
     mockRecentDownloadsSection(props);
     const ReactInner = require('react');
@@ -96,7 +96,7 @@ jest.mock('../components/GlobalSyncActivityHomeSections', () => ({
       ),
     );
   },
-  GlobalSyncRecordTimelineSection: (props: {
+  SyncRecordTimelineSection: (props: {
     days: Array<{
       key: string;
       label: string;
@@ -112,7 +112,7 @@ jest.mock('../components/GlobalSyncActivityHomeSections', () => ({
     return ReactInner.createElement(
       View,
       {
-        testID: 'global-sync-record-timeline-section',
+        testID: 'sync-record-timeline-section',
       },
       [
         ReactInner.createElement(Text, { key: 'total' }, props.totalSyncedSize),
@@ -156,7 +156,7 @@ jest.mock('../../dev/visualQa', () => ({
   isVisualQaHomeEmptyStateEnabled: () => false,
 }));
 
-describe('SyncActivityGlobalScreen', () => {
+describe('SyncActivityScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockVisualQaEnabled = false;
@@ -214,14 +214,14 @@ describe('SyncActivityGlobalScreen', () => {
 
   test('does not reserve bottom safe-area inside the main tab content', async () => {
     const { getByTestId } = render(
-      <SyncActivityGlobalScreen showBottomTabBar={false} />,
+      <SyncActivityScreen showBottomTabBar={false} />,
     );
 
     await waitFor(() => {
       expect(listDownloadRecords).toHaveBeenCalled();
     });
 
-    expect(getByTestId('sync-activity-global-safe-area').props.edges).toEqual([
+    expect(getByTestId('sync-activity-safe-area').props.edges).toEqual([
       'top',
       'left',
       'right',
@@ -232,7 +232,7 @@ describe('SyncActivityGlobalScreen', () => {
     mockVisualQaEnabled = true;
 
     const { getByText, queryByTestId } = render(
-      <SyncActivityGlobalScreen showBottomTabBar={false} />,
+      <SyncActivityScreen showBottomTabBar={false} />,
     );
 
     await waitFor(() => {
@@ -250,7 +250,7 @@ describe('SyncActivityGlobalScreen', () => {
 
   test('does not inject visual QA recent-download mocks when visual QA is disabled', async () => {
     const { queryByText } = render(
-      <SyncActivityGlobalScreen showBottomTabBar={false} />,
+      <SyncActivityScreen showBottomTabBar={false} />,
     );
 
     await waitFor(() => {
@@ -293,7 +293,7 @@ describe('SyncActivityGlobalScreen', () => {
     });
 
     const { getByText, getByTestId, queryByText } = render(
-      <SyncActivityGlobalScreen showBottomTabBar={false} />,
+      <SyncActivityScreen showBottomTabBar={false} />,
     );
 
     expect(
@@ -382,7 +382,7 @@ describe('SyncActivityGlobalScreen', () => {
     });
 
     const { getByText, getByTestId, queryByText } = render(
-      <SyncActivityGlobalScreen showBottomTabBar={false} />,
+      <SyncActivityScreen showBottomTabBar={false} />,
     );
 
     await waitFor(() => {
@@ -412,9 +412,7 @@ describe('SyncActivityGlobalScreen', () => {
   });
 
   test('subscribes to native sync events, refreshes matching snapshots, and cleans up', async () => {
-    const screen = render(
-      <SyncActivityGlobalScreen showBottomTabBar={false} />,
-    );
+    const screen = render(<SyncActivityScreen showBottomTabBar={false} />);
 
     await waitFor(() => {
       expect(NativeEventEmitter).toHaveBeenCalledWith(

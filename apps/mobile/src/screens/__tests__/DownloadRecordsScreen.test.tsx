@@ -28,14 +28,14 @@ jest.mock('../../components/Icon', () => ({
   },
 }));
 
-jest.mock('../../components/GlobalGradientBackground', () => ({
-  GlobalGradientBackground: ({ children }: { children: React.ReactNode }) => (
+jest.mock('../../components/GradientBackground', () => ({
+  GradientBackground: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
   ),
 }));
 
-jest.mock('../components/GlobalSyncActivityHomeSections', () => ({
-  GlobalMediaPreviewIcon: ({ type }: { type: string }) => {
+jest.mock('../components/SyncActivityHomeSections', () => ({
+  MediaPreviewIcon: ({ type }: { type: string }) => {
     const ReactInner = require('react');
     const { Text } = require('react-native');
     return ReactInner.createElement(Text, null, `preview-${type}`);
@@ -126,7 +126,7 @@ import {
 } from '../../services/desktop-local-service';
 import { viewDocument } from '@react-native-documents/viewer';
 import { openFileWithOtherApp } from '../../utils/file-preview';
-import { DownloadRecordsGlobalScreen } from '../DownloadRecordsGlobalScreen';
+import { DownloadRecordsScreen } from '../DownloadRecordsScreen';
 
 const mockedListDownloadRecords = listDownloadRecords as jest.MockedFunction<
   typeof listDownloadRecords
@@ -137,7 +137,7 @@ const mockedDownloadReceivedLibraryItem =
   downloadReceivedLibraryItem as jest.Mock;
 const mockedDownloadResourceForGlobal = downloadResourceForGlobal as jest.Mock;
 
-describe('DownloadRecordsGlobalScreen', () => {
+describe('DownloadRecordsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockVisualQaEnabled = false;
@@ -151,7 +151,7 @@ describe('DownloadRecordsGlobalScreen', () => {
   it('renders a dedicated empty download records page', async () => {
     mockedListDownloadRecords.mockResolvedValueOnce([]);
 
-    const { getByText, queryByText } = render(<DownloadRecordsGlobalScreen />);
+    const { getByText, queryByText } = render(<DownloadRecordsScreen />);
 
     await waitFor(() => {
       expect(getByText('Recent Downloads')).toBeTruthy();
@@ -170,7 +170,7 @@ describe('DownloadRecordsGlobalScreen', () => {
     mockVisualQaEnabled = true;
     mockedListDownloadRecords.mockResolvedValueOnce([]);
 
-    const { getByText, queryByText } = render(<DownloadRecordsGlobalScreen />);
+    const { getByText, queryByText } = render(<DownloadRecordsScreen />);
 
     await waitFor(() => {
       expect(getByText('Client-Handoff.mov')).toBeTruthy();
@@ -191,7 +191,7 @@ describe('DownloadRecordsGlobalScreen', () => {
       },
     ]);
 
-    const { getByText } = render(<DownloadRecordsGlobalScreen />);
+    const { getByText } = render(<DownloadRecordsScreen />);
 
     await waitFor(() => {
       expect(getByText('Vacation-01.JPG')).toBeTruthy();
@@ -224,7 +224,7 @@ describe('DownloadRecordsGlobalScreen', () => {
     ]);
 
     const { getByTestId, getByText, queryByTestId } = render(
-      <DownloadRecordsGlobalScreen />,
+      <DownloadRecordsScreen />,
     );
 
     await waitFor(() => {
@@ -256,7 +256,7 @@ describe('DownloadRecordsGlobalScreen', () => {
       },
     ]);
 
-    const { getByTestId } = render(<DownloadRecordsGlobalScreen />);
+    const { getByTestId } = render(<DownloadRecordsScreen />);
 
     await waitFor(() => {
       expect(getByTestId('download-record-row-image-1')).toBeTruthy();
@@ -283,7 +283,7 @@ describe('DownloadRecordsGlobalScreen', () => {
     const recordDiagnosticsLog = jest.fn();
     NativeModules.NativeSyncEngine.recordDiagnosticsLog = recordDiagnosticsLog;
 
-    const { getByTestId } = render(<DownloadRecordsGlobalScreen />);
+    const { getByTestId } = render(<DownloadRecordsScreen />);
 
     await waitFor(() => {
       expect(getByTestId('download-record-thumbnail-image-1')).toBeTruthy();
@@ -324,7 +324,7 @@ describe('DownloadRecordsGlobalScreen', () => {
       },
     ]);
 
-    const { getByTestId } = render(<DownloadRecordsGlobalScreen />);
+    const { getByTestId } = render(<DownloadRecordsScreen />);
 
     await waitFor(() => {
       expect(getByTestId('download-record-row-doc-1')).toBeTruthy();
@@ -370,7 +370,7 @@ describe('DownloadRecordsGlobalScreen', () => {
       savedLocation: 'Downloads/Lynavo Drive',
     });
 
-    const { getByTestId } = render(<DownloadRecordsGlobalScreen />);
+    const { getByTestId } = render(<DownloadRecordsScreen />);
 
     await waitFor(() => {
       expect(getByTestId('download-record-download-local-1')).toBeTruthy();
@@ -421,7 +421,7 @@ describe('DownloadRecordsGlobalScreen', () => {
       savedLocation: 'Photos',
     });
 
-    const { getByTestId } = render(<DownloadRecordsGlobalScreen />);
+    const { getByTestId } = render(<DownloadRecordsScreen />);
 
     await waitFor(() => {
       expect(

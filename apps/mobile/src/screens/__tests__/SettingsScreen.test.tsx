@@ -2,7 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
-import { SettingsGlobalScreen } from '../SettingsGlobalScreen';
+import { SettingsScreen } from '../SettingsScreen';
 import {
   getAppInfo,
   getBindingState,
@@ -164,8 +164,8 @@ const mockedShareDiagnosticsArchive =
   shareDiagnosticsArchive as jest.MockedFunction<
     typeof shareDiagnosticsArchive
   >;
-async function renderSettingsGlobalScreen() {
-  const screen = render(<SettingsGlobalScreen />);
+async function renderSettingsScreen() {
+  const screen = render(<SettingsScreen />);
   await act(async () => {
     await Promise.resolve();
     await Promise.resolve();
@@ -173,7 +173,7 @@ async function renderSettingsGlobalScreen() {
   return screen;
 }
 
-describe('SettingsGlobalScreen', () => {
+describe('SettingsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedGetBindingState.mockResolvedValue({
@@ -203,7 +203,7 @@ describe('SettingsGlobalScreen', () => {
   });
 
   test('renders local device, current desktop, and version without official account rows', async () => {
-    const { getByText, queryByText } = await renderSettingsGlobalScreen();
+    const { getByText, queryByText } = await renderSettingsScreen();
 
     await waitFor(() => expect(getByText('Field iPhone')).toBeTruthy());
     expect(getByText('Edit Bay')).toBeTruthy();
@@ -220,7 +220,7 @@ describe('SettingsGlobalScreen', () => {
   });
 
   test('uses lucide icons instead of legacy ionicon glyph names on the global settings page', async () => {
-    const { queryByText } = await renderSettingsGlobalScreen();
+    const { queryByText } = await renderSettingsScreen();
 
     [
       'person-outline',
@@ -245,7 +245,7 @@ describe('SettingsGlobalScreen', () => {
     mockedGetBindingState.mockResolvedValueOnce(null);
     mockedGetAppInfo.mockResolvedValueOnce(null);
 
-    const { getByText } = await renderSettingsGlobalScreen();
+    const { getByText } = await renderSettingsScreen();
 
     await waitFor(() => expect(getByText('No computer bound')).toBeTruthy());
     expect(getByText('Not connected to any computer')).toBeTruthy();
@@ -253,10 +253,10 @@ describe('SettingsGlobalScreen', () => {
   });
 
   test('keeps content bottom spacing aligned with the reference page padding', async () => {
-    const { getByTestId } = await renderSettingsGlobalScreen();
+    const { getByTestId } = await renderSettingsScreen();
 
     const contentStyle = StyleSheet.flatten(
-      getByTestId('global-settings-scroll').props.contentContainerStyle,
+      getByTestId('settings-scroll').props.contentContainerStyle,
     );
 
     expect(contentStyle.paddingBottom).toBe(24);
@@ -264,11 +264,11 @@ describe('SettingsGlobalScreen', () => {
 
   test('keeps settings OSS-only without account membership, logout, or delete-account actions', async () => {
     const { getByText, queryByTestId, queryByText } =
-      await renderSettingsGlobalScreen();
+      await renderSettingsScreen();
 
     expect(queryByText('Membership status')).toBeNull();
-    expect(queryByTestId('global-settings-logout')).toBeNull();
-    expect(queryByTestId('global-settings-delete-account')).toBeNull();
+    expect(queryByTestId('settings-logout')).toBeNull();
+    expect(queryByTestId('settings-delete-account')).toBeNull();
 
     fireEvent.press(getByText('Switch Device'));
     expect(mockNavigate).toHaveBeenCalledWith('DeviceDiscovery', {
@@ -280,7 +280,7 @@ describe('SettingsGlobalScreen', () => {
   });
 
   test('exports diagnostics through the local share helper', async () => {
-    const { getByText } = await renderSettingsGlobalScreen();
+    const { getByText } = await renderSettingsScreen();
 
     await act(async () => {
       fireEvent.press(getByText('Export Diagnostics'));
@@ -291,9 +291,9 @@ describe('SettingsGlobalScreen', () => {
 
   test('hydrates and persists the device display name through the native bridge', async () => {
     const { getByDisplayValue, getByTestId, getByText, queryByText } =
-      await renderSettingsGlobalScreen();
+      await renderSettingsScreen();
 
-    fireEvent.press(getByTestId('global-settings-edit-device-name'));
+    fireEvent.press(getByTestId('settings-edit-device-name'));
 
     expect(getByText('Edit Device Name')).toBeTruthy();
     fireEvent.changeText(
@@ -313,9 +313,9 @@ describe('SettingsGlobalScreen', () => {
   test('keeps the edit device modal open when saving the native display name fails', async () => {
     mockedSetClientDisplayName.mockRejectedValueOnce(new Error('bridge down'));
     const { getByDisplayValue, getByTestId, getByText } =
-      await renderSettingsGlobalScreen();
+      await renderSettingsScreen();
 
-    fireEvent.press(getByTestId('global-settings-edit-device-name'));
+    fireEvent.press(getByTestId('settings-edit-device-name'));
     fireEvent.changeText(getByDisplayValue('Field iPhone'), 'Studio iPhone');
 
     await act(async () => {
@@ -329,9 +329,9 @@ describe('SettingsGlobalScreen', () => {
 
   test('only offers supported global languages and persists selected preference', async () => {
     const { getByText, getByTestId, queryByText } =
-      await renderSettingsGlobalScreen();
+      await renderSettingsScreen();
 
-    fireEvent.press(getByTestId('global-settings-language'));
+    fireEvent.press(getByTestId('settings-language'));
 
     expect(getByText('Follow System Language')).toBeTruthy();
     expect(getByText('Select Language Manually')).toBeTruthy();
@@ -357,7 +357,7 @@ describe('SettingsGlobalScreen', () => {
     );
     expect(mockedChangeLanguage).toHaveBeenCalledWith('en');
 
-    fireEvent.press(getByTestId('global-language-back'));
+    fireEvent.press(getByTestId('language-back'));
     expect(getByText('English')).toBeTruthy();
   });
 });

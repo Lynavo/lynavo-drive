@@ -142,14 +142,14 @@ jest.mock('../../screens/DeviceDiscoveryScreen', () => ({
   },
 }));
 
-jest.mock('../../screens/DeviceDiscoveryGlobalScreen', () => ({
-  DeviceDiscoveryGlobalScreen: () => {
+jest.mock('../../screens/DeviceDiscoveryScreen', () => ({
+  DeviceDiscoveryScreen: () => {
     const R = require('react');
     const { Text } = require('react-native');
     return R.createElement(
       Text,
-      { testID: 'global-device-discovery-screen' },
-      'GlobalDeviceDiscovery',
+      { testID: 'device-discovery-screen' },
+      'DeviceDiscovery',
     );
   },
 }));
@@ -166,8 +166,8 @@ jest.mock('../../screens/SyncActivityScreen', () => ({
   },
 }));
 
-jest.mock('../../screens/SyncActivityGlobalScreen', () => ({
-  SyncActivityGlobalScreen: ({
+jest.mock('../../screens/SyncActivityScreen', () => ({
+  SyncActivityScreen: ({
     showBottomTabBar,
   }: {
     showBottomTabBar?: boolean;
@@ -176,8 +176,8 @@ jest.mock('../../screens/SyncActivityGlobalScreen', () => ({
     const { Text } = require('react-native');
     return R.createElement(
       Text,
-      { testID: 'global-sync-activity-screen' },
-      `GlobalSyncActivity showBottomTabBar=${String(showBottomTabBar)}`,
+      { testID: 'sync-activity-screen' },
+      `SyncActivity showBottomTabBar=${String(showBottomTabBar)}`,
     );
   },
 }));
@@ -218,17 +218,13 @@ jest.mock('../../screens/SharedFilesScreen', () => ({
   },
 }));
 
-jest.mock('../../screens/SharedFilesGlobalScreen', () => ({
-  SharedFilesGlobalScreen: ({
-    showBottomTabBar,
-  }: {
-    showBottomTabBar?: boolean;
-  }) => {
+jest.mock('../../screens/SharedFilesScreen', () => ({
+  SharedFilesScreen: ({ showBottomTabBar }: { showBottomTabBar?: boolean }) => {
     const R = require('react');
     const { Text } = require('react-native');
     return R.createElement(
       Text,
-      { testID: 'shared-files-global-screen' },
+      { testID: 'shared-files-screen' },
       `SharedFilesGlobal showBottomTabBar=${String(showBottomTabBar)}`,
     );
   },
@@ -242,8 +238,8 @@ jest.mock('../../screens/HistoryScreen', () => ({
   },
 }));
 
-jest.mock('../../screens/HistoryGlobalScreen', () => ({
-  HistoryGlobalScreen: () => {
+jest.mock('../../screens/HistoryScreen', () => ({
+  HistoryScreen: () => {
     const R = require('react');
     const { Text } = require('react-native');
     return R.createElement(Text, { testID: 'history-screen' }, 'History');
@@ -262,17 +258,13 @@ jest.mock('../../screens/SettingsScreen', () => ({
   },
 }));
 
-jest.mock('../../screens/SettingsGlobalScreen', () => ({
-  SettingsGlobalScreen: ({
-    showBottomTabBar,
-  }: {
-    showBottomTabBar?: boolean;
-  }) => {
+jest.mock('../../screens/SettingsScreen', () => ({
+  SettingsScreen: ({ showBottomTabBar }: { showBottomTabBar?: boolean }) => {
     const R = require('react');
     const { Text } = require('react-native');
     return R.createElement(
       Text,
-      { testID: 'settings-global-screen' },
+      { testID: 'settings-screen' },
       `SettingsGlobal showBottomTabBar=${String(showBottomTabBar)}`,
     );
   },
@@ -390,28 +382,28 @@ describe('RootNavigator - OSS fail-open routing', () => {
       </NavigationContainer>,
     );
     await waitFor(() =>
-      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+      expect(screen.getByTestId('device-discovery-screen')).toBeTruthy(),
     );
   });
 
   test('does not require account state before entering foreground LAN discovery', async () => {
     renderWithGuestLocalSession();
     await waitFor(() =>
-      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+      expect(screen.getByTestId('device-discovery-screen')).toBeTruthy(),
     );
   });
 
   test('routes hydrated local sessions to main app without an account gate', async () => {
     renderWithGuestLocalSession();
     await waitFor(() =>
-      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+      expect(screen.getByTestId('device-discovery-screen')).toBeTruthy(),
     );
   });
 
   test('keeps local sessions off account-gated routes', async () => {
     renderWithGuestLocalSession();
     await waitFor(() =>
-      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+      expect(screen.getByTestId('device-discovery-screen')).toBeTruthy(),
     );
   });
 
@@ -427,21 +419,21 @@ describe('RootNavigator - OSS fail-open routing', () => {
     renderWithGuestLocalSession();
 
     await waitFor(() =>
-      expect(screen.getByTestId('global-sync-activity-screen')).toBeTruthy(),
+      expect(screen.getByTestId('sync-activity-screen')).toBeTruthy(),
     );
   });
 
   test('stale legacy account snapshots are no longer required for LAN discovery', async () => {
     renderWithGuestLocalSession();
     await waitFor(() =>
-      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+      expect(screen.getByTestId('device-discovery-screen')).toBeTruthy(),
     );
   });
 
   test('does not reset foreground LAN route after entering the app', async () => {
     const view = renderWithGuestLocalSession();
     await waitFor(() =>
-      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+      expect(screen.getByTestId('device-discovery-screen')).toBeTruthy(),
     );
 
     mockGuestLocalSession();
@@ -452,7 +444,7 @@ describe('RootNavigator - OSS fail-open routing', () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByTestId('global-device-discovery-screen')).toBeTruthy(),
+      expect(screen.getByTestId('device-discovery-screen')).toBeTruthy(),
     );
     expect(screen.queryByTestId('open-source-info-screen')).toBeNull();
   });
@@ -480,41 +472,40 @@ describe('RootNavigator - OSS fail-open routing', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText('GlobalSyncActivity showBottomTabBar=false'),
+        screen.getByText('SyncActivity showBottomTabBar=false'),
       ).toBeTruthy(),
     );
     expect(
-      StyleSheet.flatten(
-        screen.getByTestId('global-main-tabs-root').props.style,
-      ).backgroundColor,
+      StyleSheet.flatten(screen.getByTestId('main-tabs-root').props.style)
+        .backgroundColor,
     ).toBe('#F7FBFF');
     expect(screen.queryByTestId('bottom-tab-bar-outer')).toBeNull();
-    expect(screen.getByTestId('global-bottom-tab-files')).toBeTruthy();
+    expect(screen.getByTestId('bottom-tab-files')).toBeTruthy();
 
-    fireEvent.press(screen.getByTestId('global-bottom-tab-files'));
+    fireEvent.press(screen.getByTestId('bottom-tab-files'));
     await waitFor(() =>
       expect(
         screen.getByText('SharedFilesGlobal showBottomTabBar=false'),
       ).toBeTruthy(),
     );
     expect(
-      screen.UNSAFE_getByProps({ testID: 'global-sync-activity-screen' }),
+      screen.UNSAFE_getByProps({ testID: 'sync-activity-screen' }),
     ).toBeTruthy();
 
-    fireEvent.press(screen.getByTestId('global-bottom-tab-settings'));
+    fireEvent.press(screen.getByTestId('bottom-tab-settings'));
     await waitFor(() =>
       expect(
         screen.getByText('SettingsGlobal showBottomTabBar=false'),
       ).toBeTruthy(),
     );
     expect(
-      screen.UNSAFE_getByProps({ testID: 'shared-files-global-screen' }),
+      screen.UNSAFE_getByProps({ testID: 'shared-files-screen' }),
     ).toBeTruthy();
 
-    fireEvent.press(screen.getByTestId('global-bottom-tab-home'));
+    fireEvent.press(screen.getByTestId('bottom-tab-home'));
     await waitFor(() =>
       expect(
-        screen.getByText('GlobalSyncActivity showBottomTabBar=false'),
+        screen.getByText('SyncActivity showBottomTabBar=false'),
       ).toBeTruthy(),
     );
   });

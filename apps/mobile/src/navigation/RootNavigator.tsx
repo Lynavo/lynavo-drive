@@ -16,21 +16,21 @@ import {
 } from '@react-navigation/bottom-tabs';
 
 import { useAuth } from '../stores/auth-store';
-import { DeviceDiscoveryGlobalScreen } from '../screens/DeviceDiscoveryGlobalScreen';
+import { DeviceDiscoveryScreen } from '../screens/DeviceDiscoveryScreen';
 import { CodeVerifyScreen } from '../screens/CodeVerifyScreen';
 import { ConnectionTutorialScreen } from '../screens/ConnectionTutorialScreen';
-import { SyncActivityGlobalScreen } from '../screens/SyncActivityGlobalScreen';
+import { SyncActivityScreen } from '../screens/SyncActivityScreen';
 import { AlbumWorkbenchScreen } from '../screens/AlbumWorkbenchScreen';
-import { SharedFilesGlobalScreen } from '../screens/SharedFilesGlobalScreen';
-import { PhoneSyncSpaceGlobalScreen } from '../screens/PhoneSyncSpaceGlobalScreen';
-import { LocalComputerGlobalScreen } from '../screens/LocalComputerGlobalScreen';
-import { DownloadRecordsGlobalScreen } from '../screens/DownloadRecordsGlobalScreen';
-import { HistoryGlobalScreen } from '../screens/HistoryGlobalScreen';
-import { SettingsGlobalScreen } from '../screens/SettingsGlobalScreen';
-import { HelpGlobalScreen } from '../screens/HelpGlobalScreen';
+import { SharedFilesScreen } from '../screens/SharedFilesScreen';
+import { PhoneSyncSpaceScreen } from '../screens/PhoneSyncSpaceScreen';
+import { LocalComputerScreen } from '../screens/LocalComputerScreen';
+import { DownloadRecordsScreen } from '../screens/DownloadRecordsScreen';
+import { HistoryScreen } from '../screens/HistoryScreen';
+import { SettingsScreen } from '../screens/SettingsScreen';
+import { HelpScreen } from '../screens/HelpScreen';
 import { QRScannerScreen } from '../screens/QRScannerScreen';
-import { AutoUploadSettingsGlobalScreen } from '../screens/AutoUploadSettingsGlobalScreen';
-import { GlobalBottomTabBar } from '../components/GlobalBottomTabBar';
+import { AutoUploadSettingsScreen } from '../screens/AutoUploadSettingsScreen';
+import { BottomTabBar } from '../components/BottomTabBar';
 import {
   PAIRING_INVALIDATED_EVENT,
   PAIRING_INVALIDATED_ROUTE_REASON,
@@ -45,13 +45,13 @@ import { resolveVisualQaInitialRoute } from '../dev/visualQa';
 
 type MainTabKey = 'home' | 'files' | 'settings';
 
-type GlobalMainTabParamList = {
+type MainTabParamList = {
   GlobalHomeTab: undefined;
   GlobalFilesTab: undefined;
   GlobalSettingsTab: undefined;
 };
 
-const GlobalMainTab = createBottomTabNavigator<GlobalMainTabParamList>();
+const MainTab = createBottomTabNavigator<MainTabParamList>();
 
 export type RootStackParamList = {
   DeviceDiscovery:
@@ -245,7 +245,7 @@ function LanSyncStack() {
       >
         <Stack.Screen
           name="DeviceDiscovery"
-          component={DeviceDiscoveryGlobalScreen}
+          component={DeviceDiscoveryScreen}
           initialParams={
             initialDeviceDiscoveryReason
               ? { reason: initialDeviceDiscoveryReason }
@@ -258,27 +258,21 @@ function LanSyncStack() {
           component={ConnectionTutorialScreen}
         />
         <Stack.Screen name="CodeVerify" component={CodeVerifyScreen} />
-        <Stack.Screen name="SyncActivity" component={GlobalMainTabsScreen} />
+        <Stack.Screen name="SyncActivity" component={MainTabsScreen} />
         <Stack.Screen name="AlbumWorkbench" component={AlbumWorkbenchScreen} />
-        <Stack.Screen name="SharedFiles" component={GlobalMainTabsScreen} />
-        <Stack.Screen
-          name="PhoneSyncSpace"
-          component={PhoneSyncSpaceGlobalScreen}
-        />
-        <Stack.Screen
-          name="LocalComputer"
-          component={LocalComputerGlobalScreen}
-        />
+        <Stack.Screen name="SharedFiles" component={MainTabsScreen} />
+        <Stack.Screen name="PhoneSyncSpace" component={PhoneSyncSpaceScreen} />
+        <Stack.Screen name="LocalComputer" component={LocalComputerScreen} />
         <Stack.Screen
           name="DownloadRecords"
-          component={DownloadRecordsGlobalScreen}
+          component={DownloadRecordsScreen}
         />
-        <Stack.Screen name="History" component={HistoryGlobalScreen} />
-        <Stack.Screen name="Settings" component={GlobalMainTabsScreen} />
-        <Stack.Screen name="Help" component={HelpGlobalScreen} />
+        <Stack.Screen name="History" component={HistoryScreen} />
+        <Stack.Screen name="Settings" component={MainTabsScreen} />
+        <Stack.Screen name="Help" component={HelpScreen} />
         <Stack.Screen
           name="AutoUploadSettings"
-          component={AutoUploadSettingsGlobalScreen}
+          component={AutoUploadSettingsScreen}
         />
       </Stack.Navigator>
     </>
@@ -339,9 +333,9 @@ function PairingInvalidationWatcher({ enabled }: { enabled: boolean }) {
   return null;
 }
 
-function getGlobalMainTabInitialRouteName(
+function getMainTabInitialRouteName(
   routeName: keyof RootStackParamList | undefined,
-): keyof GlobalMainTabParamList {
+): keyof MainTabParamList {
   if (routeName === 'SharedFiles') return 'GlobalFilesTab';
   if (routeName === 'Settings') return 'GlobalSettingsTab';
   return 'GlobalHomeTab';
@@ -353,48 +347,46 @@ function getMainTabForTabRouteName(routeName: string | undefined): MainTabKey {
   return 'home';
 }
 
-function getGlobalMainTabRouteName(
-  tab: MainTabKey,
-): keyof GlobalMainTabParamList {
+function getMainTabRouteName(tab: MainTabKey): keyof MainTabParamList {
   if (tab === 'files') return 'GlobalFilesTab';
   if (tab === 'settings') return 'GlobalSettingsTab';
   return 'GlobalHomeTab';
 }
 
-function GlobalHomeTabScreen() {
-  return <SyncActivityGlobalScreen showBottomTabBar={false} />;
+function HomeTabScreen() {
+  return <SyncActivityScreen showBottomTabBar={false} />;
 }
 
-function GlobalFilesTabScreen() {
-  return <SharedFilesGlobalScreen showBottomTabBar={false} />;
+function FilesTabScreen() {
+  return <SharedFilesScreen showBottomTabBar={false} />;
 }
 
-function GlobalSettingsTabScreen() {
-  return <SettingsGlobalScreen showBottomTabBar={false} />;
+function SettingsTabScreen() {
+  return <SettingsScreen showBottomTabBar={false} />;
 }
 
-function GlobalMainTabsTabBar({ state, navigation }: BottomTabBarProps) {
+function MainTabsTabBar({ state, navigation }: BottomTabBarProps) {
   const activeTab = getMainTabForTabRouteName(state.routes[state.index]?.name);
 
   return (
-    <GlobalBottomTabBar
+    <BottomTabBar
       activeTab={activeTab}
       onTabPress={tab => {
-        navigation.navigate(getGlobalMainTabRouteName(tab));
+        navigation.navigate(getMainTabRouteName(tab));
       }}
     />
   );
 }
 
-function GlobalMainTabsScreen({
+function MainTabsScreen({
   route,
 }: {
   route: { name: keyof RootStackParamList };
 }) {
   return (
-    <View testID="global-main-tabs-root" style={styles.mainTabsRoot}>
-      <GlobalMainTab.Navigator
-        initialRouteName={getGlobalMainTabInitialRouteName(route.name)}
+    <View testID="main-tabs-root" style={styles.mainTabsRoot}>
+      <MainTab.Navigator
+        initialRouteName={getMainTabInitialRouteName(route.name)}
         backBehavior="history"
         detachInactiveScreens={false}
         screenOptions={{
@@ -404,21 +396,15 @@ function GlobalMainTabsScreen({
           animation: 'none',
           sceneStyle: styles.mainTabsScene,
         }}
-        tabBar={props => <GlobalMainTabsTabBar {...props} />}
+        tabBar={props => <MainTabsTabBar {...props} />}
       >
-        <GlobalMainTab.Screen
-          name="GlobalHomeTab"
-          component={GlobalHomeTabScreen}
-        />
-        <GlobalMainTab.Screen
-          name="GlobalFilesTab"
-          component={GlobalFilesTabScreen}
-        />
-        <GlobalMainTab.Screen
+        <MainTab.Screen name="GlobalHomeTab" component={HomeTabScreen} />
+        <MainTab.Screen name="GlobalFilesTab" component={FilesTabScreen} />
+        <MainTab.Screen
           name="GlobalSettingsTab"
-          component={GlobalSettingsTabScreen}
+          component={SettingsTabScreen}
         />
-      </GlobalMainTab.Navigator>
+      </MainTab.Navigator>
     </View>
   );
 }

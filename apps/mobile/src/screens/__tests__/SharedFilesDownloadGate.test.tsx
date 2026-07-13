@@ -186,14 +186,14 @@ jest.mock('../../components/Icon', () => ({
   },
 }));
 
-jest.mock('../../components/GlobalGradientBackground', () => ({
-  GlobalGradientBackground: ({ children }: { children: React.ReactNode }) => (
+jest.mock('../../components/GradientBackground', () => ({
+  GradientBackground: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
   ),
 }));
 
-jest.mock('../../components/GlobalBottomTabBar', () => ({
-  GlobalBottomTabBar: () => null,
+jest.mock('../../components/BottomTabBar', () => ({
+  BottomTabBar: () => null,
 }));
 
 jest.mock('../../components/shared/ModalBlurBackdrop', () => ({
@@ -377,9 +377,6 @@ import {
 import { recordDownloadedFile } from '../../services/download-records-service';
 import { recordDiagnosticsLog } from '../../services/diagnostics-log-service';
 import { viewDocument } from '@react-native-documents/viewer';
-import { SharedFilesGlobalScreen } from '../SharedFilesGlobalScreen';
-import { LocalComputerGlobalScreen } from '../LocalComputerGlobalScreen';
-import { PhoneSyncSpaceGlobalScreen } from '../PhoneSyncSpaceGlobalScreen';
 import { PhoneSyncSpaceScreen } from '../PhoneSyncSpaceScreen';
 
 const mockListSharedResources = listSharedResources as jest.Mock;
@@ -523,30 +520,25 @@ describe('SharedFilesScreen Helpers', () => {
     expect(parentDirectoryPath('')).toBe('');
   });
 });
-
-describe('SharedFilesScreen V2 (Landing Menu)', () => {
+describe('SharedFilesScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetMockAuthState();
     mockVisualQaEnabled = false;
   });
 
-  it('renders landing page with correct options', () => {
-    const { getByText } = render(
-      <TestErrorBoundary>
-        <SharedFilesScreen />
-      </TestErrorBoundary>,
+  it('uses neutral landing copy instead of fake daily counts', () => {
+    const { getByText, queryByText } = render(
+      <SharedFilesScreen showBottomTabBar={false} />,
     );
 
-    expect(getByText('Phone Sync Space')).toBeTruthy();
-    expect(getByText('Computer Files')).toBeTruthy();
+    expect(getByText('Shown after sync')).toBeTruthy();
+    expect(queryByText('Today 5 items')).toBeNull();
   });
 
-  it('navigates to PhoneSyncSpace on card press', () => {
+  it('records diagnostics before opening PhoneSyncSpace', () => {
     const { getByText } = render(
-      <TestErrorBoundary>
-        <SharedFilesScreen />
-      </TestErrorBoundary>,
+      <SharedFilesScreen showBottomTabBar={false} />,
     );
 
     fireEvent.press(getByText('Phone Sync Space'));
@@ -558,68 +550,9 @@ describe('SharedFilesScreen V2 (Landing Menu)', () => {
     );
   });
 
-  it('navigates to LocalComputer on card press', () => {
-    const { getByText } = render(
-      <TestErrorBoundary>
-        <SharedFilesScreen />
-      </TestErrorBoundary>,
-    );
-
-    fireEvent.press(getByText('Computer Files'));
-    expect(mockNavigate).toHaveBeenCalledWith('LocalComputer');
-  });
-
-  it('keeps guest users on local-LAN local computer access instead of login or account flow', () => {
-    mockAuthState = {
-      isLoggedIn: false,
-    };
-
-    const { getByText } = render(
-      <TestErrorBoundary>
-        <SharedFilesScreen />
-      </TestErrorBoundary>,
-    );
-
-    fireEvent.press(getByText('Computer Files'));
-
-    expect(mockNavigate).toHaveBeenCalledWith('LocalComputer');
-    expect(mockNavigate).not.toHaveBeenCalledWith('Login');
-  });
-});
-
-describe('SharedFilesGlobalScreen', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    resetMockAuthState();
-    mockVisualQaEnabled = false;
-  });
-
-  it('uses neutral landing copy instead of fake daily counts', () => {
-    const { getByText, queryByText } = render(
-      <SharedFilesGlobalScreen showBottomTabBar={false} />,
-    );
-
-    expect(getByText('Shown after sync')).toBeTruthy();
-    expect(queryByText('Today 5 items')).toBeNull();
-  });
-
-  it('records diagnostics before opening PhoneSyncSpace', () => {
-    const { getByText } = render(
-      <SharedFilesGlobalScreen showBottomTabBar={false} />,
-    );
-
-    fireEvent.press(getByText('Phone Sync Space'));
-    expect(mockNavigate).toHaveBeenCalledWith('PhoneSyncSpace');
-    expect(mockRecordDiagnosticsLog).toHaveBeenCalledWith(
-      'PhoneSyncSpace',
-      'entry pressed',
-      { screen: 'SharedFilesGlobalScreen' },
-    );
-  });
-
   it('keeps global local computer local-LAN without an account service gate', () => {
     const { getByText, queryByText } = render(
-      <SharedFilesGlobalScreen showBottomTabBar={false} />,
+      <SharedFilesScreen showBottomTabBar={false} />,
     );
 
     expect(getByText('LAN')).toBeTruthy();
@@ -638,7 +571,7 @@ describe('SharedFilesGlobalScreen', () => {
     };
 
     const { getByText } = render(
-      <SharedFilesGlobalScreen showBottomTabBar={false} />,
+      <SharedFilesScreen showBottomTabBar={false} />,
     );
 
     fireEvent.press(getByText('Computer Files'));
@@ -648,7 +581,7 @@ describe('SharedFilesGlobalScreen', () => {
   });
 });
 
-describe('LocalComputerGlobalScreen', () => {
+describe('LocalComputerScreen', () => {
   const mockBindingState = jest.fn();
   const nativeEventHandlers: Partial<
     Record<string, (payload: unknown) => void>
@@ -693,7 +626,7 @@ describe('LocalComputerGlobalScreen', () => {
     mockListGlobalLocalComputerResources.mockResolvedValueOnce([]);
 
     expect(() => {
-      render(<LocalComputerGlobalScreen />);
+      render(<LocalComputerScreen />);
     }).not.toThrow();
 
     await waitFor(() => {
@@ -706,7 +639,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { queryByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -730,7 +663,7 @@ describe('LocalComputerGlobalScreen', () => {
       },
     ]);
 
-    const { getByText } = render(<LocalComputerGlobalScreen />);
+    const { getByText } = render(<LocalComputerScreen />);
 
     await waitFor(() => {
       expect(getByText('Project Files')).toBeTruthy();
@@ -743,7 +676,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByTestId, getByText, queryByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -771,7 +704,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText, queryByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -799,7 +732,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -826,7 +759,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -868,7 +801,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText, queryByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -883,7 +816,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText, queryByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -936,7 +869,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText, queryByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -987,7 +920,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText, queryByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1031,7 +964,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText, queryByText, unmount } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1057,7 +990,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText, queryByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1097,7 +1030,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText, queryByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1125,7 +1058,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText, queryByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1149,7 +1082,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText, queryByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1173,7 +1106,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText, queryByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1193,7 +1126,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText, queryByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1221,7 +1154,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText, queryByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1297,7 +1230,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByTestId, getByText, queryByTestId } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1338,7 +1271,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText, queryAllByTestId, queryAllByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1430,7 +1363,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByTestId } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1475,7 +1408,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getAllByTestId, getByText, queryByTestId } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1511,7 +1444,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByTestId, getByText, queryByTestId } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1552,7 +1485,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByTestId, getByText, queryByTestId } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1591,7 +1524,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { UNSAFE_getByProps, getByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1610,7 +1543,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { queryAllByTestId, queryByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1634,7 +1567,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText, queryByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1650,7 +1583,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1684,7 +1617,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1756,7 +1689,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1840,7 +1773,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1886,7 +1819,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1926,7 +1859,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -1971,7 +1904,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -2021,7 +1954,7 @@ describe('LocalComputerGlobalScreen', () => {
 
     const { getByTestId, getByText } = render(
       <TestErrorBoundary>
-        <LocalComputerGlobalScreen />
+        <LocalComputerScreen />
       </TestErrorBoundary>,
     );
 
@@ -2042,7 +1975,7 @@ describe('LocalComputerGlobalScreen', () => {
   });
 });
 
-describe('PhoneSyncSpaceGlobalScreen', () => {
+describe('PhoneSyncSpaceScreen', () => {
   const mockBindingState = jest.fn();
   const testGlobal = globalThis as typeof globalThis & {
     __LYNAVO_SHARED_FILES_PREVIEW__?: boolean;
@@ -2071,7 +2004,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
 
     const { getByTestId, getByText, queryByText } = render(
       <TestErrorBoundary>
-        <PhoneSyncSpaceGlobalScreen />
+        <PhoneSyncSpaceScreen />
       </TestErrorBoundary>,
     );
 
@@ -2142,7 +2075,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
 
     const { getByTestId, getByText } = render(
       <TestErrorBoundary>
-        <PhoneSyncSpaceGlobalScreen />
+        <PhoneSyncSpaceScreen />
       </TestErrorBoundary>,
     );
 
@@ -2175,7 +2108,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
 
     const { getByText, queryByText } = render(
       <TestErrorBoundary>
-        <PhoneSyncSpaceGlobalScreen />
+        <PhoneSyncSpaceScreen />
       </TestErrorBoundary>,
     );
 
@@ -2217,7 +2150,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
       queryByLabelText,
     } = render(
       <TestErrorBoundary>
-        <PhoneSyncSpaceGlobalScreen />
+        <PhoneSyncSpaceScreen />
       </TestErrorBoundary>,
     );
 
@@ -2272,7 +2205,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
 
     const { getByLabelText, getByTestId, getByText, queryByTestId } = render(
       <TestErrorBoundary>
-        <PhoneSyncSpaceGlobalScreen />
+        <PhoneSyncSpaceScreen />
       </TestErrorBoundary>,
     );
 
@@ -2318,7 +2251,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
 
     const { getByTestId, getByText } = render(
       <TestErrorBoundary>
-        <PhoneSyncSpaceGlobalScreen />
+        <PhoneSyncSpaceScreen />
       </TestErrorBoundary>,
     );
 
@@ -2357,7 +2290,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
 
     const { getByText } = render(
       <TestErrorBoundary>
-        <PhoneSyncSpaceGlobalScreen />
+        <PhoneSyncSpaceScreen />
       </TestErrorBoundary>,
     );
 
@@ -2404,7 +2337,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
 
     const { getByLabelText, getByText, queryByTestId } = render(
       <TestErrorBoundary>
-        <PhoneSyncSpaceGlobalScreen />
+        <PhoneSyncSpaceScreen />
       </TestErrorBoundary>,
     );
 
@@ -2460,7 +2393,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
 
     const { getByLabelText, getByText } = render(
       <TestErrorBoundary>
-        <PhoneSyncSpaceGlobalScreen />
+        <PhoneSyncSpaceScreen />
       </TestErrorBoundary>,
     );
 
@@ -2521,7 +2454,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
 
     const { getByLabelText, getByText } = render(
       <TestErrorBoundary>
-        <PhoneSyncSpaceGlobalScreen />
+        <PhoneSyncSpaceScreen />
       </TestErrorBoundary>,
     );
 
@@ -2578,7 +2511,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
 
     const { getByLabelText, getByText } = render(
       <TestErrorBoundary>
-        <PhoneSyncSpaceGlobalScreen />
+        <PhoneSyncSpaceScreen />
       </TestErrorBoundary>,
     );
 
@@ -2640,7 +2573,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
 
     const { getByText } = render(
       <TestErrorBoundary>
-        <PhoneSyncSpaceGlobalScreen />
+        <PhoneSyncSpaceScreen />
       </TestErrorBoundary>,
     );
 
@@ -2692,7 +2625,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
 
     const { getByText, queryAllByTestId, queryByText } = render(
       <TestErrorBoundary>
-        <PhoneSyncSpaceGlobalScreen />
+        <PhoneSyncSpaceScreen />
       </TestErrorBoundary>,
     );
 
@@ -2745,7 +2678,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
 
       const { getByTestId, getByText, UNSAFE_queryAllByProps } = render(
         <TestErrorBoundary>
-          <PhoneSyncSpaceGlobalScreen />
+          <PhoneSyncSpaceScreen />
         </TestErrorBoundary>,
       );
 
@@ -2801,7 +2734,7 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
 
       const { getByTestId, getByText } = render(
         <TestErrorBoundary>
-          <PhoneSyncSpaceGlobalScreen />
+          <PhoneSyncSpaceScreen />
         </TestErrorBoundary>,
       );
 
@@ -2821,709 +2754,5 @@ describe('PhoneSyncSpaceGlobalScreen', () => {
         value: originalPlatformOS,
       });
     }
-  });
-});
-
-describe('LocalComputerScreen', () => {
-  const mockBindingState = jest.fn();
-
-  beforeAll(() => {
-    (NativeModules as Record<string, unknown>).NativeSyncEngine = {
-      getBindingState: mockBindingState,
-      addListener: jest.fn(),
-      removeListeners: jest.fn(),
-    };
-  });
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockBindingState.mockResolvedValue({
-      deviceId: 'desktop-device-id',
-      host: '192.168.1.100',
-      connectionState: 'connected',
-    });
-  });
-
-  it('renders empty root list when no device is bound', async () => {
-    mockBindingState.mockResolvedValueOnce(null);
-    const { getByText } = render(
-      <TestErrorBoundary>
-        <LocalComputerScreen />
-      </TestErrorBoundary>,
-    );
-    await waitFor(() => {
-      expect(getByText('This folder is empty')).toBeTruthy();
-    });
-  });
-
-  it('renders list of shared resources', async () => {
-    mockListSharedResources.mockResolvedValueOnce([
-      {
-        resourceId: 'res-1',
-        displayName: 'test-folder',
-        kind: 'shared_folder',
-        fileSize: 0,
-      },
-      {
-        resourceId: 'res-2',
-        displayName: 'photo.jpg',
-        kind: 'shared_file',
-        fileSize: 1572864, // 1.5 MB
-      },
-    ]);
-
-    const { getByText } = render(
-      <TestErrorBoundary>
-        <LocalComputerScreen />
-      </TestErrorBoundary>,
-    );
-
-    await waitFor(() => {
-      expect(getByText('test-folder')).toBeTruthy();
-      expect(getByText('photo.jpg')).toBeTruthy();
-    });
-  });
-
-  it('renders local computer image and video thumbnails when preview urls are available', async () => {
-    mockListSharedResources.mockResolvedValueOnce([
-      {
-        resourceId: 'res-image',
-        displayName: 'photo.jpg',
-        kind: 'shared_file',
-        fileSize: 1048576,
-        mediaType: 'image',
-        thumbnailUrl:
-          'http://192.168.1.100:39394/resources/mobile/thumbnail/res-image',
-        previewUrl:
-          'http://192.168.1.100:39394/resources/mobile/download/res-image',
-      },
-      {
-        resourceId: 'res-video',
-        displayName: 'clip.mov',
-        kind: 'shared_file',
-        fileSize: 2097152,
-        mediaType: 'video',
-        previewUrl:
-          'http://192.168.1.100:39394/resources/mobile/download/res-video',
-        streamUrl:
-          'http://192.168.1.100:39394/resources/mobile/download/res-video',
-      },
-    ]);
-
-    const { getByTestId, getByText } = render(
-      <TestErrorBoundary>
-        <LocalComputerScreen />
-      </TestErrorBoundary>,
-    );
-
-    await waitFor(() => {
-      expect(getByText('photo.jpg')).toBeTruthy();
-      expect(getByText('clip.mov')).toBeTruthy();
-    });
-
-    expect(getByTestId('local-computer-thumbnail-image')).toBeTruthy();
-    expect(getByTestId('local-computer-thumbnail-video')).toBeTruthy();
-  });
-
-  it('loads real folder contents when a folder is opened', async () => {
-    mockListSharedResources.mockResolvedValueOnce([
-      {
-        resourceId: 'res-folder',
-        displayName: 'Project Files',
-        kind: 'shared_folder',
-        fileSize: 0,
-      },
-    ]);
-    mockListSharedFolderContents.mockResolvedValueOnce({
-      path: '',
-      files: [
-        {
-          name: 'real-contract.pdf',
-          path: 'real-contract.pdf',
-          type: 'document',
-          size: 4096,
-          modifiedAt: '2026-06-16T08:31:00.000Z',
-        },
-      ],
-      totalCount: 1,
-    });
-
-    const { getByText, queryByText } = render(
-      <TestErrorBoundary>
-        <LocalComputerScreen />
-      </TestErrorBoundary>,
-    );
-
-    await waitFor(() => {
-      expect(getByText('Project Files')).toBeTruthy();
-    });
-
-    await act(async () => {
-      fireEvent.press(getByText('Project Files'));
-    });
-
-    await waitFor(() => {
-      expect(mockListSharedFolderContents).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
-        'res-folder',
-        '',
-      );
-      expect(getByText('real-contract.pdf')).toBeTruthy();
-    });
-    expect(queryByText('lynavo-drive-presentation.pdf')).toBeNull();
-  });
-
-  it('triggers download when download button is pressed', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    mockListSharedResources.mockResolvedValueOnce([
-      {
-        resourceId: 'res-2',
-        displayName: 'photo.jpg',
-        kind: 'shared_file',
-        fileSize: 1048576, // 1.0 MB
-        mediaType: 'image',
-        thumbnailUrl:
-          'http://192.168.1.100:39394/resources/mobile/thumbnail/res-2',
-        previewUrl:
-          'http://192.168.1.100:39394/resources/mobile/download/res-2',
-      },
-    ]);
-    mockDownloadResource.mockResolvedValueOnce(undefined);
-    mockRecordDownloadedFile.mockResolvedValueOnce(undefined);
-
-    const { getByText } = render(
-      <TestErrorBoundary>
-        <LocalComputerScreen />
-      </TestErrorBoundary>,
-    );
-
-    await waitFor(() => {
-      expect(getByText('photo.jpg')).toBeTruthy();
-    });
-
-    // Press download button (has testID or Icon name or layout element in item row)
-    fireEvent.press(getByText('download-outline'));
-
-    await waitFor(() => {
-      expect(mockDownloadResource).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
-        'res-2',
-      );
-    });
-
-    await waitFor(() => {
-      expect(mockRecordDownloadedFile).toHaveBeenCalledWith(
-        expect.objectContaining({
-          resourceId: 'res-2',
-          filename: 'photo.jpg',
-          fileSize: 1048576,
-          mediaType: 'image',
-          thumbnailUrl:
-            'http://192.168.1.100:39394/resources/mobile/thumbnail/res-2',
-          previewUrl:
-            'http://192.168.1.100:39394/resources/mobile/download/res-2',
-        }),
-      );
-    });
-
-    await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith(
-        'Download complete',
-        'photo.jpg saved to Photos',
-      );
-    });
-
-    alertSpy.mockRestore();
-  });
-
-  it('records folder-entry sub-file downloads into Recent Downloads', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    mockListSharedResources.mockResolvedValueOnce([
-      {
-        resourceId: 'folder-root',
-        displayName: 'Project Files',
-        kind: 'shared_folder',
-        fileSize: 0,
-      },
-    ]);
-    mockListSharedFolderContents.mockResolvedValueOnce({
-      path: '',
-      files: [
-        {
-          name: 'contract.pdf',
-          path: 'contract.pdf',
-          type: 'document',
-          size: 204800,
-          modifiedAt: '2026-06-16T08:00:00.000Z',
-        },
-      ],
-      totalCount: 1,
-    });
-    mockDownloadResource.mockResolvedValueOnce(undefined);
-    mockRecordDownloadedFile.mockResolvedValueOnce(undefined);
-
-    const { getByText } = render(
-      <TestErrorBoundary>
-        <LocalComputerScreen />
-      </TestErrorBoundary>,
-    );
-
-    // Open the folder
-    await waitFor(() => {
-      expect(getByText('Project Files')).toBeTruthy();
-    });
-    await act(async () => {
-      fireEvent.press(getByText('Project Files'));
-    });
-    await waitFor(() => {
-      expect(getByText('contract.pdf')).toBeTruthy();
-    });
-
-    // Download the sub-file
-    fireEvent.press(getByText('download-outline'));
-
-    await waitFor(() => {
-      expect(mockDownloadResource).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
-        'shared-folder-entry:folder-root:contract.pdf',
-      );
-    });
-
-    await waitFor(() => {
-      expect(mockRecordDownloadedFile).toHaveBeenCalledWith(
-        expect.objectContaining({
-          resourceId: 'shared-folder-entry:folder-root:contract.pdf',
-          filename: 'contract.pdf',
-          fileSize: 204800,
-          mediaType: 'document',
-        }),
-      );
-    });
-
-    alertSpy.mockRestore();
-  });
-
-  it('keeps download available for selected local computer files', async () => {
-    mockListSharedResources.mockResolvedValueOnce([
-      {
-        resourceId: 'res-1',
-        displayName: 'alpha.jpg',
-        kind: 'shared_file',
-        fileSize: 1024,
-        mediaType: 'image',
-      },
-      {
-        resourceId: 'res-2',
-        displayName: 'beta.mov',
-        kind: 'shared_file',
-        fileSize: 2048,
-        mediaType: 'video',
-      },
-    ]);
-    mockDownloadResource.mockResolvedValue(undefined);
-    mockRecordDownloadedFile.mockResolvedValue(undefined);
-
-    const { getByText } = render(
-      <TestErrorBoundary>
-        <LocalComputerScreen />
-      </TestErrorBoundary>,
-    );
-
-    await waitFor(() => {
-      expect(getByText('alpha.jpg')).toBeTruthy();
-      expect(getByText('beta.mov')).toBeTruthy();
-    });
-
-    fireEvent.press(getByText('Select'));
-    fireEvent.press(getByText('alpha.jpg'));
-    fireEvent.press(getByText('beta.mov'));
-    fireEvent.press(getByText('Download'));
-
-    await waitFor(() => {
-      expect(mockDownloadResource).toHaveBeenCalledTimes(2);
-    });
-    expect(mockDownloadResource).toHaveBeenNthCalledWith(
-      1,
-      { host: '192.168.1.100', port: 39394 },
-      'res-1',
-    );
-    expect(mockDownloadResource).toHaveBeenNthCalledWith(
-      2,
-      { host: '192.168.1.100', port: 39394 },
-      'res-2',
-    );
-  });
-
-  it('opens the system share flow for selected local computer files', async () => {
-    mockListSharedResources.mockResolvedValueOnce([
-      {
-        resourceId: 'res-2',
-        displayName: 'photo.jpg',
-        kind: 'shared_file',
-        fileSize: 1048576,
-      },
-    ]);
-    mockShareResources.mockResolvedValueOnce(undefined);
-
-    const { getByText } = render(
-      <TestErrorBoundary>
-        <LocalComputerScreen />
-      </TestErrorBoundary>,
-    );
-
-    await waitFor(() => {
-      expect(getByText('photo.jpg')).toBeTruthy();
-    });
-
-    fireEvent.press(getByText('Select'));
-    fireEvent.press(getByText('photo.jpg'));
-    fireEvent.press(getByText('Share'));
-
-    await waitFor(() => {
-      expect(mockShareResources).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
-        [{ resourceId: 'res-2', displayName: 'photo.jpg' }],
-      );
-    });
-  });
-
-  it('opens a local computer document with the system preview viewer', async () => {
-    mockListSharedResources.mockResolvedValueOnce([
-      {
-        resourceId: 'res-doc',
-        displayName: 'contract.pdf',
-        kind: 'shared_file',
-        fileSize: 1024,
-        mediaType: 'document',
-      },
-    ]);
-    mockPrepareResourcePreview.mockResolvedValueOnce('/cache/contract.pdf');
-    mockViewDocument.mockResolvedValueOnce(undefined);
-
-    const { getByText } = render(
-      <TestErrorBoundary>
-        <LocalComputerScreen />
-      </TestErrorBoundary>,
-    );
-
-    await waitFor(() => {
-      expect(getByText('contract.pdf')).toBeTruthy();
-    });
-
-    fireEvent.press(getByText('contract.pdf'));
-
-    await waitFor(() => {
-      expect(mockPrepareResourcePreview).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
-        'res-doc',
-        'contract.pdf',
-      );
-    });
-    expect(mockViewDocument).toHaveBeenCalledWith({
-      uri: 'file:///cache/contract.pdf',
-      headerTitle: 'contract.pdf',
-      mimeType: 'application/pdf',
-    });
-  });
-
-  it('keeps selection-mode row presses from opening local computer previews', async () => {
-    mockListSharedResources.mockResolvedValueOnce([
-      {
-        resourceId: 'res-doc',
-        displayName: 'contract.pdf',
-        kind: 'shared_file',
-        fileSize: 1024,
-        mediaType: 'document',
-      },
-    ]);
-
-    const { getByText } = render(
-      <TestErrorBoundary>
-        <LocalComputerScreen />
-      </TestErrorBoundary>,
-    );
-
-    await waitFor(() => {
-      expect(getByText('contract.pdf')).toBeTruthy();
-    });
-
-    fireEvent.press(getByText('Select'));
-    fireEvent.press(getByText('contract.pdf'));
-
-    expect(mockPrepareResourcePreview).not.toHaveBeenCalled();
-    expect(mockViewDocument).not.toHaveBeenCalled();
-    expect(getByText('Selected 1 items')).toBeTruthy();
-  });
-
-  it('opens a local computer image inside the app preview', async () => {
-    mockListSharedResources.mockResolvedValueOnce([
-      {
-        resourceId: 'res-image',
-        displayName: 'photo.jpg',
-        kind: 'shared_file',
-        fileSize: 1024,
-        mediaType: 'image',
-      },
-    ]);
-    mockGetResourcePreviewUrl.mockResolvedValueOnce(
-      'http://192.168.1.100:39394/resources/mobile/download/res-image',
-    );
-
-    const { getByTestId, getByText } = render(
-      <TestErrorBoundary>
-        <LocalComputerScreen />
-      </TestErrorBoundary>,
-    );
-
-    await waitFor(() => {
-      expect(getByText('photo.jpg')).toBeTruthy();
-    });
-
-    fireEvent.press(getByText('photo.jpg'));
-
-    await waitFor(() => {
-      expect(mockGetResourcePreviewUrl).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
-        'res-image',
-      );
-      expect(getByTestId('local-computer-preview-image')).toBeTruthy();
-    });
-  });
-});
-
-describe('PhoneSyncSpaceScreen', () => {
-  const mockBindingState = jest.fn();
-
-  beforeAll(() => {
-    (NativeModules as Record<string, unknown>).NativeSyncEngine = {
-      getBindingState: mockBindingState,
-      addListener: jest.fn(),
-      removeListeners: jest.fn(),
-    };
-  });
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockBindingState.mockResolvedValue({
-      deviceId: 'desktop-device-id',
-      host: '192.168.1.100',
-      connectionState: 'connected',
-    });
-  });
-
-  it('downloads a received phone-sync item and records it in recent downloads', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    mockListCurrentClientReceivedLibrary.mockResolvedValueOnce([
-      {
-        resourceId: '',
-        desktopDeviceId: 'desktop-device-id',
-        clientId: 'client-001',
-        displayName: 'alpha.jpg',
-        fileKey: 'received/alpha.jpg',
-        filename: 'alpha.jpg',
-        mediaType: 'image',
-        fileSize: 1024,
-        completedAt: '2026-06-16T08:00:00.000Z',
-        shareStatus: 'shared',
-        thumbnailUrl:
-          'http://192.168.1.100:39394/resources/mobile/received/thumbnail?fileKey=received-1',
-        previewUrl:
-          'http://192.168.1.100:39394/resources/mobile/received/preview?fileKey=received-1',
-      },
-    ]);
-    mockDownloadReceivedLibraryItem.mockResolvedValueOnce({
-      savedToPhotos: true,
-      localPath: 'ph://asset-001',
-      savedLocation: 'Photos',
-    });
-    mockRecordDownloadedFile.mockResolvedValueOnce(undefined);
-
-    const { getByText } = render(
-      <TestErrorBoundary>
-        <PhoneSyncSpaceScreen />
-      </TestErrorBoundary>,
-    );
-
-    await waitFor(() => {
-      expect(getByText('alpha.jpg')).toBeTruthy();
-    });
-
-    fireEvent.press(getByText('download-outline'));
-
-    await waitFor(() => {
-      expect(mockDownloadReceivedLibraryItem).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
-        expect.objectContaining({ fileKey: 'received/alpha.jpg' }),
-      );
-    });
-    expect(mockListReceivedLibrary).not.toHaveBeenCalled();
-    expect(mockDownloadResource).not.toHaveBeenCalled();
-    expect(mockDownloadResourceForGlobal).not.toHaveBeenCalled();
-    expect(mockRecordDownloadedFile).toHaveBeenCalledWith({
-      resourceId: 'received/alpha.jpg',
-      filename: 'alpha.jpg',
-      fileSize: 1024,
-      mediaType: 'image',
-      localPath: 'ph://asset-001',
-      thumbnailUrl:
-        'http://192.168.1.100:39394/resources/mobile/received/thumbnail?fileKey=received-1',
-      previewUrl:
-        'http://192.168.1.100:39394/resources/mobile/received/preview?fileKey=received-1',
-      savedToPhotos: true,
-    });
-    expect(alertSpy).toHaveBeenCalledWith(
-      'Download complete',
-      'alpha.jpg saved to Photos',
-    );
-
-    alertSpy.mockRestore();
-  });
-
-  it('shows a load error instead of the empty state when the phone sync listing fails', async () => {
-    mockListCurrentClientReceivedLibrary.mockRejectedValueOnce(
-      new Error('route unavailable'),
-    );
-
-    const { getByText, queryByText } = render(
-      <TestErrorBoundary>
-        <PhoneSyncSpaceScreen />
-      </TestErrorBoundary>,
-    );
-
-    await waitFor(() => {
-      expect(getByText('Failed to Load')).toBeTruthy();
-    });
-    expect(getByText('Please try again later')).toBeTruthy();
-    expect(queryByText('No synced files yet')).toBeNull();
-  });
-
-  it('opens a received image inside the app preview when a phone-sync row is pressed', async () => {
-    mockListCurrentClientReceivedLibrary.mockResolvedValueOnce([
-      {
-        resourceId: 'received-image',
-        desktopDeviceId: 'desktop-device-id',
-        clientId: 'client-001',
-        displayName: 'alpha.jpg',
-        fileKey: 'received/alpha.jpg',
-        filename: 'alpha.jpg',
-        mediaType: 'image',
-        fileSize: 1024,
-        completedAt: '2026-06-16T08:00:00.000Z',
-        shareStatus: 'shared',
-      },
-    ]);
-    mockGetReceivedLibraryPreviewUrl.mockResolvedValueOnce(
-      'http://192.168.1.100:39394/resources/mobile/received/preview?fileKey=received%2Falpha.jpg',
-    );
-
-    const { getByTestId, getByText } = render(
-      <TestErrorBoundary>
-        <PhoneSyncSpaceScreen />
-      </TestErrorBoundary>,
-    );
-
-    await waitFor(() => {
-      expect(getByText('alpha.jpg')).toBeTruthy();
-    });
-
-    fireEvent.press(getByText('alpha.jpg'));
-
-    await waitFor(() => {
-      expect(mockGetReceivedLibraryPreviewUrl).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
-        expect.objectContaining({ fileKey: 'received/alpha.jpg' }),
-      );
-      expect(getByTestId('phone-sync-preview-image')).toBeTruthy();
-    });
-    expect(mockViewDocument).not.toHaveBeenCalled();
-  });
-
-  it('marks deleted phone-sync items and disables preview and download', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    mockListCurrentClientReceivedLibrary.mockResolvedValueOnce([
-      {
-        resourceId: 'received-deleted',
-        desktopDeviceId: 'desktop-device-id',
-        clientId: 'client-001',
-        displayName: 'deleted.jpg',
-        fileKey: 'received/deleted.jpg',
-        filename: 'deleted.jpg',
-        mediaType: 'image',
-        fileSize: 1024,
-        completedAt: '2026-06-16T08:00:00.000Z',
-        shareStatus: 'shared',
-        fileStatus: 'deleted',
-      },
-    ]);
-
-    const { getByLabelText, getByText } = render(
-      <TestErrorBoundary>
-        <PhoneSyncSpaceScreen />
-      </TestErrorBoundary>,
-    );
-
-    await waitFor(() => {
-      expect(getByText('deleted.jpg')).toBeTruthy();
-    });
-
-    expect(getByText('Deleted on computer')).toBeTruthy();
-
-    const previewButton = getByLabelText('Preview synced file');
-    const downloadButton = getByLabelText('Download synced file');
-    expect(previewButton.props.accessibilityState?.disabled).toBe(true);
-    expect(downloadButton.props.accessibilityState?.disabled).toBe(true);
-
-    fireEvent.press(previewButton);
-    fireEvent.press(downloadButton);
-
-    expect(mockGetReceivedLibraryPreviewUrl).not.toHaveBeenCalled();
-    expect(mockPrepareReceivedLibraryPreview).not.toHaveBeenCalled();
-    expect(mockDownloadReceivedLibraryItem).not.toHaveBeenCalled();
-    expect(alertSpy).not.toHaveBeenCalled();
-
-    alertSpy.mockRestore();
-  });
-
-  it('opens received documents from phone sync space with the system preview viewer', async () => {
-    mockListCurrentClientReceivedLibrary.mockResolvedValueOnce([
-      {
-        resourceId: 'received-doc',
-        desktopDeviceId: 'desktop-device-id',
-        clientId: 'client-001',
-        displayName: 'notes.pdf',
-        fileKey: 'received/notes.pdf',
-        filename: 'notes.pdf',
-        mediaType: 'document',
-        fileSize: 512,
-        completedAt: '2026-06-16T06:00:00.000Z',
-        shareStatus: 'shared',
-      },
-    ]);
-    mockPrepareReceivedLibraryPreview.mockResolvedValueOnce('/cache/notes.pdf');
-    mockViewDocument.mockResolvedValueOnce(undefined);
-
-    const { getByText } = render(
-      <TestErrorBoundary>
-        <PhoneSyncSpaceScreen />
-      </TestErrorBoundary>,
-    );
-
-    await waitFor(() => {
-      expect(getByText('notes.pdf')).toBeTruthy();
-    });
-
-    fireEvent.press(getByText('notes.pdf'));
-
-    await waitFor(() => {
-      expect(mockPrepareReceivedLibraryPreview).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
-        expect.objectContaining({ fileKey: 'received/notes.pdf' }),
-      );
-    });
-    expect(mockViewDocument).toHaveBeenCalledWith({
-      uri: 'file:///cache/notes.pdf',
-      headerTitle: 'notes.pdf',
-      mimeType: 'application/pdf',
-    });
   });
 });
