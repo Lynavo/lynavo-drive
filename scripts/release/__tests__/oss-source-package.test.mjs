@@ -540,6 +540,54 @@ test('blocks remaining CN runtime configuration and mainland payment residue', (
   }
 });
 
+test('scans native source and common config files for CN residue', () => {
+  const fixtureRoot = createTrackedFixture({
+    'services/sidecar-go/main.go': `const apiBaseURL = "${cnRuntimeEndpoint}"\n`,
+    'apps/mobile/scripts/release.py': `market = '${cnMarketValue}'\n`,
+    'apps/mobile/ios/RuntimeConfig.m': `NSString *endpoint = @"${cnRuntimeEndpoint}";\n`,
+    'apps/mobile/ios/RuntimeConfig.h': `static const char *market = "${cnMarketValue}";\n`,
+    'services/sidecar-go/migrations/market.sql': `-- region = ${cnMarketValue}\n`,
+    'services/sidecar-go/Makefile': `MARKET = ${cnMarketValue}\n`,
+    'apps/mobile/ios/Podfile': `region = '${cnMarketValue}'\n`,
+    'apps/mobile/Gemfile': `channel = '${cnMarketValue}'\n`,
+    'config/release.ini': `profile=${cnMarketValue}\n`,
+    'config/release.cfg': `variant=${cnMarketValue}\n`,
+    'config/release.conf': `flavor=${cnMarketValue}\n`,
+    'apps/mobile/ios/.xcode.env': `MARKET=${cnMarketValue}\n`,
+    'apps/mobile/ios/Podfile.lock': `endpoint: ${cnRuntimeEndpoint}\n`,
+    'services/sidecar-go/go.mod': `// region = ${cnMarketValue}\n`,
+    'apps/mobile/android/app/proguard-rules.pro': `# channel = ${cnMarketValue}\n`,
+    'apps/mobile/ios/LaunchScreen.storyboard': `<string value="${cnRuntimeEndpoint}" />\n`,
+    'apps/desktop/dummy.txt': `profile=${cnMarketValue}\n`,
+  });
+  try {
+    const result = runVerifier(['--root', fixtureRoot]);
+
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stdout, /Audited OSS source package files: 17/);
+    assert.match(result.stdout, /Disallowed OSS source package files: 17/);
+    assert.match(result.stdout, /services\/sidecar-go\/main\.go/);
+    assert.match(result.stdout, /apps\/mobile\/scripts\/release\.py/);
+    assert.match(result.stdout, /apps\/mobile\/ios\/RuntimeConfig\.m/);
+    assert.match(result.stdout, /apps\/mobile\/ios\/RuntimeConfig\.h/);
+    assert.match(result.stdout, /services\/sidecar-go\/migrations\/market\.sql/);
+    assert.match(result.stdout, /services\/sidecar-go\/Makefile/);
+    assert.match(result.stdout, /apps\/mobile\/ios\/Podfile/);
+    assert.match(result.stdout, /apps\/mobile\/Gemfile/);
+    assert.match(result.stdout, /config\/release\.ini/);
+    assert.match(result.stdout, /config\/release\.cfg/);
+    assert.match(result.stdout, /config\/release\.conf/);
+    assert.match(result.stdout, /apps\/mobile\/ios\/\.xcode\.env/);
+    assert.match(result.stdout, /apps\/mobile\/ios\/Podfile\.lock/);
+    assert.match(result.stdout, /services\/sidecar-go\/go\.mod/);
+    assert.match(result.stdout, /apps\/mobile\/android\/app\/proguard-rules\.pro/);
+    assert.match(result.stdout, /apps\/mobile\/ios\/LaunchScreen\.storyboard/);
+    assert.match(result.stdout, /apps\/desktop\/dummy\.txt/);
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
 test('falls back to filesystem walk for extracted source archives without git metadata', () => {
   const fixtureRoot = createFilesystemFixture({
     'package.json': '{}\n',
@@ -598,6 +646,13 @@ test('blocks exact retired mobile global identifiers without broad phrase matchi
   const globalFileStyle = ['global', 'FileCorner'].join('');
   const globalPlayStyle = ['global', 'PlayCircle'].join('');
   const globalHomeGradient = ['global', 'Home'].join('');
+  const deviceDiscoveryGlobalKey = ['deviceDiscovery', 'global', 'connected'].join('.');
+  const settingsGlobalKey = ['settings', 'global', 'connected'].join('.');
+  const globalPersonalDirectoryKey = [
+    'directory',
+    'pathCard',
+    'globalPersonalDirectory',
+  ].join('.');
   const fixtureRoot = createTrackedFixture({
     'apps/mobile/src/navigation/RootNavigator.tsx': `const route = '${globalHomeTab}';\n`,
     'apps/mobile/src/services/desktop-local-service.ts':
@@ -651,13 +706,18 @@ test('blocks exact retired mobile global identifiers without broad phrase matchi
       `export const ${globalPlayStyle} = {};\n`,
     'apps/mobile/src/screens/styles/gradient.ts':
       `const gradientId = \`${globalHomeGradient}\${type}MediaGradient\`;\n`,
+    'apps/mobile/src/screens/DeviceDiscoveryScreen.tsx':
+      `const label = t('${deviceDiscoveryGlobalKey}');\n`,
+    'apps/mobile/src/screens/SettingsScreen.tsx': `const label = t('${settingsGlobalKey}');\n`,
+    'apps/desktop/src/renderer/features/directory/DirectoryPathCard.tsx':
+      `const label = t('${globalPersonalDirectoryKey}');\n`,
   });
   try {
     const result = runVerifier(['--root', fixtureRoot]);
 
     assert.equal(result.status, 1, result.stderr);
-    assert.match(result.stdout, /Audited OSS source package files: 27/);
-    assert.match(result.stdout, /Disallowed OSS source package files: 22/);
+    assert.match(result.stdout, /Audited OSS source package files: 30/);
+    assert.match(result.stdout, /Disallowed OSS source package files: 25/);
     assert.match(result.stdout, /navigation\/RootNavigator\.tsx/);
     assert.match(result.stdout, /services\/desktop-local-service\.ts/);
     assert.match(result.stdout, /screens\/SyncActivityScreen\.tsx/);
@@ -688,6 +748,9 @@ test('blocks exact retired mobile global identifiers without broad phrase matchi
     assert.match(result.stdout, /screens\/styles\/file\.ts/);
     assert.match(result.stdout, /screens\/styles\/play\.ts/);
     assert.match(result.stdout, /screens\/styles\/gradient\.ts/);
+    assert.match(result.stdout, /screens\/DeviceDiscoveryScreen\.tsx/);
+    assert.match(result.stdout, /screens\/SettingsScreen\.tsx/);
+    assert.match(result.stdout, /features\/directory\/DirectoryPathCard\.tsx/);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }

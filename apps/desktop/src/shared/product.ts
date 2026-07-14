@@ -1,8 +1,7 @@
-import type { Distribution, ReleaseChannel } from '@lynavo-drive/contracts';
+import type { ReleaseChannel } from '@lynavo-drive/contracts';
 
 export const PRODUCT_NAME = 'Lynavo Drive';
 export const APP_STORAGE_IDENTITY_NAME = 'Lynavo Drive';
-export const PRODUCT_DISTRIBUTION: Distribution = 'community';
 
 type Env = NodeJS.ProcessEnv;
 

@@ -110,41 +110,41 @@ function firstNonEmptyString(...values: unknown[]): string | null {
 function getConnectionLabel(state: ConnectionState, t: any): string {
   switch (state) {
     case 'connected':
-      return t('settings.global.connected');
+      return t('settings.connected');
     case 'connecting':
-      return t('settings.global.connecting');
+      return t('settings.connecting');
     case 'discovering':
-      return t('settings.global.discovering');
+      return t('settings.discovering');
     case 'bound':
-      return t('settings.global.bound');
+      return t('settings.bound');
     case 'offline':
-      return t('settings.global.offline');
+      return t('settings.offline');
     default:
-      return t('settings.global.statusUnknown');
+      return t('settings.statusUnknown');
   }
 }
 
 function getDesktopTitle(binding: BindingStateDTO | null, t: any): string {
-  if (!binding) return t('settings.global.notBound');
+  if (!binding) return t('settings.notBound');
   return (
     firstNonEmptyString(
       binding.deviceAlias,
       binding.deviceName,
       binding.host,
-    ) ?? t('settings.global.currentDesktop')
+    ) ?? t('settings.currentDesktop')
   );
 }
 
 function getDesktopSubtitle(binding: BindingStateDTO | null, t: any): string {
-  if (!binding) return t('settings.global.notConnectedAny');
-  return t('settings.global.currentDeviceStatus', {
+  if (!binding) return t('settings.notConnectedAny');
+  return t('settings.currentDeviceStatus', {
     status: getConnectionLabel(binding.connectionState, t),
   });
 }
 
 function getLanguageLabel(preference: LanguagePreference, t: any): string {
   if (preference === 'system') {
-    return t('settings.global.followSystem');
+    return t('settings.followSystem');
   }
   return (
     LANGUAGE_OPTIONS.find(option => option.id === preference)?.label ??
@@ -154,12 +154,11 @@ function getLanguageLabel(preference: LanguagePreference, t: any): string {
 
 function getVersionLabel(appInfo: AppInfo | null, t: any): string {
   const version = firstNonEmptyString(appInfo?.version);
-  if (!version)
-    return t('settings.global.versionEmpty', { value: NEUTRAL_VALUE });
+  if (!version) return t('settings.versionEmpty', { value: NEUTRAL_VALUE });
   const build = firstNonEmptyString(appInfo?.build);
   return build
-    ? t('settings.global.versionWithBuild', { version, build })
-    : t('settings.global.versionOnly', { version });
+    ? t('settings.versionWithBuild', { version, build })
+    : t('settings.versionOnly', { version });
 }
 
 export function SettingsScreen({
@@ -269,7 +268,7 @@ export function SettingsScreen({
   const handleSaveDeviceName = async () => {
     const nextName = editingName.trim();
     if (nextName.length === 0) {
-      setDeviceNameError(t('settings.global.errorDeviceNameEmpty'));
+      setDeviceNameError(t('settings.errorDeviceNameEmpty'));
       return;
     }
     setIsSavingDeviceName(true);
@@ -280,7 +279,7 @@ export function SettingsScreen({
       setShowEditDevice(false);
     } catch (error) {
       console.warn('[SettingsScreen] setClientDisplayName failed:', error);
-      setDeviceNameError(t('settings.global.errorDeviceNameSave'));
+      setDeviceNameError(t('settings.errorDeviceNameSave'));
     } finally {
       setIsSavingDeviceName(false);
     }
@@ -365,10 +364,8 @@ export function SettingsScreen({
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <Text style={styles.title}>{t('settings.global.my')}</Text>
-            <Text style={styles.subtitle}>
-              {t('settings.global.mySubtitle')}
-            </Text>
+            <Text style={styles.title}>{t('settings.my')}</Text>
+            <Text style={styles.subtitle}>{t('settings.mySubtitle')}</Text>
           </View>
 
           <SettingsSection title={t('settings.sections.device')}>
@@ -376,14 +373,14 @@ export function SettingsScreen({
               icon={Smartphone}
               iconBackground="#E4F5FF"
               iconColor="#1677D2"
-              title={t('settings.global.deviceName')}
+              title={t('settings.deviceName')}
               subtitle={currentDeviceName}
               rightAccessory={
                 <TouchableOpacity
                   testID="settings-edit-device-name"
                   style={styles.editIconButton}
                   accessibilityRole="button"
-                  accessibilityLabel={t('settings.global.editDeviceName')}
+                  accessibilityLabel={t('settings.editDeviceName')}
                   activeOpacity={0.72}
                   onPress={handleOpenEditDevice}
                 >
@@ -446,14 +443,14 @@ export function SettingsScreen({
               icon={MessageSquare}
               iconBackground="#EEEAFB"
               iconColor="#746AA8"
-              title={t('settings.global.appVersionShort')}
+              title={t('settings.appVersionShort')}
               subtitle={getVersionLabel(appInfo, t)}
             />
             <SettingsRow
               icon={ArrowUpToLine}
               iconBackground="#E4F5FF"
               iconColor="#1677D2"
-              title={t('settings.global.exportDiagnosticsTitle')}
+              title={t('settings.exportDiagnosticsTitle')}
               subtitle={t('settings.rows.diagnosticsDesc')}
               showChevron
               last
@@ -471,8 +468,8 @@ export function SettingsScreen({
 
       {showEditDevice ? (
         <SettingsModalFrame
-          title={t('settings.global.editDeviceTitle')}
-          description={t('settings.global.editDeviceDesc')}
+          title={t('settings.editDeviceTitle')}
+          description={t('settings.editDeviceDesc')}
           icon={Pencil}
           tone="blue"
           onClose={() => setShowEditDevice(false)}
@@ -498,7 +495,7 @@ export function SettingsScreen({
               onPress={() => setShowEditDevice(false)}
             >
               <Text style={styles.modalSecondaryButtonText}>
-                {t('settings.global.cancel')}
+                {t('settings.cancel')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -511,9 +508,7 @@ export function SettingsScreen({
               }}
             >
               <Text style={styles.modalPrimaryButtonText}>
-                {isSavingDeviceName
-                  ? t('settings.global.saving')
-                  : t('settings.global.save')}
+                {isSavingDeviceName ? t('settings.saving') : t('settings.save')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -548,15 +543,13 @@ function LanguageView({
             testID="language-back"
             style={styles.childBackButton}
             accessibilityRole="button"
-            accessibilityLabel={t('settings.global.back')}
+            accessibilityLabel={t('settings.back')}
             activeOpacity={0.72}
             onPress={onBack}
           >
             <ChevronLeft size={20} color="#17191C" strokeWidth={1.9} />
           </TouchableOpacity>
-          <Text style={styles.childTitle}>
-            {t('settings.global.languageTitle')}
-          </Text>
+          <Text style={styles.childTitle}>{t('settings.languageTitle')}</Text>
         </View>
 
         <ScrollView
@@ -566,12 +559,12 @@ function LanguageView({
         >
           <View style={styles.card}>
             <LanguageModeRow
-              title={t('settings.global.systemLanguage')}
+              title={t('settings.systemLanguage')}
               selected={mode === 'system'}
               onPress={() => onModeChange('system')}
             />
             <LanguageModeRow
-              title={t('settings.global.manualLanguage')}
+              title={t('settings.manualLanguage')}
               selected={mode === 'manual'}
               onPress={() => onModeChange('manual')}
               last

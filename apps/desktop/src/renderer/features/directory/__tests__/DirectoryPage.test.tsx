@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { DirectoryPage } from '../DirectoryPage';
@@ -175,6 +177,26 @@ describe('DirectoryPage', () => {
 });
 
 describe('DirectoryPathCard', () => {
+  it('uses a market-neutral translation key for My Computer in every locale', () => {
+    const componentSource = readFileSync(
+      'src/renderer/features/directory/DirectoryPathCard.tsx',
+      'utf8',
+    );
+    const locales = ['en', 'zh-Hans', 'zh-Hant'].map((locale) =>
+      JSON.parse(readFileSync(`src/renderer/i18n/locales/${locale}/directory.json`, 'utf8')),
+    ) as Array<{ pathCard: { myComputer?: string; globalPersonalDirectory?: string } }>;
+
+    expect(componentSource).toContain("t('directory.pathCard.myComputer')");
+    expect(componentSource).not.toContain('globalPersonalDirectory');
+    expect(
+      locales.every(
+        ({ pathCard }) =>
+          typeof pathCard.myComputer === 'string' && pathCard.myComputer.trim().length > 0,
+      ),
+    ).toBe(true);
+    expect(locales.every(({ pathCard }) => !('globalPersonalDirectory' in pathCard))).toBe(true);
+  });
+
   beforeEach(() => {
     vi.useRealTimers();
     vi.unstubAllEnvs();

@@ -13,7 +13,7 @@
     "changeLocked": "正在接收文件，完成后可变更",
     "receivedDirectory": "接收目录",
     "personalDirectory": "个人共享目录",
-    "globalPersonalDirectory": "我的电脑",
+    "myComputer": "我的电脑",
     "sharedDirectory": "团队共享目录",
     "windowsDrives": "本机磁盘",
     "windowsDrivesWithPath": "本机磁盘（{{path}}）",

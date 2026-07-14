@@ -15,8 +15,6 @@ import type {
 
 export type ReleaseChannel = 'dev' | 'review' | 'prod';
 
-export type Distribution = 'community' | 'official';
-
 // ── Device Discovery ──
 
 export interface DiscoveredDeviceDTO {

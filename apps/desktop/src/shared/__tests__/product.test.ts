@@ -1,14 +1,21 @@
+import { readFileSync } from 'node:fs';
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   APP_STORAGE_IDENTITY_NAME,
-  PRODUCT_DISTRIBUTION,
   PRODUCT_NAME,
   getProductName,
   getProductReleaseChannel,
 } from '../product';
 
 describe('desktop product helper', () => {
+  it('does not expose a multi-distribution product setting', () => {
+    const productSource = readFileSync('src/shared/product.ts', 'utf8');
+
+    expect(productSource).not.toMatch(/PRODUCT_DISTRIBUTION/);
+  });
+
   afterEach(() => {
     vi.unstubAllEnvs();
   });
@@ -28,7 +35,6 @@ describe('desktop product helper', () => {
     vi.stubEnv('LYNAVO_RELEASE_CHANNEL', 'review');
 
     expect(getProductReleaseChannel()).toBe('review');
-    expect(PRODUCT_DISTRIBUTION).toBe('community');
   });
 
   it('does not expose product-level API target helpers in the OSS shell', async () => {

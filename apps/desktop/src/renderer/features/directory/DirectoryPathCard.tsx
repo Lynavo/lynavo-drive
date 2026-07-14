@@ -299,7 +299,7 @@ export function DirectoryPathCard() {
                 className="whitespace-nowrap text-sm font-semibold"
                 style={{ color: colors.title }}
               >
-                {t('directory.pathCard.globalPersonalDirectory')}
+                {t('directory.pathCard.myComputer')}
               </h4>
             </div>
             <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">

@@ -93,28 +93,66 @@ const GENERATED_SIDECAR_RESOURCE_PATHS = new Set([
 ]);
 
 const TEXT_SOURCE_AND_CONFIG_EXTENSIONS = new Set([
+  '.bat',
+  '.c',
+  '.cc',
+  '.cfg',
   '.cjs',
+  '.cmd',
+  '.conf',
+  '.cpp',
+  '.css',
+  '.env',
   '.gradle',
+  '.go',
+  '.h',
+  '.hpp',
+  '.html',
+  '.ini',
+  '.java',
   '.js',
   '.json',
   '.json5',
   '.jsx',
   '.kt',
   '.kts',
+  '.lock',
+  '.m',
   '.mjs',
+  '.mm',
+  '.mod',
+  '.nsh',
   '.pbxproj',
   '.plist',
+  '.pro',
   '.properties',
+  '.ps1',
+  '.py',
+  '.rb',
+  '.rs',
   '.sh',
+  '.sql',
+  '.storyboard',
   '.swift',
   '.toml',
   '.ts',
   '.tsx',
+  '.txt',
   '.xcconfig',
+  '.xcprivacy',
   '.xcscheme',
+  '.xcworkspacedata',
   '.xml',
   '.yaml',
   '.yml',
+]);
+
+const TEXT_SOURCE_AND_CONFIG_FILENAMES = new Set([
+  'config',
+  'gemfile',
+  'gradlew',
+  'makefile',
+  'podfile',
 ]);
 
 const KNOWN_MAINLAND_MODULE_FILENAMES = new Set([
@@ -139,6 +177,8 @@ const CN_RUNTIME_ENDPOINT_PATTERN =
   /https?:\/\/(?:api|global-api|review-api)\.vividrop\.cn(?=[:/?#"'`\s]|$)/iu;
 const RETIRED_MOBILE_GLOBAL_IDENTIFIER_PATTERN =
   /\b(?:Global(?:Home|Files|Settings)Tab|GlobalLocalComputer[A-Za-z0-9_]*|(?:list|download|get|prepare|share)GlobalLocalComputer[A-Za-z0-9_]*|(?:is|shouldRender)Global(?:Preview|Empty)|downloadResourceForGlobal|formatGlobalHistoryDuration|globalPreview|TOUR_BACKGROUND_IMAGES_GLOBAL|global(?:Sync[A-Z][A-Za-z0-9_]*|Media[A-Z][A-Za-z0-9_]*|Home|RecentDownloadSection|Section(?:Empty(?:Icon|Message|State|Title)|TitleText)|Photo(?:HillLeft|HillRight|Icon|Sun)|Video(?:Dot(?:Faint|RowBottom|RowTop)?|Icon)|File(?:Corner|Icon)|PlayCircle))\b/u;
+const RETIRED_GLOBAL_TRANSLATION_KEY_PATTERN =
+  /\b(?:(?:deviceDiscovery|settings)\.global\.|directory\.pathCard\.globalPersonalDirectory\b)/u;
 
 function usage() {
   return [
@@ -409,7 +449,9 @@ function readGitRefContent(root, gitRef, path) {
 function contentDisallowReason(path, readContent) {
   const name = basename(path);
   const isNpmrc = name === '.npmrc';
-  const isScannableText = TEXT_SOURCE_AND_CONFIG_EXTENSIONS.has(extname(path).toLowerCase());
+  const isScannableText =
+    TEXT_SOURCE_AND_CONFIG_EXTENSIONS.has(extname(path).toLowerCase()) ||
+    TEXT_SOURCE_AND_CONFIG_FILENAMES.has(name.toLowerCase());
   if (!isNpmrc && !isScannableText) {
     return null;
   }
@@ -441,6 +483,13 @@ function contentDisallowReason(path, readContent) {
     RETIRED_MOBILE_GLOBAL_IDENTIFIER_PATTERN.test(content)
   ) {
     return 'retired mobile global-market variant naming';
+  }
+  if (
+    (path.startsWith('apps/mobile/') || path.startsWith('apps/desktop/')) &&
+    !path.includes('/i18n/') &&
+    RETIRED_GLOBAL_TRANSLATION_KEY_PATTERN.test(content)
+  ) {
+    return 'retired global-market translation key naming';
   }
 
   return null;

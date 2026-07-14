@@ -13,7 +13,7 @@
     "changeLocked": "Files are being received. You can change this after transfer finishes.",
     "receivedDirectory": "Received folder",
     "personalDirectory": "Personal shared folder",
-    "globalPersonalDirectory": "My Computer",
+    "myComputer": "My Computer",
     "sharedDirectory": "Team shared folder",
     "windowsDrives": "Local disks",
     "windowsDrivesWithPath": "Local disks ({{path}})",

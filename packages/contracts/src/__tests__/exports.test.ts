@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+// @ts-expect-error Vite resolves raw source imports for this regression test.
+import typesSource from '../types.ts?raw';
 import {
   ErrorCode,
   type BlockedPairingClientDTO,
@@ -11,7 +13,6 @@ import {
 import * as contracts from '../index';
 import {
   SIDECAR_EVENT_TYPES,
-  type Distribution,
   type ReleaseChannel,
   type DesktopDeviceAuthorizationStatus,
   type DesktopDeviceBlockStatus,
@@ -74,6 +75,10 @@ function assertTypeExports(
 }
 
 describe('@lynavo-drive/contracts exports', () => {
+  it('does not model non-OSS distribution variants', () => {
+    expect(typesSource).not.toMatch(/export type Distribution\b/);
+  });
+
   it('exports PROTOCOL_VERSION', () => {
     expect(contracts.PROTOCOL_VERSION).toBe('LMUP/2');
   });
@@ -196,12 +201,10 @@ describe('@lynavo-drive/contracts exports', () => {
     expect('LYNAVO_TURN_URL' in contracts).toBe(false);
   });
 
-  it('exports Lynavo Drive release and distribution types', () => {
+  it('exports the Lynavo Drive release channel type', () => {
     const channel: ReleaseChannel = 'prod';
-    const distribution: Distribution = 'official';
 
     expect(channel).toBe('prod');
-    expect(distribution).toBe('official');
   });
 
   it('exports wake metadata DTOs and wake reachability states', () => {

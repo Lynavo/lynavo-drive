@@ -216,11 +216,11 @@ function getConnectionCodeErrorMessage(
     failure.remainingAttempts !== undefined &&
     failure.remainingAttempts > 0
   ) {
-    return t('deviceDiscovery.global.connectionCodeWrongWithAttempts', {
+    return t('deviceDiscovery.connectionCodeWrongWithAttempts', {
       remainingAttempts: failure.remainingAttempts,
     });
   }
-  return t('deviceDiscovery.global.connectionCodeWrong');
+  return t('deviceDiscovery.connectionCodeWrong');
 }
 
 function displayHostWithoutPort(host: string): string {
@@ -241,9 +241,9 @@ function getConnectionFailureCopy(
 } {
   if (failure?.code === 'blocked') {
     return {
-      title: t('deviceDiscovery.global.pairingBlockedTitle'),
-      description: t('deviceDiscovery.global.pairingBlockedDesc'),
-      actionLabel: t('deviceDiscovery.global.reenter'),
+      title: t('deviceDiscovery.pairingBlockedTitle'),
+      description: t('deviceDiscovery.pairingBlockedDesc'),
+      actionLabel: t('deviceDiscovery.reenter'),
       icon: 'alert-circle-outline',
       tone: 'danger',
     };
@@ -251,9 +251,9 @@ function getConnectionFailureCopy(
 
   if (failure?.code === 'version_incompatible') {
     return {
-      title: t('deviceDiscovery.global.versionIncompatibleTitle'),
-      description: t('deviceDiscovery.global.versionIncompatibleDesc'),
-      actionLabel: t('deviceDiscovery.global.rescan'),
+      title: t('deviceDiscovery.versionIncompatibleTitle'),
+      description: t('deviceDiscovery.versionIncompatibleDesc'),
+      actionLabel: t('deviceDiscovery.rescan'),
       icon: 'alert-circle-outline',
       tone: 'warning',
     };
@@ -261,18 +261,18 @@ function getConnectionFailureCopy(
 
   if (failure?.code === 'wrong_code') {
     return {
-      title: t('deviceDiscovery.global.connectionCodeError'),
+      title: t('deviceDiscovery.connectionCodeError'),
       description: getConnectionCodeErrorMessage(failure, t),
-      actionLabel: t('deviceDiscovery.global.reenter'),
+      actionLabel: t('deviceDiscovery.reenter'),
       icon: 'alert-circle-outline',
       tone: 'danger',
     };
   }
 
   return {
-    title: t('deviceDiscovery.global.connectionFailed'),
-    description: t('deviceDiscovery.global.connectionFailedDesc'),
-    actionLabel: t('deviceDiscovery.global.reenter'),
+    title: t('deviceDiscovery.connectionFailed'),
+    description: t('deviceDiscovery.connectionFailedDesc'),
+    actionLabel: t('deviceDiscovery.reenter'),
     icon: 'alert-circle-outline',
     tone: 'danger',
   };
@@ -405,13 +405,13 @@ export function DeviceDiscoveryScreen() {
   const getVisualQaDevices = useCallback(() => {
     return VISUAL_QA_LAN_DEVICES.map(device => {
       if (device.deviceId === 'visual-qa-openimde-mac-mini') {
-        return { ...device, name: t('deviceDiscovery.global.demoMacStudio') };
+        return { ...device, name: t('deviceDiscovery.demoMacStudio') };
       }
       if (device.deviceId === 'visual-qa-macbook-pro') {
-        return { ...device, name: t('deviceDiscovery.global.demoMacBook') };
+        return { ...device, name: t('deviceDiscovery.demoMacBook') };
       }
       if (device.deviceId === 'visual-qa-windows-workstation') {
-        return { ...device, name: t('deviceDiscovery.global.demoWindows') };
+        return { ...device, name: t('deviceDiscovery.demoWindows') };
       }
       return device;
     });
@@ -420,39 +420,39 @@ export function DeviceDiscoveryScreen() {
   const connectionFeatureGuideSteps = React.useMemo<ConnectionGuideStep[]>(
     () => [
       {
-        title: t('deviceDiscovery.global.onboarding.step1Title'),
-        description: t('deviceDiscovery.global.onboarding.step1Desc'),
-        actionLabel: t('deviceDiscovery.global.onboarding.step1Action'),
+        title: t('deviceDiscovery.onboarding.step1Title'),
+        description: t('deviceDiscovery.onboarding.step1Desc'),
+        actionLabel: t('deviceDiscovery.onboarding.step1Action'),
         previewKind: 'connect',
       },
       {
-        title: t('deviceDiscovery.global.onboarding.step2Title'),
-        description: t('deviceDiscovery.global.onboarding.step2Desc'),
-        actionLabel: t('deviceDiscovery.global.onboarding.step2Action'),
+        title: t('deviceDiscovery.onboarding.step2Title'),
+        description: t('deviceDiscovery.onboarding.step2Desc'),
+        actionLabel: t('deviceDiscovery.onboarding.step2Action'),
         previewKind: 'autoUpload',
       },
       {
-        title: t('deviceDiscovery.global.onboarding.step3Title'),
-        description: t('deviceDiscovery.global.onboarding.step3Desc'),
-        actionLabel: t('deviceDiscovery.global.onboarding.step3Action'),
+        title: t('deviceDiscovery.onboarding.step3Title'),
+        description: t('deviceDiscovery.onboarding.step3Desc'),
+        actionLabel: t('deviceDiscovery.onboarding.step3Action'),
         previewKind: 'uploadScope',
       },
       {
-        title: t('deviceDiscovery.global.onboarding.step4Title'),
-        description: t('deviceDiscovery.global.onboarding.step4Desc'),
-        actionLabel: t('deviceDiscovery.global.onboarding.step4Action'),
+        title: t('deviceDiscovery.onboarding.step4Title'),
+        description: t('deviceDiscovery.onboarding.step4Desc'),
+        actionLabel: t('deviceDiscovery.onboarding.step4Action'),
         previewKind: 'syncProgress',
       },
       {
-        title: t('deviceDiscovery.global.onboarding.step5Title'),
-        description: t('deviceDiscovery.global.onboarding.step5Desc'),
-        actionLabel: t('deviceDiscovery.global.onboarding.step5Action'),
+        title: t('deviceDiscovery.onboarding.step5Title'),
+        description: t('deviceDiscovery.onboarding.step5Desc'),
+        actionLabel: t('deviceDiscovery.onboarding.step5Action'),
         previewKind: 'records',
       },
       {
-        title: t('deviceDiscovery.global.onboarding.step6Title'),
-        description: t('deviceDiscovery.global.onboarding.step6Desc'),
-        actionLabel: t('deviceDiscovery.global.onboarding.step6Action'),
+        title: t('deviceDiscovery.onboarding.step6Title'),
+        description: t('deviceDiscovery.onboarding.step6Desc'),
+        actionLabel: t('deviceDiscovery.onboarding.step6Action'),
         previewKind: 'sharedFilesHub',
       },
     ],
@@ -690,9 +690,9 @@ export function DeviceDiscoveryScreen() {
   const discoveredCount = devices.length + displayedRecentDesktops.length;
   const isShowingSkeleton = scanning && discoveredCount === 0;
   const statusLabel = isShowingSkeleton
-    ? t('deviceDiscovery.global.connectionStatus.scanning')
+    ? t('deviceDiscovery.connectionStatus.scanning')
     : connectionStatus === 'permissionRequired'
-      ? t('deviceDiscovery.global.connectionStatus.permissionRequired')
+      ? t('deviceDiscovery.connectionStatus.permissionRequired')
       : t('deviceDiscovery.devices.foundCount', { count: discoveredCount });
 
   const measureGuideTarget = useCallback(() => {
@@ -916,7 +916,7 @@ export function DeviceDiscoveryScreen() {
   const handleManualPair = useCallback(() => {
     const manualDevice = buildManualPairDevice(manualHost);
     if (!manualDevice) {
-      setManualError(t('deviceDiscovery.global.manualIPErr'));
+      setManualError(t('deviceDiscovery.manualIPErr'));
       return;
     }
     setManualError(null);
@@ -1038,9 +1038,9 @@ export function DeviceDiscoveryScreen() {
   const connectionStateContent: FlowStateContent | null =
     !isShowingSkeleton && connectionStatus === 'empty'
       ? {
-          title: t('deviceDiscovery.global.noDeviceTitle'),
-          description: t('deviceDiscovery.global.noDeviceDesc'),
-          actionLabel: t('deviceDiscovery.global.manualPairing'),
+          title: t('deviceDiscovery.noDeviceTitle'),
+          description: t('deviceDiscovery.noDeviceDesc'),
+          actionLabel: t('deviceDiscovery.manualPairing'),
           icon: 'desktop-outline',
           tone: 'neutral',
           onAction: () => {
@@ -1052,9 +1052,9 @@ export function DeviceDiscoveryScreen() {
         }
       : !isShowingSkeleton && connectionStatus === 'permissionRequired'
         ? {
-            title: t('deviceDiscovery.global.nearbyPermissionTitle'),
-            description: t('deviceDiscovery.global.nearbyPermissionDesc'),
-            actionLabel: t('deviceDiscovery.global.startScan'),
+            title: t('deviceDiscovery.nearbyPermissionTitle'),
+            description: t('deviceDiscovery.nearbyPermissionDesc'),
+            actionLabel: t('deviceDiscovery.startScan'),
             icon: 'radio-outline',
             tone: 'neutral',
             onAction: handleRescan,
@@ -1076,18 +1076,18 @@ export function DeviceDiscoveryScreen() {
             }
           : !isShowingSkeleton && connectionStatus === 'timeout'
             ? {
-                title: t('deviceDiscovery.global.connectTimeoutTitle'),
-                description: t('deviceDiscovery.global.connectTimeoutDesc'),
-                actionLabel: t('deviceDiscovery.global.rescan'),
+                title: t('deviceDiscovery.connectTimeoutTitle'),
+                description: t('deviceDiscovery.connectTimeoutDesc'),
+                actionLabel: t('deviceDiscovery.rescan'),
                 icon: 'time-outline',
                 tone: 'warning',
                 onAction: handleRescan,
               }
             : !isShowingSkeleton && connectionStatus === 'cameraDenied'
               ? {
-                  title: t('deviceDiscovery.global.cameraDeniedTitle'),
-                  description: t('deviceDiscovery.global.cameraDeniedDesc'),
-                  actionLabel: t('deviceDiscovery.global.inputCode'),
+                  title: t('deviceDiscovery.cameraDeniedTitle'),
+                  description: t('deviceDiscovery.cameraDeniedDesc'),
+                  actionLabel: t('deviceDiscovery.inputCode'),
                   icon: 'camera-outline',
                   tone: 'warning',
                   onAction: () => {
@@ -1151,7 +1151,7 @@ export function DeviceDiscoveryScreen() {
               <TouchableOpacity
                 activeOpacity={0.76}
                 accessibilityRole="button"
-                accessibilityLabel={t('deviceDiscovery.global.back')}
+                accessibilityLabel={t('deviceDiscovery.back')}
                 onPress={goBack}
                 style={styles.backButton}
               >
@@ -1162,21 +1162,19 @@ export function DeviceDiscoveryScreen() {
             <View style={styles.header}>
               <Text style={styles.title}>
                 {mode === 'switch'
-                  ? t('deviceDiscovery.global.switchComputer')
-                  : t('deviceDiscovery.global.connectYourPC')}
+                  ? t('deviceDiscovery.switchComputer')
+                  : t('deviceDiscovery.connectYourPC')}
               </Text>
               <Text style={styles.subtitle}>
-                {t('deviceDiscovery.global.scanFirstText')}
+                {t('deviceDiscovery.scanFirstText')}
               </Text>
             </View>
 
             {showPairingInvalidatedNotice ? (
               <FlowStateCard
                 state={{
-                  title: t('deviceDiscovery.global.pairingInvalidatedTitle'),
-                  description: t(
-                    'deviceDiscovery.global.pairingInvalidatedDesc',
-                  ),
+                  title: t('deviceDiscovery.pairingInvalidatedTitle'),
+                  description: t('deviceDiscovery.pairingInvalidatedDesc'),
                   icon: 'key-outline',
                   tone: 'warning',
                 }}
@@ -1190,7 +1188,7 @@ export function DeviceDiscoveryScreen() {
             >
               <View style={styles.devicesHeader}>
                 <Text style={styles.devicesTitle}>
-                  {t('deviceDiscovery.global.lanDeviceTitle')}
+                  {t('deviceDiscovery.lanDeviceTitle')}
                 </Text>
                 <View style={styles.statusPill}>
                   {scanning ? <PulseDot /> : null}
@@ -1229,11 +1227,9 @@ export function DeviceDiscoveryScreen() {
                                 : isKnownDevice
                                   ? t('deviceDiscovery.switch.badge.known')
                                   : device.availability === 'busy'
-                                    ? t(
-                                        'deviceDiscovery.global.connectionStatus.busy',
-                                      )
+                                    ? t('deviceDiscovery.connectionStatus.busy')
                                     : t(
-                                        'deviceDiscovery.global.connectionStatus.available',
+                                        'deviceDiscovery.connectionStatus.available',
                                       )
                             }
                             iconName={
@@ -1267,7 +1263,7 @@ export function DeviceDiscoveryScreen() {
                                 : isKnownDevice
                                   ? t('deviceDiscovery.switch.badge.known')
                                   : t(
-                                      'deviceDiscovery.global.connectionStatus.available',
+                                      'deviceDiscovery.connectionStatus.available',
                                     )
                             }
                             iconName="desktop-outline"
@@ -1296,7 +1292,7 @@ export function DeviceDiscoveryScreen() {
                         {t('deviceDiscovery.actions.manualPair')}
                       </Text>
                       <Text style={styles.rowSubtitle}>
-                        {t('deviceDiscovery.global.enterIPAndCode')}
+                        {t('deviceDiscovery.enterIPAndCode')}
                       </Text>
                     </View>
                     <Icon name="chevron-forward" size={18} color="#A1B6CF" />
@@ -1596,13 +1592,13 @@ function ConnectionGuideOverlay({
             <TouchableOpacity
               accessible
               accessibilityRole="button"
-              accessibilityLabel={t('deviceDiscovery.global.preview.skipGuide')}
+              accessibilityLabel={t('deviceDiscovery.preview.skipGuide')}
               activeOpacity={0.76}
               style={styles.guideSkipButton}
               onPress={onSkip}
             >
               <Text style={styles.guideSkip}>
-                {t('deviceDiscovery.global.preview.skipGuide')}
+                {t('deviceDiscovery.preview.skipGuide')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -1641,28 +1637,28 @@ function ConnectionFeaturePreviewCard({
             </View>
             <View>
               <Text style={styles.guidePreviewStrong}>
-                {t('deviceDiscovery.global.preview.autoUpload')}
+                {t('deviceDiscovery.preview.autoUpload')}
               </Text>
               <Text style={styles.guidePreviewSubtle}>
-                {t('deviceDiscovery.global.preview.disabled')}
+                {t('deviceDiscovery.preview.disabled')}
               </Text>
             </View>
           </View>
           <View style={styles.guidePreviewPrimaryPill}>
             <Text style={styles.guidePreviewPrimaryPillText}>
-              {t('deviceDiscovery.global.preview.enableAction')}
+              {t('deviceDiscovery.preview.enableAction')}
             </Text>
           </View>
         </View>
         <View style={styles.guidePreviewPanel}>
           <Text style={styles.guidePreviewPanelTitle}>
-            {t('deviceDiscovery.global.preview.deviceStatus')}
+            {t('deviceDiscovery.preview.deviceStatus')}
           </Text>
           <Text style={styles.guidePreviewPanelValue}>
-            {t('deviceDiscovery.global.preview.autoUploadDisabled')}
+            {t('deviceDiscovery.preview.autoUploadDisabled')}
           </Text>
           <Text style={styles.guidePreviewPanelMeta}>
-            {t('deviceDiscovery.global.preview.lastSyncNone')}
+            {t('deviceDiscovery.preview.lastSyncNone')}
           </Text>
         </View>
       </GuidePreviewShell>
@@ -1681,43 +1677,43 @@ function ConnectionFeaturePreviewCard({
           </View>
           <View style={styles.guidePreviewFlex}>
             <Text style={styles.guidePreviewStrong}>
-              {t('deviceDiscovery.global.preview.syncPlan')}
+              {t('deviceDiscovery.preview.syncPlan')}
             </Text>
             <Text style={styles.guidePreviewSubtle} numberOfLines={1}>
-              {t('deviceDiscovery.global.preview.syncPlanDesc')}
+              {t('deviceDiscovery.preview.syncPlanDesc')}
             </Text>
           </View>
         </View>
         <View style={styles.guidePreviewStatsRow}>
           <GuidePreviewStat
-            label={t('deviceDiscovery.global.preview.statSource')}
+            label={t('deviceDiscovery.preview.statSource')}
             value="2"
           />
           <GuidePreviewStat
-            label={t('deviceDiscovery.global.preview.statFiles')}
+            label={t('deviceDiscovery.preview.statFiles')}
             value="3"
           />
           <GuidePreviewStat
-            label={t('deviceDiscovery.global.preview.statScope')}
-            value={t('deviceDiscovery.global.preview.statScopeAll')}
+            label={t('deviceDiscovery.preview.statScope')}
+            value={t('deviceDiscovery.preview.statScopeAll')}
           />
         </View>
         <Text style={styles.guidePreviewSectionLabel}>
-          {t('deviceDiscovery.global.preview.syncSource')}
+          {t('deviceDiscovery.preview.syncSource')}
         </Text>
         <GuidePreviewOption
           iconName="auto-upload-image"
-          title={t('deviceDiscovery.global.preview.photosAndVideos')}
-          description={t('deviceDiscovery.global.preview.photosAndVideosDesc')}
+          title={t('deviceDiscovery.preview.photosAndVideos')}
+          description={t('deviceDiscovery.preview.photosAndVideosDesc')}
           active
         />
         <Text style={styles.guidePreviewSectionLabel}>
-          {t('deviceDiscovery.global.preview.syncScope')}
+          {t('deviceDiscovery.preview.syncScope')}
         </Text>
         <GuidePreviewOption
           iconName="auto-upload-folder"
-          title={t('deviceDiscovery.global.preview.statScopeAll')}
-          description={t('deviceDiscovery.global.preview.allContentDesc')}
+          title={t('deviceDiscovery.preview.statScopeAll')}
+          description={t('deviceDiscovery.preview.allContentDesc')}
           active
         />
       </GuidePreviewShell>
@@ -1737,25 +1733,25 @@ function ConnectionFeaturePreviewCard({
             </View>
             <View>
               <Text style={styles.guidePreviewStrong}>
-                {t('deviceDiscovery.global.preview.autoUpload')}
+                {t('deviceDiscovery.preview.autoUpload')}
               </Text>
               <Text style={styles.guidePreviewSubtle}>
-                {t('deviceDiscovery.global.preview.enabled')}
+                {t('deviceDiscovery.preview.enabled')}
               </Text>
             </View>
           </View>
           <View style={styles.guidePreviewPrimaryPill}>
             <Text style={styles.guidePreviewPrimaryPillText}>
-              {t('deviceDiscovery.global.preview.adjustAction')}
+              {t('deviceDiscovery.preview.adjustAction')}
             </Text>
           </View>
         </View>
         <View style={styles.guidePreviewPanel}>
           <Text style={styles.guidePreviewPanelTitle}>
-            {t('deviceDiscovery.global.preview.deviceStatus')}
+            {t('deviceDiscovery.preview.deviceStatus')}
           </Text>
           <Text style={styles.guidePreviewPanelValue}>
-            {t('deviceDiscovery.global.preview.uploadedCount', {
+            {t('deviceDiscovery.preview.uploadedCount', {
               uploaded: 96,
               total: 128,
             })}
@@ -1763,7 +1759,7 @@ function ConnectionFeaturePreviewCard({
           <View style={styles.guidePreviewUploadCard}>
             <View style={styles.guidePreviewUploadHeader}>
               <Text style={styles.guidePreviewUploadTitle}>
-                {t('deviceDiscovery.global.preview.uploadingProgress')}
+                {t('deviceDiscovery.preview.uploadingProgress')}
               </Text>
               <Text style={styles.guidePreviewUploadPercent}>75%</Text>
             </View>
@@ -1772,21 +1768,21 @@ function ConnectionFeaturePreviewCard({
             </View>
             <View style={styles.guidePreviewUploadGrid}>
               <GuidePreviewProgressStat
-                label={t('deviceDiscovery.global.preview.speed')}
+                label={t('deviceDiscovery.preview.speed')}
                 value="68.5 MB/s"
               />
               <GuidePreviewProgressStat
-                label={t('deviceDiscovery.global.preview.progress')}
+                label={t('deviceDiscovery.preview.progress')}
                 value="96 / 128"
                 alignRight
               />
               <GuidePreviewProgressStat
-                label={t('deviceDiscovery.global.preview.fileSize')}
+                label={t('deviceDiscovery.preview.fileSize')}
                 value="2.4 GB / 3.6 GB"
               />
               <GuidePreviewProgressStat
-                label={t('deviceDiscovery.global.preview.remainingTime')}
-                value={t('deviceDiscovery.global.preview.secondsVal', {
+                label={t('deviceDiscovery.preview.remainingTime')}
+                value={t('deviceDiscovery.preview.secondsVal', {
                   seconds: 24,
                 })}
                 alignRight
@@ -1794,7 +1790,7 @@ function ConnectionFeaturePreviewCard({
             </View>
           </View>
           <Text style={styles.guidePreviewPanelMeta}>
-            {t('deviceDiscovery.global.preview.lastSyncNone')}
+            {t('deviceDiscovery.preview.lastSyncNone')}
           </Text>
         </View>
       </GuidePreviewShell>
@@ -1813,28 +1809,28 @@ function ConnectionFeaturePreviewCard({
               <Download size={16} color="#1677D2" strokeWidth={2} />
             </View>
             <Text style={styles.guidePreviewStrong}>
-              {t('deviceDiscovery.global.preview.recentDownload')}
+              {t('deviceDiscovery.preview.recentDownload')}
             </Text>
           </View>
           <Text style={styles.guidePreviewLink}>
-            {t('deviceDiscovery.global.preview.viewAll')}
+            {t('deviceDiscovery.preview.viewAll')}
           </Text>
         </View>
         <View style={styles.guidePreviewDownloadRow}>
           {[
             {
               icon: FileText,
-              label: t('deviceDiscovery.global.preview.demoFileName1'),
+              label: t('deviceDiscovery.preview.demoFileName1'),
               testID: 'file',
             },
             {
               icon: FileVideo,
-              label: t('deviceDiscovery.global.preview.demoFileName2'),
+              label: t('deviceDiscovery.preview.demoFileName2'),
               testID: 'video',
             },
             {
               icon: FileText,
-              label: t('deviceDiscovery.global.preview.demoFileName3'),
+              label: t('deviceDiscovery.preview.demoFileName3'),
               testID: 'document',
             },
           ].map(({ icon: PreviewIcon, label, testID }) => (
@@ -1851,15 +1847,15 @@ function ConnectionFeaturePreviewCard({
         <View style={styles.guidePreviewCompactRecord}>
           <View>
             <Text style={styles.guidePreviewStrong}>
-              {t('deviceDiscovery.global.preview.syncRecords')}
+              {t('deviceDiscovery.preview.syncRecords')}
             </Text>
             <Text style={styles.guidePreviewSubtle}>
-              {t('deviceDiscovery.global.preview.todayStat')}
+              {t('deviceDiscovery.preview.todayStat')}
             </Text>
           </View>
           <View style={styles.guidePreviewCompletedPill}>
             <Text style={styles.guidePreviewCompletedText}>
-              {t('deviceDiscovery.global.preview.completed')}
+              {t('deviceDiscovery.preview.completed')}
             </Text>
           </View>
         </View>
@@ -1875,11 +1871,11 @@ function ConnectionFeaturePreviewCard({
           iconStyle={styles.guidePreviewIconBlue}
           iconColor="#3B82F6"
           testID="guide-preview-phone-sync-icon"
-          title={t('deviceDiscovery.global.preview.syncSpaceTitle')}
-          description={t('deviceDiscovery.global.preview.syncSpaceDesc')}
+          title={t('deviceDiscovery.preview.syncSpaceTitle')}
+          description={t('deviceDiscovery.preview.syncSpaceDesc')}
           badges={[
-            t('deviceDiscovery.global.preview.syncSpaceBadge1'),
-            t('deviceDiscovery.global.preview.syncSpaceBadge2'),
+            t('deviceDiscovery.preview.syncSpaceBadge1'),
+            t('deviceDiscovery.preview.syncSpaceBadge2'),
           ]}
         />
         <GuidePreviewResourceEntry
@@ -1887,11 +1883,11 @@ function ConnectionFeaturePreviewCard({
           iconStyle={styles.guidePreviewIconPurple}
           iconColor="#8B5CF6"
           testID="guide-preview-local-computer-icon"
-          title={t('deviceDiscovery.global.preview.localComputerTitle')}
-          description={t('deviceDiscovery.global.preview.localComputerDesc')}
+          title={t('deviceDiscovery.preview.localComputerTitle')}
+          description={t('deviceDiscovery.preview.localComputerDesc')}
           badges={[
-            t('deviceDiscovery.global.preview.localComputerBadge1'),
-            t('deviceDiscovery.global.preview.localComputerBadge2'),
+            t('deviceDiscovery.preview.localComputerBadge1'),
+            t('deviceDiscovery.preview.localComputerBadge2'),
           ]}
         />
       </GuidePreviewShell>
@@ -2101,12 +2097,12 @@ function ConnectionFlowModal({
           <View style={styles.modalTitleStack}>
             <Text style={styles.modalTitle}>
               {isManualPairing
-                ? t('deviceDiscovery.global.manualPairing')
-                : t('deviceDiscovery.global.selectMethod')}
+                ? t('deviceDiscovery.manualPairing')
+                : t('deviceDiscovery.selectMethod')}
             </Text>
             <Text style={styles.modalSubtitle}>
               {isManualPairing
-                ? t('deviceDiscovery.global.manualPairingDesc')
+                ? t('deviceDiscovery.manualPairingDesc')
                 : t('deviceDiscovery.connectionMethod.selected', {
                     name: deviceName,
                   })}
@@ -2127,7 +2123,7 @@ function ConnectionFlowModal({
             </Text>
             <Text style={styles.optionBody}>
               {t('deviceDiscovery.connectionMethod.qrDesc', {
-                name: deviceName || t('deviceDiscovery.global.findPC'),
+                name: deviceName || t('deviceDiscovery.findPC'),
               })}
             </Text>
           </View>
@@ -2148,12 +2144,12 @@ function ConnectionFlowModal({
           <View style={styles.optionCopy}>
             <Text style={styles.optionTitle}>
               {isManualPairing
-                ? t('deviceDiscovery.global.manualIP')
+                ? t('deviceDiscovery.manualIP')
                 : t('deviceDiscovery.connectionMethod.codeTitle')}
             </Text>
             <Text style={styles.optionBody}>
               {isManualPairing
-                ? t('deviceDiscovery.global.enterIPAndCode')
+                ? t('deviceDiscovery.enterIPAndCode')
                 : t('deviceDiscovery.connectionMethod.codeDesc', {
                     name: deviceName,
                   })}
@@ -2167,7 +2163,7 @@ function ConnectionFlowModal({
           onPress={onClose}
         >
           <Text style={styles.modalCancelText}>
-            {t('deviceDiscovery.global.cancel')}
+            {t('deviceDiscovery.cancel')}
           </Text>
         </TouchableOpacity>
       </>
@@ -2181,10 +2177,10 @@ function ConnectionFlowModal({
           </View>
           <View style={styles.modalTitleStack}>
             <Text style={styles.modalTitle}>
-              {t('deviceDiscovery.global.manualPairing')}
+              {t('deviceDiscovery.manualPairing')}
             </Text>
             <Text style={styles.modalSubtitle}>
-              {t('deviceDiscovery.global.manualIPHint')}
+              {t('deviceDiscovery.manualIPHint')}
             </Text>
           </View>
         </View>
@@ -2200,7 +2196,7 @@ function ConnectionFlowModal({
           onSubmitEditing={onManualSubmit}
         />
         <Text style={manualError ? styles.errorText : styles.inputHint}>
-          {manualError || t('deviceDiscovery.global.viewSettingsHint')}
+          {manualError || t('deviceDiscovery.viewSettingsHint')}
         </Text>
         <View style={styles.modalActions}>
           <TouchableOpacity
@@ -2209,7 +2205,7 @@ function ConnectionFlowModal({
             onPress={onClose}
           >
             <Text style={styles.secondaryActionText}>
-              {t('deviceDiscovery.global.cancel')}
+              {t('deviceDiscovery.cancel')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -2218,7 +2214,7 @@ function ConnectionFlowModal({
             onPress={onManualSubmit}
           >
             <Text style={styles.primaryActionText}>
-              {t('deviceDiscovery.global.onboarding.step2Action')}
+              {t('deviceDiscovery.onboarding.step2Action')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -2233,10 +2229,10 @@ function ConnectionFlowModal({
           </View>
           <View style={styles.modalTitleStack}>
             <Text style={styles.modalTitle}>
-              {t('deviceDiscovery.global.cameraAccessTitle')}
+              {t('deviceDiscovery.cameraAccessTitle')}
             </Text>
             <Text style={styles.modalSubtitle}>
-              {t('deviceDiscovery.global.cameraAccessDesc')}
+              {t('deviceDiscovery.cameraAccessDesc')}
             </Text>
           </View>
         </View>
@@ -2247,7 +2243,7 @@ function ConnectionFlowModal({
             onPress={onDeny}
           >
             <Text style={styles.secondaryActionText}>
-              {t('deviceDiscovery.global.deny')}
+              {t('deviceDiscovery.deny')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -2256,7 +2252,7 @@ function ConnectionFlowModal({
             onPress={onAllow}
           >
             <Text style={styles.primaryActionText}>
-              {t('deviceDiscovery.global.allow')}
+              {t('deviceDiscovery.allow')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -2271,12 +2267,11 @@ function ConnectionFlowModal({
           </View>
           <View style={styles.modalTitleStack}>
             <Text style={styles.modalTitle}>
-              {t('deviceDiscovery.global.enterCodeTitle')}
+              {t('deviceDiscovery.enterCodeTitle')}
             </Text>
             <Text style={styles.modalSubtitle}>
-              {t('deviceDiscovery.global.enterCodeDesc', {
-                deviceName:
-                  deviceName || t('deviceDiscovery.global.lanDeviceTitle'),
+              {t('deviceDiscovery.enterCodeDesc', {
+                deviceName: deviceName || t('deviceDiscovery.lanDeviceTitle'),
               })}
             </Text>
           </View>
@@ -2284,7 +2279,7 @@ function ConnectionFlowModal({
         <TextInput
           value={connectionCode}
           onChangeText={onChange}
-          placeholder={t('deviceDiscovery.global.pairingCodePlaceholder')}
+          placeholder={t('deviceDiscovery.pairingCodePlaceholder')}
           placeholderTextColor="#A8B6C6"
           autoCapitalize="characters"
           autoCorrect={false}
@@ -2297,7 +2292,7 @@ function ConnectionFlowModal({
           <View style={styles.verifyingRow}>
             <ActivityIndicator size="small" color="#1677D2" />
             <Text style={styles.verifyingText}>
-              {t('deviceDiscovery.global.verifyingCode')}
+              {t('deviceDiscovery.verifyingCode')}
             </Text>
           </View>
         ) : null}
@@ -2309,7 +2304,7 @@ function ConnectionFlowModal({
             onPress={onClose}
           >
             <Text style={styles.secondaryActionText}>
-              {t('deviceDiscovery.global.cancel')}
+              {t('deviceDiscovery.cancel')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -2322,7 +2317,7 @@ function ConnectionFlowModal({
             onPress={onSubmit}
           >
             <Text style={styles.primaryActionText}>
-              {t('deviceDiscovery.global.connect')}
+              {t('deviceDiscovery.connect')}
             </Text>
           </TouchableOpacity>
         </View>
