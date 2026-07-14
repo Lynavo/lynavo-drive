@@ -233,3 +233,119 @@ test('native build workflow is path-aware, unsigned, and platform-bounded', () =
     assert.doesNotMatch(String(step.with?.path ?? ''), /[*?]/);
   }
 });
+
+test('draft release workflow is tag-gated, unsigned, and idempotent', () => {
+  const config = workflow('.github/workflows/release.yml');
+  const jobs = config.jobs ?? {};
+  const workflowText = readRepoFile('.github/workflows/release.yml');
+
+  assert.equal(config.name, 'OSS Draft Release');
+  assert.deepEqual(config.on?.push?.tags, ['v*']);
+  assert.ok(config.on?.workflow_dispatch !== undefined);
+  assert.equal(config.on?.pull_request_target, undefined);
+  assert.deepEqual(config.permissions, { contents: 'read' });
+
+  assert.ok(jobs['verify-tag']);
+  assert.equal(jobs['verify-tag'].outputs?.version, '${{ steps.version.outputs.version }}');
+  const verifyCommands = findStep(
+    jobs['verify-tag'].steps ?? [],
+    'Verify release version',
+  ).run;
+  assert.match(verifyCommands, /verify-release-tag\.mjs/);
+  assert.match(verifyCommands, /GITHUB_REF_NAME/);
+  assert.match(verifyCommands, /apps\/desktop\/package\.json/);
+
+  assert.equal(jobs.gate?.uses, './.github/workflows/oss-release-gate.yml');
+  assert.equal(jobs.ci?.uses, './.github/workflows/ci.yml');
+  assert.equal(jobs.native?.uses, './.github/workflows/native-builds.yml');
+  for (const jobName of ['gate', 'ci', 'native']) {
+    assert.match(JSON.stringify(jobs[jobName].needs), /verify-tag|gate|ci/);
+  }
+  assert.ok(workflow('.github/workflows/oss-release-gate.yml').on?.workflow_call);
+  assert.ok(workflow('.github/workflows/ci.yml').on?.workflow_call);
+  assert.match(
+    workflow('.github/workflows/oss-release-gate.yml').concurrency?.group ?? '',
+    /^oss-release-gate-/,
+  );
+  assert.match(workflow('.github/workflows/ci.yml').concurrency?.group ?? '', /^ci-/);
+  assert.match(
+    workflow('.github/workflows/native-builds.yml').concurrency?.group ?? '',
+    /^native-builds-/,
+  );
+
+  const tagOnly = /github\.event_name == 'push'.*refs\/tags\/v/;
+  assert.match(jobs.assemble?.if ?? '', tagOnly);
+  assert.match(jobs.release?.if ?? '', tagOnly);
+  assert.deepEqual(jobs.release?.permissions, { contents: 'write' });
+  for (const [jobName, job] of Object.entries(jobs)) {
+    if (jobName !== 'release') {
+      assert.notEqual(job.permissions?.contents, 'write');
+    }
+  }
+
+  const steps = allWorkflowSteps(config);
+  assertActionsPinned(steps);
+  const downloadSteps = jobs.assemble?.steps?.filter(step =>
+    step.uses?.startsWith('actions/download-artifact@'),
+  );
+  assert.deepEqual(
+    downloadSteps?.map(step => step.with?.name),
+    [
+      'native-macos-arm64',
+      'native-macos-x64',
+      'native-windows-x64',
+      'native-android',
+    ],
+  );
+  assert.equal(
+    findStep(jobs.assemble?.steps ?? [], 'Upload assembled release assets').with?.[
+      'retention-days'
+    ],
+    7,
+  );
+  assert.equal(
+    findStep(jobs.assemble?.steps ?? [], 'Upload assembled release assets').with?.path,
+    'build/release-assets',
+  );
+
+  const assets = [
+    'LynavoDrive-${VERSION}-macos-arm64.dmg',
+    'LynavoDrive-${VERSION}-macos-x64.dmg',
+    'LynavoDrive-${VERSION}-windows-x64.exe',
+    'LynavoDrive-${VERSION}-windows-x64.zip',
+    'LynavoDrive-${VERSION}-android-arm64-x86_64.apk',
+    'LynavoDrive-${VERSION}-android-arm64-x86_64.aab',
+    'SHA256SUMS',
+  ];
+  for (const asset of assets) {
+    assert.ok(workflowText.includes(asset), `missing draft release asset: ${asset}`);
+  }
+
+  const releaseCommands = jobs.release?.steps
+    ?.map(step => step.run ?? '')
+    .join('\n');
+  assert.match(releaseCommands, /gh release view.*--json isDraft/);
+  assert.match(releaseCommands, /isDraft/);
+  assert.match(releaseCommands, /published release/i);
+  assert.match(releaseCommands, /gh release create/);
+  assert.match(releaseCommands, /--draft/);
+  assert.match(releaseCommands, /--generate-notes/);
+  assert.match(releaseCommands, /--verify-tag/);
+  assert.match(releaseCommands, /gh release delete-asset/);
+  assert.match(releaseCommands, /--yes/);
+  assert.match(releaseCommands, /gh release upload/);
+  assert.match(releaseCommands, /--clobber/);
+  assert.match(releaseCommands, /unsigned OSS build-verification outputs/);
+  assert.match(releaseCommands, /SHA256SUMS/);
+
+  assert.doesNotMatch(workflowText, /pull_request_target/);
+  assert.doesNotMatch(workflowText, /(?:artifact|asset)[^\n]*linux|linux[^\n]*(?:artifact|asset)/i);
+  assert.doesNotMatch(workflowText, /notari[sz]|apple-id|app-store|play-store|auto.?update/i);
+  assert.doesNotMatch(workflowText, /secrets\.|CSC_LINK|APPLE_ID|signing-certificate/i);
+  assert.doesNotMatch(workflowText, /curl[^\n]*(?:upload|release)|electron-updater/i);
+  for (const step of steps.filter(candidate =>
+    candidate.uses?.startsWith('actions/upload-artifact@'),
+  )) {
+    assert.doesNotMatch(String(step.with?.path ?? ''), /[*?]/);
+  }
+});
