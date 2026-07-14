@@ -234,6 +234,148 @@ test('native build workflow is path-aware, unsigned, and platform-bounded', () =
   }
 });
 
+test('native change detection has the pull request permission required by paths-filter', () => {
+  const config = workflow('.github/workflows/native-builds.yml');
+
+  assert.deepEqual(config.permissions, { contents: 'read' });
+  assert.deepEqual(config.jobs?.changes?.permissions, {
+    contents: 'read',
+    'pull-requests': 'read',
+  });
+});
+
+test('native path filters select every platform for shared build inputs', () => {
+  const config = workflow('.github/workflows/native-builds.yml');
+  const paths = findStep(
+    config.jobs?.changes?.steps ?? [],
+    'Filter changed paths',
+  );
+  const filters = parse(paths.with?.filters ?? '');
+  const sharedInputs = [
+    'package.json',
+    '.npmrc',
+    'pnpm-workspace.yaml',
+    'tsconfig.base.json',
+    'turbo.json',
+    'scripts/sync-version-manifest.mjs',
+    'scripts/dev/release-child-env.cjs',
+  ];
+
+  for (const platform of ['ios', 'android', 'macos', 'windows']) {
+    assert.ok(Array.isArray(filters[platform]), `missing path filter: ${platform}`);
+    for (const input of sharedInputs) {
+      assert.ok(
+        filters[platform].includes(input),
+        `${input} must select the ${platform} native build`,
+      );
+    }
+  }
+  assert.equal(filters.linux, undefined);
+});
+
+test('Android path filter includes its native artifact staging script', () => {
+  const config = workflow('.github/workflows/native-builds.yml');
+  const paths = findStep(
+    config.jobs?.changes?.steps ?? [],
+    'Filter changed paths',
+  );
+  const filters = parse(paths.with?.filters ?? '');
+
+  assert.ok(
+    filters.android?.includes('scripts/release/stage-native-artifact.mjs'),
+  );
+});
+
+test('Android build verifies the effective APK version before staging', () => {
+  const config = workflow('.github/workflows/native-builds.yml');
+  const verifyVersion = findStep(
+    config.jobs?.android?.steps ?? [],
+    'Verify Android package version',
+  );
+
+  assert.equal(
+    verifyVersion.env?.EXPECTED_VERSION,
+    '${{ needs.changes.outputs.version }}',
+  );
+  assert.match(verifyVersion.run, /apkanalyzer.*manifest version-name/);
+  assert.match(verifyVersion.run, /ACTUAL_VERSION/);
+  assert.match(verifyVersion.run, /EXPECTED_VERSION/);
+  assert.match(verifyVersion.run, /exit 1/);
+});
+
+test('native artifact uploads overwrite same-run artifacts on rerun', () => {
+  const config = workflow('.github/workflows/native-builds.yml');
+  const uploads = allWorkflowSteps(config).filter(step =>
+    step.uses?.startsWith('actions/upload-artifact@'),
+  );
+
+  assert.equal(uploads.length, 3);
+  for (const upload of uploads) {
+    assert.equal(
+      upload.with?.overwrite,
+      true,
+      `${upload.name} must enable artifact overwrite`,
+    );
+  }
+});
+
+test('assembled release artifact upload overwrites same-run artifacts on rerun', () => {
+  const config = workflow('.github/workflows/release.yml');
+  const upload = findStep(
+    config.jobs?.assemble?.steps ?? [],
+    'Upload assembled release assets',
+  );
+
+  assert.equal(upload.with?.overwrite, true);
+});
+
+test('draft release reruns preserve generated notes', () => {
+  const config = workflow('.github/workflows/release.yml');
+  const releaseStep = findStep(
+    config.jobs?.release?.steps ?? [],
+    'Create or update draft release',
+  );
+  const commands = releaseStep.run;
+
+  assert.equal(releaseStep.env?.GH_REPO, '${{ github.repository }}');
+  assert.match(commands, /gh release create/);
+  assert.match(commands, /--generate-notes/);
+  assert.match(commands, /--notes-file "\$RUNNER_TEMP\/release-body\.md"/);
+  assert.doesNotMatch(commands, /gh release edit/);
+});
+
+test('draft release assets are uploaded once after a final draft check', () => {
+  const config = workflow('.github/workflows/release.yml');
+  const commands = findStep(
+    config.jobs?.release?.steps ?? [],
+    'Create or update draft release',
+  ).run;
+  const draftChecks = commands.match(/gh release view "\$TAG" --json isDraft/g) ?? [];
+  const uploads = commands.match(/gh release upload /g) ?? [];
+  const finalDraftCheckIndex = commands.lastIndexOf(
+    'gh release view "$TAG" --json isDraft',
+  );
+  const uploadIndex = commands.indexOf(
+    'gh release upload "$TAG" "${ASSET_PATHS[@]}" --clobber',
+  );
+
+  assert.equal(draftChecks.length, 2);
+  assert.equal(uploads.length, 1);
+  assert.notEqual(finalDraftCheckIndex, -1);
+  assert.notEqual(uploadIndex, -1);
+  assert.ok(finalDraftCheckIndex < uploadIndex);
+  const finalGuardToUpload = commands.slice(
+    finalDraftCheckIndex,
+    uploadIndex,
+  );
+  assert.match(
+    finalGuardToUpload,
+    /if \[ "\$\(jq -r '\.isDraft' <<< "\$RELEASE_JSON"\)" != "true" \]; then[\s\S]*?Refusing to overwrite published release[\s\S]*?exit 1[\s\S]*?fi\s*$/,
+  );
+  assert.doesNotMatch(finalGuardToUpload, /gh release (?:delete-asset|upload)/);
+  assert.doesNotMatch(commands, /gh release delete-asset/);
+});
+
 test('draft release workflow is tag-gated, unsigned, and idempotent', () => {
   const config = workflow('.github/workflows/release.yml');
   const jobs = config.jobs ?? {};
@@ -308,6 +450,9 @@ test('draft release workflow is tag-gated, unsigned, and idempotent', () => {
     'build/release-assets',
   );
 
+  const releaseCommands = jobs.release?.steps
+    ?.map(step => step.run ?? '')
+    .join('\n');
   const assets = [
     'LynavoDrive-${VERSION}-macos-arm64.dmg',
     'LynavoDrive-${VERSION}-macos-x64.dmg',
@@ -317,13 +462,15 @@ test('draft release workflow is tag-gated, unsigned, and idempotent', () => {
     'LynavoDrive-${VERSION}-android-arm64-x86_64.aab',
     'SHA256SUMS',
   ];
+  const declaredAssets = releaseCommands
+    .match(/ASSETS=\(([\s\S]*?)\)/)?.[1]
+    ?.match(/"([^"]+)"/g)
+    ?.map(asset => asset.slice(1, -1));
+  assert.deepEqual(declaredAssets, assets);
   for (const asset of assets) {
     assert.ok(workflowText.includes(asset), `missing draft release asset: ${asset}`);
   }
 
-  const releaseCommands = jobs.release?.steps
-    ?.map(step => step.run ?? '')
-    .join('\n');
   assert.match(releaseCommands, /gh release view.*--json isDraft/);
   assert.match(releaseCommands, /isDraft/);
   assert.match(releaseCommands, /published release/i);
@@ -331,8 +478,6 @@ test('draft release workflow is tag-gated, unsigned, and idempotent', () => {
   assert.match(releaseCommands, /--draft/);
   assert.match(releaseCommands, /--generate-notes/);
   assert.match(releaseCommands, /--verify-tag/);
-  assert.match(releaseCommands, /gh release delete-asset/);
-  assert.match(releaseCommands, /--yes/);
   assert.match(releaseCommands, /gh release upload/);
   assert.match(releaseCommands, /--clobber/);
   assert.match(releaseCommands, /unsigned OSS build-verification outputs/);

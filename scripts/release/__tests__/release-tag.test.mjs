@@ -8,6 +8,18 @@ import test from 'node:test';
 import { verifyReleaseTag } from '../release-version.mjs';
 
 const cli = new URL('../verify-release-tag.mjs', import.meta.url);
+const canonicalAndroidHelper = [
+  'def resolveIosBuildSetting(String settingName) {',
+  '    def projectFile = file("../../ios/LynavoDrive.xcodeproj/project.pbxproj")',
+  '    def matcher = projectFile.text =~ /${settingName} = ([^;]+);/',
+  '',
+  '    if (!matcher.find()) {',
+  '        throw new GradleException("Failed to resolve ${settingName} from ${projectFile}")',
+  '    }',
+  '',
+  '    return matcher.group(1).trim()',
+  '}',
+].join('\n');
 
 function writeFixtureFile(root, relativePath, content) {
   const path = join(root, relativePath);
@@ -22,6 +34,12 @@ function fixture(overrides = {}) {
     mobile: '1.2.3',
     ios: '1.2.3',
     android: 'resolveIosMarketingVersion()',
+    androidHelper: canonicalAndroidHelper,
+    androidResolver: [
+      'def resolveIosMarketingVersion() {',
+      '    return resolveIosBuildSetting("MARKETING_VERSION")',
+      '}',
+    ].join('\n'),
     ...overrides,
   };
 
@@ -47,7 +65,7 @@ function fixture(overrides = {}) {
   writeFixtureFile(
     root,
     'apps/mobile/android/app/build.gradle',
-    `versionName ${versions.android}\n`,
+    `${versions.androidHelper}\n${versions.androidResolver}\nversionName ${versions.android}\n`,
   );
 
   return root;
@@ -96,12 +114,291 @@ test('rejects ambiguous iOS marketing versions', () => {
 });
 
 test('accepts an Android literal version matching the tag', () => {
-  const root = fixture({ android: "'1.2.3'" });
+  const root = fixture({
+    android: "'1.2.3'",
+    androidResolver: '',
+  });
   assert.deepEqual(verifyReleaseTag({ repoRoot: root, tag: 'v1.2.3' }), {
     tag: 'v1.2.3',
     version: '1.2.3',
   });
 });
+
+test('accepts the Android resolver with single quotes and flexible whitespace', () => {
+  const root = fixture({
+    androidResolver: [
+      'def resolveIosMarketingVersion( ) {',
+      "  return resolveIosBuildSetting( 'MARKETING_VERSION' );",
+      '}',
+    ].join('\n'),
+  });
+
+  assert.deepEqual(verifyReleaseTag({ repoRoot: root, tag: 'v1.2.3' }), {
+    tag: 'v1.2.3',
+    version: '1.2.3',
+  });
+});
+
+test('rejects extra resolver references inside comments and strings', () => {
+  const root = fixture({
+    androidResolver: [
+      'def documentation = "${resolveIosMarketingVersion()}"',
+      '// resolveIosMarketingVersion()',
+      '/* resolveIosMarketingVersion */',
+      'def resolveIosMarketingVersion() {',
+      '    return resolveIosBuildSetting("MARKETING_VERSION")',
+      '}',
+    ].join('\n'),
+  });
+
+  assert.throws(
+    () => verifyReleaseTag({ repoRoot: root, tag: 'v1.2.3' }),
+    /Android.*resolver.*MARKETING_VERSION/i,
+  );
+});
+
+test('rejects a same-name closure shadowing the Android version resolver', () => {
+  const root = fixture();
+  writeFixtureFile(
+    root,
+    'apps/mobile/android/app/build.gradle',
+    [
+      'def resolveIosMarketingVersion() {',
+      '    return resolveIosBuildSetting("MARKETING_VERSION")',
+      '}',
+      'android {',
+      '    defaultConfig {',
+      "        def resolveIosMarketingVersion = { '9.9.9' }",
+      '        versionName resolveIosMarketingVersion()',
+      '    }',
+      '}',
+      '',
+    ].join('\n'),
+  );
+
+  assert.throws(
+    () => verifyReleaseTag({ repoRoot: root, tag: 'v1.2.3' }),
+    /Android.*resolver.*MARKETING_VERSION/i,
+  );
+});
+
+test('accepts the canonical Android build-setting helper', () => {
+  const root = fixture();
+
+  assert.deepEqual(verifyReleaseTag({ repoRoot: root, tag: 'v1.2.3' }), {
+    tag: 'v1.2.3',
+    version: '1.2.3',
+  });
+});
+
+for (const [name, androidHelper] of [
+  [
+    'a build-setting helper returning a fixed version',
+    [
+      'def resolveIosBuildSetting(String settingName) {',
+      "    return '1.2.3'",
+      '}',
+    ].join('\n'),
+  ],
+  ['a missing build-setting helper', ''],
+  [
+    'duplicate build-setting helper definitions',
+    [canonicalAndroidHelper, canonicalAndroidHelper].join('\n'),
+  ],
+  [
+    'a same-name closure shadowing the build-setting helper',
+    [
+      canonicalAndroidHelper,
+      "def resolveIosBuildSetting = { settingName -> '9.9.9' }",
+    ].join('\n'),
+  ],
+]) {
+  test(`rejects ${name}`, () => {
+    assert.throws(
+      () =>
+        verifyReleaseTag({
+          repoRoot: fixture({ androidHelper }),
+          tag: 'v1.2.3',
+        }),
+      /Android.*helper.*project\.pbxproj/i,
+    );
+  });
+}
+
+for (const [name, wrapperStart, wrapperEnd] of [
+  ['a block comment', '/*', '*/'],
+  ['a multiline string', 'def documentation = """', '"""'],
+]) {
+  test(`rejects versionName found only inside ${name}`, () => {
+    const root = fixture();
+    writeFixtureFile(
+      root,
+      'apps/mobile/android/app/build.gradle',
+      [
+        'def resolveIosMarketingVersion() {',
+        '    return resolveIosBuildSetting("MARKETING_VERSION")',
+        '}',
+        wrapperStart,
+        'versionName resolveIosMarketingVersion()',
+        wrapperEnd,
+        '',
+      ].join('\n'),
+    );
+
+    assert.throws(
+      () => verifyReleaseTag({ repoRoot: root, tag: 'v1.2.3' }),
+      /Android.*versionName|versionName.*Android/i,
+    );
+  });
+}
+
+for (const [name, androidResolver] of [
+  ['a missing resolver', ''],
+  [
+    'a resolver returning a fixed version',
+    [
+      'def resolveIosMarketingVersion() {',
+      "    return '1.2.3'",
+      '}',
+    ].join('\n'),
+  ],
+  [
+    'a resolver reading CURRENT_PROJECT_VERSION',
+    [
+      'def resolveIosMarketingVersion() {',
+      '    return resolveIosBuildSetting("CURRENT_PROJECT_VERSION")',
+      '}',
+    ].join('\n'),
+  ],
+  [
+    'a resolver with additional statements',
+    [
+      'def resolveIosMarketingVersion() {',
+      '    def version = resolveIosBuildSetting("MARKETING_VERSION")',
+      '    return version',
+      '}',
+    ].join('\n'),
+  ],
+  [
+    'a resolver with an additional multiline string statement',
+    [
+      'def resolveIosMarketingVersion() {',
+      '    """metadata"""',
+      '    return resolveIosBuildSetting("MARKETING_VERSION")',
+      '}',
+    ].join('\n'),
+  ],
+  [
+    'duplicate resolver definitions',
+    [
+      'def resolveIosMarketingVersion() {',
+      '    return resolveIosBuildSetting("MARKETING_VERSION")',
+      '}',
+      'def resolveIosMarketingVersion() {',
+      '    return resolveIosBuildSetting("MARKETING_VERSION")',
+      '}',
+    ].join('\n'),
+  ],
+  [
+    'duplicate resolver definitions with a line comment in the parameter list',
+    [
+      'def resolveIosMarketingVersion() {',
+      '    return resolveIosBuildSetting("MARKETING_VERSION")',
+      '}',
+      'def resolveIosMarketingVersion( // duplicate declaration',
+      ') {',
+      '    return resolveIosBuildSetting("MARKETING_VERSION")',
+      '}',
+    ].join('\n'),
+  ],
+  [
+    'a resolver definition inside a block comment',
+    [
+      '/*',
+      'def resolveIosMarketingVersion() {',
+      '    return resolveIosBuildSetting("MARKETING_VERSION")',
+      '}',
+      '*/',
+    ].join('\n'),
+  ],
+  [
+    'a resolver definition inside a multiline string',
+    [
+      'def documentation = """',
+      'def resolveIosMarketingVersion() {',
+      '    return resolveIosBuildSetting("MARKETING_VERSION")',
+      '}',
+      '"""',
+    ].join('\n'),
+  ],
+  [
+    'a resolver definition inside a multiline slashy string',
+    [
+      'def documentation = /',
+      'def resolveIosMarketingVersion() {',
+      '    return resolveIosBuildSetting("MARKETING_VERSION")',
+      '}',
+      '/',
+    ].join('\n'),
+  ],
+  [
+    'a resolver definition inside a returned multiline slashy string',
+    [
+      'def documentation() {',
+      '    return /',
+      'def resolveIosMarketingVersion() {',
+      '    return resolveIosBuildSetting("MARKETING_VERSION")',
+      '}',
+      '/',
+      '}',
+    ].join('\n'),
+  ],
+  [
+    'a resolver definition inside a multiline dollar-slashy string',
+    [
+      'def documentation = $/',
+      'def resolveIosMarketingVersion() {',
+      '    return resolveIosBuildSetting("MARKETING_VERSION")',
+      '}',
+      '/$',
+    ].join('\n'),
+  ],
+  [
+    'a resolver definition after an escaped dollar-slashy closing delimiter',
+    [
+      'def documentation = $/',
+      'escaped closing delimiter: $/$',
+      'def resolveIosMarketingVersion() {',
+      '    return resolveIosBuildSetting("MARKETING_VERSION")',
+      '}',
+      '/$',
+    ].join('\n'),
+  ],
+  [
+    'an incorrect resolver hidden between division-like slashes',
+    [
+      'def quotient = total /',
+      'def resolveIosMarketingVersion() {',
+      "    return '1.2.3'",
+      '}',
+      '/ scale',
+      'def resolveIosMarketingVersion() {',
+      '    return resolveIosBuildSetting("MARKETING_VERSION")',
+      '}',
+    ].join('\n'),
+  ],
+]) {
+  test(`rejects ${name}`, () => {
+    assert.throws(
+      () =>
+        verifyReleaseTag({
+          repoRoot: fixture({ androidResolver }),
+          tag: 'v1.2.3',
+        }),
+      /Android.*resolver.*MARKETING_VERSION/i,
+    );
+  });
+}
 
 test('CLI prints only the verified version', () => {
   const result = spawnSync(

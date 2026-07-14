@@ -21,6 +21,9 @@ jobs:
     name: Detect Changes
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       ios: ${{ steps.scope.outputs.ios }}
       android: ${{ steps.scope.outputs.android }}
@@ -41,11 +44,26 @@ jobs:
             ios:
               - 'apps/mobile/**'
               - 'packages/contracts/**'
+              - 'package.json'
+              - '.npmrc'
+              - 'pnpm-workspace.yaml'
+              - 'tsconfig.base.json'
+              - 'turbo.json'
+              - 'scripts/sync-version-manifest.mjs'
+              - 'scripts/dev/release-child-env.cjs'
               - 'pnpm-lock.yaml'
               - '.github/workflows/native-builds.yml'
             android:
               - 'apps/mobile/**'
               - 'packages/contracts/**'
+              - 'package.json'
+              - '.npmrc'
+              - 'pnpm-workspace.yaml'
+              - 'tsconfig.base.json'
+              - 'turbo.json'
+              - 'scripts/sync-version-manifest.mjs'
+              - 'scripts/dev/release-child-env.cjs'
+              - 'scripts/release/stage-native-artifact.mjs'
               - 'pnpm-lock.yaml'
               - '.github/workflows/native-builds.yml'
             macos:
@@ -54,6 +72,13 @@ jobs:
               - 'packages/contracts/**'
               - 'packages/design-tokens/**'
               - 'scripts/release/**'
+              - 'package.json'
+              - '.npmrc'
+              - 'pnpm-workspace.yaml'
+              - 'tsconfig.base.json'
+              - 'turbo.json'
+              - 'scripts/sync-version-manifest.mjs'
+              - 'scripts/dev/release-child-env.cjs'
               - 'pnpm-lock.yaml'
               - '.github/workflows/native-builds.yml'
             windows:
@@ -62,6 +87,13 @@ jobs:
               - 'packages/contracts/**'
               - 'packages/design-tokens/**'
               - 'scripts/release/**'
+              - 'package.json'
+              - '.npmrc'
+              - 'pnpm-workspace.yaml'
+              - 'tsconfig.base.json'
+              - 'turbo.json'
+              - 'scripts/sync-version-manifest.mjs'
+              - 'scripts/dev/release-child-env.cjs'
               - 'pnpm-lock.yaml'
               - '.github/workflows/native-builds.yml'
 
@@ -182,6 +214,18 @@ jobs:
         working-directory: apps/mobile/android
         run: ./gradlew --no-daemon assembleDebug assembleRelease bundleRelease
 
+      - name: Verify Android package version
+        env:
+          EXPECTED_VERSION: ${{ needs.changes.outputs.version }}
+        run: |
+          set -euo pipefail
+          APK_PATH="apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          ACTUAL_VERSION="$("$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" manifest version-name "$APK_PATH")"
+          if [ "$ACTUAL_VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "Android APK version $ACTUAL_VERSION does not match expected version $EXPECTED_VERSION." >&2
+            exit 1
+          fi
+
       - name: Stage Android APK
         run: >-
           node scripts/release/stage-native-artifact.mjs
@@ -205,6 +249,7 @@ jobs:
             build/release-assets/android-aab/LynavoDrive-${{ needs.changes.outputs.version }}-android-arm64-x86_64.aab
           if-no-files-found: error
           retention-days: 7
+          overwrite: true
 
   macos:
     name: macOS Package
@@ -271,6 +316,7 @@ jobs:
           path: build/release-assets/macos-${{ matrix.arch }}/LynavoDrive-${{ needs.changes.outputs.version }}-macos-${{ matrix.arch }}.dmg
           if-no-files-found: error
           retention-days: 7
+          overwrite: true
 
   windows:
     name: Windows Package
@@ -337,6 +383,7 @@ jobs:
             build/release-assets/windows-zip/LynavoDrive-${{ needs.changes.outputs.version }}-windows-x64.zip
           if-no-files-found: error
           retention-days: 7
+          overwrite: true
 
   aggregate:
     name: Native Builds

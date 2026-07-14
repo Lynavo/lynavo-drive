@@ -122,6 +122,7 @@ jobs:
           path: build/release-assets
           if-no-files-found: error
           retention-days: 7
+          overwrite: true
 
   release:
     name: Update Draft Release
@@ -144,6 +145,7 @@ jobs:
       - name: Create or update draft release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
           VERSION: ${{ needs.verify-tag.outputs.version }}
         run: |
@@ -161,7 +163,6 @@ jobs:
               echo "Refusing to overwrite published release $TAG." >&2
               exit 1
             fi
-            gh release edit "$TAG" --notes-file "$RUNNER_TEMP/release-body.md"
           else
             gh release create "$TAG" \
               --draft \
@@ -181,12 +182,14 @@ jobs:
             "SHA256SUMS"
           )
 
-          for asset in "${ASSETS[@]}"; do
-            gh release delete-asset "$TAG" "$asset" --yes 2>/dev/null || true
-          done
-
           ASSET_PATHS=()
           for asset in "${ASSETS[@]}"; do
             ASSET_PATHS+=("build/release-assets/$asset")
           done
+
+          RELEASE_JSON="$(gh release view "$TAG" --json isDraft)"
+          if [ "$(jq -r '.isDraft' <<< "$RELEASE_JSON")" != "true" ]; then
+            echo "Refusing to overwrite published release $TAG." >&2
+            exit 1
+          fi
           gh release upload "$TAG" "${ASSET_PATHS[@]}" --clobber

@@ -142,8 +142,10 @@ verification path.
 The `OSS Draft Release` workflow rebuilds verification outputs from one
 immutable commit. It accepts stable tags matching `vX.Y.Z` only. Before any
 native runner starts, the workflow verifies that the tag version exactly
-matches the desktop package, mobile package, iOS `MARKETING_VERSION`, and
-Android `versionName` sources.
+matches the desktop package, mobile package, iOS `MARKETING_VERSION`, and the
+committed Android `versionName` source contract. After Gradle builds the
+release APK, the Android job reads the effective `versionName` from its manifest
+and fails before staging artifacts if that value differs from the tag version.
 
 A manual dispatch is a build-only rehearsal and creates no GitHub Release. It
 runs the release gate, TypeScript and Go CI, and every hosted native build, then
@@ -175,11 +177,14 @@ draft uses generated release notes and this warning:
 > sideloading controls may block installation or display warnings. Verify the
 > matching entry in `SHA256SUMS` before testing an asset.
 
-An existing draft may be updated idempotently. A rerun for the same tag updates
-the existing draft, deletes only the seven allowlisted assets above, and
-uploads the newly rebuilt set. A published release is immutable: the workflow
-must fail before deleting or uploading assets and never moves, deletes, or
-recreates the tag.
+An existing draft may be updated idempotently. A rerun for the same tag
+preserves its generated notes and replaces the seven allowlisted assets above
+with the newly rebuilt set. Immediately before uploading, the workflow checks
+again that the release is still a draft. GitHub does not provide one atomic
+operation that both verifies draft state and replaces assets, so maintainers
+must not publish the draft while the workflow is running. A published release
+is treated as immutable when the workflow observes it: the workflow refuses to
+start an upload in that state and never moves, deletes, or recreates the tag.
 
 ### Maintainer Procedure
 
@@ -190,9 +195,14 @@ recreates the tag.
    created.
 4. Create and push one stable `vX.Y.Z` tag only after the target commit and
    repository checks are approved.
-5. Confirm the draft contains only the six versioned files and `SHA256SUMS`.
-6. Download the files, verify their checksums, and record platform smoke-test
+5. Do not publish the draft while the tag workflow or any rerun is in progress.
+6. After the run completes, confirm the draft contains only the six versioned
+   files and `SHA256SUMS`.
+7. Download the files, verify their checksums, and record platform smoke-test
    results before any separate publication decision.
+8. Publish only after the completed run, asset list, and checksums have been
+   reviewed. Consider enabling GitHub immutable releases as an additional
+   repository-level protection for published releases.
 
 For a failed tag run, keep the tag fixed and address only transient workflow or
 packaging failures that do not require source changes. Rerun the workflow to
@@ -238,10 +248,11 @@ hdiutil verify apps/desktop/release/LynavoDrive-<version>-x64.dmg
 file apps/desktop/release/mac*/Lynavo\ Drive.app/Contents/Resources/lynavo-drive-sidecar
 ```
 
-OSS desktop packages are local build artifacts only. The builder wrapper
-disables local code-signing identity discovery, and Windows packaging excludes
-`.exe` signing so contributor machines do not accidentally inject private
-certificates into release rehearsal outputs.
+OSS desktop packages produced locally or by the GitHub-hosted workflows are
+unsigned build-verification artifacts, not official signed distributions. The
+builder wrapper disables local code-signing identity discovery, and Windows
+packaging excludes `.exe` signing so contributor machines and hosted runners do
+not inject private certificates into verification outputs.
 
 Windows:
 
