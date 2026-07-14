@@ -5,6 +5,16 @@ import { parse } from 'yaml';
 
 const repoRoot = new URL('../../..', import.meta.url);
 const ACTION_SHA = /^[\w.-]+\/[\w.-]+@[0-9a-f]{40}$/;
+const NODE_24_ACTIONS = new Map([
+  ['actions/checkout', '9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0'],
+  ['actions/setup-go', '924ae3a1cded613372ab5595356fb5720e22ba16'],
+  ['actions/setup-java', '0f481fcb613427c0f801b606911222b5b6f3083a'],
+  ['actions/setup-node', '820762786026740c76f36085b0efc47a31fe5020'],
+  ['actions/upload-artifact', '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'],
+  ['actions/download-artifact', '70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3'],
+  ['dorny/paths-filter', '7b450fff21473bca461d4b92ce414b9d0420d706'],
+  ['pnpm/action-setup', '0ebf47130e4866e96fce0953f49152a61190b271'],
+]);
 
 function readRepoFile(path) {
   return readFileSync(new URL(path, repoRoot), 'utf8');
@@ -43,6 +53,21 @@ function findStep(steps, name) {
 function allWorkflowSteps(config) {
   return Object.values(config.jobs ?? {}).flatMap(job => job.steps ?? []);
 }
+
+test('workflow JavaScript actions use reviewed Node 24 releases', () => {
+  for (const path of [
+    '.github/workflows/ci.yml',
+    '.github/workflows/oss-release-gate.yml',
+    '.github/workflows/native-builds.yml',
+    '.github/workflows/release.yml',
+  ]) {
+    for (const step of allWorkflowSteps(workflow(path))) {
+      const [action] = String(step.uses ?? '').split('@');
+      const sha = NODE_24_ACTIONS.get(action);
+      if (sha) assert.equal(step.uses, `${action}@${sha}`, `${path}: ${action}`);
+    }
+  }
+});
 
 test('OSS Release Gate workflow is stable, read-only, and toolchain-pinned', () => {
   const config = workflow('.github/workflows/oss-release-gate.yml');
