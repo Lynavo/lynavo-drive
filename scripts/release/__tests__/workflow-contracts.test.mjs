@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import { parse } from 'yaml';
 
@@ -301,6 +301,48 @@ test('Android build verifies the effective APK version before staging', () => {
   assert.match(verifyVersion.run, /ACTUAL_VERSION/);
   assert.match(verifyVersion.run, /EXPECTED_VERSION/);
   assert.match(verifyVersion.run, /exit 1/);
+});
+
+test('Android native build compiles shared workspaces before mobile typecheck', () => {
+  const config = workflow('.github/workflows/native-builds.yml');
+  const steps = config.jobs?.android?.steps ?? [];
+  const buildIndex = steps.findIndex(step => step.name === 'Build workspaces');
+  const typecheckIndex = steps.findIndex(step => step.name === 'Typecheck mobile');
+
+  assert.notEqual(buildIndex, -1, 'missing Android Build workspaces step');
+  assert.equal(
+    steps[buildIndex].run,
+    'pnpm build --filter=!@lynavo-drive/mobile',
+  );
+  assert.ok(buildIndex < typecheckIndex, 'Android workspaces must build before typecheck');
+});
+
+test('Windows native build compiles shared workspaces before packaging', () => {
+  const config = workflow('.github/workflows/native-builds.yml');
+  const steps = config.jobs?.windows?.steps ?? [];
+  const buildIndex = steps.findIndex(step => step.name === 'Build workspaces');
+  const packageIndex = steps.findIndex(step => step.name === 'Package Windows x64');
+
+  assert.notEqual(buildIndex, -1, 'missing Windows Build workspaces step');
+  assert.equal(
+    steps[buildIndex].run,
+    'pnpm build --filter=!@lynavo-drive/mobile',
+  );
+  assert.ok(buildIndex < packageIndex, 'Windows workspaces must build before packaging');
+});
+
+test('iOS native build locks the CocoaPods toolchain to the Podfile version', () => {
+  const gemfile = readRepoFile('apps/mobile/Gemfile');
+  const gemfileLockUrl = new URL('apps/mobile/Gemfile.lock', repoRoot);
+  const podfileLock = readRepoFile('apps/mobile/ios/Podfile.lock');
+
+  assert.match(gemfile, /^gem 'cocoapods', '1\.16\.2'$/m);
+  assert.ok(existsSync(gemfileLockUrl), 'apps/mobile/Gemfile.lock must be committed');
+
+  const gemfileLock = readFileSync(gemfileLockUrl, 'utf8');
+  assert.match(gemfileLock, /^    cocoapods \(1\.16\.2\)$/m);
+  assert.match(gemfileLock, /^  cocoapods \(= 1\.16\.2\)$/m);
+  assert.match(podfileLock, /^COCOAPODS: 1\.16\.2$/m);
 });
 
 test('native artifact uploads overwrite same-run artifacts on rerun', () => {

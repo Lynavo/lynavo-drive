@@ -207,6 +207,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build workspaces
+        run: pnpm build --filter=!@lynavo-drive/mobile
+
       - name: Typecheck mobile
         run: pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
 
@@ -349,6 +352,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build workspaces
+        run: pnpm build --filter=!@lynavo-drive/mobile
 
       - name: Package Windows x64
         run: pnpm package:desktop:win
