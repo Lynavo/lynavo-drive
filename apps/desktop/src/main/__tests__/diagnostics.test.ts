@@ -291,17 +291,25 @@ describe('exportDiagnostics', () => {
 
 describe('compressBundle', () => {
   it('uses zip for Linux verification hosts', async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), 'lynavo-drive-compress-bundle-mock-test-'));
+    const bundleDir = join(tempRoot, 'bundle');
+    const archivePath = join(tempRoot, 'diagnostics.zip');
     const runCommand = vi.fn().mockResolvedValue({ stdout: '', stderr: '' });
     const { compressBundle } = await import('../diagnostics');
+    mkdirSync(bundleDir, { recursive: true });
 
-    await compressBundle('/tmp/diagnostics/bundle', '/tmp/diagnostics.zip', true, {
-      platform: 'linux',
-      runCommand,
-    });
+    try {
+      await compressBundle(bundleDir, archivePath, true, {
+        platform: 'linux',
+        runCommand,
+      });
 
-    expect(runCommand).toHaveBeenCalledWith('zip', ['-r', '/tmp/diagnostics.zip', 'bundle'], {
-      cwd: '/tmp/diagnostics',
-    });
+      expect(runCommand).toHaveBeenCalledWith('zip', ['-r', archivePath, 'bundle'], {
+        cwd: tempRoot,
+      });
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 
   it('replaces an existing Linux archive without retaining stale entries', async () => {
