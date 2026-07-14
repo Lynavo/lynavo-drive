@@ -1,0 +1,4 @@
+packages/contracts/src/version.generated.ts text eol=lf
+services/sidecar-go/internal/protocol/version_generated.go text eol=lf
+apps/mobile/ios/SyncEngine/LynavoVersion.generated.swift text eol=lf
+apps/mobile/android/app/src/main/java/com/lynavo/drive/mobile/sync/LynavoVersion.kt text eol=lf
