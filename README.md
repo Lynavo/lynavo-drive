@@ -3,11 +3,11 @@
 </p>
 
 <p align="center">
-  <img src="./screenshots/banner.png" alt="Lynavo Drive Banner" width="100%">
+  <img src="./pics/banner.png" alt="Lynavo Drive Banner" width="100%">
 </p>
 
 <p align="center">
-  <img src="./screenshots/logo.png" alt="Lynavo Drive Logo" width="120">
+  <img src="./pics/logo.png" alt="Lynavo Drive Logo" width="120">
 </p>
 
 <h1 align="center">Lynavo Drive</h1>
@@ -17,6 +17,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/lynavo/lynavo-drive/actions/workflows/oss-release-gate.yml"><img src="https://github.com/lynavo/lynavo-drive/actions/workflows/oss-release-gate.yml/badge.svg" alt="OSS Release Gate"></a>
   <img src="https://img.shields.io/badge/Node.js-%3E%3D%2022.12.0-blue?style=flat-square&logo=node.js" alt="Node Version">
   <img src="https://img.shields.io/badge/Go-%3E%3D%201.25.6-00ADD8?style=flat-square&logo=go" alt="Go Version">
   <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="Desktop Platform">
@@ -25,94 +26,87 @@
 </p>
 
 <p align="center">
-  <a href="#-screenshots-preview">Screenshots</a> •
+  <a href="#-product-preview">Product Preview</a> •
   <a href="#-key-features">Key Features</a> •
-  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-developer-quick-start">Developer Quick Start</a> •
   <a href="#-oss-boundaries">OSS Boundaries</a> •
-  <a href="#-tech-stack">Tech Stack</a>
+  <a href="#-contributing">Contributing</a>
 </p>
 
 ---
 
-## Current Status
+## Project Status
 
-- Desktop, Go sidecar, mobile, and native iOS / Android sync are implemented.
-- iOS and Android mobile apps are both in scope.
-- Current work focuses on error recovery, OSS boundary tightening, and local
-  build / package verification.
-- The repository currently has no separately maintained product spec; the
-  baseline is the current code, `@lynavo-drive/contracts`, and the test matrix.
-- Guest/local users can use foreground LAN automatic sync. Remote access and
-  silent background continuation are not part of the OSS runtime and remain off
-  without official capability.
+Lynavo Drive is implemented and open for community source builds and
+contributions. This repository provides one public local source-build and
+package-verification path; it does not publish official signed installers,
+mobile store builds, auto-updates, or hosted services.
 
-## 📸 Screenshots Preview
+| Surface      | Current OSS scope                                              |
+| ------------ | -------------------------------------------------------------- |
+| Desktop      | macOS and Windows application runtime                          |
+| Mobile       | iOS and Android application runtime                            |
+| Linux        | Local source-build and package verification only               |
+| Network      | Foreground sync over the same LAN or a LAN-equivalent VPN      |
+| Distribution | Community source builds and locally produced packages/binaries |
 
-<table width="100%">
-  <tr>
-    <td width="33%" align="center">
-      <strong>1. Device Discovery</strong><br>
-      <img src="./screenshots/screenshot_1.png" alt="Device Discovery" width="100%"><br>
-      <sub>Local LAN pairing via mDNS</sub>
-    </td>
-    <td width="33%" align="center">
-      <strong>2. Mobile Media Scan</strong><br>
-      <img src="./screenshots/screenshot_2.png" alt="Mobile Media Scan" width="100%"><br>
-      <sub>Incremental scanner for photo libraries</sub>
-    </td>
-    <td width="33%" align="center">
-      <strong>3. Active Sync Queue</strong><br>
-      <img src="./screenshots/screenshot_3.png" alt="Sync Queue" width="100%"><br>
-      <sub>Serial file upload tracking</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="33%" align="center">
-      <strong>4. Sync History</strong><br>
-      <img src="./screenshots/screenshot_4.png" alt="Sync History" width="100%"><br>
-      <sub>Transfer logs and daily completion stats</sub>
-    </td>
-    <td width="33%" align="center">
-      <strong>5. Desktop Settings</strong><br>
-      <img src="./screenshots/screenshot_5.png" alt="Desktop Settings" width="100%"><br>
-      <sub>Shared target directory configurations</sub>
-    </td>
-    <td width="33%" align="center">
-      <!-- Empty cell for grid layout balance -->
-    </td>
-  </tr>
-</table>
+## 📸 Product Preview
+
+<p align="center">
+  <img src="./pics/preview.png" alt="Lynavo Drive Product Preview" width="100%">
+</p>
+
+## ✨ Key Features
+
+- **Automatic incremental media sync**: Scans the mobile photo library and
+  queues unsynced photos and videos without manual file selection.
+- **Local discovery and pairing**: Finds desktops through mDNS on the same LAN,
+  then pairs with a QR code or six-digit pairing code.
+- **Resumable serial transfers**: Uploads one file per phone at a time and
+  continues unfinished queue items after foreground LAN reconnection.
+- **Read-only queue and history**: Shows transfer progress, completed files, and
+  completion-day statistics without delete, skip, or reorder controls.
+- **Shared-file access**: Lets mobile users browse and download files exposed by
+  the desktop's local shared directories. This is separate from automatic media
+  upload.
+- **Local diagnostics**: Exports desktop and mobile diagnostics without relying
+  on a hosted diagnostics service.
 
 ## 🛡️ OSS Boundaries
 
-<a id="-key-features"></a>
-<a id="-oss-boundaries"></a>
-
 > [!IMPORTANT]
-> **Open-Source Core & Sync Limitations**
+> **Local-LAN Open-Source Core**
 >
-> - **Guest Local LAN Mode**: Foreground automatic sync works out of the box without login or account-service state. Devices discover, pair, scan the pending queue, and upload over local LAN.
-> - **Strictly Read-Only Queue**: Users cannot delete, reorder, or skip queue items in the UI.
-> - **Automatic Incremental Sync Only**: No manual file-selection fallback or checkbox picking is provided. Sync is driven solely by local scans and the pending queue.
-> - **Fail-Open LAN Sync**: Foreground LAN sync is never blocked by login, account-service state, or missing non-OSS modules.
-> - **Single-Device Serial Upload**: A given mobile client uploads only one file at a time to the desktop.
+> - Foreground automatic sync works without sign-in or an account service.
+> - The upload set comes only from the mobile photo-library scan and local
+>   pending queue; there is no manual file-selection fallback.
+> - The queue is read-only, and each phone uploads one file at a time.
+> - Missing non-OSS modules or account-service state do not block foreground LAN
+>   pairing and sync.
 
 > [!WARNING]
-> **Closed-by-Default Capabilities & Licensing**
+> **Not Included In This Repository**
 >
-> - **Non-OSS Capabilities Fail Closed**: Silent background resume, remote access, and tunnel credentials require official capabilities and will fail closed (remain disabled) by default.
-> - **No Redistribution of Apple Bonjour**: The OSS build does not redistribute Apple Bonjour for Windows binaries. Windows users must use their local Bonjour installation or default to the zeroconf-compatible fallback.
-> - **Single Baseline**: No multi-market branches, dedicated account paths, or dual-market regression matrices are provided in this baseline.
+> - Remote access, cloud relay, tunnel credentials, official accounts, and silent
+>   background continuation are unavailable and remain disabled.
+> - Official signing, notarization, mobile store distribution, package upload,
+>   and auto-update infrastructure are not provided.
+> - The source package does not redistribute Apple Bonjour for Windows. It uses
+>   a locally installed/configured Bonjour runtime when available, otherwise the
+>   zeroconf-compatible fallback.
+> - Linux remains a local build and package-verification target, not a supported
+>   desktop user surface.
 
-> [!NOTE]
-> **Future Migration Boundaries**
-> Package scope, mDNS service names, legacy data directories, and native package/bundle ID renames are migration boundaries and do not require renames in this documentation pass.
+## 🚀 Developer Quick Start
 
-## 🚀 Quick Start
+This is a contributor workflow, not an end-user installer. See the
+[release playbook](./docs/release/release-playbook.md) for local package builds
+and platform-specific verification.
 
 ```bash
-# 1. Install dependencies
-pnpm install
+# 1. Enable the repository's pinned pnpm version and install dependencies
+corepack enable
+pnpm install --frozen-lockfile
 
 # 2. Build shared packages
 pnpm --filter @lynavo-drive/contracts build
@@ -123,6 +117,29 @@ pnpm dev:desktop
 ```
 
 The Electron window opens automatically, and the desktop app starts the sidecar.
+
+To run a mobile client, keep the desktop running and use another terminal:
+
+```bash
+# Start Metro
+pnpm dev:mobile
+
+# Then launch one platform from another terminal
+pnpm --filter @lynavo-drive/mobile ios
+# or
+pnpm dev:mobile:android
+```
+
+Platform prerequisites still apply: iOS requires macOS, Xcode, and CocoaPods;
+Android requires Android Studio plus the Android SDK/NDK.
+
+Pair the applications:
+
+1. Keep the phone and desktop on the same LAN or LAN-equivalent VPN.
+2. Open Lynavo Drive on the desktop and set or view the six-digit pairing code.
+3. On mobile, discover the desktop and scan its QR code or enter the pairing
+   code.
+4. Keep the mobile app in the foreground for OSS automatic LAN sync.
 
 ## ❓ FAQs & Troubleshooting
 
@@ -142,11 +159,15 @@ The Electron window opens automatically, and the desktop app starts the sidecar.
 
 ### 3. Can I manually select which photos/videos to sync?
 
-- No. To ensure fully automatic incremental sync, Lynavo Drive relies entirely on mobile background/foreground scans and a strictly read-only pending queue. Checkbox picking is a non-goal for this baseline.
+- No. Automatic upload is driven by the mobile photo-library scan and strictly
+  read-only pending queue. Checkbox picking is not part of the OSS workflow.
 
 ### 4. What happens when the desktop sleeps or connection drops?
 
-- LAN transfers will interrupt. Once the desktop wakes and network connectivity is restored, the mobile app will automatically resume the unfinished queue without losing progress.
+- LAN transfers will interrupt. With the mobile app in the foreground, the
+  unfinished queue continues after the desktop wakes and LAN connectivity is
+  restored.
+- The OSS runtime does not provide silent background continuation.
 - Enable _"Prevent computer from sleeping while syncing"_ in the desktop app settings for uninterrupted transfers.
 
 </details>
@@ -332,22 +353,24 @@ lynavo-drive/
 
 ## 💡 Contributing
 
-We welcome contributions from the community! To get started:
+Community contributions are welcome. To get started:
 
 1. **Fork the Repository**: Create a personal fork and clone it locally.
-2. **Setup Development Workspace**: Install dependencies and compile shared packages:
-   ```bash
-   pnpm install
-   pnpm build
-   ```
-3. **Verify Tests**: Ensure all formatting, typescript checks, and unit tests pass before submitting a PR:
+2. **Set Up the Workspace**: Follow the [Developer Quick Start](#-developer-quick-start) and install the toolchain required by the platform you plan to change.
+3. **Verify Your Change**: Run focused tests first, then the applicable repository checks before submitting a pull request:
    ```bash
    pnpm test
    pnpm typecheck
    pnpm format:check
+   pnpm gate:release
    ```
 
 For detailed coding standards, project layouts, and process rules, check out our [Contributing Guidelines](./CONTRIBUTING.md) and [Code of Conduct](./CODE_OF_CONDUCT.md).
+
+- [Browse existing issues](https://github.com/lynavo/lynavo-drive/issues)
+- [Report a bug](https://github.com/lynavo/lynavo-drive/issues/new?labels=bug)
+- [Request a feature](https://github.com/lynavo/lynavo-drive/issues/new?labels=enhancement)
+- [Report a vulnerability privately](https://github.com/lynavo/lynavo-drive/security/advisories/new) instead of posting exploitable details in a public issue.
 
 ## ⚖️ License
 
