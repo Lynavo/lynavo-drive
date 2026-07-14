@@ -379,6 +379,20 @@ test('Windows native build compiles shared workspaces before packaging', () => {
   assert.ok(buildIndex < packageIndex, 'Windows workspaces must build before packaging');
 });
 
+test('macOS DMG packaging retries transient hosted-runner failures', () => {
+  const config = workflow('.github/workflows/native-builds.yml');
+  const packageDmg = findStep(
+    config.jobs?.macos?.steps ?? [],
+    'Package macOS DMG',
+  );
+  const commands = packageDmg.run ?? '';
+
+  assert.match(commands, /for attempt in 1 2 3; do/);
+  assert.match(commands, /status=\$\?/);
+  assert.match(commands, /if \[ "\$attempt" -eq 3 \]; then[\s\S]*exit "\$status"/);
+  assert.match(commands, /sleep 5/);
+});
+
 test('iOS native build locks the CocoaPods toolchain to the Podfile version', () => {
   const gemfile = readRepoFile('apps/mobile/Gemfile');
   const gemfileLockUrl = new URL('apps/mobile/Gemfile.lock', repoRoot);

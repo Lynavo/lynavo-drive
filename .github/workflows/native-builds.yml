@@ -324,9 +324,20 @@ jobs:
         run: node apps/desktop/scripts/build-sidecar-mac.cjs ${{ matrix.arch }}
 
       - name: Package macOS DMG
-        run: >-
-          pnpm --filter @lynavo-drive/desktop exec node ./scripts/run-electron-builder.cjs
-          --mac dmg --${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if pnpm --filter @lynavo-drive/desktop exec node ./scripts/run-electron-builder.cjs --mac dmg --${{ matrix.arch }}; then
+              exit 0
+            else
+              status=$?
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit "$status"
+            fi
+            echo "DMG packaging failed with exit code $status; retrying in 5 seconds."
+            sleep 5
+          done
 
       - name: Stage macOS artifact
         run: >-
