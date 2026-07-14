@@ -86,10 +86,10 @@ describe('@lynavo-drive/contracts exports', () => {
     expect(contracts.APP_COMPATIBILITY_VERSION).toBe(1);
   });
   it('exports PROTOCOL_PORT', () => {
-    expect(contracts.PROTOCOL_PORT).toBe(39393);
+    expect(contracts.PROTOCOL_PORT).toBe(39593);
   });
   it('exports SIDECAR_HTTP_PORT', () => {
-    expect(contracts.SIDECAR_HTTP_PORT).toBe(39394);
+    expect(contracts.SIDECAR_HTTP_PORT).toBe(39594);
   });
   it('exports BONJOUR_SERVICE_TYPE', () => {
     expect(contracts.BONJOUR_SERVICE_TYPE).toBe('_lynavodrive._tcp');
@@ -225,7 +225,7 @@ describe('@lynavo-drive/contracts exports', () => {
       deviceName: 'Studio Mac',
       deviceAlias: 'Studio Mac',
       host: '192.168.1.20',
-      port: 39393,
+      port: 39593,
       connectionState: 'offline',
       pairingId: 'pair-1',
       shareEnabled: true,

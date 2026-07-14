@@ -26,9 +26,10 @@ import {
 } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
-import type {
-  DiscoveredDeviceDTO,
-  RecentDesktopDTO,
+import {
+  PROTOCOL_PORT,
+  type DiscoveredDeviceDTO,
+  type RecentDesktopDTO,
 } from '@lynavo-drive/contracts';
 import {
   SafeAreaView,
@@ -341,7 +342,7 @@ const VISUAL_QA_LAN_DEVICES: DiscoveredDevice[] = [
     name: 'Lynavo Drive Demo Mac Studio',
     ip: '192.168.31.21',
     type: 'mac',
-    port: 39393,
+    port: PROTOCOL_PORT,
     availability: 'available',
     deviceKind: 'desktop',
   },
@@ -350,7 +351,7 @@ const VISUAL_QA_LAN_DEVICES: DiscoveredDevice[] = [
     name: 'Lynavo Drive Demo MacBook Pro',
     ip: '192.168.31.36',
     type: 'mac',
-    port: 39393,
+    port: PROTOCOL_PORT,
     availability: 'available',
     deviceKind: 'laptop',
   },
@@ -359,7 +360,7 @@ const VISUAL_QA_LAN_DEVICES: DiscoveredDevice[] = [
     name: 'Lynavo Drive Demo Windows Workstation',
     ip: '192.168.31.52',
     type: 'win',
-    port: 39393,
+    port: PROTOCOL_PORT,
     availability: 'busy',
     deviceKind: 'desktop',
   },
@@ -780,14 +781,14 @@ export function DeviceDiscoveryScreen() {
           await pairDevice({
             deviceId: device.deviceId,
             host: device.ip,
-            port: device.port || 39393,
+            port: device.port || PROTOCOL_PORT,
             connectionCode: '',
           });
           await addDesktop({
             desktopDeviceId: device.deviceId,
             desktopName: device.name,
             host: device.ip,
-            port: device.port || 39393,
+            port: device.port || PROTOCOL_PORT,
             authorizationStatus: 'authorized',
           });
           setVerifying(false);
@@ -872,14 +873,14 @@ export function DeviceDiscoveryScreen() {
         await pairDevice({
           deviceId: device.deviceId,
           host: device.ip,
-          port: device.port || 39393,
+          port: device.port || PROTOCOL_PORT,
           connectionCode: '',
         });
         await addDesktop({
           desktopDeviceId: device.deviceId,
           desktopName: device.name,
           host: device.ip,
-          port: device.port || 39393,
+          port: device.port || PROTOCOL_PORT,
           authorizationStatus: 'authorized',
         });
         setVerifying(false);
@@ -948,7 +949,7 @@ export function DeviceDiscoveryScreen() {
           desktopDeviceId: selectedDevice.deviceId,
           desktopName: selectedDevice.name,
           host: selectedDevice.ip,
-          port: selectedDevice.port || 39393,
+          port: selectedDevice.port || PROTOCOL_PORT,
           authorizationStatus: 'authorized',
         });
         setVerifying(false);
@@ -965,14 +966,14 @@ export function DeviceDiscoveryScreen() {
       await pairDevice({
         deviceId: selectedDevice.deviceId,
         host: selectedDevice.ip,
-        port: selectedDevice.port || 39393,
+        port: selectedDevice.port || PROTOCOL_PORT,
         connectionCode: normalizedCode,
       });
       await addDesktop({
         desktopDeviceId: selectedDevice.deviceId,
         desktopName: selectedDevice.name,
         host: selectedDevice.ip,
-        port: selectedDevice.port || 39393,
+        port: selectedDevice.port || PROTOCOL_PORT,
         authorizationStatus: 'authorized',
       });
 

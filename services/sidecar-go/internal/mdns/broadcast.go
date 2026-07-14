@@ -36,7 +36,7 @@ type BroadcastConfig struct {
 	DeviceName   string
 	DeviceType   string // "mac" | "win" | "linux"
 	DeviceIP     string
-	TCPPort      int // 39393
+	TCPPort      int // 39593
 	Proto        int // 2
 	ShareEnabled bool
 	ShareName    string

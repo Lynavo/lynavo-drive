@@ -133,8 +133,8 @@ test('windows installer uses Lynavo Drive firewall identities scoped to the side
   assert.match(installer, /!define SF_RULE_HTTP\s+"Lynavo Drive Sidecar HTTP"/);
   assert.match(installer, /!define SF_RULE_MDNS\s+"Lynavo Drive mDNS UDP"/);
   assert.match(installer, /Configuring Windows Firewall rules for Lynavo Drive/);
-  assert.match(installer, /description="Lynavo Drive sidecar file transfer \(TCP 39393\)"/);
-  assert.match(installer, /description="Lynavo Drive sidecar HTTP health and API \(TCP 39394\)"/);
+  assert.match(installer, /description="Lynavo Drive sidecar file transfer \(TCP 39593\)"/);
+  assert.match(installer, /description="Lynavo Drive sidecar HTTP health and API \(TCP 39594\)"/);
   assert.match(installer, /description="Lynavo Drive Bonjour\/mDNS discovery \(UDP 5353\)"/);
   assert.match(installer, /resources\\lynavo-drive-sidecar\.exe/);
 });

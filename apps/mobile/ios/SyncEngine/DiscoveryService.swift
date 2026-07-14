@@ -220,7 +220,7 @@ class DiscoveryService {
                             name: txtDict["name"] ?? name,
                             type: txtDict["type"] ?? "mac",
                             ip: txtDict["ip"] ?? "",
-                            port: 39393,
+                            port: 39593,
                             protoVersion: Int(txtDict["proto"] ?? "2") ?? 2,
                             authMode: txtDict["auth"] ?? "code",
                             shareEnabled: txtDict["share"] == "1",
@@ -238,7 +238,7 @@ class DiscoveryService {
                     )
                     device = DiscoveredDevice(
                         deviceId: name, name: name, type: "mac", ip: "",
-                        port: 39393, protoVersion: 2, authMode: "code",
+                        port: 39593, protoVersion: 2, authMode: "code",
                         shareEnabled: false, shareName: nil, endpoint: result.endpoint
                     )
                 }

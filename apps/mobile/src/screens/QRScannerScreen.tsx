@@ -16,6 +16,7 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 import { Icon } from '../components/Icon';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import { PROTOCOL_PORT } from '@lynavo-drive/contracts';
 
 function CameraQRScannerScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -150,7 +151,7 @@ function CameraQRScannerScreen() {
               navigation.replace('CodeVerify', {
                 deviceId: `qr-${ip.replace(/\./g, '-')}`,
                 host: ip,
-                port: 39393,
+                port: PROTOCOL_PORT,
                 deviceName,
                 prefilledCode: code,
               });

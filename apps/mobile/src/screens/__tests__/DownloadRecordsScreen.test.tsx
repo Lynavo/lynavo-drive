@@ -55,10 +55,10 @@ jest.mock('../../services/desktop-local-service', () => ({
   downloadDesktopResource: jest.fn(),
   getLocalComputerPreviewUrl: jest
     .fn()
-    .mockResolvedValue('http://192.168.1.100:39394/personal/stream/live'),
+    .mockResolvedValue('http://192.168.1.100:39594/personal/stream/live'),
   getLocalComputerThumbnailUrl: jest
     .fn()
-    .mockResolvedValue('http://192.168.1.100:39394/personal/thumbnail/live'),
+    .mockResolvedValue('http://192.168.1.100:39594/personal/thumbnail/live'),
   isDownloadSavedLocally: jest.fn(
     (result: {
       savedToPhotos?: boolean;
@@ -209,8 +209,8 @@ describe('DownloadRecordsScreen', () => {
         fileSize: 2048,
         downloadedAt: '2026-06-17T08:00:00.000Z',
         thumbnailUrl:
-          'http://192.168.1.100:39394/personal/thumbnail/clip.mov?v=2048-1780000',
-        streamUrl: 'http://192.168.1.100:39394/personal/stream/clip.mov',
+          'http://192.168.1.100:39594/personal/thumbnail/clip.mov?v=2048-1780000',
+        streamUrl: 'http://192.168.1.100:39594/personal/stream/clip.mov',
       },
       {
         id: 'video-no-thumb',
@@ -219,7 +219,7 @@ describe('DownloadRecordsScreen', () => {
         mediaType: 'video',
         fileSize: 4096,
         downloadedAt: '2026-06-17T08:01:00.000Z',
-        streamUrl: 'http://192.168.1.100:39394/personal/stream/fallback.mov',
+        streamUrl: 'http://192.168.1.100:39594/personal/stream/fallback.mov',
       },
     ]);
 
@@ -235,7 +235,7 @@ describe('DownloadRecordsScreen', () => {
     expect(
       getByTestId('download-record-thumbnail-video-with-thumb').props.source,
     ).toEqual({
-      uri: 'http://192.168.1.100:39394/personal/thumbnail/clip.mov?v=2048-1780000',
+      uri: 'http://192.168.1.100:39594/personal/thumbnail/clip.mov?v=2048-1780000',
     });
     expect(
       queryByTestId('download-record-thumbnail-video-no-thumb'),
@@ -384,7 +384,7 @@ describe('DownloadRecordsScreen', () => {
         'Local.pdf',
       );
       expect(mockedDownloadDesktopResource).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
+        { host: '192.168.1.100', port: 39594 },
         'missing-1',
         'Missing.pdf',
         'application/pdf',
@@ -408,9 +408,9 @@ describe('DownloadRecordsScreen', () => {
         mediaType: 'image',
         downloadedAt: '2026-06-18T09:16:54.000Z',
         previewUrl:
-          'http://192.168.1.100:39394/resources/mobile/received/preview?fileKey=50cd567dd5610903b1016351646a7f910f3df6525b53ade18646f14a238260be',
+          'http://192.168.1.100:39594/resources/mobile/received/preview?fileKey=50cd567dd5610903b1016351646a7f910f3df6525b53ade18646f14a238260be',
         thumbnailUrl:
-          'http://192.168.1.100:39394/resources/mobile/received/thumbnail?fileKey=50cd567dd5610903b1016351646a7f910f3df6525b53ade18646f14a238260be',
+          'http://192.168.1.100:39594/resources/mobile/received/thumbnail?fileKey=50cd567dd5610903b1016351646a7f910f3df6525b53ade18646f14a238260be',
         savedToPhotos: true,
         localPath: null,
       },
@@ -432,7 +432,7 @@ describe('DownloadRecordsScreen', () => {
 
     await waitFor(() => {
       expect(mockedDownloadReceivedLibraryItem).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
+        { host: '192.168.1.100', port: 39594 },
         expect.objectContaining({
           fileKey:
             '50cd567dd5610903b1016351646a7f910f3df6525b53ade18646f14a238260be',

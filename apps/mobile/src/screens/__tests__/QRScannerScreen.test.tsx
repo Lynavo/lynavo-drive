@@ -244,7 +244,7 @@ describe('QRScannerScreen', () => {
     expect(mockReplace).toHaveBeenCalledWith('CodeVerify', {
       deviceId: 'qr-192-168-31-8',
       host: '192.168.31.8',
-      port: 39393,
+      port: 39593,
       deviceName: 'Studio Mac',
       prefilledCode: 'A8X2K9',
     });

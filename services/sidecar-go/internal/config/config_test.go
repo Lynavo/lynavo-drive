@@ -12,11 +12,11 @@ func TestLoadMissingFileReturnsDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if cfg.HTTPPort != 39394 {
-		t.Errorf("HTTPPort = %d, want 39394", cfg.HTTPPort)
+	if cfg.HTTPPort != 39594 {
+		t.Errorf("HTTPPort = %d, want 39594", cfg.HTTPPort)
 	}
-	if cfg.TCPPort != 39393 {
-		t.Errorf("TCPPort = %d, want 39393", cfg.TCPPort)
+	if cfg.TCPPort != 39593 {
+		t.Errorf("TCPPort = %d, want 39593", cfg.TCPPort)
 	}
 	if cfg.LogLevel != "info" {
 		t.Errorf("LogLevel = %q, want \"info\"", cfg.LogLevel)

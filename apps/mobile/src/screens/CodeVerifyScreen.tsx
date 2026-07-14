@@ -23,6 +23,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RouteProp } from '@react-navigation/native';
 import {
   ErrorCode,
+  PROTOCOL_PORT,
   type ErrorCode as NativeSyncErrorCode,
   type PairingErrorMetadataDTO,
 } from '@lynavo-drive/contracts';
@@ -148,7 +149,7 @@ export function CodeVerifyScreen() {
         await pairDevice({
           deviceId: deviceId || '',
           host: host || '',
-          port: port || 39393,
+          port: port || PROTOCOL_PORT,
           connectionCode: fullCode,
         });
 
@@ -156,7 +157,7 @@ export function CodeVerifyScreen() {
           desktopDeviceId: deviceId || '',
           desktopName: deviceName || 'Desktop',
           host: host || '',
-          port: port || 39393,
+          port: port || PROTOCOL_PORT,
           authorizationStatus: 'authorized',
         });
 

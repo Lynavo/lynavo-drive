@@ -148,14 +148,14 @@ describe('desktop-local-service', () => {
     });
 
     await expect(
-      downloadResource({ host: '192.168.10.20', port: 39394 }, 'resource-1'),
+      downloadResource({ host: '192.168.10.20', port: 39594 }, 'resource-1'),
     ).resolves.toEqual({
       savedToPhotos: false,
       localPath: null,
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://192.168.10.20:39394/resources/mobile/download/resource-1?clientId=client-001&clientName=Alice%20iPhone',
+      'http://192.168.10.20:39594/resources/mobile/download/resource-1?clientId=client-001&clientName=Alice%20iPhone',
     );
   });
 
@@ -168,7 +168,7 @@ describe('desktop-local-service', () => {
 
     await expect(
       downloadDesktopResource(
-        { host: '192.168.10.20', port: 39394 },
+        { host: '192.168.10.20', port: 39594 },
         'resource-1',
         'report.pdf',
         'document',
@@ -179,7 +179,7 @@ describe('desktop-local-service', () => {
       savedLocation: '/downloads/report.pdf',
     });
     expect(mockDownloadUrlToLocal).toHaveBeenCalledWith(
-      'http://192.168.10.20:39394/resources/mobile/download/resource-1?clientId=client-001&clientName=Alice%20iPhone',
+      'http://192.168.10.20:39594/resources/mobile/download/resource-1?clientId=client-001&clientName=Alice%20iPhone',
       'report.pdf',
       'document',
     );
@@ -195,7 +195,7 @@ describe('desktop-local-service', () => {
 
     await expect(
       downloadReceivedLibraryItem(
-        { host: '192.168.10.20', port: 39394 },
+        { host: '192.168.10.20', port: 39594 },
         {
           resourceId: '',
           desktopDeviceId: 'desktop-001',
@@ -233,7 +233,7 @@ describe('desktop-local-service', () => {
 
     await expect(
       downloadReceivedLibraryItem(
-        { host: '192.168.10.20', port: 39394 },
+        { host: '192.168.10.20', port: 39594 },
         {
           resourceId: '',
           desktopDeviceId: 'desktop-001',
@@ -263,7 +263,7 @@ describe('desktop-local-service', () => {
 
     await expect(
       downloadReceivedLibraryItem(
-        { host: '192.168.10.20', port: 39394 },
+        { host: '192.168.10.20', port: 39594 },
         {
           resourceId: '',
           desktopDeviceId: 'desktop-001',
@@ -293,7 +293,7 @@ describe('desktop-local-service', () => {
 
     await expect(
       downloadReceivedLibraryItem(
-        { host: '192.168.10.20', port: 39394 },
+        { host: '192.168.10.20', port: 39594 },
         {
           resourceId: '',
           desktopDeviceId: 'desktop-001',
@@ -330,7 +330,7 @@ describe('desktop-local-service', () => {
 
     await expect(
       downloadReceivedLibraryItem(
-        { host: '192.168.10.20', port: 39394 },
+        { host: '192.168.10.20', port: 39594 },
         {
           resourceId: '',
           desktopDeviceId: 'desktop-001',
@@ -364,7 +364,7 @@ describe('desktop-local-service', () => {
 
     await expect(
       downloadReceivedLibraryItem(
-        { host: '192.168.10.20', port: 39394 },
+        { host: '192.168.10.20', port: 39594 },
         {
           resourceId: '',
           desktopDeviceId: 'desktop-001',
@@ -409,7 +409,7 @@ describe('desktop-local-service', () => {
 
     await expect(
       listSharedFolderContents(
-        { host: '192.168.10.20', port: 39394 },
+        { host: '192.168.10.20', port: 39594 },
         'resource-1',
         'Design Assets/June',
       ),
@@ -428,7 +428,7 @@ describe('desktop-local-service', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://192.168.10.20:39394/resources/mobile/shared/resource-1/list/Design%20Assets/June?clientId=client-001&clientName=Alice%20iPhone',
+      'http://192.168.10.20:39594/resources/mobile/shared/resource-1/list/Design%20Assets/June?clientId=client-001&clientName=Alice%20iPhone',
     );
   });
 
@@ -460,8 +460,8 @@ describe('desktop-local-service', () => {
               size: 2048,
               modifiedAt: '2026-06-16T08:31:00.000Z',
               thumbnailUrl:
-                'http://192.168.10.20:39394/shared/thumbnail/photo.jpg',
-              streamUrl: 'http://192.168.10.20:39394/shared/stream/photo.jpg',
+                'http://192.168.10.20:39594/shared/thumbnail/photo.jpg',
+              streamUrl: 'http://192.168.10.20:39594/shared/stream/photo.jpg',
             },
           ],
           totalCount: 2,
@@ -469,7 +469,7 @@ describe('desktop-local-service', () => {
       });
 
     await expect(
-      listSharedResources({ host: '192.168.10.20', port: 39394 }),
+      listSharedResources({ host: '192.168.10.20', port: 39594 }),
     ).resolves.toEqual([
       {
         resourceId: 'shared-dir:Projects',
@@ -492,19 +492,19 @@ describe('desktop-local-service', () => {
         mediaType: 'image',
         addedAt: '2026-06-16T08:31:00.000Z',
         downloadCount: 0,
-        thumbnailUrl: 'http://192.168.10.20:39394/shared/thumbnail/photo.jpg',
-        previewUrl: 'http://192.168.10.20:39394/shared/stream/photo.jpg',
-        streamUrl: 'http://192.168.10.20:39394/shared/stream/photo.jpg',
+        thumbnailUrl: 'http://192.168.10.20:39594/shared/thumbnail/photo.jpg',
+        previewUrl: 'http://192.168.10.20:39594/shared/stream/photo.jpg',
+        streamUrl: 'http://192.168.10.20:39594/shared/stream/photo.jpg',
       },
     ]);
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      'http://192.168.10.20:39394/resources/mobile/shared?clientId=client-001&clientName=Alice%20iPhone',
+      'http://192.168.10.20:39594/resources/mobile/shared?clientId=client-001&clientName=Alice%20iPhone',
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      'http://192.168.10.20:39394/shared/list',
+      'http://192.168.10.20:39594/shared/list',
     );
   });
 
@@ -521,7 +521,7 @@ describe('desktop-local-service', () => {
 
     await expect(
       listSharedFolderContents(
-        { host: '192.168.10.20', port: 39394 },
+        { host: '192.168.10.20', port: 39594 },
         'shared-dir:Projects',
         'June',
       ),
@@ -532,7 +532,7 @@ describe('desktop-local-service', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://192.168.10.20:39394/shared/list/Projects/June',
+      'http://192.168.10.20:39594/shared/list/Projects/June',
     );
   });
 
@@ -544,7 +544,7 @@ describe('desktop-local-service', () => {
 
     await expect(
       downloadResource(
-        { host: '192.168.10.20', port: 39394 },
+        { host: '192.168.10.20', port: 39594 },
         'shared-dir:Reports/Quarterly%20Summary.pdf',
       ),
     ).resolves.toEqual({
@@ -553,7 +553,7 @@ describe('desktop-local-service', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://192.168.10.20:39394/shared/download/Reports/Quarterly%20Summary.pdf',
+      'http://192.168.10.20:39594/shared/download/Reports/Quarterly%20Summary.pdf',
     );
   });
 
@@ -565,11 +565,11 @@ describe('desktop-local-service', () => {
     });
 
     await expect(
-      listReceivedLibrary({ host: '192.168.10.20', port: 39394 }),
+      listReceivedLibrary({ host: '192.168.10.20', port: 39594 }),
     ).resolves.toEqual([]);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://192.168.10.20:39394/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone',
+      'http://192.168.10.20:39594/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone',
     );
   });
 
@@ -577,7 +577,7 @@ describe('desktop-local-service', () => {
     mockedListReceivedFiles.mockResolvedValueOnce([]);
 
     await expect(
-      listCurrentClientReceivedLibrary({ host: '192.168.10.20', port: 39394 }),
+      listCurrentClientReceivedLibrary({ host: '192.168.10.20', port: 39594 }),
     ).resolves.toEqual([]);
 
     expect(mockedListReceivedFiles).toHaveBeenCalledTimes(1);
@@ -608,19 +608,19 @@ describe('desktop-local-service', () => {
     });
 
     await expect(
-      listCurrentClientReceivedLibrary({ host: '192.168.10.20', port: 39394 }),
+      listCurrentClientReceivedLibrary({ host: '192.168.10.20', port: 39594 }),
     ).resolves.toMatchObject([
       {
         fileKey: '2026/06/17/fallback-image',
         previewUrl:
-          'http://192.168.10.20:39394/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Ffallback-image',
+          'http://192.168.10.20:39594/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Ffallback-image',
         thumbnailUrl:
-          'http://192.168.10.20:39394/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Ffallback-image',
+          'http://192.168.10.20:39594/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Ffallback-image',
       },
     ]);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://192.168.10.20:39394/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&scope=client',
+      'http://192.168.10.20:39594/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&scope=client',
     );
     expect(mockedListReceivedFiles).not.toHaveBeenCalled();
   });
@@ -674,7 +674,7 @@ describe('desktop-local-service', () => {
 
     await expect(
       listCurrentClientReceivedLibraryPage(
-        { host: '192.168.10.20', port: 39394 },
+        { host: '192.168.10.20', port: 39594 },
         { page: 2, pageSize: 20 },
       ),
     ).resolves.toMatchObject({
@@ -686,24 +686,24 @@ describe('desktop-local-service', () => {
         {
           fileKey: '2026/06/17/page-image',
           previewUrl:
-            'http://192.168.10.20:39394/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fpage-image',
+            'http://192.168.10.20:39594/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fpage-image',
           thumbnailUrl:
-            'http://192.168.10.20:39394/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fpage-image',
+            'http://192.168.10.20:39594/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fpage-image',
         },
         {
           fileKey: '2026/06/17/page-video',
           previewUrl:
-            'http://192.168.10.20:39394/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fpage-video',
+            'http://192.168.10.20:39594/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fpage-video',
           thumbnailUrl:
-            'http://192.168.10.20:39394/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fpage-video',
+            'http://192.168.10.20:39594/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fpage-video',
           streamUrl:
-            'http://192.168.10.20:39394/resources/mobile/received/stream?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fpage-video',
+            'http://192.168.10.20:39594/resources/mobile/received/stream?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fpage-video',
         },
       ],
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://192.168.10.20:39394/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&scope=client&page=2&pageSize=20',
+      'http://192.168.10.20:39594/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&scope=client&page=2&pageSize=20',
     );
     expect(mockedListReceivedFiles).not.toHaveBeenCalled();
   });
@@ -737,7 +737,7 @@ describe('desktop-local-service', () => {
 
     await expect(
       listGlobalReceivedLibraryPage(
-        { host: '192.168.10.20', port: 39394 },
+        { host: '192.168.10.20', port: 39594 },
         { page: 2, pageSize: 20 },
       ),
     ).resolves.toMatchObject({
@@ -749,15 +749,15 @@ describe('desktop-local-service', () => {
           clientId: 'phone-a-client',
           fileKey: '2026/06/17/phone-a-image',
           previewUrl:
-            'http://192.168.10.20:39394/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fphone-a-image',
+            'http://192.168.10.20:39594/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fphone-a-image',
           thumbnailUrl:
-            'http://192.168.10.20:39394/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fphone-a-image',
+            'http://192.168.10.20:39594/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fphone-a-image',
         },
       ],
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://192.168.10.20:39394/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&page=2&pageSize=20',
+      'http://192.168.10.20:39594/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&page=2&pageSize=20',
     );
     expect(mockedListReceivedFiles).not.toHaveBeenCalled();
   });
@@ -796,7 +796,7 @@ describe('desktop-local-service', () => {
     });
 
     const result = await listGlobalReceivedLibraryPage(
-      { host: '192.168.10.20', port: 39394 },
+      { host: '192.168.10.20', port: 39594 },
       { page: 1, pageSize: 20 },
     );
 
@@ -804,16 +804,16 @@ describe('desktop-local-service', () => {
       expect.objectContaining({
         fileKey: 'file-from-other-device',
         previewUrl:
-          'http://192.168.10.20:39394/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=file-from-other-device',
+          'http://192.168.10.20:39594/resources/mobile/received/preview?clientId=client-001&clientName=Alice%20iPhone&fileKey=file-from-other-device',
         thumbnailUrl:
-          'http://192.168.10.20:39394/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=file-from-other-device',
+          'http://192.168.10.20:39594/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=file-from-other-device',
         streamUrl:
-          'http://192.168.10.20:39394/resources/mobile/received/stream?clientId=client-001&clientName=Alice%20iPhone&fileKey=file-from-other-device',
+          'http://192.168.10.20:39594/resources/mobile/received/stream?clientId=client-001&clientName=Alice%20iPhone&fileKey=file-from-other-device',
       }),
     );
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://192.168.10.20:39394/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&page=1&pageSize=20',
+      'http://192.168.10.20:39594/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&page=1&pageSize=20',
     );
     expect(mockedListReceivedFiles).not.toHaveBeenCalled();
   });
@@ -841,7 +841,7 @@ describe('desktop-local-service', () => {
 
     await expect(
       listGlobalReceivedLibraryPage(
-        { host: '192.168.10.20', port: 39394 },
+        { host: '192.168.10.20', port: 39594 },
         { page: 1, pageSize: 20 },
       ),
     ).resolves.toMatchObject({
@@ -861,7 +861,7 @@ describe('desktop-local-service', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://192.168.10.20:39394/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&page=1&pageSize=20',
+      'http://192.168.10.20:39594/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&page=1&pageSize=20',
     );
     expect(mockedListGlobalReceivedFiles).toHaveBeenCalledTimes(1);
     expect(mockedListReceivedFiles).not.toHaveBeenCalled();
@@ -896,7 +896,7 @@ describe('desktop-local-service', () => {
 
     await expect(
       listCurrentClientReceivedLibraryPage(
-        { host: '192.168.10.20', port: 39394 },
+        { host: '192.168.10.20', port: 39594 },
         { page: 1, pageSize: 20 },
       ),
     ).resolves.toMatchObject({
@@ -907,13 +907,13 @@ describe('desktop-local-service', () => {
         {
           fileKey: '2026/06/17/ios-page-image',
           thumbnailUrl:
-            'http://192.168.10.20:39394/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fios-page-image',
+            'http://192.168.10.20:39594/resources/mobile/received/thumbnail?clientId=client-001&clientName=Alice%20iPhone&fileKey=2026%2F06%2F17%2Fios-page-image',
         },
       ],
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://192.168.10.20:39394/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&scope=client&page=1&pageSize=20',
+      'http://192.168.10.20:39594/resources/mobile/received?clientId=client-001&clientName=Alice%20iPhone&scope=client&page=1&pageSize=20',
     );
     expect(mockedListReceivedFiles).not.toHaveBeenCalled();
   });
@@ -941,7 +941,7 @@ describe('desktop-local-service', () => {
     ]);
 
     await expect(
-      listCurrentClientReceivedLibrary({ host: '192.168.10.20', port: 39394 }),
+      listCurrentClientReceivedLibrary({ host: '192.168.10.20', port: 39594 }),
     ).resolves.toMatchObject([
       {
         fileKey: '2026/06/17/native-image',
@@ -963,7 +963,7 @@ describe('desktop-local-service', () => {
     mockedListReceivedFiles.mockRejectedValueOnce(routeError);
 
     await expect(
-      listCurrentClientReceivedLibrary({ host: '192.168.10.20', port: 39394 }),
+      listCurrentClientReceivedLibrary({ host: '192.168.10.20', port: 39594 }),
     ).rejects.toBe(routeError);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -1009,7 +1009,7 @@ describe('desktop-local-service', () => {
     ]);
 
     await expect(
-      listCurrentClientReceivedLibrary({ host: '192.168.10.20', port: 39394 }),
+      listCurrentClientReceivedLibrary({ host: '192.168.10.20', port: 39594 }),
     ).resolves.toMatchObject([
       {
         fileKey: '2026/06/17/image-key',
@@ -1037,7 +1037,7 @@ describe('desktop-local-service', () => {
     mockShareFiles.mockResolvedValueOnce(true);
 
     await expect(
-      shareResources({ host: '192.168.10.20', port: 39394 }, [
+      shareResources({ host: '192.168.10.20', port: 39594 }, [
         { resourceId: 'resource-1', displayName: 'photo.jpg' },
         {
           resourceId: 'shared-folder-entry:folder-1:Specs/June Plan.pdf',
@@ -1048,12 +1048,12 @@ describe('desktop-local-service', () => {
 
     expect(mockDownloadUrlToShareCache).toHaveBeenNthCalledWith(
       1,
-      'http://192.168.10.20:39394/resources/mobile/download/resource-1?clientId=client-001&clientName=Alice%20iPhone',
+      'http://192.168.10.20:39594/resources/mobile/download/resource-1?clientId=client-001&clientName=Alice%20iPhone',
       'photo.jpg',
     );
     expect(mockDownloadUrlToShareCache).toHaveBeenNthCalledWith(
       2,
-      'http://192.168.10.20:39394/resources/mobile/download/folder-1?path=Specs%2FJune%20Plan.pdf&clientId=client-001&clientName=Alice%20iPhone',
+      'http://192.168.10.20:39594/resources/mobile/download/folder-1?path=Specs%2FJune%20Plan.pdf&clientId=client-001&clientName=Alice%20iPhone',
       'spec.pdf',
     );
     expect(mockShareFiles).toHaveBeenCalledWith([
@@ -1068,14 +1068,14 @@ describe('desktop-local-service', () => {
 
     await expect(
       prepareResourcePreview(
-        { host: '192.168.10.20', port: 39394 },
+        { host: '192.168.10.20', port: 39594 },
         'resource-1',
         'report.pdf',
       ),
     ).resolves.toBe('/cache/report.pdf');
 
     expect(mockDownloadUrlToShareCache).toHaveBeenCalledWith(
-      'http://192.168.10.20:39394/resources/mobile/download/resource-1?clientId=client-001&clientName=Alice%20iPhone',
+      'http://192.168.10.20:39594/resources/mobile/download/resource-1?clientId=client-001&clientName=Alice%20iPhone',
       'report.pdf',
     );
     expect(fetchMock).not.toHaveBeenCalled();
@@ -1090,7 +1090,7 @@ describe('desktop-local-service', () => {
       localPath: '/cache/notes.pdf',
     });
 
-    const desktop = { host: '192.168.10.20', port: 39394 };
+    const desktop = { host: '192.168.10.20', port: 39594 };
     const imageItem = {
       resourceId: '',
       desktopDeviceId: 'desktop-001',
@@ -1138,14 +1138,14 @@ describe('desktop-local-service', () => {
 
     await expect(
       prepareResourcePreview(
-        { host: '192.168.10.20', port: 39394 },
+        { host: '192.168.10.20', port: 39594 },
         'shared-folder-entry:folder-1:Specs/June Plan.pdf',
         'June Plan.pdf',
       ),
     ).resolves.toBe('/cache/june-plan.pdf');
 
     expect(mockDownloadUrlToShareCache).toHaveBeenCalledWith(
-      'http://192.168.10.20:39394/resources/mobile/download/folder-1?path=Specs%2FJune%20Plan.pdf&clientId=client-001&clientName=Alice%20iPhone',
+      'http://192.168.10.20:39594/resources/mobile/download/folder-1?path=Specs%2FJune%20Plan.pdf&clientId=client-001&clientName=Alice%20iPhone',
       'June Plan.pdf',
     );
   });
@@ -1153,17 +1153,17 @@ describe('desktop-local-service', () => {
   it('returns a direct preview URL for fallback shared-directory resources', async () => {
     await expect(
       getResourcePreviewUrl(
-        { host: '192.168.10.20', port: 39394 },
+        { host: '192.168.10.20', port: 39594 },
         'shared-dir:Reports/Quarterly%20Summary.pdf',
       ),
     ).resolves.toBe(
-      'http://192.168.10.20:39394/shared/download/Reports/Quarterly%20Summary.pdf',
+      'http://192.168.10.20:39594/shared/download/Reports/Quarterly%20Summary.pdf',
     );
   });
 
   it('lists local computer from the desktop personal directory root', async () => {
     mockedGetDirectoryFileStreamUrl.mockResolvedValueOnce(
-      'http://127.0.0.1:39394/personal/stream/cover.jpg',
+      'http://127.0.0.1:39594/personal/stream/cover.jpg',
     );
     mockedBrowseDirectory.mockResolvedValueOnce({
       scope: 'personal',
@@ -1183,7 +1183,7 @@ describe('desktop-local-service', () => {
           type: 'video',
           size: 12,
           modifiedAt: '2026-06-17T08:01:00.000Z',
-          streamUrl: 'http://127.0.0.1:39394/personal/stream/clip.mov',
+          streamUrl: 'http://127.0.0.1:39594/personal/stream/clip.mov',
         },
         {
           name: 'cover.jpg',
@@ -1192,7 +1192,7 @@ describe('desktop-local-service', () => {
           size: 2048,
           modifiedAt: '2026-06-17T08:02:00.000Z',
           thumbnailUrl:
-            'http://192.168.1.100:39394/personal/thumbnail/cover.jpg?v=2048-1780000',
+            'http://192.168.1.100:39594/personal/thumbnail/cover.jpg?v=2048-1780000',
         },
         {
           name: 'walkthrough.mov',
@@ -1201,9 +1201,9 @@ describe('desktop-local-service', () => {
           size: 4096,
           modifiedAt: '2026-06-17T08:03:00.000Z',
           thumbnailUrl:
-            'http://192.168.1.100:39394/personal/thumbnail/walkthrough.mov?v=4096-1780000',
+            'http://192.168.1.100:39594/personal/thumbnail/walkthrough.mov?v=4096-1780000',
           streamUrl:
-            'http://192.168.1.100:39394/personal/stream/walkthrough.mov',
+            'http://192.168.1.100:39594/personal/stream/walkthrough.mov',
         },
       ],
       totalCount: 4,
@@ -1231,8 +1231,8 @@ describe('desktop-local-service', () => {
         mediaType: 'video',
         addedAt: '2026-06-17T08:01:00.000Z',
         downloadCount: 0,
-        previewUrl: 'http://127.0.0.1:39394/personal/stream/clip.mov',
-        streamUrl: 'http://127.0.0.1:39394/personal/stream/clip.mov',
+        previewUrl: 'http://127.0.0.1:39594/personal/stream/clip.mov',
+        streamUrl: 'http://127.0.0.1:39594/personal/stream/clip.mov',
       },
       {
         resourceId: 'personal-dir:cover.jpg',
@@ -1243,9 +1243,9 @@ describe('desktop-local-service', () => {
         fileSize: 2048,
         mediaType: 'image',
         thumbnailUrl:
-          'http://192.168.1.100:39394/personal/thumbnail/cover.jpg?v=2048-1780000',
-        previewUrl: 'http://127.0.0.1:39394/personal/stream/cover.jpg',
-        streamUrl: 'http://127.0.0.1:39394/personal/stream/cover.jpg',
+          'http://192.168.1.100:39594/personal/thumbnail/cover.jpg?v=2048-1780000',
+        previewUrl: 'http://127.0.0.1:39594/personal/stream/cover.jpg',
+        streamUrl: 'http://127.0.0.1:39594/personal/stream/cover.jpg',
         addedAt: '2026-06-17T08:02:00.000Z',
         downloadCount: 0,
       },
@@ -1258,10 +1258,10 @@ describe('desktop-local-service', () => {
         fileSize: 4096,
         mediaType: 'video',
         thumbnailUrl:
-          'http://192.168.1.100:39394/personal/thumbnail/walkthrough.mov?v=4096-1780000',
+          'http://192.168.1.100:39594/personal/thumbnail/walkthrough.mov?v=4096-1780000',
         previewUrl:
-          'http://192.168.1.100:39394/personal/stream/walkthrough.mov',
-        streamUrl: 'http://192.168.1.100:39394/personal/stream/walkthrough.mov',
+          'http://192.168.1.100:39594/personal/stream/walkthrough.mov',
+        streamUrl: 'http://192.168.1.100:39594/personal/stream/walkthrough.mov',
         addedAt: '2026-06-17T08:03:00.000Z',
         downloadCount: 0,
       },
@@ -1315,7 +1315,7 @@ describe('desktop-local-service', () => {
 
   it('adds stream preview urls to local computer folder images that only have thumbnails', async () => {
     mockedGetDirectoryFileStreamUrl.mockResolvedValueOnce(
-      'http://127.0.0.1:39394/personal/stream/Desktop/photo.jpg',
+      'http://127.0.0.1:39594/personal/stream/Desktop/photo.jpg',
     );
     mockedBrowseDirectory.mockResolvedValueOnce({
       scope: 'personal',
@@ -1328,7 +1328,7 @@ describe('desktop-local-service', () => {
           size: 2048,
           modifiedAt: '2026-06-17T09:01:00.000Z',
           thumbnailUrl:
-            'http://192.168.1.100:39394/personal/thumbnail/Desktop/photo.jpg?v=2048-1780000',
+            'http://192.168.1.100:39594/personal/thumbnail/Desktop/photo.jpg?v=2048-1780000',
         },
       ],
       totalCount: 1,
@@ -1347,8 +1347,8 @@ describe('desktop-local-service', () => {
           size: 2048,
           modifiedAt: '2026-06-17T09:01:00.000Z',
           thumbnailUrl:
-            'http://192.168.1.100:39394/personal/thumbnail/Desktop/photo.jpg?v=2048-1780000',
-          streamUrl: 'http://127.0.0.1:39394/personal/stream/Desktop/photo.jpg',
+            'http://192.168.1.100:39594/personal/thumbnail/Desktop/photo.jpg?v=2048-1780000',
+          streamUrl: 'http://127.0.0.1:39594/personal/stream/Desktop/photo.jpg',
         },
       ],
       totalCount: 1,
@@ -1367,10 +1367,10 @@ describe('desktop-local-service', () => {
       savedLocation: '/downloads/notes.txt',
     });
     mockedGetDirectoryFileStreamUrl.mockResolvedValueOnce(
-      'http://127.0.0.1:39394/personal/stream/Desktop/notes.txt',
+      'http://127.0.0.1:39594/personal/stream/Desktop/notes.txt',
     );
     mockedGetPersonalFileThumbnailUrl.mockResolvedValueOnce(
-      'http://127.0.0.1:39394/personal/thumbnail/Desktop/notes.txt',
+      'http://127.0.0.1:39594/personal/thumbnail/Desktop/notes.txt',
     );
     mockedPrepareDirectoryFilePreview.mockResolvedValueOnce('/cache/notes.txt');
 
@@ -1383,11 +1383,11 @@ describe('desktop-local-service', () => {
     });
     await expect(
       getLocalComputerPreviewUrl('personal-dir:Desktop/notes.txt'),
-    ).resolves.toBe('http://127.0.0.1:39394/personal/stream/Desktop/notes.txt');
+    ).resolves.toBe('http://127.0.0.1:39594/personal/stream/Desktop/notes.txt');
     await expect(
       getLocalComputerThumbnailUrl('personal-dir:Desktop/notes.txt'),
     ).resolves.toBe(
-      'http://127.0.0.1:39394/personal/thumbnail/Desktop/notes.txt',
+      'http://127.0.0.1:39594/personal/thumbnail/Desktop/notes.txt',
     );
     await expect(
       prepareLocalComputerPreview(
@@ -1433,7 +1433,7 @@ describe('desktop-local-service', () => {
 
   it('prepares local computer share files through the native share cache', async () => {
     mockedGetDirectoryFileStreamUrl.mockResolvedValueOnce(
-      'http://127.0.0.1:39394/personal/stream/protoc-gen-go',
+      'http://127.0.0.1:39594/personal/stream/protoc-gen-go',
     );
     mockDownloadUrlToShareCache.mockResolvedValueOnce(
       '/share-cache/protoc-gen-go',
@@ -1451,7 +1451,7 @@ describe('desktop-local-service', () => {
       'protoc-gen-go',
     );
     expect(mockDownloadUrlToShareCache).toHaveBeenCalledWith(
-      'http://127.0.0.1:39394/personal/stream/protoc-gen-go',
+      'http://127.0.0.1:39594/personal/stream/protoc-gen-go',
       'protoc-gen-go',
     );
     expect(mockedDownloadDirectoryFile).not.toHaveBeenCalled();
@@ -1461,10 +1461,10 @@ describe('desktop-local-service', () => {
   it('shares local computer files through the native share cache', async () => {
     mockedGetDirectoryFileStreamUrl
       .mockResolvedValueOnce(
-        'http://127.0.0.1:39394/personal/stream/Pictures/photo.jpg',
+        'http://127.0.0.1:39594/personal/stream/Pictures/photo.jpg',
       )
       .mockResolvedValueOnce(
-        'http://127.0.0.1:39394/personal/stream/Documents/report.pdf',
+        'http://127.0.0.1:39594/personal/stream/Documents/report.pdf',
       );
     mockDownloadUrlToShareCache
       .mockResolvedValueOnce('/share-cache/photo.jpg')
@@ -1496,12 +1496,12 @@ describe('desktop-local-service', () => {
     );
     expect(mockDownloadUrlToShareCache).toHaveBeenNthCalledWith(
       1,
-      'http://127.0.0.1:39394/personal/stream/Pictures/photo.jpg',
+      'http://127.0.0.1:39594/personal/stream/Pictures/photo.jpg',
       'photo.jpg',
     );
     expect(mockDownloadUrlToShareCache).toHaveBeenNthCalledWith(
       2,
-      'http://127.0.0.1:39394/personal/stream/Documents/report.pdf',
+      'http://127.0.0.1:39594/personal/stream/Documents/report.pdf',
       'report.pdf',
     );
     expect(mockedDownloadDirectoryFile).not.toHaveBeenCalled();

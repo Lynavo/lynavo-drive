@@ -27,28 +27,28 @@
   nsExec::ExecToStack 'netsh advfirewall firewall delete rule name="${SF_RULE_MDNS}"'
   Pop $R0
   Pop $R1
-  ; TCP 39393 – mobile → sidecar file-transfer.
+  ; TCP 39593 – mobile → sidecar file-transfer.
   ; remoteip is intentionally unrestricted: in a typical home or office LAN the
   ; port is not exposed to the internet (NAT blocks it), so allowing any local
   ; source is safe.  Restricting to localsubnet would break cross-segment
   ; transfers (e.g. iPhone on 172.16.22.x connecting to Windows on 172.16.8.x).
   ; Scope to the sidecar executable when present for additional defence-in-depth.
   IfFileExists "$INSTDIR\resources\lynavo-drive-sidecar.exe" 0 +3
-    nsExec::ExecToStack 'netsh advfirewall firewall add rule name="${SF_RULE_TCP}" dir=in action=allow protocol=TCP localport=39393 program="$INSTDIR\resources\lynavo-drive-sidecar.exe" description="Lynavo Drive sidecar file transfer (TCP 39393)"'
+    nsExec::ExecToStack 'netsh advfirewall firewall add rule name="${SF_RULE_TCP}" dir=in action=allow protocol=TCP localport=39593 program="$INSTDIR\resources\lynavo-drive-sidecar.exe" description="Lynavo Drive sidecar file transfer (TCP 39593)"'
     Goto tcp_rule_done
-  nsExec::ExecToStack 'netsh advfirewall firewall add rule name="${SF_RULE_TCP}" dir=in action=allow protocol=TCP localport=39393 description="Lynavo Drive sidecar file transfer (TCP 39393)"'
+  nsExec::ExecToStack 'netsh advfirewall firewall add rule name="${SF_RULE_TCP}" dir=in action=allow protocol=TCP localport=39593 description="Lynavo Drive sidecar file transfer (TCP 39593)"'
   tcp_rule_done:
   Pop $R0
   Pop $R1
 
-  ; TCP 39394 – mobile discovery fallback and desktop health/API access.
+  ; TCP 39594 – mobile discovery fallback and desktop health/API access.
   ; Android subnet fallback probes /health on the sidecar HTTP API before
   ; opening the LMUP TCP session, so Windows must allow this inbound port too.
   ; Scope to the sidecar executable when present for additional defence-in-depth.
   IfFileExists "$INSTDIR\resources\lynavo-drive-sidecar.exe" 0 +3
-    nsExec::ExecToStack 'netsh advfirewall firewall add rule name="${SF_RULE_HTTP}" dir=in action=allow protocol=TCP localport=39394 program="$INSTDIR\resources\lynavo-drive-sidecar.exe" description="Lynavo Drive sidecar HTTP health and API (TCP 39394)"'
+    nsExec::ExecToStack 'netsh advfirewall firewall add rule name="${SF_RULE_HTTP}" dir=in action=allow protocol=TCP localport=39594 program="$INSTDIR\resources\lynavo-drive-sidecar.exe" description="Lynavo Drive sidecar HTTP health and API (TCP 39594)"'
     Goto http_rule_done
-  nsExec::ExecToStack 'netsh advfirewall firewall add rule name="${SF_RULE_HTTP}" dir=in action=allow protocol=TCP localport=39394 description="Lynavo Drive sidecar HTTP health and API (TCP 39394)"'
+  nsExec::ExecToStack 'netsh advfirewall firewall add rule name="${SF_RULE_HTTP}" dir=in action=allow protocol=TCP localport=39594 description="Lynavo Drive sidecar HTTP health and API (TCP 39594)"'
   http_rule_done:
   Pop $R0
   Pop $R1

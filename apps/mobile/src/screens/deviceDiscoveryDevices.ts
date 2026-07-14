@@ -1,3 +1,5 @@
+import { PROTOCOL_PORT } from '@lynavo-drive/contracts';
+
 type BaseDiscoveredDevice = {
   deviceId: string;
   name: string;
@@ -11,7 +13,6 @@ type BaseRecentDesktop = {
   port?: number;
 };
 
-const DEFAULT_DISCOVERY_PORT = 39393;
 const IPV4_WITH_OPTIONAL_PORT = /^(\d{1,3}(?:\.\d{1,3}){3})(?::(\d{1,5}))?$/;
 
 function normalizePort(port: number | undefined): number | undefined {
@@ -74,7 +75,7 @@ function normalizeDevice<T extends BaseDiscoveredDevice>(device: T): T {
   return {
     ...device,
     ip: parsed.host,
-    port: normalizePort(device.port) ?? parsed.port ?? DEFAULT_DISCOVERY_PORT,
+    port: normalizePort(device.port) ?? parsed.port ?? PROTOCOL_PORT,
   };
 }
 
@@ -87,9 +88,7 @@ function endpointKey(
   if (!host) {
     return null;
   }
-  return `host:${host}:${
-    normalizePort(port) ?? parsed.port ?? DEFAULT_DISCOVERY_PORT
-  }`;
+  return `host:${host}:${normalizePort(port) ?? parsed.port ?? PROTOCOL_PORT}`;
 }
 
 function dedupeKey(device: BaseDiscoveredDevice): string {

@@ -111,7 +111,7 @@ Handling:
   recovery, mobile should retain completed files and automatically continue the
   unfinished queue.
 - If recovery does not happen after wake, first check the mobile pending queue,
-  whether `SYNC_BEGIN` was sent again, and whether desktop `39393 / 39394` are
+  whether `SYNC_BEGIN` was sent again, and whether desktop `39593 / 39594` are
   still listening.
 
 LAN Wake-on-LAN checks:
@@ -154,7 +154,7 @@ For troubleshooting, check first:
    failure, `wake polling exhausted` / `wake probe timed out`.
 6. Whether older or summary logs show `wake packets sent`,
    `wake recovered LAN host`, or `wake polling exhausted`.
-7. Whether `/health` recovers after wake and `39393 / 39394` become reachable
+7. Whether `/health` recovers after wake and `39593 / 39594` become reachable
    again.
 8. Whether an external-network scenario without VPN-LAN was mistaken for a
    supported scenario.
@@ -176,13 +176,13 @@ this order:
 5. If `wake polling exhausted` / `wake probe timed out` appears, `/health` did
    not recover within the bounded time after the packet was sent. Check platform
    WoL settings, router broadcast behavior, sleep mode, and
-   `http://<desktop-lan-ip>:39394/health`.
+   `http://<desktop-lan-ip>:39594/health`.
 
 ## 3.5 Discovery Shows Device, But Connection Fails
 
 Check first:
 
-1. Whether the sidecar is really listening on `39393 / 39394`.
+1. Whether the sidecar is really listening on `39593 / 39594`.
 2. Whether the local machine has leftover `dns-sd` Bonjour broadcast orphan
    processes.
 3. Whether mobile selected IPv4 or `fe80::` IPv6.
@@ -195,7 +195,7 @@ Historically common causes:
 - Leftover `dns-sd` caused stale online status.
 - Older paths preferred `fe80::` link-local IPv6.
 - Windows firewall allow rules were missing or overridden by policy, especially
-  `39394/TCP` sidecar HTTP `/health` needed by Android fallback.
+  `39594/TCP` sidecar HTTP `/health` needed by Android fallback.
 - Bonjour for Windows was not installed or running, leaving only compatible
   broadcast or failed discovery.
 
@@ -249,7 +249,7 @@ iCloud issues usually block at export, not TCP transfer.
 
 When:
 
-1. `39393 / 39394` are not listening at all.
+1. `39593 / 39594` are not listening at all.
 2. `desktop-main.log` clearly reports sidecar startup failure.
 3. Multiple devices are affected at the same time.
 4. The sidecar itself does not start after DMG installation.

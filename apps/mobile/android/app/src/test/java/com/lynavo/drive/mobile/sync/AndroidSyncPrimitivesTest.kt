@@ -13,12 +13,12 @@ class AndroidSyncPrimitivesTest {
   fun sharedFilesRouteUsesDirectLanHost() {
     val route = AndroidSyncPrimitives.decideSharedFilesRoute(
       directHost = " 172.20.10.3 ",
-      directPort = 39394,
+      directPort = 39594,
     )
 
     assertEquals(AndroidSharedFilesRouteMode.DIRECT_LAN, route.mode)
     assertEquals("172.20.10.3", route.host)
-    assertEquals(39394, route.port)
+    assertEquals(39594, route.port)
   }
 
   @Test
@@ -743,19 +743,19 @@ class AndroidSyncPrimitivesTest {
   @Test
   fun buildPresenceHeartbeatUrlUsesSidecarHttpPresenceEndpoint() {
     assertEquals(
-      "http://192.168.10.237:39394/presence/client-123",
+      "http://192.168.10.237:39594/presence/client-123",
       AndroidSyncPrimitives.buildPresenceHeartbeatUrl(
         host = "192.168.10.237",
-        port = 39394,
+        port = 39594,
         clientId = "client-123",
       ),
     )
 
     assertEquals(
-      "http://[fe80::1%wlan0]:39394/presence/client-123",
+      "http://[fe80::1%wlan0]:39594/presence/client-123",
       AndroidSyncPrimitives.buildPresenceHeartbeatUrl(
         host = "fe80::1%wlan0",
-        port = 39394,
+        port = 39594,
         clientId = "client-123",
       ),
     )

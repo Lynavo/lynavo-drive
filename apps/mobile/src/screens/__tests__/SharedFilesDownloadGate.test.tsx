@@ -1262,7 +1262,7 @@ describe('LocalComputerScreen', () => {
           size: 8192,
           modifiedAt: '2026-06-16T08:33:00.000Z',
           thumbnailUrl:
-            'http://192.168.1.100:39394/personal/thumbnail/walkthrough.mov?v=8192-1780000',
+            'http://192.168.1.100:39594/personal/thumbnail/walkthrough.mov?v=8192-1780000',
         },
       ],
       totalCount: 4,
@@ -1428,7 +1428,7 @@ describe('LocalComputerScreen', () => {
         addedAt: '2026-06-16T08:00:00.000Z',
         downloadCount: 0,
         thumbnailUrl:
-          'http://192.168.1.100:39394/personal/thumbnail/alpha.jpg?v=1024-1780000',
+          'http://192.168.1.100:39594/personal/thumbnail/alpha.jpg?v=1024-1780000',
       },
       {
         resourceId: 'personal-dir:beta.mov',
@@ -1441,8 +1441,8 @@ describe('LocalComputerScreen', () => {
         addedAt: '2026-06-16T08:01:00.000Z',
         downloadCount: 0,
         thumbnailUrl:
-          'http://192.168.1.100:39394/personal/thumbnail/beta.mov?v=2048-1780000',
-        streamUrl: 'http://192.168.1.100:39394/personal/stream/beta.mov',
+          'http://192.168.1.100:39594/personal/thumbnail/beta.mov?v=2048-1780000',
+        streamUrl: 'http://192.168.1.100:39594/personal/stream/beta.mov',
       },
     ]);
 
@@ -1478,7 +1478,7 @@ describe('LocalComputerScreen', () => {
         addedAt: '2026-06-16T08:00:00.000Z',
         downloadCount: 0,
         thumbnailUrl:
-          'http://192.168.1.100:39394/personal/thumbnail/broken.jpg?v=1024-1780000',
+          'http://192.168.1.100:39594/personal/thumbnail/broken.jpg?v=1024-1780000',
       },
     ]);
 
@@ -1518,8 +1518,8 @@ describe('LocalComputerScreen', () => {
         addedAt: '2026-06-16T08:00:00.000Z',
         downloadCount: 0,
         thumbnailUrl:
-          'http://192.168.1.100:39394/personal/thumbnail/broken.mov?v=2048-1780000',
-        streamUrl: 'http://192.168.1.100:39394/personal/stream/broken.mov',
+          'http://192.168.1.100:39594/personal/thumbnail/broken.mov?v=2048-1780000',
+        streamUrl: 'http://192.168.1.100:39594/personal/stream/broken.mov',
       },
     ]);
 
@@ -1558,7 +1558,7 @@ describe('LocalComputerScreen', () => {
         status: 'available' as const,
         addedAt: '2026-06-16T08:00:00.000Z',
         downloadCount: 0,
-        thumbnailUrl: `http://192.168.1.100:39394/personal/thumbnail/photo-${index}.jpg?v=1024-1780000`,
+        thumbnailUrl: `http://192.168.1.100:39594/personal/thumbnail/photo-${index}.jpg?v=1024-1780000`,
       })),
     );
 
@@ -1645,9 +1645,9 @@ describe('LocalComputerScreen', () => {
         status: 'available',
         addedAt: '2026-06-16T08:00:00.000Z',
         downloadCount: 0,
-        thumbnailUrl: 'http://192.168.1.100:39394/personal/thumbnail/alpha.jpg',
-        previewUrl: 'http://192.168.1.100:39394/personal/stream/alpha.jpg',
-        streamUrl: 'http://192.168.1.100:39394/personal/stream/alpha.jpg',
+        thumbnailUrl: 'http://192.168.1.100:39594/personal/thumbnail/alpha.jpg',
+        previewUrl: 'http://192.168.1.100:39594/personal/stream/alpha.jpg',
+        streamUrl: 'http://192.168.1.100:39594/personal/stream/alpha.jpg',
       },
     ]);
     mockDownloadLocalComputerResource.mockResolvedValueOnce({
@@ -1678,9 +1678,9 @@ describe('LocalComputerScreen', () => {
       fileSize: 1024,
       mediaType: 'image',
       localPath: '/local/alpha.jpg',
-      thumbnailUrl: 'http://192.168.1.100:39394/personal/thumbnail/alpha.jpg',
-      previewUrl: 'http://192.168.1.100:39394/personal/stream/alpha.jpg',
-      streamUrl: 'http://192.168.1.100:39394/personal/stream/alpha.jpg',
+      thumbnailUrl: 'http://192.168.1.100:39594/personal/thumbnail/alpha.jpg',
+      previewUrl: 'http://192.168.1.100:39594/personal/stream/alpha.jpg',
+      streamUrl: 'http://192.168.1.100:39594/personal/stream/alpha.jpg',
       savedToPhotos: false,
     });
     expect(alertSpy).toHaveBeenCalledWith(
@@ -1715,9 +1715,9 @@ describe('LocalComputerScreen', () => {
           modifiedAt: '2026-06-16T08:31:00.000Z',
           isDirectory: false,
           thumbnailUrl:
-            'http://192.168.1.100:39394/personal/thumbnail/Album/photo.jpg?v=1024-1780000',
+            'http://192.168.1.100:39594/personal/thumbnail/Album/photo.jpg?v=1024-1780000',
           streamUrl:
-            'http://192.168.1.100:39394/personal/stream/Album/photo.jpg',
+            'http://192.168.1.100:39594/personal/stream/Album/photo.jpg',
         },
       ],
       totalCount: 1,
@@ -1759,9 +1759,9 @@ describe('LocalComputerScreen', () => {
       mediaType: 'image',
       localPath: '/local/photo.jpg',
       thumbnailUrl:
-        'http://192.168.1.100:39394/personal/thumbnail/Album/photo.jpg?v=1024-1780000',
-      previewUrl: 'http://192.168.1.100:39394/personal/stream/Album/photo.jpg',
-      streamUrl: 'http://192.168.1.100:39394/personal/stream/Album/photo.jpg',
+        'http://192.168.1.100:39594/personal/thumbnail/Album/photo.jpg?v=1024-1780000',
+      previewUrl: 'http://192.168.1.100:39594/personal/stream/Album/photo.jpg',
+      streamUrl: 'http://192.168.1.100:39594/personal/stream/Album/photo.jpg',
       savedToPhotos: false,
     });
     expect(mockRecordDiagnosticsLog).toHaveBeenCalledWith(
@@ -1852,7 +1852,7 @@ describe('LocalComputerScreen', () => {
         status: 'available',
         addedAt: '2026-06-16T08:00:00.000Z',
         downloadCount: 0,
-        thumbnailUrl: 'http://192.168.1.100:39394/personal/thumbnail/alpha.jpg',
+        thumbnailUrl: 'http://192.168.1.100:39594/personal/thumbnail/alpha.jpg',
       },
     ]);
     mockShareLocalComputerResources.mockResolvedValueOnce(undefined);
@@ -1987,7 +1987,7 @@ describe('LocalComputerScreen', () => {
       },
     ]);
     mockGetLocalComputerPreviewUrl.mockResolvedValueOnce(
-      'http://192.168.1.100:39394/personal/stream/cover.png',
+      'http://192.168.1.100:39594/personal/stream/cover.png',
     );
 
     const { getByTestId, getByText } = render(
@@ -2103,7 +2103,7 @@ describe('PhoneSyncSpaceScreen', () => {
     await waitFor(() => {
       expect(mockListCurrentClientReceivedLibrary).toHaveBeenCalledWith({
         host: '192.168.1.100',
-        port: 39394,
+        port: 39594,
       });
     });
 
@@ -2174,7 +2174,7 @@ describe('PhoneSyncSpaceScreen', () => {
     await waitFor(() => {
       expect(mockListGlobalReceivedLibraryPage).toHaveBeenNthCalledWith(
         1,
-        { host: '192.168.1.100', port: 39394 },
+        { host: '192.168.1.100', port: 39594 },
         { page: 1, pageSize: 20 },
       );
       expect(getByText('alpha.jpg')).toBeTruthy();
@@ -2186,7 +2186,7 @@ describe('PhoneSyncSpaceScreen', () => {
     await waitFor(() => {
       expect(mockListGlobalReceivedLibraryPage).toHaveBeenNthCalledWith(
         2,
-        { host: '192.168.1.100', port: 39394 },
+        { host: '192.168.1.100', port: 39594 },
         { page: 2, pageSize: 20 },
       );
       expect(getByText('beta.mov')).toBeTruthy();
@@ -2225,13 +2225,13 @@ describe('PhoneSyncSpaceScreen', () => {
         completedAt: '2026-06-16T08:00:00.000Z',
         shareStatus: 'shared',
         thumbnailUrl:
-          'http://192.168.1.100:39394/resources/mobile/received/thumbnail?fileKey=received-1',
+          'http://192.168.1.100:39594/resources/mobile/received/thumbnail?fileKey=received-1',
         previewUrl:
-          'http://192.168.1.100:39394/resources/mobile/received/preview?fileKey=received-1',
+          'http://192.168.1.100:39594/resources/mobile/received/preview?fileKey=received-1',
       },
     ]);
     mockGetReceivedLibraryPreviewUrl.mockResolvedValueOnce(
-      'http://192.168.1.100:39394/resources/mobile/received/preview?clientId=client-001&fileKey=received%2Falpha.jpg',
+      'http://192.168.1.100:39594/resources/mobile/received/preview?clientId=client-001&fileKey=received%2Falpha.jpg',
     );
 
     const {
@@ -2263,7 +2263,7 @@ describe('PhoneSyncSpaceScreen', () => {
 
     await waitFor(() => {
       expect(mockGetReceivedLibraryPreviewUrl).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
+        { host: '192.168.1.100', port: 39594 },
         expect.objectContaining({ fileKey: 'received/alpha.jpg' }),
       );
       expect(getByTestId('phone-sync-preview-image')).toBeTruthy();
@@ -2284,15 +2284,15 @@ describe('PhoneSyncSpaceScreen', () => {
         completedAt: '2026-06-16T07:00:00.000Z',
         shareStatus: 'shared',
         thumbnailUrl:
-          'http://192.168.1.100:39394/resources/mobile/received/thumbnail?fileKey=received-video',
+          'http://192.168.1.100:39594/resources/mobile/received/thumbnail?fileKey=received-video',
         previewUrl:
-          'http://192.168.1.100:39394/resources/mobile/received/preview?fileKey=received-video',
+          'http://192.168.1.100:39594/resources/mobile/received/preview?fileKey=received-video',
         streamUrl:
-          'http://192.168.1.100:39394/resources/mobile/received/stream?fileKey=received-video',
+          'http://192.168.1.100:39594/resources/mobile/received/stream?fileKey=received-video',
       },
     ]);
     mockGetReceivedLibraryPreviewUrl.mockResolvedValueOnce(
-      'http://192.168.1.100:39394/resources/mobile/received/stream?clientId=client-001&fileKey=received%2Fbeta.mov',
+      'http://192.168.1.100:39594/resources/mobile/received/stream?clientId=client-001&fileKey=received%2Fbeta.mov',
     );
 
     const { getByLabelText, getByTestId, getByText, queryByTestId } = render(
@@ -2313,7 +2313,7 @@ describe('PhoneSyncSpaceScreen', () => {
 
     await waitFor(() => {
       expect(mockGetReceivedLibraryPreviewUrl).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
+        { host: '192.168.1.100', port: 39594 },
         expect.objectContaining({ fileKey: 'received/beta.mov' }),
       );
       expect(getByTestId('phone-sync-preview-video')).toBeTruthy();
@@ -2334,11 +2334,11 @@ describe('PhoneSyncSpaceScreen', () => {
         completedAt: '2026-06-16T08:00:00.000Z',
         shareStatus: 'shared',
         previewUrl:
-          'http://192.168.1.100:39394/resources/mobile/received/preview?fileKey=received-image',
+          'http://192.168.1.100:39594/resources/mobile/received/preview?fileKey=received-image',
       },
     ]);
     mockGetReceivedLibraryPreviewUrl.mockResolvedValueOnce(
-      'http://192.168.1.100:39394/resources/mobile/received/preview?clientId=client-001&fileKey=received%2Falpha.jpg',
+      'http://192.168.1.100:39594/resources/mobile/received/preview?clientId=client-001&fileKey=received%2Falpha.jpg',
     );
 
     const { getByTestId, getByText } = render(
@@ -2355,7 +2355,7 @@ describe('PhoneSyncSpaceScreen', () => {
 
     await waitFor(() => {
       expect(mockGetReceivedLibraryPreviewUrl).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
+        { host: '192.168.1.100', port: 39594 },
         expect.objectContaining({ fileKey: 'received/alpha.jpg' }),
       );
       expect(getByTestId('phone-sync-preview-image')).toBeTruthy();
@@ -2394,7 +2394,7 @@ describe('PhoneSyncSpaceScreen', () => {
 
     await waitFor(() => {
       expect(mockPrepareReceivedLibraryPreview).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
+        { host: '192.168.1.100', port: 39594 },
         expect.objectContaining({ fileKey: 'received/notes.pdf' }),
       );
     });
@@ -2421,9 +2421,9 @@ describe('PhoneSyncSpaceScreen', () => {
         shareStatus: 'shared',
         fileStatus: 'deleted',
         thumbnailUrl:
-          'http://192.168.1.100:39394/resources/mobile/received/thumbnail?fileKey=received-deleted',
+          'http://192.168.1.100:39594/resources/mobile/received/thumbnail?fileKey=received-deleted',
         previewUrl:
-          'http://192.168.1.100:39394/resources/mobile/received/preview?fileKey=received-deleted',
+          'http://192.168.1.100:39594/resources/mobile/received/preview?fileKey=received-deleted',
       },
     ]);
 
@@ -2471,9 +2471,9 @@ describe('PhoneSyncSpaceScreen', () => {
         completedAt: '2026-06-16T08:00:00.000Z',
         shareStatus: 'not_shared',
         thumbnailUrl:
-          'http://192.168.1.100:39394/resources/mobile/received/thumbnail?fileKey=received-1',
+          'http://192.168.1.100:39594/resources/mobile/received/thumbnail?fileKey=received-1',
         previewUrl:
-          'http://192.168.1.100:39394/resources/mobile/received/preview?fileKey=received-1',
+          'http://192.168.1.100:39594/resources/mobile/received/preview?fileKey=received-1',
       },
     ]);
     mockDownloadReceivedLibraryItem.mockResolvedValueOnce({
@@ -2497,7 +2497,7 @@ describe('PhoneSyncSpaceScreen', () => {
 
     await waitFor(() => {
       expect(mockDownloadReceivedLibraryItem).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
+        { host: '192.168.1.100', port: 39594 },
         expect.objectContaining({ fileKey: 'received/alpha.jpg' }),
       );
     });
@@ -2508,9 +2508,9 @@ describe('PhoneSyncSpaceScreen', () => {
       mediaType: 'image',
       localPath: 'ph://asset-001',
       thumbnailUrl:
-        'http://192.168.1.100:39394/resources/mobile/received/thumbnail?fileKey=received-1',
+        'http://192.168.1.100:39594/resources/mobile/received/thumbnail?fileKey=received-1',
       previewUrl:
-        'http://192.168.1.100:39394/resources/mobile/received/preview?fileKey=received-1',
+        'http://192.168.1.100:39594/resources/mobile/received/preview?fileKey=received-1',
       savedToPhotos: true,
     });
     expect(alertSpy).toHaveBeenCalledWith(
@@ -2558,7 +2558,7 @@ describe('PhoneSyncSpaceScreen', () => {
 
     await waitFor(() => {
       expect(mockDownloadReceivedLibraryItem).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
+        { host: '192.168.1.100', port: 39594 },
         expect.objectContaining({ fileKey: 'received/alpha.jpg' }),
       );
     });
@@ -2615,7 +2615,7 @@ describe('PhoneSyncSpaceScreen', () => {
 
     await waitFor(() => {
       expect(mockDownloadReceivedLibraryItem).toHaveBeenCalledWith(
-        { host: '192.168.1.100', port: 39394 },
+        { host: '192.168.1.100', port: 39594 },
         expect.objectContaining({ fileKey: 'received/notes.txt' }),
       );
     });

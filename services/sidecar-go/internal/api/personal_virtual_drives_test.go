@@ -364,8 +364,8 @@ func newWindowsPersonalTestServer(t *testing.T, roots []personalDriveRoot, perso
 		personalShareDir = defaultPersonal
 	}
 	cfg := &config.Config{
-		HTTPPort:              39394,
-		TCPPort:               39393,
+		HTTPPort:              39594,
+		TCPPort:               39593,
 		DataDir:               dataDir,
 		ReceiveDir:            filepath.Join(dataDir, "received"),
 		PersonalShareDir:      personalShareDir,

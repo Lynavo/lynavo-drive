@@ -192,7 +192,7 @@ describe('SettingsScreen', () => {
       deviceName: 'Studio Mac',
       deviceAlias: 'Edit Bay',
       host: '192.168.1.20',
-      port: 39393,
+      port: 39593,
       connectionState: 'connected',
       pairingId: 'pairing-1',
       shareEnabled: true,

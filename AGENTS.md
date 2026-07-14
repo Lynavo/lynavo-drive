@@ -257,8 +257,8 @@ what would run.
 
 ## Sidecar HTTP API Ports
 
-- TCP/LMUP protocol port: **39393**
-- Sidecar HTTP API port: **39394**
+- TCP/LMUP protocol port: **39593**
+- Sidecar HTTP API port: **39594**
 - Both ports are defined in `@lynavo-drive/contracts` as `PROTOCOL_PORT` and
   `SIDECAR_HTTP_PORT`.
 

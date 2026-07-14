@@ -1,5 +1,5 @@
-http_port: 39394
-tcp_port: 39393
+http_port: 39594
+tcp_port: 39593
 data_dir: ''
 receive_dir: ''
 log_level: 'info'

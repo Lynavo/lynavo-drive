@@ -150,7 +150,7 @@ Minimum local checks:
    exists in the unpacked app.
 2. The installer writes `Lynavo Drive Sidecar TCP`,
    `Lynavo Drive Sidecar HTTP`, and `Lynavo Drive mDNS UDP` firewall rules
-   for ports `39393/TCP`, `39394/TCP`, and `5353/UDP`.
+   for ports `39593/TCP`, `39594/TCP`, and `5353/UDP`.
 
 The OSS source package does not redistribute Apple Bonjour runtime binaries.
 Windows builds may include `dns-sd.exe` and `dnssd.dll` only when those files are

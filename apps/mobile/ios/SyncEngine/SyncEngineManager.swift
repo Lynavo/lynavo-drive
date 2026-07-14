@@ -1079,7 +1079,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         {
             try await session.connect(
                 host: preferredHost,
-                port: device?.port ?? fallbackPort ?? 39393
+                port: device?.port ?? fallbackPort ?? 39593
             )
             return
         }
@@ -1088,7 +1088,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
            let usableFallbackHost {
             try await session.connect(
                 host: usableFallbackHost,
-                port: fallbackPort ?? 39393
+                port: fallbackPort ?? 39593
             )
             return
         }
@@ -1101,7 +1101,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         if let usableFallbackHost {
             try await session.connect(
                 host: usableFallbackHost,
-                port: fallbackPort ?? 39393
+                port: fallbackPort ?? 39593
             )
             return
         }
@@ -2797,7 +2797,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let portValue = lynavoIntSetting(
             envKey: "LYNAVO_UPLOAD_FORCE_PORT",
             userDefaultsKey: "LynavoDriveUploadForcePort"
-        ) ?? 39393
+        ) ?? 39593
         let clampedPort = min(max(portValue, 1), Int(UInt16.max))
         return (host: host, port: UInt16(clampedPort))
     }
@@ -6056,7 +6056,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         var components = URLComponents()
         components.queryItems = queryItems.isEmpty ? nil : queryItems
         let querySuffix = components.percentEncodedQuery.map { "?\($0)" } ?? ""
-        let urlStr = "http://\(hostPart):39394\(path)\(querySuffix)"
+        let urlStr = "http://\(hostPart):39594\(path)\(querySuffix)"
 
         guard let url = URL(string: urlStr) else {
             throw SyncEngineError.networkError("Invalid sidecar URL for path \(path)")
@@ -6093,7 +6093,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         let expectedDeviceId = binding.deviceId
         let expectedPairingToken = resolvedPairingToken(for: binding)
         let hostPart = host.contains(":") ? "[\(host)]" : host
-        let portPart = 39394
+        let portPart = 39594
         let urlStr = "http://\(hostPart):\(portPart)/presence/\(clientId)"
         guard let url = URL(string: urlStr) else { return }
         var request = URLRequest(url: url)
@@ -6207,7 +6207,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
     ) async -> Bool {
         let clientId = bindingService.getOrCreateClientId()
         let hostPart = host.contains(":") ? "[\(host)]" : host
-        guard let url = URL(string: "http://\(hostPart):39394/presence/\(clientId)") else {
+        guard let url = URL(string: "http://\(hostPart):39594/presence/\(clientId)") else {
             return false
         }
         var request = URLRequest(url: url)
@@ -6825,7 +6825,7 @@ class SyncEngineManager: NSObject, DiscoveryServiceDelegate, PhotoScannerDelegat
         var components = URLComponents()
         components.scheme = "http"
         components.host = host
-        components.port = 39394
+        components.port = 39594
         components.path = "/health"
         guard let url = components.url else {
             return false

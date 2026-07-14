@@ -128,7 +128,7 @@ pnpm dev:mobile:android
 ### 1. 行動端應用程式找不到我的桌面裝置（mDNS 裝置探索失敗）
 
 - **檢查網路**：確保行動端和桌面端皆處於同一個區域網路 (LAN)。
-- **Windows 防火牆**：驗證 Windows Defender 防火牆是否允許連接埠 `39393` (TCP/LMUP 檔案傳輸) 和 `39394` (HTTP API) 的連入流量。
+- **Windows 防火牆**：驗證 Windows Defender 防火牆是否允許連接埠 `39593` (TCP/LMUP 檔案傳輸) 和 `39594` (HTTP API) 的連入流量。
 - **Bonjour 執行環境**：開源建置版本不重新散布 Apple Bonjour。請確認 Windows 已安裝 Bonjour，否則使用相容於 zeroconf 的備援方案。
 
 ### 2. 為什麼我的一些 iCloud 照片卡住 / 無法傳輸？
@@ -169,8 +169,8 @@ Mobile (RN UI on iOS / Android)
   ├── iOS: Swift SyncEngine
   └── Android: Kotlin NativeSyncEngine
   ├── Bonjour/mDNS discover
-  ├── LMUP/TCP :39393
-  └── Presence/HTTP :39394
+  ├── LMUP/TCP :39593
+  └── Presence/HTTP :39594
                 │
                 ▼
 Desktop (Electron + Go sidecar, macOS / Windows)

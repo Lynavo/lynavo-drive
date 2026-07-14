@@ -241,6 +241,6 @@ test('Windows installer uses Lynavo Drive firewall rule identities', () => {
   assert.match(installer, /!define SF_RULE_TCP\s+"Lynavo Drive Sidecar TCP"/);
   assert.match(installer, /!define SF_RULE_HTTP\s+"Lynavo Drive Sidecar HTTP"/);
   assert.match(installer, /!define SF_RULE_MDNS\s+"Lynavo Drive mDNS UDP"/);
-  assert.match(installer, /description="Lynavo Drive sidecar file transfer \(TCP 39393\)"/);
+  assert.match(installer, /description="Lynavo Drive sidecar file transfer \(TCP 39593\)"/);
   assert.match(installer, /lynavo-drive-sidecar\.exe/);
 });

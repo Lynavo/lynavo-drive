@@ -310,7 +310,7 @@ class SharedFilesService {
     /// The resolved sidecar host IP address (set after connection is established).
     var sidecarHost: String?
 
-    private static let sidecarHttpPort = 39394
+    private static let sidecarHttpPort = 39594
 
     private lazy var urlSession: URLSession = {
         let config = URLSessionConfiguration.default

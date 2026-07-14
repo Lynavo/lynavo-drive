@@ -197,8 +197,8 @@ acceptance.
 
 1. Fresh install from a local Windows package.
 2. Confirm `Lynavo Drive Sidecar TCP`, `Lynavo Drive Sidecar HTTP`, and
-   `Lynavo Drive mDNS UDP` firewall rules exist and cover `39393/TCP`,
-   `39394/TCP`, and `5353/UDP`.
+   `Lynavo Drive mDNS UDP` firewall rules exist and cover `39593/TCP`,
+   `39594/TCP`, and `5353/UDP`.
 3. The settings page shows Bonjour available state or zeroconf-compatible
    fallback state.
 4. Mobile can discover and pair.
@@ -216,7 +216,7 @@ Local package verification:
 2. Confirm a `.deb` artifact is generated.
 3. Fresh install and launch the app.
 4. Confirm sidecar health becomes healthy.
-5. Confirm `39393/TCP` and `39394/TCP` are listening, and the `5353/UDP`
+5. Confirm `39593/TCP` and `39594/TCP` are listening, and the `5353/UDP`
    discovery path works according to current implementation.
 
 Maintainer experimental:

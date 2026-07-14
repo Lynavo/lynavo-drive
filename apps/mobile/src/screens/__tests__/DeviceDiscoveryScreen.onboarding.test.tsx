@@ -161,7 +161,7 @@ jest.mock('../../stores/recent-desktops-store', () => ({
         desktopDeviceId: 'studio-mac',
         desktopName: 'Studio Mac',
         host: '192.168.31.8',
-        port: 39393,
+        port: 39593,
         authorizationStatus: 'authorized',
       },
     ],
@@ -542,7 +542,7 @@ describe('DeviceDiscoveryScreen onboarding', () => {
             name: 'Studio Mac',
             ip: '192.168.31.8',
             type: 'mac',
-            port: 39393,
+            port: 39593,
           },
         ]);
         return { remove: jest.fn() } as any;
@@ -567,7 +567,7 @@ describe('DeviceDiscoveryScreen onboarding', () => {
             name: 'Studio Mac',
             ip: '192.168.31.8',
             type: 'mac',
-            port: 39393,
+            port: 39593,
           },
         ]);
         return { remove: jest.fn() } as any;
@@ -592,21 +592,21 @@ describe('DeviceDiscoveryScreen onboarding', () => {
             name: 'Mini4',
             ip: '172.16.20.108',
             type: 'mac',
-            port: 39393,
+            port: 39593,
           },
           {
             deviceId: 'Mini4',
             name: 'Mini4',
-            ip: '172.16.20.108:39393',
+            ip: '172.16.20.108:39593',
             type: 'mac',
-            port: 39393,
+            port: 39593,
           },
           {
             deviceId: 'fallback-172.16.20.108',
             name: '172.16.20.108',
-            ip: '172.16.20.108:39393',
+            ip: '172.16.20.108:39593',
             type: 'mac',
-            port: 39393,
+            port: 39593,
           },
         ]);
         return { remove: jest.fn() } as any;
@@ -618,7 +618,7 @@ describe('DeviceDiscoveryScreen onboarding', () => {
       expect(screen.getByText('1 device found')).toBeTruthy();
     });
     expect(screen.getAllByText('Mini4')).toHaveLength(1);
-    expect(screen.queryByText('172.16.20.108:39393')).toBeNull();
+    expect(screen.queryByText('172.16.20.108:39593')).toBeNull();
   });
 
   it('does not count recent-only desktops as online devices in switch mode', async () => {
@@ -631,7 +631,7 @@ describe('DeviceDiscoveryScreen onboarding', () => {
     });
 
     expect(screen.queryByText('Studio Mac')).toBeNull();
-    expect(screen.queryByText('192.168.31.8:39393')).toBeNull();
+    expect(screen.queryByText('192.168.31.8:39593')).toBeNull();
     expect(screen.queryByText('1 device found')).toBeNull();
   });
 
@@ -645,7 +645,7 @@ describe('DeviceDiscoveryScreen onboarding', () => {
     });
 
     expect(screen.getByText('192.168.31.8')).toBeTruthy();
-    expect(screen.queryByText('192.168.31.8:39393')).toBeNull();
+    expect(screen.queryByText('192.168.31.8:39593')).toBeNull();
   });
 
   it('direct-reconnects a known discovered desktop in switch mode', async () => {
@@ -665,7 +665,7 @@ describe('DeviceDiscoveryScreen onboarding', () => {
             name: 'Studio Mac',
             ip: '192.168.31.8',
             type: 'mac',
-            port: 39393,
+            port: 39593,
           },
         ]);
         return { remove: jest.fn() } as any;
@@ -686,7 +686,7 @@ describe('DeviceDiscoveryScreen onboarding', () => {
       expect(mockPairDevice).toHaveBeenCalledWith({
         deviceId: 'studio-mac',
         host: '192.168.31.8',
-        port: 39393,
+        port: 39593,
         connectionCode: '',
       });
     });
@@ -694,7 +694,7 @@ describe('DeviceDiscoveryScreen onboarding', () => {
       desktopDeviceId: 'studio-mac',
       desktopName: 'Studio Mac',
       host: '192.168.31.8',
-      port: 39393,
+      port: 39593,
       authorizationStatus: 'authorized',
     });
     expect(mockDispatch).toHaveBeenCalledWith(
@@ -726,7 +726,7 @@ describe('DeviceDiscoveryScreen onboarding', () => {
             name: 'Studio Mac',
             ip: '192.168.31.8',
             type: 'mac',
-            port: 39393,
+            port: 39593,
           },
         ]);
         return { remove: jest.fn() } as any;
@@ -749,7 +749,7 @@ describe('DeviceDiscoveryScreen onboarding', () => {
     expect(mockPairDevice).toHaveBeenCalledWith({
       deviceId: 'studio-mac',
       host: '192.168.31.8',
-      port: 39393,
+      port: 39593,
       connectionCode: '',
     });
     expect(mockAddDesktop).not.toHaveBeenCalled();
@@ -858,7 +858,7 @@ describe('DeviceDiscoveryScreen onboarding', () => {
       expect(mockPairDevice).toHaveBeenCalledWith({
         deviceId: 'studio-mac',
         host: '192.168.31.8',
-        port: 39393,
+        port: 39593,
         connectionCode: '',
       });
     });
@@ -891,7 +891,7 @@ describe('DeviceDiscoveryScreen onboarding', () => {
       expect(mockPairDevice).toHaveBeenCalledWith({
         deviceId: 'studio-mac',
         host: '192.168.31.8',
-        port: 39393,
+        port: 39593,
         connectionCode: '',
       });
     });
@@ -929,7 +929,7 @@ describe('DeviceDiscoveryScreen onboarding', () => {
       expect(mockPairDevice).toHaveBeenCalledWith({
         deviceId: 'manual-192.168.31.44',
         host: '192.168.31.44',
-        port: 39393,
+        port: 39593,
         connectionCode: 'A8X2K9',
       });
     });
@@ -939,7 +939,7 @@ describe('DeviceDiscoveryScreen onboarding', () => {
         desktopDeviceId: 'manual-192.168.31.44',
         desktopName: '192.168.31.44',
         host: '192.168.31.44',
-        port: 39393,
+        port: 39593,
         authorizationStatus: 'authorized',
       });
     });

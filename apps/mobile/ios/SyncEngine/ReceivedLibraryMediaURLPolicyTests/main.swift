@@ -8,7 +8,7 @@ func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
 }
 
 func mediaURL(fileKey: String, kind: String) -> String? {
-    "http://192.168.1.100:39394/resources/mobile/received/\(kind)?fileKey=\(fileKey)"
+    "http://192.168.1.100:39594/resources/mobile/received/\(kind)?fileKey=\(fileKey)"
 }
 
 let videoItem: [String: Any] = [
@@ -21,15 +21,15 @@ let videoItem: [String: Any] = [
 let enrichedVideo = ReceivedLibraryMediaURLPolicy.enrich(item: videoItem, mediaURL: mediaURL)
 
 expect(
-    enrichedVideo["thumbnailUrl"] as? String == "http://192.168.1.100:39394/resources/mobile/received/thumbnail?fileKey=video-key",
+    enrichedVideo["thumbnailUrl"] as? String == "http://192.168.1.100:39594/resources/mobile/received/thumbnail?fileKey=video-key",
     "received videos must expose an absolute thumbnail URL for React Native Image"
 )
 expect(
-    enrichedVideo["previewUrl"] as? String == "http://192.168.1.100:39394/resources/mobile/received/preview?fileKey=video-key",
+    enrichedVideo["previewUrl"] as? String == "http://192.168.1.100:39594/resources/mobile/received/preview?fileKey=video-key",
     "received videos must expose an absolute preview URL"
 )
 expect(
-    enrichedVideo["streamUrl"] as? String == "http://192.168.1.100:39394/resources/mobile/received/stream?fileKey=video-key",
+    enrichedVideo["streamUrl"] as? String == "http://192.168.1.100:39594/resources/mobile/received/stream?fileKey=video-key",
     "received videos must expose an absolute stream URL"
 )
 
@@ -42,11 +42,11 @@ let heicItem: [String: Any] = [
 let enrichedHEIC = ReceivedLibraryMediaURLPolicy.enrich(item: heicItem, mediaURL: mediaURL)
 
 expect(
-    enrichedHEIC["thumbnailUrl"] as? String == "http://192.168.1.100:39394/resources/mobile/received/thumbnail?fileKey=heic-key",
+    enrichedHEIC["thumbnailUrl"] as? String == "http://192.168.1.100:39594/resources/mobile/received/thumbnail?fileKey=heic-key",
     "received HEIC images must keep using an absolute thumbnail URL"
 )
 expect(
-    enrichedHEIC["previewUrl"] as? String == "http://192.168.1.100:39394/resources/mobile/received/preview?fileKey=heic-key",
+    enrichedHEIC["previewUrl"] as? String == "http://192.168.1.100:39594/resources/mobile/received/preview?fileKey=heic-key",
     "received HEIC images must expose an absolute preview URL"
 )
 

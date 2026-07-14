@@ -43,16 +43,16 @@ Desktop packages include one sidecar binary:
 
 ## 2. Standard Ports
 
-- TCP: `39393`
-- HTTP: `39394`
+- TCP: `39593`
+- HTTP: `39594`
 
 If these two ports are not listening, most sync issues do not need higher-layer
 analysis yet.
 
 The Windows installer should currently write these inbound firewall rules:
 
-- `Lynavo Drive Sidecar TCP`: `39393/TCP`, LMUP file transfer and `HELLO`
-- `Lynavo Drive Sidecar HTTP`: `39394/TCP`, sidecar HTTP API, `/health`,
+- `Lynavo Drive Sidecar TCP`: `39593/TCP`, LMUP file transfer and `HELLO`
+- `Lynavo Drive Sidecar HTTP`: `39594/TCP`, sidecar HTTP API, `/health`,
   mobile discovery fallback
 - `Lynavo Drive mDNS UDP`: `5353/UDP`, Bonjour/mDNS discovery
 
@@ -63,14 +63,14 @@ The Windows installer should currently write these inbound firewall rules:
 macOS:
 
 ```bash
-lsof -nP -iTCP:39393 -sTCP:LISTEN
-lsof -nP -iTCP:39394 -sTCP:LISTEN
+lsof -nP -iTCP:39593 -sTCP:LISTEN
+lsof -nP -iTCP:39594 -sTCP:LISTEN
 ```
 
 Windows (PowerShell):
 
 ```powershell
-Get-NetTCPConnection -State Listen -LocalPort 39393,39394 |
+Get-NetTCPConnection -State Listen -LocalPort 39593,39594 |
   Select-Object LocalAddress,LocalPort,OwningProcess
 ```
 
@@ -123,7 +123,7 @@ directory or point `LYNAVO_BONJOUR_DIR` at a locally permitted source.
 Symptoms:
 
 - Desktop has exited.
-- The local machine still listens on `39393 / 39394`.
+- The local machine still listens on `39593 / 39594`.
 - `ppid = 1`
 
 Cause:
@@ -208,8 +208,8 @@ netsh advfirewall firewall show rule name="Lynavo Drive mDNS UDP"
 Fix principles:
 
 1. First confirm `Bonjour Service` is installed and `Running`.
-2. Then confirm firewall rules exist and are enabled for `39393/TCP`,
-   `39394/TCP`, and `5353/UDP`.
+2. Then confirm firewall rules exist and are enabled for `39593/TCP`,
+   `39594/TCP`, and `5353/UDP`.
 3. If rules are missing, prefer reinstalling the latest Windows package so the
    NSIS installer script writes them again.
 
@@ -243,8 +243,8 @@ Then confirm:
 macOS:
 
 ```bash
-lsof -nP -iTCP:39393 -sTCP:LISTEN
-lsof -nP -iTCP:39394 -sTCP:LISTEN
+lsof -nP -iTCP:39593 -sTCP:LISTEN
+lsof -nP -iTCP:39594 -sTCP:LISTEN
 ```
 
 Windows (PowerShell):
@@ -254,7 +254,7 @@ Get-Process lynavo-drive-sidecar,lynavo-drive-sidecar -ErrorAction SilentlyConti
 Get-CimInstance Win32_Process -Filter "Name='dns-sd.exe'" |
   Where-Object { $_.CommandLine -like '*_lynavodrive._tcp*' } |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
-Get-NetTCPConnection -State Listen -LocalPort 39393,39394
+Get-NetTCPConnection -State Listen -LocalPort 39593,39594
 ```
 
 Expected result:

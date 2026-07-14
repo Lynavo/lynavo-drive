@@ -203,8 +203,8 @@ func testEnv(t *testing.T) (*store.Store, *config.Config, *events.Hub) {
 	os.MkdirAll(receiveDir, 0755)
 
 	cfg := &config.Config{
-		HTTPPort:              39394,
-		TCPPort:               39393,
+		HTTPPort:              39594,
+		TCPPort:               39593,
 		DataDir:               tmpDir,
 		ReceiveDir:            receiveDir,
 		LogLevel:              "debug",

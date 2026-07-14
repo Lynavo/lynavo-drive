@@ -98,7 +98,7 @@ describe('HistoryScreen', () => {
     await waitFor(() => {
       expect(mockedListHistory).toHaveBeenCalledWith({
         host: '127.0.0.1',
-        port: 39394,
+        port: 39594,
       });
     });
 
@@ -247,7 +247,7 @@ describe('HistoryScreen', () => {
     await waitFor(() => {
       expect(mockedListHistory).toHaveBeenCalledWith({
         host: '192.168.10.20',
-        port: 39394,
+        port: 39594,
       });
     });
 

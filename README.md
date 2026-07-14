@@ -149,7 +149,7 @@ Pair the applications:
 ### 1. The mobile app cannot find my desktop client (mDNS discovery failure)
 
 - **Check Network**: Ensure both mobile and desktop are on the same local LAN.
-- **Windows Firewall**: Verify that Windows Defender Firewall allows incoming traffic for ports `39393` (TCP/LMUP file transport) and `39394` (HTTP API).
+- **Windows Firewall**: Verify that Windows Defender Firewall allows incoming traffic for ports `39593` (TCP/LMUP file transport) and `39594` (HTTP API).
 - **Bonjour Runtime**: The OSS build doesn't redistribute Apple Bonjour. Ensure Bonjour is installed on Windows, or rely on the zeroconf-compatible fallback.
 
 ### 2. Why are some of my iCloud photos stuck/not transferring?
@@ -193,8 +193,8 @@ Mobile (RN UI on iOS / Android)
   ├── iOS: Swift SyncEngine
   └── Android: Kotlin NativeSyncEngine
   ├── Bonjour/mDNS discover
-  ├── LMUP/TCP :39393
-  └── Presence/HTTP :39394
+  ├── LMUP/TCP :39593
+  └── Presence/HTTP :39594
                 │
                 ▼
 Desktop (Electron + Go sidecar, macOS / Windows)

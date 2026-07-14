@@ -38,7 +38,7 @@ const mockUseRoute = jest.fn();
 const defaultRouteParams = {
   deviceId: 'device-1',
   host: '192.168.1.8',
-  port: 39393,
+  port: 39593,
   deviceName: 'Studio Mac',
 };
 
@@ -122,7 +122,7 @@ async function renderPrefilledPairingFailure(error: unknown) {
   expect(mockPairDevice).toHaveBeenCalledWith({
     deviceId: 'device-1',
     host: '192.168.1.8',
-    port: 39393,
+    port: 39593,
     connectionCode: '123456',
   });
 
@@ -261,7 +261,7 @@ describe('CodeVerifyScreen', () => {
     expect(mockPairDevice).toHaveBeenCalledWith({
       deviceId: 'device-1',
       host: '192.168.1.8',
-      port: 39393,
+      port: 39593,
       connectionCode: '123456',
     });
     expect(alertSpy).toHaveBeenCalledWith(

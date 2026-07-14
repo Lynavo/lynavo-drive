@@ -12,12 +12,13 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import type {
-  AutoUploadState,
-  BindingStateDTO,
-  HistoryLedgerCardDTO,
-  ReadOnlyQueueItemDTO,
-  SyncSummaryDTO,
+import {
+  PROTOCOL_PORT,
+  type AutoUploadState,
+  type BindingStateDTO,
+  type HistoryLedgerCardDTO,
+  type ReadOnlyQueueItemDTO,
+  type SyncSummaryDTO,
 } from '@lynavo-drive/contracts';
 
 import { BottomTabBar } from '../components/BottomTabBar';
@@ -550,7 +551,7 @@ function normalizeBindingState(value: unknown): BindingStateDTO | null {
     deviceName,
     deviceAlias: readStringField(value, 'deviceAlias') ?? deviceName,
     host: readStringField(value, 'host') ?? '',
-    port: readNumberField(value, 'port') ?? 39393,
+    port: readNumberField(value, 'port') ?? PROTOCOL_PORT,
     connectionState: isConnectionState(connectionStateValue)
       ? connectionStateValue
       : 'bound',

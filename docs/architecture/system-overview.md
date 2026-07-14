@@ -58,8 +58,8 @@ Responsibilities:
 
 Key ports:
 
-- TCP/LMUP: `39393`
-- HTTP API: `39394`
+- TCP/LMUP: `39593`
+- HTTP API: `39594`
 
 Key directories:
 

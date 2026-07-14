@@ -6480,8 +6480,8 @@ class NativeSyncEngineModule(
     private const val PAIRING_CONTROL_RESTART_DELAY_MS = 10_000L
     private const val HEADER_SIZE = 12
     private const val MAX_BODY_LENGTH = 64 * 1024 * 1024
-    private const val DEFAULT_PROTOCOL_PORT = 39_393
-    private const val DEFAULT_SIDECAR_HTTP_PORT = 39_394
+    private const val DEFAULT_PROTOCOL_PORT = 39_593
+    private const val DEFAULT_SIDECAR_HTTP_PORT = 39_594
     private const val BONJOUR_SERVICE_TYPE = "_lynavodrive._tcp"
     private const val SIDECAR_HEALTH_SERVICE = "lynavo-drive-sidecar"
     private const val DISCOVERY_PROBE_TIMEOUT_MS = 2_000

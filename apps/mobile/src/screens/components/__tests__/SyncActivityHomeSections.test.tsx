@@ -114,15 +114,15 @@ describe('RecentDownloadsSection', () => {
               filename: 'Desktop-Mockup.png',
               mediaType: 'image',
               completedAt: '2026-06-17T08:30:00.000Z',
-              previewUrl: 'http://127.0.0.1:39394/preview/image.png',
+              previewUrl: 'http://127.0.0.1:39594/preview/image.png',
             },
             {
               recordId: 'rec-video',
               filename: 'Client-Handoff.mov',
               mediaType: 'video',
               completedAt: '2026-06-17T08:31:00.000Z',
-              thumbnailUrl: 'http://127.0.0.1:39394/thumbnail/video.jpg',
-              streamUrl: 'http://127.0.0.1:39394/stream/video.mov',
+              thumbnailUrl: 'http://127.0.0.1:39594/thumbnail/video.jpg',
+              streamUrl: 'http://127.0.0.1:39594/stream/video.mov',
             },
             {
               recordId: 'rec-fallback',
@@ -144,10 +144,10 @@ describe('RecentDownloadsSection', () => {
       testID: 'recent-download-thumbnail-video',
     });
     expect(imageSources).toContainEqual({
-      uri: 'http://127.0.0.1:39394/preview/image.png',
+      uri: 'http://127.0.0.1:39594/preview/image.png',
     });
     expect(imageSources).toContainEqual({
-      uri: 'http://127.0.0.1:39394/thumbnail/video.jpg',
+      uri: 'http://127.0.0.1:39594/thumbnail/video.jpg',
     });
     expect(videoNodes).toHaveLength(0);
 

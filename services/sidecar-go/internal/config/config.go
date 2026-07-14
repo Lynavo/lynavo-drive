@@ -33,8 +33,8 @@ type Config struct {
 
 func Load(path string) (*Config, error) {
 	cfg := &Config{
-		HTTPPort:              39394,
-		TCPPort:               39393,
+		HTTPPort:              39594,
+		TCPPort:               39593,
 		LogLevel:              "info",
 		LowDiskThresholdBytes: 500 * 1024 * 1024,
 	}

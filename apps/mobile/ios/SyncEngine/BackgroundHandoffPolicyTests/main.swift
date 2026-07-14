@@ -31,7 +31,7 @@ func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
 let stored = StoredBinding(
     serverId: "desktop-1",
     sidecarHost: "192.168.1.20",
-    port: 39393,
+    port: 39593,
     pairingTokenKeychainRef: "token-ref"
 )
 
@@ -41,7 +41,7 @@ let persisted = BindingRecord(
     deviceAlias: nil,
     deviceType: "mac",
     host: "192.168.1.21",
-    port: 39393,
+    port: 39593,
     pairingId: "pairing-id",
     pairingTokenKeychainRef: "persisted-token-ref",
     shareName: nil,
@@ -68,7 +68,7 @@ let invalid = BindingRecord(
     deviceAlias: nil,
     deviceType: "mac",
     host: "192.168.1.21",
-    port: 39393,
+    port: 39593,
     pairingId: "pairing-id",
     pairingTokenKeychainRef: "persisted-token-ref",
     shareName: nil,

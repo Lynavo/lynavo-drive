@@ -40,7 +40,7 @@ describe('SyncEngineModule shared bridge wrappers', () => {
       deviceName: 'Studio Mac',
       deviceAlias: 'Studio Mac',
       host: '192.168.1.20',
-      port: 39393,
+      port: 39593,
       connectionState: 'connected',
       pairingId: 'pairing-1',
       shareEnabled: true,
@@ -327,11 +327,11 @@ describe('SyncEngineModule shared bridge wrappers', () => {
       downloadSharedFile: jest.fn().mockResolvedValue(downloadResult),
       getSharedFileStreamUrl: jest
         .fn()
-        .mockResolvedValue('http://127.0.0.1:39394/personal/stream/notes.txt'),
+        .mockResolvedValue('http://127.0.0.1:39594/personal/stream/notes.txt'),
       getPersonalFileThumbnailUrl: jest
         .fn()
         .mockResolvedValue(
-          'http://127.0.0.1:39394/personal/thumbnail/notes.txt',
+          'http://127.0.0.1:39594/personal/thumbnail/notes.txt',
         ),
       prepareSharedFilePreview: jest.fn().mockResolvedValue('/cache/notes.txt'),
     };
@@ -345,10 +345,10 @@ describe('SyncEngineModule shared bridge wrappers', () => {
     ).resolves.toEqual(downloadResult);
     await expect(
       syncEngine.getDirectoryFileStreamUrl('personal', 'Desktop/notes.txt'),
-    ).resolves.toBe('http://127.0.0.1:39394/personal/stream/notes.txt');
+    ).resolves.toBe('http://127.0.0.1:39594/personal/stream/notes.txt');
     await expect(
       syncEngine.getPersonalFileThumbnailUrl('Desktop/notes.txt'),
-    ).resolves.toBe('http://127.0.0.1:39394/personal/thumbnail/notes.txt');
+    ).resolves.toBe('http://127.0.0.1:39594/personal/thumbnail/notes.txt');
     await expect(
       syncEngine.prepareDirectoryFilePreview(
         'personal',

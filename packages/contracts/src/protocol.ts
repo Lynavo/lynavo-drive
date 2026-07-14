@@ -2,8 +2,8 @@
 
 export const PROTOCOL_VERSION = 'LMUP/2';
 export { APP_COMPATIBILITY_VERSION } from './version.generated';
-export const PROTOCOL_PORT = 39393;
-export const SIDECAR_HTTP_PORT = 39394;
+export const PROTOCOL_PORT = 39593;
+export const SIDECAR_HTTP_PORT = 39594;
 export const BONJOUR_SERVICE_TYPE = '_lynavodrive._tcp';
 export const CHUNK_SIZE = 8 * 1024 * 1024; // 8 MiB
 export const HEARTBEAT_INTERVAL_MS = 15_000;

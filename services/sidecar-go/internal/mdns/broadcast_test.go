@@ -19,7 +19,7 @@ func testConfig() BroadcastConfig {
 		DeviceName:   "WorkStation-A",
 		DeviceType:   "mac",
 		DeviceIP:     "192.168.1.10",
-		TCPPort:      39393,
+		TCPPort:      39593,
 		Proto:        2,
 		ShareEnabled: true,
 		ShareName:    "Lynavo Drive",
@@ -306,7 +306,7 @@ func TestServiceIPs(t *testing.T) {
 }
 
 func TestParseLynavoBroadcastPID(t *testing.T) {
-	pid, ok := parseLynavoBroadcastPID("29320 dns-sd -R bloomingdeMacBook-Pro-Online _lynavodrive._tcp local. 39393 id=abc")
+	pid, ok := parseLynavoBroadcastPID("29320 dns-sd -R bloomingdeMacBook-Pro-Online _lynavodrive._tcp local. 39593 id=abc")
 	if !ok {
 		t.Fatal("expected Lynavo Drive dns-sd process to match")
 	}
@@ -316,7 +316,7 @@ func TestParseLynavoBroadcastPID(t *testing.T) {
 }
 
 func TestParseLynavoBroadcastPID_WindowsCommandLine(t *testing.T) {
-	line := `6576 C:\dev\LynavoDrive\apps\desktop\resources\dns-sd.exe -R PS2021DFYQCEAF _lynavodrive._tcp local. 39393 id=c16752f3-c01d name=PS2021DFYQCEAF type=win proto=2 auth=code share=0 shareName=Lynavo%20Drive ip=192.168.0.1`
+	line := `6576 C:\dev\LynavoDrive\apps\desktop\resources\dns-sd.exe -R PS2021DFYQCEAF _lynavodrive._tcp local. 39593 id=c16752f3-c01d name=PS2021DFYQCEAF type=win proto=2 auth=code share=0 shareName=Lynavo%20Drive ip=192.168.0.1`
 	pid, ok := parseLynavoBroadcastPID(line)
 	if !ok {
 		t.Fatal("expected Windows Lynavo Drive dns-sd process to match")
@@ -502,8 +502,8 @@ func TestParseLynavoBroadcastPID_IgnoresOtherProcesses(t *testing.T) {
 		"",
 		"29320 /Applications/Other.app/Contents/MacOS/Other",
 		"29320 dns-sd -R some-service _other._tcp local. 12345",
-		"29320 dns-sd -R bloom _legacy._tcp local. 39393",
-		"not-a-pid dns-sd -R bloom _lynavodrive._tcp local. 39393",
+		"29320 dns-sd -R bloom _legacy._tcp local. 39593",
+		"not-a-pid dns-sd -R bloom _lynavodrive._tcp local. 39593",
 	}
 
 	for _, input := range cases {
@@ -548,7 +548,7 @@ func TestNewBroadcaster_BonjourServiceDown(t *testing.T) {
 		DeviceName: "BonjourDownTest",
 		DeviceType: "win",
 		DeviceIP:   "192.168.1.10",
-		TCPPort:    39393,
+		TCPPort:    39593,
 		Proto:      2,
 		ShareName:  "TestDrop",
 	}
@@ -591,7 +591,7 @@ func TestZeroconfBroadcast_Discoverable(t *testing.T) {
 		DeviceName:   "DiscoverTest",
 		DeviceType:   "win",
 		DeviceIP:     "192.168.1.42",
-		TCPPort:      39393,
+		TCPPort:      39593,
 		Proto:        2,
 		ShareEnabled: true,
 		ShareName:    "TestDrop",

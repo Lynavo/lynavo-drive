@@ -85,8 +85,8 @@ func setupTestConnectionWithDoneAndServer(t *testing.T, withTCPServer bool) (cli
 	t.Helper()
 	tmpDir := t.TempDir()
 	cfg = &config.Config{
-		HTTPPort:              39394,
-		TCPPort:               39393,
+		HTTPPort:              39594,
+		TCPPort:               39593,
 		DataDir:               tmpDir,
 		ReceiveDir:            filepath.Join(tmpDir, "received"),
 		DeviceName:            "test-mac",
@@ -663,8 +663,8 @@ func TestAuthBlockedAfterNonceDoesNotSendExtraProtocolError(t *testing.T) {
 func TestHelloResponseAdvertisesWakeCapability(t *testing.T) {
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
-		HTTPPort:              39394,
-		TCPPort:               39393,
+		HTTPPort:              39594,
+		TCPPort:               39593,
 		DataDir:               tmpDir,
 		ReceiveDir:            filepath.Join(tmpDir, "received"),
 		DeviceName:            "test-mac",

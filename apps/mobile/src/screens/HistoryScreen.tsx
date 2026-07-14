@@ -11,9 +11,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useTranslation } from 'react-i18next';
-import type {
-  BindingStateDTO,
-  DesktopSyncRecordDTO,
+import {
+  SIDECAR_HTTP_PORT,
+  type BindingStateDTO,
+  type DesktopSyncRecordDTO,
 } from '@lynavo-drive/contracts';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { Icon } from '../components/Icon';
@@ -237,7 +238,7 @@ export function HistoryScreen() {
       }
 
       setDesktopIdentity(getDesktopHistoryIdentity(binding));
-      const desktop = { host, port: 39394 };
+      const desktop = { host, port: SIDECAR_HTTP_PORT };
       const result = await listHistory(desktop);
       const completedFiles = (result || []).filter(
         item => item.status === 'completed',

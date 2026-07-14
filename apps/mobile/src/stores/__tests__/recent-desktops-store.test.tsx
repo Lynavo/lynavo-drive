@@ -28,7 +28,7 @@ function TestComponent() {
             desktopDeviceId: 'device-new',
             desktopName: 'New PC',
             host: '192.168.1.15',
-            port: 39393,
+            port: 39593,
             authorizationStatus: 'requires_code',
           })
         }
@@ -68,7 +68,7 @@ describe('recent-desktops-store raw logic', () => {
         desktopDeviceId: 'device-1',
         desktopName: 'My Mac',
         host: '192.168.1.10',
-        port: 39393,
+        port: 39593,
         lastConnectedAt: new Date().toISOString(),
         authorizationStatus: 'authorized',
       },

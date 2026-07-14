@@ -222,11 +222,11 @@ describe('download-records-service', () => {
       filename: 'photo.jpg',
       mediaType: 'image/jpeg',
       thumbnailUrl:
-        'http://172.16.20.108:39394/personal/thumbnail/Desktop/photo.jpg?v=1&X-LynavoDrive-Auth=abc&X-LynavoDrive-Auth-Timestamp=2026-06-24T06:48:27.303Z&X-LynavoDrive-Auth-Nonce=xyz',
+        'http://172.16.20.108:39594/personal/thumbnail/Desktop/photo.jpg?v=1&X-LynavoDrive-Auth=abc&X-LynavoDrive-Auth-Timestamp=2026-06-24T06:48:27.303Z&X-LynavoDrive-Auth-Nonce=xyz',
       previewUrl:
-        'http://172.16.20.108:39394/personal/stream/Desktop/photo.jpg?access_token=tok&X-LynavoDrive-Auth=abc&X-LynavoDrive-Auth-Timestamp=2026-06-24T06:48:27.303Z&X-LynavoDrive-Auth-Nonce=xyz',
+        'http://172.16.20.108:39594/personal/stream/Desktop/photo.jpg?access_token=tok&X-LynavoDrive-Auth=abc&X-LynavoDrive-Auth-Timestamp=2026-06-24T06:48:27.303Z&X-LynavoDrive-Auth-Nonce=xyz',
       streamUrl:
-        'http://172.16.20.108:39394/personal/stream/Desktop/photo.jpg?access_token=tok&X-LynavoDrive-Auth=abc&X-LynavoDrive-Auth-Timestamp=2026-06-24T06:48:27.303Z&X-LynavoDrive-Auth-Nonce=xyz',
+        'http://172.16.20.108:39594/personal/stream/Desktop/photo.jpg?access_token=tok&X-LynavoDrive-Auth=abc&X-LynavoDrive-Auth-Timestamp=2026-06-24T06:48:27.303Z&X-LynavoDrive-Auth-Nonce=xyz',
       localPath: '/var/mobile/Containers/photo.jpg',
       savedToPhotos: true,
     });
@@ -250,11 +250,11 @@ describe('download-records-service', () => {
           filename: 'old.jpg',
           downloadedAt: '2026-06-24T06:48:27.303Z',
           thumbnailUrl:
-            'http://172.16.20.108:39394/personal/thumbnail/Desktop/old.jpg?v=1&X-LynavoDrive-Auth=stale',
+            'http://172.16.20.108:39594/personal/thumbnail/Desktop/old.jpg?v=1&X-LynavoDrive-Auth=stale',
           previewUrl:
-            'http://172.16.20.108:39394/personal/stream/Desktop/old.jpg?access_token=tok&X-LynavoDrive-Auth=stale',
+            'http://172.16.20.108:39594/personal/stream/Desktop/old.jpg?access_token=tok&X-LynavoDrive-Auth=stale',
           streamUrl:
-            'http://172.16.20.108:39394/personal/stream/Desktop/old.jpg?access_token=tok&X-LynavoDrive-Auth=stale',
+            'http://172.16.20.108:39594/personal/stream/Desktop/old.jpg?access_token=tok&X-LynavoDrive-Auth=stale',
           localPath: '/var/mobile/Containers/old.jpg',
         },
       ]),
