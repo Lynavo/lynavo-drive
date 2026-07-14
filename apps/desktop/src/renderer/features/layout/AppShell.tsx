@@ -4,6 +4,11 @@ import { Download, HelpCircle, Loader2, QrCode, RefreshCw, Smartphone } from 'lu
 import { QRCodeSVG } from 'qrcode.react';
 import { LYNAVO_WEB_BASE_URL } from '@lynavo-drive/contracts';
 import { Skeleton } from '@renderer/components/ui/skeleton';
+import { Dashboard } from '@renderer/features/dashboard/Dashboard';
+import { DevicesPage } from '@renderer/features/devices/DevicesPage';
+import { ReceivedLibraryPage } from '@renderer/features/library/ReceivedLibraryPage';
+import { RecordsPage } from '@renderer/features/records/RecordsPage';
+import { SettingsPage } from '@renderer/features/settings/SettingsPage';
 import { persistLocale } from '@renderer/i18n';
 import {
   isSupportedLocale,
@@ -19,16 +24,6 @@ import { installScrollbarActivityTracker } from '@renderer/hooks/scrollbar-activ
 import { Sidebar } from './Sidebar';
 import { SidecarStatusBanner } from './SidecarStatusBanner';
 
-const Dashboard = lazy(() =>
-  import('@renderer/features/dashboard/Dashboard').then((m) => ({
-    default: m.Dashboard,
-  })),
-);
-const SettingsPage = lazy(() =>
-  import('@renderer/features/settings/SettingsPage').then((m) => ({
-    default: m.SettingsPage,
-  })),
-);
 const HelpDialog = lazy(() =>
   import('@renderer/features/help/HelpDialog').then((m) => ({
     default: m.HelpDialog,
@@ -39,24 +34,9 @@ const DeviceDetailPage = lazy(() =>
     default: m.DeviceDetailPage,
   })),
 );
-const DevicesPage = lazy(() =>
-  import('@renderer/features/devices/DevicesPage').then((m) => ({
-    default: m.DevicesPage,
-  })),
-);
-const RecordsPage = lazy(() =>
-  import('@renderer/features/records/RecordsPage').then((m) => ({
-    default: m.RecordsPage,
-  })),
-);
 const SharedResourcesPage = lazy(() =>
   import('@renderer/features/shared/SharedResourcesPage').then((m) => ({
     default: m.SharedResourcesPage,
-  })),
-);
-const ReceivedLibraryPage = lazy(() =>
-  import('@renderer/features/library/ReceivedLibraryPage').then((m) => ({
-    default: m.ReceivedLibraryPage,
   })),
 );
 

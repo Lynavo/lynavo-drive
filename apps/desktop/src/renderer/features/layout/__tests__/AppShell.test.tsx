@@ -11,6 +11,14 @@ import i18n from '@renderer/i18n';
 import { INITIAL_SIDECAR_RUNTIME_STATE } from '../../../../shared/sidecar-runtime';
 import { AppShell, getTopActionsRight } from '../AppShell';
 
+const sidebarPageModuleLoads = vi.hoisted(() => ({
+  dashboard: vi.fn(),
+  devices: vi.fn(),
+  library: vi.fn(),
+  records: vi.fn(),
+  settings: vi.fn(),
+}));
+
 vi.mock('../Sidebar', () => ({
   Sidebar: () => <aside data-testid="sidebar" />,
 }));
@@ -19,13 +27,15 @@ vi.mock('../SidecarStatusBanner', () => ({
   SidecarStatusBanner: () => <div data-testid="sidecar-status-banner" />,
 }));
 
-vi.mock('@renderer/features/dashboard/Dashboard', () => ({
-  Dashboard: () => <main>DashboardPage</main>,
-}));
+vi.mock('@renderer/features/dashboard/Dashboard', () => {
+  sidebarPageModuleLoads.dashboard();
+  return { Dashboard: () => <main>DashboardPage</main> };
+});
 
-vi.mock('@renderer/features/settings/SettingsPage', () => ({
-  SettingsPage: () => <main>SettingsPage</main>,
-}));
+vi.mock('@renderer/features/settings/SettingsPage', () => {
+  sidebarPageModuleLoads.settings();
+  return { SettingsPage: () => <main>SettingsPage</main> };
+});
 
 vi.mock('@renderer/features/help/HelpDialog', () => ({
   HelpDialog: () => <div data-testid="help-dialog">HelpDialog</div>,
@@ -35,21 +45,24 @@ vi.mock('@renderer/features/device-detail/DeviceDetailPage', () => ({
   DeviceDetailPage: () => <main>DeviceDetailPage</main>,
 }));
 
-vi.mock('@renderer/features/devices/DevicesPage', () => ({
-  DevicesPage: () => <main>DevicesPage</main>,
-}));
+vi.mock('@renderer/features/devices/DevicesPage', () => {
+  sidebarPageModuleLoads.devices();
+  return { DevicesPage: () => <main>DevicesPage</main> };
+});
 
-vi.mock('@renderer/features/records/RecordsPage', () => ({
-  RecordsPage: () => <main>RecordsPage</main>,
-}));
+vi.mock('@renderer/features/records/RecordsPage', () => {
+  sidebarPageModuleLoads.records();
+  return { RecordsPage: () => <main>RecordsPage</main> };
+});
 
 vi.mock('@renderer/features/shared/SharedResourcesPage', () => ({
   SharedResourcesPage: () => <main>SharedResourcesPage</main>,
 }));
 
-vi.mock('@renderer/features/library/ReceivedLibraryPage', () => ({
-  ReceivedLibraryPage: () => <main>ReceivedLibraryPage</main>,
-}));
+vi.mock('@renderer/features/library/ReceivedLibraryPage', () => {
+  sidebarPageModuleLoads.library();
+  return { ReceivedLibraryPage: () => <main>ReceivedLibraryPage</main> };
+});
 
 vi.mock('@renderer/features/directory/DirectoryPage', () => ({
   DirectoryPage: () => <main data-testid="directory-page">DirectoryPage</main>,
@@ -153,6 +166,21 @@ describe('AppShell', () => {
     vi.restoreAllMocks();
     vi.mocked(installScrollbarActivityTracker).mockClear();
     vi.mocked(installScrollbarActivityTracker).mockReturnValue(vi.fn());
+  });
+
+  it('loads every sidebar page before entering the shell', async () => {
+    installElectronAPI();
+
+    render(<AppShell />);
+
+    expect(await screen.findByRole('heading', { name: 'Set pairing code' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(sidebarPageModuleLoads.dashboard).toHaveBeenCalledTimes(1);
+      expect(sidebarPageModuleLoads.devices).toHaveBeenCalledTimes(1);
+      expect(sidebarPageModuleLoads.library).toHaveBeenCalledTimes(1);
+      expect(sidebarPageModuleLoads.records).toHaveBeenCalledTimes(1);
+      expect(sidebarPageModuleLoads.settings).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('renders the local desktop shell instead of the full-page login screen when not authenticated', async () => {
