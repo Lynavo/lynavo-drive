@@ -53,13 +53,13 @@ jest.mock('react-native-localize', () => ({
 // Native & 3rd-party module mocks
 // ---------------------------------------------------------------------------
 jest.mock('react-native-safe-area-context', () => {
-  const React = require('react');
+  const ReactModule = require('react');
   const insets = { top: 0, bottom: 0, left: 0, right: 0 };
-  const SafeAreaInsetsContext = React.createContext(insets);
+  const SafeAreaInsetsContext = ReactModule.createContext(insets);
   return {
     SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
     SafeAreaProvider: ({ children }: { children: React.ReactNode }) =>
-      React.createElement(
+      ReactModule.createElement(
         SafeAreaInsetsContext.Provider,
         { value: insets },
         children,

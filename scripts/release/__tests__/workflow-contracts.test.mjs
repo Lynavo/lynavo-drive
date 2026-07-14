@@ -109,6 +109,10 @@ test('repository CI workflow runs TypeScript quality and Go tests', () => {
 
   assert.equal(config.name, 'CI');
   assert.equal(mobilePackage.scripts?.test, 'jest --no-watchman');
+  assert.equal(
+    mobilePackage.scripts?.lint,
+    'ESLINT_USE_FLAT_CONFIG=false eslint . --max-warnings 0',
+  );
   assertCommonTriggers(config);
   assertReadOnlyWorkflow(config);
 

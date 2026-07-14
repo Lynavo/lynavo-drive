@@ -67,12 +67,7 @@ export function SharedFilesScreen({
             activeOpacity={0.8}
             onPress={openPhoneSyncSpace}
           >
-            <View
-              style={[
-                styles.iconWrapper,
-                { backgroundColor: 'rgba(59, 130, 246, 0.10)' },
-              ]}
-            >
+            <View style={[styles.iconWrapper, styles.phoneIconWrapper]}>
               <Icon name="phone-portrait-outline" size={24} color="#3B82F6" />
             </View>
             <View style={styles.cardInfo}>
@@ -104,12 +99,7 @@ export function SharedFilesScreen({
             activeOpacity={0.8}
             onPress={openLocalComputer}
           >
-            <View
-              style={[
-                styles.iconWrapper,
-                { backgroundColor: 'rgba(139, 92, 246, 0.10)' },
-              ]}
-            >
+            <View style={[styles.iconWrapper, styles.computerIconWrapper]}>
               <Icon name="desktop-outline" size={24} color="#8B5CF6" />
             </View>
             <View style={styles.cardInfo}>
@@ -203,6 +193,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  phoneIconWrapper: {
+    backgroundColor: 'rgba(59, 130, 246, 0.10)',
+  },
+  computerIconWrapper: {
+    backgroundColor: 'rgba(139, 92, 246, 0.10)',
   },
   cardInfo: {
     flex: 1,

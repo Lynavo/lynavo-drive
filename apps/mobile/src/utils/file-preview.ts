@@ -135,7 +135,9 @@ export function safeShareFilename(
 ): string | undefined {
   const candidate = filename?.trim();
   if (!candidate) return undefined;
-  const sanitized = candidate.replace(/[\/\\:\x00-\x1F\x7F]/g, '_').trim();
+  // Control characters are intentionally excluded from filesystem-safe names.
+  // eslint-disable-next-line no-control-regex
+  const sanitized = candidate.replace(/[/\\:\x00-\x1F\x7F]/g, '_').trim();
   return sanitized.length > 0 ? sanitized : undefined;
 }
 

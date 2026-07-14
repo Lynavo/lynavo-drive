@@ -19,7 +19,10 @@ function generateDeviceId(): string {
     }
   }
 
+  // UUID v4 version and variant fields require bit masking.
+  // eslint-disable-next-line no-bitwise
   bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  // eslint-disable-next-line no-bitwise
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
 
   const hex = Array.from(bytes, byte =>

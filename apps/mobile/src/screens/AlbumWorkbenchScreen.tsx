@@ -20,15 +20,10 @@ import {
   type ListRenderItemInfo,
 } from 'react-native';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const IC_ALBUM_PICKER: ImageSourcePropType = require('../assets/icons/album-picker.png');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const IC_SWITCH_GRID: ImageSourcePropType = require('../assets/icons/switch-grid.png');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const IC_SWITCH_LIST: ImageSourcePropType = require('../assets/icons/switch-list.png');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const IC_AUTO_UPLOAD: ImageSourcePropType = require('../assets/icons/auto-upload.png');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const IC_ARROW_DOWN: ImageSourcePropType = require('../assets/icons/arrow-down.png');
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -1127,9 +1122,9 @@ export function AlbumWorkbenchScreen() {
                       ]}
                       activeOpacity={0.7}
                       disabled={isAutoUploadActive}
-                      onPress={() =>
-                        void handleConfigChange('timeRangeMode', opt.key)
-                      }
+                      onPress={() => {
+                        void handleConfigChange('timeRangeMode', opt.key);
+                      }}
                     >
                       <Text
                         style={[
@@ -1269,7 +1264,7 @@ export function AlbumWorkbenchScreen() {
 
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: '#22c55e' }]}>
+            <Text style={[styles.statValue, styles.statValueTransferred]}>
               {stats.transferredCount}
             </Text>
             <Text style={styles.statLabel}>
@@ -1278,7 +1273,7 @@ export function AlbumWorkbenchScreen() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: '#f59e0b' }]}>
+            <Text style={[styles.statValue, styles.statValueNew]}>
               {Math.max(
                 0,
                 stats.totalCount - stats.transferredCount - stats.queuedCount,
@@ -1331,7 +1326,9 @@ export function AlbumWorkbenchScreen() {
                   source={IC_SWITCH_GRID}
                   style={[
                     styles.viewToggleIcon,
-                    { tintColor: viewMode === 'grid' ? DARK : '#8aabbd' },
+                    viewMode === 'grid'
+                      ? styles.viewToggleIconActive
+                      : styles.viewToggleIconInactive,
                   ]}
                 />
               </TouchableOpacity>
@@ -1347,7 +1344,9 @@ export function AlbumWorkbenchScreen() {
                   source={IC_SWITCH_LIST}
                   style={[
                     styles.viewToggleIcon,
-                    { tintColor: viewMode === 'list' ? DARK : '#8aabbd' },
+                    viewMode === 'list'
+                      ? styles.viewToggleIconActive
+                      : styles.viewToggleIconInactive,
                   ]}
                 />
               </TouchableOpacity>
@@ -1373,7 +1372,9 @@ export function AlbumWorkbenchScreen() {
           <TouchableOpacity
             style={styles.limitedPickerButton}
             activeOpacity={0.7}
-            onPress={() => void presentLimitedPhotoPicker()}
+            onPress={() => {
+              void presentLimitedPhotoPicker();
+            }}
           >
             <Icon name="add-circle-outline" size={16} color="#fff" />
             <Text style={styles.limitedPickerButtonText}>
@@ -1422,7 +1423,9 @@ export function AlbumWorkbenchScreen() {
         <TouchableOpacity
           style={styles.headerFilterBtn}
           activeOpacity={0.7}
-          onPress={() => void handleOpenCollectionSheet()}
+          onPress={() => {
+            void handleOpenCollectionSheet();
+          }}
         >
           <Image source={IC_ALBUM_PICKER} style={styles.headerFilterIcon} />
         </TouchableOpacity>
@@ -1553,12 +1556,12 @@ export function AlbumWorkbenchScreen() {
               <Text style={styles.collectionSheetTitle}>
                 {t('albumWorkbench.collectionSheet.title')}
               </Text>
-              <View style={{ width: 22 }} />
+              <View style={styles.collectionSheetHeaderSpacer} />
             </View>
 
             {collectionsLoading ? (
               <ActivityIndicator
-                style={{ paddingVertical: 32 }}
+                style={styles.collectionLoadingIndicator}
                 size="small"
                 color={BLUE}
               />
@@ -1971,6 +1974,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: DARK,
   },
+  statValueTransferred: {
+    color: '#22c55e',
+  },
+  statValueNew: {
+    color: '#f59e0b',
+  },
   statLabel: {
     fontSize: 10,
     color: '#8aabbd',
@@ -2303,6 +2312,12 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
   },
+  viewToggleIconActive: {
+    tintColor: DARK,
+  },
+  viewToggleIconInactive: {
+    tintColor: '#8aabbd',
+  },
 
   // Album collection picker modal
   collectionOverlay: {
@@ -2330,6 +2345,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: DARK,
+  },
+  collectionSheetHeaderSpacer: {
+    width: 22,
+  },
+  collectionLoadingIndicator: {
+    paddingVertical: 32,
   },
   collectionList: {
     paddingHorizontal: 4,

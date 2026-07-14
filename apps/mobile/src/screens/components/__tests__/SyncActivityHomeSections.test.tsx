@@ -14,28 +14,28 @@ jest.mock('react-native-video', () => 'Video');
 
 jest.mock('../../../components/Icon', () => ({
   Icon: ({ name }: { name: string }) => {
-    const React = require('react');
+    const ReactModule = require('react');
     const { Text: MockText } = require('react-native');
-    return React.createElement(MockText, null, name);
+    return ReactModule.createElement(MockText, null, name);
   },
 }));
 
 jest.mock('lucide-react-native', () => {
-  const React = require('react');
+  const ReactModule = require('react');
   const { View } = require('react-native');
   return {
     ArrowDownCircle: ({ testID }: { testID?: string }) =>
-      React.createElement(View, {
+      ReactModule.createElement(View, {
         testID: testID ?? 'mock-arrow-down-circle-icon',
       }),
   };
 });
 
 jest.mock('react-native-svg', () => {
-  const React = require('react');
+  const ReactModule = require('react');
   const { View } = require('react-native');
   const SvgMock = ({ children }: { children?: React.ReactNode }) =>
-    React.createElement(View, null, children);
+    ReactModule.createElement(View, null, children);
   return {
     __esModule: true,
     default: SvgMock,

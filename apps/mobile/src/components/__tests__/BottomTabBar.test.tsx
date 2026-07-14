@@ -27,12 +27,15 @@ jest.mock('react-i18next', () => ({
 }));
 
 jest.mock('lucide-react-native', () => {
-  const React = require('react');
+  const ReactModule = require('react');
   const { View } = require('react-native');
   const createIcon =
     (fallbackTestID: string) =>
     ({ testID, ...props }: { testID?: string }) =>
-      React.createElement(View, { testID: testID ?? fallbackTestID, ...props });
+      ReactModule.createElement(View, {
+        testID: testID ?? fallbackTestID,
+        ...props,
+      });
   return {
     FolderOpen: createIcon('mock-folder-open-icon'),
     Home: createIcon('mock-home-icon'),

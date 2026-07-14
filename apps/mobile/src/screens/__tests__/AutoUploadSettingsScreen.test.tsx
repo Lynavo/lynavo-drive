@@ -37,12 +37,12 @@ jest.mock('../../components/GradientBackground', () => ({
 }));
 
 jest.mock('lucide-react-native', () => {
-  const React = require('react');
+  const ReactModule = require('react');
   const { View } = require('react-native');
   const createIcon =
     (fallbackTestID: string) =>
     ({ testID, ...props }: { testID?: string }) =>
-      React.createElement(View, {
+      ReactModule.createElement(View, {
         testID: testID ?? fallbackTestID,
         ...props,
       });

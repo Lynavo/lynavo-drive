@@ -1148,7 +1148,6 @@ export function SyncStatusScreen() {
           style={[
             styles.connectionBanner,
             styles.connectionBannerFloating,
-            { top: 106 }, // Header height (56) + 50px offset
             isBannerError
               ? styles.connectionBannerError
               : styles.connectionBannerWarning,
@@ -1329,6 +1328,7 @@ const styles = StyleSheet.create({
   },
   connectionBannerFloating: {
     position: 'absolute',
+    top: 106, // Header height (56) + 50px offset
     left: 20,
     right: 20,
     marginHorizontal: 0,

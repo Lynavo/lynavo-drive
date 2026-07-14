@@ -396,7 +396,7 @@ function MainTabsScreen({
           animation: 'none',
           sceneStyle: styles.mainTabsScene,
         }}
-        tabBar={props => <MainTabsTabBar {...props} />}
+        tabBar={MainTabsTabBar}
       >
         <MainTab.Screen name="GlobalHomeTab" component={HomeTabScreen} />
         <MainTab.Screen name="GlobalFilesTab" component={FilesTabScreen} />

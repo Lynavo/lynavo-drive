@@ -20,7 +20,6 @@ void i18next.use(initReactI18next).init({
   returnNull: false,
   missingInterpolationHandler: __DEV__
     ? (text, value, _options) => {
-        // eslint-disable-next-line no-console
         console.warn('[i18n] missing interpolation', { text, value });
       }
     : undefined,

@@ -15,9 +15,10 @@ jest.mock('react-native-localize', () => ({
 }));
 
 jest.mock('react-native-vision-camera', () => {
-  const React = require('react');
+  const ReactModule = require('react');
   const { View } = require('react-native');
-  const Camera = (props: Record<string, unknown>) => <View {...props} />;
+  const Camera = (props: Record<string, unknown>) =>
+    ReactModule.createElement(View, props);
   Camera.getCameraPermissionStatus = jest
     .fn()
     .mockReturnValue('not-determined');

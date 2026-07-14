@@ -115,9 +115,9 @@ jest.mock('../../services/SyncEngineModule', () => ({
 
 jest.mock('../../components/Icon', () => ({
   Icon: ({ name }: { name: string }) => {
-    const React = require('react');
+    const ReactModule = require('react');
     const { Text: MockText } = require('react-native');
-    return React.createElement(MockText, null, name);
+    return ReactModule.createElement(MockText, null, name);
   },
 }));
 

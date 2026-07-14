@@ -79,7 +79,6 @@ describe('i18n bootstrap', () => {
 
     // Cast through unknown to bypass typed-key enforcement — the key is intentionally
     // outside the Chinese schema to exercise the fallbackLng path.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tAny = i18n.t.bind(i18n) as (key: string) => string;
     const { getByTestId } = render(
       <I18nextProvider i18n={i18n}>

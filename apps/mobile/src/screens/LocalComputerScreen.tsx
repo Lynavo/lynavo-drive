@@ -2282,11 +2282,15 @@ function LocalComputerEmptyArtwork({
 }: {
   variant: 'computer' | 'folder' | 'search';
 }) {
-  const isFolder = variant === 'folder';
+  const isFolderVariant = variant === 'folder';
   const isSearch = variant === 'search';
   const gradientId = `localComputerEmpty${variant}Gradient`;
-  const iconColor = isFolder ? '#AD761D' : isSearch ? '#59616D' : '#1677D2';
-  const stops = isFolder
+  const iconColor = isFolderVariant
+    ? '#AD761D'
+    : isSearch
+      ? '#59616D'
+      : '#1677D2';
+  const stops = isFolderVariant
     ? ['#FFFDF4', '#FFEAB7', '#F7C76F']
     : isSearch
       ? ['#FFFFFF', '#EFF5FB', '#D7E2F0']
@@ -2300,7 +2304,7 @@ function LocalComputerEmptyArtwork({
       <View
         style={[
           styles.emptyArtworkHalo,
-          isFolder && styles.emptyArtworkHaloFolder,
+          isFolderVariant && styles.emptyArtworkHaloFolder,
         ]}
       />
       <View style={styles.emptyArtworkTile}>
@@ -2329,7 +2333,7 @@ function LocalComputerEmptyArtwork({
         </Svg>
         <View style={styles.emptyArtworkCorner} />
         <View style={styles.emptyArtworkPulse} />
-        {isFolder ? (
+        {isFolderVariant ? (
           <FolderOpen size={30} color={iconColor} strokeWidth={1.9} />
         ) : isSearch ? (
           <Search size={29} color={iconColor} strokeWidth={1.9} />

@@ -1339,7 +1339,9 @@ export function DeviceDiscoveryScreen() {
               totalSteps={connectionFeatureGuideSteps.length}
               targetLayout={guideStepIndex === 0 ? spotlightLayout : null}
               bottomInset={insets.bottom}
-              onSkip={() => void dismissGuide()}
+              onSkip={() => {
+                void dismissGuide();
+              }}
               onNext={continuePreview}
             />
           ) : null}
