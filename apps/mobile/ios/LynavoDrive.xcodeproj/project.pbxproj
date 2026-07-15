@@ -1,0 +1,676 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 54;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0C80B921A6F3F58F76C31292 /* libPods-LynavoDrive.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-LynavoDrive.a */; };
+		0DAC8ECE3480320FE184A423 /* SharedFilesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2C0A4C610F1EE6DEAF9DAB0 /* SharedFilesService.swift */; };
+		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		5A2D2F6B3480DB6500C3A12F /* AuthKeychainCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A2D2F6A3480DB6500C3A12F /* AuthKeychainCleaner.swift */; };
+		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
+		79925496FECC53ED57FB261F /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 2A006A30AF22FE10FF0A2871 /* InfoPlist.strings */; };
+		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		9AAE6A8410E525480D8CD473 /* AlbumBrowserService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35E00EC8EDE5044F9DE0BFDA /* AlbumBrowserService.swift */; };
+		A02C8AC4F1D2121BB74AD3E9 /* AutoUploadConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D380A808E5707AB54A6BAD29 /* AutoUploadConfigStore.swift */; };
+		D4E1C9F42F92000100000001 /* BackgroundHandoffPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9F32F92000100000001 /* BackgroundHandoffPolicy.swift */; };
+		D4E1C9F62F7A000100000001 /* LynavoVersion.generated.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9F52F7A000100000001 /* LynavoVersion.generated.swift */; };
+		D4E1C9F82F8B000100000001 /* SharedFilesRoutePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9F72F8B000100000001 /* SharedFilesRoutePolicy.swift */; };
+		D4E1C9FA2F94000100000001 /* PresenceReconnectPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9F92F94000100000001 /* PresenceReconnectPolicy.swift */; };
+		D4E1C9FC2F95000100000001 /* WakeOnLanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9FB2F95000100000001 /* WakeOnLanService.swift */; };
+		D4E1C9FE2F95000100000001 /* WakeMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1C9FD2F95000100000001 /* WakeMetadata.swift */; };
+		D4E1CA042FA0000100000001 /* SidecarHostResolutionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1CA032FA0000100000001 /* SidecarHostResolutionPolicy.swift */; };
+		D4E1CA112F96000100000001 /* ReceivedLibraryMediaURLPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1CA102F96000100000001 /* ReceivedLibraryMediaURLPolicy.swift */; };
+		D4E1CA212FA1000100000001 /* ClientDisplayNameResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1CA202FA1000100000001 /* ClientDisplayNameResolver.swift */; };
+		D4E1CA312FA2000100000001 /* SharedFilesAccessPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E1CA302FA2000100000001 /* SharedFilesAccessPolicy.swift */; };
+		DB862C6CA16A33F1996C19AF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
+		FC3ECC2E2F6F05B5000460F8 /* RNBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC252F6F05B5000460F8 /* RNBridge.m */; };
+		FC3ECC302F6F05B5000460F8 /* RNBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC262F6F05B5000460F8 /* RNBridge.swift */; };
+		FC3ECC312F6F05B5000460F8 /* BindingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC212F6F05B5000460F8 /* BindingService.swift */; };
+		FC3ECC322F6F05B5000460F8 /* TcpTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC2A2F6F05B5000460F8 /* TcpTransport.swift */; };
+		FC3ECC332F6F05B5000460F8 /* AssetExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC1F2F6F05B5000460F8 /* AssetExportService.swift */; };
+		FC3ECC342F6F05B5000460F8 /* SessionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC272F6F05B5000460F8 /* SessionService.swift */; };
+		FC3ECC352F6F05B5000460F8 /* UploadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC2C2F6F05B5000460F8 /* UploadStore.swift */; };
+		FC3ECC362F6F05B5000460F8 /* DiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC222F6F05B5000460F8 /* DiscoveryService.swift */; };
+		FC3ECC372F6F05B5000460F8 /* PhotoScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC242F6F05B5000460F8 /* PhotoScanner.swift */; };
+		FC3ECC382F6F05B5000460F8 /* BackgroundExecutionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC202F6F05B5000460F8 /* BackgroundExecutionService.swift */; };
+		FC3ECC392F6F05B5000460F8 /* HistoryLedgerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC232F6F05B5000460F8 /* HistoryLedgerStore.swift */; };
+		FC3ECC3A2F6F05B5000460F8 /* SyncEngineManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC292F6F05B5000460F8 /* SyncEngineManager.swift */; };
+		FC3ECC3B2F6F05B5000460F8 /* SyncEngineError.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC282F6F05B5000460F8 /* SyncEngineError.swift */; };
+		FC3ECC3C2F6F05B5000460F8 /* ProtocolSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC3D2F6F05B5000460F8 /* ProtocolSession.swift */; };
+		FC3ECC612F6F0B00000460F8 /* NetworkPathObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC602F6F0B00000460F8 /* NetworkPathObserver.swift */; };
+		FC3ECC712F6F0C00000460F8 /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECC702F6F0C00000460F8 /* Log.swift */; };
+		FC3ECCA02F7A0001000460F8 /* HMACAuthHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECCA12F7A0001000460F8 /* HMACAuthHelper.swift */; };
+		FC3ECCC02F8A0002000460F8 /* BackgroundTransitionRefCount.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3ECCC12F8A0002000460F8 /* BackgroundTransitionRefCount.swift */; };
+		FFFF00000000000000000002 /* NativeAppRuntimeConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFFF00000000000000000001 /* NativeAppRuntimeConfig.swift */; };
+		FFFF00000000000000000004 /* NativeAppRuntimeConfigBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = FFFF00000000000000000003 /* NativeAppRuntimeConfigBridge.m */; };
+		VD0000000000000000000002 /* LynavoBlurViewManager.m in Sources */ = {isa = PBXBuildFile; fileRef = VD0000000000000000000001 /* LynavoBlurViewManager.m */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0EF759A8AFFF684CCC662C58 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		13B07F961A680F5B00A75B9A /* LynavoDriveDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LynavoDriveDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = LynavoDrive/Images.xcassets; sourceTree = "<group>"; };
+		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = LynavoDrive/Info.plist; sourceTree = "<group>"; };
+		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = LynavoDrive/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		35E00EC8EDE5044F9DE0BFDA /* AlbumBrowserService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumBrowserService.swift; sourceTree = "<group>"; };
+		3B4392A12AC88292D35C810B /* Pods-LynavoDrive.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-LynavoDrive.debug.xcconfig"; path = "Target Support Files/Pods-LynavoDrive/Pods-LynavoDrive.debug.xcconfig"; sourceTree = "<group>"; };
+		5709B34CF0A7D63546082F79 /* Pods-LynavoDrive.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-LynavoDrive.release.xcconfig"; path = "Target Support Files/Pods-LynavoDrive/Pods-LynavoDrive.release.xcconfig"; sourceTree = "<group>"; };
+		5A2D2F6A3480DB6500C3A12F /* AuthKeychainCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AuthKeychainCleaner.swift; path = LynavoDrive/AuthKeychainCleaner.swift; sourceTree = "<group>"; };
+		5DCACB8F33CDC322A6C60F78 /* libPods-LynavoDrive.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-LynavoDrive.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = LynavoDrive/AppDelegate.swift; sourceTree = "<group>"; };
+		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = LynavoDrive/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		BF03A37DF229F642E8356F03 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		D2C0A4C610F1EE6DEAF9DAB0 /* SharedFilesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedFilesService.swift; sourceTree = "<group>"; };
+		D380A808E5707AB54A6BAD29 /* AutoUploadConfigStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoUploadConfigStore.swift; sourceTree = "<group>"; };
+		D4E1C9F32F92000100000001 /* BackgroundHandoffPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundHandoffPolicy.swift; sourceTree = "<group>"; };
+		D4E1C9F52F7A000100000001 /* LynavoVersion.generated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LynavoVersion.generated.swift; sourceTree = "<group>"; };
+		D4E1C9F72F8B000100000001 /* SharedFilesRoutePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedFilesRoutePolicy.swift; sourceTree = "<group>"; };
+		D4E1C9F92F94000100000001 /* PresenceReconnectPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresenceReconnectPolicy.swift; sourceTree = "<group>"; };
+		D4E1C9FB2F95000100000001 /* WakeOnLanService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeOnLanService.swift; sourceTree = "<group>"; };
+		D4E1C9FD2F95000100000001 /* WakeMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeMetadata.swift; sourceTree = "<group>"; };
+		D4E1CA032FA0000100000001 /* SidecarHostResolutionPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidecarHostResolutionPolicy.swift; sourceTree = "<group>"; };
+		D4E1CA102F96000100000001 /* ReceivedLibraryMediaURLPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceivedLibraryMediaURLPolicy.swift; sourceTree = "<group>"; };
+		D4E1CA202FA1000100000001 /* ClientDisplayNameResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientDisplayNameResolver.swift; sourceTree = "<group>"; };
+		D4E1CA302FA2000100000001 /* SharedFilesAccessPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedFilesAccessPolicy.swift; sourceTree = "<group>"; };
+		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		FC3ECC1F2F6F05B5000460F8 /* AssetExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetExportService.swift; sourceTree = "<group>"; };
+		FC3ECC202F6F05B5000460F8 /* BackgroundExecutionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundExecutionService.swift; sourceTree = "<group>"; };
+		FC3ECC212F6F05B5000460F8 /* BindingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BindingService.swift; sourceTree = "<group>"; };
+		FC3ECC222F6F05B5000460F8 /* DiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryService.swift; sourceTree = "<group>"; };
+		FC3ECC232F6F05B5000460F8 /* HistoryLedgerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryLedgerStore.swift; sourceTree = "<group>"; };
+		FC3ECC242F6F05B5000460F8 /* PhotoScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoScanner.swift; sourceTree = "<group>"; };
+		FC3ECC252F6F05B5000460F8 /* RNBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RNBridge.m; sourceTree = "<group>"; };
+		FC3ECC262F6F05B5000460F8 /* RNBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RNBridge.swift; sourceTree = "<group>"; };
+		FC3ECC272F6F05B5000460F8 /* SessionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionService.swift; sourceTree = "<group>"; };
+		FC3ECC282F6F05B5000460F8 /* SyncEngineError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngineError.swift; sourceTree = "<group>"; };
+		FC3ECC292F6F05B5000460F8 /* SyncEngineManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngineManager.swift; sourceTree = "<group>"; };
+		FC3ECC2A2F6F05B5000460F8 /* TcpTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TcpTransport.swift; sourceTree = "<group>"; };
+		FC3ECC2C2F6F05B5000460F8 /* UploadStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadStore.swift; sourceTree = "<group>"; };
+		FC3ECC3D2F6F05B5000460F8 /* ProtocolSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolSession.swift; sourceTree = "<group>"; };
+		FC3ECC602F6F0B00000460F8 /* NetworkPathObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPathObserver.swift; sourceTree = "<group>"; };
+		FC3ECC702F6F0C00000460F8 /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
+		FC3ECCA12F7A0001000460F8 /* HMACAuthHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HMACAuthHelper.swift; sourceTree = "<group>"; };
+		FC3ECCC12F8A0002000460F8 /* BackgroundTransitionRefCount.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTransitionRefCount.swift; sourceTree = "<group>"; };
+		FFFF00000000000000000001 /* NativeAppRuntimeConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = NativeAppRuntimeConfig.swift; path = LynavoDrive/NativeAppRuntimeConfig.swift; sourceTree = "<group>"; };
+		FFFF00000000000000000003 /* NativeAppRuntimeConfigBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = NativeAppRuntimeConfigBridge.m; path = LynavoDrive/NativeAppRuntimeConfigBridge.m; sourceTree = "<group>"; };
+		VD0000000000000000000001 /* LynavoBlurViewManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = LynavoBlurViewManager.m; path = LynavoDrive/LynavoBlurViewManager.m; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		13B07F8C1A680F5B00A75B9A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0C80B921A6F3F58F76C31292 /* libPods-LynavoDrive.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		13B07FAE1A68108700A75B9A /* LynavoDrive */ = {
+			isa = PBXGroup;
+			children = (
+				13B07FB51A68108700A75B9A /* Images.xcassets */,
+				761780EC2CA45674006654EE /* AppDelegate.swift */,
+				5A2D2F6A3480DB6500C3A12F /* AuthKeychainCleaner.swift */,
+				FFFF00000000000000000001 /* NativeAppRuntimeConfig.swift */,
+				FFFF00000000000000000003 /* NativeAppRuntimeConfigBridge.m */,
+				VD0000000000000000000001 /* LynavoBlurViewManager.m */,
+				13B07FB61A68108700A75B9A /* Info.plist */,
+				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
+				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
+			);
+			name = LynavoDrive;
+			sourceTree = "<group>";
+		};
+		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
+				5DCACB8F33CDC322A6C60F78 /* libPods-LynavoDrive.a */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Libraries;
+			sourceTree = "<group>";
+		};
+		83CBB9F61A601CBA00E9B192 = {
+			isa = PBXGroup;
+			children = (
+				FC3ECC2D2F6F05B5000460F8 /* SyncEngine */,
+				13B07FAE1A68108700A75B9A /* LynavoDrive */,
+				832341AE1AAA6A7D00B99B32 /* Libraries */,
+				83CBBA001A601CBA00E9B192 /* Products */,
+				2D16E6871FA4F8E400B85C8A /* Frameworks */,
+				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				2A006A30AF22FE10FF0A2871 /* InfoPlist.strings */,
+			);
+			indentWidth = 2;
+			sourceTree = "<group>";
+			tabWidth = 2;
+			usesTabs = 0;
+		};
+		83CBBA001A601CBA00E9B192 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				13B07F961A680F5B00A75B9A /* LynavoDriveDemo.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				3B4392A12AC88292D35C810B /* Pods-LynavoDrive.debug.xcconfig */,
+				5709B34CF0A7D63546082F79 /* Pods-LynavoDrive.release.xcconfig */,
+			);
+			path = Pods;
+			sourceTree = "<group>";
+		};
+		FC3ECC2D2F6F05B5000460F8 /* SyncEngine */ = {
+			isa = PBXGroup;
+			children = (
+				FC3ECC1F2F6F05B5000460F8 /* AssetExportService.swift */,
+				FC3ECC202F6F05B5000460F8 /* BackgroundExecutionService.swift */,
+				D4E1C9F32F92000100000001 /* BackgroundHandoffPolicy.swift */,
+				FC3ECCA12F7A0001000460F8 /* HMACAuthHelper.swift */,
+				FC3ECCC12F8A0002000460F8 /* BackgroundTransitionRefCount.swift */,
+				FC3ECC212F6F05B5000460F8 /* BindingService.swift */,
+				D4E1CA202FA1000100000001 /* ClientDisplayNameResolver.swift */,
+				FC3ECC222F6F05B5000460F8 /* DiscoveryService.swift */,
+				FC3ECC232F6F05B5000460F8 /* HistoryLedgerStore.swift */,
+				FC3ECC242F6F05B5000460F8 /* PhotoScanner.swift */,
+				FC3ECC3D2F6F05B5000460F8 /* ProtocolSession.swift */,
+				FC3ECC252F6F05B5000460F8 /* RNBridge.m */,
+				FC3ECC262F6F05B5000460F8 /* RNBridge.swift */,
+				FC3ECC272F6F05B5000460F8 /* SessionService.swift */,
+				D4E1C9F92F94000100000001 /* PresenceReconnectPolicy.swift */,
+				D4E1CA102F96000100000001 /* ReceivedLibraryMediaURLPolicy.swift */,
+				D4E1CA032FA0000100000001 /* SidecarHostResolutionPolicy.swift */,
+				FC3ECC282F6F05B5000460F8 /* SyncEngineError.swift */,
+				FC3ECC292F6F05B5000460F8 /* SyncEngineManager.swift */,
+				D4E1C9F52F7A000100000001 /* LynavoVersion.generated.swift */,
+				FC3ECC2A2F6F05B5000460F8 /* TcpTransport.swift */,
+				FC3ECC2C2F6F05B5000460F8 /* UploadStore.swift */,
+				D4E1C9FD2F95000100000001 /* WakeMetadata.swift */,
+				D4E1C9FB2F95000100000001 /* WakeOnLanService.swift */,
+				35E00EC8EDE5044F9DE0BFDA /* AlbumBrowserService.swift */,
+				D380A808E5707AB54A6BAD29 /* AutoUploadConfigStore.swift */,
+				D4E1CA302FA2000100000001 /* SharedFilesAccessPolicy.swift */,
+				D4E1C9F72F8B000100000001 /* SharedFilesRoutePolicy.swift */,
+				D2C0A4C610F1EE6DEAF9DAB0 /* SharedFilesService.swift */,
+				FC3ECC602F6F0B00000460F8 /* NetworkPathObserver.swift */,
+				FC3ECC702F6F0C00000460F8 /* Log.swift */,
+			);
+			path = SyncEngine;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		13B07F861A680F5B00A75B9A /* LynavoDrive */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "LynavoDrive" */;
+			buildPhases = (
+				C38B50BA6285516D6DCD4F65 /* [CP] Check Pods Manifest.lock */,
+				13B07F871A680F5B00A75B9A /* Sources */,
+				13B07F8C1A680F5B00A75B9A /* Frameworks */,
+				13B07F8E1A680F5B00A75B9A /* Resources */,
+				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
+				00EEFC60759A1932668264C0 /* [CP] Embed Pods Frameworks */,
+				E235C05ADACE081382539298 /* [CP] Copy Pods Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = LynavoDrive;
+			productName = LynavoDriveDemo;
+			productReference = 13B07F961A680F5B00A75B9A /* LynavoDriveDemo.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		83CBB9F71A601CBA00E9B192 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 1210;
+				TargetAttributes = {
+					13B07F861A680F5B00A75B9A = {
+						LastSwiftMigration = 1120;
+					};
+				};
+			};
+			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "LynavoDrive" */;
+			compatibilityVersion = "Xcode 12.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				"zh-Hans",
+				Base,
+				en,
+			);
+			mainGroup = 83CBB9F61A601CBA00E9B192;
+			productRefGroup = 83CBBA001A601CBA00E9B192 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				13B07F861A680F5B00A75B9A /* LynavoDrive */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		13B07F8E1A680F5B00A75B9A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
+				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
+				DB862C6CA16A33F1996C19AF /* PrivacyInfo.xcprivacy in Resources */,
+				79925496FECC53ED57FB261F /* InfoPlist.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/.xcode.env.local",
+				"$(SRCROOT)/.xcode.env",
+			);
+			name = "Bundle React Native code and images";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n\n/bin/sh -c \"\\\"$WITH_ENVIRONMENT\\\" \\\"$REACT_NATIVE_XCODE\\\"\"\n";
+		};
+		00EEFC60759A1932668264C0 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-LynavoDrive/Pods-LynavoDrive-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-LynavoDrive/Pods-LynavoDrive-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-LynavoDrive/Pods-LynavoDrive-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		C38B50BA6285516D6DCD4F65 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-LynavoDrive-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		E235C05ADACE081382539298 /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-LynavoDrive/Pods-LynavoDrive-resources-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-LynavoDrive/Pods-LynavoDrive-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-LynavoDrive/Pods-LynavoDrive-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		13B07F871A680F5B00A75B9A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
+				5A2D2F6B3480DB6500C3A12F /* AuthKeychainCleaner.swift in Sources */,
+				FFFF00000000000000000002 /* NativeAppRuntimeConfig.swift in Sources */,
+				FFFF00000000000000000004 /* NativeAppRuntimeConfigBridge.m in Sources */,
+				VD0000000000000000000002 /* LynavoBlurViewManager.m in Sources */,
+				FC3ECC2E2F6F05B5000460F8 /* RNBridge.m in Sources */,
+				FC3ECC302F6F05B5000460F8 /* RNBridge.swift in Sources */,
+				FC3ECC312F6F05B5000460F8 /* BindingService.swift in Sources */,
+				FC3ECC322F6F05B5000460F8 /* TcpTransport.swift in Sources */,
+				FC3ECC332F6F05B5000460F8 /* AssetExportService.swift in Sources */,
+				FC3ECC342F6F05B5000460F8 /* SessionService.swift in Sources */,
+				FC3ECC352F6F05B5000460F8 /* UploadStore.swift in Sources */,
+				FC3ECC362F6F05B5000460F8 /* DiscoveryService.swift in Sources */,
+				FC3ECC372F6F05B5000460F8 /* PhotoScanner.swift in Sources */,
+				FC3ECC382F6F05B5000460F8 /* BackgroundExecutionService.swift in Sources */,
+				D4E1C9F42F92000100000001 /* BackgroundHandoffPolicy.swift in Sources */,
+				FC3ECCA02F7A0001000460F8 /* HMACAuthHelper.swift in Sources */,
+				FC3ECCC02F8A0002000460F8 /* BackgroundTransitionRefCount.swift in Sources */,
+				FC3ECC392F6F05B5000460F8 /* HistoryLedgerStore.swift in Sources */,
+				FC3ECC3A2F6F05B5000460F8 /* SyncEngineManager.swift in Sources */,
+				D4E1CA112F96000100000001 /* ReceivedLibraryMediaURLPolicy.swift in Sources */,
+				FC3ECC3B2F6F05B5000460F8 /* SyncEngineError.swift in Sources */,
+				FC3ECC3C2F6F05B5000460F8 /* ProtocolSession.swift in Sources */,
+				D4E1C9F62F7A000100000001 /* LynavoVersion.generated.swift in Sources */,
+				9AAE6A8410E525480D8CD473 /* AlbumBrowserService.swift in Sources */,
+				A02C8AC4F1D2121BB74AD3E9 /* AutoUploadConfigStore.swift in Sources */,
+				D4E1CA312FA2000100000001 /* SharedFilesAccessPolicy.swift in Sources */,
+				D4E1C9F82F8B000100000001 /* SharedFilesRoutePolicy.swift in Sources */,
+				D4E1C9FA2F94000100000001 /* PresenceReconnectPolicy.swift in Sources */,
+				D4E1CA042FA0000100000001 /* SidecarHostResolutionPolicy.swift in Sources */,
+				D4E1CA212FA1000100000001 /* ClientDisplayNameResolver.swift in Sources */,
+				D4E1C9FE2F95000100000001 /* WakeMetadata.swift in Sources */,
+				D4E1C9FC2F95000100000001 /* WakeOnLanService.swift in Sources */,
+				0DAC8ECE3480320FE184A423 /* SharedFilesService.swift in Sources */,
+				FC3ECC612F6F0B00000460F8 /* NetworkPathObserver.swift in Sources */,
+				FC3ECC712F6F0C00000460F8 /* Log.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		2A006A30AF22FE10FF0A2871 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				BF03A37DF229F642E8356F03 /* en */,
+				0EF759A8AFFF684CCC662C58 /* zh-Hans */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		13B07F941A680F5B00A75B9A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-LynavoDrive.debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CURRENT_PROJECT_VERSION = 62;
+				ENABLE_BITCODE = NO;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Frameworks",
+				);
+				HERMES_CLI_PATH = "${PODS_ROOT}/hermes-engine/destroot/bin/hermesc";
+				INFOPLIST_FILE = LynavoDrive/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.1;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+					"-lc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.lynavo.drive.mobile.demo;
+				PRODUCT_NAME = LynavoDriveDemo;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				"SWIFT_OBJC_BRIDGING_HEADER[arch=*]" = "LynavoDrive/LynavoDrive-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		13B07F951A680F5B00A75B9A /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5709B34CF0A7D63546082F79 /* Pods-LynavoDrive.release.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CURRENT_PROJECT_VERSION = 62;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Frameworks",
+				);
+				HERMES_CLI_PATH = "${PODS_ROOT}/hermes-engine/destroot/bin/hermesc";
+				INFOPLIST_FILE = LynavoDrive/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.1;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+					"-lc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.lynavo.drive.mobile.demo;
+				PRODUCT_NAME = LynavoDriveDemo;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				"SWIFT_OBJC_BRIDGING_HEADER[arch=*]" = "LynavoDrive/LynavoDrive-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		83CBBA201A601CBA00E9B192 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					/usr/lib/swift,
+					"$(inherited)",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"\"$(SDKROOT)/usr/lib/swift\"",
+					"\"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)\"",
+					"\"$(inherited)\"",
+				);
+				MTL_ENABLE_DEBUG_INFO = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
+				);
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(OTHER_CFLAGS)",
+					"-DFOLLY_NO_CONFIG",
+					"-DFOLLY_MOBILE=1",
+					"-DFOLLY_USE_LIBCPP=1",
+					"-DFOLLY_CFG_NO_COROUTINES=1",
+					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
+				);
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				USE_HERMES = true;
+			};
+			name = Debug;
+		};
+		83CBBA211A601CBA00E9B192 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					/usr/lib/swift,
+					"$(inherited)",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"\"$(SDKROOT)/usr/lib/swift\"",
+					"\"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)\"",
+					"\"$(inherited)\"",
+				);
+				MTL_ENABLE_DEBUG_INFO = NO;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
+				);
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(OTHER_CFLAGS)",
+					"-DFOLLY_NO_CONFIG",
+					"-DFOLLY_MOBILE=1",
+					"-DFOLLY_USE_LIBCPP=1",
+					"-DFOLLY_CFG_NO_COROUTINES=1",
+					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
+				);
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
+				SDKROOT = iphoneos;
+				USE_HERMES = true;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "LynavoDrive" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				13B07F941A680F5B00A75B9A /* Debug */,
+				13B07F951A680F5B00A75B9A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "LynavoDrive" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				83CBBA201A601CBA00E9B192 /* Debug */,
+				83CBBA211A601CBA00E9B192 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 83CBB9F71A601CBA00E9B192 /* Project object */;
+}

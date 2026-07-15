@@ -1,0 +1,162 @@
+{
+  "title": "文件",
+  "headerSubtitle": "從手機回看同步素材，也可以進入電腦目錄取檔案。",
+  "phoneSyncSpace": {
+    "title": "手機同步空間",
+    "desc": "檢視已同步至電腦的檔案與上傳來源",
+    "badgeSync": "同步後顯示",
+    "badgeSource": "保留來源",
+    "select": "選擇",
+    "selectFeature": "該功能正在開發中",
+    "empty": "尚無同步檔案",
+    "desktopDeleted": "電腦已刪除",
+    "desktopDeletedMessage": "此檔案已從電腦刪除",
+    "deletedDownloadMessage": "無法下載已刪除的檔案",
+    "summary": "{{count}} 個檔案 · {{size}}",
+    "filesCount": "{{count}} 個檔案",
+    "unnamedFile": "未命名檔案",
+    "previewSyncedFile": "預覽已同步檔案",
+    "downloadSyncedFile": "下載已同步檔案",
+    "loadingTitle": "正在載入",
+    "loadingSubtitle": "同步空間列表會在這裡更新。",
+    "loadFailedTitle": "載入失敗",
+    "loadFailedSubtitle": "請稍後重試。",
+    "emptySubtitle": "開啟自動上傳後，同步到電腦的素材會出現在這裡。",
+    "mediaTypes": {
+      "video": "影片",
+      "photo": "照片",
+      "file": "檔案"
+    },
+    "previewFailedTitle": "無法載入預覽",
+    "previewFailedSubtitle": "請確認電腦在線且檔案仍存在。"
+  },
+  "localComputer": {
+    "title": "電腦檔案",
+    "desc": "瀏覽電腦端共享的目錄結構並下載檔案",
+    "ossDesc": "透過本地局域網瀏覽已配對電腦的檔案。",
+    "ossBadge": "局域網",
+    "badgeDesktop": "桌面目錄",
+    "badgeView": "列表/網格",
+    "select": "選擇",
+    "done": "完成",
+    "download": "下載",
+    "share": "分享",
+    "selectedCount": "已選擇 {{count}} 個",
+    "selectFeature": "該功能正在開發中",
+    "shareNoSelectionTitle": "尚未選擇檔案",
+    "shareNoSelectionMessage": "請先選擇要分享的檔案",
+    "shareFailedTitle": "分享失敗",
+    "shareFailedMessage": "無法開啟系統分享，請稍後重試",
+    "empty": "目前沒有共享資源",
+    "rootDirectoryLabel": "用戶目錄",
+    "fallbackDesktopLabel": "當前電腦",
+    "unboundLocalComputerSubtitle": "尚未連接電腦",
+    "searchFolderPlaceholder": "搜尋目前資料夾",
+    "searchFilesPlaceholder": "搜尋電腦檔案",
+    "loadingTitle": "文件載入中",
+    "loadingSubtitle": "正在讀取電腦端共享目錄。",
+    "folderLoadingTitle": "資料夹載入中",
+    "folderLoadingSubtitle": "正在讀取電腦端目錄內容。",
+    "connectionStatePrefix": "電腦連線方式：",
+    "networkDisconnectedTitle": "網路斷開",
+    "networkDisconnectedSubtitle": "目前路徑將保留，恢復網路或電腦端在線後可繼續存取。",
+    "retryConnection": "重試連線",
+    "localComputerDisabledTitle": "局域網共享不可用",
+    "localComputerDisabledSubtitle": "請確認已配對電腦在線，並已在本地共享資料夾後重新檢查。",
+    "recheckPermission": "重新檢查",
+    "folderLoadErrorTitle": "目錄載入失敗",
+    "folderLoadErrorSubtitle": "無法讀取此共享資料夾，請確認電腦端檔案依然存在。",
+    "reload": "重新載入",
+    "closePreview": "關閉預覽",
+    "noMatchTitle": "無符合結果",
+    "noMatchSubtitle": "換個關鍵字再試一次",
+    "emptyFolderTitle": "空資料夾",
+    "emptyFolderSubtitle": "此目錄暫時沒有可下載或分享的檔案。",
+    "noFilesTitle": "暫無檔案",
+    "noFilesSubtitle": "電腦端尚未開放可存取的檔案目錄。",
+    "sortTitle": "排序方式",
+    "shareTitle": "分享所選檔案",
+    "shareSubtitle": "已選擇 {{count}} 個檔案",
+    "shareTargets": ["儲存", "複製連結", "郵件", "更多"],
+    "listView": "列表檢視",
+    "gridView": "網格檢視"
+  },
+  "teamFolderName": "共享目錄",
+  "personalFolderName": "個人共享目錄",
+  "defaultFolderName": "共享目錄",
+  "globalPersonalFolderName": "我的電腦",
+  "scopes": {
+    "team": "共享目錄",
+    "personal": "個人共享目錄",
+    "shared": "已分享的資源",
+    "received": "已接收的檔案"
+  },
+  "loading": "載入中...",
+  "files": {
+    "folder": "資料夾",
+    "downloaded": "已下載",
+    "parentFolder": "上一級",
+    "parentFolderMeta": "返回上層目錄",
+    "emptyFolder": "空資料夾",
+    "justNow": "剛剛",
+    "modifiedToday": "今天",
+    "modifiedDaysAgo": "{{count}}天前"
+  },
+  "connectionStatus": {
+    "lan": "區域網路在線",
+    "unavailable": "電腦端不可達",
+    "offline": "離線",
+    "unbound": "未綁定"
+  },
+  "emptyState": {
+    "title": "目前沒有內容",
+    "message": "同步完成後，檔案將顯示在這裡"
+  },
+  "deviceUnavailable": {
+    "title": "設備不可用",
+    "message": "請先連接設備",
+    "recheck": "重新檢查"
+  },
+  "directoryInaccessible": {
+    "title": "目錄不可存取",
+    "message": "請檢查電腦端設定"
+  },
+  "personalUnauthorized": {
+    "title": "個人共享目錄無法存取",
+    "message": "請先與這台電腦完成本地配對，並在電腦端配置個人共享目錄。"
+  },
+  "networkError": {
+    "title": "載入失敗",
+    "message": "請稍後重試"
+  },
+  "preview": {
+    "playVideo": "點擊播放影片"
+  },
+  "dialogs": {
+    "downloadSavedToPhotos": "{{name}} 已儲存到{{location}}",
+    "downloadSavedToFiles": "{{name}} 已儲存到檔案",
+    "downloadSaved": "{{name}} 已儲存到{{location}}",
+    "downloadComplete": "下載完成",
+    "downloadFailed": "下載失敗",
+    "downloadFailedMessage": "無法下載檔案，請稍後重試",
+    "downloadUnavailableMessage": "檔案不存在或已無法存取",
+    "previewFailed": "預覽失敗",
+    "previewFailedMessage": "無法取得檔案預覽",
+    "previewUnsupported": "無法預覽",
+    "previewUnsupportedMessage": "此檔案類型目前無法預覽，請先下載後再用其他 App 開啟",
+    "openWithOtherApp": "用其他 App 開啟",
+    "cancel": "取消",
+    "savedLocationPhotos": "相簿",
+    "savedLocationDocuments": "iOS「檔案」App -> Lynavo Drive 目錄",
+    "savedLocationDownloads": "系統 Downloads -> Lynavo Drive 目錄"
+  },
+  "localSaveUnsupported": {
+    "title": "暫不支援儲存",
+    "message": "目前版本尚未整合客戶端本地儲存功能，請等待後續版本。"
+  },
+  "sortBy": {
+    "name": "名稱",
+    "time": "時間",
+    "size": "檔案大小"
+  }
+}

@@ -1,0 +1,273 @@
+{
+  "title": "Sync Activity",
+  "desc": "View current connection, transfer progress, and recent files.",
+  "header": {
+    "help": "Help",
+    "history": "Sync History",
+    "settings": "Settings"
+  },
+  "home": {
+    "autoSyncTitle": "Auto Sync",
+    "disableAuto": "Off",
+    "enableAuto": "On",
+    "autoEnabled": "Enabled. New media will sync automatically.",
+    "autoDisabled": "Auto sync is not enabled.",
+    "uploadedCount": "Uploaded {{completed}} / {{total}}",
+    "latestSyncTime": "Latest sync: {{label}}",
+    "latestSyncTimeEmpty": "No sync records yet",
+    "recentDownloadPhoto": "Photo",
+    "recentDownloadVideo": "Video",
+    "recentDownloadFile": "File",
+    "recentDownloadsTitle": "Recent Downloads",
+    "syncRecordsTitle": "Sync Records",
+    "currentPhoneStatus": "Current Phone Status",
+    "currentTransferProgress": "Current Transfer Progress",
+    "remainingTime": "Time Remaining",
+    "remainingTimeUnknown": "Calculating",
+    "syncRecordTotal": "Total {{size}}",
+    "today": "Today",
+    "todayStats": "{{count}} files, {{size}}",
+    "todaySyncRecord": "Today's sync summary",
+    "syncing": "Syncing",
+    "synced": "Synced",
+    "uploadFiles": "Uploaded Files",
+    "adjust": "Adjust",
+    "waitingForSync": "Waiting for auto sync",
+    "completedSummary": "Synced {{count}} - {{size}}",
+    "waitingForNewAssets": "Waiting for new assets to auto sync",
+    "latestSyncTimeLabel": "Last sync time"
+  },
+  "phases": {
+    "discoveringTitle": "Searching for your computer...",
+    "reconcilingTitle": "Syncing history...",
+    "scanningTitle": "Scanning photo library...",
+    "preparingTitle": "Establishing connection...",
+    "defaultTitle": "Preparing...",
+    "discoveringSubtitleWaited": "Waited {{seconds}}s",
+    "discoveringSubtitleSearching": "Searching on the local network",
+    "reconcilingSubtitle": "First-time setup: verifying previously uploaded files",
+    "scanningSubtitleProgress": "Scanned {{scanned}} / {{total}}",
+    "scanningSubtitleReading": "Reading photo library",
+    "preparingSubtitle": "Establishing a secure connection to your computer",
+    "reconnectingTitle": "Network hiccup — reconnecting...",
+    "reconnectingSubtitle": "Upload will resume once the connection is back",
+    "autoPreparingTitle": "Enabling auto-upload...",
+    "autoPreparingSubtitle": "Preparing to scan for new photos"
+  },
+  "badges": {
+    "auto": "Auto",
+    "autoEnabled": "Auto upload enabled"
+  },
+  "running": {
+    "autoTitle": "Auto Uploading",
+    "autoRunningTitle": "Auto Upload Running",
+    "autoRunningSubtitle": "New photos will transfer to your PC automatically.",
+    "queueInfo": "{{queued}} queued"
+  },
+  "standby": {
+    "title": "Waiting for New Photos",
+    "subtitle": "New photos will transfer to your PC after you take them."
+  },
+  "notStarted": {
+    "title": "Auto Upload Is Off",
+    "subtitle": "Turn on auto upload to sync new photos and videos after you shoot.",
+    "goToAlbum": "Go to Album",
+    "enableAuto": "Enable Auto Upload"
+  },
+  "interrupted": {
+    "title": "Auto Upload Paused",
+    "subtitle": "This auto upload was interrupted. Check the receive folder on your computer, then turn it back on.",
+    "goToAlbum": "Go to Album",
+    "resumeAuto": "Turn Back On"
+  },
+  "offline": {
+    "title": "Device Is Offline",
+    "subtitle": "Make sure your computer is on and on the same network. Once it's back, uploads and shared folder access will resume.",
+    "switchDevice": "Switch Device",
+    "reconnect": "Reconnect"
+  },
+  "stats": {
+    "speed": "Speed",
+    "progress": "Progress",
+    "transferred": "Transferred",
+    "transferredCount": "{{count}}",
+    "dataAmount": "Data",
+    "transferSpeed": "Transfer Speed",
+    "fileSize": "File Size",
+    "currentFile": "Current File"
+  },
+  "completed": {
+    "speedIdle": "--",
+    "auto": {
+      "title": "Auto Upload Complete",
+      "subtitle": "Synced {{count}} files in this round",
+      "fileCountLabel": "Files",
+      "fileCountValue": "{{count}}",
+      "latestSync": "Latest sync: {{label}}",
+      "goToAlbum": "Go to Album"
+    }
+  },
+  "actions": {
+    "cancelling": "Cancelling...",
+    "closeAutoUpload": "Turn Off Auto Upload"
+  },
+  "quickEntry": {
+    "title": "Quick Actions",
+    "albumTitle": "Album",
+    "albumDesc": "Browse your photo library",
+    "sharedFilesTitle": "Shared Folder",
+    "sharedFilesDesc": "Browse shared folder and personal shared folder",
+    "globalSharedFilesTitle": "My Computer",
+    "globalSharedFilesDesc": "Browse files from My Computer"
+  },
+  "onboarding": {
+    "skip": "Skip guide",
+    "previous": "Back",
+    "next": "Next {{step}}/{{total}}",
+    "startJourney": "Start Journey",
+    "album": {
+      "title": "Album Library",
+      "body": "Browse photos and videos from here. New media is picked up by the automatic sync queue."
+    },
+    "panel": {
+      "title": "Hands-free Backup",
+      "body": "This panel shows live foreground LAN auto-upload progress while the app stays open."
+    },
+    "history": {
+      "title": "Transfer History",
+      "body": "Review completed transfers, including transfer time, file size, and destination path."
+    },
+    "settings": {
+      "title": "Global Settings",
+      "body": "Check the connected device, edit the phone display name, or get technical support."
+    },
+    "help": {
+      "title": "Help Center",
+      "body": "Need help? Tap here anytime to open the quick start guide or contact support."
+    }
+  },
+  "dialogs": {
+    "syncError": {
+      "title": "Sync Error",
+      "lowDiskPaused": "Receiving disk space is below 500 MB. New receive tasks have been paused.",
+      "storageUnavailable": "The receive folder on your computer is unavailable. Restore it or choose another folder on the desktop app."
+    },
+    "closeAuto": {
+      "title": "Turn Off Auto Upload",
+      "body": "Turning it off stops the current auto upload, and new photos will not upload automatically.",
+      "continue": "Keep Uploading",
+      "confirm": "Confirm Turn Off"
+    },
+    "closeAutoFailed": {
+      "title": "Action Failed",
+      "body": "Could not turn off auto upload. Please try again later."
+    },
+    "reconnectFailed": {
+      "title": "Reconnect Failed",
+      "body": "Reconnect only retries LAN or VPN-LAN paths. If the computer is asleep, check that macOS has Wake for network access enabled, or that Windows has BIOS/UEFI and network adapter Magic Packet wake enabled."
+    },
+    "switchDevice": {
+      "title": "Switch Device",
+      "body": "This will disconnect the current device and return to the device discovery page.",
+      "confirm": "Confirm Switch"
+    },
+    "enableAutoBlocked": {
+      "title": "Cannot Enable",
+      "body": "Please connect to a device first."
+    },
+    "switchUploadMode": {
+      "title": "Switch Upload Mode",
+      "body": "An upload is in progress. Enabling auto upload will restart the sync queue. Continue?",
+      "confirm": "Confirm Switch"
+    },
+    "enableAutoFailed": {
+      "title": "Action Failed",
+      "body": "Could not enable auto upload. Please try again later."
+    }
+  },
+  "performance": {
+    "thermalThrottled": "Device is running hot — transfer throttled."
+  },
+  "queue": {
+    "title": "Pending Sync Queue"
+  },
+  "autoUploadSettings": {
+    "title": "Auto Upload",
+    "subtitle": "Set up phone content sync to computer",
+    "planTitle": "Sync Plan",
+    "planSource": "Sources",
+    "planFile": "Items",
+    "planRange": "Range",
+    "selectedCountLabel": "{{count}} items",
+    "removeFileLabel": "Remove {{name}}",
+    "enableSwitchTitle": "Auto Upload Switch",
+    "enableSwitchDescOn": "Enabled. Will automatically sync new library content based on sync range.",
+    "enableSwitchDescOff": "Disabled. Will not automatically sync new library content.",
+    "sourcesTitle": "Sync Sources",
+    "albumTitle": "Photos and Videos",
+    "albumDesc": "Sync media content from system album",
+    "fileTitle": "Additional Sources",
+    "fileDescEmpty": "OSS sync uses album media from the pending queue",
+    "addFile": "Unavailable",
+    "addMoreFile": "Unavailable",
+    "selectedFilesTitle": "Queued Items",
+    "filePickCancelled": "Additional sources are disabled in OSS",
+    "filePickFailedTitle": "Additional Sources Disabled",
+    "filePickFailedBody": "OSS sync uses album media from the pending queue.",
+    "fileQueuedMessage": "Queued {{count}} items",
+    "fileSkippedMessage": "Skipped {{count}} duplicate queued items",
+    "rangeTitle": "Sync Range",
+    "rangeAllTitle": "All Content",
+    "rangeAllDesc": "Sync existing photos and videos",
+    "rangeNowTitle": "From Now On",
+    "rangeNowDesc": "Only sync new content from now on",
+    "rangeCustomTitle": "Custom Time",
+    "rangeCustomDesc": "Sync from specified start time",
+    "confirmEnable": "Enable Auto Upload",
+    "confirmDisable": "Disable Auto Upload",
+    "customPickerSave": "Save",
+    "infoAlbum": "Album photos and videos will sync to your computer.",
+    "infoAutoOff": "Once auto upload is disabled, subsequent new assets will not sync.",
+    "infoEmpty": "Please select at least one sync source.",
+    "loadingConfig": "Reading auto upload settings...",
+    "loadConfigFailed": "Failed to read auto upload settings. Please try again later.",
+    "disabledSuccess": "Auto upload is disabled",
+    "sourceAlbumTitle": "1. Sync from Album",
+    "sourceAlbumDesc": "Photos or videos",
+    "sourceFileTitle": "2. Additional sources",
+    "sourceFileDescEmpty": "Only album media is synced in OSS",
+    "sourceFileDescSelected": "{{count}} queued items",
+    "addedFilesSummary": "{{count}} queued items",
+    "addedFilesMore": "{{count}} more queued items",
+    "clearFiles": "Clear",
+    "infoAlbumAndFileAll": "Album photos and videos will upload to your computer.",
+    "infoAlbumAndFileNow": "From now on, new album photos and videos will sync.",
+    "infoAlbumAndFileCustom": "Album photos and videos within the selected range will upload to your computer.",
+    "infoAlbumAll": "All photos and videos in your album will upload to your computer.",
+    "infoAlbumNow": "From now on, new album photos and videos will sync.",
+    "infoAlbumCustom": "Album photos and videos within the selected range will upload to your computer.",
+    "infoFileAll": "OSS sync uses album media from the pending queue.",
+    "infoFileNow": "OSS sync uses album media from the pending queue.",
+    "infoFileCustom": "OSS sync uses album media from the pending queue."
+  },
+  "recentDownload": {
+    "title": "Recent Downloads",
+    "viewAll": "View All",
+    "emptyTitle": "No Recent Downloads",
+    "emptyMessage": "Files downloaded from your computer to this device will appear here."
+  },
+  "syncRecords": {
+    "title": "Sync Records",
+    "totalSynced": "Total synced: {{size}}",
+    "emptyTitle": "No Sync Records Yet",
+    "emptyMessage": "After your first auto sync, records will appear here sorted by completion date.",
+    "dayStats": "{{count}} files - {{size}}",
+    "todayRecord": "Today's sync record",
+    "statusCompleted": "Completed",
+    "statusSyncing": "Syncing",
+    "uploadFiles": "Uploaded Files",
+    "fileCount": "{{count}}",
+    "totalSize": "Total Size",
+    "duration": "Duration"
+  }
+}

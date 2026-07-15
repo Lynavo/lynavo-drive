@@ -1,0 +1,80 @@
+{
+  "title": "All Devices",
+  "lastSuccess": {
+    "withDevice": "Last successful sync: {{time}} \u00b7 {{device}}",
+    "none": "Last successful sync: No records"
+  },
+  "stats": {
+    "todayMediaCount": "Media received today",
+    "todayOccupied": "Space used today",
+    "remainingSpace": "Remaining device space"
+  },
+  "diskWarning": "The receive disk has less than 500 MB remaining. New receive tasks are paused.",
+  "dismissDiskWarning": "Dismiss disk warning",
+  "deviceCard": {
+    "recent": "Recent {{date}}",
+    "today": "Today",
+    "preparing": "Preparing transfer..."
+  },
+  "statusPanel": {
+    "sidecarStatus": "Sidecar Status",
+    "pairingCode": "Pairing Code",
+    "activeDevices": "Active Devices",
+    "copySuccess": "Pairing code copied to clipboard",
+    "clickToCopy": "Click to copy",
+    "status": {
+      "healthy": "Running",
+      "starting": "Starting",
+      "failed": "Failed",
+      "stopped": "Stopped"
+    }
+  },
+  "share": {
+    "title": "Share Management",
+    "toast": {
+      "connectionCodeCopied": "Pairing code copied",
+      "copyFailed": "Copy failed",
+      "localFileAccessReady": "Local file access ready",
+      "localFileAccessUnavailable": "Local file access unavailable",
+      "localFileAccessUpdateFailed": "Failed to update local file access",
+      "folderPermissionGranted": "Folder access permission granted",
+      "folderPermissionDenied": "Folder permission was not granted. Please authorize it manually in System Settings.",
+      "folderPermissionRequestFailed": "Permission request failed",
+      "showCodeBeforeRegenerate": "Show the pairing code before double-clicking to change it",
+      "connectionCodeRegenerated": "Pairing code regenerated. Previously paired devices are no longer valid.",
+      "regenerateFailed": "Failed to regenerate pairing code",
+      "transferActiveReceivePathLocked": "Files are transferring. The receive folder cannot be changed.",
+      "receivePathUpdated": "Receive folder updated",
+      "receivePathUpdateFailed": "Failed to save receive folder"
+    },
+    "connectionCode": {
+      "title": "Pairing code",
+      "regenerateTitle": "Double-click to regenerate pairing code",
+      "showBeforeRegenerateTitle": "Show the pairing code before double-clicking to change it",
+      "regenerateHint": "Double-click to change pairing code",
+      "regenerateConfirm": "Changing the pairing code will invalidate all currently paired phones. They will need to pair again with the new code. Continue?",
+      "show": "Show pairing code",
+      "hide": "Hide pairing code",
+      "copy": "Copy",
+      "showQr": "Show pairing QR code",
+      "collapseQr": "Collapse pairing QR code",
+      "qrTitle": "Lynavo Drive pairing QR code",
+      "qrDescription": "Scan with your phone to pair this computer",
+      "downloadApp": "Download App",
+      "downloadInstruction": ", scan on the same Wi-Fi, select this device, then scan or enter the pairing code to connect."
+    },
+    "localFileAccess": {
+      "title": "Local file access",
+      "description": "Paired phones on the same LAN can browse files shared by this computer.",
+      "toggle": "Local file access status",
+      "folderPermissionWarning": "Folder access permission has not been granted. Phones cannot browse local shared files on this computer.",
+      "authorize": "Authorize access"
+    },
+    "receiveFolder": {
+      "title": "Receive folder",
+      "defaultPath": "Created automatically by default",
+      "remaining": "Remaining {{space}}",
+      "changeFolder": "Change folder"
+    }
+  }
+}

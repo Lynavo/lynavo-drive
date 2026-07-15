@@ -1,0 +1,47 @@
+{
+  "phases": {
+    "uploading": "Syncing",
+    "preparing": "Preparing sync",
+    "cloudDownloading": "Preparing media",
+    "reconnecting": "Waiting to reconnect",
+    "pausedNoPermission": "Waiting for permission",
+    "default": "Sync summary"
+  },
+  "completion": {
+    "title": "All Files Synced",
+    "filesUnit": "files",
+    "subtitle": "This sync is complete.",
+    "latestSync": "Last successful sync: {{label}}"
+  },
+  "summary": {
+    "filesCompleted": "{{completed}} / {{total}} files done",
+    "transferred": "Transferred",
+    "speed": "Speed",
+    "currentFile": "Current file: {{name}}"
+  },
+  "queue": {
+    "itemStatus": {
+      "transferring": "Transferring {{percent}}%",
+      "cloudDownloading": "Downloading iCloud original",
+      "preparing": "Preparing",
+      "uploading": "Transferring"
+    }
+  },
+  "banners": {
+    "permissionRequired": "Photo library access is required.",
+    "permissionDetail": "Allow access in system settings — sync will resume automatically.",
+    "windowsInterrupted": "\"{{device}}\" interrupted the transfer.",
+    "networkPaused": "Transfer paused — waiting for the network or computer to wake.",
+    "networkReconnecting": "Connection interrupted — reconnecting to \"{{device}}\".",
+    "notConnected": "Not connected to \"{{device}}\" — make sure Lynavo Drive is running and the computer is awake.",
+    "connecting": "Connecting to \"{{device}}\".",
+    "progressWindowsRetry": "Progress saved ({{transferred}} / {{total}}). Retry {{attempt}} in {{seconds}}s. Check firewall, security software, or VPN on this Windows PC.",
+    "progressWindowsNoRetry": "Progress saved ({{transferred}} / {{total}}). Check firewall, security software, or VPN on this Windows PC — sync will resume automatically.",
+    "networkWithRetry": "Progress saved ({{transferred}} / {{total}}). Retry {{attempt}} in {{seconds}}s after the network returns or the computer wakes.",
+    "networkAutoResume": "Progress saved ({{transferred}} / {{total}}). Sync will resume when the network returns or the computer wakes.",
+    "progressWithRetry": "Progress saved ({{transferred}} / {{total}}). Retry {{attempt}} in {{seconds}}s.",
+    "retryingReconnect": "Progress saved ({{transferred}} / {{total}}). Reconnecting...",
+    "connectionErrorResume": "Sync will resume when the computer wakes, the network is restored, or Lynavo Drive is reopened on your computer.",
+    "connectingAutoResume": "Sync will resume automatically once connected."
+  }
+}

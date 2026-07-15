@@ -1,0 +1,18 @@
+{
+  "title": "掃描配對二維碼",
+  "instruction": "請將二維碼放入框內即可自動連接",
+  "guide": {
+    "title": "如何取得二維碼？",
+    "body": "打開電腦端 Lynavo Drive，在「全域設定」中找到連接碼，用攝像頭對準二維碼即可自動連接。",
+    "cta": "查看詳細圖文教程 >"
+  },
+  "trouble": {
+    "title": "掃描遇到問題？",
+    "body": "返回設備列表，手動選擇設備並輸入連接碼"
+  },
+  "permissionDenied": {
+    "text": "需要相機權限來掃描二維碼",
+    "openSettings": "開啟設定"
+  },
+  "noCameraDevice": "未找到相機設備"
+}

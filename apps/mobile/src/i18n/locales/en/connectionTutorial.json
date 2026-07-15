@@ -1,0 +1,62 @@
+{
+  "title": "Connection Tutorial",
+  "prerequisite": "Before you start: install and open Lynavo Drive on your computer.",
+  "tabs": {
+    "lan": "Search",
+    "qr": "QR",
+    "code": "Code",
+    "ip": "IP"
+  },
+  "cards": {
+    "lan": {
+      "title": "Local Network Search",
+      "description": "Let the phone find Lynavo Drive on a computer connected to the same Wi-Fi.",
+      "steps": {
+        "0": "Connect your phone and computer to the same Wi-Fi or local network.",
+        "1": "Open Lynavo Drive on your computer and keep it running.",
+        "2": "Open device search on your phone and wait for the computer to appear."
+      },
+      "warning": "Need the desktop app? Open {{host}} in your computer browser and follow the OSS desktop build or release instructions."
+    },
+    "qr": {
+      "title": "Scan QR Code",
+      "description": "Scan the QR Code shown by the desktop app to fill in the IP and pairing code automatically.",
+      "steps": {
+        "0": "Show the QR Code from Global Settings in Lynavo Drive on your computer.",
+        "1": "Tap Scan QR Code on your phone to open the camera.",
+        "2": "Aim at the QR Code on the screen. The app will continue pairing after it is recognized."
+      }
+    },
+    "code": {
+      "title": "Enter Pairing Code",
+      "description": "After finding a computer or entering an IP manually, verify with the 6-digit pairing code.",
+      "steps": {
+        "0": "Find the 6-digit pairing code in Global Settings on your computer.",
+        "1": "The code does not refresh automatically. Use Regenerate to change it manually.",
+        "2": "Enter the code on your phone to finish pairing."
+      }
+    },
+    "ip": {
+      "title": "Direct IP Pairing",
+      "description": "If search does not find the computer, enter the desktop advertised IP directly.",
+      "steps": {
+        "0": "Open Global Settings from the sidebar on your computer.",
+        "1": "Find Advertised IP (iPhone connection address).",
+        "2": "Enter that address from Manual Pairing on your phone and continue."
+      }
+    }
+  },
+  "troubleshoot": {
+    "entry": "Still cannot find the device?",
+    "cta": "View troubleshooting >",
+    "title": "Connection Troubleshooting",
+    "items": {
+      "0": "Confirm your phone and computer are on the same Wi-Fi. On office networks, check that network isolation is disabled.",
+      "1": "Check whether VPN or proxy is enabled on the phone or computer. Turn it off and search again.",
+      "2": "If it still cannot connect, use Enter IP Manually or the pairing code flow."
+    },
+    "supportTitle": "Still stuck?",
+    "supportBody": "Export diagnostics locally and open a GitHub issue with reproducible steps when needed.",
+    "supportIssue": "GitHub Issues"
+  }
+}

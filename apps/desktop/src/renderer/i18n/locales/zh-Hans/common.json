@@ -1,0 +1,84 @@
+{
+  "actions": {
+    "backToDeviceList": "返回设备列表",
+    "change": "更改",
+    "copy": "复制",
+    "open": "打开",
+    "openFile": "打开文件",
+    "openFolder": "打开文件夹",
+    "retry": "重试",
+    "save": "保存"
+  },
+  "date": {
+    "today": "今天",
+    "yesterday": "昨天",
+    "weekdays": ["周日", "周一", "周二", "周三", "周四", "周五", "周六"],
+    "todayWithTime": "今天 {{time}}",
+    "yesterdayWithTime": "昨天 {{time}}",
+    "weekdayWithTime": "{{weekday}} {{time}}",
+    "monthDay": "{{month}}月{{day}}日",
+    "monthDayWithTime": "{{month}}月{{day}}日 {{time}}",
+    "yearMonthDayWithTime": "{{year}}/{{month}}/{{day}} {{time}}"
+  },
+  "fallback": {
+    "detecting": "侦测中…",
+    "loading": "加载中...",
+    "notSet": "未设置",
+    "reading": "读取中…",
+    "starting": "启动中…",
+    "unknownDevice": "未知设备",
+    "noRecord": "暂无记录"
+  },
+  "pagination": {
+    "empty": "该日期暂无传输记录",
+    "page": "第 {{page}} / {{totalPages}} 页",
+    "range": "显示第 {{start}}-{{end}} 条，共 {{total}} 条",
+    "previous": "上一页",
+    "next": "下一页"
+  },
+  "status": {
+    "connectedIdle": "已连接",
+    "offline": "未连接",
+    "transferring": "传输中"
+  },
+  "units": {
+    "files": "个文件"
+  },
+  "shared": {
+    "addFile": "共享文件",
+    "addFolder": "共享文件夹",
+    "tableName": "名称",
+    "tableKind": "类型",
+    "tableSize": "大小",
+    "tableStatus": "状态",
+    "tableDownloads": "下载次数",
+    "tableLastAccessed": "最后访问",
+    "tableAddedAt": "添加时间",
+    "tableActions": "操作",
+    "statusAvailable": "可用",
+    "statusMissing": "文件不存在",
+    "statusRemoved": "已移除",
+    "kindFile": "本地文件",
+    "kindFolder": "本地文件夹",
+    "kindReceived": "已接收",
+    "noData": "暂无共享资源",
+    "remove": "取消共享"
+  },
+  "library": {
+    "tableName": "名称",
+    "tableMediaType": "格式",
+    "tableSize": "大小",
+    "tableSource": "来源设备",
+    "tableCompletedAt": "传输时间",
+    "tableShareStatus": "共享状态",
+    "tableActions": "操作",
+    "addToShared": "加入共享",
+    "statusShared": "已共享",
+    "statusNotShared": "未共享",
+    "statusMissing": "遗失",
+    "noData": "暂无接收数据"
+  },
+  "toast": {
+    "copied": "已复制到剪贴板"
+  }
+}

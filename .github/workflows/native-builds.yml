@@ -1,0 +1,465 @@
+name: Native Builds
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-builds-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      ios: ${{ steps.scope.outputs.ios }}
+      android: ${{ steps.scope.outputs.android }}
+      macos: ${{ steps.scope.outputs.macos }}
+      windows: ${{ steps.scope.outputs.windows }}
+      version: ${{ steps.version.outputs.version }}
+      artifact_prefix: ${{ steps.version.outputs.artifact_prefix }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Filter changed paths
+        id: paths
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706
+        with:
+          filters: |
+            ios:
+              - 'apps/mobile/**'
+              - 'packages/contracts/**'
+              - 'package.json'
+              - '.npmrc'
+              - 'pnpm-workspace.yaml'
+              - 'tsconfig.base.json'
+              - 'turbo.json'
+              - 'scripts/sync-version-manifest.mjs'
+              - 'scripts/dev/release-child-env.cjs'
+              - 'pnpm-lock.yaml'
+              - '.github/workflows/native-builds.yml'
+            android:
+              - 'apps/mobile/**'
+              - 'packages/contracts/**'
+              - 'package.json'
+              - '.npmrc'
+              - 'pnpm-workspace.yaml'
+              - 'tsconfig.base.json'
+              - 'turbo.json'
+              - 'scripts/sync-version-manifest.mjs'
+              - 'scripts/dev/release-child-env.cjs'
+              - 'scripts/release/stage-native-artifact.mjs'
+              - 'pnpm-lock.yaml'
+              - '.github/workflows/native-builds.yml'
+            macos:
+              - 'apps/desktop/**'
+              - 'services/sidecar-go/**'
+              - 'packages/contracts/**'
+              - 'packages/design-tokens/**'
+              - 'scripts/release/**'
+              - 'package.json'
+              - '.npmrc'
+              - 'pnpm-workspace.yaml'
+              - 'tsconfig.base.json'
+              - 'turbo.json'
+              - 'scripts/sync-version-manifest.mjs'
+              - 'scripts/dev/release-child-env.cjs'
+              - 'pnpm-lock.yaml'
+              - '.github/workflows/native-builds.yml'
+            windows:
+              - 'apps/desktop/**'
+              - 'services/sidecar-go/**'
+              - 'packages/contracts/**'
+              - 'packages/design-tokens/**'
+              - 'scripts/release/**'
+              - 'package.json'
+              - '.npmrc'
+              - 'pnpm-workspace.yaml'
+              - 'tsconfig.base.json'
+              - 'turbo.json'
+              - 'scripts/sync-version-manifest.mjs'
+              - 'scripts/dev/release-child-env.cjs'
+              - 'pnpm-lock.yaml'
+              - '.github/workflows/native-builds.yml'
+
+      - name: Resolve build scope
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          IOS_CHANGED: ${{ steps.paths.outputs.ios }}
+          ANDROID_CHANGED: ${{ steps.paths.outputs.android }}
+          MACOS_CHANGED: ${{ steps.paths.outputs.macos }}
+          WINDOWS_CHANGED: ${{ steps.paths.outputs.windows }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "ios=$IOS_CHANGED" >> "$GITHUB_OUTPUT"
+            echo "android=$ANDROID_CHANGED" >> "$GITHUB_OUTPUT"
+            echo "macos=$MACOS_CHANGED" >> "$GITHUB_OUTPUT"
+            echo "windows=$WINDOWS_CHANGED" >> "$GITHUB_OUTPUT"
+          else
+            echo "ios=true" >> "$GITHUB_OUTPUT"
+            echo "android=true" >> "$GITHUB_OUTPUT"
+            echo "macos=true" >> "$GITHUB_OUTPUT"
+            echo "windows=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve version
+        id: version
+        run: |
+          echo "version=$(node -p "require('./apps/desktop/package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "artifact_prefix=$(node -p "require('./apps/desktop/package.json').productName.replace(/\\s+/g, '')")" >> "$GITHUB_OUTPUT"
+
+  ios:
+    name: iOS Build
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
+    runs-on: macos-26
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+        with:
+          version: 10.32.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@6e5d382445ae5590b7449d8b3bc8cb1c2c27f617
+        with:
+          ruby-version: 3.4.9
+          bundler: 4.0.15
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspaces
+        run: pnpm build --filter=!@lynavo-drive/mobile
+
+      - name: Install Ruby dependencies
+        working-directory: apps/mobile
+        env:
+          BUNDLE_DEPLOYMENT: 'true'
+          BUNDLE_FROZEN: 'true'
+        run: bundle install --jobs 4 --retry 3
+
+      - name: Install iOS pods
+        working-directory: apps/mobile/ios
+        env:
+          BUNDLE_DEPLOYMENT: 'true'
+          BUNDLE_FROZEN: 'true'
+        run: |
+          cp Podfile.lock "$RUNNER_TEMP/Podfile.lock.before-install"
+          bundle exec pod install
+
+      - name: Verify iOS pod lock
+        run: >-
+          node scripts/release/verify-pod-lock-portability.mjs
+          --before "$RUNNER_TEMP/Podfile.lock.before-install"
+          --after apps/mobile/ios/Podfile.lock
+
+      - name: Build iOS Debug
+        working-directory: apps/mobile/ios
+        run: >-
+          xcodebuild -workspace LynavoDrive.xcworkspace -scheme LynavoDrive
+          -destination 'generic/platform=iOS' -configuration Debug
+          CODE_SIGNING_ALLOWED=NO build
+
+      - name: Build iOS Release
+        working-directory: apps/mobile/ios
+        run: >-
+          xcodebuild -workspace LynavoDrive.xcworkspace -scheme LynavoDrive
+          -destination 'generic/platform=iOS' -configuration Release
+          CODE_SIGNING_ALLOWED=NO build
+
+  android:
+    name: Android Build
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+        with:
+          version: 10.32.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: 1.25.6
+          cache: true
+          cache-dependency-path: services/sidecar-go/go.sum
+
+      - name: Setup Java
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspaces
+        run: pnpm build --filter=!@lynavo-drive/mobile
+
+      - name: Typecheck mobile
+        run: pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
+
+      - name: Build Android packages
+        working-directory: apps/mobile/android
+        run: ./gradlew --no-daemon assembleDebug assembleRelease bundleRelease
+
+      - name: Verify Android package version
+        env:
+          EXPECTED_VERSION: ${{ needs.changes.outputs.version }}
+        run: |
+          set -euo pipefail
+          APK_PATH="apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          ACTUAL_VERSION="$("$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" manifest version-name "$APK_PATH")"
+          if [ "$ACTUAL_VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "Android APK version $ACTUAL_VERSION does not match expected version $EXPECTED_VERSION." >&2
+            exit 1
+          fi
+
+      - name: Stage Android APK
+        run: >-
+          node scripts/release/stage-native-artifact.mjs
+          --source apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          --output-dir build/release-assets/android-apk
+          --name ${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-android-arm64-x86_64.apk
+
+      - name: Stage Android bundle
+        run: >-
+          node scripts/release/stage-native-artifact.mjs
+          --source apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
+          --output-dir build/release-assets/android-aab
+          --name ${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-android-arm64-x86_64.aab
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-android
+          path: |
+            build/release-assets/android-apk/${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-android-arm64-x86_64.apk
+            build/release-assets/android-aab/${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-android-arm64-x86_64.aab
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+
+  macos:
+    name: macOS Package
+    needs: changes
+    if: needs.changes.outputs.macos == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-26
+          - arch: x64
+            runner: macos-26-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+        with:
+          version: 10.32.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: 1.25.6
+          cache: true
+          cache-dependency-path: services/sidecar-go/go.sum
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspaces
+        run: pnpm build --filter=!@lynavo-drive/mobile
+
+      - name: Build macOS sidecar
+        run: node apps/desktop/scripts/build-sidecar-mac.cjs ${{ matrix.arch }}
+
+      - name: Package macOS DMG
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if pnpm --filter @lynavo-drive/desktop exec node ./scripts/run-electron-builder.cjs --mac dmg --${{ matrix.arch }}; then
+              exit 0
+            else
+              status=$?
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit "$status"
+            fi
+            echo "DMG packaging failed with exit code $status; retrying in 5 seconds."
+            sleep 5
+          done
+
+      - name: Stage macOS artifact
+        run: >-
+          node scripts/release/stage-native-artifact.mjs
+          --source apps/desktop/release/${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-${{ matrix.arch }}.dmg
+          --output-dir build/release-assets/macos-${{ matrix.arch }}
+          --name ${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-macos-${{ matrix.arch }}.dmg
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-macos-${{ matrix.arch }}
+          path: build/release-assets/macos-${{ matrix.arch }}/${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-macos-${{ matrix.arch }}.dmg
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+
+  windows:
+    name: Windows Package
+    needs: changes
+    if: needs.changes.outputs.windows == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+        with:
+          version: 10.32.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: 1.25.6
+          cache: true
+          cache-dependency-path: services/sidecar-go/go.sum
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspaces
+        run: pnpm build --filter=!@lynavo-drive/mobile
+
+      - name: Package Windows x64
+        run: pnpm package:desktop:win
+
+      - name: Verify Windows sidecar
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'apps/desktop/resources/lynavo-drive-sidecar.exe')) {
+            throw 'Windows sidecar was not produced.'
+          }
+
+      - name: Stage Windows installer
+        run: >-
+          node scripts/release/stage-native-artifact.mjs
+          --source apps/desktop/release/${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-x64.exe
+          --output-dir build/release-assets/windows-exe
+          --name ${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-windows-x64.exe
+
+      - name: Stage Windows archive
+        run: >-
+          node scripts/release/stage-native-artifact.mjs
+          --source apps/desktop/release/${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-x64.zip
+          --output-dir build/release-assets/windows-zip
+          --name ${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-windows-x64.zip
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-windows-x64
+          path: |
+            build/release-assets/windows-exe/${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-windows-x64.exe
+            build/release-assets/windows-zip/${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-windows-x64.zip
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+
+  aggregate:
+    name: Native Builds
+    if: always()
+    needs:
+      - changes
+      - ios
+      - android
+      - macos
+      - windows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify native build results
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          IOS_RESULT: ${{ needs.ios.result }}
+          ANDROID_RESULT: ${{ needs.android.result }}
+          MACOS_RESULT: ${{ needs.macos.result }}
+          WINDOWS_RESULT: ${{ needs.windows.result }}
+        run: |
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "Native change detection failed or was cancelled: $CHANGES_RESULT" >&2
+            exit 1
+          fi
+          results="$IOS_RESULT $ANDROID_RESULT $MACOS_RESULT $WINDOWS_RESULT"
+          for result in $results; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "Native build failed or was cancelled: $result" >&2; exit 1 ;;
+            esac
+          done
+          if [ "$results" = "skipped skipped skipped skipped" ]; then
+            echo "No native build scope selected."
+          fi

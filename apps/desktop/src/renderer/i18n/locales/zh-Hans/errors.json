@@ -1,0 +1,40 @@
+{
+  "common": {
+    "loadFailed": "加载失败，请稍后重试",
+    "pageRenderFailed": "页面渲染出错，请重试",
+    "retryLater": "请稍后重试"
+  },
+  "dashboard": {
+    "loadDevicesFailed": "加载设备列表失败",
+    "receiveDirectoryUnavailable": "接收目录不可用，请重新选择或恢复文件夹",
+    "receiveDirectoryUnavailableDescription": "电脑端仍在线，但目前无法存取设置的接收位置",
+    "checkNetworkAndRetry": "请检查网络连接后重试"
+  },
+  "deviceDetail": {
+    "loadFileLedgerFailed": "加载文件记录失败",
+    "openFolderFailed": "打开文件夹失败",
+    "fileMissing": "文件不存在或已被移除",
+    "invalidDateRange": "时间范围无效",
+    "startAfterEndAdjusted": "起始时间不能晚于结束时间，已自动调整",
+    "endBeforeStart": "结束时间不能早于起始时间"
+  },
+  "directory": {
+    "receiveDirectoryUnavailable": "接收目录不可用，请重新选择或恢复文件夹",
+    "sharedDirectoryUnavailable": "团队共享目录不可用，请重新选择或恢复文件夹",
+    "loadReceivedFailed": "加载接收文件列表失败",
+    "loadSharedFailed": "加载团队共享文件列表失败",
+    "transferActiveChangeRoot": "正在接收文件，完成后再变更根目录",
+    "transferActiveReceivePath": "目前正在接收文件，暂时无法修改接收目录",
+    "locationNotWritable": "所选位置不可写入，请选择其他文件夹",
+    "selectValidDirectory": "请选择有效目录",
+    "directoryUnavailable": "目录不可用",
+    "pathMissing": "路径不存在",
+    "openFolderFailed": "打开文件夹失败"
+  },
+  "settings": {
+    "shareStatusCheckFailed": "共享状态检测失败",
+    "diagnosticsExported": "诊断包已导出",
+    "diagnosticsExportFailed": "诊断包导出失败",
+    "sidecarRetryFailed": "重试启动后台服务失败"
+  }
+}

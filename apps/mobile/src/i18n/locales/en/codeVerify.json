@@ -1,0 +1,11 @@
+{
+  "title": "Connect Device",
+  "deviceLabel": "Connecting to: {{deviceName}} ({{host}})",
+  "prompt": "Enter the 6-digit pairing code",
+  "verifying": "Verifying pairing code...",
+  "helpTitle": "Where do I find the pairing code?",
+  "helpText": "Open Lynavo Drive on your computer, choose Global Settings from the sidebar, and check the 6-digit pairing code.",
+  "helpSecondary": "The code does not refresh automatically. Use Regenerate to update it manually.",
+  "exampleLabel": "Example",
+  "helpCta": "View detailed tutorial >"
+}

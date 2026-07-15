@@ -1,0 +1,34 @@
+{
+  "title": "设备管理",
+  "stats": {
+    "total": "总设备",
+    "disabled": "已禁用",
+    "connected": "已连接"
+  },
+  "empty": {
+    "title": "暂无设备",
+    "description": "通过连接码授权后的移动端设备会显示在这里。"
+  },
+  "table": {
+    "unnamedDevice": "未命名设备"
+  },
+  "status": {
+    "connected": "已连接",
+    "disabled": "已禁用",
+    "offline": "未连接",
+    "connectedWaitingSync": "已连接，等待同步"
+  },
+  "blockReason": {
+    "tooManyFailedAttempts": "输错连接码 3 次，已自动禁用"
+  },
+  "actions": {
+    "block": "禁用",
+    "unblock": "取消禁用",
+    "cancel": "取消",
+    "confirmBlock": "确认禁用"
+  },
+  "dialog": {
+    "disableTitle": "禁用设备",
+    "disableDescription": "禁用后 {{deviceName}} 将断开连接并停止所有传输，确定要禁用该设备吗？"
+  }
+}

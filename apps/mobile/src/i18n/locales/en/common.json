@@ -1,0 +1,35 @@
+{
+  "ok": "OK",
+  "cancel": "Cancel",
+  "confirm": "Confirm",
+  "back": "Back",
+  "retry": "Retry",
+  "loading": "Loading",
+  "unknownVersion": "Unknown version",
+  "privacyPolicy": "Privacy Policy",
+  "termsOfService": "Terms of Service",
+  "deviceNames": {
+    "default": "Computer",
+    "windows": "Windows PC"
+  },
+  "diagnosticsArchiveTitle": "Lynavo Drive Diagnostics",
+  "notApplicable": "N/A",
+  "unknownTime": "Unknown time",
+  "today": "Today",
+  "yesterday": "Yesterday",
+  "thumbnail": "thumbnail",
+  "connectionStates": {
+    "connected": "Connected",
+    "connecting": "Connecting",
+    "offline": "Offline",
+    "bound": "Bound",
+    "active": "Enabled",
+    "inactive": "Disabled",
+    "boundDeviceFallback": "Bound computer"
+  },
+  "tabs": {
+    "home": "Home",
+    "files": "Files",
+    "settings": "Me"
+  }
+}

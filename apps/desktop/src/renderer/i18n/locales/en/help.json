@@ -1,0 +1,396 @@
+{
+  "title": "Help Center",
+  "subtitle": "Guidance for understanding and using Lynavo Drive",
+  "dialog": {
+    "navLabel": "Help categories",
+    "nav": {
+      "intro": "Introduction",
+      "guide": "First-use guide",
+      "upload": "Upload and sharing",
+      "faq": "FAQ",
+      "contact": "Contact us"
+    },
+    "sections": {
+      "intro": {
+        "items": [
+          {
+            "title": "What is Lynavo Drive",
+            "body": "Lynavo Drive is a LAN media sync tool that helps short video teams move phone media to the desktop seamlessly. When the phone and computer are on the same Wi-Fi network, you can connect once and sync automatically."
+          },
+          {
+            "title": "How to connect to the computer",
+            "body": "After opening the app, scan for the Lynavo Drive desktop on the LAN, or scan the QR code shown on the desktop to connect directly. Uploading is available after connection succeeds."
+          },
+          {
+            "title": "How to upload media",
+            "body": "Automatic incremental upload is supported on the same LAN while the mobile app is in the foreground. The phone scans local media into a pending queue and uploads new items one file at a time."
+          },
+          {
+            "title": "How to access the shared folder",
+            "body": "Tap Shared Folder on the home screen to browse the shared folder on the desktop. Image and video preview and downloads use the local LAN connection."
+          }
+        ]
+      },
+      "guide": {
+        "items": [
+          {
+            "title": "Connect to the computer",
+            "body": "Make sure the phone and computer are on the same Wi-Fi network. Open Lynavo Drive on the desktop, then tap Scan Devices on the phone to find and connect to the computer, or scan the desktop QR code."
+          },
+          {
+            "title": "Enable automatic upload",
+            "body": "Go to the album page, expand the Automatic Upload panel, and turn on the switch. New media will transfer to the computer automatically while the phone stays foregrounded on the same LAN."
+          },
+          {
+            "title": "Foreground LAN queue",
+            "body": "The phone keeps an append-only pending queue from local media scanning. If the app backgrounds, locks, or disconnects, unfinished items stay queued and continue after foreground LAN connectivity returns."
+          },
+          {
+            "title": "View the shared folder",
+            "body": "Tap the Shared Folder card on the home screen to browse files in the desktop shared folder. You can preview images and videos and download allowed files over the LAN."
+          }
+        ]
+      },
+      "upload": {
+        "items": [
+          {
+            "title": "Automatic incremental upload",
+            "body": "Automatic upload scans local media and syncs new pending items while the phone and computer are connected on the same LAN. The OSS runtime does not provide manual file picking or background continuation."
+          },
+          {
+            "title": "received folder and shared folder",
+            "body": "The received folder stores all media uploaded from phones to the computer and is the default upload destination. The shared folder is configured on the desktop; phones can browse, preview, and download allowed files over the LAN."
+          },
+          {
+            "title": "Shared folder access is read-only",
+            "body": "Phones can only browse and preview shared folder content. They cannot modify, delete, or upload files into the shared folder."
+          }
+        ]
+      },
+      "faq": {
+        "items": [
+          {
+            "title": "What if the device is offline?",
+            "body": "Confirm the phone and computer are on the same Wi-Fi network and that Lynavo Drive is running on the desktop. If the computer is asleep or the desktop app is closed, restart the desktop app and tap Refresh on the phone to scan again."
+          },
+          {
+            "title": "What if upload fails?",
+            "body": "Check that the network connection is stable and the desktop app is still running. Lynavo Drive will automatically retry resumable work when the LAN connection recovers. Export a diagnostics package from Settings if you need to attach details to a GitHub issue."
+          },
+          {
+            "title": "What if the shared folder is empty?",
+            "body": "In Lynavo Drive desktop settings, confirm that the shared folder path is set and contains files. After setting it, pull to refresh on the phone."
+          },
+          {
+            "title": "What if I cannot connect to the computer?",
+            "body": "Confirm the phone and computer are on the same LAN, check whether the desktop firewall blocks Lynavo Drive, then try restarting the desktop app or connecting with the QR code."
+          },
+          {
+            "title": "Do I need a cloud login?",
+            "body": "No. The open-source desktop runtime supports local LAN pairing, discovery, automatic uploads, and shared-folder browsing without Lynavo cloud bootstrap."
+          },
+          {
+            "title": "Does the OSS edition include official internet relay?",
+            "body": "No. Official TURN, signaling, and account services are not part of the OSS runtime. Keep the phone and computer on the same LAN for sync and browsing."
+          }
+        ]
+      },
+      "contact": {
+        "items": [
+          {
+            "title": "Community support",
+            "body": "Open a GitHub issue for reproducible bugs or feature requests. Use the private security advisory flow for vulnerabilities."
+          },
+          {
+            "title": "Export diagnostics package",
+            "body": "Go to My -> Export Diagnostics Package to save runtime logs locally. Share the archive only if you are comfortable attaching it to a public issue."
+          },
+          {
+            "title": "Feedback entry",
+            "body": "Use My -> Feedback to describe issues or suggestions. We keep collecting feedback to improve the product."
+          }
+        ]
+      }
+    }
+  },
+  "introduction": {
+    "title": "Introduction",
+    "items": [
+      {
+        "title": "What is Lynavo Drive",
+        "description": "Lynavo Drive is a LAN media incremental synchronization tool designed for creators and teams. Without internet access, you can sync media seamlessly, at high speed, and incrementally from mobile devices to computers on the same Wi-Fi."
+      },
+      {
+        "title": "How to connect to the computer",
+        "description": "Open Lynavo Drive on the computer to get a 6-digit pairing code. Enter the code on the mobile device to pair. Make sure both devices are on the same Wi-Fi network."
+      },
+      {
+        "title": "How to upload media",
+        "description": "Enable automatic upload in the mobile album. The system performs incremental filtering and transmits only new pending media on the foreground LAN connection to avoid duplication."
+      },
+      {
+        "title": "How to access shared folders",
+        "description": "Place computer files in the `shared` folder, and you can view, preview, and download them from the team shared folder or My Computer on the mobile device."
+      }
+    ]
+  },
+  "quickStart": {
+    "title": "🚀 Quick Start",
+    "steps": [
+      {
+        "title": "Choose a sync folder",
+        "description": "Open Lynavo Drive and choose a local folder as the sync root (for example ~/Lynavo Drive on macOS or D:\\Lynavo Drive on Windows)"
+      },
+      {
+        "title": "Get the pairing code and connect",
+        "description": "Find the 6-digit pairing code in Settings, then enter it on the phone to complete pairing"
+      },
+      {
+        "title": "Check the network",
+        "description": "Make sure the computer and phone are on the same Wi-Fi network. Use 5GHz Wi-Fi for the best transfer speed."
+      },
+      {
+        "title": "Upload media",
+        "description": "Enable automatic upload in the phone album so new pending media syncs to the computer on the foreground LAN connection"
+      },
+      {
+        "title": "View files on the computer",
+        "description": "Use the received folder on the Folder Management page to view received media, or open it directly in the file manager"
+      },
+      {
+        "title": "View shared files on the phone",
+        "description": "Place team-ready files in the shared folder so phones can view, preview, and download them from the team shared folder"
+      }
+    ],
+    "globalSteps": [
+      {
+        "title": "Choose a sync folder",
+        "description": "Open Lynavo Drive and choose a local folder as the sync root (for example ~/Lynavo Drive on macOS or D:\\Lynavo Drive on Windows)"
+      },
+      {
+        "title": "Get the pairing code and connect",
+        "description": "Find the 6-digit pairing code in Settings, then enter it on the phone to complete pairing"
+      },
+      {
+        "title": "Check the network",
+        "description": "Make sure the computer and phone are on the same Wi-Fi network. Use 5GHz Wi-Fi for the best transfer speed."
+      },
+      {
+        "title": "Upload media",
+        "description": "Enable automatic upload in the phone album so new pending media syncs to the computer on the foreground LAN connection"
+      },
+      {
+        "title": "View files on the computer",
+        "description": "Use the received folder on the Folder Management page to view received media, or open it directly in the file manager"
+      },
+      {
+        "title": "View My Computer on the phone",
+        "description": "Use My Computer on the phone to browse, preview, and download files from the paired desktop"
+      }
+    ]
+  },
+  "directory": {
+    "title": "📁 Folder Guide",
+    "cards": [
+      {
+        "title": "Received folder (received)",
+        "points": [
+          "Lives under the root folder as received and receives original photos, videos, and other media uploaded from LAN phones",
+          "Affected by the root folder path and automatically organized by device name and date",
+          "Acts as the LAN phone-to-computer transfer destination and is not automatically included in the personal shared folder"
+        ]
+      },
+      {
+        "title": "Personal shared folder (personal)",
+        "points": [
+          "Can point to any permitted local folder or disk root, such as the whole Macintosh HD, C drive, or D drive",
+          "Visible to phones paired with this desktop on the local LAN",
+          "Not affected by the root folder path; use it for content that should not be visible to other LAN users"
+        ]
+      },
+      {
+        "title": "Team shared folder (shared)",
+        "points": [
+          "Stores team-ready content processed on the computer",
+          "Connected devices on the LAN can view, preview, stream, and download these files",
+          "Phones have read-only access and cannot modify or delete files"
+        ]
+      }
+    ],
+    "globalCards": [
+      {
+        "title": "Received folder (received)",
+        "points": [
+          "Lives under the root folder as received and receives original photos, videos, and other media uploaded from LAN phones",
+          "Affected by the root folder path and automatically organized by device name and date",
+          "Acts as the LAN phone-to-computer transfer destination"
+        ]
+      },
+      {
+        "title": "My Computer (personal)",
+        "points": [
+          "Can point to any permitted local folder or disk root, such as the whole Macintosh HD, C drive, or D drive",
+          "Visible to phones paired with this desktop on the local LAN",
+          "Not affected by the root folder path; use it to browse local desktop files from the phone"
+        ]
+      }
+    ],
+    "tree": "Lynavo Drive/\n├── received/      (media uploaded from LAN phones)\n└── shared/        (team files shared to LAN devices)\n\nPersonalShare/    (personal shared folder, independently configurable)",
+    "globalTree": "Lynavo Drive/\n└── received/      (media uploaded from LAN phones)\n\nMy Computer/      (local desktop folder or disk selected for phone access)"
+  },
+  "permissions": {
+    "title": "🔐 System Permissions",
+    "mac": [
+      {
+        "title": "Firewall",
+        "steps": [
+          "System Settings → Network → Firewall",
+          "If Firewall is enabled, click “Options…” and make sure Lynavo Drive is set to “Allow incoming connections”",
+          "When macOS prompts on first launch, click “Allow”"
+        ]
+      },
+      {
+        "title": "Local Network",
+        "steps": [
+          "System Settings → Privacy & Security → Local Network",
+          "Make sure Lynavo Drive is enabled. Phone discovery depends on this permission.",
+          "If the phone cannot find the computer, check this item first"
+        ]
+      },
+      {
+        "title": "Files and folders",
+        "steps": [
+          "System Settings → Privacy & Security → Files and Folders",
+          "Make sure Lynavo Drive can access the selected sync root folder",
+          "If the sync folder is on an external drive, also grant Full Disk Access"
+        ]
+      },
+      {
+        "title": "Gatekeeper and first launch",
+        "steps": [
+          "If first launch says the developer cannot be verified, right-click the app and choose “Open”",
+          "Or go to System Settings → Privacy & Security and click “Open Anyway”",
+          "After one approval, future launches should not show this prompt"
+        ]
+      },
+      {
+        "title": "Remote wake",
+        "steps": [
+          "Open System Settings → Battery or Energy Saver, then enable “Wake for network access” when available",
+          "Prefer Ethernet. Wi-Fi wake during sleep depends on the Mac model, power state, and router",
+          "Make sure the firewall allows incoming Lynavo Drive connections and Local Network permission is enabled",
+          "Lynavo Drive can send wake packets, but it cannot automatically enable macOS power settings for you"
+        ]
+      }
+    ],
+    "windows": [
+      {
+        "title": "Firewall",
+        "steps": [
+          "Windows may show a firewall prompt on first launch. Choose “Allow access”.",
+          "If blocked: Settings → Privacy & security → Windows Security → Firewall & network protection",
+          "Click “Allow an app through firewall” and make sure Lynavo Drive is checked for both private and public networks"
+        ]
+      },
+      {
+        "title": "Network discovery",
+        "steps": [
+          "Settings → Network & Internet → Advanced network settings → Advanced sharing settings",
+          "Make sure “Network discovery” is enabled for the current network profile",
+          "If the phone cannot find the computer, confirm the network type is Private, not Public"
+        ]
+      },
+      {
+        "title": "Folder access",
+        "steps": [
+          "Make sure the disk containing the sync root has sufficient read/write permissions",
+          "Avoid protected system folders such as C:\\Program Files",
+          "If using an external drive, keep it connected during transfers"
+        ]
+      },
+      {
+        "title": "SmartScreen and first launch",
+        "steps": [
+          "If Windows says it protected your PC on first launch, click “More info” → “Run anyway”",
+          "Or check “Unblock” in file properties before running",
+          "After one approval, future launches should not show this prompt"
+        ]
+      },
+      {
+        "title": "Remote wake",
+        "steps": [
+          "Enable Wake-on-LAN in BIOS/UEFI if your PC provides the option",
+          "Device Manager → Network adapters → active adapter → Power Management: enable “Allow this device to wake the computer”",
+          "If available, also enable “Only allow a magic packet to wake the computer”",
+          "On the Advanced tab, enable “Wake on Magic Packet” or the vendor-equivalent option",
+          "Prefer Ethernet. Modern Standby, hibernate, fast startup, shutdown, and Wi-Fi wake vary by device and driver",
+          "Lynavo Drive can send wake packets, but it cannot automatically change BIOS/UEFI or every network adapter driver setting"
+        ]
+      }
+    ]
+  },
+  "uploadRules": {
+    "title": "📤 Upload Rules",
+    "items": [
+      "Automatic upload is the only OSS upload path; media enters the pending queue through local mobile scanning.",
+      "After each file completes, the queue head is selected again from the persisted pending queue.",
+      "New media is deduplicated before appending, and unfinished items remain queued across foreground reconnects.",
+      "Only one file may transfer at a time. The queue uploads in order.",
+      "Per-item deletion, manual file selection, and queue reordering are not supported."
+    ]
+  },
+  "faq": {
+    "title": "❓ FAQ",
+    "items": [
+      {
+        "question": "What if my phone cannot find the computer?",
+        "answer": "Check these in order: 1) computer and phone are on the same Wi-Fi; 2) macOS users have granted Local Network permission to Lynavo Drive; 3) Windows users have a Private network with Network discovery enabled; 4) firewall is not blocking incoming connections; 5) close and reopen Lynavo Drive."
+      },
+      {
+        "question": "What happens after reconnecting?",
+        "answer": "When automatic upload is on, resumable work continues after foreground LAN connectivity returns. If automatic upload was turned off, re-enable it on the phone album page."
+      },
+      {
+        "question": "Why is upload speed unstable?",
+        "answer": "Transfer speed depends on the local network, including Wi-Fi signal strength, router load, and frequency band. Use 5GHz Wi-Fi and keep the computer and phone close to the router."
+      },
+      {
+        "question": "Why do some media files fail to upload?",
+        "answer": "Common causes: 1) the media is stored in iCloud and has not been downloaded locally yet; export will trigger download; 2) the network was interrupted during transfer. Completed files are kept, and incomplete files can retry after recovery."
+      },
+      {
+        "question": "Why is the filename on the computer different from the phone?",
+        "answer": "iOS generates album filenames automatically, such as IMG_xxxx. Export may rename files during format conversion. The received file content still matches the original media."
+      },
+      {
+        "question": "Can the sync folder be on an external drive?",
+        "answer": "Yes. Choose a folder on the external drive as the root folder. Keep the drive connected during transfer. macOS users may also need to grant Lynavo Drive Full Disk Access."
+      },
+      {
+        "question": "Will transfer stop if the computer sleeps?",
+        "answer": "Yes. When the computer sleeps, network connections are interrupted and transfer pauses. Enable \"Prevent computer sleep during sync\" in Settings to reduce interruptions. After the computer wakes, the phone reconnects automatically and continues unfinished queued tasks. Completed files are unaffected."
+      }
+    ]
+  },
+  "errors": {
+    "title": "⚠️ Error Handling",
+    "cards": [
+      {
+        "title": "Connection issue",
+        "description": "Check that the computer and phone are on the same local network, system network permissions are enabled, and then reconnect"
+      },
+      {
+        "title": "Low disk space",
+        "description": "When remaining space is below 500MB, receiving pauses. Free disk space or change the storage path."
+      },
+      {
+        "title": "Device interrupted",
+        "description": "Tasks pause when the device goes offline, the computer sleeps, or the network is interrupted. They can continue after the computer wakes and reconnects."
+      },
+      {
+        "title": "Upload interrupted",
+        "description": "Completed files are kept when transfer fails. Incomplete tasks retry automatically after recovery."
+      }
+    ]
+  }
+}

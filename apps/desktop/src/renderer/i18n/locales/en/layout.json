@@ -1,0 +1,88 @@
+{
+  "nav": {
+    "dashboard": "Share Management",
+    "directory": "Folders",
+    "devices": "Device Management",
+    "shared": "Shared",
+    "library": "Sync Records",
+    "records": "Access Records",
+    "settings": "Me",
+    "help": "Help"
+  },
+  "placeholders": {
+    "devices": {
+      "title": "Device Management",
+      "description": "Connected devices, authorization status, and blocked clients will be managed here."
+    },
+    "shared": {
+      "title": "Shared Resources",
+      "description": "Desktop-local shared resources and access scopes will be configured here."
+    },
+    "library": {
+      "title": "Library",
+      "description": "Received assets, archive locations, and local library status will be summarized here."
+    },
+    "records": {
+      "title": "Records",
+      "description": "Connection, authorization, blocklist, and sync history will be available here."
+    }
+  },
+  "connectionSetup": {
+    "title": "Set pairing code",
+    "connectionCodeLabel": "Pairing code",
+    "connectionCodeChangeConfirm": "Changing the pairing code will invalidate all currently paired phones. They will need to pair again with the new code. Continue?",
+    "saveAndEnter": "Save and enter Lynavo Drive",
+    "downloadSectionTitle": "Use and download the mobile app",
+    "errors": {
+      "invalidCode": "Enter a 6-digit pairing code",
+      "serviceUnavailable": "Pairing code service is unavailable",
+      "saveFailed": "Failed to save pairing code"
+    },
+    "steps": {
+      "download": {
+        "title": "Scan to download the mobile app",
+        "description": "Scan the QR code on the right with your phone, then download and install the Lynavo Drive mobile app"
+      },
+      "pair": {
+        "title": "Enter pairing code",
+        "description": "Enter this pairing code on the phone to connect this computer. Photos and files sync automatically on the same LAN."
+      },
+      "localFileAccess": {
+        "title": "Browse local computer files",
+        "description": "After pairing succeeds, phones on the same LAN can browse local files shared by this computer."
+      }
+    }
+  },
+  "download": {
+    "openButton": "Download mobile app",
+    "panelTitle": "Scan to download mobile app",
+    "qrTitle": "{{platform}} download QR code",
+    "qrAriaLabel": "{{platform}} download QR code"
+  },
+  "errorBoundary": {
+    "helpLoadFailed": "Help failed to load. Please retry."
+  },
+  "sidecar": {
+    "bonjourWarningTitle": "Bonjour broadcasting is not enabled",
+    "retryingTitle": "Background service is retrying",
+    "startingTitle": "Background service is starting",
+    "failedTitle": "Background service failed to start",
+    "bonjourFallbackDetail": "Bonjour for Windows was not detected on this Windows device.",
+    "startingDetail": "The desktop app is waiting for the local sidecar service to become ready.",
+    "failedDetail": "The local sidecar service could not start.",
+    "runtimeMessages": {
+      "bonjourNativeDetected": "Bonjour for Windows was detected and will be used for discovery.",
+      "bonjourFallbackDetected": "Bonjour for Windows was not detected. The app is using the compatibility broadcaster.",
+      "starting": "The local sidecar service is starting.",
+      "retrying": "The local sidecar service is retrying startup.",
+      "startFailed": "The local sidecar service failed to start.",
+      "exited": "The local sidecar service exited unexpectedly.",
+      "healthCheckFailed": "The local sidecar service did not pass its health check.",
+      "retryingAfterFailure": "Retrying background service startup ({{restart}}/{{max}}).",
+      "failedCheckExecutable": "The background service failed to start. Check the packaged executable or diagnostics bundle."
+    },
+    "bonjourPath": "Bonjour path: {{path}}",
+    "lastExitCode": "Last exit code: {{code}}",
+    "retrySidecar": "Retry background service"
+  }
+}

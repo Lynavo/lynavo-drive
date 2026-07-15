@@ -1,0 +1,21 @@
+{
+  "title": "Error",
+  "unknown": "An unknown error occurred.",
+  "networkUnavailable": "Network unavailable",
+  "sidecarUnreachable": "Cannot reach the desktop app.",
+  "networkTitle": "Network Error",
+  "networkCheckConnection": "Please check your connection and try again.",
+  "networkCheckRetry": "Network error. Please check your connection and try again.",
+  "pairingWrongCode": "Incorrect pairing code. Please try again.",
+  "pairingWrongCodeWithAttempts": "Incorrect pairing code. Please try again. {{remainingAttempts}}/{{maxAttempts}} attempts remaining.",
+  "pairingWrongCodeWithRemaining": "Incorrect pairing code. You can try {{remainingAttempts}} more times.",
+  "pairingClientBlocked": "This phone has been blocked by this computer. Unblock it on the computer, then try again.",
+  "pairingTokenInvalid": "The connection has expired. Enter the computer pairing code again.",
+  "pairingConnectFailed": "Connection failed: {{msg}}",
+  "exportDiagnosticsUnavailable": "This build does not support exporting the diagnostics bundle.",
+  "serverErrorHttp": "Server error (HTTP {{status}})",
+  "responseParseError": "Failed to parse response.",
+  "pairingVersionMismatchTitle": "Version Incompatible",
+  "pairingVersionMismatchMessage": "The app versions on your mobile device and computer are incompatible. Please update the desktop app to the latest version and try again.",
+  "pairingBlocked": "Pairing blocked. Please click 'Unblock Device' in desktop settings, or generate a new connection code and try again."
+}

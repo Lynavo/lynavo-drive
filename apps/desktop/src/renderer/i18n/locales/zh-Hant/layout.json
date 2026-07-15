@@ -1,0 +1,88 @@
+{
+  "nav": {
+    "dashboard": "共享管理",
+    "directory": "目錄管理",
+    "devices": "裝置管理",
+    "shared": "共享",
+    "library": "同步紀錄",
+    "records": "存取紀錄",
+    "settings": "我的",
+    "help": "說明"
+  },
+  "placeholders": {
+    "devices": {
+      "title": "裝置管理",
+      "description": "已連線裝置、授權狀態與封鎖名單會在這裡集中管理。"
+    },
+    "shared": {
+      "title": "共享管理",
+      "description": "電腦端本機共享資源與存取範圍會在這裡設定。"
+    },
+    "library": {
+      "title": "資料庫",
+      "description": "接收素材、歸檔位置與本機資料庫狀態會在這裡彙整。"
+    },
+    "records": {
+      "title": "記錄",
+      "description": "連線、授權、封鎖與同步記錄會在這裡查詢。"
+    }
+  },
+  "connectionSetup": {
+    "title": "設定連線碼",
+    "connectionCodeLabel": "連線碼",
+    "connectionCodeChangeConfirm": "修改配對碼會中斷目前已配對的手機，所有手機需使用新配對碼重新配對。要繼續嗎？",
+    "saveAndEnter": "儲存並進入 Lynavo Drive",
+    "downloadSectionTitle": "使用與下載手機端",
+    "errors": {
+      "invalidCode": "請輸入 6 位數字連線碼",
+      "serviceUnavailable": "連線碼服務暫時無法使用",
+      "saveFailed": "儲存連線碼失敗"
+    },
+    "steps": {
+      "download": {
+        "title": "掃碼下載手機端",
+        "description": "用手機掃描右側 QR Code，下載並安裝 Lynavo Drive 手機端"
+      },
+      "pair": {
+        "title": "輸入連線碼配對",
+        "description": "在手機端輸入此連線碼即可連接這台電腦，同一區域網路下會自動同步手機相簿和檔案到此電腦"
+      },
+      "localFileAccess": {
+        "title": "瀏覽電腦本地檔案",
+        "description": "配對成功後，同一區域網路內的手機可以瀏覽這台電腦分享的本地檔案。"
+      }
+    }
+  },
+  "download": {
+    "openButton": "下載手機端",
+    "panelTitle": "掃碼下載手機端",
+    "qrTitle": "{{platform}} 下載 QR Code",
+    "qrAriaLabel": "{{platform}} 下載 QR Code"
+  },
+  "errorBoundary": {
+    "helpLoadFailed": "說明中心載入失敗，請重試"
+  },
+  "sidecar": {
+    "bonjourWarningTitle": "Bonjour 廣播未啟用",
+    "retryingTitle": "背景服務正在重試",
+    "startingTitle": "背景服務啟動中",
+    "failedTitle": "背景服務啟動失敗",
+    "bonjourFallbackDetail": "Windows 目前未偵測到 Bonjour for Windows。",
+    "startingDetail": "桌面應用程式正在等待本機 sidecar 服務就緒。",
+    "failedDetail": "本機 sidecar 未能成功啟動。",
+    "runtimeMessages": {
+      "bonjourNativeDetected": "已偵測到 Bonjour for Windows，將用於裝置探索。",
+      "bonjourFallbackDetected": "未偵測到 Bonjour for Windows，目前使用相容廣播模式。",
+      "starting": "本機 sidecar 服務正在啟動。",
+      "retrying": "本機 sidecar 服務正在重試啟動。",
+      "startFailed": "本機 sidecar 服務啟動失敗。",
+      "exited": "本機 sidecar 服務意外結束。",
+      "healthCheckFailed": "本機 sidecar 服務健康檢查未通過。",
+      "retryingAfterFailure": "正在重試啟動背景服務（{{restart}}/{{max}}）。",
+      "failedCheckExecutable": "背景服務啟動失敗，請檢查打包後的可執行檔或診斷包。"
+    },
+    "bonjourPath": "Bonjour 路徑：{{path}}",
+    "lastExitCode": "最近退出碼：{{code}}",
+    "retrySidecar": "重試背景服務"
+  }
+}

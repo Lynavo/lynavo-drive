@@ -1,0 +1,11 @@
+{
+  "title": "连接设备",
+  "deviceLabel": "正在连接：{{deviceName}} ({{host}})",
+  "prompt": "请输入 6 位数字连接码",
+  "verifying": "正在验证连接码...",
+  "helpTitle": "去哪里找连接码？",
+  "helpText": "请在电脑端 Lynavo Drive 左侧导航栏点击「全局设置」，即可查看 6 位数字连接码。",
+  "helpSecondary": "连接码不会自动刷新，需手动点击「重新生成」才会更新。",
+  "exampleLabel": "示例",
+  "helpCta": "查看详细图文教程 >"
+}

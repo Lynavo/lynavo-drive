@@ -1,0 +1,134 @@
+import { resolveLocale } from '../locale-resolver';
+import { resources } from '../resources';
+
+type Locale = {
+  languageCode: string;
+  scriptCode?: string;
+  countryCode: string;
+  languageTag: string;
+  isRTL: boolean;
+};
+
+const locale = (
+  tag: string,
+  languageCode: string,
+  countryCode: string,
+  scriptCode?: string,
+): Locale => ({
+  languageTag: tag,
+  languageCode,
+  scriptCode,
+  countryCode,
+  isRTL: false,
+});
+
+describe('resolveLocale', () => {
+  it('returns zh-Hans for simplified Chinese script', () => {
+    expect(resolveLocale([locale('zh-Hans', 'zh', '', 'Hans')])).toBe(
+      'zh-Hans',
+    );
+  });
+
+  it('returns zh-Hans for bare Chinese without scriptCode', () => {
+    expect(resolveLocale([locale('zh', 'zh', '')])).toBe('zh-Hans');
+  });
+
+  it('returns zh-Hant for traditional Chinese (Taiwan)', () => {
+    expect(resolveLocale([locale('zh-Hant-TW', 'zh', 'TW', 'Hant')])).toBe(
+      'zh-Hant',
+    );
+  });
+
+  it('returns zh-Hant for traditional Chinese (Hong Kong)', () => {
+    expect(resolveLocale([locale('zh-Hant-HK', 'zh', 'HK', 'Hant')])).toBe(
+      'zh-Hant',
+    );
+  });
+
+  it('uses region as a fallback when traditional Chinese has no scriptCode', () => {
+    expect(resolveLocale([locale('zh-TW', 'zh', 'TW')])).toBe('zh-Hant');
+  });
+
+  it('returns en for US English', () => {
+    expect(resolveLocale([locale('en-US', 'en', 'US')])).toBe('en');
+  });
+
+  it('returns en for unsupported languages (ja, ko, fr)', () => {
+    expect(resolveLocale([locale('ja-JP', 'ja', 'JP')])).toBe('en');
+    expect(resolveLocale([locale('ko-KR', 'ko', 'KR')])).toBe('en');
+    expect(resolveLocale([locale('fr-FR', 'fr', 'FR')])).toBe('en');
+  });
+
+  it('respects user preference order: picks en when English comes first', () => {
+    expect(
+      resolveLocale([
+        locale('en-US', 'en', 'US'),
+        locale('zh-Hans', 'zh', '', 'Hans'),
+      ]),
+    ).toBe('en');
+  });
+
+  it('picks zh-Hans when simplified Chinese comes before English', () => {
+    expect(
+      resolveLocale([
+        locale('zh-Hans', 'zh', '', 'Hans'),
+        locale('en-US', 'en', 'US'),
+      ]),
+    ).toBe('zh-Hans');
+  });
+
+  it('picks zh-Hant when traditional Chinese is the highest preference', () => {
+    expect(
+      resolveLocale([
+        locale('zh-Hant-TW', 'zh', 'TW', 'Hant'),
+        locale('zh-Hans', 'zh', '', 'Hans'),
+      ]),
+    ).toBe('zh-Hant');
+  });
+
+  it('returns en for empty list', () => {
+    expect(resolveLocale([])).toBe('en');
+  });
+});
+
+describe('public locale surface guards', () => {
+  const supportedLocales = ['en', 'zh-Hans', 'zh-Hant'] as const;
+
+  it('does not ship unused remote-wake settings copy', () => {
+    for (const localeName of supportedLocales) {
+      const settings = resources[localeName].translation.settings as Record<
+        string,
+        unknown
+      >;
+
+      expect(settings).not.toHaveProperty('remoteWake');
+    }
+  });
+
+  it('keeps shared-files local-computer copy local-LAN only', () => {
+    for (const localeName of supportedLocales) {
+      const sharedFiles = resources[localeName].translation
+        .sharedFiles as Record<string, unknown>;
+      const localComputer = sharedFiles.localComputer as Record<
+        string,
+        unknown
+      >;
+      const connectionStatus = sharedFiles.connectionStatus as Record<
+        string,
+        unknown
+      >;
+
+      expect(localComputer).not.toHaveProperty('desktopLoggedOutTitle');
+      expect(localComputer).not.toHaveProperty('desktopLoggedOutSubtitle');
+      expect(localComputer).not.toHaveProperty('accountMismatchTitle');
+      expect(localComputer).not.toHaveProperty('accountMismatchSubtitle');
+      expect(connectionStatus).not.toHaveProperty('p2p');
+      expect(connectionStatus).not.toHaveProperty('relay');
+      expect(connectionStatus).not.toHaveProperty('waking');
+      expect(connectionStatus).not.toHaveProperty('p2pConnecting');
+      expect(connectionStatus).not.toHaveProperty('relayConnecting');
+      expect(connectionStatus).not.toHaveProperty('remoteWakeSetupRequired');
+      expect(sharedFiles).not.toHaveProperty('remoteWakeSetupRequired');
+    }
+  });
+});

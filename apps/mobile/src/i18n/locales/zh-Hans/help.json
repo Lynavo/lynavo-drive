@@ -1,0 +1,38 @@
+{
+  "sections": {
+    "contact": "联系支持"
+  },
+  "faq": {
+    "item0": {
+      "title": "一直显示寻找设备怎么办？",
+      "answer": "请确认手机和电脑处于同一 Wi-Fi 网络，且 Lynavo Drive PC 端正在运行。尝试重启 PC 端后，在手机端点击刷新重新扫描，或改用 6 位连接码手动连接。"
+    },
+    "item1": {
+      "title": "自动上传为什么会暂停？",
+      "answer": "自动上传在切换 Wi-Fi、电脑睡眠或手机应用不在前台时会暂停。应用回到前台且局域网恢复后，Lynavo Drive 会保留已完成文件并自动继续未完成队列。"
+    },
+    "item2": {
+      "title": "上传失败怎么处理？",
+      "answer": "请保持手机和电脑在同一 Wi-Fi 网络，并确认电脑端仍在运行。Lynavo Drive 会保留已完成文件并自动重试未完成队列；如果仍失败，可导出本地诊断包，通过邮件或系统分享发送给维护者/支持方。"
+    },
+    "item3": {
+      "title": "无法扫码连接怎么办？",
+      "answer": "确认手机摄像头对准 PC 端二维码；若扫码失败，可改用手动输入 6 位连接码的方式连接。"
+    },
+    "item4": {
+      "title": "开源版需要云端登录吗？",
+      "answer": "不需要。OSS 版本通过本地桌面配对保留局域网配对、前台同步和共享目录浏览能力。"
+    },
+    "item5": {
+      "title": "共享目录显示为空怎么办？",
+      "answer": "请在 PC 端 Lynavo Drive 设置中确认共享目录路径可用，并确认该目录下有文件。设置后在手机端下拉刷新即可看到内容。"
+    }
+  },
+  "contact": {
+    "supportIssue": "GitHub Issues",
+    "supportIssueDesc": "通过公开 issue 提交可复现 bug 或功能建议。",
+    "exportDiagnostics": "导出诊断包",
+    "exportingDiagnostics": "正在导出…",
+    "exportHint": "诊断包只会保存到本地。仅在你确认可以公开分享时附加到 issue。"
+  }
+}

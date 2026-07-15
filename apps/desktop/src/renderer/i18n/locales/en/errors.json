@@ -1,0 +1,40 @@
+{
+  "common": {
+    "loadFailed": "Failed to load. Please try again later.",
+    "pageRenderFailed": "The page failed to render. Please retry.",
+    "retryLater": "Please try again later."
+  },
+  "dashboard": {
+    "loadDevicesFailed": "Failed to load devices",
+    "receiveDirectoryUnavailable": "The receive folder is unavailable. Choose another folder or restore it.",
+    "receiveDirectoryUnavailableDescription": "The desktop app is still online, but it cannot access the configured receive location.",
+    "checkNetworkAndRetry": "Check your network connection and retry."
+  },
+  "deviceDetail": {
+    "loadFileLedgerFailed": "Failed to load file records",
+    "openFolderFailed": "Failed to open folder",
+    "fileMissing": "The file does not exist or has been removed",
+    "invalidDateRange": "Invalid date range",
+    "startAfterEndAdjusted": "The start date cannot be later than the end date. It has been adjusted automatically.",
+    "endBeforeStart": "The end date cannot be earlier than the start date."
+  },
+  "directory": {
+    "receiveDirectoryUnavailable": "The receive folder is unavailable. Choose another folder or restore it.",
+    "sharedDirectoryUnavailable": "The team shared folder is unavailable. Choose another folder or restore it.",
+    "loadReceivedFailed": "Failed to load received files",
+    "loadSharedFailed": "Failed to load team shared files",
+    "transferActiveChangeRoot": "Files are being received. Change the root folder after transfer finishes.",
+    "transferActiveReceivePath": "Files are being received. The receive folder cannot be changed right now.",
+    "locationNotWritable": "The selected location is not writable. Choose another folder.",
+    "selectValidDirectory": "Choose a valid folder.",
+    "directoryUnavailable": "Folder unavailable",
+    "pathMissing": "Path does not exist",
+    "openFolderFailed": "Failed to open folder"
+  },
+  "settings": {
+    "shareStatusCheckFailed": "Failed to check sharing status",
+    "diagnosticsExported": "Diagnostics bundle exported",
+    "diagnosticsExportFailed": "Failed to export diagnostics bundle",
+    "sidecarRetryFailed": "Failed to retry background service startup"
+  }
+}
