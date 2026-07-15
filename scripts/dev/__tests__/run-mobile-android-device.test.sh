@@ -83,7 +83,7 @@ if [[ "$actual_gradle_args" != "$expected_gradle_args" ]]; then
 fi
 
 actual_adb_log="$(cat "$LYNAVO_ANDROID_TEST_ADB_LOG")"
-expected_launch="15977ea9 shell am start -n com.lynavo.drive.mobile/com.lynavo.drive.mobile.MainActivity"
+expected_launch="15977ea9 shell am start -n com.lynavo.drive.mobile.demo/com.lynavo.drive.mobile.demo.MainActivity"
 
 if ! grep -Fq "$expected_launch" <<<"$actual_adb_log"; then
   echo "Expected adb launch: $expected_launch" >&2

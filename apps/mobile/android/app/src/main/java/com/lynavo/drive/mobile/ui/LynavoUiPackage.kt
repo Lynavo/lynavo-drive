@@ -1,4 +1,4 @@
-package com.lynavo.drive.mobile.ui
+package com.lynavo.drive.mobile.demo.ui
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule

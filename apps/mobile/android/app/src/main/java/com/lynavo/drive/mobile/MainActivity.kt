@@ -1,4 +1,4 @@
-package com.lynavo.drive.mobile
+package com.lynavo.drive.mobile.demo
 
 import android.content.Intent
 import android.os.Bundle

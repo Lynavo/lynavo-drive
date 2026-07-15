@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ANDROID_DIR="$ROOT_DIR/apps/mobile/android"
 METRO_PORT="${METRO_PORT:-${RCT_METRO_PORT:-8081}}"
 METRO_READY_TIMEOUT_SECONDS="${LYNAVO_ANDROID_METRO_READY_TIMEOUT_SECONDS:-20}"
-APP_ID="${LYNAVO_ANDROID_APP_ID:-com.lynavo.drive.mobile}"
+APP_ID="${LYNAVO_ANDROID_APP_ID:-com.lynavo.drive.mobile.demo}"
 MAIN_ACTIVITY="${LYNAVO_ANDROID_MAIN_ACTIVITY:-.MainActivity}"
 if [[ "$MAIN_ACTIVITY" == .* ]]; then
   # Resolve relative activity names against the app id being launched.

@@ -105,7 +105,7 @@ test('desktop builder config uses Lynavo Drive for package branding and public a
   const linuxConfig = readTopLevelSection(config, 'linux');
   const nsisConfig = readTopLevelSection(config, 'nsis');
 
-  assert.match(config, /^appId: com\.lynavo\.drive\.desktop$/m);
+  assert.match(config, /^appId: com\.lynavo\.drive\.desktop\.demo$/m);
   assert.match(config, /^productName: Lynavo Drive$/m);
   assert.match(macConfig, /^  artifactName: LynavoDrive-\$\{version\}-\$\{arch\}\.\$\{ext\}$/m);
   assert.match(winConfig, /^  artifactName: LynavoDrive-\$\{version\}-\$\{arch\}\.\$\{ext\}$/m);

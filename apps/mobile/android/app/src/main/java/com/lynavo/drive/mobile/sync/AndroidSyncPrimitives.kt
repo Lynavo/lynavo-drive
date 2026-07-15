@@ -1,4 +1,4 @@
-package com.lynavo.drive.mobile.sync
+package com.lynavo.drive.mobile.demo.sync
 
 import java.io.BufferedOutputStream
 import java.io.File

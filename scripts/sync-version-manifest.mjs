@@ -50,7 +50,7 @@ function renderOutputs(manifest) {
     },
     {
       path: 'apps/mobile/android/app/src/main/java/com/lynavo/drive/mobile/sync/LynavoVersion.kt',
-      content: `package com.lynavo.drive.mobile.sync\n\n${generatedHeader('//')}internal const val APP_COMPATIBILITY_VERSION = ${appCompatibilityVersion}\n`,
+      content: `package com.lynavo.drive.mobile.demo.sync\n\n${generatedHeader('//')}internal const val APP_COMPATIBILITY_VERSION = ${appCompatibilityVersion}\n`,
     },
   ];
 }

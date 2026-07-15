@@ -120,11 +120,11 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.lynavo.drive.mobile"
+    namespace "com.lynavo.drive.mobile.demo"
     defaultConfig {
         // Keep namespace and applicationId aligned so manifest placeholders,
         // launcher helpers, and native bridge tests resolve one Android identity.
-        applicationId "com.lynavo.drive.mobile"
+        applicationId "com.lynavo.drive.mobile.demo"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode resolveIosBuildNumber().toInteger()

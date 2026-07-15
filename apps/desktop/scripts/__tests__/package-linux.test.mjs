@@ -164,7 +164,7 @@ test('desktop packaging keeps a single Lynavo Drive builder config', () => {
     builderConfig,
     /^  artifactName: LynavoDrive-\$\{version\}-linux-\$\{arch\}\.\$\{ext\}$/m,
   );
-  assert.match(builderConfig, /^appId: com\.lynavo\.drive\.desktop$/m);
+  assert.match(builderConfig, /^appId: com\.lynavo\.drive\.desktop\.demo$/m);
   assert.match(builderConfig, /^  executableName: Lynavo Drive$/m);
   assert.match(builderConfig, /^  executableName: lynavo-drive$/m);
   assert.match(builderConfig, /^  shortcutName: Lynavo Drive$/m);

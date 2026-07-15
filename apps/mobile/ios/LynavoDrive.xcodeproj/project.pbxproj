@@ -445,7 +445,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.lynavo.drive.mobile;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lynavo.drive.mobile.demo;
 				PRODUCT_NAME = LynavoDrive;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -484,7 +484,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.lynavo.drive.mobile;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lynavo.drive.mobile.demo;
 				PRODUCT_NAME = LynavoDrive;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;

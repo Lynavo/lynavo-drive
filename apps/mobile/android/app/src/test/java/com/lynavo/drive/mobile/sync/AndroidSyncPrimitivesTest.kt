@@ -1,4 +1,4 @@
-package com.lynavo.drive.mobile.sync
+package com.lynavo.drive.mobile.demo.sync
 
 import java.util.zip.ZipFile
 import org.junit.Assert.assertEquals

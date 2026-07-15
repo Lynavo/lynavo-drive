@@ -1,4 +1,4 @@
-package com.lynavo.drive.mobile.ui
+package com.lynavo.drive.mobile.demo.ui
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
