@@ -64,7 +64,7 @@
     "electron": "^41.0.0",
     "electron-builder": "^26.8.0",
     "electron-vite": "^5.0.0",
-    "jsdom": "^26.0.0",
+    "jsdom": "^29.1.1",
     "postcss": "^8.5.0",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.8.0",
