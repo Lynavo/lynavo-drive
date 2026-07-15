@@ -83,25 +83,25 @@ jobs:
           node-version: 22.12.0
 
       - name: Download macOS arm64 artifact
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: native-macos-arm64
           path: build/release-downloads/native-macos-arm64
 
       - name: Download macOS x64 artifact
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: native-macos-x64
           path: build/release-downloads/native-macos-x64
 
       - name: Download Windows x64 artifacts
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: native-windows-x64
           path: build/release-downloads/native-windows-x64
 
       - name: Download Android artifacts
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: native-android
           path: build/release-downloads/native-android
@@ -140,7 +140,7 @@ jobs:
 
     steps:
       - name: Download assembled release assets
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: oss-release-assets-${{ needs.verify-tag.outputs.version }}
           path: build/release-assets
