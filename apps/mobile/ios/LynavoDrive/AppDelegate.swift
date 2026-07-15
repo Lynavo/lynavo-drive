@@ -68,7 +68,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     window = UIWindow(frame: UIScreen.main.bounds)
 
     factory.startReactNative(
-      withModuleName: "LynavoDrive",
+      withModuleName: "LynavoDriveDemo",
       in: window,
       launchOptions: launchOptions
     )

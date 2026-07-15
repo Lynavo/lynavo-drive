@@ -3,9 +3,9 @@ import { appConfig } from '../app-config';
 const token = (parts: string[]) => parts.join('');
 
 describe('appConfig', () => {
-  test('uses the single Lynavo Drive mobile identity', () => {
-    expect(appConfig.productName).toBe('Lynavo Drive');
-    expect(appConfig.bundleId).toBe('com.lynavo.drive.mobile');
+  test('uses the single LynavoDriveDemo mobile identity', () => {
+    expect(appConfig.productName).toBe('LynavoDriveDemo');
+    expect(appConfig.bundleId).toBe('com.lynavo.drive.mobile.demo');
   });
 
   test('uses OSS repository links without official service endpoints', () => {

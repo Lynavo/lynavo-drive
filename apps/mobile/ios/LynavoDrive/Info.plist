@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>zh-Hans</string>
 	<key>CFBundleDisplayName</key>
-	<string>Lynavo Drive</string>
+	<string>LynavoDriveDemo</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -20,7 +20,7 @@
 		<string>en</string>
 	</array>
 	<key>CFBundleName</key>
-	<string>Lynavo Drive</string>
+	<string>LynavoDriveDemo</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -32,6 +32,8 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
@@ -45,13 +47,13 @@
 		<string>_lynavodrive._tcp</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>Lynavo Drive needs camera access to scan the desktop QR pairing code</string>
+	<string>LynavoDriveDemo needs camera access to scan the desktop QR pairing code</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Lynavo Drive needs local network access to discover and connect to computers on the same LAN</string>
+	<string>LynavoDriveDemo needs local network access to discover and connect to computers on the same LAN</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Lynavo Drive only uses location-related capabilities when identifying nearby devices and does not collect your location information</string>
+	<string>LynavoDriveDemo only uses location-related capabilities when identifying nearby devices and does not collect your location information</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Lynavo Drive needs access to your photo library to sync media files to your computer</string>
+	<string>LynavoDriveDemo needs access to your photo library to sync media files to your computer</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIAppFonts</key>
@@ -59,6 +61,8 @@
 		<string>Ionicons.ttf</string>
 		<string>MaterialCommunityIcons.ttf</string>
 	</array>
+	<key>UIFileSharingEnabled</key>
+	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
@@ -78,9 +82,5 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
-	<key>UIFileSharingEnabled</key>
-	<true/>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
-	<true/>
 </dict>
 </plist>

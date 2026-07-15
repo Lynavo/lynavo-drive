@@ -148,26 +148,29 @@ test('builds runtime commands with node executable, absolute script paths, and d
   }
 });
 
-test('desktop packaging keeps a single Lynavo Drive builder config', () => {
+test('desktop packaging keeps a single LynavoDriveDemo builder config', () => {
   const builderConfigs = readdirSync(desktopRoot)
     .filter((entry) => /^electron-builder(?:\..*)?\.yml$/.test(entry))
     .sort();
   assert.deepEqual(builderConfigs, ['electron-builder.yml']);
 
   const packageJson = JSON.parse(readFileSync(path.join(desktopRoot, 'package.json'), 'utf8'));
-  assert.equal(packageJson.productName, 'Lynavo Drive');
+  assert.equal(packageJson.productName, 'LynavoDriveDemo');
 
   const builderConfig = readFileSync(path.join(desktopRoot, 'electron-builder.yml'), 'utf8');
-  assert.match(builderConfig, /^productName: Lynavo Drive$/m);
-  assert.match(builderConfig, /^  artifactName: LynavoDrive-\$\{version\}-\$\{arch\}\.\$\{ext\}$/m);
+  assert.match(builderConfig, /^productName: LynavoDriveDemo$/m);
   assert.match(
     builderConfig,
-    /^  artifactName: LynavoDrive-\$\{version\}-linux-\$\{arch\}\.\$\{ext\}$/m,
+    /^  artifactName: LynavoDriveDemo-\$\{version\}-\$\{arch\}\.\$\{ext\}$/m,
   );
-  assert.match(builderConfig, /^appId: com\.lynavo\.drive\.desktop$/m);
-  assert.match(builderConfig, /^  executableName: Lynavo Drive$/m);
-  assert.match(builderConfig, /^  executableName: lynavo-drive$/m);
-  assert.match(builderConfig, /^  shortcutName: Lynavo Drive$/m);
+  assert.match(
+    builderConfig,
+    /^  artifactName: LynavoDriveDemo-\$\{version\}-linux-\$\{arch\}\.\$\{ext\}$/m,
+  );
+  assert.match(builderConfig, /^appId: com\.lynavo\.drive\.desktop\.demo$/m);
+  assert.match(builderConfig, /^  executableName: LynavoDriveDemo$/m);
+  assert.match(builderConfig, /^  executableName: lynavo-drive-demo$/m);
+  assert.match(builderConfig, /^  shortcutName: LynavoDriveDemo$/m);
   assert.match(builderConfig, /lynavo-drive-sidecar/);
 });
 

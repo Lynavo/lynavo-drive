@@ -1,4 +1,4 @@
-package com.lynavo.drive.mobile.sync
+package com.lynavo.drive.mobile.demo.sync
 
 import android.content.Context
 import android.content.SharedPreferences

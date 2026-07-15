@@ -1,4 +1,4 @@
-package com.lynavo.drive.mobile.sync
+package com.lynavo.drive.mobile.demo.sync
 
 import android.Manifest
 import android.app.Activity

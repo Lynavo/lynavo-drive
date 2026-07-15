@@ -20,14 +20,14 @@ describe('desktop product helper', () => {
     vi.unstubAllEnvs();
   });
 
-  it('uses Lynavo Drive as the visible product name', () => {
-    expect(PRODUCT_NAME).toBe('Lynavo Drive');
-    expect(getProductName()).toBe('Lynavo Drive');
+  it('uses LynavoDriveDemo as the visible product name', () => {
+    expect(PRODUCT_NAME).toBe('LynavoDriveDemo');
+    expect(getProductName()).toBe('LynavoDriveDemo');
   });
 
   it('uses Lynavo Drive as the Electron storage identity', () => {
     expect(APP_STORAGE_IDENTITY_NAME).toBe('Lynavo Drive');
-    expect(APP_STORAGE_IDENTITY_NAME).toBe(getProductName());
+    expect(APP_STORAGE_IDENTITY_NAME).not.toBe(getProductName());
   });
 
   it('resolves release channel from Lynavo env only', () => {

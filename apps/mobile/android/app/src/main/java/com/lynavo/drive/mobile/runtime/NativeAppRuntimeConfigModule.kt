@@ -1,8 +1,8 @@
-package com.lynavo.drive.mobile.runtime
+package com.lynavo.drive.mobile.demo.runtime
 
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
-import com.lynavo.drive.mobile.MainActivity
+import com.lynavo.drive.mobile.demo.MainActivity
 
 class NativeAppRuntimeConfigModule(
   reactContext: ReactApplicationContext,

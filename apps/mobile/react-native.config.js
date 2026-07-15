@@ -1,7 +1,7 @@
 module.exports = {
   project: {
     android: {
-      packageName: 'com.lynavo.drive.mobile',
+      packageName: 'com.lynavo.drive.mobile.demo',
     },
   },
   dependencies: {

@@ -58,8 +58,8 @@ function readTopLevelSection(config, sectionName) {
 test('desktop app package metadata satisfies Linux deb packaging', () => {
   const packageJson = readDesktopPackageJson();
 
-  assert.equal(packageJson.productName, 'Lynavo Drive');
-  assert.equal(packageJson.description, 'Lynavo Drive desktop app for local mobile media sync.');
+  assert.equal(packageJson.productName, 'LynavoDriveDemo');
+  assert.equal(packageJson.description, 'LynavoDriveDemo desktop app for local mobile media sync.');
   assert.equal(packageJson.homepage, 'https://github.com/lynavo/lynavo-drive');
   assert.deepEqual(packageJson.author, {
     name: 'Lynavo',
@@ -98,32 +98,38 @@ test('desktop uses a single builder config with bundle build version from mobile
   );
 });
 
-test('desktop builder config uses Lynavo Drive for package branding and public app identity', () => {
+test('desktop builder config uses LynavoDriveDemo for package branding and public app identity', () => {
   const config = readDesktopConfig('electron-builder.yml');
   const macConfig = readTopLevelSection(config, 'mac');
   const winConfig = readTopLevelSection(config, 'win');
   const linuxConfig = readTopLevelSection(config, 'linux');
   const nsisConfig = readTopLevelSection(config, 'nsis');
 
-  assert.match(config, /^appId: com\.lynavo\.drive\.desktop$/m);
-  assert.match(config, /^productName: Lynavo Drive$/m);
-  assert.match(macConfig, /^  artifactName: LynavoDrive-\$\{version\}-\$\{arch\}\.\$\{ext\}$/m);
-  assert.match(winConfig, /^  artifactName: LynavoDrive-\$\{version\}-\$\{arch\}\.\$\{ext\}$/m);
-  assert.match(winConfig, /^  executableName: Lynavo Drive$/m);
+  assert.match(config, /^appId: com\.lynavo\.drive\.desktop\.demo$/m);
+  assert.match(config, /^productName: LynavoDriveDemo$/m);
+  assert.match(
+    macConfig,
+    /^  artifactName: LynavoDriveDemo-\$\{version\}-\$\{arch\}\.\$\{ext\}$/m,
+  );
+  assert.match(
+    winConfig,
+    /^  artifactName: LynavoDriveDemo-\$\{version\}-\$\{arch\}\.\$\{ext\}$/m,
+  );
+  assert.match(winConfig, /^  executableName: LynavoDriveDemo$/m);
   assert.match(
     linuxConfig,
-    /^  artifactName: LynavoDrive-\$\{version\}-linux-\$\{arch\}\.\$\{ext\}$/m,
+    /^  artifactName: LynavoDriveDemo-\$\{version\}-linux-\$\{arch\}\.\$\{ext\}$/m,
   );
-  assert.match(linuxConfig, /^  executableName: lynavo-drive$/m);
-  assert.match(nsisConfig, /^  shortcutName: Lynavo Drive$/m);
+  assert.match(linuxConfig, /^  executableName: lynavo-drive-demo$/m);
+  assert.match(nsisConfig, /^  shortcutName: LynavoDriveDemo$/m);
 });
 
-test('macOS permission descriptions use Lynavo Drive as the visible app name', () => {
+test('macOS permission descriptions use LynavoDriveDemo as the visible app name', () => {
   const config = readDesktopConfig('electron-builder.yml');
 
-  assert.match(config, /NSDesktopFolderUsageDescription: Lynavo Drive /);
-  assert.match(config, /NSDocumentsFolderUsageDescription: Lynavo Drive /);
-  assert.match(config, /NSDownloadsFolderUsageDescription: Lynavo Drive /);
+  assert.match(config, /NSDesktopFolderUsageDescription: LynavoDriveDemo /);
+  assert.match(config, /NSDocumentsFolderUsageDescription: LynavoDriveDemo /);
+  assert.match(config, /NSDownloadsFolderUsageDescription: LynavoDriveDemo /);
 });
 
 test('windows installer uses Lynavo Drive firewall identities scoped to the sidecar binary', () => {
@@ -198,9 +204,9 @@ test('desktop builder config defines Linux deb packaging', () => {
   assert.match(linuxConfig, /^linux:$/m);
   assert.match(
     linuxConfig,
-    /^  artifactName: LynavoDrive-\$\{version\}-linux-\$\{arch\}\.\$\{ext\}$/m,
+    /^  artifactName: LynavoDriveDemo-\$\{version\}-linux-\$\{arch\}\.\$\{ext\}$/m,
   );
-  assert.match(linuxConfig, /^  executableName: lynavo-drive$/m);
+  assert.match(linuxConfig, /^  executableName: lynavo-drive-demo$/m);
   assert.match(linuxConfig, /^  category: Utility$/m);
   assert.match(linuxConfig, /^  icon: resources\/icon-1024\.png$/m);
   assert.match(linuxConfig, /^    - target: deb$/m);

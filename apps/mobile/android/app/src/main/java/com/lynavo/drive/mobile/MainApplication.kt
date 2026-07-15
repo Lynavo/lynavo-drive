@@ -1,4 +1,4 @@
-package com.lynavo.drive.mobile
+package com.lynavo.drive.mobile.demo
 
 import android.app.Application
 import android.content.Context
@@ -9,10 +9,10 @@ import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.mrousavy.camera.react.CameraPackage
-import com.lynavo.drive.mobile.runtime.NativeAppRuntimeConfigPackage
-import com.lynavo.drive.mobile.sync.NativeSyncEngineModule
-import com.lynavo.drive.mobile.sync.NativeSyncEnginePackage
-import com.lynavo.drive.mobile.ui.LynavoUiPackage
+import com.lynavo.drive.mobile.demo.runtime.NativeAppRuntimeConfigPackage
+import com.lynavo.drive.mobile.demo.sync.NativeSyncEngineModule
+import com.lynavo.drive.mobile.demo.sync.NativeSyncEnginePackage
+import com.lynavo.drive.mobile.demo.ui.LynavoUiPackage
 
 class MainApplication : Application(), ReactApplication {
 

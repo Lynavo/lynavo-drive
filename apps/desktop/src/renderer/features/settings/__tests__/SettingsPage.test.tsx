@@ -207,7 +207,7 @@ describe('SettingsPage', () => {
   it('renders the product helper name in the version card', async () => {
     render(<SettingsPage />);
 
-    expect(await screen.findByText('Lynavo Drive')).toBeInTheDocument();
+    expect(await screen.findByText('LynavoDriveDemo')).toBeInTheDocument();
     expect(screen.queryByText('Lynavo Drive Desktop')).not.toBeInTheDocument();
   });
 

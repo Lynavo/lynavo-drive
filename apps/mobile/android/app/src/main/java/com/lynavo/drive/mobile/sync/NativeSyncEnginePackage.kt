@@ -1,4 +1,4 @@
-package com.lynavo.drive.mobile.sync
+package com.lynavo.drive.mobile.demo.sync
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule

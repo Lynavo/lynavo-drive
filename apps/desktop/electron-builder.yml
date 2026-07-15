@@ -1,12 +1,12 @@
-appId: com.lynavo.drive.desktop
-productName: Lynavo Drive
+appId: com.lynavo.drive.desktop.demo
+productName: LynavoDriveDemo
 buildVersion: '62'
 files:
   - out/**/*
   - node_modules/**/*
   - package.json
 mac:
-  artifactName: LynavoDrive-${version}-${arch}.${ext}
+  artifactName: LynavoDriveDemo-${version}-${arch}.${ext}
   identity: null
   target:
     - dmg
@@ -14,9 +14,9 @@ mac:
   category: public.app-category.utilities
   icon: resources/icon.icns
   extendInfo:
-    NSDesktopFolderUsageDescription: Lynavo Drive needs access to the Desktop folder to sync, store, and open media.
-    NSDocumentsFolderUsageDescription: Lynavo Drive needs access to the Documents folder to sync, store, and open media.
-    NSDownloadsFolderUsageDescription: Lynavo Drive needs access to the Downloads folder to sync, store, and open media.
+    NSDesktopFolderUsageDescription: LynavoDriveDemo needs access to the Desktop folder to sync, store, and open media.
+    NSDocumentsFolderUsageDescription: LynavoDriveDemo needs access to the Documents folder to sync, store, and open media.
+    NSDownloadsFolderUsageDescription: LynavoDriveDemo needs access to the Downloads folder to sync, store, and open media.
   binaries:
     - Contents/Resources/lynavo-drive-sidecar
   extraResources:
@@ -37,7 +37,7 @@ dmg:
       type: link
       path: /Applications
 win:
-  artifactName: LynavoDrive-${version}-${arch}.${ext}
+  artifactName: LynavoDriveDemo-${version}-${arch}.${ext}
   forceCodeSigning: false
   verifyUpdateCodeSignature: false
   signExts:
@@ -49,13 +49,13 @@ win:
     - target: zip
       arch:
         - x64
-  executableName: Lynavo Drive
+  executableName: LynavoDriveDemo
   extraResources:
     - from: resources
       filter:
         - lynavo-drive-sidecar.exe
 linux:
-  artifactName: LynavoDrive-${version}-linux-${arch}.${ext}
+  artifactName: LynavoDriveDemo-${version}-linux-${arch}.${ext}
   maintainer: Lynavo Drive Maintainers <maintainers@lynavo.invalid>
   target:
     - target: deb
@@ -63,7 +63,7 @@ linux:
         - x64
         - arm64
   category: Utility
-  executableName: lynavo-drive
+  executableName: lynavo-drive-demo
   icon: resources/icon-1024.png
   extraResources:
     - from: resources/lynavo-drive-sidecar
@@ -73,7 +73,7 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   createStartMenuShortcut: true
-  shortcutName: Lynavo Drive
+  shortcutName: LynavoDriveDemo
   include: resources/installer.nsh
 directories:
   output: release
