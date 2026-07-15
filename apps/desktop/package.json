@@ -36,7 +36,7 @@
     "@lynavo-drive/design-tokens": "workspace:*",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
-    "electron-log": "^5.4.3",
+    "electron-log": "^5.4.4",
     "i18next": "^23.16.8",
     "lucide-react": "^0.577.0",
     "qrcode.react": "^4.2.0",
