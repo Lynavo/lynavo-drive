@@ -1,0 +1,84 @@
+{
+  "actions": {
+    "backToDeviceList": "返回裝置列表",
+    "change": "變更",
+    "copy": "複製",
+    "open": "開啟",
+    "openFile": "開啟檔案",
+    "openFolder": "開啟資料夾",
+    "retry": "重試",
+    "save": "儲存"
+  },
+  "date": {
+    "today": "今天",
+    "yesterday": "昨天",
+    "weekdays": ["週日", "週一", "週二", "週三", "週四", "週五", "週六"],
+    "todayWithTime": "今天 {{time}}",
+    "yesterdayWithTime": "昨天 {{time}}",
+    "weekdayWithTime": "{{weekday}} {{time}}",
+    "monthDay": "{{month}}月{{day}}日",
+    "monthDayWithTime": "{{month}}月{{day}}日 {{time}}",
+    "yearMonthDayWithTime": "{{year}}/{{month}}/{{day}} {{time}}"
+  },
+  "fallback": {
+    "detecting": "偵測中…",
+    "loading": "載入中...",
+    "notSet": "未設定",
+    "reading": "讀取中…",
+    "starting": "啟動中…",
+    "unknownDevice": "未知裝置",
+    "noRecord": "暫無紀錄"
+  },
+  "pagination": {
+    "empty": "該日期暫無傳輸紀錄",
+    "page": "第 {{page}} / {{totalPages}} 頁",
+    "range": "顯示第 {{start}}-{{end}} 筆，共 {{total}} 筆",
+    "previous": "上一頁",
+    "next": "下一頁"
+  },
+  "status": {
+    "connectedIdle": "已連線",
+    "offline": "未連線",
+    "transferring": "傳輸中"
+  },
+  "units": {
+    "files": "個檔案"
+  },
+  "shared": {
+    "addFile": "共享檔案",
+    "addFolder": "共享資料夾",
+    "tableName": "名稱",
+    "tableKind": "類型",
+    "tableSize": "大小",
+    "tableStatus": "狀態",
+    "tableDownloads": "下載次數",
+    "tableLastAccessed": "最後存取",
+    "tableAddedAt": "新增時間",
+    "tableActions": "操作",
+    "statusAvailable": "可用",
+    "statusMissing": "檔案不存在",
+    "statusRemoved": "已移除",
+    "kindFile": "本機檔案",
+    "kindFolder": "本機資料夾",
+    "kindReceived": "已接收",
+    "noData": "尚無共享資源",
+    "remove": "取消共享"
+  },
+  "library": {
+    "tableName": "名稱",
+    "tableMediaType": "格式",
+    "tableSize": "大小",
+    "tableSource": "來源裝置",
+    "tableCompletedAt": "傳輸時間",
+    "tableShareStatus": "共享狀態",
+    "tableActions": "操作",
+    "addToShared": "加入共享",
+    "statusShared": "已共享",
+    "statusNotShared": "未共享",
+    "statusMissing": "遺失",
+    "noData": "尚無接收資料"
+  },
+  "toast": {
+    "copied": "已複製到剪貼簿"
+  }
+}

@@ -1,0 +1,15 @@
+/* Camera Usage Description */
+"NSCameraUsageDescription" = "Lynavo Drive needs camera access to scan QR codes for pairing with the desktop app.";
+
+/* Local Network Usage Description */
+"NSLocalNetworkUsageDescription" = "Lynavo Drive needs local network access to discover and sync with computers on the same network.";
+
+/* Location Usage Description */
+"NSLocationWhenInUseUsageDescription" = "Lynavo Drive only uses location services when discovering nearby devices; your location data is never collected.";
+
+/* Photo Library Usage Description */
+"NSPhotoLibraryUsageDescription" = "Lynavo Drive needs access to your photo library to sync media files with your computer.";
+
+/* Bundle Display Name */
+"CFBundleDisplayName" = "Lynavo Drive";
+"CFBundleName" = "Lynavo Drive";

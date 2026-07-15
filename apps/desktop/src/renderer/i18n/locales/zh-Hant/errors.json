@@ -1,0 +1,40 @@
+{
+  "common": {
+    "loadFailed": "載入失敗，請稍後重試",
+    "pageRenderFailed": "頁面渲染出錯，請重試",
+    "retryLater": "請稍後重試"
+  },
+  "dashboard": {
+    "loadDevicesFailed": "載入裝置列表失敗",
+    "receiveDirectoryUnavailable": "接收目錄不可用，請重新選擇或復原資料夾",
+    "receiveDirectoryUnavailableDescription": "電腦端仍在線，但目前無法存取設定的接收位置",
+    "checkNetworkAndRetry": "請檢查網路連線後重試"
+  },
+  "deviceDetail": {
+    "loadFileLedgerFailed": "載入檔案紀錄失敗",
+    "openFolderFailed": "開啟資料夾失敗",
+    "fileMissing": "檔案不存在或已被移除",
+    "invalidDateRange": "時間範圍無效",
+    "startAfterEndAdjusted": "起始時間不能晚於結束時間，已自動調整",
+    "endBeforeStart": "結束時間不能早於起始時間"
+  },
+  "directory": {
+    "receiveDirectoryUnavailable": "接收目錄不可用，請重新選擇或復原資料夾",
+    "sharedDirectoryUnavailable": "團隊共享目錄不可用，請重新選擇或復原資料夾",
+    "loadReceivedFailed": "載入接收檔案列表失敗",
+    "loadSharedFailed": "載入團隊共享檔案列表失敗",
+    "transferActiveChangeRoot": "正在接收檔案，完成後再變更根目錄",
+    "transferActiveReceivePath": "目前正在接收檔案，暫時無法修改接收目錄",
+    "locationNotWritable": "所選位置不可寫入，請選擇其他資料夾",
+    "selectValidDirectory": "請選擇有效目錄",
+    "directoryUnavailable": "目錄不可用",
+    "pathMissing": "路徑不存在",
+    "openFolderFailed": "開啟資料夾失敗"
+  },
+  "settings": {
+    "shareStatusCheckFailed": "共享狀態偵測失敗",
+    "diagnosticsExported": "診斷包已匯出",
+    "diagnosticsExportFailed": "診斷包匯出失敗",
+    "sidecarRetryFailed": "重試啟動背景服務失敗"
+  }
+}

@@ -1,0 +1,1 @@
+ALTER TABLE uploads ADD COLUMN source TEXT NOT NULL DEFAULT 'auto';

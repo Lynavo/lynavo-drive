@@ -1,0 +1,84 @@
+{
+  "actions": {
+    "backToDeviceList": "Back to devices",
+    "change": "Change",
+    "copy": "Copy",
+    "open": "Open",
+    "openFile": "Open file",
+    "openFolder": "Open folder",
+    "retry": "Retry",
+    "save": "Save"
+  },
+  "date": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "weekdays": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    "todayWithTime": "Today {{time}}",
+    "yesterdayWithTime": "Yesterday {{time}}",
+    "weekdayWithTime": "{{weekday}} {{time}}",
+    "monthDay": "{{month}}/{{day}}",
+    "monthDayWithTime": "{{month}}/{{day}} {{time}}",
+    "yearMonthDayWithTime": "{{year}}/{{month}}/{{day}} {{time}}"
+  },
+  "fallback": {
+    "detecting": "Detecting...",
+    "loading": "Loading...",
+    "notSet": "Not set",
+    "reading": "Reading...",
+    "starting": "Starting...",
+    "unknownDevice": "Unknown device",
+    "noRecord": "No records"
+  },
+  "pagination": {
+    "empty": "No transfer records for this date",
+    "page": "Page {{page}} / {{totalPages}}",
+    "range": "Showing {{start}}-{{end}} of {{total}}",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "status": {
+    "connectedIdle": "Connected",
+    "offline": "Offline",
+    "transferring": "Transferring"
+  },
+  "units": {
+    "files": "files"
+  },
+  "shared": {
+    "addFile": "Share File",
+    "addFolder": "Share Folder",
+    "tableName": "Name",
+    "tableKind": "Type",
+    "tableSize": "Size",
+    "tableStatus": "Status",
+    "tableDownloads": "Downloads",
+    "tableLastAccessed": "Last Accessed",
+    "tableAddedAt": "Added At",
+    "tableActions": "Actions",
+    "statusAvailable": "Available",
+    "statusMissing": "File Missing",
+    "statusRemoved": "Removed",
+    "kindFile": "Local File",
+    "kindFolder": "Local Folder",
+    "kindReceived": "Received File",
+    "noData": "No shared resources",
+    "remove": "Unshare"
+  },
+  "library": {
+    "tableName": "Name",
+    "tableMediaType": "Format",
+    "tableSize": "Size",
+    "tableSource": "Source Device",
+    "tableCompletedAt": "Completed At",
+    "tableShareStatus": "Share Status",
+    "tableActions": "Actions",
+    "addToShared": "Add to Shared",
+    "statusShared": "Shared",
+    "statusNotShared": "Not Shared",
+    "statusMissing": "Missing",
+    "noData": "No received items"
+  },
+  "toast": {
+    "copied": "Copied to clipboard"
+  }
+}

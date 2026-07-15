@@ -1,0 +1,32 @@
+{
+  "title": "裝置詳細資訊",
+  "openFolder": "開啟資料夾",
+  "filter": {
+    "completedDate": "完成日期",
+    "from": "從",
+    "to": "至",
+    "startLabel": "開始完成日期",
+    "endLabel": "結束完成日期",
+    "singleDateTitle": "只有一個完成日期",
+    "todayWithDate": "今天 ({{date}})"
+  },
+  "stats": {
+    "duration": "耗時"
+  },
+  "overview": {
+    "title": "裝置概覽",
+    "authorizedDevices": "授權裝置",
+    "blockedDevices": "封鎖中",
+    "totalFiles": "累計檔案",
+    "totalBytes": "累計容量",
+    "latestSeenAt": "最近出現：{{time}}"
+  },
+  "table": {
+    "fileName": "檔案名稱",
+    "fileSize": "檔案大小",
+    "completedAt": "完成時間",
+    "createdAt": "建立時間",
+    "duration": "傳輸耗時",
+    "actions": "操作"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "title": "Device Management",
+  "stats": {
+    "total": "Total devices",
+    "disabled": "Blocked",
+    "connected": "Connected"
+  },
+  "empty": {
+    "title": "No devices",
+    "description": "Mobile devices authorized with the pairing code will appear here."
+  },
+  "table": {
+    "unnamedDevice": "Unnamed device"
+  },
+  "status": {
+    "connected": "Connected",
+    "disabled": "Blocked",
+    "offline": "Offline",
+    "connectedWaitingSync": "Connected, waiting to sync"
+  },
+  "blockReason": {
+    "tooManyFailedAttempts": "Pairing code entered incorrectly 3 times. Device blocked automatically."
+  },
+  "actions": {
+    "block": "Block",
+    "unblock": "Unblock",
+    "cancel": "Cancel",
+    "confirmBlock": "Confirm block"
+  },
+  "dialog": {
+    "disableTitle": "Block device",
+    "disableDescription": "After blocking, {{deviceName}} will disconnect and stop all transfers. Block this device?"
+  }
+}

@@ -1,0 +1,15 @@
+/* Camera Usage Description */
+"NSCameraUsageDescription" = "Lynavo Drive 需要相机权限来扫描桌面端的二维码连接码";
+
+/* Local Network Usage Description */
+"NSLocalNetworkUsageDescription" = "Lynavo Drive 需要访问本地网络以发现和连接同一局域网内的电脑";
+
+/* Location Usage Description */
+"NSLocationWhenInUseUsageDescription" = "Lynavo Drive 仅在需要识别附近设备时使用定位相关能力，不会采集您的位置信息";
+
+/* Photo Library Usage Description */
+"NSPhotoLibraryUsageDescription" = "Lynavo Drive 需要访问您的照片库以同步媒体文件到电脑";
+
+/* Bundle Display Name */
+"CFBundleDisplayName" = "Lynavo Drive";
+"CFBundleName" = "Lynavo Drive";

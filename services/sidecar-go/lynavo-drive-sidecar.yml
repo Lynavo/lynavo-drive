@@ -1,0 +1,7 @@
+http_port: 39594
+tcp_port: 39593
+data_dir: ''
+receive_dir: ''
+log_level: 'info'
+device_name: ''
+low_disk_threshold_bytes: 524288000

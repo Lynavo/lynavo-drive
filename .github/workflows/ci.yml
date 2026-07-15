@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ts-quality:
+    name: TS Quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+        with:
+          version: 10.32.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build TypeScript workspaces
+        run: pnpm build --filter=!@lynavo-drive/mobile
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck workspaces
+        run: pnpm typecheck
+
+      - name: Typecheck mobile
+        run: pnpm --filter @lynavo-drive/mobile exec tsc --noEmit
+
+      - name: Test
+        run: |
+          pnpm --filter @lynavo-drive/contracts test
+          pnpm --filter @lynavo-drive/design-tokens test
+          pnpm --filter @lynavo-drive/desktop test
+          pnpm --filter @lynavo-drive/mobile test
+
+  go-tests:
+    name: Go Tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: 1.25.6
+          cache: true
+          cache-dependency-path: services/sidecar-go/go.sum
+
+      - name: Run Go tests
+        working-directory: services/sidecar-go
+        run: go test ./...

@@ -1,0 +1,80 @@
+{
+  "language": {
+    "label": "Interface language",
+    "options": {
+      "en": "English",
+      "zhHans": "Simplified Chinese",
+      "zhHant": "Traditional Chinese"
+    }
+  },
+  "filePath": {
+    "openShared": "Open team shared folder"
+  },
+  "profile": {
+    "title": "Me",
+    "cards": {
+      "community": "Open-source local sync",
+      "localMachine": "This computer",
+      "general": "General",
+      "version": "Version",
+      "support": "Support"
+    },
+    "localIp": "Local IP",
+    "language": {
+      "search": "Search languages",
+      "empty": "No matching languages"
+    },
+    "preventSleep": {
+      "title": "Prevent sleep",
+      "caption": "Keep the computer awake while transfer jobs are running"
+    },
+    "receivedAccess": {
+      "title": "Allow paired phones to browse all received files",
+      "captionEnabled": "Paired phones can browse and download all received content on this computer",
+      "captionDisabled": "Phones can only browse files synced from the same physical device to this computer"
+    },
+    "version": {
+      "caption": "v{{version}} \u00b7 Current version installed"
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "send": "Send"
+    },
+    "feedback": {
+      "title": "Feedback",
+      "openedCaption": "GitHub issue draft opened",
+      "issueCaption": "Export diagnostics locally, then open a GitHub issue",
+      "placeholder": "Describe the issue, steps, or improvements you want",
+      "contactPlaceholder": "Contact email or phone",
+      "contactEmpty": "No contact provided",
+      "issueTitle": "Lynavo Drive Desktop feedback v{{version}}",
+      "issueBody": "Issue description:\n{{description}}\n\nContact:\n{{contact}}\n\nCurrent version: v{{version}}\n\nAttach local diagnostics only if you are comfortable sharing them publicly. Use the private security advisory flow for vulnerabilities."
+    },
+    "diagnostics": {
+      "exportingCaption": "Exporting diagnostics bundle",
+      "caption": "Save logs and runtime status locally",
+      "description": "Export a local diagnostics bundle to help investigate transfer, pairing, or sharing issues.",
+      "placeholder": "Describe the steps, phone model, network environment, or error symptoms (optional)"
+    },
+    "toasts": {
+      "languageChanged": "Language changed",
+      "preventSleepEnabled": "Computer will stay awake during transfers",
+      "preventSleepDisabled": "Computer sleep prevention disabled",
+      "preventSleepFailed": "Unable to update power setting",
+      "receivedAccessFailed": "Failed to update received file browsing access",
+      "feedbackOpened": "GitHub issue draft opened"
+    },
+    "community": {
+      "title": "Local LAN access",
+      "caption": "Pair, discover, and sync automatically on the same LAN. No Lynavo cloud login is required.",
+      "devicesTitle": "Paired devices",
+      "devicesCaption": "Phones continue to use local pairing tokens and paired-device authorization for LAN access."
+    }
+  },
+  "support": {
+    "exportDiagnostics": "Export diagnostics",
+    "diagnosticsDescriptionLabel": "Issue description",
+    "diagnosticsCancel": "Cancel",
+    "diagnosticsSubmit": "Export"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "title": "设备详情",
+  "openFolder": "打开文件夹",
+  "filter": {
+    "completedDate": "完成日期",
+    "from": "从",
+    "to": "至",
+    "startLabel": "开始完成日期",
+    "endLabel": "结束完成日期",
+    "singleDateTitle": "只有一个完成日期",
+    "todayWithDate": "今天 ({{date}})"
+  },
+  "stats": {
+    "duration": "耗时"
+  },
+  "overview": {
+    "title": "设备概览",
+    "authorizedDevices": "授权设备",
+    "blockedDevices": "封锁中",
+    "totalFiles": "累计文件",
+    "totalBytes": "累计容量",
+    "latestSeenAt": "最近出现：{{time}}"
+  },
+  "table": {
+    "fileName": "文件名称",
+    "fileSize": "文件大小",
+    "completedAt": "完成时间",
+    "createdAt": "创建时间",
+    "duration": "传输耗时",
+    "actions": "操作"
+  }
+}

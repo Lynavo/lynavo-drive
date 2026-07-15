@@ -1,0 +1,108 @@
+{
+  "title": "Folder Management",
+  "subtitle": "Configure the root folder and manage received, personal shared, and team shared contents",
+  "globalSubtitle": "Configure the root folder and manage received files and My Computer",
+  "tabs": {
+    "received": "Received",
+    "shared": "Team Shared",
+    "receivedDescription": "Media files uploaded from mobile devices, kept locally on this PC",
+    "sharedDescription": "Files in the team shared folder can be accessed by other devices on the local network"
+  },
+  "pathCard": {
+    "rootPath": "Root folder path",
+    "changeLocked": "Files are being received. You can change this after transfer finishes.",
+    "receivedDirectory": "Received folder",
+    "personalDirectory": "Personal shared folder",
+    "myComputer": "My Computer",
+    "sharedDirectory": "Team shared folder",
+    "windowsDrives": "Local disks",
+    "windowsDrivesWithPath": "Local disks ({{path}})",
+    "restoreWindowsDrives": "Restore local disks"
+  },
+  "list": {
+    "stats": "{{count}} files  Total size: {{size}}",
+    "fileName": "File name",
+    "size": "Size",
+    "receivedAt": "Received at",
+    "modifiedAt": "Modified at",
+    "sourceDevice": "Source device",
+    "actions": "Actions",
+    "loading": "Loading file list...",
+    "emptyReceived": "No received files",
+    "emptyShared": "No files in the team shared folder"
+  },
+  "library": {
+    "title": "Sync records",
+    "mobileDevice": "Mobile device",
+    "thumbnailAlt": "{{filename}} thumbnail",
+    "unnamedDevice": "Unnamed device",
+    "openFolder": "Open folder",
+    "filesTitle": "All files",
+    "deviceCount": "{{count}} devices",
+    "loadedAll": "{{count}} files",
+    "loadedPartial": "Loaded {{loaded}} / {{total}}",
+    "loadingMore": "Loading...",
+    "loadMore": "Load more sync records",
+    "media": {
+      "video": "Video",
+      "photo": "Photo",
+      "audio": "Audio",
+      "file": "File"
+    },
+    "shareStatus": {
+      "shared": "Shared to phone",
+      "missing": "File missing"
+    },
+    "toasts": {
+      "devicePathUnavailable": "Device folder is temporarily unavailable",
+      "fileManagerUnavailable": "File manager API is unavailable",
+      "devicePathMissing": "Device folder does not exist or cannot be opened"
+    },
+    "stats": {
+      "totalFiles": "Total received files",
+      "totalSpace": "Total used space",
+      "remainingSpace": "Remaining disk space"
+    },
+    "empty": {
+      "title": "No sync records yet",
+      "description": "File history from device sync transfers will appear here."
+    },
+    "deviceStats": {
+      "photoUploads": "Album uploads {{count}}",
+      "fileUploads": "File uploads {{count}}"
+    }
+  },
+  "records": {
+    "title": "Access records",
+    "searchPlaceholder": "Search username, device, or IP",
+    "startDate": "Start date",
+    "endDate": "End date",
+    "clear": "Clear",
+    "unnamedDevice": "Unnamed device",
+    "accessCount": "{{count}} accesses",
+    "revealFile": "Show {{filename}} in folder",
+    "pagination": "Access records pagination",
+    "previousPage": "Previous",
+    "nextPage": "Next",
+    "actions": {
+      "list": "Browse",
+      "view": "Preview",
+      "download": "Download",
+      "error": "Error"
+    },
+    "results": {
+      "missing": "File missing",
+      "denied": "Denied",
+      "error": "Failed"
+    },
+    "network": {
+      "missing": "IP not recorded",
+      "lan": "LAN",
+      "public": "Public"
+    },
+    "empty": {
+      "title": "No matching access records",
+      "description": "Try a different keyword or date"
+    }
+  }
+}

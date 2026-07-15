@@ -1,0 +1,88 @@
+{
+  "nav": {
+    "dashboard": "共享管理",
+    "directory": "目录管理",
+    "devices": "设备管理",
+    "shared": "共享",
+    "library": "同步记录",
+    "records": "访问记录",
+    "settings": "我的",
+    "help": "帮助"
+  },
+  "placeholders": {
+    "devices": {
+      "title": "设备管理",
+      "description": "已连接设备、授权状态与封锁名单将在这里集中管理。"
+    },
+    "shared": {
+      "title": "共享管理",
+      "description": "电脑端本机共享资源与访问范围将在这里配置。"
+    },
+    "library": {
+      "title": "资料库",
+      "description": "接收素材、归档位置与本机资料库状态将在这里汇总。"
+    },
+    "records": {
+      "title": "记录",
+      "description": "连接、授权、封锁与同步记录将在这里查询。"
+    }
+  },
+  "connectionSetup": {
+    "title": "设置连接码",
+    "connectionCodeLabel": "连接码",
+    "connectionCodeChangeConfirm": "修改配对码会中断当前已配对的手机，所有手机需使用新配对码重新配对。要继续吗？",
+    "saveAndEnter": "保存并进入Lynavo Drive",
+    "downloadSectionTitle": "使用与下载手机端",
+    "errors": {
+      "invalidCode": "请输入 6 位数字连接码",
+      "serviceUnavailable": "连接码服务暂不可用",
+      "saveFailed": "保存连接码失败"
+    },
+    "steps": {
+      "download": {
+        "title": "扫码下载手机端",
+        "description": "用手机扫描右侧二维码，下载并安装 Lynavo Drive 手机端"
+      },
+      "pair": {
+        "title": "输入连接码配对",
+        "description": "在手机端输入此连接码即可连接此电脑，同一局域网下自动同步手机相册和文件到此电脑"
+      },
+      "localFileAccess": {
+        "title": "浏览电脑本地文件",
+        "description": "配对成功后，同一局域网内的手机可以浏览这台电脑共享的本地文件。"
+      }
+    }
+  },
+  "download": {
+    "openButton": "下载移动端",
+    "panelTitle": "扫码下载移动端",
+    "qrTitle": "{{platform}} 下载二维码",
+    "qrAriaLabel": "{{platform}} 下载二维码"
+  },
+  "errorBoundary": {
+    "helpLoadFailed": "帮助中心加载失败，请重试"
+  },
+  "sidecar": {
+    "bonjourWarningTitle": "Bonjour 广播未启用",
+    "retryingTitle": "后台服务正在重试",
+    "startingTitle": "后台服务启动中",
+    "failedTitle": "后台服务启动失败",
+    "bonjourFallbackDetail": "Windows 当前未检测到 Bonjour for Windows。",
+    "startingDetail": "桌面应用正在等待本地 sidecar 服务就绪。",
+    "failedDetail": "本地 sidecar 未能成功启动。",
+    "runtimeMessages": {
+      "bonjourNativeDetected": "已检测到 Bonjour for Windows，将用于设备发现。",
+      "bonjourFallbackDetected": "未检测到 Bonjour for Windows，当前使用兼容广播模式。",
+      "starting": "本地 sidecar 服务正在启动。",
+      "retrying": "本地 sidecar 服务正在重试启动。",
+      "startFailed": "本地 sidecar 服务启动失败。",
+      "exited": "本地 sidecar 服务意外退出。",
+      "healthCheckFailed": "本地 sidecar 服务健康检查未通过。",
+      "retryingAfterFailure": "正在重试启动后台服务（{{restart}}/{{max}}）。",
+      "failedCheckExecutable": "后台服务启动失败，请检查打包后的可执行文件或诊断包。"
+    },
+    "bonjourPath": "Bonjour 路径：{{path}}",
+    "lastExitCode": "最近退出码：{{code}}",
+    "retrySidecar": "重试后台服务"
+  }
+}

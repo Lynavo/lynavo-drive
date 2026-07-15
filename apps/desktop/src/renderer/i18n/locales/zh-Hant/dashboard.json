@@ -1,0 +1,80 @@
+{
+  "title": "所有裝置",
+  "lastSuccess": {
+    "withDevice": "最近一次成功同步：{{time}} · {{device}}",
+    "none": "最近一次成功同步：暫無紀錄"
+  },
+  "stats": {
+    "todayMediaCount": "今日接收媒體總數",
+    "todayOccupied": "今日占用總空間",
+    "remainingSpace": "裝置剩餘空間"
+  },
+  "diskWarning": "接收磁碟剩餘空間小於 500MB，已暫停新的接收任務",
+  "dismissDiskWarning": "關閉磁碟空間提醒",
+  "deviceCard": {
+    "recent": "最近 {{date}}",
+    "today": "今日",
+    "preparing": "準備傳輸中…"
+  },
+  "statusPanel": {
+    "sidecarStatus": "背景服務",
+    "pairingCode": "本機配對碼",
+    "activeDevices": "作用中裝置",
+    "copySuccess": "配對碼已複製到剪貼簿",
+    "clickToCopy": "點擊複製",
+    "status": {
+      "healthy": "運作中",
+      "starting": "啟動中",
+      "failed": "啟動失敗",
+      "stopped": "已停止"
+    }
+  },
+  "share": {
+    "title": "共享管理",
+    "toast": {
+      "connectionCodeCopied": "連線碼已複製",
+      "copyFailed": "複製失敗",
+      "localFileAccessReady": "本地檔案存取已可用",
+      "localFileAccessUnavailable": "本地檔案存取已關閉",
+      "localFileAccessUpdateFailed": "無法更新本地檔案存取狀態",
+      "folderPermissionGranted": "資料夾存取權限已授權",
+      "folderPermissionDenied": "未取得資料夾權限，請在系統設定中手動授權",
+      "folderPermissionRequestFailed": "權限請求失敗",
+      "showCodeBeforeRegenerate": "請先顯示連線碼，再雙擊修改",
+      "connectionCodeRegenerated": "連線碼已重新產生，舊配對裝置已失效",
+      "regenerateFailed": "重新產生連線碼失敗",
+      "transferActiveReceivePathLocked": "正在傳輸檔案，無法修改接收目錄",
+      "receivePathUpdated": "接收目錄修改成功",
+      "receivePathUpdateFailed": "儲存接收目錄失敗"
+    },
+    "connectionCode": {
+      "title": "連線碼",
+      "regenerateTitle": "雙擊重新產生連線碼",
+      "showBeforeRegenerateTitle": "顯示連線碼後可雙擊修改",
+      "regenerateHint": "雙擊修改連線碼",
+      "regenerateConfirm": "修改配對碼會中斷目前已配對的手機，所有手機需使用新配對碼重新配對。要繼續嗎？",
+      "show": "顯示連線碼",
+      "hide": "隱藏連線碼",
+      "copy": "複製",
+      "showQr": "顯示連線 QR Code",
+      "collapseQr": "收合連線 QR Code",
+      "qrTitle": "Lynavo Drive 連線 QR Code",
+      "qrDescription": "用手機掃描以配對這台電腦",
+      "downloadApp": "下載 App",
+      "downloadInstruction": "，在同一個 Wi-Fi 下掃描，選擇此裝置，掃碼或輸入連線碼連接裝置"
+    },
+    "localFileAccess": {
+      "title": "本地檔案存取",
+      "description": "同一區域網路內的已配對手機可以瀏覽這台電腦分享的檔案。",
+      "toggle": "本地檔案存取狀態",
+      "folderPermissionWarning": "尚未授予資料夾存取權限，手機暫時無法瀏覽這台電腦的本地共享檔案。",
+      "authorize": "授權存取"
+    },
+    "receiveFolder": {
+      "title": "接收目錄",
+      "defaultPath": "預設自動建立",
+      "remaining": "剩餘 {{space}}",
+      "changeFolder": "修改目錄"
+    }
+  }
+}

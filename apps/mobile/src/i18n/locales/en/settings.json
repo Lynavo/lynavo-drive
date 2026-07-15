@@ -1,0 +1,95 @@
+{
+  "copyright": "© Lynavo Drive contributors.",
+  "title": "Settings",
+  "versionLabel": "v{{version}} ({{build}})",
+  "sections": {
+    "device": "Local Device",
+    "computers": "Computer Devices",
+    "general": "General"
+  },
+  "android": {
+    "title": "Android Capability Notes",
+    "body": "This Android build supports local LAN discovery, pairing, the foreground sync queue, reconnection, incremental upload, and diagnostics export. Remote and background services are not included in this OSS build."
+  },
+  "connection": {
+    "online": "Online",
+    "connecting": "Connecting",
+    "offline": "Offline",
+    "notConnected": "Not connected"
+  },
+  "photoPermission": {
+    "title": "Photo Access Is Off",
+    "body": "Allow access to Photos to keep auto-sync running.",
+    "openSettings": "Open System Settings"
+  },
+  "rows": {
+    "language": "Language",
+    "faq": "FAQ",
+    "faqDesc": "Usage instructions & FAQ",
+    "diagnosticsDesc": "Export logs and device status for troubleshooting"
+  },
+  "diagnosticsExport": {
+    "button": "Export diagnostics",
+    "progress": {
+      "title": "Exporting..."
+    }
+  },
+  "actions": {
+    "help": "Help",
+    "switchDevice": "Switch Device",
+    "switchDeviceDesc": "Disconnect current device and connect to another computer"
+  },
+  "status": {
+    "noRecord": "No records yet"
+  },
+  "dates": {
+    "todayAt": "Today at {{time}}",
+    "monthDayAt": "{{month}}/{{day}} at {{time}}",
+    "fullDate": "{{year}}/{{month}}/{{day}} {{time}}"
+  },
+  "dialogs": {
+    "exportUnavailable": {
+      "title": "Cannot Export",
+      "body": "This build does not support exporting the diagnostics bundle."
+    },
+    "exportFailed": {
+      "title": "Export Failed",
+      "body": "Failed to export the diagnostics bundle. Please try again later."
+    },
+    "languageSaveFailed": {
+      "title": "Cannot Change Language",
+      "body": "Failed to save the language setting. Please try again later."
+    }
+  },
+  "my": "My",
+  "mySubtitle": "Devices and preferences.",
+  "deviceName": "Device Name",
+  "editDeviceName": "Edit device name",
+  "appVersionShort": "Version",
+  "back": "Back",
+  "languageTitle": "Language",
+  "systemLanguage": "Follow System Language",
+  "manualLanguage": "Select Language Manually",
+  "editDeviceTitle": "Edit Device Name",
+  "editDeviceDesc": "This name will be shown for this device in the sync history.",
+  "save": "Save",
+  "saving": "Saving...",
+  "cancel": "Cancel",
+  "errorDeviceNameEmpty": "Please enter a device name",
+  "errorDeviceNameSave": "Failed to save, please try again later",
+  "exportDiagnosticsTitle": "Export Diagnostics",
+  "statusUnknown": "Unknown status",
+  "connected": "Connected",
+  "connecting": "Connecting",
+  "discovering": "Discovering",
+  "bound": "Bound",
+  "offline": "Offline",
+  "notBound": "No computer bound",
+  "currentDesktop": "Current computer",
+  "notConnectedAny": "Not connected to any computer",
+  "currentDeviceStatus": "Current device - {{status}}",
+  "followSystem": "Follow System Language",
+  "versionEmpty": "Version {{value}}",
+  "versionWithBuild": "Version {{version}} ({{build}})",
+  "versionOnly": "Version {{version}}"
+}

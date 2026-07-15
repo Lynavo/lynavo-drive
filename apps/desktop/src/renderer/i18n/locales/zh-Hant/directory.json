@@ -1,0 +1,108 @@
+{
+  "title": "目錄管理",
+  "subtitle": "設定根目錄路徑並管理接收、個人共享與團隊共享目錄的內容",
+  "globalSubtitle": "設定根目錄路徑並管理接收目錄與我的電腦內容",
+  "tabs": {
+    "received": "接收目錄",
+    "shared": "團隊共享",
+    "receivedDescription": "接收行動端上傳的素材檔案，僅供 PC 本機保管使用",
+    "sharedDescription": "團隊共享目錄中的檔案，可供區域網路內其他裝置存取"
+  },
+  "pathCard": {
+    "rootPath": "根目錄路徑",
+    "changeLocked": "正在接收檔案，完成後可變更",
+    "receivedDirectory": "接收目錄",
+    "personalDirectory": "個人共享目錄",
+    "myComputer": "我的電腦",
+    "sharedDirectory": "團隊共享目錄",
+    "windowsDrives": "本機磁碟",
+    "windowsDrivesWithPath": "本機磁碟（{{path}}）",
+    "restoreWindowsDrives": "恢復本機磁碟"
+  },
+  "list": {
+    "stats": "共 {{count}} 個檔案  總大小: {{size}}",
+    "fileName": "檔案名稱",
+    "size": "大小",
+    "receivedAt": "接收時間",
+    "modifiedAt": "修改時間",
+    "sourceDevice": "來源裝置",
+    "actions": "操作",
+    "loading": "正在載入檔案列表...",
+    "emptyReceived": "暫無接收檔案",
+    "emptyShared": "團隊共享目錄暫無檔案"
+  },
+  "library": {
+    "title": "同步記錄",
+    "mobileDevice": "行動裝置",
+    "thumbnailAlt": "{{filename}} 縮圖",
+    "unnamedDevice": "未命名裝置",
+    "openFolder": "開啟目錄",
+    "filesTitle": "所有檔案",
+    "deviceCount": "{{count}} 台裝置",
+    "loadedAll": "{{count}} 個檔案",
+    "loadedPartial": "已載入 {{loaded}} / {{total}}",
+    "loadingMore": "載入中...",
+    "loadMore": "載入更多同步記錄",
+    "media": {
+      "video": "影片",
+      "photo": "照片",
+      "audio": "音訊",
+      "file": "檔案"
+    },
+    "shareStatus": {
+      "shared": "已共享至手機",
+      "missing": "檔案遺失"
+    },
+    "toasts": {
+      "devicePathUnavailable": "裝置目錄暫不可用",
+      "fileManagerUnavailable": "檔案管理器介面不可用",
+      "devicePathMissing": "裝置目錄不存在或無法開啟"
+    },
+    "stats": {
+      "totalFiles": "接收檔案總數",
+      "totalSpace": "占用總空間",
+      "remainingSpace": "磁碟剩餘空間"
+    },
+    "empty": {
+      "title": "尚無同步記錄",
+      "description": "裝置同步傳輸後的檔案歷史會彙整在這裡。"
+    },
+    "deviceStats": {
+      "photoUploads": "相簿上傳 {{count}}",
+      "fileUploads": "檔案上傳 {{count}}"
+    }
+  },
+  "records": {
+    "title": "存取記錄",
+    "searchPlaceholder": "搜尋使用者名稱、裝置或 IP",
+    "startDate": "開始日期",
+    "endDate": "結束日期",
+    "clear": "清除",
+    "unnamedDevice": "未命名裝置",
+    "accessCount": "{{count}} 筆存取",
+    "revealFile": "在資料夾中顯示 {{filename}}",
+    "pagination": "存取記錄分頁",
+    "previousPage": "上一頁",
+    "nextPage": "下一頁",
+    "actions": {
+      "list": "瀏覽",
+      "view": "預覽",
+      "download": "下載",
+      "error": "錯誤"
+    },
+    "results": {
+      "missing": "檔案遺失",
+      "denied": "已拒絕",
+      "error": "失敗"
+    },
+    "network": {
+      "missing": "IP 未記錄",
+      "lan": "區域網路",
+      "public": "公網"
+    },
+    "empty": {
+      "title": "沒有符合的存取記錄",
+      "description": "請嘗試更換關鍵字或日期"
+    }
+  }
+}

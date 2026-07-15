@@ -1,0 +1,95 @@
+{
+  "copyright": "© Lynavo Drive 貢獻者",
+  "title": "設定",
+  "versionLabel": "v{{version}} ({{build}})",
+  "sections": {
+    "device": "本機設備",
+    "computers": "電腦設備",
+    "general": "通用"
+  },
+  "android": {
+    "title": "Android 端能力說明",
+    "body": "Android 版本支援本地區域網路探索、配對、前台同步佇列、重新連線、增量上傳和診斷匯出。此 OSS 版本不包含遠端和背景服務。"
+  },
+  "connection": {
+    "online": "在線",
+    "connecting": "連接中",
+    "offline": "離線",
+    "notConnected": "未連接"
+  },
+  "photoPermission": {
+    "title": "照片權限未開啟",
+    "body": "需要允許存取照片後才能繼續自動同步。",
+    "openSettings": "開啟系統設定"
+  },
+  "rows": {
+    "language": "語言",
+    "faq": "常見問題",
+    "faqDesc": "操作說明與常見問題",
+    "diagnosticsDesc": "匯出日誌和設備狀態以方便排查問題"
+  },
+  "diagnosticsExport": {
+    "button": "匯出診斷包",
+    "progress": {
+      "title": "正在匯出…"
+    }
+  },
+  "actions": {
+    "help": "幫助",
+    "switchDevice": "切換設備",
+    "switchDeviceDesc": "將斷開當前設備並重新連接其他電腦"
+  },
+  "status": {
+    "noRecord": "暫無記錄"
+  },
+  "dates": {
+    "todayAt": "今天 {{time}}",
+    "monthDayAt": "{{month}}月{{day}}日 {{time}}",
+    "fullDate": "{{year}}/{{month}}/{{day}} {{time}}"
+  },
+  "dialogs": {
+    "exportUnavailable": {
+      "title": "無法導出",
+      "body": "目前版本暫不支援匯出診斷包"
+    },
+    "exportFailed": {
+      "title": "匯出失敗",
+      "body": "診斷包匯出失敗，請稍後重試"
+    },
+    "languageSaveFailed": {
+      "title": "無法切換語言",
+      "body": "語言設定保存失敗，請稍後再試。"
+    }
+  },
+  "my": "我的",
+  "mySubtitle": "設備和應用偏好。",
+  "deviceName": "設備名稱",
+  "editDeviceName": "編輯設備名稱",
+  "appVersionShort": "版本",
+  "back": "返回",
+  "languageTitle": "語言",
+  "systemLanguage": "跟隨系統語言",
+  "manualLanguage": "手動選擇語言",
+  "editDeviceTitle": "編輯設備名稱",
+  "editDeviceDesc": "修改後會用於當前設備在同步記錄中的顯示名稱。",
+  "save": "儲存",
+  "saving": "儲存中…",
+  "cancel": "取消",
+  "errorDeviceNameEmpty": "請輸入設備名稱",
+  "errorDeviceNameSave": "儲存失敗，請稍後重試",
+  "exportDiagnosticsTitle": "匯出診斷包",
+  "statusUnknown": "狀態未知",
+  "connected": "已連接",
+  "connecting": "連接中",
+  "discovering": "發現中",
+  "bound": "已綁定",
+  "offline": "離線",
+  "notBound": "未綁定電腦",
+  "currentDesktop": "當前電腦",
+  "notConnectedAny": "尚未連接任何電腦",
+  "currentDeviceStatus": "當前設備 · {{status}}",
+  "followSystem": "跟隨系統語言",
+  "versionEmpty": "版本 {{value}}",
+  "versionWithBuild": "版本 {{version}} ({{build}})",
+  "versionOnly": "版本 {{version}}"
+}

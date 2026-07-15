@@ -1,0 +1,32 @@
+{
+  "title": "Device details",
+  "openFolder": "Open folder",
+  "filter": {
+    "completedDate": "Completed date",
+    "from": "From",
+    "to": "To",
+    "startLabel": "Start completed date",
+    "endLabel": "End completed date",
+    "singleDateTitle": "Only one completed date",
+    "todayWithDate": "Today ({{date}})"
+  },
+  "stats": {
+    "duration": "Duration"
+  },
+  "overview": {
+    "title": "Device overview",
+    "authorizedDevices": "Authorized devices",
+    "blockedDevices": "Blocked",
+    "totalFiles": "Total files",
+    "totalBytes": "Total size",
+    "latestSeenAt": "Last seen: {{time}}"
+  },
+  "table": {
+    "fileName": "File name",
+    "fileSize": "File size",
+    "completedAt": "Completed at",
+    "createdAt": "Created at",
+    "duration": "Transfer duration",
+    "actions": "Actions"
+  }
+}

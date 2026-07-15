@@ -1,0 +1,273 @@
+{
+  "title": "同步动态",
+  "desc": "查看当前连接、传输进度和最近文件。",
+  "header": {
+    "help": "帮助",
+    "history": "同步历史",
+    "settings": "设置"
+  },
+  "home": {
+    "autoSyncTitle": "自动同步",
+    "disableAuto": "关闭",
+    "enableAuto": "开启",
+    "autoEnabled": "已开启，新增素材会自动同步",
+    "autoDisabled": "尚未开启自动同步",
+    "uploadedCount": "已上传 {{completed}} / {{total}} 个",
+    "latestSyncTime": "最近同步：{{label}}",
+    "latestSyncTimeEmpty": "暂无同步记录",
+    "recentDownloadPhoto": "照片",
+    "recentDownloadVideo": "视频",
+    "recentDownloadFile": "文件",
+    "recentDownloadsTitle": "最近下载",
+    "syncRecordsTitle": "同步记录",
+    "currentPhoneStatus": "当前手机状态",
+    "currentTransferProgress": "当前传输进度",
+    "remainingTime": "剩余时间",
+    "remainingTimeUnknown": "计算中",
+    "syncRecordTotal": "总计 {{size}}",
+    "today": "今天",
+    "todayStats": "{{count}} 个，{{size}}",
+    "todaySyncRecord": "今日同步摘要",
+    "syncing": "同步中",
+    "synced": "已同步",
+    "uploadFiles": "上传文件",
+    "adjust": "调整",
+    "waitingForSync": "等待自动同步",
+    "completedSummary": "已同步 {{count}} 个 · {{size}}",
+    "waitingForNewAssets": "等待新增素材自动同步",
+    "latestSyncTimeLabel": "最近同步时间"
+  },
+  "phases": {
+    "discoveringTitle": "正在搜索电脑…",
+    "reconcilingTitle": "正在同步历史记录…",
+    "scanningTitle": "正在扫描相册…",
+    "preparingTitle": "正在建立连接…",
+    "defaultTitle": "准备中…",
+    "discoveringSubtitleWaited": "已等待 {{seconds}} 秒",
+    "discoveringSubtitleSearching": "正在局域网中搜索",
+    "reconcilingSubtitle": "首次使用需要核对已传文件",
+    "scanningSubtitleProgress": "已扫描 {{scanned}} / {{total}} 张",
+    "scanningSubtitleReading": "正在读取相册",
+    "preparingSubtitle": "正在与电脑建立安全连接",
+    "reconnectingTitle": "网络波动，正在重连…",
+    "reconnectingSubtitle": "恢复连线后会继续本次上传",
+    "autoPreparingTitle": "正在开启自动同步…",
+    "autoPreparingSubtitle": "即将开始扫描新照片"
+  },
+  "badges": {
+    "auto": "自动",
+    "autoEnabled": "自动上传已开启"
+  },
+  "running": {
+    "autoTitle": "正在自动上传",
+    "autoRunningTitle": "自动上传运行中",
+    "autoRunningSubtitle": "新素材将自动传输到 PC 端",
+    "queueInfo": "排队中 {{queued}}项"
+  },
+  "standby": {
+    "title": "等待新素材",
+    "subtitle": "拍完后会自动传输到 PC 端"
+  },
+  "notStarted": {
+    "title": "自动上传未开启",
+    "subtitle": "开启自动上传，拍完后新照片和视频会自动同步",
+    "goToAlbum": "去相册",
+    "enableAuto": "开启自动上传"
+  },
+  "interrupted": {
+    "title": "自动上传已暂停",
+    "subtitle": "本次自动上传已中断，确认电脑端接收目录后可重新开启。",
+    "goToAlbum": "去相册",
+    "resumeAuto": "重新开启"
+  },
+  "offline": {
+    "title": "当前设备已离线",
+    "subtitle": "请检查电脑是否在线并连接同一局域网，恢复后可继续上传或访问共享目录与个人共享目录",
+    "switchDevice": "切换设备",
+    "reconnect": "重新连接"
+  },
+  "stats": {
+    "speed": "速度",
+    "progress": "进度",
+    "transferred": "已传输",
+    "transferredCount": "{{count}} 个",
+    "dataAmount": "数据量",
+    "transferSpeed": "传输速度",
+    "fileSize": "文件大小",
+    "currentFile": "当前文件"
+  },
+  "completed": {
+    "speedIdle": "--",
+    "auto": {
+      "title": "自动上传已完成",
+      "subtitle": "本次同步 {{count}} 个文件",
+      "fileCountLabel": "文件数",
+      "fileCountValue": "{{count}} 个",
+      "latestSync": "最近同步：{{label}}",
+      "goToAlbum": "去相册"
+    }
+  },
+  "actions": {
+    "cancelling": "正在取消...",
+    "closeAutoUpload": "关闭自动上传"
+  },
+  "quickEntry": {
+    "title": "快捷入口",
+    "albumTitle": "相册",
+    "albumDesc": "浏览相册素材",
+    "sharedFilesTitle": "共享目录",
+    "sharedFilesDesc": "浏览共享目录与个人共享目录",
+    "globalSharedFilesTitle": "我的电脑",
+    "globalSharedFilesDesc": "浏览我的电脑中的文件"
+  },
+  "onboarding": {
+    "skip": "跳过引导",
+    "previous": "上一步",
+    "next": "下一步 {{step}}/{{total}}",
+    "startJourney": "开启旅程",
+    "album": {
+      "title": "相册素材",
+      "body": "从这里浏览照片和视频。新增素材会进入自动同步队列。"
+    },
+    "panel": {
+      "title": "无感备份",
+      "body": "这里实时展示前台局域网自动上传进度，应用保持打开时新增素材会同步至电脑。"
+    },
+    "history": {
+      "title": "传输历史",
+      "body": "查看所有已完成的传输记录，包括传输时间、文件大小和目标路径。"
+    },
+    "settings": {
+      "title": "全局设置",
+      "body": "查看当前连接的设备，修改手机显示名称，或获取技术支持。"
+    },
+    "help": {
+      "title": "帮助中心",
+      "body": "遇到问题？随时点击这里查看快速上手指南，或联系我们获取支持。"
+    }
+  },
+  "dialogs": {
+    "syncError": {
+      "title": "同步异常",
+      "lowDiskPaused": "接收磁盘剩余空间小于 500MB，已暂停新的接收任务",
+      "storageUnavailable": "电脑端接收目录不可用，请在电脑端重新选择或恢复文件夹"
+    },
+    "closeAuto": {
+      "title": "关闭自动上传",
+      "body": "关闭后，当前自动上传任务将停止，后续新素材不会继续自动上传。",
+      "continue": "继续上传",
+      "confirm": "确认关闭"
+    },
+    "closeAutoFailed": {
+      "title": "操作失败",
+      "body": "无法关闭自动上传，请稍后重试"
+    },
+    "reconnectFailed": {
+      "title": "重连失败",
+      "body": "重新连接只会尝试局域网或 VPN-LAN 路径。若电脑正在睡眠，请确认 macOS 已开启\"唤醒以供网络访问\"，或 Windows 已开启 BIOS/UEFI 与网卡 Magic Packet 唤醒。"
+    },
+    "switchDevice": {
+      "title": "切换设备",
+      "body": "将断开当前设备并返回设备扫描页",
+      "confirm": "确认切换"
+    },
+    "enableAutoBlocked": {
+      "title": "无法开启",
+      "body": "请先连接设备"
+    },
+    "switchUploadMode": {
+      "title": "切换上传模式",
+      "body": "当前正在上传，继续自动上传将重启同步队列，是否继续？",
+      "confirm": "确认切换"
+    },
+    "enableAutoFailed": {
+      "title": "操作失败",
+      "body": "无法开启自动上传，请稍后重试"
+    }
+  },
+  "performance": {
+    "thermalThrottled": "设备温度较高，已降低传输强度"
+  },
+  "queue": {
+    "title": "待同步队列"
+  },
+  "autoUploadSettings": {
+    "title": "自动上传",
+    "subtitle": "设置手机内容同步到电脑",
+    "planTitle": "同步计划",
+    "planSource": "来源",
+    "planFile": "项目",
+    "planRange": "范围",
+    "selectedCountLabel": "{{count}} 个项目",
+    "removeFileLabel": "移除 {{name}}",
+    "enableSwitchTitle": "自动上传开关",
+    "enableSwitchDescOn": "已开启，会按同步范围自动同步相册新增素材",
+    "enableSwitchDescOff": "已关闭，不会自动同步相册新增素材",
+    "sourcesTitle": "同步来源",
+    "albumTitle": "照片和视频",
+    "albumDesc": "同步系统相册中的媒体内容",
+    "fileTitle": "其他来源",
+    "fileDescEmpty": "OSS 同步使用待同步队列中的相册素材",
+    "addFile": "不可用",
+    "addMoreFile": "不可用",
+    "selectedFilesTitle": "队列项目",
+    "filePickCancelled": "OSS 版本已关闭其他来源",
+    "filePickFailedTitle": "其他来源已关闭",
+    "filePickFailedBody": "OSS 同步使用待同步队列中的相册素材。",
+    "fileQueuedMessage": "已加入 {{count}} 个队列项目",
+    "fileSkippedMessage": "已跳过 {{count}} 个重复队列项目",
+    "rangeTitle": "同步范围",
+    "rangeAllTitle": "全部内容",
+    "rangeAllDesc": "同步现有照片和视频",
+    "rangeNowTitle": "从现在开始",
+    "rangeNowDesc": "仅同步后续新增内容",
+    "rangeCustomTitle": "自定义时间",
+    "rangeCustomDesc": "按指定时间起点同步",
+    "confirmEnable": "开启自动上传",
+    "confirmDisable": "关闭自动上传",
+    "customPickerSave": "保存",
+    "infoAlbum": "相册照片和视频将同步到电脑。",
+    "infoAutoOff": "自动上传关闭后，不会同步后续新增素材。",
+    "infoEmpty": "请选择至少一个同步来源。",
+    "loadingConfig": "正在读取自动上传设置...",
+    "loadConfigFailed": "自动上传设置读取失败，请稍后重试。",
+    "disabledSuccess": "自动上传已关闭",
+    "sourceAlbumTitle": "1. 从相册同步",
+    "sourceAlbumDesc": "照片或视频",
+    "sourceFileTitle": "2. 其他来源",
+    "sourceFileDescEmpty": "OSS 版本仅同步相册素材",
+    "sourceFileDescSelected": "{{count}} 个队列项目",
+    "addedFilesSummary": "已加入 {{count}} 个队列项目",
+    "addedFilesMore": "另有 {{count}} 个队列项目",
+    "clearFiles": "清空",
+    "infoAlbumAndFileAll": "相册照片和视频将上传到您的电脑。",
+    "infoAlbumAndFileNow": "从现在开始，新的相册照片和视频将同步。",
+    "infoAlbumAndFileCustom": "所选范围内的相册照片和视频将上传到您的电脑。",
+    "infoAlbumAll": "相册中的所有照片和视频将上传到您的电脑。",
+    "infoAlbumNow": "从现在开始，新的相册照片和视频将同步。",
+    "infoAlbumCustom": "所选范围内的相册照片和视频将上传到您的电脑。",
+    "infoFileAll": "OSS 同步使用待同步队列中的相册素材。",
+    "infoFileNow": "OSS 同步使用待同步队列中的相册素材。",
+    "infoFileCustom": "OSS 同步使用待同步队列中的相册素材。"
+  },
+  "recentDownload": {
+    "title": "最近下载",
+    "viewAll": "查看全部",
+    "emptyTitle": "暂无最近下载",
+    "emptyMessage": "从电脑下载到本机的文件会出现在这里。"
+  },
+  "syncRecords": {
+    "title": "同步记录",
+    "totalSynced": "累计已同步 {{size}} 文件",
+    "emptyTitle": "暂无同步记录",
+    "emptyMessage": "完成第一次自动同步后，记录会按电脑完成日期显示在这里。",
+    "dayStats": "{{count}} 个 · {{size}}",
+    "todayRecord": "当天同步记录",
+    "statusCompleted": "已完成",
+    "statusSyncing": "同步中",
+    "uploadFiles": "上传文件",
+    "fileCount": "{{count}} 个",
+    "totalSize": "总大小",
+    "duration": "耗时"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "title": "錯誤",
+  "unknown": "發生未知錯誤",
+  "networkUnavailable": "網路不可用",
+  "sidecarUnreachable": "無法連線至桌面端",
+  "networkTitle": "網路錯誤",
+  "networkCheckConnection": "請檢查網路連線後重試",
+  "networkCheckRetry": "網路錯誤，請檢查連線後重試",
+  "pairingWrongCode": "連接碼錯誤，請重新輸入",
+  "pairingWrongCodeWithAttempts": "連接碼錯誤，請重新輸入（剩餘 {{remainingAttempts}}/{{maxAttempts}} 次）",
+  "pairingWrongCodeWithRemaining": "連接碼錯誤，還可嘗試 {{remainingAttempts}} 次",
+  "pairingClientBlocked": "這台手機已被此電腦封鎖，請在電腦端解除後再試",
+  "pairingTokenInvalid": "連接已失效，請重新輸入電腦端連接碼",
+  "pairingConnectFailed": "連接失敗：{{msg}}",
+  "exportDiagnosticsUnavailable": "目前版本暫不支援匯出診斷包",
+  "serverErrorHttp": "伺服器錯誤 (HTTP {{status}})",
+  "responseParseError": "回應解析失敗",
+  "pairingVersionMismatchTitle": "版本不相容",
+  "pairingVersionMismatchMessage": "手機與電腦端的版本不相容，請將電腦端（桌面端）App 更新至最新版本後再試。",
+  "pairingBlocked": "配對已被鎖定。請在電腦端「設定」中點擊「解除封鎖此裝置」，或重新產生連接碼後再試。"
+}

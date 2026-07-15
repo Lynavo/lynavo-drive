@@ -1,0 +1,162 @@
+{
+  "title": "文件",
+  "headerSubtitle": "从手机回看同步素材，也可以进入电脑目录取文件。",
+  "phoneSyncSpace": {
+    "title": "手机同步空间",
+    "desc": "查看已同步至电脑的文件与上传来源",
+    "badgeSync": "同步后显示",
+    "badgeSource": "保留来源",
+    "select": "选择",
+    "selectFeature": "该功能正在开发中",
+    "empty": "尚无同步文件",
+    "desktopDeleted": "电脑已删除",
+    "desktopDeletedMessage": "此文件已从电脑删除",
+    "deletedDownloadMessage": "无法下载已删除的文件",
+    "summary": "{{count}} 个文件 · {{size}}",
+    "filesCount": "{{count}} 个文件",
+    "unnamedFile": "未命名文件",
+    "previewSyncedFile": "预览已同步文件",
+    "downloadSyncedFile": "下载已同步文件",
+    "loadingTitle": "正在加载",
+    "loadingSubtitle": "同步空间列表会在这里刷新。",
+    "loadFailedTitle": "加载失败",
+    "loadFailedSubtitle": "请稍后重试。",
+    "emptySubtitle": "开启自动上传后，同步到电脑的素材会出现在这里。",
+    "mediaTypes": {
+      "video": "视频",
+      "photo": "照片",
+      "file": "文件"
+    },
+    "previewFailedTitle": "无法加载预览",
+    "previewFailedSubtitle": "请确认电脑在线且文件仍存在。"
+  },
+  "localComputer": {
+    "title": "电脑文件",
+    "desc": "浏览电脑端共享的目录结构并下载文件",
+    "ossDesc": "通过本地局域网浏览已配对电脑的文件。",
+    "ossBadge": "局域网",
+    "badgeDesktop": "桌面目录",
+    "badgeView": "列表/网格",
+    "select": "选择",
+    "done": "完成",
+    "download": "下载",
+    "share": "分享",
+    "selectedCount": "已选择 {{count}} 个",
+    "selectFeature": "该功能正在开发中",
+    "shareNoSelectionTitle": "尚未选择文件",
+    "shareNoSelectionMessage": "请先选择要分享的文件",
+    "shareFailedTitle": "分享失败",
+    "shareFailedMessage": "无法打开系统分享，请稍后重试",
+    "empty": "目前没有共享资源",
+    "rootDirectoryLabel": "用户目录",
+    "fallbackDesktopLabel": "当前电脑",
+    "unboundLocalComputerSubtitle": "尚未连接电脑",
+    "searchFolderPlaceholder": "搜索当前文件夹",
+    "searchFilesPlaceholder": "搜索电脑文件",
+    "loadingTitle": "文件加载中",
+    "loadingSubtitle": "正在读取电脑端共享目录。",
+    "folderLoadingTitle": "文件夹加载中",
+    "folderLoadingSubtitle": "正在读取电脑端目录内容。",
+    "connectionStatePrefix": "电脑连接方式：",
+    "networkDisconnectedTitle": "网络断开",
+    "networkDisconnectedSubtitle": "当前路径会保留，恢复网络或电脑端在线后可以继续访问。",
+    "retryConnection": "重试连接",
+    "localComputerDisabledTitle": "局域网共享不可用",
+    "localComputerDisabledSubtitle": "请确认已配对电脑在线，并已在本地共享文件夹后重新检查。",
+    "recheckPermission": "重新检查",
+    "folderLoadErrorTitle": "目录加载失败",
+    "folderLoadErrorSubtitle": "无法读取这个共享文件夹，请确认电脑端文件仍然存在。",
+    "reload": "重新加载",
+    "closePreview": "关闭预览",
+    "noMatchTitle": "没有匹配结果",
+    "noMatchSubtitle": "换个关键词再试一次",
+    "emptyFolderTitle": "空文件夹",
+    "emptyFolderSubtitle": "这个目录暂时没有可下载或分享的文件。",
+    "noFilesTitle": "暂无文件",
+    "noFilesSubtitle": "电脑端还没有开放可访问的文件目录。",
+    "sortTitle": "排序方式",
+    "shareTitle": "分享所选文件",
+    "shareSubtitle": "已选择 {{count}} 个文件",
+    "shareTargets": ["保存", "复制链接", "邮件", "更多"],
+    "listView": "列表视图",
+    "gridView": "网格视图"
+  },
+  "teamFolderName": "共享目录",
+  "personalFolderName": "个人共享目录",
+  "defaultFolderName": "共享目录",
+  "globalPersonalFolderName": "我的电脑",
+  "scopes": {
+    "team": "共享目录",
+    "personal": "个人共享目录",
+    "shared": "已分享的资源",
+    "received": "已接收的文件"
+  },
+  "loading": "加载中...",
+  "files": {
+    "folder": "文件夹",
+    "downloaded": "已下载",
+    "parentFolder": "上一级",
+    "parentFolderMeta": "返回上层目录",
+    "emptyFolder": "空文件夹",
+    "justNow": "刚刚",
+    "modifiedToday": "今天",
+    "modifiedDaysAgo": "{{count}}天前"
+  },
+  "connectionStatus": {
+    "lan": "局域网在线",
+    "unavailable": "电脑端不可达",
+    "offline": "离线",
+    "unbound": "未绑定"
+  },
+  "emptyState": {
+    "title": "目前没有内容",
+    "message": "同步完成后，文件将显示在这里"
+  },
+  "deviceUnavailable": {
+    "title": "设备不可用",
+    "message": "请先连接设备",
+    "recheck": "重新检查"
+  },
+  "directoryInaccessible": {
+    "title": "目录不可访问",
+    "message": "请检查电脑端设置"
+  },
+  "personalUnauthorized": {
+    "title": "个人共享目录无法访问",
+    "message": "请先与这台电脑完成本地配对，并在电脑端配置个人共享目录。"
+  },
+  "networkError": {
+    "title": "加载失败",
+    "message": "请稍后重试"
+  },
+  "preview": {
+    "playVideo": "点击播放视频"
+  },
+  "dialogs": {
+    "downloadSavedToPhotos": "{{name}} 已保存到{{location}}",
+    "downloadSavedToFiles": "{{name}} 已保存到文件",
+    "downloadSaved": "{{name}} 已保存到{{location}}",
+    "downloadComplete": "下载完成",
+    "downloadFailed": "下载失败",
+    "downloadFailedMessage": "无法下载文件，请稍后重试",
+    "downloadUnavailableMessage": "文件不存在或已无法访问",
+    "previewFailed": "预览失败",
+    "previewFailedMessage": "无法获取文件预览",
+    "previewUnsupported": "无法预览",
+    "previewUnsupportedMessage": "此文件类型目前无法预览，请先下载后再用其他 App 打开",
+    "openWithOtherApp": "用其他 App 打开",
+    "cancel": "取消",
+    "savedLocationPhotos": "相册",
+    "savedLocationDocuments": "iOS“文件”App -> Lynavo Drive 目录",
+    "savedLocationDownloads": "系统 Downloads -> Lynavo Drive 目录"
+  },
+  "localSaveUnsupported": {
+    "title": "暂不支持保存",
+    "message": "当前版本还没有接入客户端本地保存能力，请等待后续版本。"
+  },
+  "sortBy": {
+    "name": "名称",
+    "time": "时间",
+    "size": "文件大小"
+  }
+}

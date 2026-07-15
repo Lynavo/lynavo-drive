@@ -1,0 +1,228 @@
+{
+  "title": "搜索设备",
+  "subtitle": {
+    "ios": "正在扫描局域网中的电脑端应用...",
+    "android": "正在扫描局域网中的电脑端应用；若未发现设备，可改用手动输入 IPv4。"
+  },
+  "scanning": {
+    "text": "扫描中，请稍候..."
+  },
+  "devices": {
+    "foundCount_one": "已发现 {{count}} 台",
+    "foundCount": "已发现 {{count}} 台",
+    "foundCount_other": "已发现 {{count}} 台"
+  },
+  "emptyState": {
+    "default": "未发现设备",
+    "android": "未发现设备，请手动输入 IP 继续配对"
+  },
+  "actions": {
+    "manualPair": "手动配对",
+    "rescan": "重新扫描",
+    "manualInputIp": "手动输入 IP",
+    "qrPair": "扫码配对"
+  },
+  "troubleshooting": {
+    "title": "找不到设备或不知道怎么连？",
+    "sameWifi": "确保手机与电脑连接在同一个 Wi-Fi（局域网）下。",
+    "desktopApp": "请在电脑端浏览器访问 {{host}}，按 OSS 桌面端构建或发布说明安装并打开客户端。",
+    "cta": "查看详细图文教程 >",
+    "notReadyTitle": "电脑端还没有准备好？",
+    "notReadyDesc": "请先从 OSS 仓库构建或安装 Lynavo Drive 桌面端，然后返回此页面扫码或输入连接码进行连接。"
+  },
+  "onboarding": {
+    "unconnected": {
+      "skip": "跳过",
+      "title": "开始使用 Lynavo Drive",
+      "subtitle": "手机与电脑无线同步素材，三步搞定",
+      "downloadStep": {
+        "title": "下载 PC 端",
+        "body": "在电脑上安装 Lynavo Drive"
+      },
+      "connectStep": {
+        "title": "手机连接",
+        "body": "输入连接码或扫码连接"
+      },
+      "syncStep": {
+        "title": "开始同步",
+        "body": "素材自动传输到电脑"
+      },
+      "copy": "复制",
+      "copyDone": "下载地址已复制",
+      "copyFailed": "暂时无法复制下载地址，请稍后重试。",
+      "copyHint": "复制后在电脑浏览器中打开即可下载",
+      "start": "我已经下载好了，去连接设备",
+      "footerNote": "首次使用引导 · 可在帮助页重新查看"
+    },
+    "step1Title": "先连接电脑",
+    "step1Desc": "选择一台电脑完成连接。后续引导只预览关键功能入口，不会跳转真实页面或创建假数据。",
+    "step1Action": "继续预览",
+    "step2Title": "开启自动上传",
+    "step2Desc": "连接电脑后，可自动将相册中的新增素材无线同步到电脑。",
+    "step2Action": "下一步",
+    "step3Title": "同步范围与限制",
+    "step3Desc": "自定义同步的相册范围和过滤条件，控制同步内容。",
+    "step3Action": "下一步",
+    "step4Title": "查看同步进度",
+    "step4Desc": "同步任务运行时，可在此处查看传输进度 and 同步状态。",
+    "step4Action": "下一步",
+    "step5Title": "查看最近记录",
+    "step5Desc": "从电脑端下载的素材或同步的历史记录会显示在这里。",
+    "step5Action": "下一步",
+    "step6Title": "电脑文件",
+    "step6Desc": "通过手机浏览电脑端的共享文件夹，并快速下载需要的文件。",
+    "step6Action": "完成"
+  },
+  "dialogs": {
+    "openLinkFailed": {
+      "title": "打开失败",
+      "body": "暂时无法打开{{label}}，请稍后重试。"
+    },
+    "manualInput": {
+      "title": "手动输入 IP 配对",
+      "description": "如果扫描不到电脑，尤其是 Windows 设备，可直接输入电脑端 IPv4 地址继续配对。",
+      "guideTitle": "去哪里找连接码和 IP？",
+      "guideBody": "请在电脑端 Lynavo Drive 左侧导航栏点击「全局设置」，即可查看 6 位连接码、设备 IP 或展示二维码。",
+      "hostLabel": "服务器地址",
+      "confirm": "继续",
+      "hint": "默认使用同步端口 39593，输入后仍需在下一步填写 6 位连接码。",
+      "ipError": "请输入有效的 IPv4 地址，例如 192.168.0.1"
+    }
+  },
+  "switch": {
+    "title": "切换设备",
+    "badge": {
+      "known": "已连过",
+      "current": "当前"
+    },
+    "toast": {
+      "alreadyCurrent": "已是当前连接设备"
+    }
+  },
+  "sections": {
+    "discovered": "已发现的电脑",
+    "recent": "最近连接的电脑"
+  },
+  "connectionMethod": {
+    "title": "选择连接方式",
+    "selected": "已选择 {{name}}",
+    "qrTitle": "扫码连接",
+    "qrDesc": "扫描 {{name}} 上显示的二维码",
+    "codeTitle": "输入连接码",
+    "codeDesc": "输入 {{name}} 显示的连接码",
+    "cancel": "取消",
+    "connect": "连接",
+    "inputPlaceholder": "输入连接码",
+    "verifying": "正在验证连接码…",
+    "connectCodeTitle": "输入连接码",
+    "connectCodeDesc": "输入 {{name}} 显示的连接码以完成连接。"
+  },
+  "connectionCodeWrongWithAttempts": "连接码错误，还可以再试 {{remainingAttempts}} 次。",
+  "connectionCodeWrong": "连接码错误，请重新输入电脑端显示的 6 位连接码。",
+  "pairingBlockedTitle": "配对已被阻止",
+  "pairingBlockedDesc": "这台电脑已阻止此手机配对，请先在电脑端解除阻止后再试。",
+  "reenter": "重新输入",
+  "versionIncompatibleTitle": "版本不兼容",
+  "versionIncompatibleDesc": "手机和电脑端版本不兼容，请更新两端 Lynavo Drive 后再试。",
+  "rescan": "重新扫描",
+  "connectionCodeError": "连接码错误",
+  "connectionFailed": "连接失败",
+  "connectionFailedDesc": "连接失败，请确认电脑端在线后重试。",
+  "pairingInvalidatedTitle": "需要重新配对这台电脑",
+  "pairingInvalidatedDesc": "这台电脑已更新连接码。请重新配对后继续同步。",
+  "noDeviceTitle": "未发现设备",
+  "noDeviceDesc": "没有扫到同一局域网内的电脑，请确认电脑端已打开并连接同一 Wi-Fi。",
+  "findPC": "寻找电脑",
+  "nearbyPermissionTitle": "允许查找附近设备",
+  "nearbyPermissionDesc": "Android 系统需要此权限来发现局域网内的电脑设备。",
+  "startScan": "开始扫描",
+  "connectTimeoutTitle": "连接超时",
+  "connectTimeoutDesc": "电脑端响应超时，请检查设备是否处于忙碌或断线状态。",
+  "cameraDeniedTitle": "相机权限已禁用",
+  "cameraDeniedDesc": "无法打开相机，你可以改用 6 位连接码连接。",
+  "inputCode": "输入连接码",
+  "back": "返回",
+  "switchComputer": "切换电脑",
+  "connectYourPC": "连接你的电脑",
+  "scanFirstText": "先扫描同一局域网下的电脑设备，再选择扫码连接或输入连接码。",
+  "lanDeviceTitle": "局域网内的电脑",
+  "verifyingCode": "正在验证连接码…",
+  "connect": "连接",
+  "demoMacStudio": "Lynavo Drive 演示 Mac Studio",
+  "demoMacBook": "Lynavo Drive 演示 MacBook Pro",
+  "demoWindows": "Lynavo Drive 演示 Windows 工作站",
+  "connectionStatus": {
+    "scanning": "正在扫描…",
+    "ready": "扫描完成",
+    "empty": "暂无设备",
+    "connected": "已连接",
+    "failed": "连接失败",
+    "permissionRequired": "等待授权",
+    "busy": "使用中",
+    "available": "可连接"
+  },
+  "manualPairing": "手动配对",
+  "selectMethod": "选择连接方式",
+  "manualPairingDesc": "选择扫码配对，或手动输入电脑 IP 与连接码。",
+  "manualIP": "手动输入 IP",
+  "enterIPAndCode": "输入电脑端 IP 和连接码",
+  "enterCodeTitle": "输入连接码",
+  "manualIPHint": "输入电脑端显示的 IP 地址进行连接。",
+  "manualIPLabel": "IP 地址",
+  "manualIPPlaceholder": "例如 192.168.0.1",
+  "manualIPErr": "请输入有效的 IP 地址或主机名。",
+  "viewSettingsHint": "请在电脑端设置中查看 IP 地址和 6 位连接码。",
+  "cameraDeniedModalDesc": "扫码连接需要相机权限以扫描电脑屏幕上的二维码。",
+  "enterCodeDesc": "输入 {{deviceName}} 显示的连接码以完成配对。",
+  "cameraAccessTitle": "允许相机访问",
+  "cameraAccessDesc": "扫码连接需要临时打开相机，用于识别电脑端二维码。",
+  "deny": "不允许",
+  "allow": "允许",
+  "pairingCodePlaceholder": "例如 A8X2K9",
+  "cancel": "取消",
+  "preview": {
+    "skipGuide": "跳过引导",
+    "autoUpload": "自动上传",
+    "disabled": "未开启",
+    "enabled": "已开启",
+    "enableAction": "开启",
+    "adjustAction": "调整",
+    "deviceStatus": "当前手机状态",
+    "autoUploadDisabled": "自动同步未开启",
+    "lastSyncNone": "最近同步时间：暂无",
+    "syncPlan": "同步计划",
+    "syncPlanDesc": "相册内容和指定文件将同步到电脑。",
+    "statSource": "来源",
+    "statFiles": "文件",
+    "statScope": "范围",
+    "statScopeAll": "全部内容",
+    "syncSource": "同步来源",
+    "photosAndVideos": "照片和视频",
+    "photosAndVideosDesc": "同步系统相册中的媒体内容",
+    "syncScope": "同步范围",
+    "allContentDesc": "同步现有照片和视频",
+    "uploadedCount": "已上传{{uploaded}}/{{total}}",
+    "uploadingProgress": "上传中 · 本次传输进度",
+    "speed": "传输速度",
+    "progress": "传输进度",
+    "fileSize": "文件大小",
+    "remainingTime": "剩余时间",
+    "secondsVal": "{{seconds}} 秒",
+    "recentDownload": "最近下载",
+    "viewAll": "查看全部",
+    "demoFileName1": "品牌手册.pdf",
+    "demoFileName2": "发布视频.mov",
+    "demoFileName3": "报价单.xlsx",
+    "syncRecords": "同步记录",
+    "todayStat": "今天 · 18 个 · 18.4 GB",
+    "completed": "已完成",
+    "syncSpaceTitle": "手机同步空间",
+    "syncSpaceDesc": "查看已同步至电脑的文件与上传来源",
+    "syncSpaceBadge1": "今日 5 个",
+    "syncSpaceBadge2": "保留来源",
+    "localComputerTitle": "电脑文件",
+    "localComputerDesc": "浏览电脑端共享目录并下载文件",
+    "localComputerBadge1": "桌面目录",
+    "localComputerBadge2": "列表/网格"
+  }
+}

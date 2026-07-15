@@ -1,0 +1,80 @@
+{
+  "title": "所有设备",
+  "lastSuccess": {
+    "withDevice": "最近一次成功同步：{{time}} · {{device}}",
+    "none": "最近一次成功同步：暂无记录"
+  },
+  "stats": {
+    "todayMediaCount": "今日接收媒体总数",
+    "todayOccupied": "今日占用总空间",
+    "remainingSpace": "设备剩余空间"
+  },
+  "diskWarning": "接收磁盘剩余空间小于 500MB，已暂停新的接收任务",
+  "dismissDiskWarning": "关闭磁盘空间提醒",
+  "deviceCard": {
+    "recent": "最近 {{date}}",
+    "today": "今日",
+    "preparing": "准备传输中…"
+  },
+  "statusPanel": {
+    "sidecarStatus": "背景服务",
+    "pairingCode": "本机配对码",
+    "activeDevices": "活动中设备",
+    "copySuccess": "配对码已复制到剪贴簿",
+    "clickToCopy": "点击复制",
+    "status": {
+      "healthy": "运行中",
+      "starting": "启动中",
+      "failed": "启动失败",
+      "stopped": "已停止"
+    }
+  },
+  "share": {
+    "title": "共享管理",
+    "toast": {
+      "connectionCodeCopied": "连接码已复制",
+      "copyFailed": "复制失败",
+      "localFileAccessReady": "本地文件访问已可用",
+      "localFileAccessUnavailable": "本地文件访问已关闭",
+      "localFileAccessUpdateFailed": "无法更新本地文件访问状态",
+      "folderPermissionGranted": "文件夹访问权限已授权",
+      "folderPermissionDenied": "未获得文件夹权限，请在系统设置中手动授权",
+      "folderPermissionRequestFailed": "权限请求失败",
+      "showCodeBeforeRegenerate": "请先显示连接码再双击修改",
+      "connectionCodeRegenerated": "连接码已重新生成！旧配对设备已失效",
+      "regenerateFailed": "重新生成连接码失败",
+      "transferActiveReceivePathLocked": "正在传输文件中，无法修改接收目录",
+      "receivePathUpdated": "接收目录修改成功",
+      "receivePathUpdateFailed": "储存接收目录失败"
+    },
+    "connectionCode": {
+      "title": "连接码",
+      "regenerateTitle": "双击重新生成连接码",
+      "showBeforeRegenerateTitle": "显示连接码后可双击修改",
+      "regenerateHint": "双击修改连接码",
+      "regenerateConfirm": "修改配对码会中断当前已配对的手机，所有手机需使用新配对码重新配对。要继续吗？",
+      "show": "显示连接码",
+      "hide": "隐藏连接码",
+      "copy": "复制",
+      "showQr": "显示连接二维码",
+      "collapseQr": "收起连接二维码",
+      "qrTitle": "Lynavo Drive 连接二维码",
+      "qrDescription": "手机扫码配对该电脑",
+      "downloadApp": "下载 App",
+      "downloadInstruction": "，在同一 Wi-Fi 下扫描，选择该设备，扫码或输入连接码连接设备"
+    },
+    "localFileAccess": {
+      "title": "本地文件访问",
+      "description": "同一局域网内的已配对手机可以浏览这台电脑共享的文件。",
+      "toggle": "本地文件访问状态",
+      "folderPermissionWarning": "尚未授予文件夹访问权限，手机暂时无法浏览这台电脑的本地共享文件。",
+      "authorize": "授权访问"
+    },
+    "receiveFolder": {
+      "title": "接收目录",
+      "defaultPath": "默认自动创建",
+      "remaining": "剩余 {{space}}",
+      "changeFolder": "修改目录"
+    }
+  }
+}

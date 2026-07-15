@@ -1,0 +1,21 @@
+{
+  "title": "历史记录",
+  "emptyState": {
+    "noRecords": "暂无同步记录"
+  },
+  "cards": {
+    "statsLabel": "共同步媒体文件",
+    "statsUnit": "个",
+    "durationLabel": "耗时"
+  },
+  "dates": {
+    "today": "今天",
+    "yesterday": "昨天",
+    "monthDay": "{{month}}月{{day}}日"
+  },
+  "liveLabel": "实时同步中",
+  "status": {
+    "completed": "同步成功",
+    "failed": "同步失败"
+  }
+}

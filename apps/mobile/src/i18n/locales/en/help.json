@@ -1,0 +1,38 @@
+{
+  "sections": {
+    "contact": "Contact Support"
+  },
+  "faq": {
+    "item0": {
+      "title": "What if the app keeps looking for devices?",
+      "answer": "Make sure your phone and computer are on the same Wi-Fi network, and that Lynavo Drive for PC is running. Try restarting the desktop app, then tap scan again on your phone, or connect manually with the 6-digit pairing code."
+    },
+    "item1": {
+      "title": "Why does auto upload pause?",
+      "answer": "Auto upload pauses after Wi-Fi changes, when the computer sleeps, or when the mobile app is no longer foregrounded. After the app is foregrounded again and the local network returns, Lynavo Drive keeps completed files and resumes unfinished queued tasks automatically."
+    },
+    "item2": {
+      "title": "What should I do if an upload fails?",
+      "answer": "Keep your phone and computer on the same Wi-Fi network and confirm the desktop app is still running. Lynavo Drive keeps completed files and retries unfinished queued items automatically. If it still fails, export a local diagnostics bundle and share it by email or the system share sheet."
+    },
+    "item3": {
+      "title": "What if QR pairing does not work?",
+      "answer": "Aim the phone camera at the QR code shown on the PC. If scanning fails, connect by manually entering the 6-digit pairing code."
+    },
+    "item4": {
+      "title": "Does the open-source edition require a cloud login?",
+      "answer": "No. The OSS edition keeps local LAN pairing, foreground sync, and shared-folder browsing available through local desktop pairing."
+    },
+    "item5": {
+      "title": "What if the shared folder is empty?",
+      "answer": "Confirm the shared folder path is available in Lynavo Drive on the PC, and that the folder contains files. After setting it, pull to refresh on your phone to see the contents."
+    }
+  },
+  "contact": {
+    "supportIssue": "GitHub Issues",
+    "supportIssueDesc": "Open a public issue for reproducible bugs or feature requests.",
+    "exportDiagnostics": "Export Diagnostics",
+    "exportingDiagnostics": "Exporting...",
+    "exportHint": "Save diagnostics locally. Share them only if you are comfortable attaching them to a public issue."
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "title": "裝置管理",
+  "stats": {
+    "total": "總裝置",
+    "disabled": "已停用",
+    "connected": "已連線"
+  },
+  "empty": {
+    "title": "暫無裝置",
+    "description": "透過連線碼授權後的手機裝置會顯示在這裡。"
+  },
+  "table": {
+    "unnamedDevice": "未命名裝置"
+  },
+  "status": {
+    "connected": "已連線",
+    "disabled": "已停用",
+    "offline": "未連線",
+    "connectedWaitingSync": "已連線，等待同步"
+  },
+  "blockReason": {
+    "tooManyFailedAttempts": "連線碼輸錯 3 次，已自動停用"
+  },
+  "actions": {
+    "block": "停用",
+    "unblock": "取消停用",
+    "cancel": "取消",
+    "confirmBlock": "確認停用"
+  },
+  "dialog": {
+    "disableTitle": "停用裝置",
+    "disableDescription": "停用後 {{deviceName}} 會中斷連線並停止所有傳輸，確定要停用這台裝置嗎？"
+  }
+}

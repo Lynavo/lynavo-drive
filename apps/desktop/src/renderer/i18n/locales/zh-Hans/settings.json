@@ -1,0 +1,80 @@
+{
+  "language": {
+    "label": "界面语言",
+    "options": {
+      "en": "English",
+      "zhHans": "简体中文",
+      "zhHant": "繁体中文"
+    }
+  },
+  "filePath": {
+    "openShared": "打开团队共享目录"
+  },
+  "profile": {
+    "title": "我的",
+    "cards": {
+      "community": "开源本地同步",
+      "localMachine": "本机",
+      "general": "通用",
+      "version": "版本",
+      "support": "支持"
+    },
+    "localIp": "本机 IP",
+    "language": {
+      "search": "搜索语言",
+      "empty": "没有匹配的语言"
+    },
+    "preventSleep": {
+      "title": "防止待机",
+      "caption": "传输任务运行时保持电脑唤醒"
+    },
+    "receivedAccess": {
+      "title": "允许已配对手机浏览所有已接收文件",
+      "captionEnabled": "已配对手机可浏览与下载这台电脑的全部 received 内容",
+      "captionDisabled": "手机只能浏览同一实体设备同步到这台电脑的文件"
+    },
+    "version": {
+      "caption": "v{{version}} · 当前版本已安装"
+    },
+    "actions": {
+      "cancel": "取消",
+      "send": "发送"
+    },
+    "feedback": {
+      "title": "问题反馈",
+      "openedCaption": "已打开 GitHub issue 草稿",
+      "issueCaption": "先本地导出诊断包，再打开 GitHub issue",
+      "placeholder": "请描述问题、发生步骤或希望改进的地方",
+      "contactPlaceholder": "联系方式邮箱或手机号",
+      "contactEmpty": "未提供联系方式",
+      "issueTitle": "Lynavo Drive Desktop 问题反馈 v{{version}}",
+      "issueBody": "问题描述：\n{{description}}\n\n联系方式：\n{{contact}}\n\n当前版本：v{{version}}\n\n仅在你确认可以公开分享时附加本地诊断包。安全漏洞请使用私有 security advisory 流程。"
+    },
+    "diagnostics": {
+      "exportingCaption": "正在导出诊断包",
+      "caption": "本地保存日志与运行状态",
+      "description": "导出本地诊断包，帮助排查传输、配对或共享问题。",
+      "placeholder": "请描述出现问题的步骤、手机型号、网络环境或错误现象（选填）"
+    },
+    "toasts": {
+      "languageChanged": "语言已切换",
+      "preventSleepEnabled": "传输时将保持电脑唤醒",
+      "preventSleepDisabled": "已关闭防止待机",
+      "preventSleepFailed": "无法更新电源设置",
+      "receivedAccessFailed": "修改已接收文件浏览权限失败",
+      "feedbackOpened": "已打开 GitHub issue 草稿"
+    },
+    "community": {
+      "title": "本地局域网访问",
+      "caption": "同一局域网内可直接配对、发现并自动同步。",
+      "devicesTitle": "已配对设备",
+      "devicesCaption": "手机继续使用本地配对令牌和已配对设备授权访问局域网能力。"
+    }
+  },
+  "support": {
+    "exportDiagnostics": "导出诊断包",
+    "diagnosticsDescriptionLabel": "问题描述",
+    "diagnosticsCancel": "取消",
+    "diagnosticsSubmit": "导出"
+  }
+}

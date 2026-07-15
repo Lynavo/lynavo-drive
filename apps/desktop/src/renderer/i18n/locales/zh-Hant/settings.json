@@ -1,0 +1,80 @@
+{
+  "language": {
+    "label": "介面語言",
+    "options": {
+      "en": "English",
+      "zhHans": "簡體中文",
+      "zhHant": "繁體中文"
+    }
+  },
+  "filePath": {
+    "openShared": "開啟團隊共享目錄"
+  },
+  "profile": {
+    "title": "我的",
+    "cards": {
+      "community": "開源本地同步",
+      "localMachine": "本機",
+      "general": "一般",
+      "version": "版本",
+      "support": "支援"
+    },
+    "localIp": "本機 IP",
+    "language": {
+      "search": "搜尋語言",
+      "empty": "沒有符合的語言"
+    },
+    "preventSleep": {
+      "title": "防止待機",
+      "caption": "傳輸任務執行時保持電腦喚醒"
+    },
+    "receivedAccess": {
+      "title": "允許已配對手機瀏覽所有已接收檔案",
+      "captionEnabled": "已配對手機可瀏覽與下載這台電腦的全部 received 內容",
+      "captionDisabled": "手機只能瀏覽同一實體設備同步到這台電腦的檔案"
+    },
+    "version": {
+      "caption": "v{{version}} · 目前版本已安裝"
+    },
+    "actions": {
+      "cancel": "取消",
+      "send": "傳送"
+    },
+    "feedback": {
+      "title": "問題回饋",
+      "openedCaption": "已開啟 GitHub issue 草稿",
+      "issueCaption": "先本機匯出診斷包，再開啟 GitHub issue",
+      "placeholder": "請描述問題、發生步驟或希望改善的地方",
+      "contactPlaceholder": "聯絡信箱或手機號碼",
+      "contactEmpty": "未提供聯絡方式",
+      "issueTitle": "Lynavo Drive Desktop 問題回饋 v{{version}}",
+      "issueBody": "問題描述：\n{{description}}\n\n聯絡方式：\n{{contact}}\n\n目前版本：v{{version}}\n\n僅在你確認可以公開分享時附加本機診斷包。安全漏洞請使用私有 security advisory 流程。"
+    },
+    "diagnostics": {
+      "exportingCaption": "正在匯出診斷包",
+      "caption": "本機保存記錄與執行狀態",
+      "description": "匯出本機診斷包，協助排查傳輸、配對或共享問題。",
+      "placeholder": "請描述出現問題的步驟、手機型號、網路環境或錯誤現象（選填）"
+    },
+    "toasts": {
+      "languageChanged": "語言已切換",
+      "preventSleepEnabled": "傳輸時將保持電腦喚醒",
+      "preventSleepDisabled": "已關閉防止待機",
+      "preventSleepFailed": "無法更新電源設定",
+      "receivedAccessFailed": "修改已接收檔案瀏覽權限失敗",
+      "feedbackOpened": "已開啟 GitHub issue 草稿"
+    },
+    "community": {
+      "title": "本地區域網路存取",
+      "caption": "同一區域網路內可直接配對、發現並自動同步。",
+      "devicesTitle": "已配對裝置",
+      "devicesCaption": "手機會繼續使用本地配對權杖和已配對裝置授權存取區域網路能力。"
+    }
+  },
+  "support": {
+    "exportDiagnostics": "匯出診斷包",
+    "diagnosticsDescriptionLabel": "問題描述",
+    "diagnosticsCancel": "取消",
+    "diagnosticsSubmit": "匯出"
+  }
+}

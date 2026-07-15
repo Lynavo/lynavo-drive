@@ -1,0 +1,35 @@
+{
+  "ok": "好",
+  "cancel": "取消",
+  "confirm": "确认",
+  "back": "返回",
+  "retry": "重试",
+  "loading": "加载中",
+  "unknownVersion": "未知版本",
+  "privacyPolicy": "《隐私政策》",
+  "termsOfService": "《用户协议》",
+  "deviceNames": {
+    "default": "电脑",
+    "windows": "Windows 电脑"
+  },
+  "diagnosticsArchiveTitle": "Lynavo Drive 诊断包",
+  "notApplicable": "不适用",
+  "unknownTime": "未知时间",
+  "today": "今天",
+  "yesterday": "昨天",
+  "thumbnail": "缩略图",
+  "connectionStates": {
+    "connected": "已连接",
+    "connecting": "连接中",
+    "offline": "离线",
+    "bound": "已绑定",
+    "active": "已开启",
+    "inactive": "未开启",
+    "boundDeviceFallback": "已绑定电脑"
+  },
+  "tabs": {
+    "home": "首页",
+    "files": "电脑文件",
+    "settings": "我的"
+  }
+}

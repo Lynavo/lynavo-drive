@@ -1,0 +1,228 @@
+{
+  "title": "Find Devices",
+  "subtitle": {
+    "ios": "Scanning for desktop apps on your local network...",
+    "android": "Scanning for desktop apps on your local network. If no device is found, enter the IPv4 address manually."
+  },
+  "scanning": {
+    "text": "Scanning, please wait..."
+  },
+  "devices": {
+    "foundCount": "{{count}} device found",
+    "foundCount_one": "{{count}} device found",
+    "foundCount_other": "{{count}} devices found"
+  },
+  "emptyState": {
+    "default": "No devices found",
+    "android": "No devices found. Enter the IP address manually to continue pairing."
+  },
+  "actions": {
+    "manualPair": "Manual Pairing",
+    "rescan": "Scan Again",
+    "manualInputIp": "Enter IP Manually",
+    "qrPair": "Scan QR Code"
+  },
+  "troubleshooting": {
+    "title": "Can't find a device or not sure how to connect?",
+    "sameWifi": "Make sure your phone and computer are connected to the same Wi-Fi or local network.",
+    "desktopApp": "Open {{host}} in your computer browser, follow the OSS desktop build or release instructions, and keep the desktop app open.",
+    "cta": "View full illustrated tutorial >",
+    "notReadyTitle": "Computer app not ready yet?",
+    "notReadyDesc": "Build or install Lynavo Drive desktop from the OSS repository first, then return to scan QR or enter code."
+  },
+  "onboarding": {
+    "unconnected": {
+      "skip": "Skip",
+      "title": "Start using Lynavo Drive",
+      "subtitle": "Sync media wirelessly from phone to computer in three steps.",
+      "downloadStep": {
+        "title": "Install PC App",
+        "body": "Install Lynavo Drive on your computer"
+      },
+      "connectStep": {
+        "title": "Connect Phone",
+        "body": "Enter a pairing code or scan QR"
+      },
+      "syncStep": {
+        "title": "Start Syncing",
+        "body": "Media transfers to your computer"
+      },
+      "copy": "Copy",
+      "copyDone": "Download address copied",
+      "copyFailed": "Could not copy the download address. Please try again later.",
+      "copyHint": "Open this address in your computer browser to download",
+      "start": "I installed it. Connect device",
+      "footerNote": "First-time guide - Available again from Help"
+    },
+    "step1Title": "Connect Computer First",
+    "step1Desc": "Select a computer to connect. The guide only previews features without creating real data.",
+    "step1Action": "Continue Preview",
+    "step2Title": "Enable Auto Upload",
+    "step2Desc": "Once connected, foreground auto upload syncs new photos and videos over the local LAN.",
+    "step2Action": "Next",
+    "step3Title": "Sync Scope",
+    "step3Desc": "Choose albums, files, and scope to control what gets synced.",
+    "step3Action": "Next",
+    "step4Title": "Sync Progress",
+    "step4Desc": "Shows upload progress, last sync time, and sync errors once active.",
+    "step4Action": "Next",
+    "step5Title": "Recent Records",
+    "step5Desc": "Files downloaded from computer and sync history are shown here.",
+    "step5Action": "Next",
+    "step6Title": "Local Computer",
+    "step6Desc": "Browse computer files and sync space, retrieve files quickly.",
+    "step6Action": "Done"
+  },
+  "dialogs": {
+    "openLinkFailed": {
+      "title": "Cannot Open",
+      "body": "Could not open {{label}} right now. Please try again later."
+    },
+    "manualInput": {
+      "title": "Enter IP to Pair",
+      "description": "If the scan can't find your computer — especially Windows — enter the desktop app's IPv4 address directly.",
+      "guideTitle": "Where do I find the code and IP?",
+      "guideBody": "Open Lynavo Drive on your computer, choose Global Settings from the sidebar, then check the 6-digit code, device IP, or QR code.",
+      "hostLabel": "Server address",
+      "confirm": "Continue",
+      "hint": "Uses sync port 39593 by default. You'll still need to enter the 6-digit pairing code in the next step.",
+      "ipError": "Please enter a valid IPv4 address, e.g. 192.168.0.1"
+    }
+  },
+  "switch": {
+    "title": "Switch Device",
+    "badge": {
+      "known": "Previously Connected",
+      "current": "Current"
+    },
+    "toast": {
+      "alreadyCurrent": "Already connected to this device"
+    }
+  },
+  "sections": {
+    "discovered": "Discovered Desktops",
+    "recent": "Recent Connected Desktops"
+  },
+  "connectionMethod": {
+    "title": "Select Connection Method",
+    "selected": "Selected {{name}}",
+    "qrTitle": "Scan QR Code",
+    "qrDesc": "Scan QR code shown on {{name}}",
+    "codeTitle": "Enter Pairing Code",
+    "codeDesc": "Enter pairing code shown on {{name}}",
+    "cancel": "Cancel",
+    "connect": "Connect",
+    "inputPlaceholder": "Enter pairing code",
+    "verifying": "Verifying code...",
+    "connectCodeTitle": "Enter Pairing Code",
+    "connectCodeDesc": "Enter the pairing code shown on {{name}} to complete connection."
+  },
+  "connectionCodeWrongWithAttempts": "Incorrect connection code. You can try {{remainingAttempts}} more times.",
+  "connectionCodeWrong": "Incorrect connection code. Please enter the 6-digit code shown on the computer.",
+  "pairingBlockedTitle": "Pairing Blocked",
+  "pairingBlockedDesc": "This computer has blocked this phone from pairing. Please unblock it on the computer first.",
+  "reenter": "Re-enter",
+  "versionIncompatibleTitle": "Incompatible Version",
+  "versionIncompatibleDesc": "App versions are incompatible. Please update Lynavo Drive on both devices.",
+  "rescan": "Scan Again",
+  "connectionCodeError": "Connection Code Error",
+  "connectionFailed": "Connection Failed",
+  "connectionFailedDesc": "Connection failed. Please check if the computer is online and try again.",
+  "pairingInvalidatedTitle": "Pair this desktop again",
+  "pairingInvalidatedDesc": "This desktop changed its pairing code. Pair again to continue.",
+  "noDeviceTitle": "No Devices Found",
+  "noDeviceDesc": "No computers found on this local network. Make sure the desktop app is open and on the same Wi-Fi.",
+  "findPC": "Find PC",
+  "nearbyPermissionTitle": "Find Nearby Devices",
+  "nearbyPermissionDesc": "Android requires permission to find nearby devices to discover computers.",
+  "startScan": "Start Scan",
+  "connectTimeoutTitle": "Connection Timeout",
+  "connectTimeoutDesc": "The computer took too long to respond. It might be in use or offline.",
+  "cameraDeniedTitle": "Camera Access Denied",
+  "cameraDeniedDesc": "Cannot open camera. You can use the 6-digit pairing code instead.",
+  "inputCode": "Enter Code",
+  "back": "Back",
+  "switchComputer": "Switch Computer",
+  "connectYourPC": "Connect Your PC",
+  "scanFirstText": "Scan local network computers first, then scan QR code or enter pairing code.",
+  "lanDeviceTitle": "Computers on Local Network",
+  "verifyingCode": "Verifying code...",
+  "connect": "Connect",
+  "demoMacStudio": "Lynavo Drive Demo Mac Studio",
+  "demoMacBook": "Lynavo Drive Demo MacBook Pro",
+  "demoWindows": "Lynavo Drive Demo Windows Workstation",
+  "connectionStatus": {
+    "scanning": "Scanning...",
+    "ready": "Scan complete",
+    "empty": "No devices",
+    "connected": "Connected",
+    "failed": "Failed",
+    "permissionRequired": "Waiting for permission",
+    "busy": "In Use",
+    "available": "Available"
+  },
+  "manualPairing": "Manual Pairing",
+  "selectMethod": "Select Connection Method",
+  "manualPairingDesc": "Select QR pairing, or enter computer IP and pairing code.",
+  "manualIP": "Manual IP",
+  "enterIPAndCode": "Enter computer IP and pairing code",
+  "enterCodeTitle": "Enter Pairing Code",
+  "manualIPHint": "Enter the IP address shown on the computer to connect.",
+  "manualIPLabel": "IP Address",
+  "manualIPPlaceholder": "e.g. 192.168.0.1",
+  "manualIPErr": "Please enter a valid IP address or hostname.",
+  "viewSettingsHint": "Check computer settings for IP and 6-digit connection code.",
+  "cameraDeniedModalDesc": "Scan QR code requires camera permission to scan the computer's screen.",
+  "enterCodeDesc": "Enter the connection code shown on {{deviceName}} to complete pairing.",
+  "cameraAccessTitle": "Allow Camera Access",
+  "cameraAccessDesc": "Scanning QR code requires camera access to read the QR code on the computer screen.",
+  "deny": "Don't Allow",
+  "allow": "Allow",
+  "pairingCodePlaceholder": "e.g. A8X2K9",
+  "cancel": "Cancel",
+  "preview": {
+    "skipGuide": "Skip Guide",
+    "autoUpload": "Auto Upload",
+    "disabled": "Off",
+    "enabled": "On",
+    "enableAction": "Enable",
+    "adjustAction": "Adjust",
+    "deviceStatus": "Device Status",
+    "autoUploadDisabled": "Auto upload is off",
+    "lastSyncNone": "Last sync: None",
+    "syncPlan": "Sync Plan",
+    "syncPlanDesc": "Albums and files will sync to your computer.",
+    "statSource": "Sources",
+    "statFiles": "Files",
+    "statScope": "Scope",
+    "statScopeAll": "All Content",
+    "syncSource": "Sync Source",
+    "photosAndVideos": "Photos & Videos",
+    "photosAndVideosDesc": "Sync media from system photos",
+    "syncScope": "Sync Scope",
+    "allContentDesc": "Sync all existing photos & videos",
+    "uploadedCount": "Uploaded {{uploaded}}/{{total}}",
+    "uploadingProgress": "Uploading - Progress",
+    "speed": "Speed",
+    "progress": "Progress",
+    "fileSize": "File Size",
+    "remainingTime": "Time Left",
+    "secondsVal": "{{seconds}}s",
+    "recentDownload": "Recent Downloads",
+    "viewAll": "View All",
+    "demoFileName1": "Brand Guidelines.pdf",
+    "demoFileName2": "Launch Video.mov",
+    "demoFileName3": "Price List.xlsx",
+    "syncRecords": "Sync Records",
+    "todayStat": "Today - 18 files - 18.4 GB",
+    "completed": "Completed",
+    "syncSpaceTitle": "Phone Sync Space",
+    "syncSpaceDesc": "View files synced to computer and upload sources",
+    "syncSpaceBadge1": "Today 5 files",
+    "syncSpaceBadge2": "Keep source",
+    "localComputerTitle": "Local Computer",
+    "localComputerDesc": "Browse computer shared folders and download files",
+    "localComputerBadge1": "Desktop folder",
+    "localComputerBadge2": "List/Grid"
+  }
+}

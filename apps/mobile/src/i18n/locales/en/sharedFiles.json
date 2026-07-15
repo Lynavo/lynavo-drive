@@ -1,0 +1,162 @@
+{
+  "title": "Files",
+  "headerSubtitle": "Browse synced media from your phone or access your computer's directory.",
+  "phoneSyncSpace": {
+    "title": "Phone Sync Space",
+    "desc": "View files synced to your computer and their upload sources",
+    "badgeSync": "Synced",
+    "badgeSource": "Source kept",
+    "select": "Select",
+    "selectFeature": "This feature is under development",
+    "empty": "No synced files yet",
+    "desktopDeleted": "Deleted on computer",
+    "desktopDeletedMessage": "This file was deleted from the computer.",
+    "deletedDownloadMessage": "Deleted files cannot be downloaded.",
+    "summary": "{{count}} files - {{size}}",
+    "filesCount": "{{count}} files",
+    "unnamedFile": "Unnamed File",
+    "previewSyncedFile": "Preview synced file",
+    "downloadSyncedFile": "Download synced file",
+    "loadingTitle": "Loading",
+    "loadingSubtitle": "Sync space list will refresh here.",
+    "loadFailedTitle": "Failed to Load",
+    "loadFailedSubtitle": "Please try again later.",
+    "emptySubtitle": "Once auto upload is enabled, assets synced to the computer will appear here.",
+    "mediaTypes": {
+      "video": "Video",
+      "photo": "Photo",
+      "file": "File"
+    },
+    "previewFailedTitle": "Cannot load preview",
+    "previewFailedSubtitle": "Please ensure the computer is online and the file still exists."
+  },
+  "localComputer": {
+    "title": "Local Computer",
+    "desc": "Browse your computer's shared directory and download files",
+    "ossDesc": "Browse paired desktop files over your local LAN.",
+    "ossBadge": "LAN",
+    "badgeDesktop": "Desktop dir",
+    "badgeView": "List/Grid",
+    "select": "Select",
+    "done": "Done",
+    "download": "Download",
+    "share": "Share",
+    "selectedCount": "{{count}} selected",
+    "selectFeature": "This feature is under development",
+    "shareNoSelectionTitle": "No Files Selected",
+    "shareNoSelectionMessage": "Select files to share first.",
+    "shareFailedTitle": "Share Failed",
+    "shareFailedMessage": "Could not open the system share sheet. Please try again later.",
+    "empty": "No shared resources available",
+    "rootDirectoryLabel": "User Directory",
+    "fallbackDesktopLabel": "Current PC",
+    "unboundLocalComputerSubtitle": "Not connected to computer",
+    "searchFolderPlaceholder": "Search current folder",
+    "searchFilesPlaceholder": "Search computer files",
+    "loadingTitle": "Computer files loading",
+    "loadingSubtitle": "Reading computer shared directory...",
+    "folderLoadingTitle": "Folder loading",
+    "folderLoadingSubtitle": "Reading computer directory contents...",
+    "connectionStatePrefix": "Local computer connection method: ",
+    "networkDisconnectedTitle": "Network Disconnected",
+    "networkDisconnectedSubtitle": "Current path will be kept. You can continue accessing after network is restored or desktop app is online.",
+    "retryConnection": "Retry Connection",
+    "localComputerDisabledTitle": "LAN Sharing Unavailable",
+    "localComputerDisabledSubtitle": "Make sure the paired desktop is online and sharing a local folder, then check again.",
+    "recheckPermission": "Check Again",
+    "folderLoadErrorTitle": "Folder Load Failed",
+    "folderLoadErrorSubtitle": "Unable to read this shared folder. Please make sure the files still exist on the computer.",
+    "reload": "Reload",
+    "closePreview": "Close Preview",
+    "noMatchTitle": "No Matching Results",
+    "noMatchSubtitle": "Try another keyword",
+    "emptyFolderTitle": "Empty Folder",
+    "emptyFolderSubtitle": "No files available for download or sharing in this directory.",
+    "noFilesTitle": "No Files",
+    "noFilesSubtitle": "No accessible file directories have been opened on the computer yet.",
+    "sortTitle": "Sort By",
+    "shareTitle": "Share Selected Files",
+    "shareSubtitle": "{{count}} files selected",
+    "shareTargets": ["Save", "Copy Link", "Email", "More"],
+    "listView": "List View",
+    "gridView": "Grid View"
+  },
+  "defaultFolderName": "Shared Folder",
+  "teamFolderName": "Shared Folder",
+  "personalFolderName": "Personal Shared Folder",
+  "globalPersonalFolderName": "My PC",
+  "scopes": {
+    "team": "Shared Folder",
+    "personal": "Personal Shared Folder",
+    "shared": "Shared Resources",
+    "received": "Received Files"
+  },
+  "loading": "Loading...",
+  "files": {
+    "folder": "Folder",
+    "downloaded": "Downloaded",
+    "parentFolder": "Parent Folder",
+    "parentFolderMeta": "Up one level",
+    "emptyFolder": "Empty Folder",
+    "justNow": "Just now",
+    "modifiedToday": "Today",
+    "modifiedDaysAgo": "{{count}} days ago"
+  },
+  "connectionStatus": {
+    "lan": "LAN online",
+    "unavailable": "Desktop unreachable",
+    "offline": "Offline",
+    "unbound": "Unbound"
+  },
+  "emptyState": {
+    "title": "No Content Yet",
+    "message": "Files will appear here once syncing is complete."
+  },
+  "deviceUnavailable": {
+    "title": "Device Unavailable",
+    "message": "Please connect to a device first.",
+    "recheck": "Check Again"
+  },
+  "directoryInaccessible": {
+    "title": "Directory Inaccessible",
+    "message": "Please check the desktop app settings."
+  },
+  "personalUnauthorized": {
+    "title": "Personal Shared Folder Unavailable",
+    "message": "Pair this phone with the desktop and configure the personal shared folder on the desktop."
+  },
+  "networkError": {
+    "title": "Failed to Load",
+    "message": "Please try again later."
+  },
+  "preview": {
+    "playVideo": "Tap to play video"
+  },
+  "dialogs": {
+    "downloadSavedToPhotos": "{{name}} saved to {{location}}",
+    "downloadSavedToFiles": "{{name}} saved to Files",
+    "downloadSaved": "{{name}} saved to {{location}}",
+    "downloadComplete": "Download complete",
+    "downloadFailed": "Download Failed",
+    "downloadFailedMessage": "Could not download the file. Please try again later.",
+    "downloadUnavailableMessage": "The file does not exist or is no longer accessible.",
+    "previewFailed": "Preview Failed",
+    "previewFailedMessage": "Could not load file preview.",
+    "previewUnsupported": "Cannot Preview",
+    "previewUnsupportedMessage": "This file type cannot be previewed yet. Download it first, then open it with another app.",
+    "openWithOtherApp": "Open with Another App",
+    "cancel": "Cancel",
+    "savedLocationPhotos": "Photos",
+    "savedLocationDocuments": "iOS Files App -> Lynavo Drive folder",
+    "savedLocationDownloads": "system Downloads -> Lynavo Drive folder"
+  },
+  "localSaveUnsupported": {
+    "title": "Save Not Supported Yet",
+    "message": "Local client saving is not integrated in the current version. Please wait for future releases."
+  },
+  "sortBy": {
+    "name": "Name",
+    "time": "Date",
+    "size": "Size"
+  }
+}

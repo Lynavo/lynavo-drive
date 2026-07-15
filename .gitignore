@@ -1,0 +1,63 @@
+node_modules/
+dist/
+out/
+.turbo/
+*.tsbuildinfo
+.DS_Store
+*.exe
+*.dmg
+*.docx
+.env
+.env.*
+*.cer
+*.crt
+*.key
+*.keystore
+*.mobileprovision
+*.p12
+*.pem
+*.provisionprofile
+!apps/desktop/src/renderer/i18n/locales/**/settings.json
+tmp
+# Playwright
+.playwright-mcp/
+
+# Desktop release/resources
+apps/desktop/release/
+apps/desktop/resources/.sidecar-build/
+apps/desktop/resources/dns-sd.exe
+apps/desktop/resources/dnssd.dll
+apps/desktop/resources/embedded.provisionprofile
+apps/desktop/resources/lynavo-drive-sidecar
+apps/desktop/resources/lynavo-drive-sidecar.exe
+apps/desktop/resources-vendor/
+tools/node/
+
+# Go sidecar
+services/sidecar-go/lynavo-drive-sidecar
+services/sidecar-go/sidecar.db
+services/sidecar-go/sidecar.db-wal
+services/sidecar-go/sidecar.db-shm
+tmp/sidecar-eval.db
+AuthKey_*.p8
+
+# IDE / tooling
+.vscode/
+.claude/
+.gemini/
+.antigravitycli/
+.agent/
+.superpowers/
+
+
+# Locale resource files must remain trackable even if a developer has a broad
+# global settings.json ignore rule.
+!apps/desktop/src/renderer/i18n/locales/en/settings.json
+!apps/desktop/src/renderer/i18n/locales/zh-Hans/settings.json
+!apps/desktop/src/renderer/i18n/locales/zh-Hant/settings.json
+
+# Local docs (not tracked)
+Lynavo Drive-*.md
+UI/
+!apps/mobile/android/app/src/main/java/com/lynavo/drive/mobile/ui/
+!apps/mobile/android/app/src/main/java/com/lynavo/drive/mobile/ui/**
