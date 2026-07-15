@@ -191,6 +191,10 @@ test('native build workflow is path-aware, unsigned, and platform-bounded', () =
   assert.equal(jobs.macos?.name, 'macOS Package');
   assert.equal(jobs.windows?.name, 'Windows Package');
   assert.equal(jobs.aggregate?.name, 'Native Builds');
+  assert.equal(
+    jobs.changes?.outputs?.artifact_prefix,
+    '${{ steps.version.outputs.artifact_prefix }}',
+  );
 
   const paths = findStep(jobs.changes?.steps ?? [], 'Filter changed paths');
   const filters = paths.with?.filters ?? '';
@@ -229,16 +233,17 @@ test('native build workflow is path-aware, unsigned, and platform-bounded', () =
   assert.match(workflowText, /java-version:\s*['"]?17['"]?/);
   assert.match(workflowText, /CODE_SIGNING_ALLOWED=NO/);
   assert.match(workflowText, /retention-days:\s*7/);
+  assert.match(workflowText, /artifact_prefix=.*productName/);
 
   for (const artifact of [
     'native-macos-${{ matrix.arch }}',
     'native-windows-x64',
     'native-android',
-    'LynavoDrive-${{ needs.changes.outputs.version }}-macos-${{ matrix.arch }}.dmg',
-    'LynavoDrive-${{ needs.changes.outputs.version }}-windows-x64.exe',
-    'LynavoDrive-${{ needs.changes.outputs.version }}-windows-x64.zip',
-    'LynavoDrive-${{ needs.changes.outputs.version }}-android-arm64-x86_64.apk',
-    'LynavoDrive-${{ needs.changes.outputs.version }}-android-arm64-x86_64.aab',
+    '${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-macos-${{ matrix.arch }}.dmg',
+    '${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-windows-x64.exe',
+    '${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-windows-x64.zip',
+    '${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-android-arm64-x86_64.apk',
+    '${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-android-arm64-x86_64.aab',
   ]) {
     assert.ok(workflowText.includes(artifact), `missing native artifact: ${artifact}`);
   }
@@ -614,12 +619,12 @@ test('draft release workflow is tag-gated, unsigned, and idempotent', () => {
     ?.map(step => step.run ?? '')
     .join('\n');
   const assets = [
-    'LynavoDrive-${VERSION}-macos-arm64.dmg',
-    'LynavoDrive-${VERSION}-macos-x64.dmg',
-    'LynavoDrive-${VERSION}-windows-x64.exe',
-    'LynavoDrive-${VERSION}-windows-x64.zip',
-    'LynavoDrive-${VERSION}-android-arm64-x86_64.apk',
-    'LynavoDrive-${VERSION}-android-arm64-x86_64.aab',
+    '${ARTIFACT_PREFIX}-${VERSION}-macos-arm64.dmg',
+    '${ARTIFACT_PREFIX}-${VERSION}-macos-x64.dmg',
+    '${ARTIFACT_PREFIX}-${VERSION}-windows-x64.exe',
+    '${ARTIFACT_PREFIX}-${VERSION}-windows-x64.zip',
+    '${ARTIFACT_PREFIX}-${VERSION}-android-arm64-x86_64.apk',
+    '${ARTIFACT_PREFIX}-${VERSION}-android-arm64-x86_64.aab',
     'SHA256SUMS',
   ];
   const declaredAssets = releaseCommands

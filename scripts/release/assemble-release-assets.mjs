@@ -11,17 +11,18 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { basename, join } from 'node:path';
+import { RELEASE_ARTIFACT_PREFIX } from './release-artifact-prefix.mjs';
 
 const RELEASE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
 function releaseAssetNames(version) {
   return [
-    `LynavoDrive-${version}-macos-arm64.dmg`,
-    `LynavoDrive-${version}-macos-x64.dmg`,
-    `LynavoDrive-${version}-windows-x64.exe`,
-    `LynavoDrive-${version}-windows-x64.zip`,
-    `LynavoDrive-${version}-android-arm64-x86_64.apk`,
-    `LynavoDrive-${version}-android-arm64-x86_64.aab`,
+    `${RELEASE_ARTIFACT_PREFIX}-${version}-macos-arm64.dmg`,
+    `${RELEASE_ARTIFACT_PREFIX}-${version}-macos-x64.dmg`,
+    `${RELEASE_ARTIFACT_PREFIX}-${version}-windows-x64.exe`,
+    `${RELEASE_ARTIFACT_PREFIX}-${version}-windows-x64.zip`,
+    `${RELEASE_ARTIFACT_PREFIX}-${version}-android-arm64-x86_64.apk`,
+    `${RELEASE_ARTIFACT_PREFIX}-${version}-android-arm64-x86_64.aab`,
   ];
 }
 

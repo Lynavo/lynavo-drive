@@ -30,6 +30,7 @@ jobs:
       macos: ${{ steps.scope.outputs.macos }}
       windows: ${{ steps.scope.outputs.windows }}
       version: ${{ steps.version.outputs.version }}
+      artifact_prefix: ${{ steps.version.outputs.artifact_prefix }}
 
     steps:
       - name: Checkout
@@ -120,7 +121,9 @@ jobs:
 
       - name: Resolve version
         id: version
-        run: echo "version=$(node -p "require('./apps/desktop/package.json').version")" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=$(node -p "require('./apps/desktop/package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "artifact_prefix=$(node -p "require('./apps/desktop/package.json').productName.replace(/\\s+/g, '')")" >> "$GITHUB_OUTPUT"
 
   ios:
     name: iOS Build
@@ -257,22 +260,22 @@ jobs:
           node scripts/release/stage-native-artifact.mjs
           --source apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
           --output-dir build/release-assets/android-apk
-          --name LynavoDrive-${{ needs.changes.outputs.version }}-android-arm64-x86_64.apk
+          --name ${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-android-arm64-x86_64.apk
 
       - name: Stage Android bundle
         run: >-
           node scripts/release/stage-native-artifact.mjs
           --source apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
           --output-dir build/release-assets/android-aab
-          --name LynavoDrive-${{ needs.changes.outputs.version }}-android-arm64-x86_64.aab
+          --name ${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-android-arm64-x86_64.aab
 
       - name: Upload Android artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-android
           path: |
-            build/release-assets/android-apk/LynavoDrive-${{ needs.changes.outputs.version }}-android-arm64-x86_64.apk
-            build/release-assets/android-aab/LynavoDrive-${{ needs.changes.outputs.version }}-android-arm64-x86_64.aab
+            build/release-assets/android-apk/${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-android-arm64-x86_64.apk
+            build/release-assets/android-aab/${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-android-arm64-x86_64.aab
           if-no-files-found: error
           retention-days: 7
           overwrite: true
@@ -342,15 +345,15 @@ jobs:
       - name: Stage macOS artifact
         run: >-
           node scripts/release/stage-native-artifact.mjs
-          --source apps/desktop/release/LynavoDrive-${{ needs.changes.outputs.version }}-${{ matrix.arch }}.dmg
+          --source apps/desktop/release/${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-${{ matrix.arch }}.dmg
           --output-dir build/release-assets/macos-${{ matrix.arch }}
-          --name LynavoDrive-${{ needs.changes.outputs.version }}-macos-${{ matrix.arch }}.dmg
+          --name ${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-macos-${{ matrix.arch }}.dmg
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-macos-${{ matrix.arch }}
-          path: build/release-assets/macos-${{ matrix.arch }}/LynavoDrive-${{ needs.changes.outputs.version }}-macos-${{ matrix.arch }}.dmg
+          path: build/release-assets/macos-${{ matrix.arch }}/${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-macos-${{ matrix.arch }}.dmg
           if-no-files-found: error
           retention-days: 7
           overwrite: true
@@ -403,24 +406,24 @@ jobs:
       - name: Stage Windows installer
         run: >-
           node scripts/release/stage-native-artifact.mjs
-          --source apps/desktop/release/LynavoDrive-${{ needs.changes.outputs.version }}-x64.exe
+          --source apps/desktop/release/${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-x64.exe
           --output-dir build/release-assets/windows-exe
-          --name LynavoDrive-${{ needs.changes.outputs.version }}-windows-x64.exe
+          --name ${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-windows-x64.exe
 
       - name: Stage Windows archive
         run: >-
           node scripts/release/stage-native-artifact.mjs
-          --source apps/desktop/release/LynavoDrive-${{ needs.changes.outputs.version }}-x64.zip
+          --source apps/desktop/release/${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-x64.zip
           --output-dir build/release-assets/windows-zip
-          --name LynavoDrive-${{ needs.changes.outputs.version }}-windows-x64.zip
+          --name ${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-windows-x64.zip
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-windows-x64
           path: |
-            build/release-assets/windows-exe/LynavoDrive-${{ needs.changes.outputs.version }}-windows-x64.exe
-            build/release-assets/windows-zip/LynavoDrive-${{ needs.changes.outputs.version }}-windows-x64.zip
+            build/release-assets/windows-exe/${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-windows-x64.exe
+            build/release-assets/windows-zip/${{ needs.changes.outputs.artifact_prefix }}-${{ needs.changes.outputs.version }}-windows-x64.zip
           if-no-files-found: error
           retention-days: 7
           overwrite: true

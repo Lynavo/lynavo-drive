@@ -108,12 +108,12 @@ test('draft release operations document tags, assets, retries, and repository ru
   assert.match(readme, /draft GitHub Release/i);
 
   for (const asset of [
-    'LynavoDrive-<version>-macos-arm64.dmg',
-    'LynavoDrive-<version>-macos-x64.dmg',
-    'LynavoDrive-<version>-windows-x64.exe',
-    'LynavoDrive-<version>-windows-x64.zip',
-    'LynavoDrive-<version>-android-arm64-x86_64.apk',
-    'LynavoDrive-<version>-android-arm64-x86_64.aab',
+    'LynavoDriveDemo-<version>-macos-arm64.dmg',
+    'LynavoDriveDemo-<version>-macos-x64.dmg',
+    'LynavoDriveDemo-<version>-windows-x64.exe',
+    'LynavoDriveDemo-<version>-windows-x64.zip',
+    'LynavoDriveDemo-<version>-android-arm64-x86_64.apk',
+    'LynavoDriveDemo-<version>-android-arm64-x86_64.aab',
     'SHA256SUMS',
   ]) {
     assert.ok(playbook.includes(`\`${asset}\``), `missing release asset: ${asset}`);

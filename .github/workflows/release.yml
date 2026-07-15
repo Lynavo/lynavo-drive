@@ -20,6 +20,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       version: ${{ steps.version.outputs.version }}
+      artifact_prefix: ${{ steps.version.outputs.artifact_prefix }}
 
     steps:
       - name: Checkout
@@ -35,7 +36,9 @@ jobs:
           else
             VERSION="$(node -p "require('./apps/desktop/package.json').version")"
           fi
+          ARTIFACT_PREFIX="$(node -p "require('./apps/desktop/package.json').productName.replace(/\\s+/g, '')")"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "artifact_prefix=$ARTIFACT_PREFIX" >> "$GITHUB_OUTPUT"
 
   gate:
     needs: verify-tag
@@ -151,6 +154,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
           VERSION: ${{ needs.verify-tag.outputs.version }}
+          ARTIFACT_PREFIX: ${{ needs.verify-tag.outputs.artifact_prefix }}
         run: |
           set -euo pipefail
 
@@ -176,12 +180,12 @@ jobs:
           fi
 
           ASSETS=(
-            "LynavoDrive-${VERSION}-macos-arm64.dmg"
-            "LynavoDrive-${VERSION}-macos-x64.dmg"
-            "LynavoDrive-${VERSION}-windows-x64.exe"
-            "LynavoDrive-${VERSION}-windows-x64.zip"
-            "LynavoDrive-${VERSION}-android-arm64-x86_64.apk"
-            "LynavoDrive-${VERSION}-android-arm64-x86_64.aab"
+            "${ARTIFACT_PREFIX}-${VERSION}-macos-arm64.dmg"
+            "${ARTIFACT_PREFIX}-${VERSION}-macos-x64.dmg"
+            "${ARTIFACT_PREFIX}-${VERSION}-windows-x64.exe"
+            "${ARTIFACT_PREFIX}-${VERSION}-windows-x64.zip"
+            "${ARTIFACT_PREFIX}-${VERSION}-android-arm64-x86_64.apk"
+            "${ARTIFACT_PREFIX}-${VERSION}-android-arm64-x86_64.aab"
             "SHA256SUMS"
           )
 

@@ -26,15 +26,15 @@ test('stages one non-empty native artifact with an exact filename', () => {
   const result = run([
     '--source', source,
     '--output-dir', outputDir,
-    '--name', 'LynavoDrive-1.2.3-macos-arm64.dmg',
+    '--name', 'LynavoDriveDemo-1.2.3-macos-arm64.dmg',
   ]);
 
   assert.equal(result.status, 0, result.stderr);
   assert.equal(
-    readFileSync(join(outputDir, 'LynavoDrive-1.2.3-macos-arm64.dmg'), 'utf8'),
+    readFileSync(join(outputDir, 'LynavoDriveDemo-1.2.3-macos-arm64.dmg'), 'utf8'),
     'native artifact',
   );
-  assert.match(result.stdout, /LynavoDrive-1\.2\.3-macos-arm64\.dmg/);
+  assert.match(result.stdout, /LynavoDriveDemo-1\.2\.3-macos-arm64\.dmg/);
 });
 
 test('rejects a missing source artifact', () => {

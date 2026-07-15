@@ -155,12 +155,12 @@ unsigned Debug and Release generic-device builds and produces no IPA.
 A valid tag run waits for `OSS Release Gate`, `TS Quality`, `Go Tests`, and
 `Native Builds` from the same commit. It then assembles exactly these files:
 
-- `LynavoDrive-<version>-macos-arm64.dmg`
-- `LynavoDrive-<version>-macos-x64.dmg`
-- `LynavoDrive-<version>-windows-x64.exe`
-- `LynavoDrive-<version>-windows-x64.zip`
-- `LynavoDrive-<version>-android-arm64-x86_64.apk`
-- `LynavoDrive-<version>-android-arm64-x86_64.aab`
+- `LynavoDriveDemo-<version>-macos-arm64.dmg`
+- `LynavoDriveDemo-<version>-macos-x64.dmg`
+- `LynavoDriveDemo-<version>-windows-x64.exe`
+- `LynavoDriveDemo-<version>-windows-x64.zip`
+- `LynavoDriveDemo-<version>-android-arm64-x86_64.apk`
+- `LynavoDriveDemo-<version>-android-arm64-x86_64.aab`
 - `SHA256SUMS`
 
 `SHA256SUMS` contains one sorted SHA-256 entry for each of the six package
@@ -236,15 +236,15 @@ pnpm package:desktop
 
 Expected local artifacts:
 
-- `apps/desktop/release/LynavoDrive-<version>-arm64.dmg`
-- `apps/desktop/release/LynavoDrive-<version>-x64.dmg`
+- `apps/desktop/release/LynavoDriveDemo-<version>-arm64.dmg`
+- `apps/desktop/release/LynavoDriveDemo-<version>-x64.dmg`
 - `apps/desktop/release/mac*/Lynavo Drive.app`
 
 Minimum local checks:
 
 ```bash
-hdiutil verify apps/desktop/release/LynavoDrive-<version>-arm64.dmg
-hdiutil verify apps/desktop/release/LynavoDrive-<version>-x64.dmg
+hdiutil verify apps/desktop/release/LynavoDriveDemo-<version>-arm64.dmg
+hdiutil verify apps/desktop/release/LynavoDriveDemo-<version>-x64.dmg
 file apps/desktop/release/mac*/Lynavo\ Drive.app/Contents/Resources/lynavo-drive-sidecar
 ```
 
@@ -262,8 +262,8 @@ pnpm package:desktop:win
 
 Expected local artifacts:
 
-- `apps/desktop/release/LynavoDrive-<version>-x64.exe`
-- `apps/desktop/release/LynavoDrive-<version>-x64.zip`
+- `apps/desktop/release/LynavoDriveDemo-<version>-x64.exe`
+- `apps/desktop/release/LynavoDriveDemo-<version>-x64.zip`
 
 Minimum local checks:
 
@@ -301,8 +301,8 @@ pnpm --filter @lynavo-drive/desktop package:linux -- --arch=arm64
 
 Expected local artifact for the selected architecture:
 
-- `--arch=x64`: `apps/desktop/release/LynavoDrive-<version>-linux-x64.deb`
-- `--arch=arm64`: `apps/desktop/release/LynavoDrive-<version>-linux-arm64.deb`
+- `--arch=x64`: `apps/desktop/release/LynavoDriveDemo-<version>-linux-x64.deb`
+- `--arch=arm64`: `apps/desktop/release/LynavoDriveDemo-<version>-linux-arm64.deb`
 
 ## Android Release Variant
 

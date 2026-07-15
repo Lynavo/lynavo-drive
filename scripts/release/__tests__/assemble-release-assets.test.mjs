@@ -17,12 +17,12 @@ const version = '1.2.3';
 
 function expectedNames(releaseVersion = version) {
   return [
-    `LynavoDrive-${releaseVersion}-macos-arm64.dmg`,
-    `LynavoDrive-${releaseVersion}-macos-x64.dmg`,
-    `LynavoDrive-${releaseVersion}-windows-x64.exe`,
-    `LynavoDrive-${releaseVersion}-windows-x64.zip`,
-    `LynavoDrive-${releaseVersion}-android-arm64-x86_64.apk`,
-    `LynavoDrive-${releaseVersion}-android-arm64-x86_64.aab`,
+    `LynavoDriveDemo-${releaseVersion}-macos-arm64.dmg`,
+    `LynavoDriveDemo-${releaseVersion}-macos-x64.dmg`,
+    `LynavoDriveDemo-${releaseVersion}-windows-x64.exe`,
+    `LynavoDriveDemo-${releaseVersion}-windows-x64.zip`,
+    `LynavoDriveDemo-${releaseVersion}-android-arm64-x86_64.apk`,
+    `LynavoDriveDemo-${releaseVersion}-android-arm64-x86_64.aab`,
   ];
 }
 
