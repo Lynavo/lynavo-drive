@@ -13,6 +13,7 @@
 ### Task 1: Add Failing Community Health Contracts
 
 **Files:**
+
 - Create: `scripts/release/__tests__/community-health-contracts.test.mjs`
 
 - [ ] **Step 1: Create the contract test**
@@ -45,10 +46,7 @@ test('repository provides pull request community health files', () => {
 
 test('global code ownership names every current repository administrator', () => {
   const codeowners = readRepoFile('.github/CODEOWNERS');
-  assert.match(
-    codeowners,
-    /^\* @Bloomingg @skiffer-git @std-s @EthanForAi$/m,
-  );
+  assert.match(codeowners, /^\* @Bloomingg @skiffer-git @std-s @EthanForAi$/m);
 });
 
 test('pull request template captures impact, validation, and contamination review', () => {
@@ -75,14 +73,12 @@ test('issue forms collect actionable reports and route security privately', () =
 
   assert.equal(bug.name, 'Bug report');
   assert.equal(feature.name, 'Feature request');
-  assert.ok(bug.body.some(field => field.id === 'reproduction'));
-  assert.ok(bug.body.some(field => field.id === 'diagnostics'));
-  assert.ok(feature.body.some(field => field.id === 'constraints'));
+  assert.ok(bug.body.some((field) => field.id === 'reproduction'));
+  assert.ok(bug.body.some((field) => field.id === 'diagnostics'));
+  assert.ok(feature.body.some((field) => field.id === 'constraints'));
   assert.equal(config.blank_issues_enabled, true);
   assert.ok(
-    config.contact_links.some(link =>
-      String(link.url).includes('/security/advisories/new'),
-    ),
+    config.contact_links.some((link) => String(link.url).includes('/security/advisories/new')),
   );
 });
 
@@ -115,6 +111,7 @@ Expected: FAIL because `.github/CODEOWNERS` and the other community-health files
 ### Task 2: Add Ownership And Pull Request Guidance
 
 **Files:**
+
 - Create: `.github/CODEOWNERS`
 - Create: `.github/pull_request_template.md`
 
@@ -144,6 +141,7 @@ remain red.
 ### Task 3: Add Structured Issue Intake
 
 **Files:**
+
 - Create: `.github/ISSUE_TEMPLATE/bug_report.yml`
 - Create: `.github/ISSUE_TEMPLATE/feature_request.yml`
 - Create: `.github/ISSUE_TEMPLATE/config.yml`
@@ -173,6 +171,7 @@ remains red.
 ### Task 4: Document The Complete Contributor Lifecycle
 
 **Files:**
+
 - Modify: `CONTRIBUTING.md`
 
 - [ ] **Step 1: Expand branch and commit guidance**
@@ -200,6 +199,7 @@ Expected: PASS.
 ### Task 5: Validate And Commit Repository Artifacts
 
 **Files:**
+
 - All files from Tasks 1-4
 - `docs/superpowers/plans/2026-07-16-pr-community-health-plan.md`
 - `docs/superpowers/plans/2026-07-16-github-pr-enforcement-plan.md`
@@ -233,4 +233,3 @@ account-service, or release-behavior changes.
 git add .github CONTRIBUTING.md scripts/release/__tests__/community-health-contracts.test.mjs docs/superpowers/plans
 git commit -m "chore: establish pull request governance"
 ```
-

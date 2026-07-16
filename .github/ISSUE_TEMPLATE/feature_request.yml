@@ -1,0 +1,45 @@
+name: Feature request
+description: Propose an improvement within the Lynavo Drive OSS product boundaries.
+title: '[Feature]: '
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the user problem and who experiences it.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the behavior or result you want, without prescribing an implementation.
+    validations:
+      required: true
+  - type: checkboxes
+    id: surfaces
+    attributes:
+      label: Affected surfaces
+      options:
+        - label: iOS
+        - label: Android
+        - label: macOS
+        - label: Windows
+        - label: Sidecar or shared contracts
+        - label: Build, packaging, or documentation
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe current workarounds or other approaches you evaluated.
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: OSS boundary acknowledgement
+      options:
+        - label: This request preserves automatic local-LAN sync and does not add manual file selection or queue mutation.
+          required: true
+        - label: This request does not assume official signing, hosted services, remote access, background capabilities, upload, auto-update, or non-OSS distribution.
+          required: true

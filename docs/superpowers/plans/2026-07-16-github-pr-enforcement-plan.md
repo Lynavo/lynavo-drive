@@ -13,6 +13,7 @@
 ### Task 1: Publish The Implementation Branch
 
 **Files:**
+
 - No additional file changes
 
 - [ ] **Step 1: Confirm branch and commits**
@@ -37,6 +38,7 @@ Expected: the remote branch is created and tracks `origin/chore/pr-governance`.
 ### Task 2: Standardize Repository Merge Settings
 
 **Files:**
+
 - No repository file changes
 
 - [ ] **Step 1: Apply merge policy**
@@ -62,12 +64,19 @@ gh api repos/Lynavo/lynavo-drive --jq '{allow_squash_merge,allow_merge_commit,al
 Expected:
 
 ```json
-{"allow_auto_merge":false,"allow_merge_commit":false,"allow_rebase_merge":false,"allow_squash_merge":true,"delete_branch_on_merge":true}
+{
+  "allow_auto_merge": false,
+  "allow_merge_commit": false,
+  "allow_rebase_merge": false,
+  "allow_squash_merge": true,
+  "delete_branch_on_merge": true
+}
 ```
 
 ### Task 3: Create The Main Branch Ruleset
 
 **Files:**
+
 - No repository file changes
 
 - [ ] **Step 1: Confirm no conflicting ruleset exists**
@@ -145,6 +154,7 @@ is absent or enforcement is not `active`.
 ### Task 4: Open And Verify The Governance Pull Request
 
 **Files:**
+
 - No additional file changes
 
 - [ ] **Step 1: Open the pull request**
