@@ -4,7 +4,7 @@ import test from 'node:test';
 import { parse } from 'yaml';
 
 const repoRoot = new URL('../../..', import.meta.url);
-const ACTION_SHA = /^[\w.-]+\/[\w.-]+@[0-9a-f]{40}$/;
+const ACTION_SHA = /^[\w.-]+(?:\/[\w.-]+)+@[0-9a-f]{40}$/;
 const NODE_24_ACTIONS = new Map([
   ['actions/checkout', '9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0'],
   ['actions/setup-go', '924ae3a1cded613372ab5595356fb5720e22ba16'],
@@ -12,7 +12,10 @@ const NODE_24_ACTIONS = new Map([
   ['actions/setup-node', '820762786026740c76f36085b0efc47a31fe5020'],
   ['actions/upload-artifact', '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'],
   ['actions/download-artifact', '70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3'],
+  ['actions/dependency-review-action', 'a1d282b36b6f3519aa1f3fc636f609c47dddb294'],
   ['dorny/paths-filter', '7b450fff21473bca461d4b92ce414b9d0420d706'],
+  ['github/codeql-action/init', '99df26d4f13ea111d4ec1a7dddef6063f76b97e9'],
+  ['github/codeql-action/analyze', '99df26d4f13ea111d4ec1a7dddef6063f76b97e9'],
   ['pnpm/action-setup', '0ebf47130e4866e96fce0953f49152a61190b271'],
 ]);
 
@@ -60,6 +63,8 @@ test('workflow JavaScript actions use reviewed Node 24 releases', () => {
     '.github/workflows/oss-release-gate.yml',
     '.github/workflows/native-builds.yml',
     '.github/workflows/release.yml',
+    '.github/workflows/codeql.yml',
+    '.github/workflows/dependency-review.yml',
   ]) {
     for (const step of allWorkflowSteps(workflow(path))) {
       const [action] = String(step.uses ?? '').split('@');
@@ -161,18 +166,60 @@ test('repository CI workflow runs TypeScript quality and Go tests', () => {
 test('Dependabot proposes reviewed monthly dependency updates', () => {
   const config = workflow('.github/dependabot.yml');
   const updates = config.updates ?? [];
-  const pnpm = updates.find(update => update['package-ecosystem'] === 'npm');
-  const actions = updates.find(
-    update => update['package-ecosystem'] === 'github-actions',
-  );
+  const expected = new Map([
+    ['npm', '/'],
+    ['github-actions', '/'],
+    ['gomod', '/services/sidecar-go'],
+    ['bundler', '/apps/mobile'],
+    ['gradle', '/apps/mobile/android'],
+  ]);
 
   assert.equal(config.version, 2);
-  for (const update of [pnpm, actions]) {
+  assert.equal(updates.length, expected.size);
+  for (const [ecosystem, directory] of expected) {
+    const update = updates.find(
+      candidate => candidate['package-ecosystem'] === ecosystem,
+    );
     assert.ok(update);
-    assert.equal(update.directory, '/');
+    assert.equal(update.directory, directory);
     assert.equal(update.schedule?.interval, 'monthly');
     assert.equal(update['open-pull-requests-limit'], 5);
   }
+});
+
+test('security workflows are least-privileged and block risky dependencies', () => {
+  const codeql = workflow('.github/workflows/codeql.yml');
+  const analyze = codeql.jobs?.analyze;
+  const dependencyReview = workflow('.github/workflows/dependency-review.yml');
+  const review = dependencyReview.jobs?.['dependency-review'];
+
+  assert.equal(codeql.name, 'CodeQL');
+  assertCommonTriggers(codeql);
+  assert.deepEqual(codeql.permissions, { contents: 'read' });
+  assert.deepEqual(analyze?.permissions, {
+    contents: 'read',
+    packages: 'read',
+    'security-events': 'write',
+  });
+  assert.deepEqual(analyze?.strategy?.matrix?.include, [
+    { language: 'javascript-typescript', 'build-mode': 'none' },
+    { language: 'go', 'build-mode': 'autobuild' },
+  ]);
+  assertActionsPinned(analyze?.steps ?? []);
+
+  assert.equal(dependencyReview.name, 'Dependency Review');
+  assert.ok(dependencyReview.on?.pull_request !== undefined);
+  assert.deepEqual(dependencyReview.permissions, { contents: 'read' });
+  assert.equal(review?.name, 'Dependency Review');
+  assert.equal(review?.['runs-on'], 'ubuntu-24.04');
+  assert.equal(review?.['timeout-minutes'], 10);
+  assert.equal(
+    findStep(review?.steps ?? [], 'Review dependency changes').with?.[
+      'fail-on-severity'
+    ],
+    'high',
+  );
+  assertActionsPinned(review?.steps ?? []);
 });
 
 test('native build workflow is path-aware, unsigned, and platform-bounded', () => {
