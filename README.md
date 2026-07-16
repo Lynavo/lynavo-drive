@@ -428,9 +428,9 @@ For detailed coding standards, project layouts, and process rules, check out our
 
 Follow project news and updates across these channels:
 
-- [![X](https://img.shields.io/badge/X-%23000000?style=flat-square&logo=x&logoColor=white)](https://x.com/founder_im63606) — [@founder_im63606](https://x.com/founder_im63606)
-- [![Mastodon](https://img.shields.io/badge/Mastodon-%236364FF?style=flat-square&logo=mastodon&logoColor=white)](https://mastodon.social/@ViviDrop) — [@ViviDrop](https://mastodon.social/@ViviDrop)
-- [![Bluesky](https://img.shields.io/badge/Bluesky-%230085FF?style=flat-square&logo=bluesky&logoColor=white)](https://bsky.app/profile/vividrop.bsky.social) — [@vividrop.bsky.social](https://bsky.app/profile/vividrop.bsky.social)
+- [![X](https://img.shields.io/badge/X-%23000000?style=flat-square&logo=x&logoColor=white)](https://x.com/founder_im63606) — [@Lynavo](https://x.com/founder_im63606)
+- [![Mastodon](https://img.shields.io/badge/Mastodon-%236364FF?style=flat-square&logo=mastodon&logoColor=white)](https://mastodon.social/@ViviDrop) — [@Lynavo](https://mastodon.social/@ViviDrop)
+- [![Bluesky](https://img.shields.io/badge/Bluesky-%230085FF?style=flat-square&logo=bluesky&logoColor=white)](https://bsky.app/profile/vividrop.bsky.social) — [@Lynavo](https://bsky.app/profile/vividrop.bsky.social)
 - [![LinkedIn](https://img.shields.io/badge/LinkedIn-%230077B5?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/lynavo-lynavo-1273322b6/) — [Lynavo](https://www.linkedin.com/in/lynavo-lynavo-1273322b6/)
 - [![YouTube](https://img.shields.io/badge/YouTube-%23FF0000?style=flat-square&logo=youtube&logoColor=white)](https://www.youtube.com/channel/UCMcYmWmPMzQ5N8bHFffnldQ) — [YouTube Channel](https://www.youtube.com/channel/UCMcYmWmPMzQ5N8bHFffnldQ)
 
