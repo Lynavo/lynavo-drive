@@ -1,5 +1,5 @@
 <p align="center">
-  <strong>English</strong> | <a href="./README.zh-Hant.md">繁體中文</a>
+  <strong>English</strong> | <a href="./README.zh-Hant.md">Traditional Chinese</a>
 </p>
 
 <p align="center">
@@ -17,9 +17,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Lynavo/lynavo-drive/actions/workflows/oss-release-gate.yml"><img src="https://github.com/Lynavo/lynavo-drive/actions/workflows/oss-release-gate.yml/badge.svg" alt="OSS Release Gate"></a>
-  <a href="https://github.com/Lynavo/lynavo-drive/actions/workflows/ci.yml"><img src="https://github.com/Lynavo/lynavo-drive/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/Node.js-%3E%3D%2022.12.0-blue?style=flat-square&logo=node.js" alt="Node Version">
+  <a href="https://github.com/lynavo/lynavo-drive/actions/workflows/oss-release-gate.yml"><img src="https://img.shields.io/github/actions/workflow/status/lynavo/lynavo-drive/oss-release-gate.yml?branch=main&label=OSS%20Release%20Gate&style=flat-square" alt="OSS Release Gate"></a>
+  <a href="https://github.com/lynavo/lynavo-drive/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/lynavo/lynavo-drive/ci.yml?branch=main&label=CI&style=flat-square" alt="CI"></a>
+  <img src="https://img.shields.io/badge/Node.js-%3E%3D%2022.12.0-339933?style=flat-square&logo=node.js" alt="Node Version">
   <img src="https://img.shields.io/badge/Go-%3E%3D%201.25.6-00ADD8?style=flat-square&logo=go" alt="Go Version">
   <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="Desktop Platform">
   <img src="https://img.shields.io/badge/Mobile-iOS%20%7C%20Android-lightgrey?style=flat-square" alt="Mobile Platform">
@@ -29,9 +29,10 @@
 <p align="center">
   <a href="#-product-preview">Product Preview</a> •
   <a href="#-key-features">Key Features</a> •
-  <a href="#-developer-quick-start">Developer Quick Start</a> •
   <a href="#-oss-boundaries">OSS Boundaries</a> •
-  <a href="#-contributing">Contributing</a>
+  <a href="#-developer-quick-start">Developer Quick Start</a> •
+  <a href="#-contributing">Contributing</a> •
+  <a href="#-community--social">Community & Social</a>
 </p>
 
 ---
@@ -43,13 +44,13 @@ contributions. This repository provides one public local source-build and
 package-verification path; it does not publish official signed installers,
 mobile store builds, auto-updates, or hosted services.
 
-| Surface      | Current OSS scope                                              |
-| ------------ | -------------------------------------------------------------- |
-| Desktop      | macOS and Windows application runtime                          |
-| Mobile       | iOS and Android application runtime                            |
-| Linux        | Local source-build and package verification only               |
-| Network      | Foreground sync over the same LAN                              |
-| Distribution | Community source builds and locally produced packages/binaries |
+| Surface         | Current OSS scope                                              |
+| --------------- | -------------------------------------------------------------- |
+| 💻 Desktop      | macOS and Windows application runtime                          |
+| 📱 Mobile       | iOS and Android application runtime                            |
+| 🐧 Linux        | Local source-build and package verification only               |
+| 🌐 Network      | Foreground sync over the same LAN                              |
+| 📦 Distribution | Community source builds and locally produced packages/binaries |
 
 ## 📸 Product Preview
 
@@ -79,30 +80,26 @@ mobile store builds, auto-updates, or hosted services.
 > **Local-LAN Open-Source Core**
 >
 > - Foreground automatic sync works without sign-in or an account service.
-> - The upload set comes only from the mobile photo-library scan and local
->   pending queue; there is no manual file-selection fallback.
+> - The upload set comes only from the mobile photo-library scan and local pending queue; there is no manual file-selection fallback.
 > - The queue is read-only, and each phone uploads one file at a time.
-> - Missing non-OSS modules or account-service state do not block foreground LAN
->   pairing and sync.
+> - Missing non-OSS modules or account-service state do not block foreground LAN pairing and sync.
 
 > [!WARNING]
 > **Not Included In This Repository**
 >
-> - Remote access, cloud relay, tunnel credentials, official accounts, and silent
->   background continuation are unavailable and remain disabled.
-> - Official signing, notarization, mobile store distribution, package upload,
->   and auto-update infrastructure are not provided.
-> - The source package does not redistribute Apple Bonjour for Windows. It uses
->   a locally installed/configured Bonjour runtime when available, otherwise the
->   zeroconf-compatible fallback.
-> - Linux remains a local build and package-verification target, not a supported
->   desktop user surface.
+> - Remote access, cloud relay, tunnel credentials, official accounts, and silent background continuation are unavailable and remain disabled.
+> - Official signing, notarization, mobile store distribution, package upload, and auto-update infrastructure are not provided.
+> - The source package does not redistribute Apple Bonjour for Windows. It uses a locally installed/configured Bonjour runtime when available, otherwise the zeroconf-compatible fallback.
+> - Linux remains a local build and package-verification target, not a supported desktop user surface.
 
 ## 🚀 Developer Quick Start
 
 This is a contributor workflow, not an end-user installer. See the
 [release playbook](./docs/release/release-playbook.md) for local package builds
 and platform-specific verification.
+
+<details>
+<summary>💻 Setup & Start Commands</summary>
 
 ```bash
 # 1. Enable the repository's pinned pnpm version and install dependencies
@@ -117,9 +114,14 @@ pnpm --filter @lynavo-drive/design-tokens build
 pnpm dev:desktop
 ```
 
+</details>
+
 The Electron window opens automatically, and the desktop app starts the sidecar.
 
 To run a mobile client, keep the desktop running and use another terminal:
+
+<details>
+<summary>📱 Mobile Development Commands</summary>
 
 ```bash
 # Start Metro
@@ -130,6 +132,8 @@ pnpm --filter @lynavo-drive/mobile ios
 # or
 pnpm dev:mobile:android
 ```
+
+</details>
 
 Platform prerequisites still apply: iOS requires macOS, Xcode, and CocoaPods;
 Android requires Android Studio plus the Android SDK/NDK.
@@ -147,23 +151,23 @@ Pair the applications:
 <details>
 <summary>🔍 View Troubleshooting Guide & Common FAQs</summary>
 
-### 1. The mobile app cannot find my desktop client (mDNS discovery failure)
+### 📡 1. The mobile app cannot find my desktop client (mDNS discovery failure)
 
 - **Check Network**: Ensure both mobile and desktop are on the same local LAN.
 - **Windows Firewall**: Verify that Windows Defender Firewall allows incoming traffic for ports `39593` (TCP/LMUP file transport) and `39594` (HTTP API).
 - **Bonjour Runtime**: The OSS build doesn't redistribute Apple Bonjour. Ensure Bonjour is installed on Windows, or rely on the zeroconf-compatible fallback.
 
-### 2. Why are some of my iCloud photos stuck/not transferring?
+### ☁️ 2. Why are some of my iCloud photos stuck/not transferring?
 
 - Photos marked with `iCloud` must be exported from the Apple Photos cloud repository before transfer.
 - While in `cloud_downloading` or `preparing` states, the phone is downloading the high-res original asset to local storage. Transfer begins automatically once complete.
 
-### 3. Can I manually select which photos/videos to sync?
+### 📸 3. Can I manually select which photos/videos to sync?
 
 - No. Automatic upload is driven by the mobile photo-library scan and strictly
   read-only pending queue. Checkbox picking is not part of the OSS workflow.
 
-### 4. What happens when the desktop sleeps or connection drops?
+### 💤 4. What happens when the desktop sleeps or connection drops?
 
 - LAN transfers will interrupt. With the mobile app in the foreground, the
   unfinished queue continues after the desktop wakes and LAN connectivity is
@@ -173,40 +177,66 @@ Pair the applications:
 
 </details>
 
-## 🛠️ Tech Stack
-
-| Layer          | Technology                                                 |
-| -------------- | ---------------------------------------------------------- |
-| Monorepo       | pnpm 10 + turborepo 2.8                                    |
-| Desktop        | Electron 41 + electron-vite 5 + electron-builder 26        |
-| Desktop UI     | React 18.3 + zustand 5 + Tailwind CSS v4                   |
-| Mobile         | React Native 0.84.1 + React 19 (iOS / Android)             |
-| iOS Native     | Swift `SyncEngine` + BGTask + PhotoKit + Network.framework |
-| Android Native | Kotlin bridge + NativeSyncEngine / MediaStore / NsdManager |
-| Sidecar        | Go 1.25.6 + SQLite + WebSocket                             |
-| Shared         | `@lynavo-drive/contracts` + `@lynavo-drive/design-tokens`  |
-| Test           | vitest 4.1 + jest + `go test`                              |
-
 ## 🏗️ Architecture Overview
 
-```text
-Mobile (RN UI on iOS / Android)
-  ├── iOS: Swift SyncEngine
-  └── Android: Kotlin NativeSyncEngine
-  ├── Bonjour/mDNS discover
-  ├── LMUP/TCP :39593
-  └── Presence/HTTP :39594
-                │
-                ▼
-Desktop (Electron + Go sidecar, macOS / Windows)
-  ├── Electron: UI shell, window, bridge, sidecar lifecycle
-  ├── Sidecar HTTP API / WebSocket
-  ├── LMUP file receiver
-  ├── SQLite
-  └── Filesystem / shared directory detection
+```mermaid
+flowchart TD
+    subgraph Mobile["📱 Mobile Client (iOS / Android)"]
+        RN["React Native UI"]
+        subgraph SE["Native Sync Engine"]
+            iOS["iOS (Swift)"]
+            Android["Android (Kotlin)"]
+        end
+    end
+
+    subgraph Desktop["💻 Desktop App (macOS / Windows)"]
+        Renderer["React 18 Renderer"]
+        Preload["Preload Bridge"]
+        Main["Electron Main Process"]
+        subgraph Sidecar["Go Sidecar"]
+            HTTP["HTTP API & WebSockets (Port 39594)"]
+            LMUP["LMUP Receiver (Port 39593)"]
+            DB[("SQLite DB")]
+            FS["Filesystem Shared Dirs"]
+        end
+    end
+
+    %% Communication Links
+    RN <--> SE
+    Renderer <--> Preload
+    Preload <--> Main
+    Main <--> HTTP
+
+    %% Network Sync Channels
+    SE -- "mDNS Discovery / Pairing" --> HTTP
+    SE -- "Presence & Metadata (HTTP/WS)" --> HTTP
+    SE -- "Incremental Media Sync (LMUP/TCP)" --> LMUP
+
+    classDef mobile fill:#fff0f5,stroke:#db7093,stroke-width:1px;
+    classDef desktop fill:#f0f8ff,stroke:#4682b4,stroke-width:1px;
+    classDef sidecar fill:#f5fffa,stroke:#2e8b57,stroke-width:1px;
+    class Mobile,RN,SE,iOS,Android mobile;
+    class Desktop,Renderer,Preload,Main desktop;
+    class Sidecar,HTTP,LMUP,DB,FS sidecar;
 ```
 
-## ⚙️ Prerequisites
+## 🔧 Technical Infrastructure
+
+### 🛠️ Tech Stack
+
+| Layer             | Technology                                                 |
+| ----------------- | ---------------------------------------------------------- |
+| 📦 Monorepo       | pnpm 10 + turborepo 2.8                                    |
+| 💻 Desktop        | Electron 41 + electron-vite 5 + electron-builder 26        |
+| 🎨 Desktop UI     | React 18.3 + zustand 5 + Tailwind CSS v4                   |
+| 📱 Mobile         | React Native 0.84.1 + React 19 (iOS / Android)             |
+| 🍎 iOS Native     | Swift `SyncEngine` + BGTask + PhotoKit + Network.framework |
+| 🤖 Android Native | Kotlin bridge + NativeSyncEngine / MediaStore / NsdManager |
+| ⚡ Sidecar        | Go 1.25.6 + SQLite + WebSocket                             |
+| 🔗 Shared         | `@lynavo-drive/contracts` + `@lynavo-drive/design-tokens`  |
+| 🧪 Test           | vitest 4.1 + jest + `go test`                              |
+
+### ⚙️ Prerequisites
 
 - **macOS or Windows** (desktop currently supports macOS / Windows; Linux is
   only for local build / package verification; iOS builds still require macOS +
@@ -223,7 +253,7 @@ Desktop (Electron + Go sidecar, macOS / Windows)
 
 </details>
 
-## 💻 Common Commands
+### 💻 Common Commands
 
 <details>
 <summary>🛠️ View Developer Command Reference</summary>
@@ -256,7 +286,7 @@ pnpm check
 
 </details>
 
-## 📦 OSS Build & Package Verification
+### 📦 OSS Build & Package Verification
 
 This OSS repository keeps contributor-local source-build paths and
 GitHub-hosted, secret-free unsigned build/package verification. Hosted outputs
@@ -305,7 +335,7 @@ OSS build-verification outputs and include SHA-256 checksums; see the
 [release playbook](./docs/release/release-playbook.md) for the exact asset list,
 warnings, and maintainer procedure.
 
-## 📁 Project Structure
+### 📁 Project Structure
 
 <details>
 <summary>📂 View Directory Structure Map</summary>
@@ -351,21 +381,21 @@ lynavo-drive/
 
 ## 📄 Documentation Reference
 
-- Development constraints and operating rules: [`AGENTS.md`](./AGENTS.md)
-- System overview: [`docs/architecture/system-overview.md`](./docs/architecture/system-overview.md)
-- Sync state machine: [`docs/architecture/sync-state-machine.md`](./docs/architecture/sync-state-machine.md)
-- Data model and statistics semantics: [`docs/architecture/data-model.md`](./docs/architecture/data-model.md)
-- Troubleshooting guide: [`docs/operations/troubleshooting.md`](./docs/operations/troubleshooting.md)
-- Mobile diagnostics package: [`docs/operations/mobile-diagnostics.md`](./docs/operations/mobile-diagnostics.md)
-- Sidecar runbook: [`docs/operations/sidecar-runbook.md`](./docs/operations/sidecar-runbook.md)
-- Product constraints, OSS boundaries, and non-goals: [`docs/product/constraints.md`](./docs/product/constraints.md)
-- OSS build verification playbook: [`docs/release/release-playbook.md`](./docs/release/release-playbook.md)
-- OSS verification matrix: [`docs/testing/oss-verification-matrix.md`](./docs/testing/oss-verification-matrix.md)
-- Security policy: [`SECURITY.md`](./SECURITY.md)
-- Privacy notice: [`PRIVACY.md`](./PRIVACY.md)
-- Contributing guide: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
-- Code of conduct: [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md)
-- Third-party notices: [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md)
+- ⚙️ Development constraints and operating rules: [`AGENTS.md`](./AGENTS.md)
+- 📘 System overview: [`docs/architecture/system-overview.md`](./docs/architecture/system-overview.md)
+- 🔄 Sync state machine: [`docs/architecture/sync-state-machine.md`](./docs/architecture/sync-state-machine.md)
+- 📊 Data model and statistics semantics: [`docs/architecture/data-model.md`](./docs/architecture/data-model.md)
+- 🔧 Troubleshooting guide: [`docs/operations/troubleshooting.md`](./docs/operations/troubleshooting.md)
+- 📱 Mobile diagnostics package: [`docs/operations/mobile-diagnostics.md`](./docs/operations/mobile-diagnostics.md)
+- ⚡ Sidecar runbook: [`docs/operations/sidecar-runbook.md`](./docs/operations/sidecar-runbook.md)
+- 🛡️ Product constraints, OSS boundaries, and non-goals: [`docs/product/constraints.md`](./docs/product/constraints.md)
+- 📦 OSS build verification playbook: [`docs/release/release-playbook.md`](./docs/release/release-playbook.md)
+- 🔬 OSS verification matrix: [`docs/testing/oss-verification-matrix.md`](./docs/testing/oss-verification-matrix.md)
+- 🔒 Security policy: [`SECURITY.md`](./SECURITY.md)
+- 🕵️ Privacy notice: [`PRIVACY.md`](./PRIVACY.md)
+- 🤝 Contributing guide: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- 📜 Code of conduct: [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md)
+- 📄 Third-party notices: [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md)
 
 ## 💡 Contributing
 
@@ -374,12 +404,18 @@ Community contributions are welcome. To get started:
 1. **Fork the Repository**: Create a personal fork and clone it locally.
 2. **Set Up the Workspace**: Follow the [Developer Quick Start](#-developer-quick-start) and install the toolchain required by the platform you plan to change.
 3. **Verify Your Change**: Run focused tests first, then the applicable repository checks before submitting a pull request:
-   ```bash
-   pnpm test
-   pnpm typecheck
-   pnpm format:check
-   pnpm gate:release
-   ```
+
+<details>
+<summary>⚙️ Verification Commands</summary>
+
+```bash
+pnpm test
+pnpm typecheck
+pnpm format:check
+pnpm gate:release
+```
+
+</details>
 
 For detailed coding standards, project layouts, and process rules, check out our [Contributing Guidelines](./CONTRIBUTING.md) and [Code of Conduct](./CODE_OF_CONDUCT.md).
 
@@ -387,6 +423,16 @@ For detailed coding standards, project layouts, and process rules, check out our
 - [Report a bug](https://github.com/lynavo/lynavo-drive/issues/new?labels=bug)
 - [Request a feature](https://github.com/lynavo/lynavo-drive/issues/new?labels=enhancement)
 - [Report a vulnerability privately](https://github.com/lynavo/lynavo-drive/security/advisories/new) instead of posting exploitable details in a public issue.
+
+## 🌐 Community & Social
+
+Follow project news and updates across these channels:
+
+- [![X](https://img.shields.io/badge/X-%23000000?style=flat-square&logo=x&logoColor=white)](https://x.com/founder_im63606) — [@founder_im63606](https://x.com/founder_im63606)
+- [![Mastodon](https://img.shields.io/badge/Mastodon-%236364FF?style=flat-square&logo=mastodon&logoColor=white)](https://mastodon.social/@ViviDrop) — [@ViviDrop](https://mastodon.social/@ViviDrop)
+- [![Bluesky](https://img.shields.io/badge/Bluesky-%230085FF?style=flat-square&logo=bluesky&logoColor=white)](https://bsky.app/profile/vividrop.bsky.social) — [@vividrop.bsky.social](https://bsky.app/profile/vividrop.bsky.social)
+- [![LinkedIn](https://img.shields.io/badge/LinkedIn-%230077B5?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/lynavo-lynavo-1273322b6/) — [Lynavo](https://www.linkedin.com/in/lynavo-lynavo-1273322b6/)
+- [![YouTube](https://img.shields.io/badge/YouTube-%23FF0000?style=flat-square&logo=youtube&logoColor=white)](https://www.youtube.com/channel/UCMcYmWmPMzQ5N8bHFffnldQ) — [YouTube Channel](https://www.youtube.com/channel/UCMcYmWmPMzQ5N8bHFffnldQ)
 
 ## ⚖️ License
 
