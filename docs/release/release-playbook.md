@@ -193,16 +193,18 @@ start an upload in that state and never moves, deletes, or recreates the tag.
 3. Optionally dispatch `OSS Draft Release` manually. Confirm all reusable jobs
    pass, the four intermediate artifact groups exist, and no release is
    created.
-4. Create and push one stable `vX.Y.Z` tag only after the target commit and
-   repository checks are approved.
+4. After the target commit and repository checks are approved, a repository
+   admin creates and pushes one stable `vX.Y.Z` tag. The release tag ruleset
+   blocks other roles from creating, updating, or deleting matching tags.
 5. Do not publish the draft while the tag workflow or any rerun is in progress.
 6. After the run completes, confirm the draft contains only the six versioned
    files and `SHA256SUMS`.
 7. Download the files, verify their checksums, and record platform smoke-test
    results before any separate publication decision.
 8. Publish only after the completed run, asset list, and checksums have been
-   reviewed. Consider enabling GitHub immutable releases as an additional
-   repository-level protection for published releases.
+   reviewed. GitHub immutable releases protect the published tag and assets
+   from later modification or deletion; drafts remain editable until they are
+   published.
 
 For a failed tag run, keep the tag fixed and address only transient workflow or
 packaging failures that do not require source changes. Rerun the workflow to

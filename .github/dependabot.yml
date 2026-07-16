@@ -11,3 +11,21 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
+
+  - package-ecosystem: gomod
+    directory: /services/sidecar-go
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: bundler
+    directory: /apps/mobile
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: gradle
+    directory: /apps/mobile/android
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
