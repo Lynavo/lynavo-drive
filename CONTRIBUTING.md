@@ -31,31 +31,55 @@ this OSS repository.
 
 ## Pull Requests
 
+Create a focused branch from the latest `main`. Use one of these prefixes so
+the branch purpose is clear: `feat/`, `fix/`, `docs/`, `test/`, `ci/`, or
+`chore/`. Keep commit subjects concise and use a Conventional Commit-style
+type when practical, such as `fix: recover interrupted uploads`.
+
 Before opening a pull request:
 
 1. Run focused tests for the files you changed.
 2. Run `pnpm gate:release`.
 3. Update documentation when behavior, build paths, or OSS boundaries change.
 4. Keep unrelated formatting and generated artifacts out of the diff.
+5. Review your own diff for affected modules, call chains, user-visible
+   behavior, and platforms.
+6. Complete the pull request template, including validation results and the
+   contamination review.
+
+Pull requests target `main`. Keep the branch current with `main` when required
+checks report that it is out of date. A pull request can merge only after all
+required checks pass against the current base branch, it has one approving review
+including a code owner review, all review conversations are resolved, and no
+unresolved change request remains. New commits dismiss stale approvals, so
+reviewers must approve the current revision.
+
+The repository uses squash merge only. Write a final squash commit subject that
+describes the completed change and follows the same concise Conventional
+Commit-style convention. GitHub automatically deletes the source branch after
+merge. Maintainers must not bypass these rules for routine changes.
 
 ## Repository Checks
 
-The intended required checks are:
+The required checks are:
 
 - `OSS Release Gate`
 - `TS Quality`
 - `Go Tests`
 - `Native Builds` (added by the native verification workflow)
 
-Repository rules are configured in GitHub after each check has appeared at
-least once. Keep the display names stable when changing workflows so existing
-rules do not silently stop applying.
+The `main` branch ruleset requires these checks in strict mode, so a pull
+request must be tested with the current base branch before merge. Keep the
+display names stable when changing workflows so existing rules do not silently
+stop applying. Maintainers should periodically audit the ruleset and repository
+merge settings against this document.
 
 Protect release tags with a maintainer-only `v*` tag ruleset. Only stable tags
 matching `vX.Y.Z` are accepted, and the tag version must match the desktop,
-mobile, iOS, and Android version sources. Branch protection and tag rulesets are
-GitHub repository settings, not enforced by committed YAML; maintainers must
-configure and audit them separately.
+mobile, iOS, and Android version sources.
+
+GitHub repository settings are not enforced by committed YAML. Maintainers must
+audit these rulesets separately.
 
 The tag workflow creates draft releases only. Treat a published release as
 immutable: correct a bad published release with a new version instead of moving

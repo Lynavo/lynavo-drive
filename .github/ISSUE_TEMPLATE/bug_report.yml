@@ -1,0 +1,78 @@
+name: Bug report
+description: Report a reproducible problem in the Lynavo Drive OSS baseline.
+title: '[Bug]: '
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include secrets, pairing codes, private media, local databases, or diagnostic archives. Report security vulnerabilities through private vulnerability reporting instead.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Affected platform
+      options:
+        - iOS
+        - Android
+        - macOS
+        - Windows
+        - Linux verification
+        - Cross-platform or shared code
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Provide the app version, release tag, or full commit SHA.
+      placeholder: v1.2.3 or 0123456789abcdef...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest reliable sequence that reproduces the problem.
+      placeholder: |
+        1. Start...
+        2. Pair...
+        3. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include exact error text when it is safe to share.
+    validations:
+      required: true
+  - type: dropdown
+    id: diagnostics
+    attributes:
+      label: Diagnostics availability
+      description: State whether sanitized diagnostics can be provided privately if requested.
+      options:
+        - Sanitized diagnostics are available privately
+        - Diagnostics are unavailable
+        - Not applicable
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add relevant network, permission, or device details with sensitive values removed.
+  - type: checkboxes
+    id: sensitive-data
+    attributes:
+      label: Sensitive data acknowledgement
+      options:
+        - label: I have not attached secrets, pairing codes, private media, local databases, unsanitized diagnostics, or signing material.
+          required: true
