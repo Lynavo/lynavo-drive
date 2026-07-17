@@ -145,7 +145,7 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
     implementation(project(":react-native-vision-camera"))
-    implementation("androidx.core:core:1.18.0")
+    implementation("androidx.core:core:1.19.0")
     testImplementation("junit:junit:4.13.2")
 
     if (hermesEnabled.toBoolean()) {
