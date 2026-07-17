@@ -5,7 +5,7 @@ go 1.25.6
 require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/grandcat/zeroconf v1.0.0
-	github.com/mattn/go-sqlite3 v1.14.37
+	github.com/mattn/go-sqlite3 v1.14.48
 	golang.org/x/sys v0.45.0
 	gopkg.in/yaml.v3 v3.0.1
 )
