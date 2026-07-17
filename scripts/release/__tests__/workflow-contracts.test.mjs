@@ -7,7 +7,7 @@ const repoRoot = new URL('../../..', import.meta.url);
 const ACTION_SHA = /^[\w.-]+(?:\/[\w.-]+)+@[0-9a-f]{40}$/;
 const NODE_24_ACTIONS = new Map([
   ['actions/checkout', '9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0'],
-  ['actions/setup-go', '924ae3a1cded613372ab5595356fb5720e22ba16'],
+  ['actions/setup-go', 'b7ad1dad31e06c5925ef5d2fc7ad053ef454303e'],
   ['actions/setup-java', '0f481fcb613427c0f801b606911222b5b6f3083a'],
   ['actions/setup-node', '820762786026740c76f36085b0efc47a31fe5020'],
   ['actions/upload-artifact', '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'],
@@ -473,7 +473,7 @@ test('iOS native build pins Ruby and installs the locked bundle', () => {
 
   assert.equal(
     setupRuby.uses,
-    'ruby/setup-ruby@6e5d382445ae5590b7449d8b3bc8cb1c2c27f617',
+    'ruby/setup-ruby@003a5c4d8d6321bd302e38f6f0ec593f77f06600',
   );
   assert.equal(setupRuby.with?.['ruby-version'], '3.4.9');
   assert.equal(setupRuby.with?.bundler, '4.0.15');
