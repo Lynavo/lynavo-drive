@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@lynavo-drive/contracts": "workspace:*",
-    "@react-native-async-storage/async-storage": "^2.1.2",
+    "@react-native-async-storage/async-storage": "^3.1.1",
     "@react-native-community/datetimepicker": "^9.1.0",
     "@react-native-documents/viewer": "4.0.0",
     "@react-navigation/bottom-tabs": "^7.15.9",
