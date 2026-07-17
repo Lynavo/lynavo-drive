@@ -454,13 +454,13 @@ test('iOS native build locks the CocoaPods toolchain to the Podfile version', ()
   const gemfileLockUrl = new URL('apps/mobile/Gemfile.lock', repoRoot);
   const podfileLock = readRepoFile('apps/mobile/ios/Podfile.lock');
 
-  assert.match(gemfile, /^gem 'cocoapods', '1\.16\.2'$/m);
+  assert.match(gemfile, /^gem 'cocoapods', '1\.17\.0'$/m);
   assert.ok(existsSync(gemfileLockUrl), 'apps/mobile/Gemfile.lock must be committed');
 
   const gemfileLock = readFileSync(gemfileLockUrl, 'utf8');
-  assert.match(gemfileLock, /^    cocoapods \(1\.16\.2\)$/m);
-  assert.match(gemfileLock, /^  cocoapods \(= 1\.16\.2\)$/m);
-  assert.match(podfileLock, /^COCOAPODS: 1\.16\.2$/m);
+  assert.match(gemfileLock, /^    cocoapods \(1\.17\.0\)$/m);
+  assert.match(gemfileLock, /^  cocoapods \(= 1\.17\.0\)$/m);
+  assert.match(podfileLock, /^COCOAPODS: 1\.17\.0$/m);
 });
 
 test('iOS native build pins Ruby and installs the locked bundle', () => {

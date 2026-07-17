@@ -166,6 +166,13 @@ jobs:
           BUNDLE_FROZEN: 'true'
         run: bundle install --jobs 4 --retry 3
 
+      - name: Test CocoaPods path workaround
+        working-directory: apps/mobile
+        env:
+          BUNDLE_DEPLOYMENT: 'true'
+          BUNDLE_FROZEN: 'true'
+        run: bundle exec ruby ios/__tests__/cocoapods_pathname_workaround_test.rb
+
       - name: Install iOS pods
         working-directory: apps/mobile/ios
         env:
