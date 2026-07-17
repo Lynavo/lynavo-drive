@@ -148,7 +148,7 @@ jobs:
           cache: pnpm
 
       - name: Setup Ruby
-        uses: ruby/setup-ruby@6e5d382445ae5590b7449d8b3bc8cb1c2c27f617
+        uses: ruby/setup-ruby@003a5c4d8d6321bd302e38f6f0ec593f77f06600
         with:
           ruby-version: 3.4.9
           bundler: 4.0.15
@@ -225,7 +225,7 @@ jobs:
           cache: pnpm
 
       - name: Setup Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
           go-version: 1.25.6
           cache: true
@@ -318,7 +318,7 @@ jobs:
           cache: pnpm
 
       - name: Setup Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
           go-version: 1.25.6
           cache: true
@@ -388,7 +388,7 @@ jobs:
           cache: pnpm
 
       - name: Setup Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
           go-version: 1.25.6
           cache: true
