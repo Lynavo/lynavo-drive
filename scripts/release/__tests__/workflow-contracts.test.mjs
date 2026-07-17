@@ -8,7 +8,7 @@ const ACTION_SHA = /^[\w.-]+(?:\/[\w.-]+)+@[0-9a-f]{40}$/;
 const NODE_24_ACTIONS = new Map([
   ['actions/checkout', '9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0'],
   ['actions/setup-go', 'b7ad1dad31e06c5925ef5d2fc7ad053ef454303e'],
-  ['actions/setup-java', '0f481fcb613427c0f801b606911222b5b6f3083a'],
+  ['actions/setup-java', '03ad4de0992f5dab5e18fcb136590ce7c4a0ac95'],
   ['actions/setup-node', '820762786026740c76f36085b0efc47a31fe5020'],
   ['actions/upload-artifact', '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'],
   ['actions/download-artifact', '70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3'],
