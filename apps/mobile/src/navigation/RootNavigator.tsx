@@ -55,8 +55,7 @@ const MainTab = createBottomTabNavigator<MainTabParamList>();
 
 export type RootStackParamList = {
   DeviceDiscovery:
-    | { mode?: 'switch'; reason?: PairingInvalidatedRouteReason }
-    | undefined;
+    { mode?: 'switch'; reason?: PairingInvalidatedRouteReason } | undefined;
   CodeVerify: {
     deviceId?: string;
     host: string;

@@ -18,8 +18,7 @@ export function recordDiagnosticsLog(
   details?: Record<string, DiagnosticsLogValue>,
 ): void {
   const nativeSyncEngine = NativeModules.NativeSyncEngine as
-    | NativeDiagnosticsLogger
-    | undefined;
+    NativeDiagnosticsLogger | undefined;
   if (!nativeSyncEngine?.recordDiagnosticsLog) return;
 
   const trimmedCategory = category.trim() || 'JS';

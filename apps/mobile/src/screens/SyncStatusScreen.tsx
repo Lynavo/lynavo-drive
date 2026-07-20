@@ -88,11 +88,7 @@ interface BindingState {
   deviceType?: DeviceType;
   host: string;
   connectionState:
-    | 'bound'
-    | 'connecting'
-    | 'connected'
-    | 'offline'
-    | 'discovering';
+    'bound' | 'connecting' | 'connected' | 'offline' | 'discovering';
 }
 
 interface RetryBannerState {
@@ -259,8 +255,8 @@ function buildOverviewFromPayload(
     uploadState: nextUploadState,
     performanceHint:
       (payload.performanceHint as
-        | SyncOverview['performanceHint']
-        | undefined) ?? previous.performanceHint,
+        SyncOverview['performanceHint'] | undefined) ??
+      previous.performanceHint,
     performanceMessage:
       typeof payload.performanceMessage === 'string'
         ? payload.performanceMessage
@@ -626,8 +622,7 @@ export function SyncStatusScreen() {
         if (!mod) return;
         const history = await mod.getHistoryDays('');
         const items = history?.items as
-          | Array<Record<string, unknown>>
-          | undefined;
+          Array<Record<string, unknown>> | undefined;
         if (!items?.length) {
           setLatestSync(null);
           return;

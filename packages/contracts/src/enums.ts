@@ -4,24 +4,12 @@ export type DeviceType = 'mac' | 'win' | 'linux';
 export type ConnectionState = 'discovering' | 'bound' | 'connecting' | 'connected' | 'offline';
 
 export type SharedFilesReachabilityState =
-  | 'unknown'
-  | 'available'
-  | 'unavailable'
-  | 'waking'
-  | 'wake_setup_required'
-  | 'wake_unavailable';
+  'unknown' | 'available' | 'unavailable' | 'waking' | 'wake_setup_required' | 'wake_unavailable';
 
 export type SharedFilesRouteKind = 'lan';
 
 export type UploadState =
-  | 'idle'
-  | 'scanning'
-  | 'queued'
-  | 'uploading'
-  | 'paused'
-  | 'retrying'
-  | 'completed'
-  | 'failed';
+  'idle' | 'scanning' | 'queued' | 'uploading' | 'paused' | 'retrying' | 'completed' | 'failed';
 
 export type SidecarUploadStatus =
   | 'receiving'
@@ -34,11 +22,7 @@ export type SidecarUploadStatus =
 export type DeviceDashboardStatus = 'transferring' | 'connected_idle' | 'offline';
 
 export type ShareStatus =
-  | 'unknown'
-  | 'needs_manual_enable'
-  | 'share_registered'
-  | 'ready'
-  | 'error';
+  'unknown' | 'needs_manual_enable' | 'share_registered' | 'ready' | 'error';
 
 export type FileInitAction = 'UPLOAD' | 'RESUME' | 'SKIP' | 'REJECT';
 

@@ -1,9 +1,5 @@
 export type MobileConnectionState =
-  | 'bound'
-  | 'connecting'
-  | 'connected'
-  | 'offline'
-  | 'discovering';
+  'bound' | 'connecting' | 'connected' | 'offline' | 'discovering';
 
 export type SyncConnectionEvidence = {
   progressPercent?: number | null;

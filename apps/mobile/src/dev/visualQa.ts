@@ -58,8 +58,7 @@ function readNativeValue(
   name: keyof VisualQaNativeConstants,
 ): string | undefined {
   const nativeAppRuntimeConfig = NativeModules.NativeAppRuntimeConfig as
-    | VisualQaNativeConstants
-    | undefined;
+    VisualQaNativeConstants | undefined;
   const nativeAppRuntimeConstants = nativeAppRuntimeConfig?.getConstants?.();
   const value =
     nativeAppRuntimeConfig?.[name] ?? nativeAppRuntimeConstants?.[name];

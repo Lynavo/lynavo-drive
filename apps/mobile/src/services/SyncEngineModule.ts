@@ -295,8 +295,7 @@ export async function enableAutoUpload(
   let currentConfig: AutoUploadConfigDTO | undefined;
   try {
     currentConfig = (await NativeSyncEngine.getAutoUploadConfig?.()) as
-      | AutoUploadConfigDTO
-      | undefined;
+      AutoUploadConfigDTO | undefined;
   } catch (e) {
     console.warn(
       '[SyncEngineModule] getAutoUploadConfig before enable failed:',
