@@ -90,8 +90,14 @@ function photoThumbnail(id, x, y, width, height, variant, opacity = 1) {
 function bezierPoint(progress, start, control, end) {
   const inverse = 1 - progress;
   return {
-    x: inverse * inverse * start.x + 2 * inverse * progress * control.x + progress * progress * end.x,
-    y: inverse * inverse * start.y + 2 * inverse * progress * control.y + progress * progress * end.y,
+    x:
+      inverse * inverse * start.x +
+      2 * inverse * progress * control.x +
+      progress * progress * end.x,
+    y:
+      inverse * inverse * start.y +
+      2 * inverse * progress * control.y +
+      progress * progress * end.y,
   };
 }
 
@@ -164,7 +170,9 @@ function pairUi(time, opacity) {
 }
 
 function galleryUi(time, opacity) {
-  const uploads = Array.from({ length: 3 }, (_, index) => smooth(1.92 + index * 0.4, 2.5 + index * 0.4, time));
+  const uploads = Array.from({ length: 3 }, (_, index) =>
+    smooth(1.92 + index * 0.4, 2.5 + index * 0.4, time),
+  );
   let laptopPhotos = '';
   let phonePhotos = '';
   let flyingPhotos = '';
@@ -173,7 +181,15 @@ function galleryUi(time, opacity) {
     const laptopX = 303 + (index % 3) * 145;
     const laptopY = 307 + Math.floor(index / 3) * 94;
     const laptopOpacity = index < 3 ? uploads[index] : 0.16;
-    laptopPhotos += photoThumbnail(`desktop-${index}`, laptopX, laptopY, 124, 76, index, laptopOpacity);
+    laptopPhotos += photoThumbnail(
+      `desktop-${index}`,
+      laptopX,
+      laptopY,
+      124,
+      76,
+      index,
+      laptopOpacity,
+    );
     if (index === 2) laptopPhotos += playBadge(laptopX + 62, laptopY + 38, 14, laptopOpacity);
 
     const phoneX = 954 + (index % 3) * 43;
@@ -184,7 +200,12 @@ function galleryUi(time, opacity) {
 
   uploads.forEach((progress, index) => {
     if (progress <= 0 || progress >= 1) return;
-    const point = bezierPoint(progress, { x: 1008, y: 366 }, { x: 786, y: 262 }, { x: 510, y: 351 });
+    const point = bezierPoint(
+      progress,
+      { x: 1008, y: 366 },
+      { x: 786, y: 262 },
+      { x: 510, y: 351 },
+    );
     const scale = 0.66 + 0.34 * Math.sin(Math.PI * progress);
     flyingPhotos += `<g transform="translate(${format(point.x)} ${format(point.y)}) scale(${format(scale)}) translate(-28 -20)" filter="url(#card-shadow)">
       ${photoThumbnail(`flying-${index}`, 0, 0, 56, 40, index, Math.sin(Math.PI * progress))}
@@ -250,7 +271,16 @@ function fileTypeIcon(x, y, size, type, selected = false) {
   </g>`;
 }
 
-function documentRows(x, y, width, rowHeight, opacity = 1, selectedIndex = -1, showDownload = false, count = 4) {
+function documentRows(
+  x,
+  y,
+  width,
+  rowHeight,
+  opacity = 1,
+  selectedIndex = -1,
+  showDownload = false,
+  count = 4,
+) {
   let rows = '';
   const types = ['document', 'image', 'archive', 'document'];
   for (let index = 0; index < count; index += 1) {
@@ -326,7 +356,8 @@ function downloadUi(time, opacity) {
 
 function connectionLayer(time) {
   const connectionProgress = smooth(1.02, 1.42, time) * (1 - smooth(7.08, 7.48, time));
-  const connectionFlash = Math.sin(Math.PI * smooth(1.2, 1.55, time)) * (1 - smooth(1.55, 1.75, time));
+  const connectionFlash =
+    Math.sin(Math.PI * smooth(1.2, 1.55, time)) * (1 - smooth(1.55, 1.75, time));
   const uploadDirection = smooth(1.78, 2.0, time) * (1 - smooth(3.3, 3.58, time));
   const downloadDirection = smooth(5.52, 5.78, time) * (1 - smooth(6.86, 7.12, time));
   let arrows = '';
@@ -454,26 +485,33 @@ async function createCdpClient(webSocketUrl) {
 }
 
 async function rasterizeFrames(framesDirectory) {
-  const chromePath = process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  const chromePath =
+    process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
   const profileDirectory = mkdtempSync(join(tmpdir(), 'lynavo-drive-chrome-'));
   const port = await getFreePort();
-  const chrome = spawn(chromePath, [
-    '--headless=new',
-    '--disable-background-networking',
-    '--disable-default-apps',
-    '--disable-extensions',
-    '--disable-gpu',
-    '--force-device-scale-factor=1',
-    '--hide-scrollbars',
-    '--no-default-browser-check',
-    '--no-first-run',
-    `--remote-debugging-port=${port}`,
-    `--user-data-dir=${profileDirectory}`,
-  ], { stdio: 'ignore' });
+  const chrome = spawn(
+    chromePath,
+    [
+      '--headless=new',
+      '--disable-background-networking',
+      '--disable-default-apps',
+      '--disable-extensions',
+      '--disable-gpu',
+      '--force-device-scale-factor=1',
+      '--hide-scrollbars',
+      '--no-default-browser-check',
+      '--no-first-run',
+      `--remote-debugging-port=${port}`,
+      `--user-data-dir=${profileDirectory}`,
+    ],
+    { stdio: 'ignore' },
+  );
 
   try {
     await waitForChrome(port);
-    const pageResponse = await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' });
+    const pageResponse = await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, {
+      method: 'PUT',
+    });
     const page = await pageResponse.json();
     const client = await createCdpClient(page.webSocketDebuggerUrl);
 
@@ -492,7 +530,9 @@ async function rasterizeFrames(framesDirectory) {
       for (let frame = 0; frame < FRAME_COUNT; frame += 1) {
         const stem = `frame-${String(frame).padStart(3, '0')}`;
         const loaded = client.waitForEvent('Page.loadEventFired');
-        await client.send('Page.navigate', { url: `file://${join(framesDirectory, `${stem}.svg`)}` });
+        await client.send('Page.navigate', {
+          url: `file://${join(framesDirectory, `${stem}.svg`)}`,
+        });
         await loaded;
         const screenshot = await client.send('Page.captureScreenshot', {
           format: 'png',
@@ -526,20 +566,57 @@ async function run() {
 
     await rasterizeFrames(framesDirectory);
     const inputPattern = join(framesDirectory, 'frame-%03d.png');
-    execFileSync('ffmpeg', [
-      '-hide_banner', '-loglevel', 'error', '-y',
-      '-framerate', String(FPS), '-start_number', '0', '-i', inputPattern,
-      '-frames:v', String(FRAME_COUNT), '-c:v', 'apng', '-plays', '0',
-      '-compression_level', '9', '-f', 'apng', join(outputDirectory, 'banner.png'),
-    ], { stdio: 'inherit' });
+    execFileSync(
+      'ffmpeg',
+      [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-y',
+        '-framerate',
+        String(FPS),
+        '-start_number',
+        '0',
+        '-i',
+        inputPattern,
+        '-frames:v',
+        String(FRAME_COUNT),
+        '-c:v',
+        'apng',
+        '-plays',
+        '0',
+        '-compression_level',
+        '9',
+        '-f',
+        'apng',
+        join(outputDirectory, 'banner.png'),
+      ],
+      { stdio: 'inherit' },
+    );
 
-    execFileSync('ffmpeg', [
-      '-hide_banner', '-loglevel', 'error', '-y',
-      '-framerate', String(FPS), '-start_number', '0', '-i', inputPattern,
-      '-frames:v', String(FRAME_COUNT),
-      '-filter_complex', '[0:v]split[a][b];[a]palettegen=max_colors=160:reserve_transparent=1:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle:alpha_threshold=64',
-      '-loop', '0', join(outputDirectory, 'banner.gif'),
-    ], { stdio: 'inherit' });
+    execFileSync(
+      'ffmpeg',
+      [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-y',
+        '-framerate',
+        String(FPS),
+        '-start_number',
+        '0',
+        '-i',
+        inputPattern,
+        '-frames:v',
+        String(FRAME_COUNT),
+        '-filter_complex',
+        '[0:v]split[a][b];[a]palettegen=max_colors=160:reserve_transparent=1:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle:alpha_threshold=64',
+        '-loop',
+        '0',
+        join(outputDirectory, 'banner.gif'),
+      ],
+      { stdio: 'inherit' },
+    );
 
     chmodSync(join(outputDirectory, 'banner.png'), 0o644);
     chmodSync(join(outputDirectory, 'banner.gif'), 0o644);
