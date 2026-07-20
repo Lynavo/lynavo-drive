@@ -36,3 +36,6 @@ updates:
       # React Native 0.84 tooling cannot read Gradle 9.6 Kotlin metadata.
       - dependency-name: gradle-wrapper
         versions: ['>= 9.0.0']
+      # AndroidX Core 1.19 requires Android Gradle Plugin 9.1 or newer.
+      - dependency-name: androidx.core:core
+        versions: ['>= 1.19.0']
