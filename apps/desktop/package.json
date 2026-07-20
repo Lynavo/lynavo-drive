@@ -53,7 +53,7 @@
   "devDependencies": {
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
-    "@tailwindcss/postcss": "^4.1.0",
+    "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^6.0.0",
     "@testing-library/react": "^16.0.0",
     "@types/node": "^22.0.0",
