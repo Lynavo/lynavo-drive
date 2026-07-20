@@ -32,7 +32,7 @@
     "react-native-gesture-handler": "^2.30.0",
     "react-native-keychain": "^10.0.0",
     "react-native-localize": "^3.7.0",
-    "react-native-safe-area-context": "^5.5.2",
+    "react-native-safe-area-context": "^5.8.0",
     "react-native-screens": "^4.24.0",
     "react-native-share": "12.3.1",
     "react-native-svg": "^15.15.4",
