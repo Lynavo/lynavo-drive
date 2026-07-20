@@ -32,3 +32,7 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
+    ignore:
+      # React Native 0.84 tooling cannot read Gradle 9.6 Kotlin metadata.
+      - dependency-name: gradle-wrapper
+        versions: ['>= 9.0.0']
