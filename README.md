@@ -3,14 +3,8 @@
 </p>
 
 <p align="center">
-  <img src="./pics/banner.png" alt="Lynavo Drive Banner" width="100%">
+  <a href="https://drive.lynavo.io/"><img src="./pics/banner.png" alt="Lynavo Drive animated product banner" width="100%"></a>
 </p>
-
-<p align="center">
-  <img src="./pics/logo.png" alt="Lynavo Drive Logo" width="120">
-</p>
-
-<h1 align="center">Lynavo Drive</h1>
 
 <p align="center">
   <strong>A high-performance, local-LAN incremental media sync tool from mobile (iOS / Android) to desktop (macOS / Windows).</strong>

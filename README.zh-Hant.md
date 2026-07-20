@@ -3,14 +3,8 @@
 </p>
 
 <p align="center">
-  <img src="./pics/banner.png" alt="Lynavo Drive Banner" width="100%">
+  <a href="https://drive.lynavo.io/"><img src="./pics/banner.png" alt="Lynavo Drive animated product banner" width="100%"></a>
 </p>
-
-<p align="center">
-  <img src="./pics/logo.png" alt="Lynavo Drive Logo" width="120">
-</p>
-
-<h1 align="center">Lynavo Drive</h1>
 
 <p align="center">
   <strong>一款高效能、從行動端（iOS / Android）至桌面端（macOS / Windows）的區域網路 (LAN) 增量同步媒體工具。</strong>
