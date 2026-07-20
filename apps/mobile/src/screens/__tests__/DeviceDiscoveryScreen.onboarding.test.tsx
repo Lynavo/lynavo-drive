@@ -20,10 +20,10 @@ const mockUpdateAuthStatus = jest.fn().mockResolvedValue(undefined);
 const mockGetBindingState = jest.fn().mockResolvedValue(null);
 const mockGetKnownDeviceIds = jest.fn().mockResolvedValue([]);
 let mockRouteParams:
-  | { mode?: 'initial' | 'switch'; reason?: 'pairing_invalidated' }
-  | undefined = {
-  mode: 'initial',
-};
+  { mode?: 'initial' | 'switch'; reason?: 'pairing_invalidated' } | undefined =
+  {
+    mode: 'initial',
+  };
 
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({

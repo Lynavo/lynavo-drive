@@ -115,11 +115,7 @@ type TransferFilter = 'all' | 'untransferred' | 'transferred';
 type ViewMode = 'grid' | 'list';
 
 type UnifiedFilter =
-  | 'all'
-  | 'photos'
-  | 'videos'
-  | 'untransferred'
-  | 'transferred';
+  'all' | 'photos' | 'videos' | 'untransferred' | 'transferred';
 const UNIFIED_FILTER_TABS = [
   { key: 'all', labelKey: 'albumWorkbench.tabs.all' },
   { key: 'photos', labelKey: 'albumWorkbench.tabs.photos' },

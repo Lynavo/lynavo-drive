@@ -2,13 +2,7 @@ import { create } from 'zustand';
 import type { DashboardDeviceDTO } from '@lynavo-drive/contracts';
 
 export type AppView =
-  | 'dashboard'
-  | 'devices'
-  | 'shared'
-  | 'library'
-  | 'records'
-  | 'settings'
-  | 'help';
+  'dashboard' | 'devices' | 'shared' | 'library' | 'records' | 'settings' | 'help';
 type InternalAppView = AppView | 'device-detail';
 
 export interface AppState {

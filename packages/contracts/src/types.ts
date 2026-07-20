@@ -290,12 +290,7 @@ export interface ShareStatusDTO {
 export type ConnectionDeviceStatus = 'authorized' | 'connected' | 'offline';
 
 export type PairingAttemptResult =
-  | 'success'
-  | 'wrong_code'
-  | 'blocked'
-  | 'incompatible'
-  | 'malformed'
-  | 'revoked_repair_required';
+  'success' | 'wrong_code' | 'blocked' | 'incompatible' | 'malformed' | 'revoked_repair_required';
 
 export interface PairingErrorMetadataDTO {
   failedAttempts?: number;

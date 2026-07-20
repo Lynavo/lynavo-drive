@@ -91,19 +91,13 @@ type ConnectionFlowStatus =
   | 'permissionRequired'
   | 'cameraDenied';
 type ConnectionFailureCode =
-  | 'wrong_code'
-  | 'blocked'
-  | 'version_incompatible'
-  | 'unknown';
+  'wrong_code' | 'blocked' | 'version_incompatible' | 'unknown';
 type ConnectionFailure = {
   code: ConnectionFailureCode;
   remainingAttempts?: number;
 };
 type ConnectionModalStep =
-  | 'method'
-  | 'manualPair'
-  | 'cameraPermission'
-  | 'code';
+  'method' | 'manualPair' | 'cameraPermission' | 'code';
 type FlowStateTone = 'neutral' | 'danger' | 'warning';
 type NativeDiscoveryModule = {
   addListener: (eventName: string) => void;
@@ -527,8 +521,7 @@ export function DeviceDiscoveryScreen() {
       setKnownDeviceIds(new Set(ids));
       setCurrentDeviceId(
         ((binding as { deviceId?: string } | null)?.deviceId as
-          | string
-          | undefined) ?? null,
+          string | undefined) ?? null,
       );
     });
 

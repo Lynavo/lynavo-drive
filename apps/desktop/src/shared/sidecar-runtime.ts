@@ -1,11 +1,7 @@
 export type SidecarRuntimeStatus = 'starting' | 'healthy' | 'failed' | 'stopped';
 export type BonjourRuntimeStatus = 'native' | 'fallback' | 'not_applicable';
 export type BonjourRuntimeSource =
-  | 'environment'
-  | 'bundled'
-  | 'system'
-  | 'fallback'
-  | 'not_applicable';
+  'environment' | 'bundled' | 'system' | 'fallback' | 'not_applicable';
 export type BonjourRuntimeMessageCode = 'bonjourNativeDetected' | 'bonjourFallbackDetected';
 export type SidecarRuntimeMessageCode =
   | 'starting'
