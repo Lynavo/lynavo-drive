@@ -2,11 +2,12 @@
 
 This repository is the global-only open-source baseline. The release playbook
 documents contributor-local verification and approved GitHub-hosted,
-secret-free, unsigned source-build/package verification. Hosted outputs are
-verification artifacts, not official signed distributions.
+secret-free, unsigned source-build/package verification. Stable `vX.Y.Z` tag
+releases are the only exception: they use repository Actions Secrets to sign
+Android APK/AAB assets after the unsigned `Native Builds` workflow completes.
 
-Third-party or external build services, code signing, notarization, store
-upload, auto-update, and private distribution infrastructure remain
+Third-party or external build services, desktop code signing, notarization,
+store upload, auto-update, and private distribution infrastructure remain
 unavailable. Linux remains local build/package verification only.
 
 ## Release Gate
@@ -153,7 +154,10 @@ stops with seven-day Actions artifacts. iOS remains build-only: it performs
 unsigned Debug and Release generic-device builds and produces no IPA.
 
 A valid tag run waits for `OSS Release Gate`, `TS Quality`, `Go Tests`, and
-`Native Builds` from the same commit. It then assembles exactly these files:
+`Native Builds` from the same commit. The tag-only `Sign Android Release` job
+downloads `native-android`, signs and verifies the APK and AAB, and uploads
+`native-android-signed`. Checksum assembly starts only after that signed
+artifact is available. The release then contains exactly these files:
 
 - `LynavoDriveDemo-<version>-macos-arm64.dmg`
 - `LynavoDriveDemo-<version>-macos-x64.dmg`
@@ -172,10 +176,62 @@ Release creation is draft-only. The job has read-only repository permissions
 until the final tag-gated release job, which receives `contents: write`. A new
 draft uses generated release notes and this warning:
 
-> These files are unsigned OSS build-verification outputs, not an official
-> signed distribution. macOS Gatekeeper, Windows SmartScreen, and Android
-> sideloading controls may block installation or display warnings. Verify the
-> matching entry in `SHA256SUMS` before testing an asset.
+> The Android APK is signed for direct installation and future updates; the AAB
+> is signed for verification and later distribution. Desktop files remain
+> unsigned OSS build-verification outputs, so macOS Gatekeeper and Windows
+> SmartScreen may block installation or display warnings. Verify the matching
+> entry in `SHA256SUMS` before testing any asset.
+
+### Android Signing Setup And Recovery
+
+The stable-tag signing job reads exactly these repository Actions Secrets:
+
+- `ANDROID_RELEASE_KEYSTORE_BASE64`: the Base64-encoded release JKS
+- `ANDROID_RELEASE_STORE_PASSWORD`: the JKS store password
+- `ANDROID_RELEASE_KEY_ALIAS`: `lynavo-drive-release`
+- `ANDROID_RELEASE_KEY_PASSWORD`: the private-key password
+
+`Native Builds`, pull requests, pushes to `main`, manual `OSS Draft Release`
+dispatches, and local source-build verification remain secret-free and
+unsigned. Signing material must never be committed or exposed to pull request
+workflows.
+
+The maintainer recovery copy is
+`~/.config/lynavo-drive/signing/lynavo-drive-release.jks`. Keep the directory at
+mode `0700` and the file at mode `0600`. Store its two passwords in macOS
+Keychain under account `lynavo-drive-release` and services
+`dev.lynavo.drive.android.release-store-password` and
+`dev.lynavo.drive.android.release-key-password`.
+
+To restore the repository Secrets from the protected backup without writing a
+Base64 copy to disk:
+
+```bash
+base64 < ~/.config/lynavo-drive/signing/lynavo-drive-release.jks | tr -d '\n' | \
+  gh secret set ANDROID_RELEASE_KEYSTORE_BASE64 --repo Lynavo/lynavo-drive
+security find-generic-password -a lynavo-drive-release \
+  -s dev.lynavo.drive.android.release-store-password -w | \
+  gh secret set ANDROID_RELEASE_STORE_PASSWORD --repo Lynavo/lynavo-drive
+printf '%s' 'lynavo-drive-release' | \
+  gh secret set ANDROID_RELEASE_KEY_ALIAS --repo Lynavo/lynavo-drive
+security find-generic-password -a lynavo-drive-release \
+  -s dev.lynavo.drive.android.release-key-password -w | \
+  gh secret set ANDROID_RELEASE_KEY_PASSWORD --repo Lynavo/lynavo-drive
+```
+
+Never rotate or lose this key without an explicit Android package migration
+plan. Losing the key prevents APK updates from installing over every existing
+installation signed by it. After recovery, confirm only the Secret names and
+the certificate identity; never print Secret values.
+
+Verify downloaded tag assets before publication:
+
+```bash
+"$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs \
+  LynavoDriveDemo-<version>-android-arm64-x86_64.apk
+jarsigner -verify -strict -certs \
+  LynavoDriveDemo-<version>-android-arm64-x86_64.aab
+```
 
 An existing draft may be updated idempotently. A rerun for the same tag
 preserves its generated notes and replaces the seven allowlisted assets above
@@ -191,16 +247,17 @@ start an upload in that state and never moves, deletes, or recreates the tag.
 1. Confirm all four version sources contain the intended stable version.
 2. Run `pnpm gate:release` and the relevant local native checks.
 3. Optionally dispatch `OSS Draft Release` manually. Confirm all reusable jobs
-   pass, the four intermediate artifact groups exist, and no release is
-   created.
+   pass, the four unsigned intermediate artifact groups exist, no signing job
+   runs, and no release is created.
 4. After the target commit and repository checks are approved, a repository
    admin creates and pushes one stable `vX.Y.Z` tag. The release tag ruleset
    blocks other roles from creating, updating, or deleting matching tags.
 5. Do not publish the draft while the tag workflow or any rerun is in progress.
-6. After the run completes, confirm the draft contains only the six versioned
-   files and `SHA256SUMS`.
-7. Download the files, verify their checksums, and record platform smoke-test
-   results before any separate publication decision.
+6. After the run completes, confirm `native-android-signed` passed signature
+   verification and the draft contains only the six versioned files and
+   `SHA256SUMS`.
+7. Download the files, verify their checksums and Android signatures, and record
+   platform smoke-test results before any separate publication decision.
 8. Publish only after the completed run, asset list, and checksums have been
    reviewed. GitHub immutable releases protect the published tag and assets
    from later modification or deletion; drafts remain editable until they are
@@ -308,8 +365,10 @@ Expected local artifact for the selected architecture:
 
 ## Android Release Variant
 
-The Android release variant is kept as a source-build target. It does not define
-repository-owned keystore inputs or shared signing material.
+The Android release variant remains an unsigned source-build target locally and
+in `Native Builds`; Gradle does not define repository-owned keystore inputs.
+Only the stable-tag release workflow signs the staged APK/AAB afterward by using
+the protected Actions Secrets documented above.
 
 ## Debug Flags
 

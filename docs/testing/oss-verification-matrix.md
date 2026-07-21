@@ -18,10 +18,13 @@ The OSS baseline must continuously verify four capability groups:
    builds, and desktop package verification are reproducible locally and in
    approved GitHub-hosted verification jobs.
 
-GitHub-hosted jobs use public source, no repository secrets, and unsigned
-verification artifacts only. Third-party or external build services, signing,
-notarization, store upload, auto-update, and private distribution infrastructure
-remain prohibited. Linux remains local build/package verification only.
+GitHub-hosted verification jobs use public source, no repository secrets, and
+unsigned verification artifacts only. Stable `vX.Y.Z` tag releases are the only
+exception and may use repository Actions Secrets to sign Android APK/AAB assets
+after verification builds finish. Third-party or external build services,
+desktop signing, notarization, store upload, auto-update, and private
+distribution infrastructure remain prohibited. Linux remains local
+build/package verification only.
 
 ## 2. Automated Verification
 
@@ -135,15 +138,19 @@ Acceptance criteria:
 2. A valid tag run rebuilds from the tagged commit and creates a draft containing
    six exact versioned assets plus `SHA256SUMS`; iOS remains an unsigned
    build-only check with no IPA.
-3. The draft warning identifies unsigned OSS build-verification outputs and the
-   expected Gatekeeper, SmartScreen, and Android sideloading warnings.
+3. The tag run must fail when any Android signing Secret is missing or APK/AAB
+   signature verification fails. It uploads `native-android-signed` and starts
+   checksum assembly only after both signed Android assets verify successfully.
 4. A published release is immutable and any overwrite attempt must fail before
    asset deletion or upload.
 5. A rerun against a draft replaces only the seven allowlisted assets and leaves
    the tag unchanged.
-6. Linux remains excluded from hosted release assets, and signing,
-   notarization, store upload, auto-update, secrets, and external distribution
-   services remain absent.
+6. The draft warning identifies signed Android assets, unsigned OSS desktop
+   build-verification outputs, and the expected Gatekeeper and SmartScreen
+   warnings.
+7. Linux remains excluded from hosted release assets. Desktop signing,
+   notarization, store upload, auto-update, and external distribution services
+   remain absent.
 
 ## 3. Device Script Regression
 

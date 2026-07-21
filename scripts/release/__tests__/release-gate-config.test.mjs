@@ -42,7 +42,7 @@ test('package scripts expose an OSS release gate without native builds', () => {
   assert.equal(scripts[token(['tag:', 'beta:push'])], undefined);
 });
 
-test('policy permits only secret-free unsigned GitHub-hosted verification builds', () => {
+test('policy keeps verification secret-free and permits tag-only Android signing', () => {
   const policyPaths = [
     'AGENTS.md',
     'README.md',
@@ -58,7 +58,21 @@ test('policy permits only secret-free unsigned GitHub-hosted verification builds
   }
 
   const policy = docs.join('\n');
-  assert.match(policy, /no repository secrets/i);
+  for (const secret of [
+    'ANDROID_RELEASE_KEYSTORE_BASE64',
+    'ANDROID_RELEASE_STORE_PASSWORD',
+    'ANDROID_RELEASE_KEY_ALIAS',
+    'ANDROID_RELEASE_KEY_PASSWORD',
+  ]) {
+    assert.ok(policy.includes(`\`${secret}\``), `missing signing Secret: ${secret}`);
+  }
+  assert.match(policy, /Native Builds.+secret-free.+unsigned/is);
+  assert.match(policy, /stable.+`vX\.Y\.Z`.+only.+signed Android/is);
+  assert.match(policy, /native-android-signed/);
+  assert.match(policy, /~\/\.config\/lynavo-drive\/signing\/lynavo-drive-release\.jks/);
+  assert.match(policy, /keystore.+backup|backup.+keystore/is);
+  assert.match(policy, /recover|recovery/i);
+  assert.match(policy, /los(?:e|ing|s).+key.+(?:update|upgrade)|key loss.+(?:update|upgrade)/is);
   assert.match(policy, /Linux.+local.+verification/is);
   assert.match(policy, /signing|code signing/i);
   assert.match(policy, /notarization/i);

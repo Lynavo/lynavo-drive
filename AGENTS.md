@@ -10,9 +10,12 @@ Android sync capabilities.
 This repository is the global-only OSS baseline. It maintains public local and
 GitHub-hosted source-build and package-verification paths. Hosted verification
 uses public source, no repository secrets, and unsigned artifacts only. It does
-not include multi-market, official signing, upload, auto-update, non-OSS
-distribution, or other non-OSS product paths. Linux is kept only for local
-source-build / package verification; it is not a current user support surface.
+not include multi-market, desktop signing, notarization, store upload,
+auto-update, non-OSS distribution, or other non-OSS product paths. Stable tags
+matching `vX.Y.Z` are the only hosted path that produces signed Android APK/AAB
+assets, using repository Actions Secrets that are unavailable to pull requests.
+Linux is kept only for local source-build / package verification; it is not a
+current user support surface.
 
 ## Current Development Baseline
 
@@ -75,10 +78,13 @@ machine, persistence, or sync semantics.
   such as sharing checks and packaging, according to current code and the
   relevant docs. The OSS repository provides local and GitHub-hosted unsigned
   source-build and package verification.
-- **No official non-OSS release path is available here**. Do not add or assume
-  official signing, notarization, upload, auto-update, non-OSS market,
-  server-side capability, support, or hosted release infrastructure in this public
-  baseline.
+- **The only signing path is Android stable-tag signing**. Stable `vX.Y.Z` tag
+  releases may use repository Actions Secrets to sign Android APK/AAB assets.
+  `Native Builds`, pull requests, `main` pushes, manual dispatches, and local
+  source-build verification remain secret-free and unsigned. Do not add or
+  assume desktop signing, notarization, store upload, auto-update, non-OSS
+  market, server-side capability, support, or other hosted release
+  infrastructure in this public baseline.
 - **Linux is verification-only**. Keep Linux local source-build and package
   verification paths working where documented, but do not treat Linux as a
   supported desktop user surface.
@@ -104,8 +110,9 @@ machine, persistence, or sync semantics.
   everything through the preload bridge.
 - **Approved build environments are narrowly scoped**. Contributor-local builds
   and GitHub-hosted Actions builds are allowed for public, secret-free OSS
-  source-build and unsigned package verification. Third-party or external build
-  and packaging services remain prohibited.
+  source-build and unsigned package verification. The stable-tag Android signing
+  exception may run only on GitHub-hosted Actions with repository Secrets.
+  Third-party or external build and packaging services remain prohibited.
 
 Additional clarifications:
 

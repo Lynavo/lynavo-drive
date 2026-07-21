@@ -727,7 +727,9 @@ test('draft release workflow signs Android assets only for stable tags', () => {
   assert.match(releaseCommands, /--verify-tag/);
   assert.match(releaseCommands, /gh release upload/);
   assert.match(releaseCommands, /--clobber/);
-  assert.match(releaseCommands, /unsigned OSS build-verification outputs/);
+  assert.match(releaseCommands, /Android APK is signed/);
+  assert.match(releaseCommands, /AAB is\s+signed/);
+  assert.match(releaseCommands, /Desktop files remain unsigned OSS\s+build-verification outputs/);
   assert.match(releaseCommands, /SHA256SUMS/);
 
   assert.doesNotMatch(workflowText, /pull_request_target/);
