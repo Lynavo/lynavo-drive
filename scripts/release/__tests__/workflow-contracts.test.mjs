@@ -549,6 +549,11 @@ test('draft release reruns preserve generated notes', () => {
   assert.match(commands, /gh release create/);
   assert.match(commands, /--generate-notes/);
   assert.match(commands, /--notes-file "\$RUNNER_TEMP\/release-body\.md"/);
+  assert.match(commands, /Choose an edition/);
+  assert.match(commands, /Open Source Edition/);
+  assert.match(commands, /Official \/ Commercial Edition/);
+  assert.match(commands, /https:\/\/drive\.lynavo\.io\/download\.html/);
+  assert.match(commands, /outside this\s+repository/);
   assert.doesNotMatch(commands, /gh release edit/);
 });
 
@@ -732,6 +737,9 @@ test('draft release workflow signs Android assets only for stable tags', () => {
   assert.match(releaseCommands, /AAB is\s+signed/);
   assert.match(releaseCommands, /Desktop files remain unsigned OSS\s+build-verification outputs/);
   assert.match(releaseCommands, /SHA256SUMS/);
+  assert.match(releaseCommands, /Official \/ Commercial Edition/);
+  assert.match(releaseCommands, /https:\/\/drive\.lynavo\.io\/download\.html/);
+  assert.match(releaseCommands, /not\s+included in the GitHub Release assets/i);
 
   assert.doesNotMatch(workflowText, /pull_request_target/);
   assert.doesNotMatch(workflowText, /(?:artifact|asset)[^\n]*linux|linux[^\n]*(?:artifact|asset)/i);

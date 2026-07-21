@@ -233,11 +233,23 @@ jobs:
           set -euo pipefail
 
           cat > "$RUNNER_TEMP/release-body.md" <<'EOF'
+          ## Choose an edition
+
+          ### Open Source Edition
+
           The Android APK is signed for direct installation and future updates; the AAB is
           signed for verification and later distribution. Desktop files remain unsigned OSS
           build-verification outputs, so macOS Gatekeeper and Windows SmartScreen may block
           installation or display warnings. Verify the matching entry in `SHA256SUMS` before
           testing any asset.
+
+          ### Official / Commercial Edition
+
+          For signed desktop installers, official mobile builds, and services available
+          for the selected plan, visit the [official download page](https://drive.lynavo.io/download.html).
+          Official binaries are built, hosted, licensed, and supported outside this
+          repository. Their version numbers may differ from this OSS tag, and they are not
+          included in the GitHub Release assets below.
           EOF
 
           if RELEASE_JSON="$(gh release view "$TAG" --json isDraft 2>/dev/null)"; then

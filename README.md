@@ -3,14 +3,8 @@
 </p>
 
 <p align="center">
-  <img src="./pics/banner.png" alt="Lynavo Drive Banner" width="100%">
+  <a href="https://drive.lynavo.io/"><img src="./pics/banner.png" alt="Lynavo Drive animated product banner" width="100%"></a>
 </p>
-
-<p align="center">
-  <img src="./pics/logo.png" alt="Lynavo Drive Logo" width="120">
-</p>
-
-<h1 align="center">Lynavo Drive</h1>
 
 <p align="center">
   <strong>A high-performance, local-LAN incremental media sync tool from mobile (iOS / Android) to desktop (macOS / Windows).</strong>
@@ -27,6 +21,7 @@
 </p>
 
 <p align="center">
+  <a href="#-editions--downloads">Editions & Downloads</a> •
   <a href="#-product-preview">Product Preview</a> •
   <a href="#-key-features">Key Features</a> •
   <a href="#-oss-boundaries">OSS Boundaries</a> •
@@ -51,6 +46,18 @@ mobile store builds, auto-updates, or hosted services.
 | 🐧 Linux        | Local source-build and package verification only               |
 | 🌐 Network      | Foreground sync over the same LAN                              |
 | 📦 Distribution | Community source builds and locally produced packages/binaries |
+
+## 📦 Editions & Downloads
+
+| Edition                       | What it includes                                                                                | Download                                                           |
+| ----------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Open Source Edition           | The local-LAN core in this repository, source builds, and unsigned verification files           | [GitHub Releases](https://github.com/Lynavo/lynavo-drive/releases) |
+| Official / Commercial Edition | Signed desktop installers, official mobile builds, and services available for the selected plan | [Official Downloads](https://drive.lynavo.io/download.html)        |
+
+Commercial binaries, signing, account services, remote access, billing, and
+updates are built and operated outside this repository. Their version numbers,
+license terms, capabilities, and support policy may differ from an OSS tag.
+GitHub Release assets remain open-source build-verification outputs only.
 
 ## 📸 Product Preview
 

@@ -174,13 +174,19 @@ asset.
 
 Release creation is draft-only. The job has read-only repository permissions
 until the final tag-gated release job, which receives `contents: write`. A new
-draft uses generated release notes and this warning:
+draft uses generated release notes and separates the two distribution channels:
 
-> The Android APK is signed for direct installation and future updates; the AAB
-> is signed for verification and later distribution. Desktop files remain
-> unsigned OSS build-verification outputs, so macOS Gatekeeper and Windows
-> SmartScreen may block installation or display warnings. Verify the matching
-> entry in `SHA256SUMS` before testing any asset.
+1. **Open Source Edition**: the Android APK is signed for direct installation
+   and future updates, and the AAB is signed for verification and later
+   distribution. Desktop files remain unsigned OSS build-verification outputs.
+   The warning covers Gatekeeper, SmartScreen, and `SHA256SUMS` verification.
+2. **Official / Commercial Edition**: the release body links to
+   <https://drive.lynavo.io/download.html>. Official binaries and services are
+   built, hosted, licensed, and supported outside this repository; they are not
+   attached to the OSS GitHub Release and may use a different version number.
+
+The external link is informational only. The workflow does not download,
+build, sign, inspect, or upload any official/commercial package.
 
 ### Android Signing Setup And Recovery
 
