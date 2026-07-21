@@ -584,7 +584,7 @@ test('draft release assets are uploaded once after a final draft check', () => {
   assert.doesNotMatch(commands, /gh release delete-asset/);
 });
 
-test('draft release workflow is tag-gated, unsigned, and idempotent', () => {
+test('draft release workflow signs Android assets only for stable tags', () => {
   const config = workflow('.github/workflows/release.yml');
   const jobs = config.jobs ?? {};
   const workflowText = readRepoFile('.github/workflows/release.yml');
@@ -628,7 +628,42 @@ test('draft release workflow is tag-gated, unsigned, and idempotent', () => {
   );
 
   const tagOnly = /github\.event_name == 'push'.*refs\/tags\/v/;
+  const signAndroid = jobs['sign-android'];
+  assert.equal(signAndroid?.name, 'Sign Android Release');
+  assert.match(signAndroid?.if ?? '', tagOnly);
+  assert.deepEqual(signAndroid?.needs, ['verify-tag', 'native']);
+  assert.equal(signAndroid?.['runs-on'], 'ubuntu-24.04');
+  assert.equal(signAndroid?.['timeout-minutes'], 10);
+  assert.deepEqual(signAndroid?.permissions, { contents: 'read' });
+
+  const signingSteps = signAndroid?.steps ?? [];
+  const restore = findStep(signingSteps, 'Restore Android signing keystore');
+  assert.deepEqual(Object.keys(restore.env ?? {}).sort(), [
+    'ANDROID_RELEASE_KEYSTORE_BASE64',
+  ]);
+  assert.match(restore.run, /base64 --decode/);
+  assert.match(restore.run, /chmod 600/);
+
+  const sign = findStep(signingSteps, 'Sign and verify Android artifacts');
+  assert.deepEqual(Object.keys(sign.env ?? {}).sort(), [
+    'ANDROID_RELEASE_KEY_ALIAS',
+    'ANDROID_RELEASE_KEY_PASSWORD',
+    'ANDROID_RELEASE_STORE_PASSWORD',
+  ]);
+  assert.match(sign.run, /apksigner sign/);
+  assert.match(sign.run, /--ks-pass env:ANDROID_RELEASE_STORE_PASSWORD/);
+  assert.match(sign.run, /--key-pass env:ANDROID_RELEASE_KEY_PASSWORD/);
+  assert.match(sign.run, /apksigner verify --verbose --print-certs/);
+  assert.match(sign.run, /jarsigner/);
+  assert.match(sign.run, /-verify/);
+
+  assert.equal(
+    findStep(signingSteps, 'Upload signed Android artifacts').with?.name,
+    'native-android-signed',
+  );
+
   assert.match(jobs.assemble?.if ?? '', tagOnly);
+  assert.match(JSON.stringify(jobs.assemble?.needs), /sign-android/);
   assert.match(jobs.release?.if ?? '', tagOnly);
   assert.deepEqual(jobs.release?.permissions, { contents: 'write' });
   for (const [jobName, job] of Object.entries(jobs)) {
@@ -648,7 +683,7 @@ test('draft release workflow is tag-gated, unsigned, and idempotent', () => {
       'native-macos-arm64',
       'native-macos-x64',
       'native-windows-x64',
-      'native-android',
+      'native-android-signed',
     ],
   );
   assert.equal(
@@ -698,7 +733,12 @@ test('draft release workflow is tag-gated, unsigned, and idempotent', () => {
   assert.doesNotMatch(workflowText, /pull_request_target/);
   assert.doesNotMatch(workflowText, /(?:artifact|asset)[^\n]*linux|linux[^\n]*(?:artifact|asset)/i);
   assert.doesNotMatch(workflowText, /notari[sz]|apple-id|app-store|play-store|auto.?update/i);
-  assert.doesNotMatch(workflowText, /secrets\.|CSC_LINK|APPLE_ID|signing-certificate/i);
+  const secretSteps = steps.filter(step => JSON.stringify(step).includes('secrets.'));
+  assert.deepEqual(
+    secretSteps.map(step => step.name),
+    ['Restore Android signing keystore', 'Sign and verify Android artifacts'],
+  );
+  assert.doesNotMatch(workflowText, /CSC_LINK|APPLE_ID|signing-certificate/i);
   assert.doesNotMatch(workflowText, /curl[^\n]*(?:upload|release)|electron-updater/i);
   for (const step of steps.filter(candidate =>
     candidate.uses?.startsWith('actions/upload-artifact@'),
