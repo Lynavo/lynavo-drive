@@ -650,10 +650,10 @@ test('draft release workflow signs Android assets only for stable tags', () => {
     'ANDROID_RELEASE_KEY_PASSWORD',
     'ANDROID_RELEASE_STORE_PASSWORD',
   ]);
-  assert.match(sign.run, /apksigner sign/);
+  assert.match(sign.run, /"\$APKSIGNER" sign/);
   assert.match(sign.run, /--ks-pass env:ANDROID_RELEASE_STORE_PASSWORD/);
   assert.match(sign.run, /--key-pass env:ANDROID_RELEASE_KEY_PASSWORD/);
-  assert.match(sign.run, /apksigner verify --verbose --print-certs/);
+  assert.match(sign.run, /"\$APKSIGNER" verify --verbose --print-certs/);
   assert.match(sign.run, /jarsigner/);
   assert.match(sign.run, /-verify/);
 
