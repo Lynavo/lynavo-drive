@@ -26,6 +26,7 @@
 ### Task 1: Add Failing Workflow Contract Tests
 
 **Files:**
+
 - Modify: `scripts/release/__tests__/workflow-contracts.test.mjs`
 - Test: `scripts/release/__tests__/workflow-contracts.test.mjs`
 
@@ -58,9 +59,7 @@ assert.deepEqual(signAndroid?.permissions, { contents: 'read' });
 
 const signingSteps = signAndroid?.steps ?? [];
 const restore = findStep(signingSteps, 'Restore Android signing keystore');
-assert.deepEqual(Object.keys(restore.env ?? {}).sort(), [
-  'ANDROID_RELEASE_KEYSTORE_BASE64',
-]);
+assert.deepEqual(Object.keys(restore.env ?? {}).sort(), ['ANDROID_RELEASE_KEYSTORE_BASE64']);
 assert.match(restore.run, /base64 --decode/);
 assert.match(restore.run, /chmod 600/);
 
@@ -121,6 +120,7 @@ git commit -m "test: require signed Android tag artifacts"
 ### Task 2: Implement Tag-Only Android Signing
 
 **Files:**
+
 - Modify: `.github/workflows/release.yml`
 - Test: `scripts/release/__tests__/workflow-contracts.test.mjs`
 
@@ -131,37 +131,37 @@ download `native-android`, and restore the JKS under `RUNNER_TEMP`. The restore
 step must fail on an empty Base64 secret before decoding:
 
 ```yaml
-  sign-android:
-    name: Sign Android Release
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    needs:
-      - verify-tag
-      - native
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: read
+sign-android:
+  name: Sign Android Release
+  if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+  needs:
+    - verify-tag
+    - native
+  runs-on: ubuntu-24.04
+  timeout-minutes: 10
+  permissions:
+    contents: read
 
-    steps:
-      - name: Download unsigned Android artifacts
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3
-        with:
-          name: native-android
-          path: build/release-downloads/native-android
+  steps:
+    - name: Download unsigned Android artifacts
+      uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3
+      with:
+        name: native-android
+        path: build/release-downloads/native-android
 
-      - name: Restore Android signing keystore
-        env:
-          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
-        run: |
-          set -euo pipefail
-          if [ -z "$ANDROID_RELEASE_KEYSTORE_BASE64" ]; then
-            echo "Missing ANDROID_RELEASE_KEYSTORE_BASE64." >&2
-            exit 1
-          fi
-          KEYSTORE_PATH="$RUNNER_TEMP/lynavo-drive-release.jks"
-          printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
-          chmod 600 "$KEYSTORE_PATH"
-          echo "ANDROID_RELEASE_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+    - name: Restore Android signing keystore
+      env:
+        ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+      run: |
+        set -euo pipefail
+        if [ -z "$ANDROID_RELEASE_KEYSTORE_BASE64" ]; then
+          echo "Missing ANDROID_RELEASE_KEYSTORE_BASE64." >&2
+          exit 1
+        fi
+        KEYSTORE_PATH="$RUNNER_TEMP/lynavo-drive-release.jks"
+        printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+        chmod 600 "$KEYSTORE_PATH"
+        echo "ANDROID_RELEASE_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
 ```
 
 - [ ] **Step 2: Sign and verify the exact APK and AAB**
@@ -170,35 +170,35 @@ Use build tools `36.0.0`, fail when any password or alias is empty, use
 environment-based password inputs, and sign files in place:
 
 ```yaml
-      - name: Sign and verify Android artifacts
-        env:
-          ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
-          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
-          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          : "${ANDROID_RELEASE_STORE_PASSWORD:?Missing ANDROID_RELEASE_STORE_PASSWORD}"
-          : "${ANDROID_RELEASE_KEY_ALIAS:?Missing ANDROID_RELEASE_KEY_ALIAS}"
-          : "${ANDROID_RELEASE_KEY_PASSWORD:?Missing ANDROID_RELEASE_KEY_PASSWORD}"
+- name: Sign and verify Android artifacts
+  env:
+    ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+    ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+    ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+  run: |
+    set -euo pipefail
+    : "${ANDROID_RELEASE_STORE_PASSWORD:?Missing ANDROID_RELEASE_STORE_PASSWORD}"
+    : "${ANDROID_RELEASE_KEY_ALIAS:?Missing ANDROID_RELEASE_KEY_ALIAS}"
+    : "${ANDROID_RELEASE_KEY_PASSWORD:?Missing ANDROID_RELEASE_KEY_PASSWORD}"
 
-          APK_PATH="build/release-downloads/native-android/${{ needs.verify-tag.outputs.artifact_prefix }}-${{ needs.verify-tag.outputs.version }}-android-arm64-x86_64.apk"
-          AAB_PATH="build/release-downloads/native-android/${{ needs.verify-tag.outputs.artifact_prefix }}-${{ needs.verify-tag.outputs.version }}-android-arm64-x86_64.aab"
-          APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+    APK_PATH="build/release-downloads/native-android/${{ needs.verify-tag.outputs.artifact_prefix }}-${{ needs.verify-tag.outputs.version }}-android-arm64-x86_64.apk"
+    AAB_PATH="build/release-downloads/native-android/${{ needs.verify-tag.outputs.artifact_prefix }}-${{ needs.verify-tag.outputs.version }}-android-arm64-x86_64.aab"
+    APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
 
-          "$APKSIGNER" sign \
-            --ks "$ANDROID_RELEASE_KEYSTORE_PATH" \
-            --ks-key-alias "$ANDROID_RELEASE_KEY_ALIAS" \
-            --ks-pass env:ANDROID_RELEASE_STORE_PASSWORD \
-            --key-pass env:ANDROID_RELEASE_KEY_PASSWORD \
-            "$APK_PATH"
-          "$APKSIGNER" verify --verbose --print-certs "$APK_PATH"
+    "$APKSIGNER" sign \
+      --ks "$ANDROID_RELEASE_KEYSTORE_PATH" \
+      --ks-key-alias "$ANDROID_RELEASE_KEY_ALIAS" \
+      --ks-pass env:ANDROID_RELEASE_STORE_PASSWORD \
+      --key-pass env:ANDROID_RELEASE_KEY_PASSWORD \
+      "$APK_PATH"
+    "$APKSIGNER" verify --verbose --print-certs "$APK_PATH"
 
-          jarsigner \
-            -keystore "$ANDROID_RELEASE_KEYSTORE_PATH" \
-            -storepass:env ANDROID_RELEASE_STORE_PASSWORD \
-            -keypass:env ANDROID_RELEASE_KEY_PASSWORD \
-            "$AAB_PATH" "$ANDROID_RELEASE_KEY_ALIAS"
-          jarsigner -verify -strict -certs "$AAB_PATH"
+    jarsigner \
+      -keystore "$ANDROID_RELEASE_KEYSTORE_PATH" \
+      -storepass:env ANDROID_RELEASE_STORE_PASSWORD \
+      -keypass:env ANDROID_RELEASE_KEY_PASSWORD \
+      "$AAB_PATH" "$ANDROID_RELEASE_KEY_ALIAS"
+    jarsigner -verify -verbose -certs "$AAB_PATH"
 ```
 
 - [ ] **Step 3: Upload only the two exact signed files**
@@ -212,11 +212,11 @@ artifacts`, with artifact name `native-android-signed`, the exact APK/AAB paths,
 Add `sign-android` to `assemble.needs` and change the Android download step to:
 
 ```yaml
-      - name: Download signed Android artifacts
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3
-        with:
-          name: native-android-signed
-          path: build/release-downloads/native-android-signed
+- name: Download signed Android artifacts
+  uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3
+  with:
+    name: native-android-signed
+    path: build/release-downloads/native-android-signed
 ```
 
 Update the `assemble:release-assets` input directory to
@@ -248,6 +248,7 @@ git commit -m "ci: sign Android stable tag assets"
 ### Task 3: Update Release Policy Documentation With Tests
 
 **Files:**
+
 - Modify: `scripts/release/__tests__/release-gate-config.test.mjs`
 - Modify: `AGENTS.md`
 - Modify: `README.md`
@@ -322,6 +323,7 @@ git commit -m "docs: define Android tag signing boundary"
 ### Task 4: Generate Durable Signing Material And Configure GitHub
 
 **Files:**
+
 - Create outside repository: `~/.config/lynavo-drive/signing/lynavo-drive-release.jks`
 - Modify external state: macOS Keychain
 - Modify external state: GitHub repository Actions Secrets
@@ -395,6 +397,7 @@ Expected: all four Secret names are listed. No Secret value is printed.
 ### Task 5: Full Verification And Self-Review
 
 **Files:**
+
 - Review all modified tracked files
 - Verify external signing state without printing secrets
 

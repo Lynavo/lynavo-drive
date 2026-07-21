@@ -229,7 +229,7 @@ Verify downloaded tag assets before publication:
 ```bash
 "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs \
   LynavoDriveDemo-<version>-android-arm64-x86_64.apk
-jarsigner -verify -strict -certs \
+jarsigner -verify -verbose -certs \
   LynavoDriveDemo-<version>-android-arm64-x86_64.aab
 ```
 

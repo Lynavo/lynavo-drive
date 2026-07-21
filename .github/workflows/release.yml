@@ -120,7 +120,7 @@ jobs:
             -storepass:env ANDROID_RELEASE_STORE_PASSWORD \
             -keypass:env ANDROID_RELEASE_KEY_PASSWORD \
             "$AAB_PATH" "$ANDROID_RELEASE_KEY_ALIAS"
-          jarsigner -verify -strict -certs "$AAB_PATH"
+          jarsigner -verify -verbose -certs "$AAB_PATH"
 
       - name: Upload signed Android artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

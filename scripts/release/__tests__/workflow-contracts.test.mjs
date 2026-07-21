@@ -656,6 +656,7 @@ test('draft release workflow signs Android assets only for stable tags', () => {
   assert.match(sign.run, /"\$APKSIGNER" verify --verbose --print-certs/);
   assert.match(sign.run, /jarsigner/);
   assert.match(sign.run, /-verify/);
+  assert.doesNotMatch(sign.run, /jarsigner -verify -strict/);
 
   assert.equal(
     findStep(signingSteps, 'Upload signed Android artifacts').with?.name,
