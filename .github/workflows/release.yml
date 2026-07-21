@@ -159,10 +159,22 @@ jobs:
           set -euo pipefail
 
           cat > "$RUNNER_TEMP/release-body.md" <<'EOF'
+          ## Choose an edition
+
+          ### Open Source Edition
+
           These files are unsigned OSS build-verification outputs, not an official signed
           distribution. macOS Gatekeeper, Windows SmartScreen, and Android sideloading
           controls may block installation or display warnings. Verify the matching entry
           in `SHA256SUMS` before testing an asset.
+
+          ### Official / Commercial Edition
+
+          For signed desktop installers, official mobile builds, and services available
+          for the selected plan, visit the [official download page](https://drive.lynavo.io/download.html).
+          Official binaries are built, hosted, licensed, and supported outside this
+          repository. Their version numbers may differ from this OSS tag, and they are not
+          included in the GitHub Release assets below.
           EOF
 
           if RELEASE_JSON="$(gh release view "$TAG" --json isDraft 2>/dev/null)"; then

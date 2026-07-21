@@ -170,12 +170,18 @@ asset.
 
 Release creation is draft-only. The job has read-only repository permissions
 until the final tag-gated release job, which receives `contents: write`. A new
-draft uses generated release notes and this warning:
+draft uses generated release notes and separates the two distribution channels:
 
-> These files are unsigned OSS build-verification outputs, not an official
-> signed distribution. macOS Gatekeeper, Windows SmartScreen, and Android
-> sideloading controls may block installation or display warnings. Verify the
-> matching entry in `SHA256SUMS` before testing an asset.
+1. **Open Source Edition**: the attached files remain unsigned OSS
+   build-verification outputs. The warning covers Gatekeeper, SmartScreen,
+   Android sideloading, and `SHA256SUMS` verification.
+2. **Official / Commercial Edition**: the release body links to
+   <https://drive.lynavo.io/download.html>. Official binaries and services are
+   built, hosted, licensed, and supported outside this repository; they are not
+   attached to the OSS GitHub Release and may use a different version number.
+
+The external link is informational only. The workflow does not download,
+build, sign, inspect, or upload any official/commercial package.
 
 An existing draft may be updated idempotently. A rerun for the same tag
 preserves its generated notes and replaces the seven allowlisted assets above
