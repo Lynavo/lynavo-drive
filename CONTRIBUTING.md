@@ -25,9 +25,12 @@ machines or GitHub-hosted Actions. Hosted jobs use public source, no repository
 secrets, and produce unsigned verification artifacts only. Linux build/package
 verification remains local-only.
 
-Third-party or external build services, code signing, notarization, store
-upload, auto-update, and private distribution infrastructure are not part of
-this OSS repository.
+Stable tags matching `vX.Y.Z` are the only exception: the release workflow may
+use repository Actions Secrets to sign Android APK/AAB assets after `Native
+Builds` completes. Contributors and pull requests do not need, receive, or
+access those Secrets. Third-party or external build services, desktop code
+signing, notarization, store upload, auto-update, and private distribution
+infrastructure are not part of this OSS repository.
 
 ## Pull Requests
 

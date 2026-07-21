@@ -95,7 +95,7 @@ GitHub Release assets remain open-source build-verification outputs only.
 > **Not Included In This Repository**
 >
 > - Remote access, cloud relay, tunnel credentials, official accounts, and silent background continuation are unavailable and remain disabled.
-> - Official signing, notarization, mobile store distribution, package upload, and auto-update infrastructure are not provided.
+> - Desktop signing, notarization, mobile store distribution, package upload, and auto-update infrastructure are not provided; only stable-tag Android APK/AAB assets use repository signing Secrets.
 > - The source package does not redistribute Apple Bonjour for Windows. It uses a locally installed/configured Bonjour runtime when available, otherwise the zeroconf-compatible fallback.
 > - Linux remains a local build and package-verification target, not a supported desktop user surface.
 
@@ -296,8 +296,8 @@ pnpm check
 ### 📦 OSS Build & Package Verification
 
 This OSS repository keeps contributor-local source-build paths and
-GitHub-hosted, secret-free unsigned build/package verification. Hosted outputs
-are verification artifacts, not official signed distributions. Linux remains
+GitHub-hosted, secret-free unsigned build/package verification. `Native Builds`
+outputs are verification artifacts, not signed distributions. Linux remains
 local verification only and is not a supported desktop user surface.
 
 <details>
@@ -330,17 +330,19 @@ pnpm --filter @lynavo-drive/desktop package:linux -- --arch=arm64
 `release` profiles only inject `LYNAVO_RELEASE_CHANNEL` and local build
 configuration, and only select local build/package commands.
 
-GitHub-hosted workflows may invoke these commands using public source and no
-repository secrets. Third-party or external build services, code signing,
-notarization, store upload, auto-update, and private distribution infrastructure
-remain outside this OSS baseline.
+GitHub-hosted verification workflows may invoke these commands using public
+source and no repository secrets. Third-party or external build services,
+desktop code signing, notarization, store upload, auto-update, and private
+distribution infrastructure remain outside this OSS baseline.
 
 The `OSS Draft Release` workflow accepts stable tags matching `vX.Y.Z`, rebuilds
 the complete verification set from that tagged commit, and creates or updates a
-draft GitHub Release. Manual dispatch is build-only. Release files are unsigned
-OSS build-verification outputs and include SHA-256 checksums; see the
-[release playbook](./docs/release/release-playbook.md) for the exact asset list,
-warnings, and maintainer procedure.
+draft GitHub Release. Manual dispatch is build-only and remains secret-free.
+Stable tags are the only path that uses repository Actions Secrets to create
+signed Android APK/AAB assets; desktop release files remain unsigned OSS
+build-verification outputs. All assets include SHA-256 checksums. See the
+[release playbook](./docs/release/release-playbook.md) for signing setup, the
+exact asset list, warnings, and the maintainer procedure.
 
 ### 📁 Project Structure
 

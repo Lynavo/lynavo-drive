@@ -48,6 +48,7 @@ AuthKey_*.p8
 .antigravitycli/
 .agent/
 .superpowers/
+.worktrees/
 
 
 # Locale resource files must remain trackable even if a developer has a broad
