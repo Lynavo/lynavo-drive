@@ -28,8 +28,12 @@ data class AndroidMediaAsset(
 )
 
 class AndroidMediaStoreRepository(private val context: Context) {
-  fun scanAssets(clientId: String): List<AndroidUploadItem> =
-    queryAssets(mediaFilter = "all", collectionId = null)
+  fun scanAssets(clientId: String, addedAfterEpochSeconds: Long? = null): List<AndroidUploadItem> =
+    queryAssets(
+      mediaFilter = "all",
+      collectionId = null,
+      addedAfterEpochSeconds = addedAfterEpochSeconds,
+    )
       .map { asset -> asset.toUploadItem(clientId = clientId, source = "auto", batchId = null) }
 
   fun findAssetsByIds(assetLocalIds: List<String>, clientId: String, source: String, batchId: String): List<AndroidUploadItem> {
@@ -160,23 +164,35 @@ class AndroidMediaStoreRepository(private val context: Context) {
     return null
   }
 
-  private fun queryAssets(mediaFilter: String, collectionId: String?): List<AndroidMediaAsset> {
+  private fun queryAssets(
+    mediaFilter: String,
+    collectionId: String?,
+    addedAfterEpochSeconds: Long? = null,
+  ): List<AndroidMediaAsset> {
     val collections = when (mediaFilter) {
       "photos", "image", "images" -> listOf(MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
       "videos", "video" -> listOf(MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
       else -> listOf(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
     }
-    return collections.flatMap { uri -> queryCollection(uri, collectionId) }
+    return collections.flatMap { uri -> queryCollection(uri, collectionId, addedAfterEpochSeconds) }
       .sortedByDescending { it.createdAt }
   }
 
-  private fun queryCollection(collectionUri: Uri, collectionId: String?): List<AndroidMediaAsset> {
+  private fun queryCollection(
+    collectionUri: Uri,
+    collectionId: String?,
+    addedAfterEpochSeconds: Long?,
+  ): List<AndroidMediaAsset> {
     val projection = assetProjection()
     val selectionParts = mutableListOf<String>()
     val selectionArgs = mutableListOf<String>()
     if (!collectionId.isNullOrBlank()) {
       selectionParts.add("${MediaStore.MediaColumns.BUCKET_ID}=?")
       selectionArgs.add(collectionId)
+    }
+    if (addedAfterEpochSeconds != null) {
+      selectionParts.add("${MediaStore.MediaColumns.DATE_ADDED}>=?")
+      selectionArgs.add(addedAfterEpochSeconds.toString())
     }
     val selection = selectionParts.takeIf { it.isNotEmpty() }?.joinToString(" AND ")
     val sortOrder = "${MediaStore.MediaColumns.DATE_ADDED} DESC"

@@ -10,6 +10,83 @@ import org.junit.Test
 
 class AndroidSyncPrimitivesTest {
   @Test
+  fun fromNowAutoUploadUsesPersistedRangeStartAsScanThreshold() {
+    val threshold = AndroidSyncPrimitives.autoUploadScanThresholdEpochSeconds(
+      timeRangeMode = "from_now",
+      customTimeFrom = null,
+      rangeStartAt = "2026-07-22T04:05:06.789Z",
+      nowEpochMillis = 0,
+      timeZoneId = "UTC",
+    )
+
+    assertEquals(1_784_693_106L, threshold)
+  }
+
+  @Test
+  fun customAutoUploadParsesJavaScriptFractionalTimestampAsScanThreshold() {
+    val threshold = AndroidSyncPrimitives.autoUploadScanThresholdEpochSeconds(
+      timeRangeMode = "custom",
+      customTimeFrom = "2026-06-16T03:04:05.000Z",
+      rangeStartAt = null,
+      nowEpochMillis = 0,
+      timeZoneId = "UTC",
+    )
+
+    assertEquals(1_781_579_045L, threshold)
+  }
+
+  @Test
+  fun fromTodayAutoUploadUsesStartOfLocalDayAsScanThreshold() {
+    val threshold = AndroidSyncPrimitives.autoUploadScanThresholdEpochSeconds(
+      timeRangeMode = "from_today",
+      customTimeFrom = null,
+      rangeStartAt = null,
+      nowEpochMillis = 1_784_693_106_000L,
+      timeZoneId = "Asia/Taipei",
+    )
+
+    assertEquals(1_784_649_600L, threshold)
+  }
+
+  @Test
+  fun allAutoUploadDoesNotApplyScanThreshold() {
+    assertNull(
+      AndroidSyncPrimitives.autoUploadScanThresholdEpochSeconds(
+        timeRangeMode = "all",
+        customTimeFrom = null,
+        rangeStartAt = null,
+        nowEpochMillis = 0,
+        timeZoneId = "UTC",
+      ),
+    )
+  }
+
+  @Test
+  fun activeAutoUploadRescansWhenHostReturnsToForeground() {
+    assertTrue(
+      AndroidSyncPrimitives.shouldRescanAutoUploadOnHostResume(
+        wasVisible = false,
+        enabled = true,
+        state = "active",
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldRescanAutoUploadOnHostResume(
+        wasVisible = true,
+        enabled = true,
+        state = "active",
+      ),
+    )
+    assertFalse(
+      AndroidSyncPrimitives.shouldRescanAutoUploadOnHostResume(
+        wasVisible = false,
+        enabled = true,
+        state = "interrupted",
+      ),
+    )
+  }
+
+  @Test
   fun publicDownloadResultKeepsSavedLocationWhenContentUriIsHidden() {
     val result = AndroidSyncPrimitives.publicDownloadResult(
       exposeContentUri = false,

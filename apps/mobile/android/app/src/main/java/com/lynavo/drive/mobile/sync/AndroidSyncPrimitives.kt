@@ -4,6 +4,7 @@ import java.io.BufferedOutputStream
 import java.io.File
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
 import java.util.zip.ZipEntry
@@ -398,6 +399,35 @@ object AndroidSyncPrimitives {
     nextEnabled &&
       nextState == "active" &&
       (!previousEnabled || previousState != "active")
+
+  fun shouldRescanAutoUploadOnHostResume(
+    wasVisible: Boolean,
+    enabled: Boolean,
+    state: String,
+  ): Boolean = !wasVisible && enabled && state == "active"
+
+  fun autoUploadScanThresholdEpochSeconds(
+    timeRangeMode: String,
+    customTimeFrom: String?,
+    rangeStartAt: String?,
+    nowEpochMillis: Long,
+    timeZoneId: String,
+  ): Long? {
+    val thresholdMillis = when (timeRangeMode) {
+      "from_now" -> rangeStartAt?.let(::parseIsoInstantMillis)
+      "from_today" -> Calendar.getInstance(TimeZone.getTimeZone(timeZoneId)).run {
+        timeInMillis = nowEpochMillis
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+        timeInMillis
+      }
+      "custom" -> customTimeFrom?.let(::parseIsoInstantMillis)
+      else -> null
+    }
+    return thresholdMillis?.let { Math.floorDiv(it, 1_000L) }
+  }
 
   fun shouldContinueAutoUploadRound(
     roundReason: String,
