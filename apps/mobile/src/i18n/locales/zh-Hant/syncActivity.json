@@ -201,7 +201,7 @@
     "selectedCountLabel": "{{count}} 個項目",
     "removeFileLabel": "移除 {{name}}",
     "enableSwitchTitle": "自動上傳開關",
-    "enableSwitchDescOn": "已開啟，會按同步範圍自動同步相簿新增素材",
+    "enableSwitchDescOn": "已開啟，會自動同步相簿內容",
     "enableSwitchDescOff": "已關閉，不會自動同步相簿新增素材",
     "sourcesTitle": "同步來源",
     "albumTitle": "照片和影片",

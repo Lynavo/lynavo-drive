@@ -1,12 +1,6 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
-import {
-  Alert,
-  Platform,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-} from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import {
   disableAutoUpload,
   enableAutoUpload,
@@ -18,7 +12,6 @@ import {
 const mockGoBack = jest.fn();
 const mockDispatch = jest.fn();
 const mockCanGoBack = jest.fn();
-const originalPlatformOS = Platform.OS;
 
 jest.mock('@react-navigation/native', () => ({
   CommonActions: {
@@ -30,8 +23,6 @@ jest.mock('@react-navigation/native', () => ({
     canGoBack: mockCanGoBack,
   }),
 }));
-
-jest.mock('@react-native-community/datetimepicker', () => 'DateTimePicker');
 
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
@@ -54,12 +45,9 @@ jest.mock('lucide-react-native', () => {
         ...props,
       });
   return {
-    Calendar: createIcon('mock-calendar-icon'),
     Check: createIcon('mock-check-icon'),
     ChevronLeft: createIcon('mock-chevron-left-icon'),
-    Clock: createIcon('mock-clock-icon'),
     CloudDownload: createIcon('mock-cloud-download-icon'),
-    Folder: createIcon('mock-folder-icon'),
     Image: createIcon('mock-image-icon'),
     ShieldCheck: createIcon('mock-shield-check-icon'),
   };
@@ -88,24 +76,14 @@ jest.mock('react-i18next', () => ({
         'syncActivity.autoUploadSettings.enableSwitchTitle':
           'Auto Upload Switch',
         'syncActivity.autoUploadSettings.enableSwitchDescOn':
-          'Enabled. New album media will sync automatically based on sync range',
+          'Enabled. Album content will sync automatically',
         'syncActivity.autoUploadSettings.enableSwitchDescOff':
           'Disabled. New album media will not sync automatically',
         'syncActivity.autoUploadSettings.sourcesTitle': 'Sync Sources',
         'syncActivity.autoUploadSettings.albumTitle': 'Photos and Videos',
         'syncActivity.autoUploadSettings.albumDesc':
           'Sync media content from system album',
-        'syncActivity.autoUploadSettings.rangeTitle': 'Sync Range',
         'syncActivity.autoUploadSettings.rangeAllTitle': 'All Content',
-        'syncActivity.autoUploadSettings.rangeAllDesc':
-          'Sync existing photos and videos',
-        'syncActivity.autoUploadSettings.rangeNowTitle': 'From Now On',
-        'syncActivity.autoUploadSettings.rangeNowDesc':
-          'Only sync newly added content from now on',
-        'syncActivity.autoUploadSettings.rangeCustomTitle': 'CustomTime',
-        'syncActivity.autoUploadSettings.rangeCustomDesc':
-          'Sync from the specified start time',
-        'syncActivity.autoUploadSettings.customPickerSave': 'Save',
         'syncActivity.autoUploadSettings.infoAlbum':
           'Album photos and videos will sync to your computer.',
         'syncActivity.autoUploadSettings.infoAutoOff':
@@ -118,7 +96,6 @@ jest.mock('react-i18next', () => ({
         'syncActivity.dialogs.enableAutoFailed.body':
           'Could not enable auto upload. Please try again later',
         'common.back': 'Back',
-        'common.cancel': 'Cancel',
         'common.notApplicable': 'N/A',
       };
       return copy[key] ?? '';
@@ -174,10 +151,6 @@ describe('AutoUploadSettingsScreen', () => {
   });
 
   afterEach(() => {
-    Object.defineProperty(Platform, 'OS', {
-      configurable: true,
-      value: originalPlatformOS,
-    });
     jest.restoreAllMocks();
   });
 
@@ -188,15 +161,18 @@ describe('AutoUploadSettingsScreen', () => {
     expect(textValues).toContain('Sync Plan');
     expect(textValues).toContain('Auto Upload Switch');
     expect(textValues).toContain(
+      'Enabled. Album content will sync automatically',
+    );
+    expect(textValues).toContain(
       'Album photos and videos will sync to your computer.',
     );
     expect(textValues).toContain('Sync Sources');
     expect(textValues).toContain('Photos and Videos');
     expect(textValues).toContain('Sync media content from system album');
-    expect(textValues).toContain('Sync Range');
-    expect(textValues).toContain('Sync existing photos and videos');
-    expect(textValues).toContain('Only sync newly added content from now on');
-    expect(textValues).toContain('CustomTime');
+    expect(textValues).toContain('All Content');
+    expect(textValues).not.toContain('Sync Range');
+    expect(textValues).not.toContain('From Now On');
+    expect(textValues).not.toContain('CustomTime');
     expect(textValues).not.toContain('Specified Files');
     expect(textValues).not.toContain(
       'Select content to sync from system files',
@@ -211,6 +187,15 @@ describe('AutoUploadSettingsScreen', () => {
     ).toHaveLength(0);
     expect(
       tree.root.findAllByProps({ testID: 'auto-upload-source-file-icon' }),
+    ).toHaveLength(0);
+    expect(
+      tree.root.findAllByProps({ testID: 'auto-upload-range-all' }),
+    ).toHaveLength(0);
+    expect(
+      tree.root.findAllByProps({ testID: 'auto-upload-range-now' }),
+    ).toHaveLength(0);
+    expect(
+      tree.root.findAllByProps({ testID: 'auto-upload-range-custom' }),
     ).toHaveLength(0);
   });
 
@@ -227,7 +212,7 @@ describe('AutoUploadSettingsScreen', () => {
     expect(getAutoUploadSwitch(tree).props.value).toBe(true);
   });
 
-  it('hides source and range controls when the auto upload switch is off', async () => {
+  it('hides source controls when the auto upload switch is off', async () => {
     const tree = await renderScreen();
 
     await ReactTestRenderer.act(async () => {
@@ -238,30 +223,21 @@ describe('AutoUploadSettingsScreen', () => {
     expect(
       tree.root.findAllByProps({ testID: 'auto-upload-source-album' }),
     ).toHaveLength(0);
-    expect(
-      tree.root.findAllByProps({ testID: 'auto-upload-range-all' }),
-    ).toHaveLength(0);
     expect(getTextValues(tree)).toContain(
       'After auto upload is disabled, newly added media will not sync.',
     );
   });
 
-  it('uses reference-style source and range icons without file-source icons', async () => {
+  it('uses the reference-style source icon without file-source icons', async () => {
     const tree = await renderScreen();
     const albumIcon = tree.root.findByProps({
       testID: 'auto-upload-source-album-icon',
     });
-    const rangeAllIcon = tree.root.findByProps({
-      testID: 'auto-upload-range-all-icon',
-    });
-
     expect(
       tree.root.findByProps({ testID: 'auto-upload-plan-icon' }),
     ).toBeTruthy();
     expect(albumIcon.props.size).toBe(20);
     expect(albumIcon.props.color).toBe('#fff');
-    expect(rangeAllIcon.props.size).toBe(18);
-    expect(rangeAllIcon.props.color).toBe('#fff');
     expect(
       tree.root.findAllByProps({ testID: 'auto-upload-source-file-icon' }),
     ).toHaveLength(0);
@@ -278,12 +254,6 @@ describe('AutoUploadSettingsScreen', () => {
     const albumIcon = tree.root.findByProps({
       testID: 'auto-upload-source-album-icon',
     });
-    const rangeAllIcon = tree.root.findByProps({
-      testID: 'auto-upload-range-all-icon',
-    });
-    const rangeCustomSelectionBox = tree.root.findByProps({
-      testID: 'auto-upload-range-custom-check-icon-box',
-    });
 
     expect(StyleSheet.flatten(titleNode?.props.style)).toMatchObject({
       fontSize: 17,
@@ -295,20 +265,6 @@ describe('AutoUploadSettingsScreen', () => {
       width: 44,
       height: 44,
       borderRadius: 13,
-    });
-    expect(StyleSheet.flatten(rangeAllIcon.parent?.props.style)).toMatchObject({
-      width: 40,
-      height: 40,
-      borderRadius: 12,
-    });
-    expect(
-      StyleSheet.flatten(rangeCustomSelectionBox.props.style),
-    ).toMatchObject({
-      width: 24,
-      height: 24,
-      borderRadius: 8,
-      borderColor: '#C9D6E4',
-      backgroundColor: 'rgba(255,255,255,0.72)',
     });
   });
 
@@ -358,15 +314,11 @@ describe('AutoUploadSettingsScreen', () => {
       tree.root.findByProps({ testID: 'auto-upload-source-album' }).props
         .accessibilityState,
     ).toMatchObject({ selected: true });
-    expect(
-      tree.root.findByProps({ testID: 'auto-upload-range-custom' }).props
-        .accessibilityState,
-    ).toMatchObject({ selected: true });
     expect(mockedPrepareAutoUploadEnable).toHaveBeenCalledTimes(1);
     expect(mockedSaveAutoUploadConfig).toHaveBeenCalledWith({
       enabled: true,
-      timeRangeMode: 'custom',
-      customTimeFrom: '2026-06-16T03:04:05.000Z',
+      timeRangeMode: 'all',
+      customTimeFrom: undefined,
     });
     expect(mockedEnableAutoUpload).toHaveBeenCalledWith({
       skipPermissionPreflight: true,
@@ -390,146 +342,6 @@ describe('AutoUploadSettingsScreen', () => {
 
     expect(mockedPrepareAutoUploadEnable).not.toHaveBeenCalled();
     expect(mockedSaveAutoUploadConfig).not.toHaveBeenCalled();
-    expect(mockedEnableAutoUpload).not.toHaveBeenCalled();
-  });
-
-  it('opens the custom range picker UI when custom range is selected', async () => {
-    const tree = await renderScreen();
-
-    ReactTestRenderer.act(() => {
-      tree.root
-        .findByProps({ testID: 'auto-upload-range-custom' })
-        .props.onPress();
-    });
-
-    expect(
-      tree.root.findByProps({
-        testID: 'auto-upload-range-custom',
-      }).props.accessibilityState,
-    ).toMatchObject({ selected: true });
-    expect(getTextValues(tree)).toContain('Save');
-    expect(
-      tree.root.findAllByType(
-        'DateTimePicker' as unknown as React.ComponentType,
-      ),
-    ).toHaveLength(1);
-  });
-
-  it('starts Android custom time selection with the supported date picker mode', async () => {
-    Object.defineProperty(Platform, 'OS', {
-      configurable: true,
-      value: 'android',
-    });
-    const tree = await renderScreen();
-
-    ReactTestRenderer.act(() => {
-      tree.root
-        .findByProps({ testID: 'auto-upload-range-custom' })
-        .props.onPress();
-    });
-
-    const picker = tree.root.findByType(
-      'DateTimePicker' as unknown as React.ComponentType,
-    );
-    expect(picker.props.mode).toBe('date');
-  });
-
-  it('continues Android custom time selection with a time picker after the date is set', async () => {
-    Object.defineProperty(Platform, 'OS', {
-      configurable: true,
-      value: 'android',
-    });
-    const tree = await renderScreen();
-
-    ReactTestRenderer.act(() => {
-      tree.root
-        .findByProps({ testID: 'auto-upload-range-custom' })
-        .props.onPress();
-    });
-    ReactTestRenderer.act(() => {
-      tree.root
-        .findByType('DateTimePicker' as unknown as React.ComponentType)
-        .props.onChange({ type: 'set' }, new Date('2026-07-20T03:04:00.000Z'));
-    });
-
-    const picker = tree.root.findByType(
-      'DateTimePicker' as unknown as React.ComponentType,
-    );
-    expect(picker.props.mode).toBe('time');
-  });
-
-  it('persists the combined Android custom date and time selection', async () => {
-    Object.defineProperty(Platform, 'OS', {
-      configurable: true,
-      value: 'android',
-    });
-    const initialDate = new Date('2026-06-16T03:04:05.000Z');
-    const selectedDate = new Date(2026, 6, 20, 0, 0, 0, 0);
-    const selectedTime = new Date(2026, 0, 1, 14, 45, 0, 0);
-    const expectedDate = new Date(initialDate);
-    expectedDate.setFullYear(
-      selectedDate.getFullYear(),
-      selectedDate.getMonth(),
-      selectedDate.getDate(),
-    );
-    expectedDate.setHours(
-      selectedTime.getHours(),
-      selectedTime.getMinutes(),
-      0,
-      0,
-    );
-    mockedGetAutoUploadConfig.mockResolvedValueOnce({
-      enabled: true,
-      timeRangeMode: 'custom',
-      customTimeFrom: initialDate.toISOString(),
-      state: 'active',
-    });
-    const tree = await renderScreen();
-
-    ReactTestRenderer.act(() => {
-      tree.root
-        .findByProps({ testID: 'auto-upload-range-custom' })
-        .props.onPress();
-    });
-    ReactTestRenderer.act(() => {
-      tree.root
-        .findByType('DateTimePicker' as unknown as React.ComponentType)
-        .props.onChange({ type: 'set' }, selectedDate);
-    });
-    await ReactTestRenderer.act(async () => {
-      tree.root
-        .findByType('DateTimePicker' as unknown as React.ComponentType)
-        .props.onChange({ type: 'set' }, selectedTime);
-      await Promise.resolve();
-    });
-
-    expect(
-      tree.root.findAllByType(
-        'DateTimePicker' as unknown as React.ComponentType,
-      ),
-    ).toHaveLength(0);
-    expect(mockedSaveAutoUploadConfig).toHaveBeenCalledWith({
-      enabled: true,
-      timeRangeMode: 'custom',
-      customTimeFrom: expectedDate.toISOString(),
-    });
-  });
-
-  it('saves range changes immediately while auto upload is enabled', async () => {
-    const tree = await renderScreen();
-
-    await ReactTestRenderer.act(async () => {
-      await tree.root
-        .findByProps({ testID: 'auto-upload-range-now' })
-        .props.onPress();
-    });
-
-    expect(mockedSaveAutoUploadConfig).toHaveBeenCalledWith({
-      enabled: true,
-      timeRangeMode: 'from_now',
-      customTimeFrom: undefined,
-    });
-    expect(mockedPrepareAutoUploadEnable).not.toHaveBeenCalled();
     expect(mockedEnableAutoUpload).not.toHaveBeenCalled();
   });
 
@@ -579,7 +391,7 @@ describe('AutoUploadSettingsScreen', () => {
     expect(mockedPrepareAutoUploadEnable).toHaveBeenCalledTimes(1);
     expect(mockedSaveAutoUploadConfig).toHaveBeenCalledWith({
       enabled: true,
-      timeRangeMode: 'from_now',
+      timeRangeMode: 'all',
       customTimeFrom: undefined,
     });
     expect(mockedEnableAutoUpload).toHaveBeenCalledTimes(1);
@@ -614,7 +426,7 @@ describe('AutoUploadSettingsScreen', () => {
     expect(mockedEnableAutoUpload).not.toHaveBeenCalled();
   });
 
-  it('preserves hydrated from_today mode when the range is not edited', async () => {
+  it('normalizes a hydrated from_today mode when enabling auto upload', async () => {
     mockedGetAutoUploadConfig.mockResolvedValueOnce({
       enabled: false,
       timeRangeMode: 'from_today',
@@ -628,7 +440,7 @@ describe('AutoUploadSettingsScreen', () => {
 
     expect(mockedSaveAutoUploadConfig).toHaveBeenCalledWith({
       enabled: true,
-      timeRangeMode: 'from_today',
+      timeRangeMode: 'all',
       customTimeFrom: undefined,
     });
     expect(mockedEnableAutoUpload).toHaveBeenCalledWith({
