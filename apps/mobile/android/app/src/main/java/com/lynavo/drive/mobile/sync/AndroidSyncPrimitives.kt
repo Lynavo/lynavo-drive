@@ -179,6 +179,11 @@ data class AndroidForegroundLanRuntimeDecision(
   val reason: String?,
 )
 
+data class AndroidMediaStoreTimeFilter(
+  val selection: String,
+  val selectionArg: String,
+)
+
 object AndroidSyncPrimitives {
   fun publicDownloadResult(
     exposeContentUri: Boolean,
@@ -406,7 +411,7 @@ object AndroidSyncPrimitives {
     state: String,
   ): Boolean = !wasVisible && enabled && state == "active"
 
-  fun autoUploadScanThresholdEpochSeconds(
+  fun autoUploadScanThresholdEpochMillis(
     timeRangeMode: String,
     customTimeFrom: String?,
     rangeStartAt: String?,
@@ -426,7 +431,16 @@ object AndroidSyncPrimitives {
       "custom" -> customTimeFrom?.let(::parseIsoInstantMillis)
       else -> null
     }
-    return thresholdMillis?.let { Math.floorDiv(it, 1_000L) }
+    return thresholdMillis
+  }
+
+  fun autoUploadCreationTimeFilter(
+    thresholdEpochMillis: Long?,
+  ): AndroidMediaStoreTimeFilter? = thresholdEpochMillis?.let {
+    AndroidMediaStoreTimeFilter(
+      selection = "datetaken>=?",
+      selectionArg = it.toString(),
+    )
   }
 
   fun shouldContinueAutoUploadRound(

@@ -1891,7 +1891,7 @@ class NativeSyncEngineModule(
         config = config.copy(rangeStartAt = isoNow())
         saveAutoUploadConfig(config)
       }
-      val scanThresholdEpochSeconds = AndroidSyncPrimitives.autoUploadScanThresholdEpochSeconds(
+      val scanThresholdEpochMillis = AndroidSyncPrimitives.autoUploadScanThresholdEpochMillis(
         timeRangeMode = config.timeRangeMode,
         customTimeFrom = config.customTimeFrom,
         rangeStartAt = config.rangeStartAt,
@@ -1901,7 +1901,7 @@ class NativeSyncEngineModule(
       recordDiagnosticsLog(
         "Sync",
         "round requested reason=$reason autoEnabled=${config.enabled} autoState=${config.state} " +
-          "timeRangeMode=${config.timeRangeMode} scanThresholdEpochSeconds=$scanThresholdEpochSeconds",
+          "timeRangeMode=${config.timeRangeMode} scanThresholdEpochMillis=$scanThresholdEpochMillis",
       )
       val roundStartRuntimeDecision = currentForegroundLanRuntimeDecision()
       if (!roundStartRuntimeDecision.canContinue) {
@@ -1922,7 +1922,7 @@ class NativeSyncEngineModule(
       val existingAssetIds = existing
         .filter { it.status in ACTIVE_UPLOAD_STATUSES }
         .mapTo(mutableSetOf()) { it.assetLocalId }
-      val discovered = mediaStoreRepository.scanAssets(clientId, scanThresholdEpochSeconds)
+      val discovered = mediaStoreRepository.scanAssets(clientId, scanThresholdEpochMillis)
         .filter { it.assetLocalId !in existingAssetIds }
       if (discovered.isNotEmpty() && config.enabled) {
         uploadStore.upsertItems(discovered.map { it.copy(source = "auto", status = "queued", updatedAt = isoNow()) })

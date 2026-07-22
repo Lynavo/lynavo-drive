@@ -10,8 +10,8 @@ import org.junit.Test
 
 class AndroidSyncPrimitivesTest {
   @Test
-  fun fromNowAutoUploadUsesPersistedRangeStartAsScanThreshold() {
-    val threshold = AndroidSyncPrimitives.autoUploadScanThresholdEpochSeconds(
+  fun fromNowAutoUploadUsesPersistedRangeStartAsCreationTimeThreshold() {
+    val threshold = AndroidSyncPrimitives.autoUploadScanThresholdEpochMillis(
       timeRangeMode = "from_now",
       customTimeFrom = null,
       rangeStartAt = "2026-07-22T04:05:06.789Z",
@@ -19,12 +19,12 @@ class AndroidSyncPrimitivesTest {
       timeZoneId = "UTC",
     )
 
-    assertEquals(1_784_693_106L, threshold)
+    assertEquals(1_784_693_106_789L, threshold)
   }
 
   @Test
-  fun customAutoUploadParsesJavaScriptFractionalTimestampAsScanThreshold() {
-    val threshold = AndroidSyncPrimitives.autoUploadScanThresholdEpochSeconds(
+  fun customAutoUploadParsesJavaScriptFractionalTimestampAsCreationTimeThreshold() {
+    val threshold = AndroidSyncPrimitives.autoUploadScanThresholdEpochMillis(
       timeRangeMode = "custom",
       customTimeFrom = "2026-06-16T03:04:05.000Z",
       rangeStartAt = null,
@@ -32,12 +32,12 @@ class AndroidSyncPrimitivesTest {
       timeZoneId = "UTC",
     )
 
-    assertEquals(1_781_579_045L, threshold)
+    assertEquals(1_781_579_045_000L, threshold)
   }
 
   @Test
-  fun fromTodayAutoUploadUsesStartOfLocalDayAsScanThreshold() {
-    val threshold = AndroidSyncPrimitives.autoUploadScanThresholdEpochSeconds(
+  fun fromTodayAutoUploadUsesStartOfLocalDayAsCreationTimeThreshold() {
+    val threshold = AndroidSyncPrimitives.autoUploadScanThresholdEpochMillis(
       timeRangeMode = "from_today",
       customTimeFrom = null,
       rangeStartAt = null,
@@ -45,13 +45,13 @@ class AndroidSyncPrimitivesTest {
       timeZoneId = "Asia/Taipei",
     )
 
-    assertEquals(1_784_649_600L, threshold)
+    assertEquals(1_784_649_600_000L, threshold)
   }
 
   @Test
   fun allAutoUploadDoesNotApplyScanThreshold() {
     assertNull(
-      AndroidSyncPrimitives.autoUploadScanThresholdEpochSeconds(
+      AndroidSyncPrimitives.autoUploadScanThresholdEpochMillis(
         timeRangeMode = "all",
         customTimeFrom = null,
         rangeStartAt = null,
@@ -59,6 +59,16 @@ class AndroidSyncPrimitivesTest {
         timeZoneId = "UTC",
       ),
     )
+  }
+
+  @Test
+  fun autoUploadCreationTimeFilterUsesMediaCaptureTime() {
+    val filter = AndroidSyncPrimitives.autoUploadCreationTimeFilter(
+      thresholdEpochMillis = 1_784_693_106_789L,
+    )
+
+    assertEquals("datetaken>=?", filter?.selection)
+    assertEquals("1784693106789", filter?.selectionArg)
   }
 
   @Test

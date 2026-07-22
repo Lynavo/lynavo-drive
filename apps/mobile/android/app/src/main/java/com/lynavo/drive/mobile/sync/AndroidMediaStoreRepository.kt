@@ -28,11 +28,11 @@ data class AndroidMediaAsset(
 )
 
 class AndroidMediaStoreRepository(private val context: Context) {
-  fun scanAssets(clientId: String, addedAfterEpochSeconds: Long? = null): List<AndroidUploadItem> =
+  fun scanAssets(clientId: String, createdAfterEpochMillis: Long? = null): List<AndroidUploadItem> =
     queryAssets(
       mediaFilter = "all",
       collectionId = null,
-      addedAfterEpochSeconds = addedAfterEpochSeconds,
+      createdAfterEpochMillis = createdAfterEpochMillis,
     )
       .map { asset -> asset.toUploadItem(clientId = clientId, source = "auto", batchId = null) }
 
@@ -167,21 +167,21 @@ class AndroidMediaStoreRepository(private val context: Context) {
   private fun queryAssets(
     mediaFilter: String,
     collectionId: String?,
-    addedAfterEpochSeconds: Long? = null,
+    createdAfterEpochMillis: Long? = null,
   ): List<AndroidMediaAsset> {
     val collections = when (mediaFilter) {
       "photos", "image", "images" -> listOf(MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
       "videos", "video" -> listOf(MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
       else -> listOf(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
     }
-    return collections.flatMap { uri -> queryCollection(uri, collectionId, addedAfterEpochSeconds) }
+    return collections.flatMap { uri -> queryCollection(uri, collectionId, createdAfterEpochMillis) }
       .sortedByDescending { it.createdAt }
   }
 
   private fun queryCollection(
     collectionUri: Uri,
     collectionId: String?,
-    addedAfterEpochSeconds: Long?,
+    createdAfterEpochMillis: Long?,
   ): List<AndroidMediaAsset> {
     val projection = assetProjection()
     val selectionParts = mutableListOf<String>()
@@ -190,9 +190,10 @@ class AndroidMediaStoreRepository(private val context: Context) {
       selectionParts.add("${MediaStore.MediaColumns.BUCKET_ID}=?")
       selectionArgs.add(collectionId)
     }
-    if (addedAfterEpochSeconds != null) {
-      selectionParts.add("${MediaStore.MediaColumns.DATE_ADDED}>=?")
-      selectionArgs.add(addedAfterEpochSeconds.toString())
+    val creationTimeFilter = AndroidSyncPrimitives.autoUploadCreationTimeFilter(createdAfterEpochMillis)
+    if (creationTimeFilter != null) {
+      selectionParts.add(creationTimeFilter.selection)
+      selectionArgs.add(creationTimeFilter.selectionArg)
     }
     val selection = selectionParts.takeIf { it.isNotEmpty() }?.joinToString(" AND ")
     val sortOrder = "${MediaStore.MediaColumns.DATE_ADDED} DESC"
