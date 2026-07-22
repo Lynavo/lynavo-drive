@@ -114,6 +114,11 @@ data class AndroidSharedFilesRouteDecision(
   val port: Int,
 )
 
+data class AndroidPublicDownloadResult(
+  val localPath: String?,
+  val savedLocation: String,
+)
+
 data class AndroidPersonalAccessSignature(
   val signature: String,
   val timestamp: String,
@@ -174,6 +179,15 @@ data class AndroidForegroundLanRuntimeDecision(
 )
 
 object AndroidSyncPrimitives {
+  fun publicDownloadResult(
+    exposeContentUri: Boolean,
+    contentUri: String,
+    savedLocation: String,
+  ): AndroidPublicDownloadResult = AndroidPublicDownloadResult(
+    localPath = contentUri.takeIf { exposeContentUri },
+    savedLocation = savedLocation,
+  )
+
   fun mergeWakeCapability(
     newWake: AndroidWakeCapability?,
     existingWake: AndroidWakeCapability?,
