@@ -108,12 +108,19 @@ jobs:
           APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
 
           "$APKSIGNER" sign \
+            --v1-signing-enabled false \
+            --v2-signing-enabled true \
+            --v3-signing-enabled false \
+            --v4-signing-enabled false \
             --ks "$ANDROID_RELEASE_KEYSTORE_PATH" \
             --ks-key-alias "$ANDROID_RELEASE_KEY_ALIAS" \
             --ks-pass env:ANDROID_RELEASE_STORE_PASSWORD \
             --key-pass env:ANDROID_RELEASE_KEY_PASSWORD \
             "$APK_PATH"
-          "$APKSIGNER" verify --verbose --print-certs "$APK_PATH"
+          APK_VERIFY_OUTPUT="$("$APKSIGNER" verify --verbose --print-certs "$APK_PATH")"
+          printf '%s\n' "$APK_VERIFY_OUTPUT"
+          grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' <<< "$APK_VERIFY_OUTPUT"
+          grep -Fq 'Verified using v3 scheme (APK Signature Scheme v3): false' <<< "$APK_VERIFY_OUTPUT"
 
           jarsigner \
             -keystore "$ANDROID_RELEASE_KEYSTORE_PATH" \
