@@ -159,7 +159,18 @@ class NativeSyncEngineModule(
   }
 
   override fun onHostResume() {
+    val wasVisible = appVisible
     appVisible = true
+    val config = loadAutoUploadConfig()
+    if (
+      AndroidSyncPrimitives.shouldRescanAutoUploadOnHostResume(
+        wasVisible = wasVisible,
+        enabled = config.enabled,
+        state = config.state,
+      )
+    ) {
+      startAutoUploadSyncRound(reason = "foreground_resume")
+    }
   }
 
   override fun onHostPause() {
@@ -1090,6 +1101,11 @@ class NativeSyncEngineModule(
     val customTimeFrom = params.getStringOrNull("customTimeFrom")
       ?.takeIf { it.isNotBlank() }
       ?: currentConfig.customTimeFrom
+    val rangeStartAt = when {
+      timeRangeMode != "from_now" -> null
+      params.hasKey("timeRangeMode") -> isoNow()
+      else -> currentConfig.rangeStartAt ?: isoNow()
+    }
     val state = when {
       !enabled -> "disabled"
       currentConfig.state == "disabled" -> "active"
@@ -1101,6 +1117,7 @@ class NativeSyncEngineModule(
       state = state,
       timeRangeMode = timeRangeMode,
       customTimeFrom = customTimeFrom,
+      rangeStartAt = rangeStartAt,
     )
     val shouldStartRound = AndroidSyncPrimitives.shouldStartAutoUploadRound(
       previousEnabled = currentConfig.enabled,
@@ -1864,16 +1881,28 @@ class NativeSyncEngineModule(
         emitError("ANDROID_PHOTO_PERMISSION_DENIED", "Android photo permission is not enabled, so sync media cannot be scanned.")
         return
       }
-      val config = loadAutoUploadConfig()
-      recordDiagnosticsLog(
-        "Sync",
-        "round requested reason=$reason autoEnabled=${config.enabled} autoState=${config.state}",
-      )
+      var config = loadAutoUploadConfig()
       if (!config.enabled) {
         recordDiagnosticsLog("Sync", "round ignored reason=$reason auto upload disabled")
         emitIdleSyncState(binding)
         return
       }
+      if (config.timeRangeMode == "from_now" && config.rangeStartAt.isNullOrBlank()) {
+        config = config.copy(rangeStartAt = isoNow())
+        saveAutoUploadConfig(config)
+      }
+      val scanThresholdEpochMillis = AndroidSyncPrimitives.autoUploadScanThresholdEpochMillis(
+        timeRangeMode = config.timeRangeMode,
+        customTimeFrom = config.customTimeFrom,
+        rangeStartAt = config.rangeStartAt,
+        nowEpochMillis = System.currentTimeMillis(),
+        timeZoneId = TimeZone.getDefault().id,
+      )
+      recordDiagnosticsLog(
+        "Sync",
+        "round requested reason=$reason autoEnabled=${config.enabled} autoState=${config.state} " +
+          "timeRangeMode=${config.timeRangeMode} scanThresholdEpochMillis=$scanThresholdEpochMillis",
+      )
       val roundStartRuntimeDecision = currentForegroundLanRuntimeDecision()
       if (!roundStartRuntimeDecision.canContinue) {
         val stopReason = roundStartRuntimeDecision.reason ?: "foreground_lan_runtime_inactive"
@@ -1893,7 +1922,7 @@ class NativeSyncEngineModule(
       val existingAssetIds = existing
         .filter { it.status in ACTIVE_UPLOAD_STATUSES }
         .mapTo(mutableSetOf()) { it.assetLocalId }
-      val discovered = mediaStoreRepository.scanAssets(clientId)
+      val discovered = mediaStoreRepository.scanAssets(clientId, scanThresholdEpochMillis)
         .filter { it.assetLocalId !in existingAssetIds }
       if (discovered.isNotEmpty() && config.enabled) {
         uploadStore.upsertItems(discovered.map { it.copy(source = "auto", status = "queued", updatedAt = isoNow()) })
@@ -5346,6 +5375,8 @@ class NativeSyncEngineModule(
         ?: "all",
       customTimeFrom = prefs.getString(PREF_AUTO_UPLOAD_CUSTOM_TIME_FROM, null)
         ?.takeIf { it.isNotBlank() },
+      rangeStartAt = prefs.getString(PREF_AUTO_UPLOAD_RANGE_START_AT, null)
+        ?.takeIf { it.isNotBlank() },
     )
   }
 
@@ -5373,6 +5404,11 @@ class NativeSyncEngineModule(
       editor.remove(PREF_AUTO_UPLOAD_CUSTOM_TIME_FROM)
     } else {
       editor.putString(PREF_AUTO_UPLOAD_CUSTOM_TIME_FROM, config.customTimeFrom)
+    }
+    if (config.rangeStartAt.isNullOrBlank()) {
+      editor.remove(PREF_AUTO_UPLOAD_RANGE_START_AT)
+    } else {
+      editor.putString(PREF_AUTO_UPLOAD_RANGE_START_AT, config.rangeStartAt)
     }
     editor.apply()
   }
@@ -6416,6 +6452,7 @@ class NativeSyncEngineModule(
     val state: String,
     val timeRangeMode: String,
     val customTimeFrom: String?,
+    val rangeStartAt: String?,
   )
 
   private class NativeBridgeException(
@@ -6464,6 +6501,7 @@ class NativeSyncEngineModule(
     private const val PREF_AUTO_UPLOAD_STATE = "auto_upload_state"
     private const val PREF_AUTO_UPLOAD_TIME_RANGE_MODE = "auto_upload_time_range_mode"
     private const val PREF_AUTO_UPLOAD_CUSTOM_TIME_FROM = "auto_upload_custom_time_from"
+    private const val PREF_AUTO_UPLOAD_RANGE_START_AT = "auto_upload_range_start_at"
     /** Auth-layer EncryptedSharedPreferences file (react-native-keychain service).
      *  Mirror of the iOS Keychain service `com.lynavo.drive.auth`. */
     const val AUTH_KEYCHAIN_PREFS_NAME = "com.lynavo.drive.auth"

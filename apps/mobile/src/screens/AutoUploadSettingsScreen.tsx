@@ -11,28 +11,19 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Platform,
   Alert,
-  Modal,
   Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import {
-  Calendar,
   Check,
   ChevronLeft,
-  Clock,
   CloudDownload,
-  Folder,
   Image as ImageIcon,
   ShieldCheck,
 } from 'lucide-react-native';
-import DateTimePicker, {
-  DateTimePickerEvent,
-} from '@react-native-community/datetimepicker';
-import type { AutoUploadTimeRangeMode } from '@lynavo-drive/contracts';
 
 import { GradientBackground } from '../components/GradientBackground';
 import { androidBoxShadow } from '../utils/androidShadow';
@@ -44,33 +35,21 @@ import {
   saveAutoUploadConfig,
 } from '../services/SyncEngineModule';
 
-type AutoUploadRange = 'all' | 'now' | 'custom';
-type AndroidPickerMode = 'date' | 'time';
-
 const BLUE = '#1677D2';
 const DARK = '#17191C';
-const MUTED_ICON = '#7B8490';
 const FALLBACK_COPY = {
   title: 'Auto Upload',
   subtitle: 'Set up phone content sync to computer',
   planTitle: 'Sync Plan',
   enableSwitchTitle: 'Auto Upload Switch',
-  enableSwitchDescOn:
-    'Enabled. New album media will sync automatically based on sync range',
+  enableSwitchDescOn: 'Enabled. Album content will sync automatically',
   enableSwitchDescOff: 'Disabled. New album media will not sync automatically',
   sourcesTitle: 'Sync Sources',
   albumTitle: 'Photos and Videos',
   albumDesc: 'Sync media content from system album',
-  rangeTitle: 'Sync Range',
   rangeAllTitle: 'All Content',
-  rangeAllDesc: 'Sync existing photos and videos',
-  rangeNowTitle: 'From Now On',
-  rangeNowDesc: 'Only sync newly added content from now on',
-  rangeCustomTitle: 'Custom Time',
-  rangeCustomDesc: 'Sync from the specified start time',
   confirmEnable: 'Enable Auto Upload',
   confirmDisable: 'Disable Auto Upload',
-  customPickerSave: 'Save',
   infoAlbum: 'Album photos and videos will sync to your computer.',
   infoAutoOff:
     'After auto upload is disabled, newly added media will not sync.',
@@ -80,34 +59,6 @@ const FALLBACK_COPY = {
     'Failed to read auto upload settings. Please try again later.',
   disabledSuccess: 'Auto upload is disabled',
 };
-
-function toUploadRange(mode: AutoUploadTimeRangeMode): AutoUploadRange {
-  if (mode === 'custom') return 'custom';
-  if (mode === 'from_now' || mode === 'from_today') return 'now';
-  return 'all';
-}
-
-function toTimeRangeMode(range: AutoUploadRange): AutoUploadTimeRangeMode {
-  if (range === 'now') return 'from_now';
-  return range;
-}
-
-function resolveTimeRangeMode(
-  range: AutoUploadRange,
-  hydratedMode: AutoUploadTimeRangeMode,
-  rangeEdited: boolean,
-): AutoUploadTimeRangeMode {
-  if (!rangeEdited && hydratedMode === 'from_today' && range === 'now') {
-    return 'from_today';
-  }
-  return toTimeRangeMode(range);
-}
-
-function parseConfigDate(value?: string): Date | null {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
 
 export function AutoUploadSettingsScreen() {
   const navigation = useNavigation();
@@ -139,36 +90,15 @@ export function AutoUploadSettingsScreen() {
       albumDesc:
         t('syncActivity.autoUploadSettings.albumDesc') ||
         FALLBACK_COPY.albumDesc,
-      rangeTitle:
-        t('syncActivity.autoUploadSettings.rangeTitle') ||
-        FALLBACK_COPY.rangeTitle,
       rangeAllTitle:
         t('syncActivity.autoUploadSettings.rangeAllTitle') ||
         FALLBACK_COPY.rangeAllTitle,
-      rangeAllDesc:
-        t('syncActivity.autoUploadSettings.rangeAllDesc') ||
-        FALLBACK_COPY.rangeAllDesc,
-      rangeNowTitle:
-        t('syncActivity.autoUploadSettings.rangeNowTitle') ||
-        FALLBACK_COPY.rangeNowTitle,
-      rangeNowDesc:
-        t('syncActivity.autoUploadSettings.rangeNowDesc') ||
-        FALLBACK_COPY.rangeNowDesc,
-      rangeCustomTitle:
-        t('syncActivity.autoUploadSettings.rangeCustomTitle') ||
-        FALLBACK_COPY.rangeCustomTitle,
-      rangeCustomDesc:
-        t('syncActivity.autoUploadSettings.rangeCustomDesc') ||
-        FALLBACK_COPY.rangeCustomDesc,
       confirmEnable:
         t('syncActivity.autoUploadSettings.confirmEnable') ||
         FALLBACK_COPY.confirmEnable,
       confirmDisable:
         t('syncActivity.autoUploadSettings.confirmDisable') ||
         FALLBACK_COPY.confirmDisable,
-      customPickerSave:
-        t('syncActivity.autoUploadSettings.customPickerSave') ||
-        FALLBACK_COPY.customPickerSave,
       infoAlbum:
         t('syncActivity.autoUploadSettings.infoAlbum') ||
         FALLBACK_COPY.infoAlbum,
@@ -194,15 +124,6 @@ export function AutoUploadSettingsScreen() {
   const [autoUploadEnabled, setAutoUploadEnabled] = useState(false);
   const [persistedAutoUploadEnabled, setPersistedAutoUploadEnabled] =
     useState(false);
-  const [uploadRange, setUploadRange] = useState<AutoUploadRange>('all');
-  const [hydratedTimeRangeMode, setHydratedTimeRangeMode] =
-    useState<AutoUploadTimeRangeMode>('all');
-  const [rangeEdited, setRangeEdited] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [androidPickerMode, setAndroidPickerMode] =
-    useState<AndroidPickerMode>('date');
-  const [customDate, setCustomDate] = useState<Date>(new Date());
-  const [tempDate, setTempDate] = useState<Date>(new Date());
   const [configLoading, setConfigLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -222,15 +143,6 @@ export function AutoUploadSettingsScreen() {
 
         setPersistedAutoUploadEnabled(config.enabled);
         setAutoUploadEnabled(config.enabled);
-        setHydratedTimeRangeMode(config.timeRangeMode);
-        setRangeEdited(false);
-        setUploadRange(toUploadRange(config.timeRangeMode));
-
-        const parsedDate = parseConfigDate(config.customTimeFrom);
-        if (parsedDate) {
-          setCustomDate(parsedDate);
-          setTempDate(parsedDate);
-        }
         setConfigError(null);
       } catch (e) {
         console.warn('[AutoUploadSettings] getAutoUploadConfig failed:', e);
@@ -251,22 +163,11 @@ export function AutoUploadSettingsScreen() {
     };
   }, [copy.loadConfigFailed]);
 
-  const persistAlbumAutoUploadConfig = async (
-    range: AutoUploadRange,
-    date: Date,
-    edited: boolean,
-  ) => {
+  const persistAlbumAutoUploadConfig = async () => {
     if (savingRef.current) return;
     savingRef.current = true;
     try {
       setSaving(true);
-      const timeRangeMode = resolveTimeRangeMode(
-        range,
-        hydratedTimeRangeMode,
-        edited,
-      );
-      const customTimeFrom =
-        timeRangeMode === 'custom' ? date.toISOString() : undefined;
       const wasPersistedEnabled = persistedAutoUploadEnabled;
 
       if (!wasPersistedEnabled) {
@@ -274,16 +175,14 @@ export function AutoUploadSettingsScreen() {
       }
       await saveAutoUploadConfig({
         enabled: true,
-        timeRangeMode,
-        customTimeFrom,
+        timeRangeMode: 'all',
+        customTimeFrom: undefined,
       });
       if (!wasPersistedEnabled) {
         await enableAutoUpload({ skipPermissionPreflight: true });
       }
       setPersistedAutoUploadEnabled(true);
       setAutoUploadEnabled(true);
-      setHydratedTimeRangeMode(timeRangeMode);
-      setRangeEdited(false);
     } catch (e) {
       console.warn('[AutoUploadSettings] save auto upload config failed:', e);
       if (!persistedAutoUploadEnabled) {
@@ -326,7 +225,7 @@ export function AutoUploadSettingsScreen() {
       }
       return;
     }
-    await persistAlbumAutoUploadConfig(uploadRange, customDate, rangeEdited);
+    await persistAlbumAutoUploadConfig();
   };
 
   const handleBack = useCallback(() => {
@@ -343,66 +242,6 @@ export function AutoUploadSettingsScreen() {
     );
   }, [navigation]);
 
-  const handleRangeSelect = (range: AutoUploadRange) => {
-    setRangeEdited(true);
-    setUploadRange(range);
-    if (range === 'custom') {
-      setTempDate(customDate);
-      setAndroidPickerMode('date');
-      setShowDatePicker(true);
-      return;
-    }
-    if (autoUploadEnabled) {
-      void persistAlbumAutoUploadConfig(range, customDate, true);
-    }
-  };
-
-  const handleDateChange = (
-    event: DateTimePickerEvent,
-    selectedDate?: Date,
-  ) => {
-    if (Platform.OS === 'android') {
-      if (event.type !== 'set' || !selectedDate) {
-        setShowDatePicker(false);
-        return;
-      }
-      if (androidPickerMode === 'date') {
-        const nextDate = new Date(tempDate);
-        nextDate.setFullYear(
-          selectedDate.getFullYear(),
-          selectedDate.getMonth(),
-          selectedDate.getDate(),
-        );
-        setTempDate(nextDate);
-        setAndroidPickerMode('time');
-        return;
-      }
-      const nextDate = new Date(tempDate);
-      nextDate.setHours(
-        selectedDate.getHours(),
-        selectedDate.getMinutes(),
-        0,
-        0,
-      );
-      setCustomDate(nextDate);
-      setTempDate(nextDate);
-      setShowDatePicker(false);
-      if (autoUploadEnabled) {
-        void persistAlbumAutoUploadConfig('custom', nextDate, true);
-      }
-    } else if (selectedDate) {
-      setTempDate(selectedDate);
-    }
-  };
-
-  const handleConfirmDatePicker = () => {
-    setCustomDate(tempDate);
-    setShowDatePicker(false);
-    if (autoUploadEnabled) {
-      void persistAlbumAutoUploadConfig('custom', tempDate, true);
-    }
-  };
-
   // Render dynamic explanation sentence
   const renderInfoText = () => {
     if (configLoading) {
@@ -417,14 +256,8 @@ export function AutoUploadSettingsScreen() {
     return copy.infoAlbum;
   };
 
-  const activeRangeLabel =
-    uploadRange === 'all'
-      ? copy.rangeAllTitle
-      : uploadRange === 'now'
-        ? copy.rangeNowTitle
-        : copy.rangeCustomTitle;
   const planRangeLabel = autoUploadEnabled
-    ? activeRangeLabel
+    ? copy.rangeAllTitle
     : t('common.notApplicable') || 'N/A';
   const infoText = renderInfoText();
 
@@ -524,170 +357,35 @@ export function AutoUploadSettingsScreen() {
           </View>
 
           {autoUploadEnabled ? (
-            <>
-              {/* Synchronize Source */}
-              <View style={styles.section}>
-                <View style={styles.sectionHeaderRow}>
-                  <Text style={styles.sectionTitle}>{copy.sourcesTitle}</Text>
-                </View>
-                <View style={styles.cardContainer}>
-                  {/* Option 1: Album */}
-                  <View
-                    style={[styles.optionRow, styles.optionRowActive]}
-                    testID="auto-upload-source-album"
-                    accessibilityState={{ selected: true }}
-                  >
-                    <View style={[styles.sourceIconBox, styles.iconBoxActive]}>
-                      <ImageIcon
-                        testID="auto-upload-source-album-icon"
-                        size={20}
-                        color="#fff"
-                        strokeWidth={1.9}
-                      />
-                    </View>
-                    <View style={styles.optionInfo}>
-                      <Text style={styles.optionTitle}>{copy.albumTitle}</Text>
-                      <Text style={styles.optionDesc}>{copy.albumDesc}</Text>
-                    </View>
-                    <SelectionIndicator
-                      selected
-                      testID="auto-upload-source-album-check-icon"
+            <View style={styles.section}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>{copy.sourcesTitle}</Text>
+              </View>
+              <View style={styles.cardContainer}>
+                <View
+                  style={[styles.optionRow, styles.optionRowActive]}
+                  testID="auto-upload-source-album"
+                  accessibilityState={{ selected: true }}
+                >
+                  <View style={[styles.sourceIconBox, styles.iconBoxActive]}>
+                    <ImageIcon
+                      testID="auto-upload-source-album-icon"
+                      size={20}
+                      color="#fff"
+                      strokeWidth={1.9}
                     />
                   </View>
+                  <View style={styles.optionInfo}>
+                    <Text style={styles.optionTitle}>{copy.albumTitle}</Text>
+                    <Text style={styles.optionDesc}>{copy.albumDesc}</Text>
+                  </View>
+                  <SelectionIndicator
+                    selected
+                    testID="auto-upload-source-album-check-icon"
+                  />
                 </View>
               </View>
-
-              {/* Upload Range */}
-              <View style={styles.section}>
-                <Text
-                  style={[styles.sectionTitle, styles.standaloneSectionTitle]}
-                >
-                  {copy.rangeTitle}
-                </Text>
-                <View style={styles.cardContainer}>
-                  {/* Option: All */}
-                  <TouchableOpacity
-                    style={[
-                      styles.optionRow,
-                      uploadRange === 'all' && styles.optionRowActive,
-                    ]}
-                    activeOpacity={0.8}
-                    testID="auto-upload-range-all"
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: uploadRange === 'all' }}
-                    onPress={() => handleRangeSelect('all')}
-                  >
-                    <View
-                      style={[
-                        styles.rangeIconBox,
-                        uploadRange === 'all'
-                          ? styles.iconBoxActive
-                          : styles.iconBoxInactive,
-                      ]}
-                    >
-                      <Folder
-                        testID="auto-upload-range-all-icon"
-                        size={18}
-                        color={uploadRange === 'all' ? '#fff' : MUTED_ICON}
-                        strokeWidth={1.9}
-                      />
-                    </View>
-                    <View style={styles.optionInfo}>
-                      <Text style={styles.optionTitle}>
-                        {copy.rangeAllTitle}
-                      </Text>
-                      <Text style={styles.optionDesc}>{copy.rangeAllDesc}</Text>
-                    </View>
-                    <SelectionIndicator
-                      selected={uploadRange === 'all'}
-                      testID="auto-upload-range-all-check-icon"
-                    />
-                  </TouchableOpacity>
-
-                  {/* Option: Now */}
-                  <TouchableOpacity
-                    style={[
-                      styles.optionRow,
-                      uploadRange === 'now' && styles.optionRowActive,
-                    ]}
-                    activeOpacity={0.8}
-                    testID="auto-upload-range-now"
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: uploadRange === 'now' }}
-                    onPress={() => handleRangeSelect('now')}
-                  >
-                    <View
-                      style={[
-                        styles.rangeIconBox,
-                        uploadRange === 'now'
-                          ? styles.iconBoxActive
-                          : styles.iconBoxInactive,
-                      ]}
-                    >
-                      <Clock
-                        testID="auto-upload-range-now-icon"
-                        size={18}
-                        color={uploadRange === 'now' ? '#fff' : MUTED_ICON}
-                        strokeWidth={1.9}
-                      />
-                    </View>
-                    <View style={styles.optionInfo}>
-                      <Text style={styles.optionTitle}>
-                        {copy.rangeNowTitle}
-                      </Text>
-                      <Text style={styles.optionDesc}>{copy.rangeNowDesc}</Text>
-                    </View>
-                    <SelectionIndicator
-                      selected={uploadRange === 'now'}
-                      testID="auto-upload-range-now-check-icon"
-                    />
-                  </TouchableOpacity>
-
-                  {/* Option: Custom */}
-                  <TouchableOpacity
-                    style={[
-                      styles.optionRow,
-                      uploadRange === 'custom' && styles.optionRowActive,
-                    ]}
-                    activeOpacity={0.8}
-                    testID="auto-upload-range-custom"
-                    accessibilityRole="button"
-                    accessibilityState={{
-                      selected: uploadRange === 'custom',
-                    }}
-                    onPress={() => handleRangeSelect('custom')}
-                  >
-                    <View
-                      style={[
-                        styles.rangeIconBox,
-                        uploadRange === 'custom'
-                          ? styles.iconBoxActive
-                          : styles.iconBoxInactive,
-                      ]}
-                    >
-                      <Calendar
-                        testID="auto-upload-range-custom-icon"
-                        size={18}
-                        color={uploadRange === 'custom' ? '#fff' : MUTED_ICON}
-                        strokeWidth={1.9}
-                      />
-                    </View>
-                    <View style={styles.optionInfo}>
-                      <Text style={styles.optionTitle}>
-                        {copy.rangeCustomTitle}
-                      </Text>
-                      <Text style={styles.optionDesc}>
-                        {copy.rangeCustomDesc}
-                      </Text>
-                    </View>
-                    <SelectionIndicator
-                      selected={uploadRange === 'custom'}
-                      testID="auto-upload-range-custom-check-icon"
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </>
+            </View>
           ) : null}
 
           {/* Info Card */}
@@ -704,50 +402,6 @@ export function AutoUploadSettingsScreen() {
           </View>
         </ScrollView>
       </SafeAreaView>
-
-      {/* Date Picker Modal for iOS / Modal structure for Android */}
-      {showDatePicker && Platform.OS === 'ios' && (
-        <Modal transparent animationType="fade" visible={showDatePicker}>
-          <View style={styles.pickerOverlay}>
-            <View style={styles.pickerCard}>
-              <View style={styles.pickerHeader}>
-                <TouchableOpacity
-                  activeOpacity={0.6}
-                  onPress={() => setShowDatePicker(false)}
-                >
-                  <Text style={styles.pickerCancelText}>
-                    {t('common.cancel') || 'Cancel'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  activeOpacity={0.6}
-                  onPress={handleConfirmDatePicker}
-                >
-                  <Text style={styles.pickerConfirmText}>
-                    {copy.customPickerSave}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              <DateTimePicker
-                value={tempDate}
-                mode="datetime"
-                display="spinner"
-                onChange={handleDateChange}
-                style={styles.datePicker}
-              />
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {showDatePicker && Platform.OS === 'android' && (
-        <DateTimePicker
-          value={tempDate}
-          mode={androidPickerMode}
-          display="default"
-          onChange={handleDateChange}
-        />
-      )}
     </GradientBackground>
   );
 }
@@ -924,9 +578,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#7B8490',
   },
-  standaloneSectionTitle: {
-    marginBottom: 10,
-  },
   cardContainer: {
     gap: 12,
   },
@@ -961,18 +612,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  rangeIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   iconBoxActive: {
     backgroundColor: '#1677D2',
-  },
-  iconBoxInactive: {
-    backgroundColor: 'rgba(255,255,255,0.72)',
   },
   optionInfo: {
     flex: 1,
@@ -1041,38 +682,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 22,
     color: '#3F4A58',
-  },
-  // Date Picker iOS styles
-  pickerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
-  },
-  pickerCard: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 16,
-  },
-  pickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#edf2f7',
-  },
-  pickerCancelText: {
-    fontSize: 15,
-    color: '#718096',
-  },
-  pickerConfirmText: {
-    fontSize: 15,
-    color: '#1D4ED8',
-    fontWeight: '600',
-  },
-  datePicker: {
-    height: 200,
-    width: '100%',
   },
 });
 

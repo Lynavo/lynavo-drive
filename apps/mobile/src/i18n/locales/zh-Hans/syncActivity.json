@@ -201,7 +201,7 @@
     "selectedCountLabel": "{{count}} 个项目",
     "removeFileLabel": "移除 {{name}}",
     "enableSwitchTitle": "自动上传开关",
-    "enableSwitchDescOn": "已开启，会按同步范围自动同步相册新增素材",
+    "enableSwitchDescOn": "已开启，会自动同步相册内容",
     "enableSwitchDescOff": "已关闭，不会自动同步相册新增素材",
     "sourcesTitle": "同步来源",
     "albumTitle": "照片和视频",

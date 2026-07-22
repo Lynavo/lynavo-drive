@@ -201,7 +201,7 @@
     "selectedCountLabel": "{{count}} items",
     "removeFileLabel": "Remove {{name}}",
     "enableSwitchTitle": "Auto Upload Switch",
-    "enableSwitchDescOn": "Enabled. Will automatically sync new library content based on sync range.",
+    "enableSwitchDescOn": "Enabled. Album content will sync automatically.",
     "enableSwitchDescOff": "Disabled. Will not automatically sync new library content.",
     "sourcesTitle": "Sync Sources",
     "albumTitle": "Photos and Videos",
