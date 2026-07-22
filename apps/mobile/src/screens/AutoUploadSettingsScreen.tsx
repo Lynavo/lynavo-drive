@@ -45,6 +45,7 @@ import {
 } from '../services/SyncEngineModule';
 
 type AutoUploadRange = 'all' | 'now' | 'custom';
+type AndroidPickerMode = 'date' | 'time';
 
 const BLUE = '#1677D2';
 const DARK = '#17191C';
@@ -198,6 +199,8 @@ export function AutoUploadSettingsScreen() {
     useState<AutoUploadTimeRangeMode>('all');
   const [rangeEdited, setRangeEdited] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [androidPickerMode, setAndroidPickerMode] =
+    useState<AndroidPickerMode>('date');
   const [customDate, setCustomDate] = useState<Date>(new Date());
   const [tempDate, setTempDate] = useState<Date>(new Date());
   const [configLoading, setConfigLoading] = useState(true);
@@ -345,6 +348,7 @@ export function AutoUploadSettingsScreen() {
     setUploadRange(range);
     if (range === 'custom') {
       setTempDate(customDate);
+      setAndroidPickerMode('date');
       setShowDatePicker(true);
       return;
     }
@@ -358,10 +362,33 @@ export function AutoUploadSettingsScreen() {
     selectedDate?: Date,
   ) => {
     if (Platform.OS === 'android') {
+      if (event.type !== 'set' || !selectedDate) {
+        setShowDatePicker(false);
+        return;
+      }
+      if (androidPickerMode === 'date') {
+        const nextDate = new Date(tempDate);
+        nextDate.setFullYear(
+          selectedDate.getFullYear(),
+          selectedDate.getMonth(),
+          selectedDate.getDate(),
+        );
+        setTempDate(nextDate);
+        setAndroidPickerMode('time');
+        return;
+      }
+      const nextDate = new Date(tempDate);
+      nextDate.setHours(
+        selectedDate.getHours(),
+        selectedDate.getMinutes(),
+        0,
+        0,
+      );
+      setCustomDate(nextDate);
+      setTempDate(nextDate);
       setShowDatePicker(false);
-      if (event.type === 'set' && selectedDate) {
-        setCustomDate(selectedDate);
-        setTempDate(selectedDate);
+      if (autoUploadEnabled) {
+        void persistAlbumAutoUploadConfig('custom', nextDate, true);
       }
     } else if (selectedDate) {
       setTempDate(selectedDate);
@@ -715,8 +742,8 @@ export function AutoUploadSettingsScreen() {
 
       {showDatePicker && Platform.OS === 'android' && (
         <DateTimePicker
-          value={customDate}
-          mode="datetime"
+          value={tempDate}
+          mode={androidPickerMode}
           display="default"
           onChange={handleDateChange}
         />

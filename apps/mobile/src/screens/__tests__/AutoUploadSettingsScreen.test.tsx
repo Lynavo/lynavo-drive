@@ -1,6 +1,12 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
-import { Alert, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import {
+  Alert,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+} from 'react-native';
 import {
   disableAutoUpload,
   enableAutoUpload,
@@ -12,6 +18,7 @@ import {
 const mockGoBack = jest.fn();
 const mockDispatch = jest.fn();
 const mockCanGoBack = jest.fn();
+const originalPlatformOS = Platform.OS;
 
 jest.mock('@react-navigation/native', () => ({
   CommonActions: {
@@ -167,6 +174,10 @@ describe('AutoUploadSettingsScreen', () => {
   });
 
   afterEach(() => {
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: originalPlatformOS,
+    });
     jest.restoreAllMocks();
   });
 
@@ -402,6 +413,106 @@ describe('AutoUploadSettingsScreen', () => {
         'DateTimePicker' as unknown as React.ComponentType,
       ),
     ).toHaveLength(1);
+  });
+
+  it('starts Android custom time selection with the supported date picker mode', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'android',
+    });
+    const tree = await renderScreen();
+
+    ReactTestRenderer.act(() => {
+      tree.root
+        .findByProps({ testID: 'auto-upload-range-custom' })
+        .props.onPress();
+    });
+
+    const picker = tree.root.findByType(
+      'DateTimePicker' as unknown as React.ComponentType,
+    );
+    expect(picker.props.mode).toBe('date');
+  });
+
+  it('continues Android custom time selection with a time picker after the date is set', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'android',
+    });
+    const tree = await renderScreen();
+
+    ReactTestRenderer.act(() => {
+      tree.root
+        .findByProps({ testID: 'auto-upload-range-custom' })
+        .props.onPress();
+    });
+    ReactTestRenderer.act(() => {
+      tree.root
+        .findByType('DateTimePicker' as unknown as React.ComponentType)
+        .props.onChange({ type: 'set' }, new Date('2026-07-20T03:04:00.000Z'));
+    });
+
+    const picker = tree.root.findByType(
+      'DateTimePicker' as unknown as React.ComponentType,
+    );
+    expect(picker.props.mode).toBe('time');
+  });
+
+  it('persists the combined Android custom date and time selection', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'android',
+    });
+    const initialDate = new Date('2026-06-16T03:04:05.000Z');
+    const selectedDate = new Date(2026, 6, 20, 0, 0, 0, 0);
+    const selectedTime = new Date(2026, 0, 1, 14, 45, 0, 0);
+    const expectedDate = new Date(initialDate);
+    expectedDate.setFullYear(
+      selectedDate.getFullYear(),
+      selectedDate.getMonth(),
+      selectedDate.getDate(),
+    );
+    expectedDate.setHours(
+      selectedTime.getHours(),
+      selectedTime.getMinutes(),
+      0,
+      0,
+    );
+    mockedGetAutoUploadConfig.mockResolvedValueOnce({
+      enabled: true,
+      timeRangeMode: 'custom',
+      customTimeFrom: initialDate.toISOString(),
+      state: 'active',
+    });
+    const tree = await renderScreen();
+
+    ReactTestRenderer.act(() => {
+      tree.root
+        .findByProps({ testID: 'auto-upload-range-custom' })
+        .props.onPress();
+    });
+    ReactTestRenderer.act(() => {
+      tree.root
+        .findByType('DateTimePicker' as unknown as React.ComponentType)
+        .props.onChange({ type: 'set' }, selectedDate);
+    });
+    await ReactTestRenderer.act(async () => {
+      tree.root
+        .findByType('DateTimePicker' as unknown as React.ComponentType)
+        .props.onChange({ type: 'set' }, selectedTime);
+      await Promise.resolve();
+    });
+
+    expect(
+      tree.root.findAllByType(
+        'DateTimePicker' as unknown as React.ComponentType,
+      ),
+    ).toHaveLength(0);
+    expect(mockedSaveAutoUploadConfig).toHaveBeenCalledWith({
+      enabled: true,
+      timeRangeMode: 'custom',
+      customTimeFrom: expectedDate.toISOString(),
+    });
   });
 
   it('saves range changes immediately while auto upload is enabled', async () => {
