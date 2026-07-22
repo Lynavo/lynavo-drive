@@ -239,6 +239,13 @@ jarsigner -verify -verbose -certs \
   LynavoDriveDemo-<version>-android-arm64-x86_64.aab
 ```
 
+The APK must report v2 signing as `true` and v1, v3, and v4 signing as
+`false`. This explicit v2-only profile preserves compatibility with MIUI 14
+package installers that reject an otherwise valid v3-only APK during package
+metadata parsing. Do not remove the signing-scheme flags from the workflow and
+rely on `apksigner` defaults: for an APK with `minSdkVersion` 29, Build Tools 36
+selects v3-only signing by default.
+
 An existing draft may be updated idempotently. A rerun for the same tag
 preserves its generated notes and replaces the seven allowlisted assets above
 with the newly rebuilt set. Immediately before uploading, the workflow checks
