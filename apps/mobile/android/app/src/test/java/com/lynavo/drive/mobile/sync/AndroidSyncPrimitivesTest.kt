@@ -10,6 +10,18 @@ import org.junit.Test
 
 class AndroidSyncPrimitivesTest {
   @Test
+  fun publicDownloadResultKeepsSavedLocationWhenContentUriIsHidden() {
+    val result = AndroidSyncPrimitives.publicDownloadResult(
+      exposeContentUri = false,
+      contentUri = "content://downloads/public_downloads/42",
+      savedLocation = "Download/Lynavo Drive",
+    )
+
+    assertNull(result.localPath)
+    assertEquals("Download/Lynavo Drive", result.savedLocation)
+  }
+
+  @Test
   fun sharedFilesRouteUsesDirectLanHost() {
     val route = AndroidSyncPrimitives.decideSharedFilesRoute(
       directHost = " 172.20.10.3 ",

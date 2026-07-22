@@ -3165,17 +3165,21 @@ class NativeSyncEngineModule(
       tempFile.delete() // Stored in public Downloads; remove the private temporary backup
       recordNativeLog(
         "SharedFiles",
-        "persistHttpDownload saved_to_downloads filename=$safeFilename saved_location=$savedLocation local_path=$uri expose_uri=true",
+        "persistHttpDownload saved_to_downloads filename=$safeFilename saved_location=$savedLocation local_path=$uri expose_uri=$exposeDownloadsUri",
+      )
+      val result = AndroidSyncPrimitives.publicDownloadResult(
+        exposeContentUri = exposeDownloadsUri,
+        contentUri = uri.toString(),
+        savedLocation = savedLocation,
       )
       return Arguments.createMap().apply {
         putBoolean("savedToPhotos", false)
-        if (exposeDownloadsUri) {
-          putString("localPath", uri.toString())
-          putString("savedLocation", savedLocation)
+        if (result.localPath != null) {
+          putString("localPath", result.localPath)
         } else {
           putNull("localPath")
-          putNull("savedLocation")
         }
+        putString("savedLocation", result.savedLocation)
       }
     }
 
