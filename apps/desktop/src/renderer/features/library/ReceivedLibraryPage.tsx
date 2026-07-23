@@ -562,6 +562,7 @@ export function ReceivedLibraryPage() {
                         );
                       }}
                       className="flex h-12 w-[76px] items-center justify-center rounded-lg border border-[#cdeeff]/80 bg-[#edf8ff]/78 text-[#1677d2] shadow-[0_10px_24px_rgba(67,157,220,0.1)] transition hover:-translate-y-0.5 hover:bg-[#dff2ff] hover:text-[#0d68bd] hover:shadow-[0_16px_34px_rgba(67,157,220,0.15)]"
+                      aria-label={t('directory.library.openFolder')}
                       title={t('directory.library.openFolder')}
                     >
                       <FolderOpen className="h-5 w-5" />

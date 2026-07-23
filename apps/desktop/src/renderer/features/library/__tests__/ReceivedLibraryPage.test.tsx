@@ -636,6 +636,15 @@ describe('ReceivedLibraryPage', () => {
     }
   });
 
+  it('labels the icon-only receive folder trigger for assistive technology', async () => {
+    seedReceivedLibraryDevice();
+
+    render(<ReceivedLibraryPage />);
+
+    const trigger = await screen.findByRole('button', { name: 'Open folder' });
+    expect(trigger).toHaveAttribute('aria-label', 'Open folder');
+  });
+
   it('opens the only available receive location directly without a dialog or legacy fallback', async () => {
     seedReceivedLibraryDevice();
     mockReceiveLocations([
