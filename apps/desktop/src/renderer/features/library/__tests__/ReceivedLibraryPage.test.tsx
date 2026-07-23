@@ -1,12 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { ReceivedLibraryPage } from '../ReceivedLibraryPage';
 import { useResourcesStore } from '@renderer/stores/resources-store';
 import { useDashboardStore } from '@renderer/stores/dashboard-store';
 import { useManagementStore } from '@renderer/stores/management-store';
 import { useSettingsStore } from '@renderer/stores/settings-store';
 import { toast } from 'sonner';
-import type { DashboardDeviceDTO, ReceivedLibraryItemDTO } from '@lynavo-drive/contracts';
+import type {
+  DashboardDeviceDTO,
+  DeviceReceiveLocationDTO,
+  ReceivedLibraryItemDTO,
+} from '@lynavo-drive/contracts';
 import type { ElectronAPI } from '../../../../preload/api';
 
 const testWindow = window as Window & { electronAPI: ElectronAPI };
@@ -54,6 +58,107 @@ function buildMockReceivedLibraryPage() {
       ? state.receivedDeviceStats
       : Array.from(statsByClient.values()),
   };
+}
+
+function seedReceivedLibraryDevice() {
+  const dashboardDevice: DashboardDeviceDTO = {
+    deviceId: 'client-1',
+    stableDeviceId: 'client-1-stable',
+    displayName: 'My iPhone',
+    clientName: 'My iPhone',
+    platform: 'iOS',
+    ip: '192.168.0.10',
+    status: 'connected_idle',
+    todayFileCount: 2,
+    todayBytes: 3145728,
+    storageLeft: '4.7 GB',
+    storagePath: '/mock/receive/path',
+    devicePath: '/mock/receive/path/My iPhone',
+    receiveDirName: 'My iPhone',
+  };
+
+  useManagementStore.setState({
+    devices: [
+      {
+        desktopDeviceId: 'dev-1',
+        clientId: 'client-1',
+        clientIdShort: 'cl-1',
+        displayName: 'My iPhone',
+        platform: 'iOS',
+        stableDeviceId: 'client-1-stable',
+        authorizationStatus: 'authorized',
+        blockStatus: 'none',
+        failedAttemptCount: 0,
+        todayFileCount: 2,
+        todayBytes: 3145728,
+        totalFileCount: 2,
+        totalBytes: 3145728,
+        lastIp: '192.168.0.10',
+        authorizedAt: '2026-06-15T00:00:00Z',
+        lastSeenAt: '2026-06-15T00:00:00Z',
+      },
+    ],
+  });
+  useDashboardStore.setState({ devices: [dashboardDevice] });
+  useResourcesStore.setState({
+    receivedItems: [
+      {
+        resourceId: 'rec-1',
+        desktopDeviceId: 'dev-1',
+        clientId: 'client-1',
+        displayName: 'My iPhone',
+        fileKey: 'key-1',
+        filename: 'photo.jpg',
+        mediaType: 'image/jpeg',
+        fileSize: 1024,
+        completedAt: '2026-06-15T00:00:00Z',
+        shareStatus: 'not_shared',
+      },
+    ],
+    receivedTotalItems: 1,
+    receivedTotalBytes: 1024,
+    receivedDeviceStats: [
+      {
+        clientId: 'client-1',
+        photoCount: 1,
+        fileCount: 0,
+        totalBytes: 1024,
+      },
+    ],
+  });
+}
+
+function mockReceiveLocations(locations: DeviceReceiveLocationDTO[]) {
+  vi.mocked(testWindow.electronAPI.sidecar.getDeviceReceiveLocations).mockResolvedValue(locations);
+}
+
+function addSecondReceivedLibraryDevice() {
+  const firstDevice = useManagementStore.getState().devices[0];
+  if (!firstDevice) throw new Error('Expected the first received library device to be seeded');
+
+  useManagementStore.setState({
+    devices: [
+      firstDevice,
+      {
+        ...firstDevice,
+        desktopDeviceId: 'dev-2',
+        clientId: 'client-2',
+        clientIdShort: 'cl-2',
+        displayName: 'Second Phone',
+        stableDeviceId: 'client-2-stable',
+      },
+    ],
+  });
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
 }
 
 describe('ReceivedLibraryPage', () => {
@@ -113,9 +218,11 @@ describe('ReceivedLibraryPage', () => {
     testWindow.electronAPI = {
       files: {
         openFolder: vi.fn().mockResolvedValue(null),
+        copyToClipboard: vi.fn().mockResolvedValue(null),
       },
       sidecar: {
         getReceivedLibrary: vi.fn().mockImplementation(async () => buildMockReceivedLibraryPage()),
+        getDeviceReceiveLocations: vi.fn().mockResolvedValue([]),
       },
     } as unknown as ElectronAPI;
   });
@@ -529,167 +636,336 @@ describe('ReceivedLibraryPage', () => {
     }
   });
 
-  it('triggers folder opening on button click', async () => {
-    const dashboardDevice: DashboardDeviceDTO = {
-      deviceId: 'client-1',
-      stableDeviceId: 'client-1-stable',
-      displayName: 'My iPhone',
-      clientName: 'My iPhone',
-      platform: 'iOS',
-      ip: '192.168.0.10',
-      status: 'connected_idle',
-      todayFileCount: 2,
-      todayBytes: 3145728,
-      storageLeft: '4.7 GB',
-      storagePath: '/mock/receive/path',
-      devicePath: '/mock/receive/path/My iPhone',
-      receiveDirName: 'My iPhone',
-    };
-
-    useManagementStore.setState({
-      devices: [
-        {
-          desktopDeviceId: 'dev-1',
-          clientId: 'client-1',
-          clientIdShort: 'cl-1',
-          displayName: 'My iPhone',
-          platform: 'iOS',
-          stableDeviceId: 'client-1-stable',
-          authorizationStatus: 'authorized',
-          blockStatus: 'none',
-          failedAttemptCount: 0,
-          todayFileCount: 2,
-          todayBytes: 3145728,
-          totalFileCount: 2,
-          totalBytes: 3145728,
-          lastIp: '192.168.0.10',
-          authorizedAt: '2026-06-15T00:00:00Z',
-          lastSeenAt: '2026-06-15T00:00:00Z',
-        },
-      ],
-    });
-    useDashboardStore.setState({ devices: [dashboardDevice] });
-    useResourcesStore.setState({
-      receivedItems: [
-        {
-          resourceId: 'rec-1',
-          desktopDeviceId: 'dev-1',
-          clientId: 'client-1',
-          displayName: 'My iPhone',
-          fileKey: 'key-1',
-          filename: 'photo.jpg',
-          mediaType: 'image/jpeg',
-          fileSize: 1024,
-          completedAt: '2026-06-15T00:00:00Z',
-          shareStatus: 'not_shared',
-        },
-      ],
-      receivedTotalItems: 1,
-      receivedTotalBytes: 1024,
-      receivedDeviceStats: [
-        {
-          clientId: 'client-1',
-          photoCount: 1,
-          fileCount: 0,
-          totalBytes: 1024,
-        },
-      ],
-    });
+  it('opens the only available receive location directly without a dialog or legacy fallback', async () => {
+    seedReceivedLibraryDevice();
+    mockReceiveLocations([
+      {
+        path: '/current/Phone',
+        available: true,
+        isCurrent: true,
+        lastUsedAt: '2026-07-20T00:00:00Z',
+      },
+    ]);
 
     render(<ReceivedLibraryPage />);
+    fireEvent.click(await screen.findByTitle('Open folder'));
 
     await waitFor(() => {
-      expect(screen.getByTitle('Open folder')).toBeInTheDocument();
+      expect(testWindow.electronAPI.sidecar.getDeviceReceiveLocations).toHaveBeenCalledWith(
+        'client-1',
+      );
+      expect(testWindow.electronAPI.files.openFolder).toHaveBeenCalledWith('/current/Phone');
     });
-
-    const openBtn = screen.getByTitle('Open folder');
-    fireEvent.click(openBtn);
-    expect(window.electronAPI?.files.openFolder).toHaveBeenCalledWith(
+    expect(testWindow.electronAPI.files.openFolder).not.toHaveBeenCalledWith(
       '/mock/receive/path/My iPhone',
     );
+    expect(testWindow.electronAPI.files.openFolder).not.toHaveBeenCalledWith('/mock/receive/path');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('does not fall back to the receive root when opening a device folder fails', async () => {
-    const openFolder = vi.fn().mockRejectedValue(new Error('missing folder'));
-    testWindow.electronAPI.files.openFolder = openFolder;
-    useManagementStore.setState({
-      devices: [
-        {
-          desktopDeviceId: 'dev-1',
-          clientId: 'client-1',
-          clientIdShort: 'cl-1',
-          displayName: 'My iPhone',
-          platform: 'iOS',
-          stableDeviceId: 'client-1-stable',
-          authorizationStatus: 'authorized',
-          blockStatus: 'none',
-          failedAttemptCount: 0,
-          todayFileCount: 0,
-          todayBytes: 0,
-          totalFileCount: 0,
-          totalBytes: 0,
-          lastIp: '192.168.0.10',
-          authorizedAt: '2026-06-15T00:00:00Z',
-          lastSeenAt: '2026-06-15T00:00:00Z',
-        },
-      ],
-    });
-    useDashboardStore.setState({
-      devices: [
-        {
-          deviceId: 'client-1',
-          displayName: 'My iPhone',
-          clientName: 'My iPhone',
-          platform: 'iOS',
-          ip: '192.168.0.10',
-          status: 'offline',
-          todayFileCount: 0,
-          todayBytes: 0,
-          storageLeft: '4.7 GB',
-          storagePath: '/mock/receive/path',
-          devicePath: '/mock/receive/path/My iPhone',
-        },
-      ],
-    });
-    useResourcesStore.setState({
-      receivedItems: [
-        {
-          resourceId: 'rec-1',
-          desktopDeviceId: 'dev-1',
-          clientId: 'client-1',
-          displayName: 'My iPhone',
-          fileKey: 'key-1',
-          filename: 'photo.jpg',
-          mediaType: 'image/jpeg',
-          fileSize: 1024,
-          completedAt: '2026-06-15T00:00:00Z',
-          shareStatus: 'not_shared',
-        },
-      ],
-      receivedTotalItems: 1,
-      receivedTotalBytes: 1024,
-      receivedDeviceStats: [
-        {
-          clientId: 'client-1',
-          photoCount: 1,
-          fileCount: 0,
-          totalBytes: 1024,
-        },
-      ],
-    });
+  it('shows multiple locations in sidecar order with the device name and statuses', async () => {
+    seedReceivedLibraryDevice();
+    mockReceiveLocations([
+      {
+        path: '/current/Phone',
+        available: true,
+        isCurrent: true,
+        lastUsedAt: '2026-07-20T00:00:00Z',
+      },
+      {
+        path: '/history/Phone',
+        available: true,
+        isCurrent: false,
+        lastUsedAt: '2026-07-10T00:00:00Z',
+      },
+      {
+        path: '/offline/Phone',
+        available: false,
+        isCurrent: false,
+        lastUsedAt: '2026-07-01T00:00:00Z',
+      },
+    ]);
 
     render(<ReceivedLibraryPage />);
+    fireEvent.click(await screen.findByTitle('Open folder'));
 
-    await waitFor(() => {
-      expect(screen.getByTitle('Open folder')).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('My iPhone')).toBeInTheDocument();
+    expect(
+      within(dialog)
+        .getAllByTestId('receive-location-path')
+        .map((node) => node.textContent),
+    ).toEqual(['/current/Phone', '/history/Phone', '/offline/Phone']);
+    expect(within(dialog).getByText('Current location')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('Historical location')).toHaveLength(2);
+    expect(within(dialog).getByText('Currently unavailable')).toBeInTheDocument();
+  });
+
+  it('ignores an older location query that resolves after the latest device query', async () => {
+    seedReceivedLibraryDevice();
+    addSecondReceivedLibraryDevice();
+    const firstQuery = createDeferred<DeviceReceiveLocationDTO[]>();
+    const secondQuery = createDeferred<DeviceReceiveLocationDTO[]>();
+    vi.mocked(testWindow.electronAPI.sidecar.getDeviceReceiveLocations).mockImplementation(
+      (clientId) => (clientId === 'client-1' ? firstQuery.promise : secondQuery.promise),
+    );
+
+    render(<ReceivedLibraryPage />);
+    const triggers = await screen.findAllByTitle('Open folder');
+    fireEvent.click(triggers[0]);
+    fireEvent.click(triggers[1]);
+
+    await act(async () => {
+      secondQuery.resolve([
+        {
+          path: '/second/current',
+          available: false,
+          isCurrent: true,
+          lastUsedAt: '2026-07-20T00:00:00Z',
+        },
+      ]);
     });
 
-    fireEvent.click(screen.getByTitle('Open folder'));
+    const latestDialog = await screen.findByRole('dialog');
+    expect(within(latestDialog).getByText('Second Phone')).toBeInTheDocument();
+    expect(within(latestDialog).getByText('/second/current')).toBeInTheDocument();
+
+    await act(async () => {
+      firstQuery.resolve([
+        {
+          path: '/first/history',
+          available: false,
+          isCurrent: false,
+          lastUsedAt: '2026-07-10T00:00:00Z',
+        },
+      ]);
+    });
+
+    expect(within(screen.getByRole('dialog')).getByText('Second Phone')).toBeInTheDocument();
+    expect(screen.getByText('/second/current')).toBeInTheDocument();
+    expect(screen.queryByText('/first/history')).not.toBeInTheDocument();
+  });
+
+  it('shows a single unavailable location, prevents opening it, and copies its exact path', async () => {
+    seedReceivedLibraryDevice();
+    mockReceiveLocations([
+      {
+        path: '/offline/Phone',
+        available: false,
+        isCurrent: false,
+        lastUsedAt: '2026-07-01T00:00:00Z',
+      },
+    ]);
+
+    render(<ReceivedLibraryPage />);
+    fireEvent.click(await screen.findByTitle('Open folder'));
+
+    const dialog = await screen.findByRole('dialog');
+    const path = within(dialog).getByText('/offline/Phone');
+    fireEvent.click(path);
+    expect(
+      within(dialog).getByRole('button', { name: 'Open folder: /offline/Phone' }),
+    ).toBeDisabled();
+    expect(testWindow.electronAPI.files.openFolder).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Copy path' }));
+    expect(testWindow.electronAPI.files.copyToClipboard).toHaveBeenCalledWith('/offline/Phone');
+  });
+
+  it('shows a localized toast when no receive locations exist', async () => {
+    seedReceivedLibraryDevice();
+    mockReceiveLocations([]);
+
+    render(<ReceivedLibraryPage />);
+    fireEvent.click(await screen.findByTitle('Open folder'));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('No available sync folder could be found');
+    });
+    expect(testWindow.electronAPI.files.openFolder).not.toHaveBeenCalled();
+  });
+
+  it('shows a localized query error when receive locations cannot be queried', async () => {
+    seedReceivedLibraryDevice();
+    vi.mocked(testWindow.electronAPI.sidecar.getDeviceReceiveLocations).mockRejectedValue(
+      new Error('sidecar unavailable'),
+    );
+
+    render(<ReceivedLibraryPage />);
+    fireEvent.click(await screen.findByTitle('Open folder'));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Sync folder locations are unavailable');
+    });
+    expect(testWindow.electronAPI.files.openFolder).not.toHaveBeenCalled();
+  });
+
+  it('keeps the dialog open and marks a row unavailable when opening it fails', async () => {
+    seedReceivedLibraryDevice();
+    mockReceiveLocations([
+      {
+        path: '/current/Phone',
+        available: true,
+        isCurrent: true,
+        lastUsedAt: '2026-07-20T00:00:00Z',
+      },
+      {
+        path: '/history/Phone',
+        available: true,
+        isCurrent: false,
+        lastUsedAt: '2026-07-10T00:00:00Z',
+      },
+    ]);
+    vi.mocked(testWindow.electronAPI.files.openFolder).mockRejectedValue(
+      new Error('missing folder'),
+    );
+
+    render(<ReceivedLibraryPage />);
+    fireEvent.click(await screen.findByTitle('Open folder'));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Open folder: /current/Phone' }));
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Device folder does not exist or cannot be opened');
     });
-    expect(openFolder).toHaveBeenCalledTimes(1);
-    expect(openFolder).not.toHaveBeenCalledWith('/mock/receive/path');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    const failedRow = screen.getByText('/current/Phone').closest('li');
+    expect(failedRow).not.toBeNull();
+    expect(within(failedRow as HTMLElement).getByText('Currently unavailable')).toBeInTheDocument();
+    expect(
+      within(failedRow as HTMLElement).getByRole('button', {
+        name: 'Open folder: /current/Phone',
+      }),
+    ).toBeDisabled();
+    expect(testWindow.electronAPI.files.openFolder).toHaveBeenCalledTimes(1);
+    expect(testWindow.electronAPI.files.openFolder).not.toHaveBeenCalledWith('/mock/receive/path');
+  });
+
+  it('closes the dialog after opening an available location successfully', async () => {
+    seedReceivedLibraryDevice();
+    mockReceiveLocations([
+      {
+        path: '/current/Phone',
+        available: true,
+        isCurrent: true,
+        lastUsedAt: '2026-07-20T00:00:00Z',
+      },
+      {
+        path: '/history/Phone',
+        available: true,
+        isCurrent: false,
+        lastUsedAt: '2026-07-10T00:00:00Z',
+      },
+    ]);
+
+    render(<ReceivedLibraryPage />);
+    fireEvent.click(await screen.findByTitle('Open folder'));
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', {
+        name: 'Open folder: /history/Phone',
+      }),
+    );
+
+    await waitFor(() => {
+      expect(testWindow.electronAPI.files.openFolder).toHaveBeenCalledWith('/history/Phone');
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
+  it('ignores open completions from a closed dialog after another device dialog opens', async () => {
+    seedReceivedLibraryDevice();
+    addSecondReceivedLibraryDevice();
+    vi.mocked(testWindow.electronAPI.sidecar.getDeviceReceiveLocations).mockImplementation(
+      async (clientId) =>
+        clientId === 'client-1'
+          ? [
+              {
+                path: '/first/current',
+                available: true,
+                isCurrent: true,
+                lastUsedAt: '2026-07-20T00:00:00Z',
+              },
+              {
+                path: '/first/history',
+                available: true,
+                isCurrent: false,
+                lastUsedAt: '2026-07-10T00:00:00Z',
+              },
+            ]
+          : [
+              {
+                path: '/second/current',
+                available: false,
+                isCurrent: true,
+                lastUsedAt: '2026-07-21T00:00:00Z',
+              },
+            ],
+    );
+    const oldFailure = createDeferred<void>();
+    const oldSuccess = createDeferred<void>();
+    vi.mocked(testWindow.electronAPI.files.openFolder).mockImplementation((path) =>
+      path === '/first/current' ? oldFailure.promise : oldSuccess.promise,
+    );
+
+    render(<ReceivedLibraryPage />);
+    const triggers = await screen.findAllByTitle('Open folder');
+    fireEvent.click(triggers[0]);
+    const firstDialog = await screen.findByRole('dialog');
+    fireEvent.click(
+      within(firstDialog).getByRole('button', { name: 'Open folder: /first/current' }),
+    );
+    fireEvent.click(
+      within(firstDialog).getByRole('button', { name: 'Open folder: /first/history' }),
+    );
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    fireEvent.click(triggers[1]);
+    const secondDialog = await screen.findByRole('dialog');
+    expect(within(secondDialog).getByText('Second Phone')).toBeInTheDocument();
+
+    await act(async () => {
+      oldFailure.reject(new Error('old folder missing'));
+    });
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(within(screen.getByRole('dialog')).getByText('/second/current')).toBeInTheDocument();
+
+    await act(async () => {
+      oldSuccess.resolve();
+    });
+    const currentDialog = screen.getByRole('dialog');
+    expect(currentDialog).toBeInTheDocument();
+    expect(within(currentDialog).getByText('Second Phone')).toBeInTheDocument();
+  });
+
+  it('returns focus to the invoking folder button after Escape closes the dialog', async () => {
+    seedReceivedLibraryDevice();
+    mockReceiveLocations([
+      {
+        path: '/current/Phone',
+        available: true,
+        isCurrent: true,
+        lastUsedAt: '2026-07-20T00:00:00Z',
+      },
+      {
+        path: '/history/Phone',
+        available: true,
+        isCurrent: false,
+        lastUsedAt: '2026-07-10T00:00:00Z',
+      },
+    ]);
+
+    render(<ReceivedLibraryPage />);
+    const trigger = await screen.findByTitle('Open folder');
+    trigger.focus();
+    fireEvent.click(trigger);
+    await screen.findByRole('dialog');
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+    });
   });
 });

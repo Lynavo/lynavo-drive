@@ -17,7 +17,16 @@ import { useManagementStore } from '@renderer/stores/management-store';
 import { formatBytes, formatSmartDate } from '@renderer/lib/format';
 import { FileIcon } from '@renderer/components/shared/FileIcon';
 import { Skeleton } from '@renderer/components/ui/skeleton';
-import type { ReceivedLibraryItemDTO } from '@lynavo-drive/contracts';
+import type { DeviceReceiveLocationDTO, ReceivedLibraryItemDTO } from '@lynavo-drive/contracts';
+import { DeviceReceiveLocationDialog } from './DeviceReceiveLocationDialog';
+
+interface LocationDialogState {
+  sessionId: number;
+  deviceName: string;
+  locations: DeviceReceiveLocationDTO[];
+  failedPaths: Set<string>;
+  returnFocusElement: HTMLButtonElement;
+}
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -207,6 +216,11 @@ export function ReceivedLibraryPage() {
   const fetchDashboard = useDashboardStore((s) => s.fetchDashboard);
   const scrollRegionRef = useRef<HTMLDivElement | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const locationQueryRequestRef = useRef(0);
+  const nextLocationDialogSessionRef = useRef(0);
+  const activeLocationDialogSessionRef = useRef<number | null>(null);
+  const [locationDialogOpen, setLocationDialogOpen] = useState(false);
+  const [locationDialogState, setLocationDialogState] = useState<LocationDialogState | null>(null);
 
   useEffect(() => {
     void loadReceivedLibrary();
@@ -278,7 +292,6 @@ export function ReceivedLibraryPage() {
   // Managed devices provide metadata; received stats provide fallback rows while management is loading.
   const managedDeviceIds = new Set(visibleManagedDevices.map((d) => d.clientId));
   const managedDeviceList = visibleManagedDevices.map((d) => {
-    const dashboardDevice = dashboardDeviceMap.get(d.clientId);
     const stats = statsByDevice[d.clientId] || {
       photoCount: 0,
       fileCount: 0,
@@ -288,7 +301,6 @@ export function ReceivedLibraryPage() {
       clientId: d.clientId,
       displayName: d.displayName,
       platform: d.platform,
-      devicePath: dashboardDevice?.devicePath,
       ...stats,
     };
   });
@@ -301,26 +313,104 @@ export function ReceivedLibraryPage() {
         displayName:
           dashboardDevice?.displayName ?? receivedDeviceDisplayNameMap.get(clientId) ?? clientId,
         platform: dashboardDevice?.platform ?? t('directory.library.mobileDevice'),
-        devicePath: dashboardDevice?.devicePath,
         ...stats,
       };
     });
   const deviceList = [...managedDeviceList, ...fallbackDeviceList];
 
-  const handleOpenFolder = (devicePath?: string) => {
-    const targetPath = devicePath?.trim();
-    if (!targetPath) {
-      toast.error(t('directory.library.toasts.devicePathUnavailable'));
+  const handleOpenFolder = async (
+    clientId: string,
+    displayName: string,
+    returnFocusElement: HTMLButtonElement,
+  ) => {
+    const requestId = ++locationQueryRequestRef.current;
+    const getReceiveLocations = window.electronAPI?.sidecar.getDeviceReceiveLocations;
+    if (!getReceiveLocations) {
+      toast.error(t('directory.library.toasts.receiveLocationsUnavailable'));
       return;
     }
+
+    try {
+      const locations = await getReceiveLocations(clientId);
+      if (requestId !== locationQueryRequestRef.current) return;
+
+      if (locations.length === 0) {
+        toast.error(t('directory.library.toasts.noReceiveLocations'));
+        return;
+      }
+
+      if (locations.length === 1 && locations[0].available) {
+        const openFolder = window.electronAPI?.files.openFolder;
+        if (!openFolder) {
+          toast.error(t('directory.library.toasts.fileManagerUnavailable'));
+          return;
+        }
+
+        try {
+          await openFolder(locations[0].path);
+        } catch {
+          if (requestId === locationQueryRequestRef.current) {
+            toast.error(t('directory.library.toasts.devicePathMissing'));
+          }
+        }
+        return;
+      }
+
+      const sessionId = ++nextLocationDialogSessionRef.current;
+      activeLocationDialogSessionRef.current = sessionId;
+      setLocationDialogState({
+        sessionId,
+        deviceName: displayName,
+        locations,
+        failedPaths: new Set(),
+        returnFocusElement,
+      });
+      setLocationDialogOpen(true);
+    } catch {
+      if (requestId === locationQueryRequestRef.current) {
+        toast.error(t('directory.library.toasts.receiveLocationsUnavailable'));
+      }
+    }
+  };
+
+  const markLocationUnavailable = (sessionId: number, path: string) => {
+    setLocationDialogState((current) =>
+      current?.sessionId === sessionId
+        ? {
+            ...current,
+            failedPaths: new Set(current.failedPaths).add(path),
+          }
+        : current,
+    );
+  };
+
+  const handleOpenLocation = (location: DeviceReceiveLocationDTO) => {
+    const sessionId = locationDialogState?.sessionId;
+    if (sessionId == null || activeLocationDialogSessionRef.current !== sessionId) return;
+
     const openFolder = window.electronAPI?.files.openFolder;
     if (!openFolder) {
+      markLocationUnavailable(sessionId, location.path);
       toast.error(t('directory.library.toasts.fileManagerUnavailable'));
       return;
     }
-    void openFolder(targetPath).catch(() => {
-      toast.error(t('directory.library.toasts.devicePathMissing'));
-    });
+
+    void openFolder(location.path)
+      .then(() => {
+        if (activeLocationDialogSessionRef.current !== sessionId) return;
+        activeLocationDialogSessionRef.current = null;
+        setLocationDialogOpen(false);
+      })
+      .catch(() => {
+        if (activeLocationDialogSessionRef.current !== sessionId) return;
+        markLocationUnavailable(sessionId, location.path);
+        toast.error(t('directory.library.toasts.devicePathMissing'));
+      });
+  };
+
+  const handleLocationDialogOpenChange = (open: boolean) => {
+    if (!open) activeLocationDialogSessionRef.current = null;
+    setLocationDialogOpen(open);
   };
 
   return (
@@ -464,7 +554,13 @@ export function ReceivedLibraryPage() {
                     {/* Open Folder Button */}
                     <button
                       type="button"
-                      onClick={() => handleOpenFolder(device.devicePath)}
+                      onClick={(event) => {
+                        void handleOpenFolder(
+                          device.clientId,
+                          device.displayName || t('directory.library.unnamedDevice'),
+                          event.currentTarget,
+                        );
+                      }}
                       className="flex h-12 w-[76px] items-center justify-center rounded-lg border border-[#cdeeff]/80 bg-[#edf8ff]/78 text-[#1677d2] shadow-[0_10px_24px_rgba(67,157,220,0.1)] transition hover:-translate-y-0.5 hover:bg-[#dff2ff] hover:text-[#0d68bd] hover:shadow-[0_16px_34px_rgba(67,157,220,0.15)]"
                       title={t('directory.library.openFolder')}
                     >
@@ -524,6 +620,20 @@ export function ReceivedLibraryPage() {
           )}
         </div>
       </div>
+      <DeviceReceiveLocationDialog
+        open={locationDialogOpen}
+        deviceName={locationDialogState?.deviceName ?? ''}
+        locations={
+          locationDialogState?.locations.map((location) =>
+            locationDialogState.failedPaths.has(location.path)
+              ? { ...location, available: false }
+              : location,
+          ) ?? []
+        }
+        returnFocusElement={locationDialogState?.returnFocusElement ?? null}
+        onOpenChange={handleLocationDialogOpenChange}
+        onOpenLocation={handleOpenLocation}
+      />
     </div>
   );
 }
