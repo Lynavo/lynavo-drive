@@ -28,6 +28,7 @@ import {
   type DesktopSyncRecordDTO,
   type DesktopLocalListResponse,
   type AddSharedResourcePayload,
+  type DeviceReceiveLocationDTO,
   type ReceivedLibraryItemDTO,
   type RecentDesktopDTO,
   type PairingFailureDTO,
@@ -67,6 +68,7 @@ function assertTypeExports(
   _sync: DesktopSyncRecordDTO,
   _listResponse: DesktopLocalListResponse<DesktopManagedDeviceDTO>,
   _addSharedResource: AddSharedResourcePayload,
+  _receiveLocation: DeviceReceiveLocationDTO,
   _library: ReceivedLibraryItemDTO,
   _recent: RecentDesktopDTO,
   _pairingFailure: PairingFailureDTO,
@@ -243,6 +245,12 @@ describe('@lynavo-drive/contracts exports', () => {
       completedAt: '2026-07-13T00:00:00.000Z',
       shareStatus: 'not_shared',
     };
+    const receiveLocation: DeviceReceiveLocationDTO = {
+      path: '/Volumes/Archive/received/My iPhone',
+      available: true,
+      isCurrent: false,
+      lastUsedAt: '2026-07-20T08:30:00Z',
+    };
 
     expect(
       assertTypeExports(
@@ -293,6 +301,7 @@ describe('@lynavo-drive/contracts exports', () => {
         },
         { items: [device] },
         { kind: 'shared_file', displayName: 'example.txt', localPath: '/tmp/example.txt' },
+        receiveLocation,
         library,
         {
           desktopDeviceId: 'desktop-1',
