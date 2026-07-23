@@ -342,6 +342,44 @@ func TestAbsolutizeCompletedUploadFinalPaths(t *testing.T) {
 	}
 }
 
+func TestAbsolutizeCompletedUploadFinalPathsRejectsUnsafePaths(t *testing.T) {
+	s := newTestStore(t)
+	receiveDir := t.TempDir()
+	completedAt := "2026-07-18T12:00:00Z"
+	fixtures := []struct {
+		fileKey   string
+		finalPath string
+	}{
+		{fileKey: "traversal", finalPath: filepath.Join("..", "..", "outside", "photo.jpg")},
+		{fileKey: "windows-absolute", finalPath: `C:\Archive\Phone\2026-07-18\photo.jpg`},
+		{fileKey: "unix-absolute", finalPath: "/Volumes/Archive/Phone/2026-07-18/photo.jpg"},
+	}
+
+	for _, fixture := range fixtures {
+		upload := sampleUpload(fixture.fileKey, "client-1")
+		upload.Status = "completed"
+		upload.FinalPath = &fixture.finalPath
+		upload.CompletedAt = &completedAt
+		if err := s.UpsertUpload(upload); err != nil {
+			t.Fatalf("UpsertUpload %q: %v", fixture.fileKey, err)
+		}
+	}
+
+	if err := s.AbsolutizeCompletedUploadFinalPaths(receiveDir, true); err != nil {
+		t.Fatalf("AbsolutizeCompletedUploadFinalPaths: %v", err)
+	}
+
+	for _, fixture := range fixtures {
+		upload, err := s.GetUpload(fixture.fileKey)
+		if err != nil {
+			t.Fatalf("GetUpload %q: %v", fixture.fileKey, err)
+		}
+		if upload.FinalPath == nil || *upload.FinalPath != fixture.finalPath {
+			t.Errorf("%s final path=%v, want unchanged %q", fixture.fileKey, upload.FinalPath, fixture.finalPath)
+		}
+	}
+}
+
 func TestUpdateUploadProgress(t *testing.T) {
 	s := newTestStore(t)
 	u := sampleUpload("progress-me", "client-1")

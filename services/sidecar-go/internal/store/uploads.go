@@ -92,10 +92,14 @@ func (s *Store) AbsolutizeCompletedUploadFinalPaths(
 			rows.Close()
 			return fmt.Errorf("scan completed upload final path: %w", err)
 		}
-		if filepath.IsAbs(finalPath) {
+		if isAbsoluteUploadPath(finalPath) {
 			continue
 		}
 		absolutePath := filepath.Join(receiveDir, finalPath)
+		relativePath, err := filepath.Rel(filepath.Clean(receiveDir), absolutePath)
+		if err != nil || relativePath == ".." || strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) {
+			continue
+		}
 		if !preserveUnavailablePaths {
 			if info, err := os.Stat(absolutePath); err != nil || info.IsDir() {
 				continue
@@ -134,6 +138,13 @@ func (s *Store) AbsolutizeCompletedUploadFinalPaths(
 		return fmt.Errorf("commit completed upload path update: %w", err)
 	}
 	return nil
+}
+
+func isAbsoluteUploadPath(path string) bool {
+	return filepath.IsAbs(path) ||
+		strings.HasPrefix(path, `/`) ||
+		strings.HasPrefix(path, `\`) ||
+		(len(path) >= 2 && path[1] == ':')
 }
 
 // ListCompletedUploadRootDirs returns distinct first path components used by
