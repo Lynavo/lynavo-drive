@@ -44,14 +44,16 @@
     "loadingMore": "Loading...",
     "loadMore": "Load more sync records",
     "locationDialog": {
-      "title": "Sync folders",
-      "description": "Device:",
+      "title": "Folder paths",
+      "description": "View and open folders used by {{deviceName}}",
       "current": "Current location",
-      "history": "Historical location",
+      "history": "Previous location",
       "unavailable": "Currently unavailable",
-      "unavailableAction": "This folder is currently unavailable",
-      "open": "Open folder",
+      "unavailableAction": "Unavailable",
+      "open": "Open",
+      "folderCount": "{{count}} folders",
       "copyPath": "Copy path",
+      "closeDialog": "Close dialog",
       "close": "Close"
     },
     "media": {

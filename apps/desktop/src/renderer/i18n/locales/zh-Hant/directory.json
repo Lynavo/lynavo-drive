@@ -44,14 +44,16 @@
     "loadingMore": "載入中...",
     "loadMore": "載入更多同步記錄",
     "locationDialog": {
-      "title": "同步資料夾",
-      "description": "裝置：",
+      "title": "資料夾路徑",
+      "description": "查看並開啟 {{deviceName}} 使用的資料夾",
       "current": "目前位置",
       "history": "歷史位置",
       "unavailable": "目前無法存取",
-      "unavailableAction": "此資料夾目前無法存取",
-      "open": "開啟資料夾",
+      "unavailableAction": "無法存取",
+      "open": "開啟",
+      "folderCount": "共 {{count}} 個資料夾",
       "copyPath": "複製路徑",
+      "closeDialog": "關閉對話框",
       "close": "關閉"
     },
     "media": {

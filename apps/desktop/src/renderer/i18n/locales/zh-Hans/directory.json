@@ -44,14 +44,16 @@
     "loadingMore": "加载中...",
     "loadMore": "加载更多同步记录",
     "locationDialog": {
-      "title": "同步文件夹",
-      "description": "设备：",
+      "title": "文件夹路径",
+      "description": "查看并打开 {{deviceName}} 使用的文件夹",
       "current": "当前位置",
       "history": "历史位置",
       "unavailable": "当前无法访问",
-      "unavailableAction": "此文件夹当前无法访问",
-      "open": "打开文件夹",
+      "unavailableAction": "无法访问",
+      "open": "打开",
+      "folderCount": "共 {{count}} 个文件夹",
       "copyPath": "复制路径",
+      "closeDialog": "关闭对话框",
       "close": "关闭"
     },
     "media": {

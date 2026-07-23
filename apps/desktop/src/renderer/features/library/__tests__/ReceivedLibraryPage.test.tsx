@@ -190,6 +190,12 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
+function getReceiveLocationRow(dialog: HTMLElement, path: string): HTMLElement {
+  const row = within(dialog).getByText(path).closest('li');
+  if (!row) throw new Error(`Missing receive location row for ${path}`);
+  return row;
+}
+
 describe('ReceivedLibraryPage', () => {
   let intersectionCallback: IntersectionObserverCallback | null = null;
 
@@ -726,7 +732,7 @@ describe('ReceivedLibraryPage', () => {
     expect(testWindow.electronAPI.files.openFolder).not.toHaveBeenCalled();
   });
 
-  it('shows multiple locations in sidecar order with the device name and statuses', async () => {
+  it('shows multiple locations in the approved folder-path action layout', async () => {
     seedReceivedLibraryDevice();
     mockReceiveLocations([
       {
@@ -753,15 +759,21 @@ describe('ReceivedLibraryPage', () => {
     fireEvent.click(await screen.findByTitle('Open folder'));
 
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText('My iPhone')).toBeInTheDocument();
+    expect(within(dialog).getByRole('heading', { name: 'Folder paths' })).toBeInTheDocument();
+    expect(within(dialog).getByText('View and open folders used by My iPhone')).toBeInTheDocument();
     expect(
       within(dialog)
         .getAllByTestId('receive-location-path')
         .map((node) => node.textContent),
     ).toEqual(['/current/Phone', '/history/Phone', '/offline/Phone']);
     expect(within(dialog).getByText('Current location')).toBeInTheDocument();
-    expect(within(dialog).getAllByText('Historical location')).toHaveLength(2);
+    expect(within(dialog).getAllByText('Previous location')).toHaveLength(1);
     expect(within(dialog).getByText('Currently unavailable')).toBeInTheDocument();
+    expect(within(dialog).getAllByRole('button', { name: 'Open' })).toHaveLength(2);
+    expect(within(dialog).getByRole('button', { name: 'Unavailable' })).toBeDisabled();
+    expect(within(dialog).getByText('3 folders')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Close dialog' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Close' })).toBeInTheDocument();
   });
 
   it('ignores an older location query that resolves after the latest device query', async () => {
@@ -790,7 +802,9 @@ describe('ReceivedLibraryPage', () => {
     });
 
     const latestDialog = await screen.findByRole('dialog');
-    expect(within(latestDialog).getByText('Second Phone')).toBeInTheDocument();
+    expect(
+      within(latestDialog).getByText('View and open folders used by Second Phone'),
+    ).toBeInTheDocument();
     expect(within(latestDialog).getByText('/second/current')).toBeInTheDocument();
 
     await act(async () => {
@@ -804,7 +818,9 @@ describe('ReceivedLibraryPage', () => {
       ]);
     });
 
-    expect(within(screen.getByRole('dialog')).getByText('Second Phone')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('dialog')).getByText('View and open folders used by Second Phone'),
+    ).toBeInTheDocument();
     expect(screen.getByText('/second/current')).toBeInTheDocument();
     expect(screen.queryByText('/first/history')).not.toBeInTheDocument();
   });
@@ -824,11 +840,9 @@ describe('ReceivedLibraryPage', () => {
     fireEvent.click(await screen.findByTitle('Open folder'));
 
     const dialog = await screen.findByRole('dialog');
-    const path = within(dialog).getByText('/offline/Phone');
-    fireEvent.click(path);
-    expect(
-      within(dialog).getByRole('button', { name: 'Open folder: /offline/Phone' }),
-    ).toBeDisabled();
+    const row = getReceiveLocationRow(dialog, '/offline/Phone');
+    fireEvent.click(within(row).getByText('/offline/Phone'));
+    expect(within(row).getByRole('button', { name: 'Unavailable' })).toBeDisabled();
     expect(testWindow.electronAPI.files.openFolder).not.toHaveBeenCalled();
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Copy path' }));
@@ -886,20 +900,16 @@ describe('ReceivedLibraryPage', () => {
     render(<ReceivedLibraryPage />);
     fireEvent.click(await screen.findByTitle('Open folder'));
     const dialog = await screen.findByRole('dialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Open folder: /current/Phone' }));
+    const currentRow = getReceiveLocationRow(dialog, '/current/Phone');
+    fireEvent.click(within(currentRow).getByRole('button', { name: 'Open' }));
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Device folder does not exist or cannot be opened');
     });
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    const failedRow = screen.getByText('/current/Phone').closest('li');
-    expect(failedRow).not.toBeNull();
-    expect(within(failedRow as HTMLElement).getByText('Currently unavailable')).toBeInTheDocument();
-    expect(
-      within(failedRow as HTMLElement).getByRole('button', {
-        name: 'Open folder: /current/Phone',
-      }),
-    ).toBeDisabled();
+    const failedRow = getReceiveLocationRow(screen.getByRole('dialog'), '/current/Phone');
+    expect(within(failedRow).getByText('Currently unavailable')).toBeInTheDocument();
+    expect(within(failedRow).getByRole('button', { name: 'Unavailable' })).toBeDisabled();
     expect(testWindow.electronAPI.files.openFolder).toHaveBeenCalledTimes(1);
     expect(testWindow.electronAPI.files.openFolder).not.toHaveBeenCalledWith('/mock/receive/path');
   });
@@ -926,12 +936,14 @@ describe('ReceivedLibraryPage', () => {
     render(<ReceivedLibraryPage />);
     fireEvent.click(await screen.findByTitle('Open folder'));
     const dialog = await screen.findByRole('dialog');
-    const currentButton = within(dialog).getByRole('button', {
-      name: 'Open folder: /current/Phone',
-    });
-    const historicalButton = within(dialog).getByRole('button', {
-      name: 'Open folder: /history/Phone',
-    });
+    const currentButton = within(getReceiveLocationRow(dialog, '/current/Phone')).getByRole(
+      'button',
+      { name: 'Open' },
+    );
+    const historicalButton = within(getReceiveLocationRow(dialog, '/history/Phone')).getByRole(
+      'button',
+      { name: 'Open' },
+    );
     const copyButton = within(dialog).getAllByRole('button', { name: 'Copy path' })[0];
 
     fireEvent.click(currentButton);
@@ -967,9 +979,10 @@ describe('ReceivedLibraryPage', () => {
 
     render(<ReceivedLibraryPage />);
     fireEvent.click(await screen.findByTitle('Open folder'));
+    const dialog = await screen.findByRole('dialog');
     fireEvent.click(
-      within(await screen.findByRole('dialog')).getByRole('button', {
-        name: 'Open folder: /history/Phone',
+      within(getReceiveLocationRow(dialog, '/history/Phone')).getByRole('button', {
+        name: 'Open',
       }),
     );
 
@@ -991,7 +1004,9 @@ describe('ReceivedLibraryPage', () => {
     fireEvent.click(triggers[0]);
     const firstDialog = await screen.findByRole('dialog');
     fireEvent.click(
-      within(firstDialog).getByRole('button', { name: 'Open folder: /first/current' }),
+      within(getReceiveLocationRow(firstDialog, '/first/current')).getByRole('button', {
+        name: 'Open',
+      }),
     );
     expect(testWindow.electronAPI.files.openFolder).toHaveBeenCalledWith('/first/current');
     fireEvent.keyDown(document, { key: 'Escape' });
@@ -999,7 +1014,9 @@ describe('ReceivedLibraryPage', () => {
 
     fireEvent.click(triggers[1]);
     const secondDialog = await screen.findByRole('dialog');
-    expect(within(secondDialog).getByText('Second Phone')).toBeInTheDocument();
+    expect(
+      within(secondDialog).getByText('View and open folders used by Second Phone'),
+    ).toBeInTheDocument();
 
     await act(async () => {
       oldFailure.reject(new Error('old folder missing'));
@@ -1020,7 +1037,9 @@ describe('ReceivedLibraryPage', () => {
     fireEvent.click(triggers[0]);
     const firstDialog = await screen.findByRole('dialog');
     fireEvent.click(
-      within(firstDialog).getByRole('button', { name: 'Open folder: /first/current' }),
+      within(getReceiveLocationRow(firstDialog, '/first/current')).getByRole('button', {
+        name: 'Open',
+      }),
     );
     expect(testWindow.electronAPI.files.openFolder).toHaveBeenCalledTimes(1);
     expect(testWindow.electronAPI.files.openFolder).toHaveBeenCalledWith('/first/current');
@@ -1029,14 +1048,18 @@ describe('ReceivedLibraryPage', () => {
 
     fireEvent.click(triggers[1]);
     const secondDialog = await screen.findByRole('dialog');
-    expect(within(secondDialog).getByText('Second Phone')).toBeInTheDocument();
+    expect(
+      within(secondDialog).getByText('View and open folders used by Second Phone'),
+    ).toBeInTheDocument();
 
     await act(async () => {
       oldSuccess.resolve();
     });
     const currentDialog = screen.getByRole('dialog');
     expect(currentDialog).toBeInTheDocument();
-    expect(within(currentDialog).getByText('Second Phone')).toBeInTheDocument();
+    expect(
+      within(currentDialog).getByText('View and open folders used by Second Phone'),
+    ).toBeInTheDocument();
   });
 
   it('returns focus to the invoking folder button after Escape closes the dialog', async () => {
