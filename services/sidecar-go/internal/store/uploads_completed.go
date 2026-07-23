@@ -83,6 +83,15 @@ func (s *Store) RecordDeviceReceiveLocation(clientID, path, lastUsedAt string) e
 	return nil
 }
 
+func (s *Store) InvalidateDeviceReceiveLocationBackfill(clientID string) error {
+	if _, err := s.db.Exec(`
+		DELETE FROM device_receive_location_backfills WHERE client_id = ?`, clientID,
+	); err != nil {
+		return fmt.Errorf("invalidate receive location backfill for %q: %w", clientID, err)
+	}
+	return nil
+}
+
 // ListCompletedUploadLocationsByDevice returns the minimal completed-upload
 // fields required to derive a device's receive folders.
 func (s *Store) ListCompletedUploadLocationsByDevice(clientID string) ([]CompletedUploadLocation, error) {

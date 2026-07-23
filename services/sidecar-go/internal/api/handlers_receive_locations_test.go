@@ -59,6 +59,34 @@ func TestDeriveDeviceReceiveLocationsFiltersDeduplicatesAndSorts(t *testing.T) {
 	assertReceiveLocations(t, got, want)
 }
 
+func TestDeriveDeviceReceiveLocationsChecksAvailabilityOncePerFolder(t *testing.T) {
+	receiveDir := filepath.Join(t.TempDir(), "received")
+	deviceFolder := filepath.Join(receiveDir, "Phone")
+	older := "2026-07-20T09:00:00Z"
+	newer := "2026-07-22T12:00:00Z"
+	uploads := []store.CompletedUploadLocation{
+		locationUpload(filepath.Join("Phone", "2026-07-20", "one.jpg"), &older, older),
+		locationUpload(filepath.Join("Phone", "2026-07-21", "two.jpg"), nil, newer),
+		locationUpload(filepath.Join("Phone", "2026-07-22", "three.jpg"), &newer, newer),
+	}
+	checks := 0
+
+	got := deriveDeviceReceiveLocationsWithDirectoryCheck(receiveDir, uploads, func(path string) bool {
+		checks++
+		if path != deviceFolder {
+			t.Fatalf("availability check path = %q, want %q", path, deviceFolder)
+		}
+		return true
+	})
+
+	if checks != 1 {
+		t.Fatalf("availability checks = %d, want 1", checks)
+	}
+	assertReceiveLocations(t, got, []deviceReceiveLocation{{
+		Path: deviceFolder, Available: true, IsCurrent: true, LastUsedAt: newer,
+	}})
+}
+
 func TestRenderDeviceReceiveLocationsRejectsUnsafeAndInvalidEntries(t *testing.T) {
 	receiveDir := filepath.Join(t.TempDir(), "received")
 	currentFolder := filepath.Join(receiveDir, "Phone")
@@ -144,7 +172,7 @@ func TestDeviceReceiveLocationsEndpointBackfillsPersistsAndIsLocalOnly(t *testin
 	}
 }
 
-func TestDeviceReceiveLocationsEndpointRepairsMissingIndexEntriesFromCompletedUploads(t *testing.T) {
+func TestDeviceReceiveLocationsEndpointUsesPersistedIndexAndRepairsAfterInvalidation(t *testing.T) {
 	st, cfg, hub := newReceiveLocationsTestEnv(t)
 	currentFolder := filepath.Join(cfg.ReceiveDir, "Phone")
 	historicalFolder := filepath.Join(t.TempDir(), "Archive", "Old Phone")
@@ -180,17 +208,24 @@ func TestDeviceReceiveLocationsEndpointRepairsMissingIndexEntriesFromCompletedUp
 	)
 
 	second := getReceiveLocations(t, httpServer.URL+"/devices/client-1/receive-locations")
+	assertReceiveLocations(t, second, first)
+
+	if err := st.InvalidateDeviceReceiveLocationBackfill("client-1"); err != nil {
+		t.Fatalf("invalidate receive location backfill: %v", err)
+	}
+
+	third := getReceiveLocations(t, httpServer.URL+"/devices/client-1/receive-locations")
 	want := []deviceReceiveLocation{
 		{Path: currentFolder, Available: false, IsCurrent: true, LastUsedAt: currentUsedAt},
 		{Path: historicalFolder, Available: false, IsCurrent: false, LastUsedAt: historicalUsedAt},
 	}
-	assertReceiveLocations(t, second, want)
+	assertReceiveLocations(t, third, want)
 
 	if _, err := st.DB().Exec("DELETE FROM uploads"); err != nil {
 		t.Fatalf("delete source uploads: %v", err)
 	}
-	third := getReceiveLocations(t, httpServer.URL+"/devices/client-1/receive-locations")
-	assertReceiveLocations(t, third, want)
+	fourth := getReceiveLocations(t, httpServer.URL+"/devices/client-1/receive-locations")
+	assertReceiveLocations(t, fourth, want)
 }
 
 func TestDeviceReceiveLocationsEndpointIncludesRecordedIndexBeforeBackfill(t *testing.T) {

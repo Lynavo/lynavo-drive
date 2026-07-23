@@ -39,9 +39,13 @@ func (s *Server) handleDeviceReceiveLocations(w http.ResponseWriter, r *http.Req
 		writeError(w, http.StatusInternalServerError, "failed to list receive locations")
 		return
 	}
+	if backfilled {
+		writeJSON(w, http.StatusOK, renderDeviceReceiveLocations(s.config.ReceiveDir, stored))
+		return
+	}
 	uploads, err := s.store.ListCompletedUploadLocationsByDevice(deviceID)
 	if err != nil {
-		if backfilled || len(stored) > 0 {
+		if len(stored) > 0 {
 			slog.Warn("repair device receive locations", "err", err, "deviceId", deviceID)
 			writeJSON(w, http.StatusOK, renderDeviceReceiveLocations(s.config.ReceiveDir, stored))
 			return
@@ -71,6 +75,18 @@ func (s *Server) handleDeviceReceiveLocations(w http.ResponseWriter, r *http.Req
 func deriveDeviceReceiveLocations(
 	receiveDir string,
 	uploads []store.CompletedUploadLocation,
+) []deviceReceiveLocation {
+	return deriveDeviceReceiveLocationsWithDirectoryCheck(
+		receiveDir,
+		uploads,
+		isReceiveLocationDirectory,
+	)
+}
+
+func deriveDeviceReceiveLocationsWithDirectoryCheck(
+	receiveDir string,
+	uploads []store.CompletedUploadLocation,
+	directoryAvailable func(string) bool,
 ) []deviceReceiveLocation {
 	locationsByPath := make(map[string]derivedDeviceReceiveLocation)
 	for _, upload := range uploads {
@@ -113,7 +129,7 @@ func deriveDeviceReceiveLocations(
 		locationsByPath[key] = candidate
 	}
 
-	return sortedDeviceReceiveLocations(locationsByPath)
+	return sortedDeviceReceiveLocations(locationsByPath, directoryAvailable)
 }
 
 func renderDeviceReceiveLocations(
@@ -139,7 +155,7 @@ func renderDeviceReceiveLocations(
 		locationsByPath[key] = candidate
 	}
 
-	return sortedDeviceReceiveLocations(locationsByPath)
+	return sortedDeviceReceiveLocations(locationsByPath, isReceiveLocationDirectory)
 }
 
 func newDerivedDeviceReceiveLocation(
@@ -150,7 +166,6 @@ func newDerivedDeviceReceiveLocation(
 	return derivedDeviceReceiveLocation{
 		deviceReceiveLocation: deviceReceiveLocation{
 			Path:       path,
-			Available:  isReceiveLocationDirectory(path),
 			IsCurrent:  pathWithinReceiveRoot(receiveDir, path),
 			LastUsedAt: lastUsedTime.Format(time.RFC3339),
 		},
@@ -167,6 +182,7 @@ func newerReceiveLocation(candidate, existing derivedDeviceReceiveLocation) bool
 
 func sortedDeviceReceiveLocations(
 	locationsByPath map[string]derivedDeviceReceiveLocation,
+	directoryAvailable func(string) bool,
 ) []deviceReceiveLocation {
 	derived := make([]derivedDeviceReceiveLocation, 0, len(locationsByPath))
 	for _, location := range locationsByPath {
@@ -184,6 +200,7 @@ func sortedDeviceReceiveLocations(
 
 	locations := make([]deviceReceiveLocation, 0, len(derived))
 	for _, location := range derived {
+		location.Available = directoryAvailable(location.Path)
 		locations = append(locations, location.deviceReceiveLocation)
 	}
 	return locations

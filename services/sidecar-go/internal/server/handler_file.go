@@ -483,6 +483,13 @@ func (c *connection) handleFileEnd(body []byte) error {
 			time.Now().UTC().Format(time.RFC3339),
 		); err != nil {
 			slog.Warn("failed to record device receive location", "fileKey", req.FileKey, "err", err)
+			if invalidateErr := c.store.InvalidateDeviceReceiveLocationBackfill(c.clientID); invalidateErr != nil {
+				slog.Warn(
+					"failed to invalidate device receive location backfill",
+					"fileKey", req.FileKey,
+					"err", invalidateErr,
+				)
+			}
 		}
 	}
 	storeCompleteElapsed := time.Since(storeCompleteStart)

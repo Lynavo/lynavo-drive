@@ -817,6 +817,9 @@ func TestReceiveLocationIndexFailureDoesNotFailCompletedUpload(t *testing.T) {
 	defer cleanup()
 
 	_ = doPairing(t, client)
+	if err := st.CacheDeviceReceiveLocations(testClientID, nil); err != nil {
+		t.Fatalf("mark receive locations backfilled: %v", err)
+	}
 	payload := []byte("completed upload")
 	doSyncBegin(t, client, "sess-index-failure", 1, int64(len(payload)))
 
@@ -850,6 +853,13 @@ func TestReceiveLocationIndexFailureDoesNotFailCompletedUpload(t *testing.T) {
 	}
 	if upload.Status != "completed" {
 		t.Fatalf("upload status=%q, want completed", upload.Status)
+	}
+	_, backfilled, err := st.ListDeviceReceiveLocations(testClientID)
+	if err != nil {
+		t.Fatalf("ListDeviceReceiveLocations: %v", err)
+	}
+	if backfilled {
+		t.Fatal("receive location index failure must invalidate the backfill marker")
 	}
 }
 
