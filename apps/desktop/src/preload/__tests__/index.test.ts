@@ -6,6 +6,7 @@ const exposed = vi.hoisted(() => ({
     | {
         sidecar: {
           getConnectionDevices(): Promise<unknown>;
+          getDeviceReceiveLocations(clientId: string): Promise<unknown>;
           revokeConnectionDevice(clientId: string): Promise<unknown>;
           clearBlockedClient(clientId: string): Promise<unknown>;
           getManagedDevices(): Promise<unknown>;
@@ -52,6 +53,7 @@ const allowedSidecarApiKeys = [
   'getDashboardSummary',
   'getDeviceDates',
   'getDeviceFiles',
+  'getDeviceReceiveLocations',
   'getHealth',
   'getManagedDevices',
   'getReceivedLibrary',
@@ -115,6 +117,7 @@ describe('preload electronAPI', () => {
     await import('../index');
 
     await exposed.api?.sidecar.getConnectionDevices();
+    await exposed.api?.sidecar.getDeviceReceiveLocations('phone/a b');
     await exposed.api?.sidecar.revokeConnectionDevice('phone-a');
     await exposed.api?.sidecar.clearBlockedClient('phone-a');
     await exposed.api?.sidecar.getManagedDevices();
@@ -131,6 +134,7 @@ describe('preload electronAPI', () => {
     await exposed.api?.sidecar.getReceivedLibrary({ page: 2, pageSize: 30 });
 
     expect(exposed.invoke).toHaveBeenCalledWith('sidecar:connection-devices');
+    expect(exposed.invoke).toHaveBeenCalledWith('sidecar:device-receive-locations', 'phone/a b');
     expect(exposed.invoke).toHaveBeenCalledWith('sidecar:revoke-connection-device', 'phone-a');
     expect(exposed.invoke).toHaveBeenCalledWith('sidecar:clear-blocked-client', 'phone-a');
     expect(exposed.invoke).toHaveBeenCalledWith('sidecar:managed-devices');

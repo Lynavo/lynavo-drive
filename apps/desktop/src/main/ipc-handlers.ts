@@ -26,6 +26,7 @@ export const IPC = {
   SIDECAR_DASHBOARD_DEVICES: 'sidecar:dashboard-devices',
   SIDECAR_DEVICE_FILES: 'sidecar:device-files',
   SIDECAR_DEVICE_DATES: 'sidecar:device-dates',
+  SIDECAR_DEVICE_RECEIVE_LOCATIONS: 'sidecar:device-receive-locations',
   SIDECAR_SETTINGS: 'sidecar:settings',
   SIDECAR_UPDATE_SETTINGS: 'sidecar:update-settings',
   SIDECAR_CONNECTION_DEVICES: 'sidecar:connection-devices',
@@ -102,6 +103,9 @@ export function registerIpcHandlers(
   );
   ipcMain.handle(IPC.SIDECAR_DEVICE_DATES, (_e, deviceId: string) =>
     sidecarClient.getDeviceDates(deviceId),
+  );
+  ipcMain.handle(IPC.SIDECAR_DEVICE_RECEIVE_LOCATIONS, (_e, clientId: string) =>
+    sidecarClient.getDeviceReceiveLocations(clientId),
   );
   ipcMain.handle(IPC.SIDECAR_SETTINGS, () => sidecarClient.getSettings());
   ipcMain.handle(IPC.SIDECAR_UPDATE_SETTINGS, (_e, partial) =>

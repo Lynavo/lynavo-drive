@@ -10,6 +10,7 @@ import type {
   DesktopSyncRecordDTO,
   DeviceFileLedgerPageDTO,
   DeviceFileSortField,
+  DeviceReceiveLocationDTO,
   ReceivedLibraryItemDTO,
   ReceivedLibraryPageDTO,
   SortDirection,
@@ -195,6 +196,11 @@ export const sidecarClient = {
     return request<DeviceFileLedgerPageDTO>('GET', `/devices/${id}/files?${params.toString()}`);
   },
   getDeviceDates: (id: string) => request<{ dates: string[] }>('GET', `/devices/${id}/dates`),
+  getDeviceReceiveLocations: (clientId: string) =>
+    request<DeviceReceiveLocationDTO[]>(
+      'GET',
+      `/devices/${encodeURIComponent(clientId)}/receive-locations`,
+    ),
   getSettings: () => request<import('@lynavo-drive/contracts').SettingsDTO>('GET', '/settings'),
   updateSettings: (s: Partial<import('@lynavo-drive/contracts').SettingsDTO>) =>
     request<import('@lynavo-drive/contracts').SettingsDTO>('PUT', '/settings', s),

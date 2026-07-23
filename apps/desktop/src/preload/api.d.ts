@@ -10,6 +10,7 @@ import type {
   DesktopSyncRecordDTO,
   DeviceFileLedgerPageDTO,
   DeviceFileSortField,
+  DeviceReceiveLocationDTO,
   ReceivedLibraryPageDTO,
   SettingsDTO,
   SharedDirectoryDTO,
@@ -41,6 +42,7 @@ export interface ElectronAPI {
       },
     ): Promise<DeviceFileLedgerPageDTO>;
     getDeviceDates(deviceId: string): Promise<{ dates: string[] }>;
+    getDeviceReceiveLocations(clientId: string): Promise<DeviceReceiveLocationDTO[]>;
     getSettings(): Promise<SettingsDTO>;
     updateSettings(settings: Partial<SettingsDTO>): Promise<SettingsDTO>;
     getConnectionDevices(): Promise<ConnectionDevicesSettingsDTO>;

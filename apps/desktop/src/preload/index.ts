@@ -13,6 +13,7 @@ const IPC = {
   SIDECAR_DASHBOARD_DEVICES: 'sidecar:dashboard-devices',
   SIDECAR_DEVICE_FILES: 'sidecar:device-files',
   SIDECAR_DEVICE_DATES: 'sidecar:device-dates',
+  SIDECAR_DEVICE_RECEIVE_LOCATIONS: 'sidecar:device-receive-locations',
   SIDECAR_SETTINGS: 'sidecar:settings',
   SIDECAR_UPDATE_SETTINGS: 'sidecar:update-settings',
   SIDECAR_CONNECTION_DEVICES: 'sidecar:connection-devices',
@@ -67,6 +68,8 @@ const electronAPI: ElectronAPI = {
       },
     ) => ipcRenderer.invoke(IPC.SIDECAR_DEVICE_FILES, deviceId, date, options),
     getDeviceDates: (deviceId: string) => ipcRenderer.invoke(IPC.SIDECAR_DEVICE_DATES, deviceId),
+    getDeviceReceiveLocations: (clientId: string) =>
+      ipcRenderer.invoke(IPC.SIDECAR_DEVICE_RECEIVE_LOCATIONS, clientId),
     getSettings: () => ipcRenderer.invoke(IPC.SIDECAR_SETTINGS),
     updateSettings: (settings) => ipcRenderer.invoke(IPC.SIDECAR_UPDATE_SETTINGS, settings),
     getConnectionDevices: () => ipcRenderer.invoke(IPC.SIDECAR_CONNECTION_DEVICES),

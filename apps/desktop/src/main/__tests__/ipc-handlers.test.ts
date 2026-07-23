@@ -4,6 +4,7 @@ import {
   type DesktopManagedDeviceDTO,
   type DesktopSharedResourceDTO,
   type DesktopSyncRecordDTO,
+  type DeviceReceiveLocationDTO,
   type ReceivedLibraryItemDTO,
 } from '@lynavo-drive/contracts';
 import { IPC, registerIpcHandlers } from '../ipc-handlers';
@@ -94,6 +95,13 @@ const receivedLibraryFixture: ReceivedLibraryItemDTO = {
   shareStatus: 'not_shared',
 };
 
+const receiveLocationFixture: DeviceReceiveLocationDTO = {
+  path: '/Volumes/Archive/received/iPhone',
+  available: true,
+  isCurrent: false,
+  lastUsedAt: '2026-07-20T08:30:00Z',
+};
+
 const electronMockState = vi.hoisted(() => {
   const browserWindowInstance = {
     once: vi.fn((event: string, callback: () => void) => {
@@ -156,6 +164,7 @@ vi.mock('../sidecar-client', async () => {
       getDashboardDevices: vi.fn(),
       getDeviceFiles: vi.fn(),
       getDeviceDates: vi.fn(),
+      getDeviceReceiveLocations: vi.fn(),
       getSettings: vi.fn(),
       updateSettings: vi.fn(),
       regenerateConnectionCode: vi.fn(),
@@ -228,6 +237,16 @@ describe('registerIpcHandlers', () => {
 
     await expect(handler({}, '238416')).resolves.toEqual({ code: '238416' });
     expect(sidecarClient.setConnectionCode).toHaveBeenCalledWith('238416');
+  });
+
+  it('forwards device receive location requests through IPC', async () => {
+    vi.mocked(sidecarClient.getDeviceReceiveLocations).mockResolvedValue([receiveLocationFixture]);
+
+    registerIpcHandlers({ retryStart: vi.fn() } as never);
+    const handler = handlers.get(IPC.SIDECAR_DEVICE_RECEIVE_LOCATIONS);
+
+    await expect(handler?.(undefined, 'phone/a b')).resolves.toEqual([receiveLocationFixture]);
+    expect(sidecarClient.getDeviceReceiveLocations).toHaveBeenCalledWith('phone/a b');
   });
 
   it('registers diagnostics export IPC with description payload', async () => {
