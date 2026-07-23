@@ -11,10 +11,6 @@ func (s *Store) ListDeviceReceiveLocations(clientID string) ([]DeviceReceiveLoca
 	).Scan(&backfilled); err != nil {
 		return nil, false, fmt.Errorf("check receive location backfill for %q: %w", clientID, err)
 	}
-	if backfilled == 0 {
-		return nil, false, nil
-	}
-
 	rows, err := s.db.Query(`
 		SELECT path, last_used_at
 		FROM device_receive_locations
@@ -36,7 +32,7 @@ func (s *Store) ListDeviceReceiveLocations(clientID string) ([]DeviceReceiveLoca
 	if err := rows.Err(); err != nil {
 		return nil, false, fmt.Errorf("iterate device receive locations for %q: %w", clientID, err)
 	}
-	return locations, true, nil
+	return locations, backfilled != 0, nil
 }
 
 func (s *Store) CacheDeviceReceiveLocations(clientID string, locations []DeviceReceiveLocation) error {
@@ -74,7 +70,11 @@ func (s *Store) RecordDeviceReceiveLocation(clientID, path, lastUsedAt string) e
 	_, err := s.db.Exec(`
 		INSERT INTO device_receive_locations (client_id, path, last_used_at)
 		VALUES (?, ?, ?)
-		ON CONFLICT(client_id, path) DO UPDATE SET last_used_at = excluded.last_used_at`,
+		ON CONFLICT(client_id, path) DO UPDATE SET
+			last_used_at = CASE
+				WHEN excluded.last_used_at > last_used_at THEN excluded.last_used_at
+				ELSE last_used_at
+			END`,
 		clientID, path, lastUsedAt,
 	)
 	if err != nil {

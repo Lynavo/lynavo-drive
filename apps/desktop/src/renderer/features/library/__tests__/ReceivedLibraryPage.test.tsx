@@ -151,6 +151,35 @@ function addSecondReceivedLibraryDevice() {
   });
 }
 
+function mockTwoDeviceReceiveLocations() {
+  vi.mocked(testWindow.electronAPI.sidecar.getDeviceReceiveLocations).mockImplementation(
+    async (clientId) =>
+      clientId === 'client-1'
+        ? [
+            {
+              path: '/first/current',
+              available: true,
+              isCurrent: true,
+              lastUsedAt: '2026-07-20T00:00:00Z',
+            },
+            {
+              path: '/first/history',
+              available: true,
+              isCurrent: false,
+              lastUsedAt: '2026-07-10T00:00:00Z',
+            },
+          ]
+        : [
+            {
+              path: '/second/current',
+              available: false,
+              isCurrent: true,
+              lastUsedAt: '2026-07-21T00:00:00Z',
+            },
+          ],
+  );
+}
+
 function createDeferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
   let reject!: (reason?: unknown) => void;
@@ -672,6 +701,31 @@ describe('ReceivedLibraryPage', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('does not open a receive location after the page unmounts', async () => {
+    seedReceivedLibraryDevice();
+    const query = createDeferred<DeviceReceiveLocationDTO[]>();
+    vi.mocked(testWindow.electronAPI.sidecar.getDeviceReceiveLocations).mockReturnValue(
+      query.promise,
+    );
+
+    const { unmount } = render(<ReceivedLibraryPage />);
+    fireEvent.click(await screen.findByTitle('Open folder'));
+    unmount();
+
+    await act(async () => {
+      query.resolve([
+        {
+          path: '/current/Phone',
+          available: true,
+          isCurrent: true,
+          lastUsedAt: '2026-07-20T00:00:00Z',
+        },
+      ]);
+    });
+
+    expect(testWindow.electronAPI.files.openFolder).not.toHaveBeenCalled();
+  });
+
   it('shows multiple locations in sidecar order with the device name and statuses', async () => {
     seedReceivedLibraryDevice();
     mockReceiveLocations([
@@ -850,6 +904,50 @@ describe('ReceivedLibraryPage', () => {
     expect(testWindow.electronAPI.files.openFolder).not.toHaveBeenCalledWith('/mock/receive/path');
   });
 
+  it('allows only one receive location open request at a time', async () => {
+    seedReceivedLibraryDevice();
+    mockReceiveLocations([
+      {
+        path: '/current/Phone',
+        available: true,
+        isCurrent: true,
+        lastUsedAt: '2026-07-20T00:00:00Z',
+      },
+      {
+        path: '/history/Phone',
+        available: true,
+        isCurrent: false,
+        lastUsedAt: '2026-07-10T00:00:00Z',
+      },
+    ]);
+    const openRequest = createDeferred<void>();
+    vi.mocked(testWindow.electronAPI.files.openFolder).mockReturnValue(openRequest.promise);
+
+    render(<ReceivedLibraryPage />);
+    fireEvent.click(await screen.findByTitle('Open folder'));
+    const dialog = await screen.findByRole('dialog');
+    const currentButton = within(dialog).getByRole('button', {
+      name: 'Open folder: /current/Phone',
+    });
+    const historicalButton = within(dialog).getByRole('button', {
+      name: 'Open folder: /history/Phone',
+    });
+    const copyButton = within(dialog).getAllByRole('button', { name: 'Copy path' })[0];
+
+    fireEvent.click(currentButton);
+    fireEvent.click(currentButton);
+    fireEvent.click(historicalButton);
+
+    expect(testWindow.electronAPI.files.openFolder).toHaveBeenCalledTimes(1);
+    expect(currentButton).toBeDisabled();
+    expect(historicalButton).toBeDisabled();
+    expect(copyButton).toBeEnabled();
+
+    await act(async () => {
+      openRequest.resolve();
+    });
+  });
+
   it('closes the dialog after opening an available location successfully', async () => {
     seedReceivedLibraryDevice();
     mockReceiveLocations([
@@ -881,40 +979,12 @@ describe('ReceivedLibraryPage', () => {
     });
   });
 
-  it('ignores open completions from a closed dialog after another device dialog opens', async () => {
+  it('ignores a failed open completion from a closed dialog after another device dialog opens', async () => {
     seedReceivedLibraryDevice();
     addSecondReceivedLibraryDevice();
-    vi.mocked(testWindow.electronAPI.sidecar.getDeviceReceiveLocations).mockImplementation(
-      async (clientId) =>
-        clientId === 'client-1'
-          ? [
-              {
-                path: '/first/current',
-                available: true,
-                isCurrent: true,
-                lastUsedAt: '2026-07-20T00:00:00Z',
-              },
-              {
-                path: '/first/history',
-                available: true,
-                isCurrent: false,
-                lastUsedAt: '2026-07-10T00:00:00Z',
-              },
-            ]
-          : [
-              {
-                path: '/second/current',
-                available: false,
-                isCurrent: true,
-                lastUsedAt: '2026-07-21T00:00:00Z',
-              },
-            ],
-    );
+    mockTwoDeviceReceiveLocations();
     const oldFailure = createDeferred<void>();
-    const oldSuccess = createDeferred<void>();
-    vi.mocked(testWindow.electronAPI.files.openFolder).mockImplementation((path) =>
-      path === '/first/current' ? oldFailure.promise : oldSuccess.promise,
-    );
+    vi.mocked(testWindow.electronAPI.files.openFolder).mockReturnValue(oldFailure.promise);
 
     render(<ReceivedLibraryPage />);
     const triggers = await screen.findAllByTitle('Open folder');
@@ -923,9 +993,7 @@ describe('ReceivedLibraryPage', () => {
     fireEvent.click(
       within(firstDialog).getByRole('button', { name: 'Open folder: /first/current' }),
     );
-    fireEvent.click(
-      within(firstDialog).getByRole('button', { name: 'Open folder: /first/history' }),
-    );
+    expect(testWindow.electronAPI.files.openFolder).toHaveBeenCalledWith('/first/current');
     fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
@@ -938,6 +1006,30 @@ describe('ReceivedLibraryPage', () => {
     });
     expect(toast.error).not.toHaveBeenCalled();
     expect(within(screen.getByRole('dialog')).getByText('/second/current')).toBeInTheDocument();
+  });
+
+  it('ignores a successful open completion from a closed dialog after another device dialog opens', async () => {
+    seedReceivedLibraryDevice();
+    addSecondReceivedLibraryDevice();
+    mockTwoDeviceReceiveLocations();
+    const oldSuccess = createDeferred<void>();
+    vi.mocked(testWindow.electronAPI.files.openFolder).mockReturnValue(oldSuccess.promise);
+
+    render(<ReceivedLibraryPage />);
+    const triggers = await screen.findAllByTitle('Open folder');
+    fireEvent.click(triggers[0]);
+    const firstDialog = await screen.findByRole('dialog');
+    fireEvent.click(
+      within(firstDialog).getByRole('button', { name: 'Open folder: /first/current' }),
+    );
+    expect(testWindow.electronAPI.files.openFolder).toHaveBeenCalledTimes(1);
+    expect(testWindow.electronAPI.files.openFolder).toHaveBeenCalledWith('/first/current');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    fireEvent.click(triggers[1]);
+    const secondDialog = await screen.findByRole('dialog');
+    expect(within(secondDialog).getByText('Second Phone')).toBeInTheDocument();
 
     await act(async () => {
       oldSuccess.resolve();

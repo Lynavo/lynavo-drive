@@ -812,6 +812,47 @@ func TestFullPairingAndFileTransfer(t *testing.T) {
 	}
 }
 
+func TestReceiveLocationIndexFailureDoesNotFailCompletedUpload(t *testing.T) {
+	client, st, _, cleanup := setupTestConnection(t)
+	defer cleanup()
+
+	_ = doPairing(t, client)
+	payload := []byte("completed upload")
+	doSyncBegin(t, client, "sess-index-failure", 1, int64(len(payload)))
+
+	fileKey := "photo-index-failure"
+	initRes := doFileInit(t, client, fileKey, "index-failure.jpg", int64(len(payload)))
+	if initRes.Action != "UPLOAD" {
+		t.Fatalf("expected action=UPLOAD, got %q", initRes.Action)
+	}
+
+	sendFileData(t, client, fileKey, 0, payload)
+	var ack protocol.FileAck
+	recvJSON(t, client, protocol.TypeFileAck, &ack)
+
+	if _, err := st.DB().Exec(`
+		CREATE TRIGGER fail_receive_location_insert
+		BEFORE INSERT ON device_receive_locations
+		BEGIN
+			SELECT RAISE(FAIL, 'forced receive location index failure');
+		END`); err != nil {
+		t.Fatalf("create receive location failure trigger: %v", err)
+	}
+
+	hash := sha256.Sum256(payload)
+	endRes := doFileEnd(t, client, fileKey, int64(len(payload)), hex.EncodeToString(hash[:]))
+	if !endRes.OK {
+		t.Fatal("FileEndRes.OK=false when receive location indexing fails")
+	}
+	upload, err := st.GetUpload(fileKey)
+	if err != nil {
+		t.Fatalf("GetUpload: %v", err)
+	}
+	if upload.Status != "completed" {
+		t.Fatalf("upload status=%q, want completed", upload.Status)
+	}
+}
+
 func TestCompletedSessionStaysCompletedAfterDisconnect(t *testing.T) {
 	client, st, _, done, cleanup := setupTestConnectionWithTCPServerDone(t)
 	defer cleanup()

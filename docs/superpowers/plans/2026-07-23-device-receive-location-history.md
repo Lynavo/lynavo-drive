@@ -400,7 +400,7 @@ Opening a dialog row calls the file bridge with that row's path, closes only aft
 
 - [ ] **Step 5: Add all locale keys**
 
-Under `directory.library`, add equivalent keys in all three locale files for `locationDialog.title`, `locationDialog.current`, `locationDialog.history`, `locationDialog.unavailable`, `locationDialog.copyPath`, `locationDialog.close`, `toasts.noReceiveLocations`, and `toasts.receiveLocationsUnavailable`. Taiwan Traditional Chinese values must use `同步資料夾`, `目前位置`, `歷史位置`, `目前無法存取`, and `找不到可用的同步目錄`.
+Under `directory.library`, add equivalent keys in all three locale files for `locationDialog.title`, `locationDialog.current`, `locationDialog.history`, `locationDialog.unavailable`, `locationDialog.copyPath`, `locationDialog.close`, `toasts.noReceiveLocations`, and `toasts.receiveLocationsUnavailable`. Use Taiwan-standard terminology for the Traditional Chinese translations.
 
 - [ ] **Step 6: Verify the renderer and commit**
 

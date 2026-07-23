@@ -219,8 +219,23 @@ export function ReceivedLibraryPage() {
   const locationQueryRequestRef = useRef(0);
   const nextLocationDialogSessionRef = useRef(0);
   const activeLocationDialogSessionRef = useRef<number | null>(null);
+  const openingLocationDialogSessionRef = useRef<number | null>(null);
+  const locationPageMountedRef = useRef(true);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const [locationDialogState, setLocationDialogState] = useState<LocationDialogState | null>(null);
+  const [openingLocationDialogSessionId, setOpeningLocationDialogSessionId] = useState<
+    number | null
+  >(null);
+
+  useEffect(() => {
+    locationPageMountedRef.current = true;
+    return () => {
+      locationPageMountedRef.current = false;
+      locationQueryRequestRef.current += 1;
+      activeLocationDialogSessionRef.current = null;
+      openingLocationDialogSessionRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     void loadReceivedLibrary();
@@ -332,7 +347,7 @@ export function ReceivedLibraryPage() {
 
     try {
       const locations = await getReceiveLocations(clientId);
-      if (requestId !== locationQueryRequestRef.current) return;
+      if (!locationPageMountedRef.current || requestId !== locationQueryRequestRef.current) return;
 
       if (locations.length === 0) {
         toast.error(t('directory.library.toasts.noReceiveLocations'));
@@ -349,7 +364,7 @@ export function ReceivedLibraryPage() {
         try {
           await openFolder(locations[0].path);
         } catch {
-          if (requestId === locationQueryRequestRef.current) {
+          if (locationPageMountedRef.current && requestId === locationQueryRequestRef.current) {
             toast.error(t('directory.library.toasts.devicePathMissing'));
           }
         }
@@ -358,6 +373,8 @@ export function ReceivedLibraryPage() {
 
       const sessionId = ++nextLocationDialogSessionRef.current;
       activeLocationDialogSessionRef.current = sessionId;
+      openingLocationDialogSessionRef.current = null;
+      setOpeningLocationDialogSessionId(null);
       setLocationDialogState({
         sessionId,
         deviceName: displayName,
@@ -367,7 +384,7 @@ export function ReceivedLibraryPage() {
       });
       setLocationDialogOpen(true);
     } catch {
-      if (requestId === locationQueryRequestRef.current) {
+      if (locationPageMountedRef.current && requestId === locationQueryRequestRef.current) {
         toast.error(t('directory.library.toasts.receiveLocationsUnavailable'));
       }
     }
@@ -387,6 +404,7 @@ export function ReceivedLibraryPage() {
   const handleOpenLocation = (location: DeviceReceiveLocationDTO) => {
     const sessionId = locationDialogState?.sessionId;
     if (sessionId == null || activeLocationDialogSessionRef.current !== sessionId) return;
+    if (openingLocationDialogSessionRef.current != null) return;
 
     const openFolder = window.electronAPI?.files.openFolder;
     if (!openFolder) {
@@ -395,21 +413,31 @@ export function ReceivedLibraryPage() {
       return;
     }
 
+    openingLocationDialogSessionRef.current = sessionId;
+    setOpeningLocationDialogSessionId(sessionId);
     void openFolder(location.path)
       .then(() => {
         if (activeLocationDialogSessionRef.current !== sessionId) return;
+        openingLocationDialogSessionRef.current = null;
+        setOpeningLocationDialogSessionId(null);
         activeLocationDialogSessionRef.current = null;
         setLocationDialogOpen(false);
       })
       .catch(() => {
         if (activeLocationDialogSessionRef.current !== sessionId) return;
+        openingLocationDialogSessionRef.current = null;
+        setOpeningLocationDialogSessionId(null);
         markLocationUnavailable(sessionId, location.path);
         toast.error(t('directory.library.toasts.devicePathMissing'));
       });
   };
 
   const handleLocationDialogOpenChange = (open: boolean) => {
-    if (!open) activeLocationDialogSessionRef.current = null;
+    if (!open) {
+      activeLocationDialogSessionRef.current = null;
+      openingLocationDialogSessionRef.current = null;
+      setOpeningLocationDialogSessionId(null);
+    }
     setLocationDialogOpen(open);
   };
 
@@ -631,6 +659,7 @@ export function ReceivedLibraryPage() {
               : location,
           ) ?? []
         }
+        opening={openingLocationDialogSessionId === locationDialogState?.sessionId}
         returnFocusElement={locationDialogState?.returnFocusElement ?? null}
         onOpenChange={handleLocationDialogOpenChange}
         onOpenLocation={handleOpenLocation}

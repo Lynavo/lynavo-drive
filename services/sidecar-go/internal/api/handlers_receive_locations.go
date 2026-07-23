@@ -39,13 +39,13 @@ func (s *Server) handleDeviceReceiveLocations(w http.ResponseWriter, r *http.Req
 		writeError(w, http.StatusInternalServerError, "failed to list receive locations")
 		return
 	}
-	if backfilled {
-		writeJSON(w, http.StatusOK, renderDeviceReceiveLocations(s.config.ReceiveDir, stored))
-		return
-	}
-
 	uploads, err := s.store.ListCompletedUploadLocationsByDevice(deviceID)
 	if err != nil {
+		if backfilled || len(stored) > 0 {
+			slog.Warn("repair device receive locations", "err", err, "deviceId", deviceID)
+			writeJSON(w, http.StatusOK, renderDeviceReceiveLocations(s.config.ReceiveDir, stored))
+			return
+		}
 		slog.Error("backfill device receive locations", "err", err, "deviceId", deviceID)
 		writeError(w, http.StatusInternalServerError, "failed to list receive locations")
 		return
@@ -61,6 +61,9 @@ func (s *Server) handleDeviceReceiveLocations(w http.ResponseWriter, r *http.Req
 	if err := s.store.CacheDeviceReceiveLocations(deviceID, cacheEntries); err != nil {
 		slog.Warn("cache device receive locations", "err", err, "deviceId", deviceID)
 	}
+
+	stored = append(stored, cacheEntries...)
+	locations = renderDeviceReceiveLocations(s.config.ReceiveDir, stored)
 
 	writeJSON(w, http.StatusOK, locations)
 }

@@ -14,6 +14,7 @@ interface DeviceReceiveLocationDialogProps {
   open: boolean;
   deviceName: string;
   locations: DeviceReceiveLocationDTO[];
+  opening: boolean;
   returnFocusElement: HTMLButtonElement | null;
   onOpenChange(open: boolean): void;
   onOpenLocation(location: DeviceReceiveLocationDTO): void;
@@ -23,6 +24,7 @@ export function DeviceReceiveLocationDialog({
   open,
   deviceName,
   locations,
+  opening,
   returnFocusElement,
   onOpenChange,
   onOpenLocation,
@@ -75,7 +77,7 @@ export function DeviceReceiveLocationDialog({
             >
               <button
                 type="button"
-                disabled={!location.available}
+                disabled={!location.available || opening}
                 onClick={() => onOpenLocation(location)}
                 className="flex min-w-0 items-center gap-3 rounded-md px-2 py-2 text-left transition hover:bg-white/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1677d2]/45 disabled:cursor-not-allowed disabled:opacity-70"
                 aria-label={`${t('directory.library.locationDialog.open')}: ${location.path}`}

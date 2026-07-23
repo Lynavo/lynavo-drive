@@ -247,6 +247,9 @@ func TestDeviceReceiveLocationPersistence(t *testing.T) {
 	if err := s.RecordDeviceReceiveLocation("client-1", path, newer); err != nil {
 		t.Fatalf("RecordDeviceReceiveLocation: %v", err)
 	}
+	if err := s.RecordDeviceReceiveLocation("client-1", path, older); err != nil {
+		t.Fatalf("RecordDeviceReceiveLocation older: %v", err)
+	}
 
 	locations, backfilled, err := s.ListDeviceReceiveLocations("client-1")
 	if err != nil {
@@ -278,6 +281,27 @@ func TestDeviceReceiveLocationPersistence(t *testing.T) {
 		).Scan(&name); err != nil {
 			t.Errorf("%s %q not found: %v", object.objectType, object.name, err)
 		}
+	}
+}
+
+func TestListDeviceReceiveLocationsReturnsRecordedEntriesBeforeBackfill(t *testing.T) {
+	s := newTestStore(t)
+	path := filepath.Join(t.TempDir(), "Phone")
+	usedAt := "2026-07-19T11:00:00Z"
+
+	if err := s.RecordDeviceReceiveLocation("client-1", path, usedAt); err != nil {
+		t.Fatalf("RecordDeviceReceiveLocation: %v", err)
+	}
+
+	locations, backfilled, err := s.ListDeviceReceiveLocations("client-1")
+	if err != nil {
+		t.Fatalf("ListDeviceReceiveLocations: %v", err)
+	}
+	if backfilled {
+		t.Fatal("recording one location must not mark legacy history as backfilled")
+	}
+	if len(locations) != 1 || locations[0].Path != path || locations[0].LastUsedAt != usedAt {
+		t.Fatalf("locations=%+v, want path=%q lastUsedAt=%q", locations, path, usedAt)
 	}
 }
 

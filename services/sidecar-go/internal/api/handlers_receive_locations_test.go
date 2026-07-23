@@ -144,6 +144,117 @@ func TestDeviceReceiveLocationsEndpointBackfillsPersistsAndIsLocalOnly(t *testin
 	}
 }
 
+func TestDeviceReceiveLocationsEndpointRepairsMissingIndexEntriesFromCompletedUploads(t *testing.T) {
+	st, cfg, hub := newReceiveLocationsTestEnv(t)
+	currentFolder := filepath.Join(cfg.ReceiveDir, "Phone")
+	historicalFolder := filepath.Join(t.TempDir(), "Archive", "Old Phone")
+	currentUsedAt := "2026-07-20T12:00:00Z"
+	historicalUsedAt := "2026-07-22T12:00:00Z"
+	insertCompletedLocationUpload(
+		t,
+		st,
+		"current",
+		"client-1",
+		filepath.Join("Phone", "2026-07-20", "current.jpg"),
+		&currentUsedAt,
+		currentUsedAt,
+	)
+
+	_, handler := NewServer(st, cfg, hub, nil)
+	httpServer := httptest.NewServer(handler)
+	t.Cleanup(httpServer.Close)
+
+	first := getReceiveLocations(t, httpServer.URL+"/devices/client-1/receive-locations")
+	assertReceiveLocations(t, first, []deviceReceiveLocation{{
+		Path: currentFolder, Available: false, IsCurrent: true, LastUsedAt: currentUsedAt,
+	}})
+
+	insertCompletedLocationUpload(
+		t,
+		st,
+		"historical",
+		"client-1",
+		filepath.Join(historicalFolder, "2026-07-22", "historical.jpg"),
+		&historicalUsedAt,
+		historicalUsedAt,
+	)
+
+	second := getReceiveLocations(t, httpServer.URL+"/devices/client-1/receive-locations")
+	want := []deviceReceiveLocation{
+		{Path: currentFolder, Available: false, IsCurrent: true, LastUsedAt: currentUsedAt},
+		{Path: historicalFolder, Available: false, IsCurrent: false, LastUsedAt: historicalUsedAt},
+	}
+	assertReceiveLocations(t, second, want)
+
+	if _, err := st.DB().Exec("DELETE FROM uploads"); err != nil {
+		t.Fatalf("delete source uploads: %v", err)
+	}
+	third := getReceiveLocations(t, httpServer.URL+"/devices/client-1/receive-locations")
+	assertReceiveLocations(t, third, want)
+}
+
+func TestDeviceReceiveLocationsEndpointIncludesRecordedIndexBeforeBackfill(t *testing.T) {
+	st, cfg, hub := newReceiveLocationsTestEnv(t)
+	path := filepath.Join(t.TempDir(), "Archive", "Phone")
+	usedAt := "2026-07-22T12:00:00Z"
+	if err := st.RecordDeviceReceiveLocation("client-1", path, usedAt); err != nil {
+		t.Fatalf("RecordDeviceReceiveLocation: %v", err)
+	}
+
+	_, handler := NewServer(st, cfg, hub, nil)
+	httpServer := httptest.NewServer(handler)
+	t.Cleanup(httpServer.Close)
+
+	got := getReceiveLocations(t, httpServer.URL+"/devices/client-1/receive-locations")
+	assertReceiveLocations(t, got, []deviceReceiveLocation{{
+		Path: path, Available: false, IsCurrent: false, LastUsedAt: usedAt,
+	}})
+}
+
+func TestDeviceReceiveLocationsEndpointUsesPersistedIndexWhenUploadScanFails(t *testing.T) {
+	st, cfg, hub := newReceiveLocationsTestEnv(t)
+	path := filepath.Join(t.TempDir(), "Archive", "Phone")
+	usedAt := "2026-07-22T12:00:00Z"
+	if err := st.CacheDeviceReceiveLocations("client-1", []store.DeviceReceiveLocation{{
+		Path: path, LastUsedAt: usedAt,
+	}}); err != nil {
+		t.Fatalf("CacheDeviceReceiveLocations: %v", err)
+	}
+	if _, err := st.DB().Exec("DROP TABLE uploads"); err != nil {
+		t.Fatalf("drop uploads table: %v", err)
+	}
+
+	_, handler := NewServer(st, cfg, hub, nil)
+	httpServer := httptest.NewServer(handler)
+	t.Cleanup(httpServer.Close)
+
+	got := getReceiveLocations(t, httpServer.URL+"/devices/client-1/receive-locations")
+	assertReceiveLocations(t, got, []deviceReceiveLocation{{
+		Path: path, Available: false, IsCurrent: false, LastUsedAt: usedAt,
+	}})
+}
+
+func TestDeviceReceiveLocationsEndpointUsesRecordedIndexWhenInitialUploadScanFails(t *testing.T) {
+	st, cfg, hub := newReceiveLocationsTestEnv(t)
+	path := filepath.Join(t.TempDir(), "Archive", "Phone")
+	usedAt := "2026-07-22T12:00:00Z"
+	if err := st.RecordDeviceReceiveLocation("client-1", path, usedAt); err != nil {
+		t.Fatalf("RecordDeviceReceiveLocation: %v", err)
+	}
+	if _, err := st.DB().Exec("DROP TABLE uploads"); err != nil {
+		t.Fatalf("drop uploads table: %v", err)
+	}
+
+	_, handler := NewServer(st, cfg, hub, nil)
+	httpServer := httptest.NewServer(handler)
+	t.Cleanup(httpServer.Close)
+
+	got := getReceiveLocations(t, httpServer.URL+"/devices/client-1/receive-locations")
+	assertReceiveLocations(t, got, []deviceReceiveLocation{{
+		Path: path, Available: false, IsCurrent: false, LastUsedAt: usedAt,
+	}})
+}
+
 func TestDeviceReceiveLocationsEndpointFiltersInvalidPersistedRows(t *testing.T) {
 	st, cfg, hub := newReceiveLocationsTestEnv(t)
 	valid := filepath.Join(t.TempDir(), "Archive", "Phone")
