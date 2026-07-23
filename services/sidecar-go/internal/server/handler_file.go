@@ -473,15 +473,17 @@ func (c *connection) handleFileEnd(body []byte) error {
 
 	// Update store (accumulates active_transmission_ms)
 	storeCompleteStart := time.Now()
-	absoluteFinalPath := filepath.Join(c.config.ReceiveDir, relativePath)
-	if err := c.store.CompleteUpload(req.FileKey, absoluteFinalPath, req.SHA256, thisSegmentMs); err != nil {
+	if err := c.store.CompleteUpload(req.FileKey, relativePath, req.SHA256, thisSegmentMs); err != nil {
 		slog.Warn("failed to complete upload in store", "fileKey", req.FileKey, "err", err)
-	} else if err := c.store.RecordDeviceReceiveLocation(
-		c.clientID,
-		filepath.Dir(filepath.Dir(absoluteFinalPath)),
-		time.Now().UTC().Format(time.RFC3339),
-	); err != nil {
-		slog.Warn("failed to record device receive location", "fileKey", req.FileKey, "err", err)
+	} else {
+		absoluteFinalPath := filepath.Join(c.config.ReceiveDir, relativePath)
+		if err := c.store.RecordDeviceReceiveLocation(
+			c.clientID,
+			filepath.Dir(filepath.Dir(absoluteFinalPath)),
+			time.Now().UTC().Format(time.RFC3339),
+		); err != nil {
+			slog.Warn("failed to record device receive location", "fileKey", req.FileKey, "err", err)
+		}
 	}
 	storeCompleteElapsed := time.Since(storeCompleteStart)
 

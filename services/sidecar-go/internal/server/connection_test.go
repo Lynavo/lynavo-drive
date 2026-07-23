@@ -717,7 +717,7 @@ func TestHelloResponseAdvertisesWakeCapability(t *testing.T) {
 }
 
 func TestFullPairingAndFileTransfer(t *testing.T) {
-	client, _, cfg, cleanup := setupTestConnection(t)
+	client, st, cfg, cleanup := setupTestConnection(t)
 	defer cleanup()
 
 	// Step 1-2: Pair the device
@@ -781,6 +781,26 @@ func TestFullPairingAndFileTransfer(t *testing.T) {
 		if content[i] != payload[i] {
 			t.Fatalf("file content mismatch at byte %d: got 0x%02x, want 0x%02x", i, content[i], payload[i])
 		}
+	}
+
+	upload, err := st.GetUpload(fileKey)
+	if err != nil {
+		t.Fatalf("GetUpload: %v", err)
+	}
+	expectedRelativePath := filepath.Join(testClientName, date, filename)
+	if upload.FinalPath == nil || *upload.FinalPath != expectedRelativePath {
+		t.Fatalf("finalPath=%v, want relative path %q", upload.FinalPath, expectedRelativePath)
+	}
+
+	var receiveLocation string
+	if err := st.DB().QueryRow(`
+		SELECT path FROM device_receive_locations WHERE client_id = ?`, testClientID,
+	).Scan(&receiveLocation); err != nil {
+		t.Fatalf("query device receive location: %v", err)
+	}
+	expectedReceiveLocation := filepath.Join(cfg.ReceiveDir, testClientName)
+	if receiveLocation != expectedReceiveLocation {
+		t.Fatalf("receive location=%q, want %q", receiveLocation, expectedReceiveLocation)
 	}
 
 	// Step 11: SYNC_END
