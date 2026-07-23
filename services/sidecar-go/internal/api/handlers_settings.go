@@ -143,6 +143,18 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "failed to update settings")
 			return
 		}
+		if filepath.Clean(s.config.ReceiveDir) != filepath.Clean(newPath) {
+			previousRootWasPersisted := strings.TrimSpace(shareConfig.ReceiveRoot) != "" &&
+				filepath.Clean(shareConfig.ReceiveRoot) == filepath.Clean(s.config.ReceiveDir)
+			if err := s.store.AbsolutizeCompletedUploadFinalPaths(
+				s.config.ReceiveDir,
+				previousRootWasPersisted,
+			); err != nil {
+				slog.Error("preserve completed upload paths before receive root update", "err", err)
+				writeError(w, http.StatusInternalServerError, "failed to update settings")
+				return
+			}
+		}
 		shareConfig.ReceiveRoot = newPath
 		if err := s.store.UpdateShareConfig(*shareConfig); err != nil {
 			slog.Error("update share config receive_root", "err", err)

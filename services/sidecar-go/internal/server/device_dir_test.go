@@ -668,6 +668,30 @@ func TestPairDeviceWithDirName_ReusesHistoricalUploadDir(t *testing.T) {
 	}
 }
 
+func TestPairDeviceWithDirName_ReusesHistoricalUploadDirFromAbsoluteFinalPath(t *testing.T) {
+	st := newTestStoreForDir(t)
+	receiveDir := t.TempDir()
+
+	mkDir(t, receiveDir, "My iPhone")
+	insertCompletedUploadWithFinalPath(
+		t,
+		st,
+		"new-dev",
+		"historical-file",
+		filepath.Join(receiveDir, "My iPhone", "2026-06-17", "IMG_0001.JPG"),
+		"2026-06-17T10:00:00Z",
+	)
+
+	device := newPairDevice("new-dev", "My iPhone", nil)
+	got, err := PairDeviceWithDirName(st, receiveDir, device)
+	if err != nil {
+		t.Fatalf("PairDeviceWithDirName: %v", err)
+	}
+	if got != "My iPhone" {
+		t.Fatalf("expected historical upload dir %q, got %q", "My iPhone", got)
+	}
+}
+
 func TestPairDeviceWithDirName_ReusesReceiveDirForSameStableDevice(t *testing.T) {
 	st := newTestStoreForDir(t)
 	receiveDir := t.TempDir()

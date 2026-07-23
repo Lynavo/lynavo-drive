@@ -1,6 +1,8 @@
 package store
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -143,6 +145,7 @@ func TestCompleteUpload(t *testing.T) {
 
 func TestListCompletedUploadRootDirs(t *testing.T) {
 	s := newTestStore(t)
+	receiveDir := t.TempDir()
 
 	olderCompletedAt := "2026-06-16T10:00:00Z"
 	newerCompletedAt := "2026-06-17T10:00:00Z"
@@ -178,7 +181,14 @@ func TestListCompletedUploadRootDirs(t *testing.T) {
 			fileKey:     "absolute-path",
 			clientID:    "client-1",
 			status:      "completed",
-			finalPath:   stringPtr("/tmp/received/iPhone 17 Pro/file.jpg"),
+			finalPath:   stringPtr(filepath.Join(receiveDir, "Absolute Phone", "2026-06-17", "file.jpg")),
+			completedAt: &newerCompletedAt,
+		},
+		{
+			fileKey:     "outside-root",
+			clientID:    "client-1",
+			status:      "completed",
+			finalPath:   stringPtr(filepath.Join(t.TempDir(), "Outside Phone", "file.jpg")),
 			completedAt: &newerCompletedAt,
 		},
 		{
@@ -208,11 +218,11 @@ func TestListCompletedUploadRootDirs(t *testing.T) {
 		}
 	}
 
-	roots, err := s.ListCompletedUploadRootDirs("client-1")
+	roots, err := s.ListCompletedUploadRootDirs("client-1", receiveDir)
 	if err != nil {
 		t.Fatalf("ListCompletedUploadRootDirs: %v", err)
 	}
-	want := []string{"iPhone 17 Pro", "Other Phone"}
+	want := []string{"iPhone 17 Pro", "Absolute Phone", "Other Phone"}
 	if len(roots) != len(want) {
 		t.Fatalf("roots=%v, want %v", roots, want)
 	}
@@ -220,6 +230,115 @@ func TestListCompletedUploadRootDirs(t *testing.T) {
 		if roots[i] != want[i] {
 			t.Fatalf("roots=%v, want %v", roots, want)
 		}
+	}
+}
+
+func TestDeviceReceiveLocationPersistence(t *testing.T) {
+	s := newTestStore(t)
+	path := filepath.Join(t.TempDir(), "Phone")
+	older := "2026-07-18T10:00:00Z"
+	newer := "2026-07-19T11:00:00Z"
+
+	if err := s.CacheDeviceReceiveLocations("client-1", []DeviceReceiveLocation{
+		{Path: path, LastUsedAt: older},
+	}); err != nil {
+		t.Fatalf("CacheDeviceReceiveLocations: %v", err)
+	}
+	if err := s.RecordDeviceReceiveLocation("client-1", path, newer); err != nil {
+		t.Fatalf("RecordDeviceReceiveLocation: %v", err)
+	}
+
+	locations, backfilled, err := s.ListDeviceReceiveLocations("client-1")
+	if err != nil {
+		t.Fatalf("ListDeviceReceiveLocations: %v", err)
+	}
+	if !backfilled {
+		t.Fatal("expected device receive locations to be marked backfilled")
+	}
+	if len(locations) != 1 {
+		t.Fatalf("locations=%v, want one location", locations)
+	}
+	if locations[0].Path != path || locations[0].LastUsedAt != newer {
+		t.Fatalf("location=%+v, want path=%q lastUsedAt=%q", locations[0], path, newer)
+	}
+
+	for _, object := range []struct {
+		objectType string
+		name       string
+	}{
+		{objectType: "table", name: "device_receive_locations"},
+		{objectType: "table", name: "device_receive_location_backfills"},
+		{objectType: "index", name: "uploads_client_status_completed_idx"},
+	} {
+		var name string
+		if err := s.DB().QueryRow(
+			"SELECT name FROM sqlite_master WHERE type = ? AND name = ?",
+			object.objectType,
+			object.name,
+		).Scan(&name); err != nil {
+			t.Errorf("%s %q not found: %v", object.objectType, object.name, err)
+		}
+	}
+}
+
+func TestAbsolutizeCompletedUploadFinalPaths(t *testing.T) {
+	s := newTestStore(t)
+	receiveDir := t.TempDir()
+	relativePath := filepath.Join("Phone", "2026-07-18", "photo.jpg")
+	resolvedPath := filepath.Join(receiveDir, relativePath)
+	if err := os.MkdirAll(filepath.Dir(resolvedPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(resolvedPath, []byte("photo"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	alreadyAbsolute := filepath.Join(t.TempDir(), "Archived Phone", "2026-07-17", "old.jpg")
+	completedAt := "2026-07-18T12:00:00Z"
+
+	for _, fixture := range []struct {
+		fileKey   string
+		finalPath string
+	}{
+		{fileKey: "relative", finalPath: relativePath},
+		{fileKey: "absolute", finalPath: alreadyAbsolute},
+	} {
+		upload := sampleUpload(fixture.fileKey, "client-1")
+		upload.Status = "completed"
+		upload.FinalPath = &fixture.finalPath
+		upload.CompletedAt = &completedAt
+		if err := s.UpsertUpload(upload); err != nil {
+			t.Fatalf("UpsertUpload %q: %v", fixture.fileKey, err)
+		}
+	}
+
+	if err := s.AbsolutizeCompletedUploadFinalPaths(receiveDir, true); err != nil {
+		t.Fatalf("AbsolutizeCompletedUploadFinalPaths: %v", err)
+	}
+
+	relativeUpload, err := s.GetUpload("relative")
+	if err != nil {
+		t.Fatalf("GetUpload relative: %v", err)
+	}
+	if relativeUpload.FinalPath == nil || *relativeUpload.FinalPath != resolvedPath {
+		t.Fatalf("relative final path=%v, want %q", relativeUpload.FinalPath, resolvedPath)
+	}
+	absoluteUpload, err := s.GetUpload("absolute")
+	if err != nil {
+		t.Fatalf("GetUpload absolute: %v", err)
+	}
+	if absoluteUpload.FinalPath == nil || *absoluteUpload.FinalPath != alreadyAbsolute {
+		t.Fatalf("absolute final path=%v, want %q", absoluteUpload.FinalPath, alreadyAbsolute)
+	}
+
+	locations, err := s.ListCompletedUploadLocationsByDevice("client-1")
+	if err != nil {
+		t.Fatalf("ListCompletedUploadLocationsByDevice: %v", err)
+	}
+	if len(locations) != 2 {
+		t.Fatalf("locations=%v, want two completed uploads", locations)
+	}
+	if locations[0].FinalPath == nil || locations[0].CompletedAt == nil || locations[0].UpdatedAt == "" {
+		t.Fatalf("first completed upload location is incomplete: %+v", locations[0])
 	}
 }
 

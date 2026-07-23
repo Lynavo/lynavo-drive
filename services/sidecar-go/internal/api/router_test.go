@@ -2297,6 +2297,183 @@ func TestUpdateSettingsRootPathDerivesReceiveAndSharedWithoutChangingPersonalPat
 	}
 }
 
+func TestUpdateSettingsRootPathPreservesExistingUploadLocations(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	oldReceiveDir := cfg.ReceiveDir
+	relativeFinalPath := filepath.Join("Super Wings", "2026-07-15", "photo.jpg")
+	now := time.Now().UTC().Format(time.RFC3339)
+	if err := st.UpsertUpload(store.Upload{
+		FileKey:          "historical-photo",
+		ClientID:         "client-history",
+		OriginalFilename: "photo.jpg",
+		MediaType:        "image/jpeg",
+		FileSize:         4,
+		Status:           "completed",
+		FinalPath:        &relativeFinalPath,
+		CommittedBytes:   4,
+		CompletedAt:      &now,
+		UpdatedAt:        now,
+	}); err != nil {
+		t.Fatalf("UpsertUpload: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(oldReceiveDir, relativeFinalPath)), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(oldReceiveDir, relativeFinalPath), []byte("data"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	newRoot := filepath.Join(t.TempDir(), "new-storage")
+	reqBody := `{"rootPath":` + strconv.Quote(newRoot) + `}`
+	req, _ := http.NewRequest(http.MethodPut, srv.URL+"/settings", strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("PUT /settings: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	upload, err := st.GetUpload("historical-photo")
+	if err != nil {
+		t.Fatalf("GetUpload: %v", err)
+	}
+	want := filepath.Join(oldReceiveDir, relativeFinalPath)
+	if upload.FinalPath == nil || *upload.FinalPath != want {
+		t.Fatalf("finalPath = %v, want %q", upload.FinalPath, want)
+	}
+}
+
+func TestUpdateSettingsRootPathPreservesUploadLocationsWhenPreviousVolumeIsOffline(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	oldReceiveDir := filepath.Join(t.TempDir(), "offline-volume", "received")
+	cfg.ReceiveDir = oldReceiveDir
+	if err := st.UpdateShareConfig(store.ShareConfig{ReceiveRoot: oldReceiveDir}); err != nil {
+		t.Fatalf("UpdateShareConfig: %v", err)
+	}
+	relativeFinalPath := filepath.Join("Super Wings", "2026-07-15", "photo.jpg")
+	now := time.Now().UTC().Format(time.RFC3339)
+	if err := st.UpsertUpload(store.Upload{
+		FileKey:          "offline-historical-photo",
+		ClientID:         "client-history",
+		OriginalFilename: "photo.jpg",
+		MediaType:        "image/jpeg",
+		FileSize:         4,
+		Status:           "completed",
+		FinalPath:        &relativeFinalPath,
+		CommittedBytes:   4,
+		CompletedAt:      &now,
+		UpdatedAt:        now,
+	}); err != nil {
+		t.Fatalf("UpsertUpload: %v", err)
+	}
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	newRoot := filepath.Join(t.TempDir(), "new-storage")
+	reqBody := `{"rootPath":` + strconv.Quote(newRoot) + `}`
+	req, _ := http.NewRequest(http.MethodPut, srv.URL+"/settings", strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("PUT /settings: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	upload, err := st.GetUpload("offline-historical-photo")
+	if err != nil {
+		t.Fatalf("GetUpload: %v", err)
+	}
+	want := filepath.Join(oldReceiveDir, relativeFinalPath)
+	if upload.FinalPath == nil || *upload.FinalPath != want {
+		t.Fatalf("finalPath = %v, want %q", upload.FinalPath, want)
+	}
+}
+
+func TestUpdateSettingsRootPathDoesNotFreezeAlreadyBrokenRelativePath(t *testing.T) {
+	st, cfg, hub := testEnv(t)
+	incorrectCurrentReceiveDir := cfg.ReceiveDir
+	relativeFinalPath := filepath.Join("Super Wings", "2026-07-15", "photo.jpg")
+	now := time.Now().UTC().Format(time.RFC3339)
+	if err := st.UpsertUpload(store.Upload{
+		FileKey:          "historical-photo",
+		ClientID:         "client-history",
+		OriginalFilename: "photo.jpg",
+		MediaType:        "image/jpeg",
+		FileSize:         4,
+		Status:           "completed",
+		FinalPath:        &relativeFinalPath,
+		CommittedBytes:   4,
+		CompletedAt:      &now,
+		UpdatedAt:        now,
+	}); err != nil {
+		t.Fatalf("UpsertUpload: %v", err)
+	}
+
+	originalRoot := filepath.Join(t.TempDir(), "original-storage")
+	originalReceiveDir := filepath.Join(originalRoot, "received")
+	originalFinalPath := filepath.Join(originalReceiveDir, relativeFinalPath)
+	if err := os.MkdirAll(filepath.Dir(originalFinalPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(originalFinalPath, []byte("data"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	updateRoot := func(root string) {
+		t.Helper()
+		reqBody := `{"rootPath":` + strconv.Quote(root) + `}`
+		req, _ := http.NewRequest(http.MethodPut, srv.URL+"/settings", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("PUT /settings: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.StatusCode)
+		}
+	}
+
+	updateRoot(originalRoot)
+	upload, err := st.GetUpload("historical-photo")
+	if err != nil {
+		t.Fatalf("GetUpload after restoring root: %v", err)
+	}
+	if upload.FinalPath == nil || *upload.FinalPath != relativeFinalPath {
+		t.Fatalf(
+			"restoring root changed unresolved finalPath from %q to %v (incorrect current root %q)",
+			relativeFinalPath,
+			upload.FinalPath,
+			incorrectCurrentReceiveDir,
+		)
+	}
+
+	updateRoot(filepath.Join(t.TempDir(), "desired-storage"))
+	upload, err = st.GetUpload("historical-photo")
+	if err != nil {
+		t.Fatalf("GetUpload after desired root: %v", err)
+	}
+	if upload.FinalPath == nil || *upload.FinalPath != originalFinalPath {
+		t.Fatalf("finalPath = %v, want %q", upload.FinalPath, originalFinalPath)
+	}
+}
+
 func TestUpdateSettingsPersonalPathDoesNotChangeRootReceiveOrSharedPath(t *testing.T) {
 	st, cfg, hub := testEnv(t)
 	handler := func() http.Handler { _, h := api.NewServer(st, cfg, hub, nil); return h }()

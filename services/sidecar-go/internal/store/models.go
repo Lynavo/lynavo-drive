@@ -36,6 +36,18 @@ type Upload struct {
 	UpdatedAt            string  `json:"updatedAt"`
 }
 
+// CompletedUploadLocation contains only fields needed to derive receive folders.
+type CompletedUploadLocation struct {
+	FinalPath   *string
+	CompletedAt *string
+	UpdatedAt   string
+}
+
+type DeviceReceiveLocation struct {
+	Path       string
+	LastUsedAt string
+}
+
 type UploadPage struct {
 	Items                     []Upload `json:"items"`
 	Page                      int      `json:"page"`

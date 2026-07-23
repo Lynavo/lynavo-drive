@@ -196,7 +196,7 @@ func receiveDirReservedByDifferentStable(devices []store.PairedDevice, dirName s
 }
 
 func historicalUploadDirName(st *store.Store, receiveDir string, device *store.PairedDevice) (string, bool, error) {
-	rootDirs, err := st.ListCompletedUploadRootDirs(device.ClientID)
+	rootDirs, err := st.ListCompletedUploadRootDirs(device.ClientID, receiveDir)
 	if err != nil {
 		return "", false, fmt.Errorf("list historical upload dirs: %w", err)
 	}

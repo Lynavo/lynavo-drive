@@ -26,6 +26,9 @@ var migration005SQL string
 //go:embed migrations/006_pairing_device_management.sql
 var migration006SQL string
 
+//go:embed migrations/007_device_receive_locations.sql
+var migration007SQL string
+
 // Store wraps a SQLite database connection and provides CRUD operations
 // for all Lynavo Drive sidecar tables.
 type Store struct {
@@ -72,6 +75,9 @@ func (s *Store) migrate() error {
 	}
 	// Migration 006: add local pairing attempt, rate-limit, and block tables.
 	if _, err := s.db.Exec(migration006SQL); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(migration007SQL); err != nil {
 		return err
 	}
 	return nil

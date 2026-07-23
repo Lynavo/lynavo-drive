@@ -2,6 +2,115 @@ package store
 
 import "fmt"
 
+func (s *Store) ListDeviceReceiveLocations(clientID string) ([]DeviceReceiveLocation, bool, error) {
+	var backfilled int
+	if err := s.db.QueryRow(`
+		SELECT EXISTS(
+			SELECT 1 FROM device_receive_location_backfills WHERE client_id = ?
+		)`, clientID,
+	).Scan(&backfilled); err != nil {
+		return nil, false, fmt.Errorf("check receive location backfill for %q: %w", clientID, err)
+	}
+	if backfilled == 0 {
+		return nil, false, nil
+	}
+
+	rows, err := s.db.Query(`
+		SELECT path, last_used_at
+		FROM device_receive_locations
+		WHERE client_id = ?`, clientID,
+	)
+	if err != nil {
+		return nil, false, fmt.Errorf("list device receive locations for %q: %w", clientID, err)
+	}
+	defer rows.Close()
+
+	locations := make([]DeviceReceiveLocation, 0)
+	for rows.Next() {
+		var location DeviceReceiveLocation
+		if err := rows.Scan(&location.Path, &location.LastUsedAt); err != nil {
+			return nil, false, fmt.Errorf("scan device receive location: %w", err)
+		}
+		locations = append(locations, location)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, fmt.Errorf("iterate device receive locations for %q: %w", clientID, err)
+	}
+	return locations, true, nil
+}
+
+func (s *Store) CacheDeviceReceiveLocations(clientID string, locations []DeviceReceiveLocation) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin receive location cache for %q: %w", clientID, err)
+	}
+	defer tx.Rollback()
+
+	for _, location := range locations {
+		if _, err := tx.Exec(`
+			INSERT INTO device_receive_locations (client_id, path, last_used_at)
+			VALUES (?, ?, ?)
+			ON CONFLICT(client_id, path) DO UPDATE SET
+				last_used_at = CASE
+					WHEN excluded.last_used_at > last_used_at THEN excluded.last_used_at
+					ELSE last_used_at
+				END`, clientID, location.Path, location.LastUsedAt,
+		); err != nil {
+			return fmt.Errorf("cache receive location for %q: %w", clientID, err)
+		}
+	}
+	if _, err := tx.Exec(`
+		INSERT OR IGNORE INTO device_receive_location_backfills (client_id) VALUES (?)`, clientID,
+	); err != nil {
+		return fmt.Errorf("mark receive location backfill for %q: %w", clientID, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit receive location cache for %q: %w", clientID, err)
+	}
+	return nil
+}
+
+func (s *Store) RecordDeviceReceiveLocation(clientID, path, lastUsedAt string) error {
+	_, err := s.db.Exec(`
+		INSERT INTO device_receive_locations (client_id, path, last_used_at)
+		VALUES (?, ?, ?)
+		ON CONFLICT(client_id, path) DO UPDATE SET last_used_at = excluded.last_used_at`,
+		clientID, path, lastUsedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("record receive location for %q: %w", clientID, err)
+	}
+	return nil
+}
+
+// ListCompletedUploadLocationsByDevice returns the minimal completed-upload
+// fields required to derive a device's receive folders.
+func (s *Store) ListCompletedUploadLocationsByDevice(clientID string) ([]CompletedUploadLocation, error) {
+	rows, err := s.db.Query(`
+		SELECT final_path, completed_at, updated_at
+		FROM uploads
+		WHERE client_id = ? AND status = 'completed'
+		  AND final_path IS NOT NULL AND final_path != ''`, clientID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list completed upload locations for %q: %w", clientID, err)
+	}
+	defer rows.Close()
+
+	locations := make([]CompletedUploadLocation, 0)
+	for rows.Next() {
+		var location CompletedUploadLocation
+		if err := rows.Scan(&location.FinalPath, &location.CompletedAt, &location.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan completed upload location: %w", err)
+		}
+		locations = append(locations, location)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate completed upload locations for %q: %w", clientID, err)
+	}
+	return locations, nil
+}
+
 // ListCompletedUploadsByDevice returns every completed upload row for a client.
 func (s *Store) ListCompletedUploadsByDevice(clientID string) ([]Upload, error) {
 	rows, err := s.db.Query(`
