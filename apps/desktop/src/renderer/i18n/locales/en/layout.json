@@ -83,6 +83,10 @@
     },
     "bonjourPath": "Bonjour path: {{path}}",
     "lastExitCode": "Last exit code: {{code}}",
-    "retrySidecar": "Retry background service"
+    "retrySidecar": "Retry background service",
+    "installBonjour": "Install Bonjour",
+    "installingBonjour": "Installing silently...",
+    "bonjourInstallSuccess": "Bonjour installed silently. Rechecking background service.",
+    "bonjourInstallFailed": "Failed to install Bonjour. Please retry."
   }
 }

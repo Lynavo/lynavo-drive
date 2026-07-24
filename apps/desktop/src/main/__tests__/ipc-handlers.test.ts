@@ -26,6 +26,11 @@ const platformCapabilitiesMock = vi.hoisted(() => ({
   usesTitleBarOverlayControls: vi.fn(() => true),
 }));
 
+const bonjourInstallerMocks = vi.hoisted(() => ({
+  runInstaller: vi.fn(),
+  writeFile: vi.fn(),
+}));
+
 const managedDeviceFixture: DesktopManagedDeviceDTO = {
   desktopDeviceId: 'desktop-1',
   clientId: 'client-1',
@@ -196,11 +201,134 @@ vi.mock('../diagnostics', () => ({
 describe('registerIpcHandlers', () => {
   beforeEach(() => {
     handlers.clear();
+    vi.restoreAllMocks();
     vi.clearAllMocks();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     platformCapabilitiesMock.usesTitleBarOverlayControls.mockReset();
     platformCapabilitiesMock.usesTitleBarOverlayControls.mockReturnValue(true);
+    bonjourInstallerMocks.writeFile.mockResolvedValue(undefined);
+    bonjourInstallerMocks.runInstaller.mockResolvedValue(undefined);
+  });
+
+  function registerBonjourInstallerHandler(
+    overrides: Partial<{
+      platform: NodeJS.Platform;
+      download: typeof fetch;
+      writeFile: typeof bonjourInstallerMocks.writeFile;
+      runInstaller: typeof bonjourInstallerMocks.runInstaller;
+      tempDir: string;
+    }> = {},
+  ) {
+    const manager = {
+      retryStart: vi.fn().mockResolvedValue(undefined),
+    };
+    const dependencies = {
+      platform: 'win32' as const,
+      download: vi.fn(),
+      writeFile: bonjourInstallerMocks.writeFile,
+      runInstaller: bonjourInstallerMocks.runInstaller,
+      tempDir: '/tmp/lynavo-drive-test',
+      ...overrides,
+    };
+    registerIpcHandlers(manager as never, undefined, dependencies);
+    const handler = handlers.get(IPC.SIDECAR_INSTALL_BONJOUR);
+    if (!handler) {
+      throw new Error('missing Bonjour installer handler');
+    }
+    return { dependencies, handler, manager };
+  }
+
+  it('downloads and runs the Apple Bonjour executable before restarting the sidecar', async () => {
+    const installer = Uint8Array.from([0x4d, 0x5a, 0x90, 0x00]);
+    const download = vi.fn().mockResolvedValue(new Response(installer));
+
+    const { handler, manager } = registerBonjourInstallerHandler({ download });
+
+    await expect(handler()).resolves.toBeUndefined();
+    expect(download).toHaveBeenCalledWith(
+      'https://download.info.apple.com/Mac_OS_X/061-8098.20100603.gthyu/BonjourPSSetup.exe',
+    );
+    expect(bonjourInstallerMocks.writeFile).toHaveBeenCalledWith(
+      '/tmp/lynavo-drive-test/BonjourPSSetup.exe',
+      Buffer.from(installer),
+    );
+    expect(bonjourInstallerMocks.runInstaller).toHaveBeenCalledWith(
+      '/tmp/lynavo-drive-test/BonjourPSSetup.exe',
+      ['/quiet', '/norestart'],
+    );
+    expect(manager.retryStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects Bonjour installation outside Windows before downloading', async () => {
+    const download = vi.fn();
+
+    const { handler, manager } = registerBonjourInstallerHandler({
+      platform: 'darwin',
+      download,
+    });
+
+    await expect(handler()).rejects.toThrow('supported on Windows only');
+    expect(download).not.toHaveBeenCalled();
+    expect(bonjourInstallerMocks.writeFile).not.toHaveBeenCalled();
+    expect(bonjourInstallerMocks.runInstaller).not.toHaveBeenCalled();
+    expect(manager.retryStart).not.toHaveBeenCalled();
+  });
+
+  it('preserves the configured Bonjour MSI installer path', async () => {
+    vi.stubEnv('LYNAVO_BONJOUR_MSI_URL', 'https://downloads.example/Bonjour64.msi');
+    const installer = Uint8Array.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+    const download = vi.fn().mockResolvedValue(new Response(installer));
+
+    const { handler, manager } = registerBonjourInstallerHandler({ download });
+
+    await expect(handler()).resolves.toBeUndefined();
+    expect(download).toHaveBeenCalledWith('https://downloads.example/Bonjour64.msi');
+    expect(bonjourInstallerMocks.writeFile).toHaveBeenCalledWith(
+      '/tmp/lynavo-drive-test/Bonjour64.msi',
+      Buffer.from(installer),
+    );
+    expect(bonjourInstallerMocks.runInstaller).toHaveBeenCalledWith('msiexec.exe', [
+      '/i',
+      '/tmp/lynavo-drive-test/Bonjour64.msi',
+      '/qn',
+      '/norestart',
+    ]);
+    expect(manager.retryStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects an unsuccessful Bonjour installer download', async () => {
+    const download = vi.fn().mockResolvedValue(new Response(null, { status: 503 }));
+
+    const { handler, manager } = registerBonjourInstallerHandler({ download });
+
+    await expect(handler()).rejects.toThrow('Failed to download Bonjour installer (503)');
+    expect(bonjourInstallerMocks.writeFile).not.toHaveBeenCalled();
+    expect(bonjourInstallerMocks.runInstaller).not.toHaveBeenCalled();
+    expect(manager.retryStart).not.toHaveBeenCalled();
+  });
+
+  it('rejects a Bonjour download that is not a Windows executable', async () => {
+    const download = vi.fn().mockResolvedValue(new Response('<html>not found</html>'));
+
+    const { handler, manager } = registerBonjourInstallerHandler({ download });
+
+    await expect(handler()).rejects.toThrow('not a valid Windows executable');
+    expect(bonjourInstallerMocks.writeFile).not.toHaveBeenCalled();
+    expect(bonjourInstallerMocks.runInstaller).not.toHaveBeenCalled();
+    expect(manager.retryStart).not.toHaveBeenCalled();
+  });
+
+  it('does not restart the sidecar when Bonjour installation fails', async () => {
+    const download = vi
+      .fn()
+      .mockResolvedValue(new Response(Uint8Array.from([0x4d, 0x5a, 0x90, 0x00])));
+    bonjourInstallerMocks.runInstaller.mockRejectedValue(new Error('installer failed'));
+
+    const { handler, manager } = registerBonjourInstallerHandler({ download });
+
+    await expect(handler()).rejects.toThrow('installer failed');
+    expect(manager.retryStart).not.toHaveBeenCalled();
   });
 
   function registerWithManager() {
