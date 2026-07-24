@@ -174,6 +174,7 @@ func NewServer(s *store.Store, cfg *config.Config, hub *events.Hub, csp ClientSt
 	mux.HandleFunc("GET /devices/{deviceId}", withJSON(requireLocalRequest(srv.handleDeviceDetail)))
 	mux.HandleFunc("GET /devices/{deviceId}/files", withJSON(requireLocalRequest(srv.handleDeviceFiles)))
 	mux.HandleFunc("GET /devices/{deviceId}/dates", withJSON(requireLocalRequest(srv.handleDeviceDates)))
+	mux.HandleFunc("GET /devices/{deviceId}/receive-locations", withJSON(requireLocalRequest(srv.handleDeviceReceiveLocations)))
 	mux.HandleFunc("GET /devices/{deviceId}/existing-file-keys", withJSON(requireLocalNetworkRequest(srv.handleDeviceExistingFileKeys)))
 	// Settings
 	mux.HandleFunc("GET /settings", withJSON(requireLocalRequest(srv.handleGetSettings)))

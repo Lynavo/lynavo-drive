@@ -43,6 +43,19 @@
     "loadedPartial": "Loaded {{loaded}} / {{total}}",
     "loadingMore": "Loading...",
     "loadMore": "Load more sync records",
+    "locationDialog": {
+      "title": "Folder paths",
+      "description": "View and open folders used by {{deviceName}}",
+      "current": "Current location",
+      "history": "Previous location",
+      "unavailable": "Currently unavailable",
+      "unavailableAction": "Unavailable",
+      "open": "Open",
+      "folderCount": "{{count}} folders",
+      "copyPath": "Copy path",
+      "closeDialog": "Close dialog",
+      "close": "Close"
+    },
     "media": {
       "video": "Video",
       "photo": "Photo",
@@ -56,7 +69,9 @@
     "toasts": {
       "devicePathUnavailable": "Device folder is temporarily unavailable",
       "fileManagerUnavailable": "File manager API is unavailable",
-      "devicePathMissing": "Device folder does not exist or cannot be opened"
+      "devicePathMissing": "Device folder does not exist or cannot be opened",
+      "noReceiveLocations": "No available sync folder could be found",
+      "receiveLocationsUnavailable": "Sync folder locations are unavailable"
     },
     "stats": {
       "totalFiles": "Total received files",

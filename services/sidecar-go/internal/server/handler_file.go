@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -474,6 +475,22 @@ func (c *connection) handleFileEnd(body []byte) error {
 	storeCompleteStart := time.Now()
 	if err := c.store.CompleteUpload(req.FileKey, relativePath, req.SHA256, thisSegmentMs); err != nil {
 		slog.Warn("failed to complete upload in store", "fileKey", req.FileKey, "err", err)
+	} else {
+		absoluteFinalPath := filepath.Join(c.config.ReceiveDir, relativePath)
+		if err := c.store.RecordDeviceReceiveLocation(
+			c.clientID,
+			filepath.Dir(filepath.Dir(absoluteFinalPath)),
+			time.Now().UTC().Format(time.RFC3339),
+		); err != nil {
+			slog.Warn("failed to record device receive location", "fileKey", req.FileKey, "err", err)
+			if invalidateErr := c.store.InvalidateDeviceReceiveLocationBackfill(c.clientID); invalidateErr != nil {
+				slog.Warn(
+					"failed to invalidate device receive location backfill",
+					"fileKey", req.FileKey,
+					"err", invalidateErr,
+				)
+			}
+		}
 	}
 	storeCompleteElapsed := time.Since(storeCompleteStart)
 

@@ -221,6 +221,13 @@ export interface ReceivedLibraryDeviceStatDTO {
   totalBytes: number;
 }
 
+export interface DeviceReceiveLocationDTO {
+  path: string;
+  available: boolean;
+  isCurrent: boolean;
+  lastUsedAt: string;
+}
+
 export interface DesktopLocalListResponse<T> {
   items: T[];
 }

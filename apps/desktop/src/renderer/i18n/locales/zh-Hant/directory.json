@@ -43,6 +43,19 @@
     "loadedPartial": "已載入 {{loaded}} / {{total}}",
     "loadingMore": "載入中...",
     "loadMore": "載入更多同步記錄",
+    "locationDialog": {
+      "title": "資料夾路徑",
+      "description": "查看並開啟 {{deviceName}} 使用的資料夾",
+      "current": "目前位置",
+      "history": "歷史位置",
+      "unavailable": "目前無法存取",
+      "unavailableAction": "無法存取",
+      "open": "開啟",
+      "folderCount": "共 {{count}} 個資料夾",
+      "copyPath": "複製路徑",
+      "closeDialog": "關閉對話框",
+      "close": "關閉"
+    },
     "media": {
       "video": "影片",
       "photo": "照片",
@@ -56,7 +69,9 @@
     "toasts": {
       "devicePathUnavailable": "裝置目錄暫不可用",
       "fileManagerUnavailable": "檔案管理器介面不可用",
-      "devicePathMissing": "裝置目錄不存在或無法開啟"
+      "devicePathMissing": "裝置目錄不存在或無法開啟",
+      "noReceiveLocations": "找不到可用的同步目錄",
+      "receiveLocationsUnavailable": "同步資料夾位置暫時無法取得"
     },
     "stats": {
       "totalFiles": "接收檔案總數",

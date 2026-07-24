@@ -717,7 +717,7 @@ func TestHelloResponseAdvertisesWakeCapability(t *testing.T) {
 }
 
 func TestFullPairingAndFileTransfer(t *testing.T) {
-	client, _, cfg, cleanup := setupTestConnection(t)
+	client, st, cfg, cleanup := setupTestConnection(t)
 	defer cleanup()
 
 	// Step 1-2: Pair the device
@@ -783,12 +783,83 @@ func TestFullPairingAndFileTransfer(t *testing.T) {
 		}
 	}
 
+	upload, err := st.GetUpload(fileKey)
+	if err != nil {
+		t.Fatalf("GetUpload: %v", err)
+	}
+	expectedRelativePath := filepath.Join(testClientName, date, filename)
+	if upload.FinalPath == nil || *upload.FinalPath != expectedRelativePath {
+		t.Fatalf("finalPath=%v, want relative path %q", upload.FinalPath, expectedRelativePath)
+	}
+
+	var receiveLocation string
+	if err := st.DB().QueryRow(`
+		SELECT path FROM device_receive_locations WHERE client_id = ?`, testClientID,
+	).Scan(&receiveLocation); err != nil {
+		t.Fatalf("query device receive location: %v", err)
+	}
+	expectedReceiveLocation := filepath.Join(cfg.ReceiveDir, testClientName)
+	if receiveLocation != expectedReceiveLocation {
+		t.Fatalf("receive location=%q, want %q", receiveLocation, expectedReceiveLocation)
+	}
+
 	// Step 11: SYNC_END
 	sendJSON(t, client, protocol.TypeSyncEndReq, struct{}{})
 	var syncEndRes protocol.SyncEndRes
 	recvJSON(t, client, protocol.TypeSyncEndRes, &syncEndRes)
 	if !syncEndRes.OK {
 		t.Fatal("SyncEndRes.OK=false")
+	}
+}
+
+func TestReceiveLocationIndexFailureDoesNotFailCompletedUpload(t *testing.T) {
+	client, st, _, cleanup := setupTestConnection(t)
+	defer cleanup()
+
+	_ = doPairing(t, client)
+	if err := st.CacheDeviceReceiveLocations(testClientID, nil); err != nil {
+		t.Fatalf("mark receive locations backfilled: %v", err)
+	}
+	payload := []byte("completed upload")
+	doSyncBegin(t, client, "sess-index-failure", 1, int64(len(payload)))
+
+	fileKey := "photo-index-failure"
+	initRes := doFileInit(t, client, fileKey, "index-failure.jpg", int64(len(payload)))
+	if initRes.Action != "UPLOAD" {
+		t.Fatalf("expected action=UPLOAD, got %q", initRes.Action)
+	}
+
+	sendFileData(t, client, fileKey, 0, payload)
+	var ack protocol.FileAck
+	recvJSON(t, client, protocol.TypeFileAck, &ack)
+
+	if _, err := st.DB().Exec(`
+		CREATE TRIGGER fail_receive_location_insert
+		BEFORE INSERT ON device_receive_locations
+		BEGIN
+			SELECT RAISE(FAIL, 'forced receive location index failure');
+		END`); err != nil {
+		t.Fatalf("create receive location failure trigger: %v", err)
+	}
+
+	hash := sha256.Sum256(payload)
+	endRes := doFileEnd(t, client, fileKey, int64(len(payload)), hex.EncodeToString(hash[:]))
+	if !endRes.OK {
+		t.Fatal("FileEndRes.OK=false when receive location indexing fails")
+	}
+	upload, err := st.GetUpload(fileKey)
+	if err != nil {
+		t.Fatalf("GetUpload: %v", err)
+	}
+	if upload.Status != "completed" {
+		t.Fatalf("upload status=%q, want completed", upload.Status)
+	}
+	_, backfilled, err := st.ListDeviceReceiveLocations(testClientID)
+	if err != nil {
+		t.Fatalf("ListDeviceReceiveLocations: %v", err)
+	}
+	if backfilled {
+		t.Fatal("receive location index failure must invalidate the backfill marker")
 	}
 }
 

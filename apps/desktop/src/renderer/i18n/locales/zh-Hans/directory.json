@@ -43,6 +43,19 @@
     "loadedPartial": "已加载 {{loaded}} / {{total}}",
     "loadingMore": "加载中...",
     "loadMore": "加载更多同步记录",
+    "locationDialog": {
+      "title": "文件夹路径",
+      "description": "查看并打开 {{deviceName}} 使用的文件夹",
+      "current": "当前位置",
+      "history": "历史位置",
+      "unavailable": "当前无法访问",
+      "unavailableAction": "无法访问",
+      "open": "打开",
+      "folderCount": "共 {{count}} 个文件夹",
+      "copyPath": "复制路径",
+      "closeDialog": "关闭对话框",
+      "close": "关闭"
+    },
     "media": {
       "video": "视频",
       "photo": "照片",
@@ -56,7 +69,9 @@
     "toasts": {
       "devicePathUnavailable": "设备目录暂不可用",
       "fileManagerUnavailable": "文件管理器接口不可用",
-      "devicePathMissing": "设备目录不存在或无法打开"
+      "devicePathMissing": "设备目录不存在或无法打开",
+      "noReceiveLocations": "找不到可用的同步目录",
+      "receiveLocationsUnavailable": "同步文件夹位置暂不可用"
     },
     "stats": {
       "totalFiles": "总接收文件数",

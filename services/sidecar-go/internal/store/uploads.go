@@ -3,6 +3,8 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -59,9 +61,95 @@ func (s *Store) GetUpload(fileKey string) (*Upload, error) {
 	return u, nil
 }
 
+// AbsolutizeCompletedUploadFinalPaths preserves completed upload locations
+// before the configured receive directory changes.
+func (s *Store) AbsolutizeCompletedUploadFinalPaths(
+	receiveDir string,
+	preserveUnavailablePaths bool,
+) error {
+	if strings.TrimSpace(receiveDir) == "" || !filepath.IsAbs(receiveDir) {
+		return fmt.Errorf("receive directory must be an absolute path")
+	}
+
+	rows, err := s.db.Query(`
+		SELECT file_key, final_path
+		FROM uploads
+		WHERE status = 'completed' AND final_path IS NOT NULL AND final_path != ''`)
+	if err != nil {
+		return fmt.Errorf("list completed upload final paths: %w", err)
+	}
+
+	type finalPathUpdate struct {
+		fileKey      string
+		previousPath string
+		absolutePath string
+	}
+	updates := []finalPathUpdate{}
+	for rows.Next() {
+		var fileKey string
+		var finalPath string
+		if err := rows.Scan(&fileKey, &finalPath); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan completed upload final path: %w", err)
+		}
+		if isAbsoluteUploadPath(finalPath) {
+			continue
+		}
+		absolutePath := filepath.Join(receiveDir, finalPath)
+		relativePath, err := filepath.Rel(filepath.Clean(receiveDir), absolutePath)
+		if err != nil || relativePath == ".." || strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) {
+			continue
+		}
+		if !preserveUnavailablePaths {
+			if info, err := os.Stat(absolutePath); err != nil || info.IsDir() {
+				continue
+			}
+		}
+		updates = append(updates, finalPathUpdate{
+			fileKey:      fileKey,
+			previousPath: finalPath,
+			absolutePath: absolutePath,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("iterate completed upload final paths: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("close completed upload final paths: %w", err)
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin completed upload path update: %w", err)
+	}
+	defer tx.Rollback()
+	for _, update := range updates {
+		if _, err := tx.Exec(`
+			UPDATE uploads
+			SET final_path = ?
+			WHERE file_key = ? AND final_path = ?`,
+			update.absolutePath, update.fileKey, update.previousPath,
+		); err != nil {
+			return fmt.Errorf("preserve completed upload path %q: %w", update.fileKey, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit completed upload path update: %w", err)
+	}
+	return nil
+}
+
+func isAbsoluteUploadPath(path string) bool {
+	return filepath.IsAbs(path) ||
+		strings.HasPrefix(path, `/`) ||
+		strings.HasPrefix(path, `\`) ||
+		(len(path) >= 2 && path[1] == ':')
+}
+
 // ListCompletedUploadRootDirs returns distinct first path components used by
 // completed uploads for a client, newest first.
-func (s *Store) ListCompletedUploadRootDirs(clientID string) ([]string, error) {
+func (s *Store) ListCompletedUploadRootDirs(clientID, receiveDir string) ([]string, error) {
 	rows, err := s.db.Query(`
 		SELECT final_path
 		FROM uploads
@@ -79,7 +167,7 @@ func (s *Store) ListCompletedUploadRootDirs(clientID string) ([]string, error) {
 		if err := rows.Scan(&finalPath); err != nil {
 			return nil, fmt.Errorf("scan completed upload final path: %w", err)
 		}
-		root := uploadRootDirFromFinalPath(finalPath)
+		root := uploadRootDirFromFinalPath(finalPath, receiveDir)
 		if root == "" || seen[root] {
 			continue
 		}
@@ -92,12 +180,18 @@ func (s *Store) ListCompletedUploadRootDirs(clientID string) ([]string, error) {
 	return roots, nil
 }
 
-func uploadRootDirFromFinalPath(finalPath string) string {
+func uploadRootDirFromFinalPath(finalPath, receiveDir string) string {
 	trimmed := strings.TrimSpace(finalPath)
-	if trimmed == "" ||
-		strings.HasPrefix(trimmed, "/") ||
-		strings.HasPrefix(trimmed, `\`) ||
-		(len(trimmed) >= 2 && trimmed[1] == ':') {
+	if trimmed == "" {
+		return ""
+	}
+	if filepath.IsAbs(trimmed) {
+		relativePath, err := filepath.Rel(receiveDir, trimmed)
+		if err != nil || relativePath == ".." || strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) {
+			return ""
+		}
+		trimmed = relativePath
+	} else if strings.HasPrefix(trimmed, `\`) || (len(trimmed) >= 2 && trimmed[1] == ':') {
 		return ""
 	}
 	separatorIndex := strings.IndexAny(trimmed, `/\`)
