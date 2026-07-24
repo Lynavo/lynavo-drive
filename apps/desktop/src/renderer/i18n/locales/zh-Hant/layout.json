@@ -83,6 +83,10 @@
     },
     "bonjourPath": "Bonjour 路徑：{{path}}",
     "lastExitCode": "最近退出碼：{{code}}",
-    "retrySidecar": "重試背景服務"
+    "retrySidecar": "重試背景服務",
+    "installBonjour": "一鍵安裝 Bonjour",
+    "installingBonjour": "正在靜默安裝...",
+    "bonjourInstallSuccess": "Bonjour 靜默安裝完成，正在重新校驗背景服務",
+    "bonjourInstallFailed": "Bonjour 靜默安裝失敗，請重試"
   }
 }

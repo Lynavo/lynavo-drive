@@ -64,6 +64,7 @@ const allowedSidecarApiKeys = [
   'getSharedResources',
   'getSyncRecords',
   'getTransferActive',
+  'installBonjour',
   'regenerateConnectionCode',
   'removeSharedResource',
   'retryStart',

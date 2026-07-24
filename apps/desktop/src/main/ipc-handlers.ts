@@ -1,6 +1,7 @@
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, app, BrowserWindow } from 'electron';
 import log from 'electron-log';
-import { readdir } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { readdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { AddSharedResourcePayload } from '@lynavo-drive/contracts';
@@ -36,6 +37,7 @@ export const IPC = {
   SIDECAR_REGENERATE_CODE: 'sidecar:regenerate-code',
   SIDECAR_RUNTIME_STATE: 'sidecar:runtime-state',
   SIDECAR_RETRY_START: 'sidecar:retry-start',
+  SIDECAR_INSTALL_BONJOUR: 'sidecar:install-bonjour',
   SIDECAR_SHARE_STATUS: 'sidecar:share-status',
   SIDECAR_VALIDATE_SHARE: 'sidecar:validate-share',
   SIDECAR_TRANSFER_ACTIVE: 'sidecar:transfer-active',
@@ -75,6 +77,29 @@ type PowerSaveController = {
   setPreventSleepDuringTransfer(enabled: boolean): PowerSaveState;
 };
 
+type BonjourInstallerDependencies = {
+  platform: NodeJS.Platform;
+  download(url: string): Promise<Response>;
+  writeFile(path: string, data: Uint8Array): Promise<void>;
+  runInstaller(path: string, args: string[]): Promise<void>;
+  tempDir: string;
+};
+
+const DEFAULT_BONJOUR_INSTALLER_URL =
+  'https://download.info.apple.com/Mac_OS_X/061-8098.20100603.gthyu/BonjourPSSetup.exe';
+
+function runInstaller(path: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    execFile(path, args, (error) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
 async function regenerateConnectionCodeSafely(): Promise<{ code: string }> {
   return sidecarClient.regenerateConnectionCode();
 }
@@ -82,6 +107,13 @@ async function regenerateConnectionCodeSafely(): Promise<{ code: string }> {
 export function registerIpcHandlers(
   sidecarManager: SidecarManager,
   powerSave?: PowerSaveController,
+  bonjourInstaller: BonjourInstallerDependencies = {
+    platform: process.platform,
+    download: fetch,
+    writeFile,
+    runInstaller,
+    tempDir: app.getPath('temp'),
+  },
 ): void {
   // Sidecar — real HTTP calls
   ipcMain.handle(IPC.SIDECAR_HEALTH, () => sidecarClient.getHealth());
@@ -124,6 +156,37 @@ export function registerIpcHandlers(
   ipcMain.handle(IPC.SIDECAR_REGENERATE_CODE, () => regenerateConnectionCodeSafely());
   ipcMain.handle(IPC.SIDECAR_RUNTIME_STATE, () => sidecarManager.getState());
   ipcMain.handle(IPC.SIDECAR_RETRY_START, () => sidecarManager.retryStart());
+  ipcMain.handle(IPC.SIDECAR_INSTALL_BONJOUR, async () => {
+    if (bonjourInstaller.platform !== 'win32') {
+      throw new Error('Bonjour installation is supported on Windows only.');
+    }
+    const configuredMsiUrl = process.env.LYNAVO_BONJOUR_MSI_URL;
+    const downloadUrl = configuredMsiUrl || DEFAULT_BONJOUR_INSTALLER_URL;
+
+    const res = await bonjourInstaller.download(downloadUrl);
+    if (!res.ok) {
+      throw new Error(`Failed to download Bonjour installer (${res.status})`);
+    }
+    const buffer = Buffer.from(await res.arrayBuffer());
+    if (configuredMsiUrl) {
+      const msiHeader = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+      if (!buffer.subarray(0, msiHeader.length).equals(msiHeader)) {
+        throw new Error('Downloaded Bonjour installer is not a valid Windows Installer package.');
+      }
+      const tempMsiPath = join(bonjourInstaller.tempDir, 'Bonjour64.msi');
+      await bonjourInstaller.writeFile(tempMsiPath, buffer);
+      await bonjourInstaller.runInstaller('msiexec.exe', ['/i', tempMsiPath, '/qn', '/norestart']);
+    } else {
+      if (buffer.length < 2 || buffer[0] !== 0x4d || buffer[1] !== 0x5a) {
+        throw new Error('Downloaded Bonjour installer is not a valid Windows executable.');
+      }
+      const tempInstallerPath = join(bonjourInstaller.tempDir, 'BonjourPSSetup.exe');
+      await bonjourInstaller.writeFile(tempInstallerPath, buffer);
+      await bonjourInstaller.runInstaller(tempInstallerPath, ['/quiet', '/norestart']);
+    }
+
+    await sidecarManager.retryStart();
+  });
   ipcMain.handle(IPC.SIDECAR_SHARE_STATUS, () => sidecarClient.getShareStatus());
   ipcMain.handle(IPC.SIDECAR_VALIDATE_SHARE, () => sidecarClient.validateShare());
   ipcMain.handle(IPC.SIDECAR_TRANSFER_ACTIVE, () => sidecarClient.getTransferActive());

@@ -52,6 +52,7 @@ export interface ElectronAPI {
     regenerateConnectionCode(): Promise<{ code: string }>;
     getRuntimeState(): Promise<SidecarRuntimeState>;
     retryStart(): Promise<void>;
+    installBonjour(): Promise<void>;
     getShareStatus(): Promise<ShareStatusDTO>;
     validateShare(): Promise<ShareStatusDTO>;
     getTransferActive(): Promise<{ active: boolean }>;
