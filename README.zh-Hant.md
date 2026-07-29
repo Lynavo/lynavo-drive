@@ -11,6 +11,11 @@
 </p>
 
 <p align="center">
+  <a href="https://drive.lynavo.io/"><strong>LynavoDrive（Lynavo Drive）官方網站</strong></a> •
+  <a href="https://drive.lynavo.io/download.html">官方簽署應用程式下載</a>
+</p>
+
+<p align="center">
   <a href="https://github.com/lynavo/lynavo-drive/actions/workflows/oss-release-gate.yml"><img src="https://img.shields.io/github/actions/workflow/status/lynavo/lynavo-drive/oss-release-gate.yml?branch=main&label=OSS%20Release%20Gate&style=flat-square" alt="OSS Release Gate"></a>
   <a href="https://github.com/lynavo/lynavo-drive/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/lynavo/lynavo-drive/ci.yml?branch=main&label=CI&style=flat-square" alt="CI"></a>
   <img src="https://img.shields.io/badge/Node.js-%3E%3D%2022.12.0-339933?style=flat-square&logo=node.js" alt="Node Version">
