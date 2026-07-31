@@ -103,8 +103,8 @@ jobs:
           : "${ANDROID_RELEASE_KEY_ALIAS:?Missing ANDROID_RELEASE_KEY_ALIAS}"
           : "${ANDROID_RELEASE_KEY_PASSWORD:?Missing ANDROID_RELEASE_KEY_PASSWORD}"
 
-          APK_PATH="build/release-downloads/native-android/${{ needs.verify-tag.outputs.artifact_prefix }}-${{ needs.verify-tag.outputs.version }}-android-arm64-x86_64.apk"
-          AAB_PATH="build/release-downloads/native-android/${{ needs.verify-tag.outputs.artifact_prefix }}-${{ needs.verify-tag.outputs.version }}-android-arm64-x86_64.aab"
+          APK_PATH="build/release-downloads/native-android/android-apk/${{ needs.verify-tag.outputs.artifact_prefix }}-${{ needs.verify-tag.outputs.version }}-android-arm64-x86_64.apk"
+          AAB_PATH="build/release-downloads/native-android/android-aab/${{ needs.verify-tag.outputs.artifact_prefix }}-${{ needs.verify-tag.outputs.version }}-android-arm64-x86_64.aab"
           APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
 
           "$APKSIGNER" sign \
@@ -134,8 +134,8 @@ jobs:
         with:
           name: native-android-signed
           path: |
-            build/release-downloads/native-android/${{ needs.verify-tag.outputs.artifact_prefix }}-${{ needs.verify-tag.outputs.version }}-android-arm64-x86_64.apk
-            build/release-downloads/native-android/${{ needs.verify-tag.outputs.artifact_prefix }}-${{ needs.verify-tag.outputs.version }}-android-arm64-x86_64.aab
+            build/release-downloads/native-android/android-apk/${{ needs.verify-tag.outputs.artifact_prefix }}-${{ needs.verify-tag.outputs.version }}-android-arm64-x86_64.apk
+            build/release-downloads/native-android/android-aab/${{ needs.verify-tag.outputs.artifact_prefix }}-${{ needs.verify-tag.outputs.version }}-android-arm64-x86_64.aab
           if-no-files-found: error
           retention-days: 7
           overwrite: true
