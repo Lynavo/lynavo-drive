@@ -669,9 +669,24 @@ test('draft release workflow signs Android assets only for stable tags', () => {
   assert.match(sign.run, /-verify/);
   assert.doesNotMatch(sign.run, /jarsigner -verify -strict/);
 
-  assert.equal(
-    findStep(signingSteps, 'Upload signed Android artifacts').with?.name,
-    'native-android-signed',
+  assert.match(
+    sign.run,
+    /APK_PATH="build\/release-downloads\/native-android\/android-apk\//,
+  );
+  assert.match(
+    sign.run,
+    /AAB_PATH="build\/release-downloads\/native-android\/android-aab\//,
+  );
+
+  const signedUpload = findStep(signingSteps, 'Upload signed Android artifacts');
+  assert.equal(signedUpload.with?.name, 'native-android-signed');
+  assert.match(
+    signedUpload.with?.path ?? '',
+    /build\/release-downloads\/native-android\/android-apk\//,
+  );
+  assert.match(
+    signedUpload.with?.path ?? '',
+    /build\/release-downloads\/native-android\/android-aab\//,
   );
 
   assert.match(jobs.assemble?.if ?? '', tagOnly);
