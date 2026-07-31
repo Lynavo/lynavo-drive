@@ -2,8 +2,8 @@
   "name": "@lynavo-drive/desktop",
   "productName": "LynavoDriveDemo",
   "description": "LynavoDriveDemo desktop app for local mobile media sync.",
-  "version": "1.0.1",
-  "lynavoDriveBuildNumber": "62",
+  "version": "1.0.2",
+  "lynavoDriveBuildNumber": "63",
   "homepage": "https://github.com/lynavo/lynavo-drive",
   "author": {
     "name": "Lynavo",

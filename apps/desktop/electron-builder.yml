@@ -1,6 +1,6 @@
 appId: com.lynavo.drive.desktop.demo
 productName: LynavoDriveDemo
-buildVersion: '62'
+buildVersion: '63'
 files:
   - out/**/*
   - node_modules/**/*
