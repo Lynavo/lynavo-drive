@@ -38,7 +38,7 @@
     "react-native-svg": "^15.15.4",
     "react-native-vector-icons": "^10.3.0",
     "react-native-video": "^6.19.1",
-    "react-native-vision-camera": "4.7.3"
+    "react-native-vision-camera": "5.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.29.6",
