@@ -160,6 +160,9 @@ Pair the applications:
 
 ## ❓ FAQs & Troubleshooting
 
+For a checkpoint-based first run, see
+[First Automatic Backup: Setup And Verification](./docs/operations/first-automatic-backup.md).
+
 <details>
 <summary>🔍 View Troubleshooting Guide & Common FAQs</summary>
 
