@@ -473,7 +473,7 @@ test('iOS native build pins Ruby and installs the locked bundle', () => {
 
   assert.equal(
     setupRuby.uses,
-    'ruby/setup-ruby@003a5c4d8d6321bd302e38f6f0ec593f77f06600',
+    'ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b',
   );
   assert.equal(setupRuby.with?.['ruby-version'], '3.4.9');
   assert.equal(setupRuby.with?.bundler, '4.0.15');
