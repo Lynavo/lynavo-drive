@@ -14,8 +14,8 @@ const NODE_24_ACTIONS = new Map([
   ['actions/download-artifact', '70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3'],
   ['actions/dependency-review-action', 'a1d282b36b6f3519aa1f3fc636f609c47dddb294'],
   ['dorny/paths-filter', '7b450fff21473bca461d4b92ce414b9d0420d706'],
-  ['github/codeql-action/init', 'e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81'],
-  ['github/codeql-action/analyze', 'e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81'],
+  ['github/codeql-action/init', 'cdf488f595d80d6e07e03d4674febd5ab45fa938'],
+  ['github/codeql-action/analyze', 'cdf488f595d80d6e07e03d4674febd5ab45fa938'],
   ['pnpm/action-setup', '0ebf47130e4866e96fce0953f49152a61190b271'],
 ]);
 
