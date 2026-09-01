@@ -16,7 +16,7 @@ const NODE_24_ACTIONS = new Map([
   ['dorny/paths-filter', '7b450fff21473bca461d4b92ce414b9d0420d706'],
   ['github/codeql-action/init', 'e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81'],
   ['github/codeql-action/analyze', 'e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81'],
-  ['pnpm/action-setup', '0ebf47130e4866e96fce0953f49152a61190b271'],
+  ['pnpm/action-setup', '0977fd99725f1db4007ccb2928dbb4e90d06cc86'],
 ]);
 
 function readRepoFile(path) {
