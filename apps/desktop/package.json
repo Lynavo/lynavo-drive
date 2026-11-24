@@ -37,7 +37,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "electron-log": "^5.4.3",
-    "i18next": "^23.16.8",
+    "i18next": "^26.3.4",
     "lucide-react": "^1.24.0",
     "qrcode.react": "^4.2.0",
     "radix-ui": "^1.4.3",
